@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -38,6 +38,22 @@ export default function SignatureGenerator() {
   const [emailError, setEmailError] = useState("");
   const [phoneError, setPhoneError] = useState("");
 
+  // Auto-generate email when first name or last name changes
+  useEffect(() => {
+    if (formData.firstName && formData.lastName) {
+      const firstLetter = formData.lastName.charAt(0).toLowerCase();
+      const firstName = formData.firstName.toLowerCase().replace(/\s+/g, '');
+      const autoEmail = `${firstLetter}.${firstName}@org.acoblighting.com`;
+      
+      // Only auto-generate if the email is empty or still matches the auto-generated pattern
+      if (!formData.companyEmail || 
+          formData.companyEmail.endsWith('@org.acoblighting.com') ||
+          formData.companyEmail.endsWith('@acoblighting.com')) {
+        setFormData((prev) => ({ ...prev, companyEmail: autoEmail }));
+      }
+    }
+  }, [formData.firstName, formData.lastName]);
+
   const formatPhoneNumber = (phone: string) => {
     // Remove any non-digits
     const digits = phone.replace(/\D/g, "");
@@ -59,7 +75,9 @@ export default function SignatureGenerator() {
 
   const validateEmail = (email: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
+    const isValidFormat = emailRegex.test(email);
+    const isAllowedDomain = email.endsWith('@org.acoblighting.com') || email.endsWith('@acoblighting.com');
+    return isValidFormat && isAllowedDomain;
   };
 
   const validatePhone = (phone: string) => {
@@ -157,7 +175,7 @@ export default function SignatureGenerator() {
       setFormData((prev) => ({ ...prev, [field]: value }));
 
       if (value && !validateEmail(value)) {
-        setEmailError("Please enter a valid email address");
+        setEmailError("Email must end with @org.acoblighting.com or @acoblighting.com");
       } else {
         setEmailError("");
       }
@@ -290,8 +308,11 @@ export default function SignatureGenerator() {
                   onChange={(e) =>
                     handleInputChange("companyEmail", e.target.value)
                   }
-                  placeholder="j.akpa@org.acoblighting.com"
+                  placeholder="a.john@org.acoblighting.com"
                 />
+                <p className="text-sm text-muted-foreground">
+                  Auto-generated from your name. You can edit if needed (e.g., a.john@acoblighting.com)
+                </p>
                 {emailError && (
                   <p className="text-sm text-destructive">{emailError}</p>
                 )}
