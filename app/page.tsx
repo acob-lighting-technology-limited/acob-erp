@@ -61,55 +61,55 @@ export default function SignatureGenerator() {
       `${formData.firstName}${formData.middleName ? " " + formData.middleName : ""} ${formData.lastName}`.trim()
     const formattedPhone = formatPhoneNumber(formData.phoneNumber)
 
-    return `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 0; padding: 20px 0; line-height: 1.5;">
-  <div style="width: 24px; height: 2px; background-color: #15803d; margin: 0 0 8px 0;"></div>
-  <p style="margin: 0 0 16px 0; font-size: 14px; color: #374151; font-style: italic;">Best Regards,</p>
+    return `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 0; padding: 12px 0; line-height: 1.5;">
+  <!-- Thin green line -->
+  <div style="color: #15803d;">&mdash;&mdash;</div>
+  
+  <!-- Greeting -->
+  <p style="margin: 0 0 12px 0; font-size: 14px; color: #374151; font-style: italic;">Best Regards,</p>
 
-  
-  <div style="border-bottom: 2px solid #15803d; padding-bottom: 16px; margin-bottom: 16px;">
-    <p style="margin: 0 0 4px 0; font-size: 18px; font-weight: 700; color: #1f2937; letter-spacing: -0.025em;">${fullName}</p>
-    <p style="margin: 0 0 12px 0; font-size: 14px; font-weight: 500; color: #15803d; text-transform: uppercase; letter-spacing: 0.05em; font-style: italic;">${formData.companyRole}</p>
+  <!-- Name & Role -->
+  <div style="border-bottom: 1.5px solid #15803d; padding-bottom: 12px; margin-bottom: 12px;">
+    <p style="margin: 0 0 2px 0; font-size: 18px; font-weight: bold; color: #1f2937; letter-spacing: -0.025em;">${fullName}</p>
+    <p style="margin: 0 0 10px 0; font-size: 14px; font-weight: 500; color: #15803d; text-transform: uppercase; letter-spacing: 0.05em; font-style: italic;">${formData.companyRole}</p>
     
-    <div style="display: flex; flex-direction: column; gap: 4px; margin-bottom: 16px;">
-      <div style="display: flex; align-items: center; gap: 8px; font-size: 14px; color: #374151;">
-        <img src="https://www.acoblighting.com/wp-includes/images/signature/phone.png" width="16" height="16" style="opacity: 0.8;" alt="Phone" />
-        <span>${formattedPhone}</span>
+    <!-- Contact details -->
+    <div style="font-size: 14px; color: #374151; line-height: 1.6;">
+      <div style="margin: 0 0 4px 0;">
+        <img src="https://www.acoblighting.com/wp-includes/images/signature/phone.png" width="14" height="14" style="vertical-align: middle; opacity: 0.8; margin-right: 6px; display: inline-block;" alt="Phone" /><a href="tel:${formData.phoneNumber.replace(/\s+/g, '')}" style="color: #15803d; text-decoration: none; vertical-align: middle;">${formattedPhone}</a>
       </div>
-      <div style="display: flex; align-items: center; gap: 8px; font-size: 14px; color: #374151;">
-        <img src="https://www.acoblighting.com/wp-includes/images/signature/mail.png" width="16" height="16" style="opacity: 0.8;" alt="Email" />
-        <a href="mailto:${formData.companyEmail}" style="color: #15803d; text-decoration: none;">${formData.companyEmail}</a>
+      <div style="margin: 0 0 4px 0;">
+        <img src="https://www.acoblighting.com/wp-includes/images/signature/mail.png" width="14" height="14" style="vertical-align: middle; opacity: 0.8; margin-right: 6px; display: inline-block;" alt="Email" /><a href="mailto:${formData.companyEmail}" style="color: #15803d; text-decoration: none; vertical-align: middle;">${formData.companyEmail}</a>
       </div>
-      <div style="display: flex; align-items: center; gap: 8px; font-size: 14px; color: #374151;">
-        <img src="https://www.acoblighting.com/wp-includes/images/signature/web.png" width="16" height="16" style="opacity: 0.8;" alt="Website" />
-        <a href="http://www.acoblighting.com" style="color: #15803d; text-decoration: none;">www.acoblighting.com</a>
+      <div>
+        <img src="https://www.acoblighting.com/wp-includes/images/signature/web.png" width="14" height="14" style="vertical-align: middle; opacity: 0.8; margin-right: 6px; display: inline-block;" alt="Website" /><a href="http://www.acoblighting.com" style="color: #15803d; text-decoration: none; vertical-align: middle;">www.acoblighting.com</a>
       </div>
     </div>
   </div>
   
-  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
-    <img src="https://www.acoblighting.com/wp-includes/images/signature/acob-logo.png" width="200" height="47" alt="ACOB Lighting Technology Limited" style="max-width: 200px; height: auto;" />
-    
-    <div style="display: flex; align-items: center; gap: 1px;">
-      <a href="https://www.linkedin.com/company/acob-lighting-technology-limited" style="text-decoration: none;" rel="noopener noreferrer">
-        <img src="https://www.acoblighting.com/wp-includes/images/signature/linkedin.png" width="24" height="24" alt="LinkedIn" style="border-radius: 4px; transition: opacity 0.2s;" />
-      </a>
-      <a href="https://twitter.com/AcobLimited" style="text-decoration: none;" rel="noopener noreferrer">
-        <img src="https://www.acoblighting.com/wp-includes/images/signature/x.png" width="24" height="24" alt="X (Twitter)" style="border-radius: 4px; transition: opacity 0.2s;" />
-      </a>
-      <a href="https://www.facebook.com/acoblightingtechltd" style="text-decoration: none;" rel="noopener noreferrer">
-        <img src="https://www.acoblighting.com/wp-includes/images/signature/facebook.png" width="24" height="24" alt="Facebook" style="border-radius: 4px; transition: opacity 0.2s;" />
-      </a>
-      <a href="https://www.instagram.com/acob_lighting/" style="text-decoration: none;" rel="noopener noreferrer">
-        <img src="https://www.acoblighting.com/wp-includes/images/signature/instagram.png" width="24" height="24" alt="Instagram" style="border-radius: 4px; transition: opacity 0.2s;" />
-      </a>
-    </div>
-  </div>
+  <!-- Logo + Socials (table ensures alignment on all clients) -->
+  <table width="100%" cellspacing="0" cellpadding="0" style="margin-bottom: 12px;">
+    <tbody>
+      <tr>
+        <td style="vertical-align: middle;">
+          <img src="https://www.acoblighting.com/wp-includes/images/signature/acob-logo.png" width="200" height="47" alt="ACOB Lighting Technology Limited" style="display: block;" />
+        </td>
+        <td style="vertical-align: middle; text-align: right; white-space: nowrap;">
+          <a href="https://www.linkedin.com/company/acob-lighting-technology-limited" style="text-decoration: none; display: inline-block;"><img src="https://www.acoblighting.com/wp-includes/images/signature/linkedin.png" width="25" height="25" alt="LinkedIn" style="border-radius: 4px; display: inline-block;" /></a>
+          <a href="https://twitter.com/AcobLimited" style="text-decoration: none; display: inline-block; margin-left: 6px;"><img src="https://www.acoblighting.com/wp-includes/images/signature/x.png" width="25" height="25" alt="X (Twitter)" style="border-radius: 4px; display: inline-block;" /></a>
+          <a href="https://www.facebook.com/acoblightingtechltd" style="text-decoration: none; display: inline-block; margin-left: 6px;"><img src="https://www.acoblighting.com/wp-includes/images/signature/facebook.png" width="25" height="25" alt="Facebook" style="border-radius: 4px; display: inline-block;" /></a>
+          <a href="https://www.instagram.com/acob_lighting/" style="text-decoration: none; display: inline-block; margin-left: 6px;"><img src="https://www.acoblighting.com/wp-includes/images/signature/instagram.png" width="25" height="25" alt="Instagram" style="border-radius: 4px; display: inline-block;" /></a>
+        </td>
+      </tr>
+    </tbody>
+  </table>
   
-  <div style="border-top: 1px solid #e5e7eb; padding-top: 12px; font-size: 11px; color: #6b7280; line-height: 1.4;">
-    <p style="margin: 0 0 8px 0; font-style: italic;">This email, including any attachments, contains confidential information intended solely for the recipient(s) named above. If you have received this email in error, please notify the sender immediately and delete the email from your system. Any unauthorized use, disclosure, distribution, or copying of this email is strictly prohibited and may be unlawful.</p>
-    <p style="margin: 0 0 6px 0; font-weight: 600; color: #15803d;">ACOB Lighting Technology Limited is a renewable energy company registered under the Laws of the Federal Republic of Nigeria.</p>
-    <p style="margin: 0 0 4px 0; font-style: italic;">We are a leading provider of solar and energy solutions for homes, businesses, and communities.</p>
-    <p style="margin: 0; font-weight: 600;  font-style: italic;">Lighting up Nigeria!</p>
+  <!-- Footer -->
+  <div style="border-top: 2px solid #e5e7eb; padding-top: 10px; font-size: 11px; color: #6b7280; line-height: 1.4;">
+    <p style="margin: 0 0 6px 0; font-style: italic;">This email, including any attachments, contains confidential information intended solely for the recipient(s) named above. If you have received this email in error, please notify the sender immediately and delete the email from your system. Any unauthorized use, disclosure, distribution, or copying of this email is strictly prohibited and may be unlawful.</p>
+    <p style="margin: 0 0 4px 0; font-weight: 600; color: #15803d;">ACOB Lighting Technology Limited is a renewable energy company registered under the Laws of the Federal Republic of Nigeria.</p>
+    <p style="margin: 0 0 2px 0; font-style: italic;">We are a leading provider of solar and energy solutions for homes, businesses, and communities.</p>
+    <p style="margin: 0; font-weight: 600; font-style: italic;">Lighting up Nigeria!</p>
   </div>
 </div>`
   }
