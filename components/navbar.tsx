@@ -15,7 +15,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { toast } from "sonner"
-import { LogOut, Menu, X, User, MessageSquare, LayoutDashboard, FileSignature, ShieldCheck } from "lucide-react"
+import { LogOut, Menu, X, User, MessageSquare, LayoutDashboard, FileSignature, ShieldCheck, Droplet } from "lucide-react"
 import Image from "next/image"
 
 interface NavbarProps {
@@ -114,6 +114,12 @@ export function Navbar({ user, isAdmin = false }: NavbarProps) {
                       Signature
                     </Link>
                   </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/watermark" className="cursor-pointer">
+                      <Droplet className="mr-2 h-4 w-4" />
+                      Watermark
+                    </Link>
+                  </DropdownMenuItem>
                   {isAdmin && (
                     <>
                       <DropdownMenuSeparator />
@@ -169,6 +175,10 @@ export function Navbar({ user, isAdmin = false }: NavbarProps) {
               <Link href="/signature" className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-accent rounded">
                 <FileSignature className="h-4 w-4" />
                 Signature
+              </Link>
+              <Link href="/watermark" className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-accent rounded">
+                <Droplet className="h-4 w-4" />
+                Watermark
               </Link>
               {isAdmin && (
                 <>
