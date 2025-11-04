@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { cn } from "@/lib/utils"
+import { cn, formatName } from "@/lib/utils"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -116,7 +116,7 @@ export function AdminSidebar({ user, profile }: AdminSidebarProps) {
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-foreground truncate">
               {profile?.first_name && profile?.last_name
-                ? `${profile.first_name} ${profile.last_name}`
+                ? `${formatName(profile.first_name)} ${formatName(profile.last_name)}`
                 : user?.email?.split("@")[0]}
             </p>
             {profile?.role && (

@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/select"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
+import { formatName } from "@/lib/utils"
 import {
   Users,
   Search,
@@ -44,6 +45,9 @@ import {
   UserCog,
   LayoutGrid,
   List,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react"
 import type { UserRole } from "@/types/database"
 import { getRoleDisplayName, getRoleBadgeColor, canAssignRoles, DEPARTMENTS } from "@/lib/permissions"
@@ -77,6 +81,7 @@ export default function AdminStaffPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [departmentFilter, setDepartmentFilter] = useState("all")
   const [roleFilter, setRoleFilter] = useState("all")
+  const [nameSortOrder, setNameSortOrder] = useState<"asc" | "desc">("asc")
   const [viewMode, setViewMode] = useState<"list" | "card">("list")
   const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
@@ -172,21 +177,32 @@ export default function AdminStaffPage() {
     }
   }
 
-  const filteredStaff = staff.filter((member) => {
-    const matchesSearch =
-      member.first_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      member.last_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      member.company_email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      member.company_role?.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredStaff = staff
+    .filter((member) => {
+      const matchesSearch =
+        member.first_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        member.last_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        member.company_email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        member.company_role?.toLowerCase().includes(searchQuery.toLowerCase())
 
-    const matchesDepartment =
-      departmentFilter === "all" || member.department === departmentFilter
+      const matchesDepartment =
+        departmentFilter === "all" || member.department === departmentFilter
 
-    const matchesRole =
-      roleFilter === "all" || member.role === roleFilter
+      const matchesRole =
+        roleFilter === "all" || member.role === roleFilter
 
-    return matchesSearch && matchesDepartment && matchesRole
-  })
+      return matchesSearch && matchesDepartment && matchesRole
+    })
+    .sort((a, b) => {
+      const lastNameA = formatName(a.last_name).toLowerCase()
+      const lastNameB = formatName(b.last_name).toLowerCase()
+      
+      if (nameSortOrder === "asc") {
+        return lastNameA.localeCompare(lastNameB)
+      } else {
+        return lastNameB.localeCompare(lastNameA)
+      }
+    })
 
   const departments = Array.from(
     new Set(staff.map((s) => s.department).filter(Boolean))
@@ -245,26 +261,26 @@ export default function AdminStaffPage() {
               View and manage staff members, roles, and permissions
             </p>
           </div>
-          <div className="flex items-center border rounded-lg p-1">
-            <Button
-              variant={viewMode === "list" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setViewMode("list")}
-              className="gap-2"
-            >
-              <List className="h-4 w-4" />
-              List
-            </Button>
-            <Button
-              variant={viewMode === "card" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setViewMode("card")}
-              className="gap-2"
-            >
-              <LayoutGrid className="h-4 w-4" />
-              Card
-            </Button>
-          </div>
+                      <div className="flex items-center border rounded-lg p-1">
+              <Button
+                variant={viewMode === "list" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setViewMode("list")}
+                className="gap-2"
+              >
+                <List className="h-4 w-4" />
+                List
+              </Button>
+              <Button
+                variant={viewMode === "card" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setViewMode("card")}
+                className="gap-2"
+              >
+                <LayoutGrid className="h-4 w-4" />
+                Card
+              </Button>
+            </div>
         </div>
 
         {/* Stats */}
@@ -375,17 +391,33 @@ export default function AdminStaffPage() {
           viewMode === "list" ? (
             <Card className="border-2">
               <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-12">#</TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Department</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Position</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
+                                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12">#</TableHead>
+                      <TableHead>
+                        <div className="flex items-center gap-2">
+                          <span>Name</span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setNameSortOrder(nameSortOrder === "asc" ? "desc" : "asc")}
+                            className="h-6 w-6 p-0"
+                          >
+                            {nameSortOrder === "asc" ? (
+                              <ArrowUp className="h-3 w-3" />
+                            ) : (
+                              <ArrowDown className="h-3 w-3" />
+                            )}
+                          </Button>
+                        </div>
+                      </TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Department</TableHead>
+                      <TableHead>Role</TableHead>
+                      <TableHead>Position</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
                 <TableBody>
                   {filteredStaff.map((member, index) => (
                     <TableRow key={member.id}>
@@ -395,9 +427,9 @@ export default function AdminStaffPage() {
                           <div className="p-2 bg-primary/10 rounded-lg">
                             <Users className="h-4 w-4 text-primary" />
                           </div>
-                          <span className="font-medium text-foreground">
-                            {member.first_name} {member.last_name}
-                          </span>
+                                                      <span className="font-medium text-foreground">
+                              {formatName(member.last_name)}, {formatName(member.first_name)}
+                            </span>
                         </div>
                       </TableCell>
                       <TableCell>

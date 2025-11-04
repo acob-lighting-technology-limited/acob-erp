@@ -3,25 +3,28 @@
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
-import Link from "next/link"
 import { toast } from "sonner"
-import { Eye, List, LayoutGrid, MessageSquare } from "lucide-react"
+import { Eye, List, LayoutGrid, MessageSquare, Search, Filter, ArrowUp, ArrowDown } from "lucide-react"
 import { formatName } from "@/lib/utils"
 
-interface FeedbackViewerProps {
+interface FeedbackViewerClientProps {
   feedback: any[]
 }
 
-export function FeedbackViewer({ feedback }: FeedbackViewerProps) {
+export function FeedbackViewerClient({ feedback }: FeedbackViewerClientProps) {
   const [filteredFeedback, setFilteredFeedback] = useState(feedback)
+  const [searchQuery, setSearchQuery] = useState("")
   const [selectedType, setSelectedType] = useState("all")
   const [selectedStatus, setSelectedStatus] = useState("all")
+  const [departmentFilter, setDepartmentFilter] = useState("all")
+  const [nameSortOrder, setNameSortOrder] = useState<"asc" | "desc">("asc")
   const [viewMode, setViewMode] = useState<"list" | "card">("list")
   const [selectedFeedback, setSelectedFeedback] = useState<any | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -31,44 +34,80 @@ export function FeedbackViewer({ feedback }: FeedbackViewerProps) {
   useEffect(() => {
     let filtered = feedback
 
+    // Search filter
+    if (searchQuery) {
+      filtered = filtered.filter((item) => {
+        const titleMatch = item.title?.toLowerCase().includes(searchQuery.toLowerCase())
+        const userMatch = 
+          item.profiles?.first_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          item.profiles?.last_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          item.profiles?.company_email?.toLowerCase().includes(searchQuery.toLowerCase())
+        return titleMatch || userMatch
+      })
+    }
+
+    // Type filter
     if (selectedType !== "all") {
       filtered = filtered.filter((item) => item.feedback_type === selectedType)
     }
 
+    // Status filter
     if (selectedStatus !== "all") {
       filtered = filtered.filter((item) => item.status === selectedStatus)
     }
 
+    // Department filter
+    if (departmentFilter !== "all") {
+      filtered = filtered.filter((item) => item.profiles?.department === departmentFilter)
+    }
+
+    // Sort by name
+    filtered = filtered.sort((a, b) => {
+      const lastNameA = formatName(a.profiles?.last_name || "").toLowerCase()
+      const lastNameB = formatName(b.profiles?.last_name || "").toLowerCase()
+      
+      if (nameSortOrder === "asc") {
+        return lastNameA.localeCompare(lastNameB)
+      } else {
+        return lastNameB.localeCompare(lastNameA)
+      }
+    })
+
     setFilteredFeedback(filtered)
-  }, [feedback, selectedType, selectedStatus])
+  }, [feedback, searchQuery, selectedType, selectedStatus, departmentFilter, nameSortOrder])
+
+  // Get unique departments from feedback profiles
+  const departments = Array.from(
+    new Set(feedback.map((f) => f.profiles?.department).filter(Boolean))
+  ) as string[]
 
   const getTypeColor = (type: string) => {
     switch (type) {
       case "concern":
-        return "bg-yellow-100 text-yellow-800"
+        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
       case "complaint":
-        return "bg-red-100 text-red-800"
+        return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
       case "suggestion":
-        return "bg-blue-100 text-blue-800"
+        return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
       case "required_item":
-        return "bg-purple-100 text-purple-800"
+        return "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400"
       default:
-        return "bg-gray-100 text-gray-800"
+        return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
     }
   }
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case "open":
-        return "bg-green-100 text-green-800"
+        return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
       case "in_progress":
-        return "bg-blue-100 text-blue-800"
+        return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
       case "resolved":
-        return "bg-purple-100 text-purple-800"
+        return "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400"
       case "closed":
-        return "bg-gray-100 text-gray-800"
+        return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
       default:
-        return "bg-gray-100 text-gray-800"
+        return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
     }
   }
 
@@ -100,10 +139,8 @@ export function FeedbackViewer({ feedback }: FeedbackViewerProps) {
       const updatedFeedback = { ...selectedFeedback, status: newStatus }
       setSelectedFeedback(updatedFeedback)
       
-      // Update in the list
-      setFilteredFeedback(
-        filteredFeedback.map((item) => (item.id === selectedFeedback.id ? updatedFeedback : item))
-      )
+      // Trigger a re-render by updating the feedback list
+      window.location.reload()
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Failed to update status"
       toast.error(message)
@@ -114,11 +151,14 @@ export function FeedbackViewer({ feedback }: FeedbackViewerProps) {
 
   return (
     <div className="space-y-6">
-      {/* Filters */}
-      <Card>
-        <CardHeader>
+      {/* Filters and Search */}
+      <Card className="border-2 shadow-lg">
+        <CardHeader className="border-b bg-muted/30">
           <div className="flex items-center justify-between">
-            <CardTitle>Filters</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <Filter className="h-5 w-5 text-primary" />
+              Filters & Search
+            </CardTitle>
             <div className="flex items-center border rounded-lg p-1">
               <Button
                 variant={viewMode === "list" ? "default" : "ghost"}
@@ -141,10 +181,22 @@ export function FeedbackViewer({ feedback }: FeedbackViewerProps) {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-3">
+        <CardContent className="p-6 space-y-4">
+          {/* Search Input */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by title or user name..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+
+          {/* Filter Selects */}
+          <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Feedback Type</label>
+              <label className="text-sm font-medium text-foreground">Feedback Type</label>
               <Select value={selectedType} onValueChange={setSelectedType}>
                 <SelectTrigger>
                   <SelectValue />
@@ -158,8 +210,9 @@ export function FeedbackViewer({ feedback }: FeedbackViewerProps) {
                 </SelectContent>
               </Select>
             </div>
+
             <div className="space-y-2">
-              <label className="text-sm font-medium">Status</label>
+              <label className="text-sm font-medium text-foreground">Status</label>
               <Select value={selectedStatus} onValueChange={setSelectedStatus}>
                 <SelectTrigger>
                   <SelectValue />
@@ -173,6 +226,30 @@ export function FeedbackViewer({ feedback }: FeedbackViewerProps) {
                 </SelectContent>
               </Select>
             </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground">Department</label>
+              <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All Departments" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Departments</SelectItem>
+                  {departments.map((dept) => (
+                    <SelectItem key={dept} value={dept}>
+                      {dept}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground">Results</label>
+              <div className="px-3 py-2 border rounded-md bg-muted text-sm font-medium">
+                {filteredFeedback.length} item{filteredFeedback.length !== 1 ? "s" : ""}
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -180,18 +257,38 @@ export function FeedbackViewer({ feedback }: FeedbackViewerProps) {
       {/* Feedback List */}
       {filteredFeedback.length > 0 ? (
         viewMode === "list" ? (
-          <Card>
-            <CardHeader>
-              <CardTitle>Feedback Items</CardTitle>
+          <Card className="border-2 shadow-lg">
+            <CardHeader className="border-b bg-muted/30">
+              <CardTitle className="flex items-center gap-2">
+                <MessageSquare className="h-5 w-5 text-primary" />
+                Feedback Items
+              </CardTitle>
               <CardDescription>Total: {filteredFeedback.length} items</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-6">
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-12">#</TableHead>
-                      <TableHead>User</TableHead>
+                      <TableHead>
+                        <div className="flex items-center gap-2">
+                          <span>User</span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setNameSortOrder(nameSortOrder === "asc" ? "desc" : "asc")}
+                            className="h-6 w-6 p-0"
+                          >
+                            {nameSortOrder === "asc" ? (
+                              <ArrowUp className="h-3 w-3" />
+                            ) : (
+                              <ArrowDown className="h-3 w-3" />
+                            )}
+                          </Button>
+                        </div>
+                      </TableHead>
+                      <TableHead>Department</TableHead>
                       <TableHead>Type</TableHead>
                       <TableHead>Title</TableHead>
                       <TableHead>Status</TableHead>
@@ -206,11 +303,12 @@ export function FeedbackViewer({ feedback }: FeedbackViewerProps) {
                         <TableCell>
                           <div className="text-sm">
                             <p className="font-medium">
-                              {formatName(item.profiles?.first_name)} {formatName(item.profiles?.last_name)}
+                              {formatName(item.profiles?.last_name)}, {formatName(item.profiles?.first_name)}
                             </p>
                             <p className="text-xs text-muted-foreground">{item.profiles?.company_email}</p>
                           </div>
                         </TableCell>
+                        <TableCell className="text-sm">{item.profiles?.department || "-"}</TableCell>
                         <TableCell>
                           <Badge className={getTypeColor(item.feedback_type)}>{item.feedback_type}</Badge>
                         </TableCell>
@@ -229,8 +327,9 @@ export function FeedbackViewer({ feedback }: FeedbackViewerProps) {
                               e.stopPropagation()
                               handleViewDetails(item)
                             }}
+                            className="gap-2"
                           >
-                            <Eye className="h-4 w-4 mr-1" />
+                            <Eye className="h-4 w-4" />
                             View
                           </Button>
                         </TableCell>
@@ -253,7 +352,7 @@ export function FeedbackViewer({ feedback }: FeedbackViewerProps) {
                       </div>
                       <div className="flex-1 min-w-0">
                         <CardTitle className="text-lg line-clamp-2">{item.title}</CardTitle>
-                        <div className="flex items-center gap-2 mt-2">
+                        <div className="flex items-center gap-2 mt-2 flex-wrap">
                           <Badge className={getTypeColor(item.feedback_type)}>
                             {item.feedback_type}
                           </Badge>
@@ -268,9 +367,10 @@ export function FeedbackViewer({ feedback }: FeedbackViewerProps) {
                 <CardContent className="p-4 space-y-3">
                   <div className="text-sm">
                     <p className="font-medium">
-                      {item.profiles?.first_name} {item.profiles?.last_name}
+                      {formatName(item.profiles?.last_name)}, {formatName(item.profiles?.first_name)}
                     </p>
                     <p className="text-xs text-muted-foreground">{item.profiles?.company_email}</p>
+                    <p className="text-xs text-muted-foreground">{item.profiles?.department}</p>
                   </div>
                   <p className="text-sm text-muted-foreground line-clamp-2">
                     {item.description || "No description provided."}
@@ -295,14 +395,14 @@ export function FeedbackViewer({ feedback }: FeedbackViewerProps) {
           </div>
         )
       ) : (
-        <Card>
+        <Card className="border-2">
           <CardContent className="p-12 text-center">
             <MessageSquare className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
             <h3 className="text-xl font-semibold text-foreground mb-2">
               No Feedback Found
             </h3>
             <p className="text-muted-foreground">
-              {selectedType !== "all" || selectedStatus !== "all"
+              {searchQuery || selectedType !== "all" || selectedStatus !== "all" || departmentFilter !== "all"
                 ? "No feedback matches your filters"
                 : "No feedback has been submitted yet"}
             </p>
@@ -310,15 +410,11 @@ export function FeedbackViewer({ feedback }: FeedbackViewerProps) {
         </Card>
       )}
 
-      <Link href="/admin">
-        <Button variant="outline">Back to Admin Dashboard</Button>
-      </Link>
-
       {/* Feedback Details Modal */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Feedback Details</DialogTitle>
+            <DialogTitle className="text-2xl">Feedback Details</DialogTitle>
             <DialogDescription>View and manage feedback details</DialogDescription>
           </DialogHeader>
 
@@ -327,19 +423,22 @@ export function FeedbackViewer({ feedback }: FeedbackViewerProps) {
               {/* User Information */}
               <div className="space-y-2">
                 <Label className="text-sm font-semibold">Submitted By</Label>
-                <div className="p-3 bg-muted rounded-md">
-                  <p className="font-medium">
-                    {selectedFeedback.profiles?.first_name} {selectedFeedback.profiles?.last_name}
+                <div className="p-4 bg-muted/50 rounded-lg border">
+                  <p className="font-medium text-lg">
+                    {formatName(selectedFeedback.profiles?.first_name)} {formatName(selectedFeedback.profiles?.last_name)}
                   </p>
                   <p className="text-sm text-muted-foreground">{selectedFeedback.profiles?.company_email}</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Submitted: {new Date(selectedFeedback.created_at).toLocaleString()}
-                  </p>
-                  {selectedFeedback.updated_at !== selectedFeedback.created_at && (
+                  <p className="text-sm text-muted-foreground">{selectedFeedback.profiles?.department}</p>
+                  <div className="mt-2 pt-2 border-t">
                     <p className="text-xs text-muted-foreground">
-                      Updated: {new Date(selectedFeedback.updated_at).toLocaleString()}
+                      Submitted: {new Date(selectedFeedback.created_at).toLocaleString()}
                     </p>
-                  )}
+                    {selectedFeedback.updated_at !== selectedFeedback.created_at && (
+                      <p className="text-xs text-muted-foreground">
+                        Updated: {new Date(selectedFeedback.updated_at).toLocaleString()}
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -354,7 +453,7 @@ export function FeedbackViewer({ feedback }: FeedbackViewerProps) {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-sm font-semibold">Status</Label>
+                  <Label className="text-sm font-semibold">Current Status</Label>
                   <div>
                     <Badge className={getStatusColor(selectedFeedback.status)}>{selectedFeedback.status}</Badge>
                   </div>
@@ -364,15 +463,15 @@ export function FeedbackViewer({ feedback }: FeedbackViewerProps) {
               {/* Title */}
               <div className="space-y-2">
                 <Label className="text-sm font-semibold">Title</Label>
-                <div className="p-3 bg-muted rounded-md">
-                  <p>{selectedFeedback.title}</p>
+                <div className="p-3 bg-muted/50 rounded-lg border">
+                  <p className="font-medium">{selectedFeedback.title}</p>
                 </div>
               </div>
 
               {/* Description */}
               <div className="space-y-2">
                 <Label className="text-sm font-semibold">Description</Label>
-                <div className="p-3 bg-muted rounded-md min-h-[100px]">
+                <div className="p-4 bg-muted/50 rounded-lg border min-h-[100px]">
                   <p className="whitespace-pre-wrap">{selectedFeedback.description || "No description provided."}</p>
                 </div>
               </div>
@@ -398,7 +497,7 @@ export function FeedbackViewer({ feedback }: FeedbackViewerProps) {
               </div>
 
               {/* Actions */}
-              <div className="flex gap-2 pt-4">
+              <div className="flex gap-2 pt-4 border-t">
                 <Button onClick={() => setIsModalOpen(false)} variant="outline" className="flex-1">
                   Close
                 </Button>
@@ -410,3 +509,4 @@ export function FeedbackViewer({ feedback }: FeedbackViewerProps) {
     </div>
   )
 }
+

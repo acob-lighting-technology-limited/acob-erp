@@ -15,6 +15,7 @@ import {
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Notifications } from "@/components/notifications"
+import { formatName } from "@/lib/utils"
 
 export default async function AdminDashboardPage() {
   const supabase = await createClient()
@@ -264,9 +265,9 @@ export default async function AdminDashboardPage() {
             <Shield className="h-8 w-8 text-primary" />
             <h1 className="text-3xl md:text-4xl font-bold text-foreground">Admin Dashboard</h1>
           </div>
-          <p className="text-muted-foreground text-lg">
-            Welcome back, {profile?.first_name || "Admin"}! Manage your organization from here.
-          </p>
+                      <p className="text-muted-foreground text-lg">
+              Welcome back, {formatName(profile?.first_name) || "Admin"}! Manage your organization from here.
+            </p>
         </div>
 
         {/* Notifications */}
@@ -352,10 +353,10 @@ export default async function AdminDashboardPage() {
           <h2 className="text-2xl font-bold mb-4">Quick Actions</h2>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {filteredActions.map((action) => (
-              <Link key={action.href} href={action.href}>
-                <Card className="border-2 hover:shadow-lg transition-all hover:-translate-y-1 cursor-pointer">
-                  <CardContent className="p-6">
-                    <div className="flex items-start gap-4">
+              <Link key={action.href} href={action.href} className="h-full">
+                <Card className="border-2 hover:shadow-lg transition-all hover:-translate-y-1 cursor-pointer h-full flex flex-col">
+                  <CardContent className="p-6 flex-1 flex flex-col">
+                    <div className="flex items-start gap-4 flex-1">
                       <div className={`${action.color} p-3 rounded-lg text-white`}>
                         <action.icon className="h-6 w-6" />
                       </div>
@@ -363,7 +364,7 @@ export default async function AdminDashboardPage() {
                         <h3 className="font-semibold text-foreground mb-1">{action.title}</h3>
                         <p className="text-sm text-muted-foreground">{action.description}</p>
                       </div>
-                      <ArrowRight className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
+                      <ArrowRight className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors flex-shrink-0" />
                     </div>
                   </CardContent>
                 </Card>

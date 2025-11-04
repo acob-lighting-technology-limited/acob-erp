@@ -23,6 +23,7 @@ import {
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { ScrollText, Search, Filter, Calendar, User, FileText, LayoutGrid, List } from "lucide-react"
+import { formatName } from "@/lib/utils"
 
 interface AuditLog {
   id: string
@@ -458,7 +459,7 @@ export default function AuditLogsPage() {
                         <div className="flex items-center gap-2 text-sm">
                           <User className="h-3 w-3 text-muted-foreground" />
                           <span className="text-foreground">
-                            {(log.user as any)?.first_name} {(log.user as any)?.last_name}
+                            {formatName((log.user as any)?.first_name)} {formatName((log.user as any)?.last_name)}
                           </span>
                         </div>
                       </TableCell>
@@ -499,7 +500,7 @@ export default function AuditLogsPage() {
                             <User className="h-4 w-4 text-muted-foreground" />
                             <span className="text-muted-foreground">By:</span>
                             <span className="text-foreground">
-                              {(log.user as any)?.first_name} {(log.user as any)?.last_name}
+                              {formatName((log.user as any)?.first_name)} {formatName((log.user as any)?.last_name)}
                             </span>
                           </div>
                           <div className="flex items-center gap-2">

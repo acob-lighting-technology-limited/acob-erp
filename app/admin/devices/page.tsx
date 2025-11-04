@@ -42,6 +42,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
+import { formatName } from "@/lib/utils"
 import {
   Laptop,
   Plus,
@@ -750,12 +751,12 @@ export default function AdminDevicesPage() {
                       </TableCell>
                       <TableCell>
                         {device.current_assignment ? (
-                          <div className="flex items-center gap-2 text-sm">
-                            <User className="h-3 w-3 text-muted-foreground" />
-                            <span className="text-foreground">
-                              {device.current_assignment.user.first_name} {device.current_assignment.user.last_name}
-                            </span>
-                          </div>
+                                                      <div className="flex items-center gap-2 text-sm">
+                              <User className="h-3 w-3 text-muted-foreground" />
+                              <span className="text-foreground">
+                                {formatName(device.current_assignment.user.first_name)} {formatName(device.current_assignment.user.last_name)}
+                              </span>
+                            </div>
                         ) : (
                           <span className="text-sm text-muted-foreground">Unassigned</span>
                         )}
@@ -847,7 +848,7 @@ export default function AdminDevicesPage() {
                         <div className="flex items-center gap-2">
                           <User className="h-3 w-3 text-muted-foreground" />
                           <span className="text-sm text-foreground font-medium">
-                            {device.current_assignment.user.first_name} {device.current_assignment.user.last_name}
+                            {formatName(device.current_assignment.user.first_name)} {formatName(device.current_assignment.user.last_name)}
                           </span>
                         </div>
                       ) : (
@@ -1033,10 +1034,9 @@ export default function AdminDevicesPage() {
           <div className="space-y-4 py-4">
             {currentAssignment && (
               <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-                <p className="text-sm font-medium text-yellow-900 dark:text-yellow-200">
-                  Currently assigned to: {(currentAssignment.user as any)?.first_name}{" "}
-                  {(currentAssignment.user as any)?.last_name}
-                </p>
+                                  <p className="text-sm font-medium text-yellow-900 dark:text-yellow-200">
+                    Currently assigned to: {formatName((currentAssignment.user as any)?.first_name)} {formatName((currentAssignment.user as any)?.last_name)}
+                  </p>
                 <p className="text-xs text-yellow-700 dark:text-yellow-300 mt-1">
                   This assignment will be marked as handed over
                 </p>
@@ -1054,13 +1054,13 @@ export default function AdminDevicesPage() {
                 <SelectTrigger>
                   <SelectValue placeholder="Select staff member" />
                 </SelectTrigger>
-                <SelectContent className="max-h-[300px] overflow-y-auto">
-                  {staff.map((member) => (
-                    <SelectItem key={member.id} value={member.id}>
-                      {member.first_name} {member.last_name} - {member.department}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
+                                  <SelectContent className="max-h-[300px] overflow-y-auto">
+                    {staff.map((member) => (
+                      <SelectItem key={member.id} value={member.id}>
+                        {formatName(member.first_name)} {formatName(member.last_name)} - {member.department}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground mt-1">
                 {staff.length} staff members available
@@ -1147,34 +1147,34 @@ export default function AdminDevicesPage() {
                   </div>
                 </div>
 
-                {history.assigned_to_user && (
-                  <div className="mb-2">
-                    <p className="text-sm text-muted-foreground">
-                      Assigned to:{" "}
-                      <span className="text-foreground font-semibold">
-                        {history.assigned_to_user.first_name} {history.assigned_to_user.last_name}
+                                  {history.assigned_to_user && (
+                    <div className="mb-2">
+                      <p className="text-sm text-muted-foreground">
+                        Assigned to:{" "}
+                        <span className="text-foreground font-semibold">
+                          {formatName(history.assigned_to_user.first_name)} {formatName(history.assigned_to_user.last_name)}
+                        </span>
+                      </p>
+                    </div>
+                  )}
+
+                                  {history.assigned_by_user && (
+                    <p className="text-sm text-muted-foreground mb-2">
+                      Assigned by:{" "}
+                      <span className="text-foreground font-medium">
+                        {formatName(history.assigned_by_user.first_name)} {formatName(history.assigned_by_user.last_name)}
                       </span>
                     </p>
-                  </div>
-                )}
+                  )}
 
-                {history.assigned_by_user && (
-                  <p className="text-sm text-muted-foreground mb-2">
-                    Assigned by:{" "}
-                    <span className="text-foreground font-medium">
-                      {history.assigned_by_user.first_name} {history.assigned_by_user.last_name}
-                    </span>
-                  </p>
-                )}
-
-                {history.assigned_from_user && (
-                  <p className="text-sm text-muted-foreground mb-2">
-                    Transferred from:{" "}
-                    <span className="text-foreground font-medium">
-                      {history.assigned_from_user.first_name} {history.assigned_from_user.last_name}
-                    </span>
-                  </p>
-                )}
+                                  {history.assigned_from_user && (
+                    <p className="text-sm text-muted-foreground mb-2">
+                      Transferred from:{" "}
+                      <span className="text-foreground font-medium">
+                        {formatName(history.assigned_from_user.first_name)} {formatName(history.assigned_from_user.last_name)}
+                      </span>
+                    </p>
+                  )}
 
                 {history.assignment_notes && (
                   <div className="mt-3 p-3 bg-background/50 rounded border">

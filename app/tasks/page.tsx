@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Progress } from "@/components/ui/progress"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
+import { formatName } from "@/lib/utils"
 import {
   ClipboardList,
   Calendar,
@@ -510,14 +511,14 @@ export default function TasksPage() {
                             <span>Due: {formatDate(task.due_date)}</span>
                           </div>
                         )}
-                        {task.assigned_by_user && (
-                          <div className="flex items-center gap-1">
-                            <User className="h-4 w-4" />
-                            <span>
-                              By: {task.assigned_by_user.first_name} {task.assigned_by_user.last_name}
-                            </span>
-                          </div>
-                        )}
+                                                {task.assigned_by_user && (
+                            <div className="flex items-center gap-1">
+                              <User className="h-4 w-4" />
+                              <span>
+                                By: {formatName(task.assigned_by_user.first_name)} {formatName(task.assigned_by_user.last_name)}
+                              </span>
+                            </div>
+                          )}
                       </div>
                     </div>
                   </div>

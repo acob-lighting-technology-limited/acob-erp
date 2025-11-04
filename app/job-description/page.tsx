@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
-import { Briefcase, Save, Edit2, Clock } from "lucide-react"
+import { Briefcase, Save, Edit2, Clock, Printer } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { formatName } from "@/lib/utils"
 
 export default function JobDescriptionPage() {
   const [jobDescription, setJobDescription] = useState("")
@@ -15,6 +16,13 @@ export default function JobDescriptionPage() {
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [profile, setProfile] = useState<{
+    first_name: string | null
+    last_name: string | null
+    company_email: string | null
+    department: string | null
+    phone_number: string | null
+  } | null>(null)
   const supabase = createClient()
 
   useEffect(() => {
@@ -26,18 +34,25 @@ export default function JobDescriptionPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-      const { data: profile, error } = await supabase
+      const { data: profileData, error } = await supabase
         .from("profiles")
-        .select("job_description, job_description_updated_at")
+        .select("first_name, last_name, company_email, department, phone_number, job_description, job_description_updated_at")
         .eq("id", user.id)
         .single()
 
       if (error) throw error
 
-      if (profile) {
-        setJobDescription(profile.job_description || "")
-        setLastUpdated(profile.job_description_updated_at)
-        setIsEditing(!profile.job_description) // Auto-edit if empty
+      if (profileData) {
+        setJobDescription(profileData.job_description || "")
+        setLastUpdated(profileData.job_description_updated_at)
+        setIsEditing(!profileData.job_description) // Auto-edit if empty
+        setProfile({
+          first_name: profileData.first_name,
+          last_name: profileData.last_name,
+          company_email: profileData.company_email,
+          department: profileData.department,
+          phone_number: profileData.phone_number,
+        })
       }
     } catch (error) {
       console.error("Error loading job description:", error)
@@ -92,6 +107,10 @@ export default function JobDescriptionPage() {
     })
   }
 
+  const handlePrint = () => {
+    window.print()
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 p-4 md:p-8">
@@ -106,10 +125,21 @@ export default function JobDescriptionPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 p-4 md:p-8">
+    <>
+      <style dangerouslySetInnerHTML={{__html: `
+        @media print {
+          body {
+            background: white !important;
+          }
+          .no-print {
+            display: none !important;
+          }
+        }
+      `}} />
+      <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 p-4 md:p-8 print:p-4">
       <div className="mx-auto max-w-4xl space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between no-print">
           <div>
             <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
               <Briefcase className="h-8 w-8 text-primary" />
@@ -120,37 +150,64 @@ export default function JobDescriptionPage() {
             </p>
           </div>
           {!isEditing && jobDescription && (
-            <Button onClick={() => setIsEditing(true)} variant="outline" className="gap-2">
-              <Edit2 className="h-4 w-4" />
-              Edit
-            </Button>
+            <div className="flex gap-2">
+              <Button onClick={handlePrint} variant="outline" className="gap-2">
+                <Printer className="h-4 w-4" />
+                Print
+              </Button>
+              <Button onClick={() => setIsEditing(true)} variant="outline" className="gap-2">
+                <Edit2 className="h-4 w-4" />
+                Edit
+              </Button>
+            </div>
           )}
         </div>
 
         {/* Last Updated Info */}
         {lastUpdated && !isEditing && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground no-print">
             <Clock className="h-4 w-4" />
             <span>Last updated: {formatDate(lastUpdated)}</span>
           </div>
         )}
 
+        {/* Print Letterhead - Hidden on screen, visible when printing */}
+        <div className="hidden print:block print:mb-8 print:border-b print:pb-4">
+          <div className="flex justify-between items-start">
+            <div>
+              <img src="/acob-logo.webp" alt="ACOB Lighting" className="h-16 w-auto" />
+            </div>
+            <div className="text-right text-sm">
+              {profile?.first_name && profile?.last_name && (
+                <p className="font-semibold mb-1">
+                  {formatName(profile.first_name)} {formatName(profile.last_name)}
+                </p>
+              )}
+              {profile?.company_email && <p className="mb-1">{profile.company_email}</p>}
+              {profile?.department && <p className="mb-1">{profile.department}</p>}
+              {profile?.phone_number && <p className="mb-1">{profile.phone_number}</p>}
+              <p className="mt-2">{new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</p>
+            </div>
+          </div>
+        </div>
+
         {/* Main Card */}
-        <Card className="border-2 shadow-lg">
-          <CardHeader className="border-b bg-muted/30">
-            <CardTitle className="flex items-center justify-between">
-              <span>Job Description</span>
+        <Card className="border-2 shadow-lg print:border-0 print:shadow-none">
+          <CardHeader className="border-b bg-muted/30 print:border-0 print:pb-2">
+            <CardTitle className="flex items-center justify-between print:text-xl">
+              <span className="print:hidden">Job Description</span>
+              <span className="hidden print:block">Job Description</span>
               {!jobDescription && (
-                <Badge variant="outline" className="bg-yellow-50 text-yellow-700 dark:bg-yellow-900/30">
+                <Badge variant="outline" className="bg-yellow-50 text-yellow-700 dark:bg-yellow-900/30 print:hidden">
                   Not Set
                 </Badge>
               )}
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="print:hidden">
               Describe your key responsibilities, duties, and objectives in your current role
             </CardDescription>
           </CardHeader>
-          <CardContent className="p-6">
+          <CardContent className="p-6 print:p-0 print:pt-4">
             {isEditing ? (
               <div className="space-y-4">
                 <Textarea
@@ -206,7 +263,7 @@ export default function JobDescriptionPage() {
         </Card>
 
         {/* Info Card */}
-        <Card className="border bg-blue-50 dark:bg-blue-950/20">
+        <Card className="border bg-blue-50 dark:bg-blue-950/20 no-print">
           <CardContent className="p-4">
             <div className="flex gap-3">
               <div className="text-blue-600 dark:text-blue-400 mt-0.5">
@@ -231,5 +288,6 @@ export default function JobDescriptionPage() {
         </Card>
       </div>
     </div>
+    </>
   )
 }

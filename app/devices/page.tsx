@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
+import { formatName } from "@/lib/utils"
 import { Laptop, Calendar, User, FileText, Package } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -213,7 +214,7 @@ export default function DevicesPage() {
                       <User className="h-4 w-4 text-muted-foreground" />
                       <span className="text-muted-foreground">Assigned by:</span>
                       <span className="text-foreground">
-                        {assignment.assigner.first_name} {assignment.assigner.last_name}
+                        {formatName(assignment.assigner.first_name)} {formatName(assignment.assigner.last_name)}
                       </span>
                     </div>
                   )}

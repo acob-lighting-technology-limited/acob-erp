@@ -42,6 +42,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
+import { formatName } from "@/lib/utils"
 import {
   ClipboardList,
   Plus,
@@ -559,8 +560,7 @@ export default function AdminTasksPage() {
                         {task.assigned_to_user ? (
                           <div className="text-sm">
                             <div className="text-foreground">
-                              {(task.assigned_to_user as any)?.first_name}{" "}
-                              {(task.assigned_to_user as any)?.last_name}
+                              {formatName((task.assigned_to_user as any)?.first_name)} {formatName((task.assigned_to_user as any)?.last_name)}
                             </div>
                             {task.department && (
                               <div className="text-xs text-muted-foreground">{task.department}</div>
@@ -656,8 +656,7 @@ export default function AdminTasksPage() {
                         <User className="h-4 w-4 text-muted-foreground" />
                         <span className="text-muted-foreground">Assigned to:</span>
                         <span className="text-foreground font-medium">
-                          {(task.assigned_to_user as any)?.first_name}{" "}
-                          {(task.assigned_to_user as any)?.last_name}
+                          {formatName((task.assigned_to_user as any)?.first_name)} {formatName((task.assigned_to_user as any)?.last_name)}
                         </span>
                       </div>
                     )}

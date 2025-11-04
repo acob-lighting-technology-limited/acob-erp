@@ -19,6 +19,7 @@ import {
   Clock,
 } from "lucide-react"
 import { Notifications } from "@/components/notifications"
+import { formatName } from "@/lib/utils"
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -245,8 +246,8 @@ export default async function DashboardPage() {
               <div className="flex-1 space-y-4">
                 <div>
                   <h2 className="text-2xl font-bold text-foreground">
-                    {profile?.first_name} {profile?.last_name}
-                    {profile?.other_names && ` ${profile.other_names}`}
+                    {formatName(profile?.first_name)} {formatName(profile?.last_name)}
+                    {profile?.other_names && ` ${formatName(profile.other_names)}`}
                   </h2>
                   <p className="text-muted-foreground">{profile?.company_role || "Staff Member"}</p>
                 </div>

@@ -41,9 +41,13 @@ import {
   XCircle,
   List,
   LayoutGrid,
+  Printer,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react"
 import type { UserRole } from "@/types/database"
 import { getRoleDisplayName, getRoleBadgeColor } from "@/lib/permissions"
+import { formatName } from "@/lib/utils"
 
 interface Profile {
   id: string
@@ -52,6 +56,7 @@ interface Profile {
   company_email: string
   department: string
   company_role: string | null
+  phone_number: string | null
   role: UserRole
   job_description: string | null
   job_description_updated_at: string | null
@@ -70,6 +75,7 @@ export default function AdminJobDescriptionsPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [departmentFilter, setDepartmentFilter] = useState("all")
   const [statusFilter, setStatusFilter] = useState("all")
+  const [nameSortOrder, setNameSortOrder] = useState<"asc" | "desc">("asc")
   const [viewMode, setViewMode] = useState<"list" | "card">("list")
   const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null)
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
@@ -125,23 +131,34 @@ export default function AdminJobDescriptionsPage() {
     setIsViewDialogOpen(true)
   }
 
-  const filteredProfiles = profiles.filter((profile) => {
-    const matchesSearch =
-      profile.first_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      profile.last_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      profile.company_email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      profile.company_role?.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredProfiles = profiles
+    .filter((profile) => {
+      const matchesSearch =
+        profile.first_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        profile.last_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        profile.company_email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        profile.company_role?.toLowerCase().includes(searchQuery.toLowerCase())
 
-    const matchesDepartment =
-      departmentFilter === "all" || profile.department === departmentFilter
+      const matchesDepartment =
+        departmentFilter === "all" || profile.department === departmentFilter
 
-    const matchesStatus =
-      statusFilter === "all" ||
-      (statusFilter === "completed" && profile.job_description) ||
-      (statusFilter === "pending" && !profile.job_description)
+      const matchesStatus =
+        statusFilter === "all" ||
+        (statusFilter === "completed" && profile.job_description) ||
+        (statusFilter === "pending" && !profile.job_description)
 
-    return matchesSearch && matchesDepartment && matchesStatus
-  })
+      return matchesSearch && matchesDepartment && matchesStatus
+    })
+    .sort((a, b) => {
+      const lastNameA = formatName(a.last_name).toLowerCase()
+      const lastNameB = formatName(b.last_name).toLowerCase()
+      
+      if (nameSortOrder === "asc") {
+        return lastNameA.localeCompare(lastNameB)
+      } else {
+        return lastNameB.localeCompare(lastNameA)
+      }
+    })
 
   const departments = Array.from(
     new Set(profiles.map((p) => p.department).filter(Boolean))
@@ -166,6 +183,10 @@ export default function AdminJobDescriptionsPage() {
       day: "numeric",
       year: "numeric",
     })
+  }
+
+  const handlePrint = () => {
+    window.print()
   }
 
   const getCompletionColor = (hasDescription: boolean) => {
@@ -334,25 +355,41 @@ export default function AdminJobDescriptionsPage() {
             <Card className="border-2">
               <CardContent className="p-6">
                 <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-12">#</TableHead>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Department</TableHead>
-                      <TableHead>Company Role</TableHead>
-                      <TableHead>Role</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Last Updated</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
+                                      <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-12">#</TableHead>
+                        <TableHead>
+                          <div className="flex items-center gap-2">
+                            <span>Name</span>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setNameSortOrder(nameSortOrder === "asc" ? "desc" : "asc")}
+                              className="h-6 w-6 p-0"
+                            >
+                              {nameSortOrder === "asc" ? (
+                                <ArrowUp className="h-3 w-3" />
+                              ) : (
+                                <ArrowDown className="h-3 w-3" />
+                              )}
+                            </Button>
+                          </div>
+                        </TableHead>
+                        <TableHead>Department</TableHead>
+                        <TableHead>Company Role</TableHead>
+                        <TableHead>Role</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Last Updated</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
                   <TableBody>
-                    {filteredProfiles.map((profile, index) => (
-                      <TableRow key={profile.id}>
-                        <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
-                        <TableCell className="font-medium">
-                          {profile.first_name} {profile.last_name}
-                        </TableCell>
+                                          {filteredProfiles.map((profile, index) => (
+                        <TableRow key={profile.id}>
+                          <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
+                          <TableCell className="font-medium">
+                            {formatName(profile.last_name)}, {formatName(profile.first_name)}
+                          </TableCell>
                         <TableCell>{profile.department}</TableCell>
                         <TableCell>{profile.company_role || "-"}</TableCell>
                         <TableCell>
@@ -396,10 +433,10 @@ export default function AdminJobDescriptionsPage() {
                         <div className="p-2 bg-primary/10 rounded-lg">
                           <User className="h-5 w-5 text-primary" />
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <CardTitle className="text-lg">
-                            {profile.first_name} {profile.last_name}
-                          </CardTitle>
+                                                  <div className="flex-1 min-w-0">
+                            <CardTitle className="text-lg">
+                              {formatName(profile.last_name)}, {formatName(profile.first_name)}
+                            </CardTitle>
                           <div className="flex items-center gap-2 mt-2">
                             <Badge className={getCompletionColor(!!profile.job_description)}>
                               {profile.job_description ? "Completed" : "Pending"}
@@ -465,10 +502,28 @@ export default function AdminJobDescriptionsPage() {
       {/* View Job Description Dialog */}
       <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
         <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-2xl">
-              {selectedProfile?.first_name} {selectedProfile?.last_name}'s Job Description
-            </DialogTitle>
+          <style dangerouslySetInnerHTML={{__html: `
+            @media print {
+              body {
+                background: white !important;
+              }
+              .no-print {
+                display: none !important;
+              }
+            }
+          `}} />
+          <DialogHeader className="no-print">
+            <div className="flex items-center justify-between">
+              <DialogTitle className="text-2xl">
+                {selectedProfile?.first_name} {selectedProfile?.last_name}'s Job Description
+              </DialogTitle>
+              {selectedProfile?.job_description && (
+                <Button onClick={handlePrint} variant="outline" size="sm" className="gap-2">
+                  <Printer className="h-4 w-4" />
+                  Print
+                </Button>
+              )}
+            </div>
             <DialogDescription>
               <div className="flex flex-wrap items-center gap-3 mt-2">
                 <span className="text-sm">
@@ -486,11 +541,33 @@ export default function AdminJobDescriptionsPage() {
               </div>
             </DialogDescription>
           </DialogHeader>
-          <div className="mt-4">
+          
+          {/* Print Letterhead - Hidden on screen, visible when printing */}
+          <div className="hidden print:block print:mb-8 print:border-b print:pb-4">
+            <div className="flex justify-between items-start">
+              <div>
+                <img src="/acob-logo.webp" alt="ACOB Lighting" className="h-16 w-auto" />
+              </div>
+              <div className="text-right text-sm">
+                {selectedProfile?.first_name && selectedProfile?.last_name && (
+                  <p className="font-semibold mb-1">
+                    {formatName(selectedProfile.first_name)} {formatName(selectedProfile.last_name)}
+                  </p>
+                )}
+                {selectedProfile?.company_email && <p className="mb-1">{selectedProfile.company_email}</p>}
+                {selectedProfile?.department && <p className="mb-1">{selectedProfile.department}</p>}
+                {selectedProfile?.phone_number && <p className="mb-1">{selectedProfile.phone_number}</p>}
+                <p className="mt-2">{new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 print:mt-0">
             {selectedProfile?.job_description ? (
               <div className="prose dark:prose-invert max-w-none">
-                <div className="whitespace-pre-wrap bg-muted/50 p-6 rounded-lg">
-                  {selectedProfile.job_description}
+                <div className="whitespace-pre-wrap bg-muted/50 p-6 rounded-lg print:bg-transparent print:p-0 print:rounded-none">
+                  <h2 className="text-xl font-bold mb-4 print:mb-2">Job Description</h2>
+                  <div className="whitespace-pre-wrap">{selectedProfile.job_description}</div>
                 </div>
               </div>
             ) : (

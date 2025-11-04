@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/select"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
+import { formatName } from "@/lib/utils"
 import {
   FileText,
   Search,
@@ -74,6 +75,7 @@ export default function AdminDocumentationPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [categoryFilter, setCategoryFilter] = useState("all")
   const [statusFilter, setStatusFilter] = useState("all")
+  const [departmentFilter, setDepartmentFilter] = useState("all")
   const [viewMode, setViewMode] = useState<"list" | "card">("list")
   const [selectedDoc, setSelectedDoc] = useState<Documentation | null>(null)
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
@@ -168,11 +170,18 @@ export default function AdminDocumentationPage() {
       (statusFilter === "published" && !doc.is_draft) ||
       (statusFilter === "draft" && doc.is_draft)
 
-    return matchesSearch && matchesCategory && matchesStatus
+    const matchesDepartment =
+      departmentFilter === "all" || doc.user?.department === departmentFilter
+
+    return matchesSearch && matchesCategory && matchesStatus && matchesDepartment
   })
 
   const categories = Array.from(
     new Set(documentation.map((d) => d.category).filter(Boolean))
+  ) as string[]
+
+  const departments = Array.from(
+    new Set(documentation.map((d) => d.user?.department).filter(Boolean))
   ) as string[]
 
   const stats = {
@@ -326,30 +335,43 @@ export default function AdminDocumentationPage() {
                   className="pl-10"
                 />
               </div>
-              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                <SelectTrigger className="w-full md:w-48">
-                  <Filter className="h-4 w-4 mr-2" />
-                  <SelectValue placeholder="All Categories" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Categories</SelectItem>
-                  {categories.map((category) => (
-                    <SelectItem key={category} value={category}>
-                      {category}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-full md:w-48">
-                  <SelectValue placeholder="All Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="published">Published</SelectItem>
-                  <SelectItem value="draft">Draft</SelectItem>
-                </SelectContent>
-              </Select>
+                              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                  <SelectTrigger className="w-full md:w-48">
+                    <Filter className="h-4 w-4 mr-2" />
+                    <SelectValue placeholder="All Categories" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Categories</SelectItem>
+                    {categories.map((category) => (
+                      <SelectItem key={category} value={category}>
+                        {category}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+                  <SelectTrigger className="w-full md:w-48">
+                    <SelectValue placeholder="All Departments" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Departments</SelectItem>
+                    {departments.map((dept) => (
+                      <SelectItem key={dept} value={dept}>
+                        {dept}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-full md:w-48">
+                    <SelectValue placeholder="All Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="published">Published</SelectItem>
+                    <SelectItem value="draft">Draft</SelectItem>
+                  </SelectContent>
+                </Select>
             </div>
           </CardContent>
         </Card>
@@ -360,27 +382,31 @@ export default function AdminDocumentationPage() {
             <Card className="border-2">
               <CardContent className="p-6">
                 <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-12">#</TableHead>
-                      <TableHead>Title</TableHead>
-                      <TableHead>Author</TableHead>
-                      <TableHead>Department</TableHead>
-                      <TableHead>Category</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Created</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
+                                      <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-12">#</TableHead>
+                        <TableHead>Author</TableHead>
+                        <TableHead>Department</TableHead>
+                        <TableHead>Title</TableHead>
+                        <TableHead>Category</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Created</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
                   <TableBody>
                     {filteredDocumentation.map((doc, index) => (
                       <TableRow key={doc.id}>
                         <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
-                        <TableCell className="font-medium">{doc.title}</TableCell>
                         <TableCell>
-                          {doc.user?.first_name} {doc.user?.last_name}
+                          {doc.user?.first_name && doc.user?.last_name
+                            ? `${formatName(doc.user.last_name)}, ${formatName(doc.user.first_name)}`
+                            : doc.user?.first_name || doc.user?.last_name
+                            ? formatName(doc.user.first_name || doc.user.last_name)
+                            : "-"}
                         </TableCell>
                         <TableCell>{doc.user?.department || "No Department"}</TableCell>
+                        <TableCell className="font-medium">{doc.title}</TableCell>
                         <TableCell>
                           {doc.category ? (
                             <Badge variant="outline" className="text-xs">
@@ -502,7 +528,7 @@ export default function AdminDocumentationPage() {
                 No Documentation Found
               </h3>
               <p className="text-muted-foreground">
-                {searchQuery || categoryFilter !== "all" || statusFilter !== "all"
+                {searchQuery || categoryFilter !== "all" || statusFilter !== "all" || departmentFilter !== "all"
                   ? "No documentation matches your filters"
                   : "No documentation has been created yet"}
               </p>
