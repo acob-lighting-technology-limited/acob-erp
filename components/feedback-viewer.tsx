@@ -94,6 +94,19 @@ export function FeedbackViewer({ feedback }: FeedbackViewerProps) {
 
       if (error) throw error
 
+      // Log audit
+      await supabase.rpc("log_audit", {
+        p_action: "update",
+        p_entity_type: "feedback",
+        p_entity_id: selectedFeedback.id,
+        p_old_values: {
+          status: selectedFeedback.status,
+        },
+        p_new_values: {
+          status: newStatus,
+        },
+      })
+
       toast.success("Status updated successfully!")
       
       // Update local state
