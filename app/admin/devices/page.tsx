@@ -403,84 +403,25 @@ export default function AdminDevicesPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-      // CRITICAL FIX: Mark ALL is_current assignments for this device as false FIRST
-      // This handles any existing duplicates in the database
-      const { error: cleanupError } = await supabase
-        .from("device_assignments")
-        .update({
-          is_current: false,
-          handed_over_at: new Date().toISOString(),
-          handover_notes: `Device reassigned`,
-        })
-        .eq("device_id", selectedDevice.id)
-        .eq("is_current", true)
-
-      if (cleanupError) {
-        console.error("Error cleaning up old assignments:", cleanupError)
-        throw new Error(`Failed to update previous assignments: ${cleanupError.message}`)
-      }
-
-      // Wait to ensure database commit
-      await new Promise(resolve => setTimeout(resolve, 150))
-
-      // Get the most recent assignment for tracking (after we've marked them all as not current)
-      const { data: previousAssignment } = await supabase
-        .from("device_assignments")
-        .select("assigned_to")
-        .eq("device_id", selectedDevice.id)
-        .order("assigned_at", { ascending: false })
-        .limit(1)
-        .single()
-
-      // Now create the new assignment
-      const { error: insertError } = await supabase.from("device_assignments").insert({
-        device_id: selectedDevice.id,
-        assigned_to: assignForm.assigned_to,
-        assigned_from: previousAssignment?.assigned_to || null,
-        assigned_by: user.id,
-        assignment_notes: assignForm.assignment_notes,
-        is_current: true,
+      // Use transactional RPC to handle assignment safely
+      const { data: previousAssignedTo, error: rpcError } = await supabase.rpc("assign_device", {
+        p_device_id: selectedDevice.id,
+        p_assigned_to: assignForm.assigned_to,
+        p_assigned_by: user.id,
+        p_assignment_notes: assignForm.assignment_notes || null,
       })
 
-      if (insertError) {
-        console.error("Error creating new assignment:", insertError)
-        // If we still get a duplicate key error, it means there's a race condition
-        // Try one more time after cleaning up again
-        if (insertError.message?.includes("unique_current_device_assignment")) {
-          await supabase
-            .from("device_assignments")
-            .update({ is_current: false })
-            .eq("device_id", selectedDevice.id)
-            .eq("is_current", true)
-          
-          await new Promise(resolve => setTimeout(resolve, 200))
-          
-          const { error: retryError } = await supabase.from("device_assignments").insert({
-            device_id: selectedDevice.id,
-            assigned_to: assignForm.assigned_to,
-            assigned_from: previousAssignment?.assigned_to || null,
-            assigned_by: user.id,
-            assignment_notes: assignForm.assignment_notes,
-            is_current: true,
-          })
-          
-          if (retryError) throw retryError
-        } else {
-          throw insertError
-        }
+      if (rpcError) {
+        console.error("assign_device RPC error:", rpcError)
+        throw rpcError
       }
-
-      // Update device status to assigned
-      await supabase
-        .from("devices")
-        .update({ status: "assigned" })
-        .eq("id", selectedDevice.id)
 
       // Log audit
       await supabase.rpc("log_audit", {
         p_action: currentAssignment ? "reassign" : "assign",
         p_entity_type: "device",
         p_entity_id: selectedDevice.id,
+        p_old_values: previousAssignedTo ? { assigned_to: previousAssignedTo } : null,
         p_new_values: {
           assigned_to: assignForm.assigned_to,
           notes: assignForm.assignment_notes,
@@ -493,7 +434,7 @@ export default function AdminDevicesPage() {
       loadData()
     } catch (error: any) {
       console.error("Error assigning device:", error)
-      const errorMessage = error?.message || "Failed to assign device"
+      const errorMessage = error?.message || error?.toString() || "Failed to assign device"
       toast.error(`Failed to assign device: ${errorMessage}`)
     } finally {
       setIsAssigning(false)
