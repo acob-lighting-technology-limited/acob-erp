@@ -335,30 +335,26 @@ export default async function DashboardPage() {
                 {feedbacks.map((feedback) => (
                   <div
                     key={feedback.id}
-                    className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors"
+                    className="flex items-center justify-between gap-3 p-2.5 rounded-lg border hover:bg-muted/50 transition-colors"
                   >
                     <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <div className="p-2 bg-primary/10 rounded">
-                        <MessageSquare className="h-4 w-4 text-primary" />
+                      <div className="p-1.5 bg-primary/10 rounded">
+                        <MessageSquare className="h-3.5 w-3.5 text-primary" />
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm text-foreground truncate">{feedback.title}</p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <Badge className={`text-xs ${getStatusColor(feedback.status)}`}>
-                            {feedback.status?.replace("_", " ") || "Pending"}
-                          </Badge>
-                          {feedback.feedback_type && (
-                            <Badge variant="outline" className="text-xs">{feedback.feedback_type}</Badge>
-                          )}
-                          <span className="text-xs text-muted-foreground">
-                            {formatDate(feedback.created_at)}
-                          </span>
-                        </div>
-                      </div>
+                      <p className="font-medium text-sm text-foreground truncate flex-1">{feedback.title}</p>
+                      <Badge className={`text-xs ${getStatusColor(feedback.status)}`}>
+                        {feedback.status?.replace("_", " ") || "Pending"}
+                      </Badge>
+                      {feedback.feedback_type && (
+                        <Badge variant="outline" className="text-xs">{feedback.feedback_type}</Badge>
+                      )}
+                      <span className="text-xs text-muted-foreground whitespace-nowrap">
+                        {formatDate(feedback.created_at)}
+                      </span>
                     </div>
                     <Link href="/feedback">
-                      <Button variant="ghost" size="sm">
-                        <ArrowRight className="h-4 w-4" />
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                        <ArrowRight className="h-3.5 w-3.5" />
                       </Button>
                     </Link>
                   </div>
