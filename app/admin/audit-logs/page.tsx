@@ -232,13 +232,26 @@ export default function AuditLogsPage() {
         }
 
         // Combine logs with all fetched data
-        const logsWithUsers = logsData.map(log => ({
-          ...log,
-          user: log.user_id ? usersMap.get(log.user_id) : null,
-          target_user: log.entity_id ? usersMap.get(log.entity_id) : null,
-          task_info: log.entity_id && log.entity_type === 'task' ? tasksMap.get(log.entity_id) : null,
-          device_info: log.entity_id && (log.entity_type === 'device' || log.entity_type === 'device_assignment') ? devicesMap.get(log.entity_id) : null
-        }))
+        const logsWithUsers = logsData.map(log => {
+          let targetFromNewValues = null
+          
+          // Check new_values for assigned_to if we don't have task/device info
+          if (log.entity_type === 'task' && !tasksMap.get(log.entity_id) && log.new_values?.assigned_to) {
+            targetFromNewValues = usersMap.get(log.new_values.assigned_to)
+          }
+          
+          if ((log.entity_type === 'device' || log.entity_type === 'device_assignment') && !devicesMap.get(log.entity_id) && log.new_values?.assigned_to) {
+            targetFromNewValues = usersMap.get(log.new_values.assigned_to)
+          }
+          
+          return {
+            ...log,
+            user: log.user_id ? usersMap.get(log.user_id) : null,
+            target_user: log.entity_id ? usersMap.get(log.entity_id) : (targetFromNewValues || null),
+            task_info: log.entity_id && log.entity_type === 'task' ? tasksMap.get(log.entity_id) : null,
+            device_info: log.entity_id && (log.entity_type === 'device' || log.entity_type === 'device_assignment') ? devicesMap.get(log.entity_id) : null
+          }
+        })
 
         console.log("Loaded audit logs count:", logsWithUsers.length)
         setLogs(logsWithUsers as any)
@@ -330,47 +343,32 @@ export default function AuditLogsPage() {
     const action = log.action.toLowerCase()
     const entityType = log.entity_type.toLowerCase()
     
-    // Handle task-related logs - check if we have task_info data
-    if (entityType === 'task') {
-      if (log.task_info) {
-        if (log.task_info.assigned_to_user) {
-          const name = `${formatName(log.task_info.assigned_to_user.first_name)} ${formatName(log.task_info.assigned_to_user.last_name)}`
-          return name
-        }
-        // Task exists but no assigned user
-        return "Unassigned"
-      }
-      // Task entity type but no data - might be just created or deleted
-      if (log.new_values?.assigned_to) {
-        // Check if new_values has assigned_to, fetch from there
-        return "Task created"
-      }
-      return "Unassigned"
+    // First priority: Check if we have target_user (this handles all user-related targets including tasks)
+    if (log.target_user && (entityType === 'profile' || entityType === 'user' || entityType === 'pending_user' || entityType === 'task' || entityType === 'device' || entityType === 'device_assignment' || entityType === 'job_description')) {
+      const name = `${formatName(log.target_user.first_name)} ${formatName(log.target_user.last_name)}`
+      return name
     }
     
-    // Handle device-related logs - check if we have device_info data
-    if (entityType === 'device' || entityType === 'device_assignment') {
-      if (log.device_info) {
-        if (log.device_info.assigned_to_user) {
-          const name = `${formatName(log.device_info.assigned_to_user.first_name)} ${formatName(log.device_info.assigned_to_user.last_name)}`
-          return name
-        }
-        // Device exists but no assigned user
-        return "Unassigned"
+    // Handle task-related logs with task_info
+    if (entityType === 'task' && log.task_info) {
+      if (log.task_info.assigned_to_user) {
+        const name = `${formatName(log.task_info.assigned_to_user.first_name)} ${formatName(log.task_info.assigned_to_user.last_name)}`
+        return name
       }
-      // Device entity type but no data
-      if (log.new_values?.assigned_to) {
-        return "Device assigned"
+    }
+    
+    // Handle device-related logs with device_info
+    if ((entityType === 'device' || entityType === 'device_assignment') && log.device_info) {
+      if (log.device_info.assigned_to_user) {
+        const name = `${formatName(log.device_info.assigned_to_user.first_name)} ${formatName(log.device_info.assigned_to_user.last_name)}`
+        return name
       }
-      return "Unassigned"
+      // Devices can be unassigned
+      return "-"
     }
     
     // Handle user-related logs
     if (entityType === 'profile' || entityType === 'user' || entityType === 'pending_user') {
-      if (log.target_user) {
-        const name = `${formatName(log.target_user.first_name)} ${formatName(log.target_user.last_name)}`
-        return name
-      }
       // Check new_values for user creation
       if (log.new_values?.first_name && log.new_values?.last_name) {
         return `${formatName(log.new_values.first_name)} ${formatName(log.new_values.last_name)}`
@@ -378,23 +376,27 @@ export default function AuditLogsPage() {
       return "User"
     }
     
-    // Handle documentation - show title from new_values if available
+    // Handle documentation - target is the person who created it (the user performing the action)
     if (entityType === 'user_documentation' || entityType === 'documentation') {
-      if (log.new_values?.title) {
-        return `Doc: ${log.new_values.title}`
-      }
-      if (log.old_values?.title) {
-        return `Doc: ${log.old_values.title}`
+      if (log.user) {
+        const name = `${formatName(log.user.first_name)} ${formatName(log.user.last_name)}`
+        return name
       }
       return "Documentation"
     }
     
-    // Handle feedback
+    // Handle feedback - target is the person who submitted it
     if (entityType === 'feedback') {
-      if (log.new_values?.title) {
-        return `Feedback: ${log.new_values.title}`
+      if (log.user) {
+        const name = `${formatName(log.user.first_name)} ${formatName(log.user.last_name)}`
+        return name
       }
       return "Feedback"
+    }
+    
+    // Fallback for devices without assignment
+    if (entityType === 'device' || entityType === 'device_assignment') {
+      return "-"
     }
     
     // For any other entity types, capitalize and show nicely

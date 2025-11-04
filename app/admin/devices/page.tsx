@@ -403,39 +403,52 @@ export default function AdminDevicesPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-      // Mark ALL existing assignments for this device as not current
-      const { error: updateError } = await supabase
+      // First, get ALL current assignments for this device (including duplicates if any exist)
+      const { data: currentAssignments } = await supabase
         .from("device_assignments")
-        .update({
-          is_current: false,
-          handed_over_at: new Date().toISOString(),
-          handover_notes: `Reassigned to another user`,
-        })
+        .select("id, assigned_to")
         .eq("device_id", selectedDevice.id)
         .eq("is_current", true)
 
-      if (updateError) throw updateError
+      // Mark ALL existing current assignments for this device as not current
+      if (currentAssignments && currentAssignments.length > 0) {
+        const { error: updateError } = await supabase
+          .from("device_assignments")
+          .update({
+            is_current: false,
+            handed_over_at: new Date().toISOString(),
+            handover_notes: `Reassigned to another user`,
+          })
+          .in("id", currentAssignments.map(a => a.id))
 
-      // Get the previous assignment for tracking
-      const { data: previousAssignment } = await supabase
-        .from("device_assignments")
-        .select("assigned_to")
-        .eq("device_id", selectedDevice.id)
-        .order("assigned_at", { ascending: false })
-        .limit(1)
-        .single()
+        if (updateError) {
+          console.error("Error updating old assignments:", updateError)
+          throw updateError
+        }
+
+        // Wait a moment to ensure the update is committed
+        await new Promise(resolve => setTimeout(resolve, 100))
+      }
+
+      // Get the previous assignment for tracking (from the most recent one)
+      const previousAssignedTo = currentAssignments && currentAssignments.length > 0 
+        ? currentAssignments[0].assigned_to 
+        : null
 
       // Create new assignment
       const { error } = await supabase.from("device_assignments").insert({
         device_id: selectedDevice.id,
         assigned_to: assignForm.assigned_to,
-        assigned_from: previousAssignment?.assigned_to || null,
+        assigned_from: previousAssignedTo,
         assigned_by: user.id,
         assignment_notes: assignForm.assignment_notes,
         is_current: true,
       })
 
-      if (error) throw error
+      if (error) {
+        console.error("Error creating new assignment:", error)
+        throw error
+      }
 
       // Update device status to assigned
       await supabase
