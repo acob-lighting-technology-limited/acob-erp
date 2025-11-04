@@ -403,51 +403,71 @@ export default function AdminDevicesPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-      // First, get ALL current assignments for this device (including duplicates if any exist)
-      const { data: currentAssignments } = await supabase
+      // CRITICAL FIX: Mark ALL is_current assignments for this device as false FIRST
+      // This handles any existing duplicates in the database
+      const { error: cleanupError } = await supabase
         .from("device_assignments")
-        .select("id, assigned_to")
+        .update({
+          is_current: false,
+          handed_over_at: new Date().toISOString(),
+          handover_notes: `Device reassigned`,
+        })
         .eq("device_id", selectedDevice.id)
         .eq("is_current", true)
 
-      // Mark ALL existing current assignments for this device as not current
-      if (currentAssignments && currentAssignments.length > 0) {
-        const { error: updateError } = await supabase
-          .from("device_assignments")
-          .update({
-            is_current: false,
-            handed_over_at: new Date().toISOString(),
-            handover_notes: `Reassigned to another user`,
-          })
-          .in("id", currentAssignments.map(a => a.id))
-
-        if (updateError) {
-          console.error("Error updating old assignments:", updateError)
-          throw updateError
-        }
-
-        // Wait a moment to ensure the update is committed
-        await new Promise(resolve => setTimeout(resolve, 100))
+      if (cleanupError) {
+        console.error("Error cleaning up old assignments:", cleanupError)
+        throw new Error(`Failed to update previous assignments: ${cleanupError.message}`)
       }
 
-      // Get the previous assignment for tracking (from the most recent one)
-      const previousAssignedTo = currentAssignments && currentAssignments.length > 0 
-        ? currentAssignments[0].assigned_to 
-        : null
+      // Wait to ensure database commit
+      await new Promise(resolve => setTimeout(resolve, 150))
 
-      // Create new assignment
-      const { error } = await supabase.from("device_assignments").insert({
+      // Get the most recent assignment for tracking (after we've marked them all as not current)
+      const { data: previousAssignment } = await supabase
+        .from("device_assignments")
+        .select("assigned_to")
+        .eq("device_id", selectedDevice.id)
+        .order("assigned_at", { ascending: false })
+        .limit(1)
+        .single()
+
+      // Now create the new assignment
+      const { error: insertError } = await supabase.from("device_assignments").insert({
         device_id: selectedDevice.id,
         assigned_to: assignForm.assigned_to,
-        assigned_from: previousAssignedTo,
+        assigned_from: previousAssignment?.assigned_to || null,
         assigned_by: user.id,
         assignment_notes: assignForm.assignment_notes,
         is_current: true,
       })
 
-      if (error) {
-        console.error("Error creating new assignment:", error)
-        throw error
+      if (insertError) {
+        console.error("Error creating new assignment:", insertError)
+        // If we still get a duplicate key error, it means there's a race condition
+        // Try one more time after cleaning up again
+        if (insertError.message?.includes("unique_current_device_assignment")) {
+          await supabase
+            .from("device_assignments")
+            .update({ is_current: false })
+            .eq("device_id", selectedDevice.id)
+            .eq("is_current", true)
+          
+          await new Promise(resolve => setTimeout(resolve, 200))
+          
+          const { error: retryError } = await supabase.from("device_assignments").insert({
+            device_id: selectedDevice.id,
+            assigned_to: assignForm.assigned_to,
+            assigned_from: previousAssignment?.assigned_to || null,
+            assigned_by: user.id,
+            assignment_notes: assignForm.assignment_notes,
+            is_current: true,
+          })
+          
+          if (retryError) throw retryError
+        } else {
+          throw insertError
+        }
       }
 
       // Update device status to assigned
