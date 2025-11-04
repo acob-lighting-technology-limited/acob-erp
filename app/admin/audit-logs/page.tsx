@@ -330,51 +330,80 @@ export default function AuditLogsPage() {
     const action = log.action.toLowerCase()
     const entityType = log.entity_type.toLowerCase()
     
-    // Handle task-related logs
-    if (log.task_info) {
-      if (log.task_info.assigned_to_user) {
-        const name = `${formatName(log.task_info.assigned_to_user.first_name)} ${formatName(log.task_info.assigned_to_user.last_name)}`
-        return name
+    // Handle task-related logs - check if we have task_info data
+    if (entityType === 'task') {
+      if (log.task_info) {
+        if (log.task_info.assigned_to_user) {
+          const name = `${formatName(log.task_info.assigned_to_user.first_name)} ${formatName(log.task_info.assigned_to_user.last_name)}`
+          return name
+        }
+        // Task exists but no assigned user
+        return "Unassigned"
       }
-      // If task exists but no assigned user, show "Unassigned"
-      return "Unassigned Task"
+      // Task entity type but no data - might be just created or deleted
+      if (log.new_values?.assigned_to) {
+        // Check if new_values has assigned_to, fetch from there
+        return "Task created"
+      }
+      return "Unassigned"
     }
     
-    // Handle device-related logs
-    if (log.device_info) {
-      if (log.device_info.assigned_to_user) {
-        const name = `${formatName(log.device_info.assigned_to_user.first_name)} ${formatName(log.device_info.assigned_to_user.last_name)}`
-        return name
+    // Handle device-related logs - check if we have device_info data
+    if (entityType === 'device' || entityType === 'device_assignment') {
+      if (log.device_info) {
+        if (log.device_info.assigned_to_user) {
+          const name = `${formatName(log.device_info.assigned_to_user.first_name)} ${formatName(log.device_info.assigned_to_user.last_name)}`
+          return name
+        }
+        // Device exists but no assigned user
+        return "Unassigned"
       }
-      // If device exists but no assigned user, show "Unassigned"
-      return "Unassigned Device"
+      // Device entity type but no data
+      if (log.new_values?.assigned_to) {
+        return "Device assigned"
+      }
+      return "Unassigned"
     }
     
     // Handle user-related logs
-    if (log.target_user) {
-      const name = `${formatName(log.target_user.first_name)} ${formatName(log.target_user.last_name)}`
-      return name
-    }
-    
-    // Check if entity_type suggests it should have related info but doesn't
-    if (entityType === 'task') {
-      return "Task (deleted or not found)"
-    }
-    
-    if (entityType === 'device' || entityType === 'device_assignment') {
-      return "Device (deleted or not found)"
-    }
-    
     if (entityType === 'profile' || entityType === 'user' || entityType === 'pending_user') {
-      return "User (deleted or not found)"
+      if (log.target_user) {
+        const name = `${formatName(log.target_user.first_name)} ${formatName(log.target_user.last_name)}`
+        return name
+      }
+      // Check new_values for user creation
+      if (log.new_values?.first_name && log.new_values?.last_name) {
+        return `${formatName(log.new_values.first_name)} ${formatName(log.new_values.last_name)}`
+      }
+      return "User"
     }
     
-    // For other entity types, show a friendly message
+    // Handle documentation - show title from new_values if available
+    if (entityType === 'user_documentation' || entityType === 'documentation') {
+      if (log.new_values?.title) {
+        return `Doc: ${log.new_values.title}`
+      }
+      if (log.old_values?.title) {
+        return `Doc: ${log.old_values.title}`
+      }
+      return "Documentation"
+    }
+    
+    // Handle feedback
+    if (entityType === 'feedback') {
+      if (log.new_values?.title) {
+        return `Feedback: ${log.new_values.title}`
+      }
+      return "Feedback"
+    }
+    
+    // For any other entity types, capitalize and show nicely
     if (log.entity_id) {
-      return `${entityType.replace('_', ' ').charAt(0).toUpperCase() + entityType.replace('_', ' ').slice(1)}`
+      return entityType.split('_').map(word => 
+        word.charAt(0).toUpperCase() + word.slice(1)
+      ).join(' ')
     }
     
-    // Only show dash if there's truly no entity
     return "N/A"
   }
 
