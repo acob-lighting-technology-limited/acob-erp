@@ -318,7 +318,7 @@ export default async function DashboardPage() {
           <CardHeader className="border-b bg-muted/30">
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2">
-                <MessageSquare className="h-5 w-5" />
+                <MessageSquare className="h-5 w-5 text-primary" />
                 Recent Feedback
               </CardTitle>
               <Link href="/feedback">
@@ -331,35 +331,36 @@ export default async function DashboardPage() {
           </CardHeader>
           <CardContent className="p-6">
             {feedbacks && feedbacks.length > 0 ? (
-              <div className="space-y-4">
+              <div className="space-y-2">
                 {feedbacks.map((feedback) => (
                   <div
                     key={feedback.id}
-                    className="p-4 rounded-lg border bg-card hover:shadow-md transition-shadow"
+                    className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors"
                   >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1 space-y-2">
-                        <div className="flex items-center gap-2">
-                          <Badge className={getStatusColor(feedback.status)}>
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className="p-2 bg-primary/10 rounded">
+                        <MessageSquare className="h-4 w-4 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm text-foreground truncate">{feedback.title}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Badge className={`text-xs ${getStatusColor(feedback.status)}`}>
                             {feedback.status?.replace("_", " ") || "Pending"}
                           </Badge>
-                          <Badge variant="outline">{feedback.category}</Badge>
-                        </div>
-                        <h4 className="font-semibold text-foreground">{feedback.title}</h4>
-                        <p className="text-sm text-muted-foreground line-clamp-2">{feedback.description}</p>
-                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                          <div className="flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            {formatDate(feedback.created_at)}
-                          </div>
-                          {feedback.priority && (
-                            <span className="font-medium text-orange-600 dark:text-orange-400">
-                              {feedback.priority} priority
-                            </span>
+                          {feedback.feedback_type && (
+                            <Badge variant="outline" className="text-xs">{feedback.feedback_type}</Badge>
                           )}
+                          <span className="text-xs text-muted-foreground">
+                            {formatDate(feedback.created_at)}
+                          </span>
                         </div>
                       </div>
                     </div>
+                    <Link href="/feedback">
+                      <Button variant="ghost" size="sm">
+                        <ArrowRight className="h-4 w-4" />
+                      </Button>
+                    </Link>
                   </div>
                 ))}
               </div>
