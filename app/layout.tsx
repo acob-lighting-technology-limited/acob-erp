@@ -53,7 +53,14 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable}`}>
         <Suspense fallback={null}>
-          <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+          {/* Theme follows system preference automatically (light/dark mode) */}
+          <ThemeProvider 
+            attribute="class" 
+            defaultTheme="system" 
+            enableSystem 
+            enableColorScheme
+            storageKey="acob-theme"
+          >
             <NProgressProvider />
             <NProgressHandler />
             {/* <HeaderWrapperWithData /> */}
