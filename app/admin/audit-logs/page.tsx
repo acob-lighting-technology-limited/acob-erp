@@ -328,47 +328,54 @@ export default function AuditLogsPage() {
 
   const getTargetDescription = (log: AuditLog) => {
     const action = log.action.toLowerCase()
+    const entityType = log.entity_type.toLowerCase()
     
     // Handle task-related logs
     if (log.task_info) {
-      const taskTitle = log.task_info.title
       if (log.task_info.assigned_to_user) {
         const name = `${formatName(log.task_info.assigned_to_user.first_name)} ${formatName(log.task_info.assigned_to_user.last_name)}`
-        return `Task "${taskTitle}" for ${name}`
+        return name
       }
-      return `Task "${taskTitle}"`
+      // If task exists but no assigned user, show "Unassigned"
+      return "Unassigned Task"
     }
     
     // Handle device-related logs
     if (log.device_info) {
-      const deviceName = log.device_info.device_name
       if (log.device_info.assigned_to_user) {
         const name = `${formatName(log.device_info.assigned_to_user.first_name)} ${formatName(log.device_info.assigned_to_user.last_name)}`
-        return `Device "${deviceName}" for ${name}`
+        return name
       }
-      return `Device "${deviceName}"`
+      // If device exists but no assigned user, show "Unassigned"
+      return "Unassigned Device"
     }
     
     // Handle user-related logs
     if (log.target_user) {
       const name = `${formatName(log.target_user.first_name)} ${formatName(log.target_user.last_name)}`
-      
-      if (action.includes("assign")) return `Assigned to ${name}`
-      if (action.includes("create")) return `Created for ${name}`
-      if (action.includes("update")) return `Updated ${name}`
-      if (action.includes("delete")) return `Deleted ${name}`
-      if (action.includes("approve")) return `Approved ${name}`
-      if (action.includes("reject")) return `Rejected ${name}`
-      
       return name
     }
     
-    // Fallback to entity ID or dash
-    if (log.entity_id) {
-      return `ID: ${log.entity_id.substring(0, 8)}...`
+    // Check if entity_type suggests it should have related info but doesn't
+    if (entityType === 'task') {
+      return "Task (deleted or not found)"
     }
     
-    return "-"
+    if (entityType === 'device' || entityType === 'device_assignment') {
+      return "Device (deleted or not found)"
+    }
+    
+    if (entityType === 'profile' || entityType === 'user' || entityType === 'pending_user') {
+      return "User (deleted or not found)"
+    }
+    
+    // For other entity types, show a friendly message
+    if (log.entity_id) {
+      return `${entityType.replace('_', ' ').charAt(0).toUpperCase() + entityType.replace('_', ' ').slice(1)}`
+    }
+    
+    // Only show dash if there's truly no entity
+    return "N/A"
   }
 
   const handleViewDetails = (log: AuditLog) => {
