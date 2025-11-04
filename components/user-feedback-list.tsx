@@ -54,9 +54,27 @@ export function UserFeedbackList({ feedback }: UserFeedbackListProps) {
     const supabase = createClient()
 
     try {
+      // Get feedback details before deleting for audit log
+      const feedbackToDelete = feedbackList.find((item) => item.id === id)
+
       const { error } = await supabase.from("feedback").delete().eq("id", id)
 
       if (error) throw error
+
+      // Log audit
+      if (feedbackToDelete) {
+        await supabase.rpc("log_audit", {
+          p_action: "delete",
+          p_entity_type: "feedback",
+          p_entity_id: id,
+          p_old_values: {
+            feedback_type: feedbackToDelete.feedback_type,
+            title: feedbackToDelete.title,
+            description: feedbackToDelete.description,
+            status: feedbackToDelete.status,
+          },
+        })
+      }
 
       setFeedbackList(feedbackList.filter((item) => item.id !== id))
       toast.success("Feedback deleted successfully!")

@@ -41,6 +41,23 @@ export function FeedbackEditModal({ feedback, onClose, onSave }: FeedbackEditMod
 
       if (error) throw error
 
+      // Log audit
+      await supabase.rpc("log_audit", {
+        p_action: "update",
+        p_entity_type: "feedback",
+        p_entity_id: feedback.id,
+        p_old_values: {
+          feedback_type: feedback.feedback_type,
+          title: feedback.title,
+          description: feedback.description,
+        },
+        p_new_values: {
+          feedback_type: formData.feedbackType,
+          title: formData.title,
+          description: formData.description,
+        },
+      })
+
       toast.success("Feedback updated successfully!")
       onSave({
         ...feedback,
