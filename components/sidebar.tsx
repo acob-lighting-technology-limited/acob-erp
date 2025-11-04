@@ -19,6 +19,7 @@ import {
   ClipboardList,
   FileText,
   Briefcase,
+  Package,
 } from "lucide-react"
 import Image from "next/image"
 import { useState } from "react"
@@ -49,6 +50,7 @@ const navigation = [
   { name: "Job Description", href: "/job-description", icon: Briefcase },
   { name: "My Tasks", href: "/tasks", icon: ClipboardList },
   { name: "My Devices", href: "/devices", icon: Laptop },
+  { name: "My Assets", href: "/assets", icon: Package },
   { name: "Documentation", href: "/documentation", icon: FileText },
   { name: "Feedback", href: "/feedback", icon: MessageSquare },
   { name: "Signature", href: "/signature", icon: FileSignature },
