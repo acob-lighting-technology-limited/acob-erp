@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
-import { Laptop, Calendar, User, FileText, History, Package } from "lucide-react"
+import { Laptop, Calendar, User, FileText, Package } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -36,28 +36,10 @@ interface DeviceAssignment {
   }
 }
 
-interface AssignmentHistory {
-  id: string
-  assigned_at: string
-  handed_over_at?: string
-  assignment_notes?: string
-  handover_notes?: string
-  assigned_from_user?: {
-    first_name: string
-    last_name: string
-  }
-  assigned_by_user?: {
-    first_name: string
-    last_name: string
-  }
-}
 
 export default function DevicesPage() {
   const [assignments, setAssignments] = useState<DeviceAssignment[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [selectedDevice, setSelectedDevice] = useState<string | null>(null)
-  const [deviceHistory, setDeviceHistory] = useState<AssignmentHistory[]>([])
-  const [isHistoryOpen, setIsHistoryOpen] = useState(false)
   const supabase = createClient()
 
   useEffect(() => {
@@ -76,64 +58,46 @@ export default function DevicesPage() {
           assigned_at,
           assignment_notes,
           assigned_by,
-          device:devices!device_assignments_device_id_fkey (
-            id,
-            device_name,
-            device_type,
-            device_model,
-            serial_number,
-            status
-          ),
-          assigner:profiles!device_assignments_assigned_by_fkey (
-            first_name,
-            last_name
-          )
+          device_id
         `)
         .eq("assigned_to", user.id)
         .eq("is_current", true)
         .order("assigned_at", { ascending: false })
 
       if (error) throw error
-      setAssignments(data as any || [])
-    } catch (error) {
+      
+      // Fetch device and assigner details separately
+      const assignmentsWithDetails = await Promise.all((data || []).map(async (assignment: any) => {
+        const [deviceResult, assignerResult] = await Promise.all([
+          supabase
+            .from("devices")
+            .select("id, device_name, device_type, device_model, serial_number, status")
+            .eq("id", assignment.device_id)
+            .single(),
+          assignment.assigned_by ? supabase
+            .from("profiles")
+            .select("first_name, last_name")
+            .eq("id", assignment.assigned_by)
+            .single() : Promise.resolve({ data: null })
+        ])
+        
+        return {
+          ...assignment,
+          device: deviceResult.data,
+          assigner: assignerResult.data
+        }
+      }))
+      
+      setAssignments(assignmentsWithDetails as any || [])
+    } catch (error: any) {
       console.error("Error loading devices:", error)
-      toast.error("Failed to load devices")
+      const errorMessage = error?.message || error?.toString() || "Failed to load devices"
+      toast.error(`Failed to load devices: ${errorMessage}`)
     } finally {
       setIsLoading(false)
     }
   }
 
-  const loadDeviceHistory = async (deviceId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from("device_assignments")
-        .select(`
-          id,
-          assigned_at,
-          handed_over_at,
-          assignment_notes,
-          handover_notes,
-          assigned_from_user:profiles!device_assignments_assigned_from_fkey (
-            first_name,
-            last_name
-          ),
-          assigned_by_user:profiles!device_assignments_assigned_by_fkey (
-            first_name,
-            last_name
-          )
-        `)
-        .eq("device_id", deviceId)
-        .order("assigned_at", { ascending: false })
-
-      if (error) throw error
-      setDeviceHistory(data as any || [])
-      setSelectedDevice(deviceId)
-      setIsHistoryOpen(true)
-    } catch (error) {
-      console.error("Error loading device history:", error)
-      toast.error("Failed to load device history")
-    }
-  }
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-US", {
@@ -260,16 +224,6 @@ export default function DevicesPage() {
                       <p className="text-sm text-muted-foreground">{assignment.assignment_notes}</p>
                     </div>
                   )}
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => loadDeviceHistory(assignment.device.id)}
-                    className="w-full gap-2 mt-4"
-                  >
-                    <History className="h-4 w-4" />
-                    View History
-                  </Button>
                 </CardContent>
               </Card>
             ))}
@@ -287,72 +241,6 @@ export default function DevicesPage() {
         )}
       </div>
 
-      {/* Device History Dialog */}
-      <Dialog open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <History className="h-5 w-5" />
-              Device Assignment History
-            </DialogTitle>
-            <DialogDescription>
-              Complete history of this device's assignments and transfers
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 mt-4">
-            {deviceHistory.map((history, index) => (
-              <div
-                key={history.id}
-                className={`p-4 rounded-lg border ${index === 0 ? "bg-primary/5 border-primary/20" : "bg-muted/30"}`}
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <Badge variant={index === 0 ? "default" : "outline"}>
-                    {index === 0 ? "Current" : `Assignment ${deviceHistory.length - index}`}
-                  </Badge>
-                  <span className="text-sm text-muted-foreground">{formatDate(history.assigned_at)}</span>
-                </div>
-
-                {history.assigned_by_user && (
-                  <p className="text-sm text-muted-foreground">
-                    Assigned by: <span className="text-foreground font-medium">
-                      {history.assigned_by_user.first_name} {history.assigned_by_user.last_name}
-                    </span>
-                  </p>
-                )}
-
-                {history.assigned_from_user && (
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Transferred from: <span className="text-foreground font-medium">
-                      {history.assigned_from_user.first_name} {history.assigned_from_user.last_name}
-                    </span>
-                  </p>
-                )}
-
-                {history.assignment_notes && (
-                  <div className="mt-2 p-2 bg-background rounded text-sm">
-                    <p className="font-medium text-foreground mb-1">Assignment Notes:</p>
-                    <p className="text-muted-foreground">{history.assignment_notes}</p>
-                  </div>
-                )}
-
-                {history.handed_over_at && (
-                  <div className="mt-2 pt-2 border-t">
-                    <p className="text-sm text-muted-foreground">
-                      Handed over: <span className="text-foreground">{formatDate(history.handed_over_at)}</span>
-                    </p>
-                    {history.handover_notes && (
-                      <div className="mt-2 p-2 bg-background rounded text-sm">
-                        <p className="font-medium text-foreground mb-1">Handover Notes:</p>
-                        <p className="text-muted-foreground">{history.handover_notes}</p>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

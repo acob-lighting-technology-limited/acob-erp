@@ -47,6 +47,8 @@ export default function AuditLogsPage() {
   const [actionFilter, setActionFilter] = useState("all")
   const [entityFilter, setEntityFilter] = useState("all")
   const [dateFilter, setDateFilter] = useState("all")
+  const [customStartDate, setCustomStartDate] = useState("")
+  const [customEndDate, setCustomEndDate] = useState("")
   const [viewMode, setViewMode] = useState<"list" | "card">("list")
 
   const supabase = createClient()
@@ -135,6 +137,22 @@ export default function AuditLogsPage() {
           break
         case "month":
           matchesDate = daysDiff <= 30
+          break
+        case "custom":
+          if (customStartDate && customEndDate) {
+            const startDate = new Date(customStartDate)
+            const endDate = new Date(customEndDate)
+            // Set end date to end of day
+            endDate.setHours(23, 59, 59, 999)
+            matchesDate = logDate >= startDate && logDate <= endDate
+          } else if (customStartDate) {
+            const startDate = new Date(customStartDate)
+            matchesDate = logDate >= startDate
+          } else if (customEndDate) {
+            const endDate = new Date(customEndDate)
+            endDate.setHours(23, 59, 59, 999)
+            matchesDate = logDate <= endDate
+          }
           break
       }
     }
@@ -344,7 +362,13 @@ export default function AuditLogsPage() {
                 </SelectContent>
               </Select>
 
-              <Select value={dateFilter} onValueChange={setDateFilter}>
+              <Select value={dateFilter} onValueChange={(value) => {
+                setDateFilter(value)
+                if (value !== "custom") {
+                  setCustomStartDate("")
+                  setCustomEndDate("")
+                }
+              }}>
                 <SelectTrigger>
                   <SelectValue placeholder="Time Period" />
                 </SelectTrigger>
@@ -353,9 +377,42 @@ export default function AuditLogsPage() {
                   <SelectItem value="today">Today</SelectItem>
                   <SelectItem value="week">Last 7 Days</SelectItem>
                   <SelectItem value="month">Last 30 Days</SelectItem>
+                  <SelectItem value="custom">Custom Range</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+
+            {dateFilter === "custom" && (
+              <div className="grid gap-4 md:grid-cols-2 mt-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">Start Date</label>
+                  <div className="relative">
+                    <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      type="date"
+                      value={customStartDate}
+                      onChange={(e) => setCustomStartDate(e.target.value)}
+                      className="pl-10"
+                      placeholder="Select start date"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">End Date</label>
+                  <div className="relative">
+                    <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      type="date"
+                      value={customEndDate}
+                      onChange={(e) => setCustomEndDate(e.target.value)}
+                      className="pl-10"
+                      placeholder="Select end date"
+                      min={customStartDate}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 

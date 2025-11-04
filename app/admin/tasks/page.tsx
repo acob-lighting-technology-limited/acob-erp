@@ -137,14 +137,7 @@ export default function AdminTasksPage() {
       // Build query based on role
       let tasksQuery = supabase
         .from("tasks")
-        .select(`
-          *,
-          assigned_to_user:profiles!tasks_assigned_to_fkey (
-            first_name,
-            last_name,
-            department
-          )
-        `)
+        .select("*")
         .order("created_at", { ascending: false })
 
       // Filter by department for department leads
@@ -165,11 +158,29 @@ export default function AdminTasksPage() {
 
       console.log("Loaded staff count:", staffData.data?.length)
 
-      setTasks(tasksData.data as any || [])
+      // Fetch assigned user details separately
+      const tasksWithUsers = await Promise.all((tasksData.data || []).map(async (task: any) => {
+        if (task.assigned_to) {
+          const { data: userProfile } = await supabase
+            .from("profiles")
+            .select("first_name, last_name, department")
+            .eq("id", task.assigned_to)
+            .single()
+          
+          return {
+            ...task,
+            assigned_to_user: userProfile
+          }
+        }
+        return task
+      }))
+
+      setTasks(tasksWithUsers as any || [])
       setStaff(staffData.data || [])
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error loading data:", error)
-      toast.error("Failed to load data")
+      const errorMessage = error?.message || error?.toString() || "Failed to load data"
+      toast.error(`Failed to load data: ${errorMessage}`)
     } finally {
       setIsLoading(false)
     }

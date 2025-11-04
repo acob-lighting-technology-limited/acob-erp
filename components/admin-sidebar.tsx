@@ -144,7 +144,9 @@ export function AdminSidebar({ user, profile }: AdminSidebarProps) {
       {/* Navigation */}
       <nav className="flex-1 px-4 py-6 space-y-1">
         {filteredNavigation.map((item) => {
-          const isActive = pathname === item.href || pathname?.startsWith(item.href + "/")
+          const isActive = item.href === "/admin" 
+            ? pathname === "/admin"
+            : pathname === item.href || pathname?.startsWith(item.href + "/")
           return (
             <Link
               key={item.name}

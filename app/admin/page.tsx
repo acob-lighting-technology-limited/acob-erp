@@ -14,6 +14,7 @@ import {
   Shield,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { Notifications } from "@/components/notifications"
 
 export default async function AdminDashboardPage() {
   const supabase = await createClient()
@@ -67,6 +68,104 @@ export default async function AdminDashboardPage() {
     `)
     .order("created_at", { ascending: false })
     .limit(5)
+
+  // Fetch notifications for admin
+  const notifications = []
+
+  // Pending user approvals
+  const { count: pendingUsersCount } = await supabase
+    .from("pending_users")
+    .select("*", { count: "exact", head: true })
+    .eq("status", "pending")
+
+  if (pendingUsersCount && pendingUsersCount > 0) {
+    notifications.push({
+      id: "pending-users",
+      type: "warning" as const,
+      title: "Pending User Approvals",
+      message: `You have ${pendingUsersCount} user${pendingUsersCount > 1 ? "s" : ""} waiting for approval.`,
+      timestamp: "Just now",
+      link: "/admin/staff",
+      linkText: "Review Users",
+    })
+  }
+
+  // Open feedback that needs attention
+  const { count: openFeedbackCount } = await supabase
+    .from("feedback")
+    .select("*", { count: "exact", head: true })
+    .eq("status", "open")
+
+  if (openFeedbackCount && openFeedbackCount > 0) {
+    notifications.push({
+      id: "open-feedback",
+      type: "info" as const,
+      title: "Open Feedback",
+      message: `There ${openFeedbackCount === 1 ? "is" : "are"} ${openFeedbackCount} open feedback item${openFeedbackCount > 1 ? "s" : ""} that need attention.`,
+      timestamp: "Recent",
+      link: "/admin/feedback",
+      linkText: "View Feedback",
+    })
+  }
+
+  // Urgent tasks
+  const { count: urgentTasksCount } = await supabase
+    .from("tasks")
+    .select("*", { count: "exact", head: true })
+    .eq("priority", "urgent")
+    .in("status", ["pending", "in_progress"])
+
+  if (urgentTasksCount && urgentTasksCount > 0) {
+    notifications.push({
+      id: "urgent-tasks",
+      type: "error" as const,
+      title: "Urgent Tasks",
+      message: `You have ${urgentTasksCount} urgent task${urgentTasksCount > 1 ? "s" : ""} that need immediate attention.`,
+      timestamp: "Urgent",
+      link: "/admin/tasks",
+      linkText: "View Tasks",
+    })
+  }
+
+  // Overdue tasks
+  const today = new Date().toISOString().split("T")[0]
+  const { data: overdueTasks } = await supabase
+    .from("tasks")
+    .select("id", { count: "exact", head: false })
+    .lt("due_date", today)
+    .in("status", ["pending", "in_progress"])
+
+  if (overdueTasks && overdueTasks.length > 0) {
+    notifications.push({
+      id: "overdue-tasks",
+      type: "error" as const,
+      title: "Overdue Tasks",
+      message: `There ${overdueTasks.length === 1 ? "is" : "are"} ${overdueTasks.length} overdue task${overdueTasks.length > 1 ? "s" : ""} that need to be completed.`,
+      timestamp: "Overdue",
+      link: "/admin/tasks",
+      linkText: "View Tasks",
+    })
+  }
+
+  // Recent audit logs (show if there are many actions today)
+  const todayStart = new Date()
+  todayStart.setHours(0, 0, 0, 0)
+  const { count: todayAuditCount } = await supabase
+    .from("audit_logs")
+    .select("*", { count: "exact", head: true })
+    .gte("created_at", todayStart.toISOString())
+
+  if (todayAuditCount && todayAuditCount > 50) {
+    notifications.push({
+      id: "high-activity",
+      type: "info" as const,
+      title: "High System Activity",
+      message: `There have been ${todayAuditCount} system activities today. Review audit logs for details.`,
+      timestamp: "Today",
+      link: "/admin/audit-logs",
+      linkText: "View Audit Logs",
+    })
+  }
 
   const quickActions = [
     {
@@ -169,6 +268,11 @@ export default async function AdminDashboardPage() {
             Welcome back, {profile?.first_name || "Admin"}! Manage your organization from here.
           </p>
         </div>
+
+        {/* Notifications */}
+        {notifications.length > 0 && (
+          <Notifications notifications={notifications} title="Admin Notifications" />
+        )}
 
         {/* Stats Grid */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">

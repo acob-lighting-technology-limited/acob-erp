@@ -377,42 +377,23 @@ export function FeedbackViewer({ feedback }: FeedbackViewerProps) {
               </div>
 
               {/* Update Status */}
-              <div className="space-y-3">
+              <div className="space-y-2">
                 <Label className="text-sm font-semibold">Update Status</Label>
-                <div className="grid grid-cols-2 gap-3">
-                  <Button
-                    variant={selectedFeedback.status === "open" ? "default" : "outline"}
-                    onClick={() => handleUpdateStatus("open")}
-                    disabled={isUpdating}
-                    className="w-full border-2 hover:shadow-md transition-all"
-                  >
-                    Open
-                  </Button>
-                  <Button
-                    variant={selectedFeedback.status === "in_progress" ? "default" : "outline"}
-                    onClick={() => handleUpdateStatus("in_progress")}
-                    disabled={isUpdating}
-                    className="w-full border-2 hover:shadow-md transition-all"
-                  >
-                    In Progress
-                  </Button>
-                  <Button
-                    variant={selectedFeedback.status === "resolved" ? "default" : "outline"}
-                    onClick={() => handleUpdateStatus("resolved")}
-                    disabled={isUpdating}
-                    className="w-full border-2 hover:shadow-md transition-all"
-                  >
-                    Resolved
-                  </Button>
-                  <Button
-                    variant={selectedFeedback.status === "closed" ? "default" : "outline"}
-                    onClick={() => handleUpdateStatus("closed")}
-                    disabled={isUpdating}
-                    className="w-full border-2 hover:shadow-md transition-all"
-                  >
-                    Closed
-                  </Button>
-                </div>
+                <Select
+                  value={selectedFeedback.status}
+                  onValueChange={(value) => handleUpdateStatus(value)}
+                  disabled={isUpdating}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="open">Open</SelectItem>
+                    <SelectItem value="in_progress">In Progress</SelectItem>
+                    <SelectItem value="resolved">Resolved</SelectItem>
+                    <SelectItem value="closed">Closed</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Actions */}

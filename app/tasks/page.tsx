@@ -101,29 +101,36 @@ export default function TasksPage() {
       const { data, error } = await supabase
         .from("tasks")
         .select(`
-          id,
-          title,
-          description,
-          priority,
-          status,
-          progress,
-          due_date,
-          created_at,
-          department,
-          assigned_by_user:profiles!tasks_assigned_by_fkey (
-            first_name,
-            last_name
-          )
+          *
         `)
         .eq("assigned_to", user.id)
         .order("created_at", { ascending: false })
 
       if (error) throw error
-      setTasks(data as any || [])
-      setFilteredTasks(data as any || [])
-    } catch (error) {
+      
+      // Fetch the assigned_by user details separately
+      const tasksWithUsers = await Promise.all((data || []).map(async (task: any) => {
+        if (task.assigned_by) {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("first_name, last_name")
+            .eq("id", task.assigned_by)
+            .single()
+          
+          return {
+            ...task,
+            assigned_by_user: profile
+          }
+        }
+        return task
+      }))
+      
+      setTasks(tasksWithUsers as any || [])
+      setFilteredTasks(tasksWithUsers as any || [])
+    } catch (error: any) {
       console.error("Error loading tasks:", error)
-      toast.error("Failed to load tasks")
+      const errorMessage = error?.message || error?.toString() || "Failed to load tasks"
+      toast.error(`Failed to load tasks: ${errorMessage}`)
     } finally {
       setIsLoading(false)
     }

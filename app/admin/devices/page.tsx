@@ -54,6 +54,10 @@ import {
   LayoutGrid,
   List,
   User,
+  Eye,
+  History,
+  Calendar,
+  FileText,
 } from "lucide-react"
 
 interface Device {
@@ -94,6 +98,26 @@ interface DeviceAssignment {
   }
 }
 
+interface AssignmentHistory {
+  id: string
+  assigned_at: string
+  handed_over_at?: string
+  assignment_notes?: string
+  handover_notes?: string
+  assigned_from_user?: {
+    first_name: string
+    last_name: string
+  }
+  assigned_by_user?: {
+    first_name: string
+    last_name: string
+  }
+  assigned_to_user?: {
+    first_name: string
+    last_name: string
+  }
+}
+
 export default function AdminDevicesPage() {
   const [devices, setDevices] = useState<Device[]>([])
   const [staff, setStaff] = useState<Staff[]>([])
@@ -106,8 +130,11 @@ export default function AdminDevicesPage() {
   const [isDeviceDialogOpen, setIsDeviceDialogOpen] = useState(false)
   const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false)
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null)
   const [deviceToDelete, setDeviceToDelete] = useState<Device | null>(null)
+  const [isAssigning, setIsAssigning] = useState(false)
+  const [deviceHistory, setDeviceHistory] = useState<AssignmentHistory[]>([])
 
   // Form states
   const [deviceForm, setDeviceForm] = useState({
@@ -145,17 +172,27 @@ export default function AdminDevicesPage() {
       // Fetch current assignments for all devices
       const { data: assignmentsData, error: assignmentsError } = await supabase
         .from("device_assignments")
-        .select(`
-          device_id,
-          assigned_to,
-          user:profiles!device_assignments_assigned_to_fkey (
-            first_name,
-            last_name
-          )
-        `)
+        .select("device_id, assigned_to")
         .eq("is_current", true)
 
       if (assignmentsError) throw assignmentsError
+      
+      // Fetch user details for assignments
+      const assignmentsWithUsers = await Promise.all((assignmentsData || []).map(async (assignment: any) => {
+        if (assignment.assigned_to) {
+          const { data: userProfile } = await supabase
+            .from("profiles")
+            .select("first_name, last_name")
+            .eq("id", assignment.assigned_to)
+            .single()
+          
+          return {
+            ...assignment,
+            user: userProfile
+          }
+        }
+        return assignment
+      }))
 
       // Fetch staff
       const { data: staffData, error: staffError } = await supabase
@@ -167,7 +204,7 @@ export default function AdminDevicesPage() {
 
       // Combine devices with their current assignments
       const devicesWithAssignments = (devicesData || []).map((device) => {
-        const assignment = (assignmentsData || []).find((a: any) => a.device_id === device.id)
+        const assignment = (assignmentsWithUsers || []).find((a: any) => a.device_id === device.id)
         return {
           ...device,
           current_assignment: assignment ? {
@@ -179,9 +216,10 @@ export default function AdminDevicesPage() {
 
       setDevices(devicesWithAssignments)
       setStaff(staffData || [])
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error loading data:", error)
-      toast.error("Failed to load data")
+      const errorMessage = error?.message || error?.toString() || "Failed to load data"
+      toast.error(`Failed to load data: ${errorMessage}`)
     } finally {
       setIsLoading(false)
     }
@@ -191,24 +229,79 @@ export default function AdminDevicesPage() {
     try {
       const { data, error } = await supabase
         .from("device_assignments")
-        .select(`
-          id,
-          assigned_to,
-          assigned_at,
-          is_current,
-          user:profiles!device_assignments_assigned_to_fkey (
-            first_name,
-            last_name
-          )
-        `)
+        .select("id, assigned_to, assigned_at, is_current")
         .eq("device_id", deviceId)
         .eq("is_current", true)
         .single()
 
       if (error && error.code !== "PGRST116") throw error
-      setCurrentAssignment(data as any)
+      
+      if (data && data.assigned_to) {
+        // Fetch user details separately
+        const { data: userProfile } = await supabase
+          .from("profiles")
+          .select("first_name, last_name")
+          .eq("id", data.assigned_to)
+          .single()
+        
+        setCurrentAssignment({
+          ...data,
+          user: userProfile
+        } as any)
+      } else {
+        setCurrentAssignment(null)
+      }
     } catch (error) {
       console.error("Error loading assignment:", error)
+      setCurrentAssignment(null)
+    }
+  }
+
+  const loadDeviceHistory = async (device: Device) => {
+    try {
+      const { data, error } = await supabase
+        .from("device_assignments")
+        .select("id, assigned_at, handed_over_at, assignment_notes, handover_notes, assigned_from, assigned_by, assigned_to")
+        .eq("device_id", device.id)
+        .order("assigned_at", { ascending: false })
+
+      if (error) throw error
+      
+      // Fetch user details separately for each assignment
+      const historyWithUsers = await Promise.all((data || []).map(async (assignment: any) => {
+        const [assignedFromResult, assignedByResult, assignedToResult] = await Promise.all([
+          assignment.assigned_from ? supabase
+            .from("profiles")
+            .select("first_name, last_name")
+            .eq("id", assignment.assigned_from)
+            .single() : Promise.resolve({ data: null }),
+          assignment.assigned_by ? supabase
+            .from("profiles")
+            .select("first_name, last_name")
+            .eq("id", assignment.assigned_by)
+            .single() : Promise.resolve({ data: null }),
+          assignment.assigned_to ? supabase
+            .from("profiles")
+            .select("first_name, last_name")
+            .eq("id", assignment.assigned_to)
+            .single() : Promise.resolve({ data: null })
+        ])
+        
+        return {
+          ...assignment,
+          assigned_from_user: assignedFromResult.data,
+          assigned_by_user: assignedByResult.data,
+          assigned_to_user: assignedToResult.data
+        }
+      }))
+      
+      setDeviceHistory(historyWithUsers as any || [])
+      setSelectedDevice(device)
+      setIsHistoryOpen(true)
+    } catch (error: any) {
+      console.error("Error loading device history:", error)
+      const errorMessage = error?.message || error?.toString() || "Failed to load device history"
+      toast.error(`Failed to load device history: ${errorMessage}`)
     }
   }
 
@@ -299,37 +392,43 @@ export default function AdminDevicesPage() {
   }
 
   const handleAssignDevice = async () => {
+    if (isAssigning) return // Prevent duplicate submissions
+    
     try {
       if (!selectedDevice || !assignForm.assigned_to) return
+
+      setIsAssigning(true)
 
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-      // Check for existing assignment
-      const { data: existing } = await supabase
+      // Mark ALL existing assignments for this device as not current
+      const { error: updateError } = await supabase
         .from("device_assignments")
-        .select("*")
+        .update({
+          is_current: false,
+          handed_over_at: new Date().toISOString(),
+          handover_notes: `Reassigned to another user`,
+        })
         .eq("device_id", selectedDevice.id)
         .eq("is_current", true)
-        .single()
 
-      if (existing) {
-        // Mark old assignment as not current and set handover date
-        await supabase
-          .from("device_assignments")
-          .update({
-            is_current: false,
-            handed_over_at: new Date().toISOString(),
-            handover_notes: `Reassigned to another user`,
-          })
-          .eq("id", existing.id)
-      }
+      if (updateError) throw updateError
+
+      // Get the previous assignment for tracking
+      const { data: previousAssignment } = await supabase
+        .from("device_assignments")
+        .select("assigned_to")
+        .eq("device_id", selectedDevice.id)
+        .order("assigned_at", { ascending: false })
+        .limit(1)
+        .single()
 
       // Create new assignment
       const { error } = await supabase.from("device_assignments").insert({
         device_id: selectedDevice.id,
         assigned_to: assignForm.assigned_to,
-        assigned_from: existing?.assigned_to || null,
+        assigned_from: previousAssignment?.assigned_to || null,
         assigned_by: user.id,
         assignment_notes: assignForm.assignment_notes,
         is_current: true,
@@ -345,7 +444,7 @@ export default function AdminDevicesPage() {
 
       // Log audit
       await supabase.rpc("log_audit", {
-        p_action: "assign",
+        p_action: currentAssignment ? "reassign" : "assign",
         p_entity_type: "device",
         p_entity_id: selectedDevice.id,
         p_new_values: {
@@ -354,12 +453,16 @@ export default function AdminDevicesPage() {
         },
       })
 
-      toast.success("Device assigned successfully")
+      toast.success(`Device ${currentAssignment ? "reassigned" : "assigned"} successfully`)
       setIsAssignDialogOpen(false)
+      setCurrentAssignment(null)
       loadData()
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error assigning device:", error)
-      toast.error("Failed to assign device")
+      const errorMessage = error?.message || "Failed to assign device"
+      toast.error(`Failed to assign device: ${errorMessage}`)
+    } finally {
+      setIsAssigning(false)
     }
   }
 
@@ -423,6 +526,16 @@ export default function AdminDevicesPage() {
     available: devices.filter((d) => d.status === "available").length,
     assigned: devices.filter((d) => d.status === "assigned").length,
     maintenance: devices.filter((d) => d.status === "maintenance").length,
+  }
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
   }
 
   const getStatusColor = (status: string) => {
@@ -653,15 +766,26 @@ export default function AdminDevicesPage() {
                             variant="outline"
                             size="sm"
                             onClick={() => handleOpenAssignDialog(device)}
+                            title={device.current_assignment ? "Reassign device" : "Assign device"}
                           >
-                            <UserPlus className="h-3 w-3" />
+                            <UserPlus className="h-3 w-3 mr-1" />
+                            {device.current_assignment ? "Reassign" : "Assign"}
                           </Button>
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => handleOpenDeviceDialog(device)}
+                            title="Edit device"
                           >
                             <Edit className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => loadDeviceHistory(device)}
+                            title="View assignment history"
+                          >
+                            <Eye className="h-3 w-3" />
                           </Button>
                           <Button
                             variant="outline"
@@ -670,6 +794,7 @@ export default function AdminDevicesPage() {
                               setDeviceToDelete(device)
                               setIsDeleteDialogOpen(true)
                             }}
+                            title="Delete device"
                             className="text-red-600 hover:text-red-700"
                           >
                             <Trash2 className="h-3 w-3" />
@@ -738,14 +863,23 @@ export default function AdminDevicesPage() {
                         className="flex-1 gap-2"
                       >
                         <UserPlus className="h-3 w-3" />
-                        Assign
+                        {device.current_assignment ? "Reassign" : "Assign"}
                       </Button>
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => handleOpenDeviceDialog(device)}
+                        title="Edit device"
                       >
                         <Edit className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => loadDeviceHistory(device)}
+                        title="View assignment history"
+                      >
+                        <Eye className="h-3 w-3" />
                       </Button>
                       <Button
                         variant="outline"
@@ -754,6 +888,7 @@ export default function AdminDevicesPage() {
                           setDeviceToDelete(device)
                           setIsDeleteDialogOpen(true)
                         }}
+                        title="Delete device"
                         className="text-red-600 hover:text-red-700"
                       >
                         <Trash2 className="h-3 w-3" />
@@ -890,9 +1025,9 @@ export default function AdminDevicesPage() {
       <Dialog open={isAssignDialogOpen} onOpenChange={setIsAssignDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Assign Device</DialogTitle>
+            <DialogTitle>{currentAssignment ? "Reassign" : "Assign"} Device</DialogTitle>
             <DialogDescription>
-              Assign {selectedDevice?.device_name} to a staff member
+              {currentAssignment ? "Reassign" : "Assign"} {selectedDevice?.device_name} to a staff member
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -946,11 +1081,11 @@ export default function AdminDevicesPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAssignDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setIsAssignDialogOpen(false)} disabled={isAssigning}>
               Cancel
             </Button>
-            <Button onClick={handleAssignDevice} disabled={!assignForm.assigned_to}>
-              Assign Device
+            <Button onClick={handleAssignDevice} disabled={!assignForm.assigned_to || isAssigning}>
+              {isAssigning ? "Processing..." : currentAssignment ? "Reassign Device" : "Assign Device"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -979,6 +1114,102 @@ export default function AdminDevicesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Device History Dialog */}
+      <Dialog open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <History className="h-5 w-5 text-primary" />
+              Device Assignment History
+            </DialogTitle>
+            <DialogDescription>
+              Complete history of assignments for {selectedDevice?.device_name}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            {deviceHistory.map((history, index) => (
+              <div
+                key={history.id}
+                className={`p-4 rounded-lg border-2 ${
+                  index === 0 
+                    ? "bg-primary/5 border-primary/30 shadow-sm" 
+                    : "bg-muted/30 border-muted"
+                }`}
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <Badge variant={index === 0 ? "default" : "outline"} className="text-xs">
+                    {index === 0 ? "Current Assignment" : `Assignment ${deviceHistory.length - index}`}
+                  </Badge>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Calendar className="h-3 w-3" />
+                    {formatDate(history.assigned_at)}
+                  </div>
+                </div>
+
+                {history.assigned_to_user && (
+                  <div className="mb-2">
+                    <p className="text-sm text-muted-foreground">
+                      Assigned to:{" "}
+                      <span className="text-foreground font-semibold">
+                        {history.assigned_to_user.first_name} {history.assigned_to_user.last_name}
+                      </span>
+                    </p>
+                  </div>
+                )}
+
+                {history.assigned_by_user && (
+                  <p className="text-sm text-muted-foreground mb-2">
+                    Assigned by:{" "}
+                    <span className="text-foreground font-medium">
+                      {history.assigned_by_user.first_name} {history.assigned_by_user.last_name}
+                    </span>
+                  </p>
+                )}
+
+                {history.assigned_from_user && (
+                  <p className="text-sm text-muted-foreground mb-2">
+                    Transferred from:{" "}
+                    <span className="text-foreground font-medium">
+                      {history.assigned_from_user.first_name} {history.assigned_from_user.last_name}
+                    </span>
+                  </p>
+                )}
+
+                {history.assignment_notes && (
+                  <div className="mt-3 p-3 bg-background/50 rounded border">
+                    <p className="text-xs font-semibold text-foreground mb-1 flex items-center gap-1">
+                      <FileText className="h-3 w-3" />
+                      Assignment Notes:
+                    </p>
+                    <p className="text-sm text-muted-foreground">{history.assignment_notes}</p>
+                  </div>
+                )}
+
+                {history.handed_over_at && (
+                  <div className="mt-3 pt-3 border-t">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Badge variant="secondary" className="text-xs">Handed Over</Badge>
+                      <span className="text-xs text-muted-foreground">
+                        {formatDate(history.handed_over_at)}
+                      </span>
+                    </div>
+                    {history.handover_notes && (
+                      <div className="p-3 bg-background/50 rounded border">
+                        <p className="text-xs font-semibold text-foreground mb-1 flex items-center gap-1">
+                          <FileText className="h-3 w-3" />
+                          Handover Notes:
+                        </p>
+                        <p className="text-sm text-muted-foreground">{history.handover_notes}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
