@@ -59,3 +59,9 @@ BEGIN
 END;
 $$;
 
+-- Grant execute permission to authenticated users
+GRANT EXECUTE ON FUNCTION assign_device(uuid, uuid, uuid, text) TO authenticated;
+
+-- Grant execute permission to anon users (if needed for service role)
+GRANT EXECUTE ON FUNCTION assign_device(uuid, uuid, uuid, text) TO anon;
+
