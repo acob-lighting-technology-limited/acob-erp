@@ -34,6 +34,8 @@ export function FeedbackViewerClient({ feedback }: FeedbackViewerClientProps) {
   const [isUpdating, setIsUpdating] = useState(false)
   const [departments, setDepartments] = useState<string[]>([])
   const [staff, setStaff] = useState<{ id: string; first_name: string; last_name: string; department: string }[]>([])
+  const [userRole, setUserRole] = useState<string | null>(null)
+  const [leadDepartments, setLeadDepartments] = useState<string[]>([])
 
   const supabase = createClient()
 
@@ -41,20 +43,48 @@ export function FeedbackViewerClient({ feedback }: FeedbackViewerClientProps) {
   useEffect(() => {
     const loadFilterData = async () => {
       try {
-        // Load all departments
-        const { data: staffData } = await supabase
+        // Get current user profile to check if they're a lead
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
+
+        const { data: userProfile } = await supabase
+          .from("profiles")
+          .select("role, lead_departments")
+          .eq("id", user.id)
+          .single()
+
+        if (userProfile) {
+          setUserRole(userProfile.role)
+          setLeadDepartments(userProfile.lead_departments || [])
+        }
+
+        // Load staff - leads can only see staff in their departments
+        let staffQuery = supabase
           .from("profiles")
           .select("id, first_name, last_name, department")
           .order("last_name", { ascending: true })
 
+        // If user is a lead, filter by their lead departments
+        if (userProfile?.role === "lead" && userProfile.lead_departments && userProfile.lead_departments.length > 0) {
+          staffQuery = staffQuery.in("department", userProfile.lead_departments)
+        }
+
+        const { data: staffData } = await staffQuery
+
         if (staffData) {
           setStaff(staffData)
           
-          // Extract unique departments
-          const uniqueDepartments = Array.from(
-            new Set(staffData.map((s: any) => s.department).filter(Boolean))
-          ) as string[]
-          setDepartments(uniqueDepartments.sort())
+          // Extract unique departments - for leads, only show their lead departments
+          let uniqueDepartments: string[] = []
+          if (userProfile?.role === "lead" && userProfile.lead_departments && userProfile.lead_departments.length > 0) {
+            uniqueDepartments = userProfile.lead_departments.sort()
+          } else {
+            uniqueDepartments = Array.from(
+              new Set(staffData.map((s: any) => s.department).filter(Boolean))
+            ) as string[]
+            uniqueDepartments.sort()
+          }
+          setDepartments(uniqueDepartments)
         }
       } catch (error) {
         console.error("Error loading filter data:", error)
@@ -274,35 +304,51 @@ export function FeedbackViewerClient({ feedback }: FeedbackViewerClientProps) {
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground">Department</label>
-              <SearchableSelect
-                value={departmentFilter}
-                onValueChange={setDepartmentFilter}
-                placeholder="All Departments"
-                searchPlaceholder="Search departments..."
-                icon={<Building2 className="h-4 w-4" />}
-                options={[
-                  { value: "all", label: "All Departments" },
-                  ...departments.map((dept) => ({
-                    value: dept,
-                    label: dept,
-                    icon: <Building2 className="h-3 w-3" />,
-                  })),
-                ]}
-              />
-            </div>
+            {/* Department filter - hidden for leads */}
+            {userRole !== "lead" && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground">Department</label>
+                <SearchableSelect
+                  value={departmentFilter}
+                  onValueChange={setDepartmentFilter}
+                  placeholder="All Departments"
+                  searchPlaceholder="Search departments..."
+                  icon={<Building2 className="h-4 w-4" />}
+                  options={[
+                    { value: "all", label: "All Departments" },
+                    ...departments.map((dept) => ({
+                      value: dept,
+                      label: dept,
+                      icon: <Building2 className="h-3 w-3" />,
+                    })),
+                  ]}
+                />
+              </div>
+            )}
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground">Staff</label>
+              <label className="text-sm font-medium text-foreground">
+                {userRole === "lead" && departments.length > 0 
+                  ? `Staff (${departments.join(", ")})`
+                  : "Staff"}
+              </label>
               <SearchableSelect
                 value={staffFilter}
                 onValueChange={setStaffFilter}
-                placeholder="All Staff"
+                placeholder={
+                  userRole === "lead" && departments.length > 0
+                    ? `All ${departments.length === 1 ? departments[0] : "Department"} Staff`
+                    : "All Staff"
+                }
                 searchPlaceholder="Search staff..."
                 icon={<User className="h-4 w-4" />}
                 options={[
-                  { value: "all", label: "All Staff" },
+                  { 
+                    value: "all", 
+                    label: userRole === "lead" && departments.length > 0
+                      ? `All ${departments.length === 1 ? departments[0] : "Department"} Staff`
+                      : "All Staff"
+                  },
                   ...staff.map((member) => ({
                     value: member.id,
                     label: `${formatName(member.first_name)} ${formatName(member.last_name)} - ${member.department}`,

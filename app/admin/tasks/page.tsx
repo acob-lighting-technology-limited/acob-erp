@@ -158,17 +158,25 @@ export default function AdminTasksPage() {
         .select("*")
         .order("created_at", { ascending: false })
 
-      // Filter by department for department leads
-      if (profile?.role === "department_lead" && profile?.lead_departments) {
+      // Filter by department for leads - STRICTLY by their departments
+      if (profile?.role === "lead" && profile?.lead_departments && profile.lead_departments.length > 0) {
         tasksQuery = tasksQuery.in("department", profile.lead_departments)
+      }
+
+      // Fetch staff - leads can only see staff in their departments
+      let staffQuery = supabase
+        .from("profiles")
+        .select("id, first_name, last_name, company_email, department")
+        .order("last_name", { ascending: true })
+
+      // Filter staff by lead's departments
+      if (profile?.role === "lead" && profile?.lead_departments && profile.lead_departments.length > 0) {
+        staffQuery = staffQuery.in("department", profile.lead_departments)
       }
 
       const [tasksData, staffData] = await Promise.all([
         tasksQuery,
-        supabase
-          .from("profiles")
-          .select("id, first_name, last_name, company_email, department")
-          .order("last_name", { ascending: true }),
+        staffQuery,
       ])
 
       if (tasksData.error) throw tasksData.error
@@ -223,14 +231,42 @@ export default function AdminTasksPage() {
         return taskData
       }))
 
-      setTasks(tasksWithUsers as any || [])
+      // For leads, filter tasks strictly by their departments
+      let filteredTasks = tasksWithUsers as any || []
+      if (profile?.role === "lead" && profile?.lead_departments && profile.lead_departments.length > 0) {
+        filteredTasks = filteredTasks.filter((task: any) => {
+          // Check if task department is in lead's departments
+          if (task.department && profile.lead_departments.includes(task.department)) {
+            return true
+          }
+          // Check if assigned user is in lead's departments
+          if (task.assigned_to_user?.department && profile.lead_departments.includes(task.assigned_to_user.department)) {
+            return true
+          }
+          // Check if any assigned user in multiple-user tasks is in lead's departments
+          if (task.assigned_users && task.assigned_users.length > 0) {
+            return task.assigned_users.some((u: any) => 
+              u.department && profile.lead_departments.includes(u.department)
+            )
+          }
+          return false
+        })
+      }
+
+      setTasks(filteredTasks)
       setStaff(staffData.data || [])
       
-      // Get unique departments
-      const uniqueDepartments = Array.from(
-        new Set(staffData.data?.map((s: any) => s.department).filter(Boolean))
-      ) as string[]
-      setDepartments(uniqueDepartments.sort())
+      // Get unique departments - for leads, only show their lead departments
+      let uniqueDepartments: string[] = []
+      if (profile?.role === "lead" && profile?.lead_departments && profile.lead_departments.length > 0) {
+        uniqueDepartments = profile.lead_departments.sort()
+      } else {
+        uniqueDepartments = Array.from(
+          new Set(staffData.data?.map((s: any) => s.department).filter(Boolean))
+        ) as string[]
+        uniqueDepartments.sort()
+      }
+      setDepartments(uniqueDepartments)
     } catch (error: any) {
       console.error("Error loading data:", error)
       const errorMessage = error?.message || error?.toString() || "Failed to load data"
@@ -446,10 +482,23 @@ export default function AdminTasksPage() {
     const matchesStatus = statusFilter === "all" || task.status === statusFilter
     const matchesPriority = priorityFilter === "all" || task.priority === priorityFilter
 
-    // Filter by department
-    const matchesDepartment = departmentFilter === "all" || 
-      task.department === departmentFilter ||
-      (task.assigned_to_user && staff.find((s) => s.id === task.assigned_to)?.department === departmentFilter)
+    // Filter by department - for leads, always filter by their departments
+    let matchesDepartment = true
+    if (userProfile?.role === "lead") {
+      // Leads: tasks are already filtered, but ensure they match lead's departments
+      if (userProfile.lead_departments && userProfile.lead_departments.length > 0) {
+        matchesDepartment = userProfile.lead_departments.includes(task.department || "") ||
+          (task.assigned_to_user && userProfile.lead_departments.includes(task.assigned_to_user.department || "")) ||
+          (task.assigned_users && task.assigned_users.some((u: any) => 
+            u.department && userProfile.lead_departments.includes(u.department)
+          ))
+      }
+    } else {
+      // Admins: use department filter
+      matchesDepartment = departmentFilter === "all" || 
+        task.department === departmentFilter ||
+        (task.assigned_to_user && staff.find((s) => s.id === task.assigned_to)?.department === departmentFilter)
+    }
 
     // Filter by staff
     const matchesStaff = staffFilter === "all" || 
@@ -699,31 +748,43 @@ export default function AdminTasksPage() {
                   <SelectItem value="low">Low</SelectItem>
                 </SelectContent>
               </Select>
-              <SearchableSelect
-                value={departmentFilter}
-                onValueChange={setDepartmentFilter}
-                placeholder="All Departments"
-                searchPlaceholder="Search departments..."
-                icon={<Building2 className="h-4 w-4" />}
-                className="w-full md:w-48"
-                options={[
-                  { value: "all", label: "All Departments" },
-                  ...departments.map((dept) => ({
-                    value: dept,
-                    label: dept,
-                    icon: <Building2 className="h-3 w-3" />,
-                  })),
-                ]}
-              />
+              {/* Department filter - hidden for leads */}
+              {userProfile?.role !== "lead" && (
+                <SearchableSelect
+                  value={departmentFilter}
+                  onValueChange={setDepartmentFilter}
+                  placeholder="All Departments"
+                  searchPlaceholder="Search departments..."
+                  icon={<Building2 className="h-4 w-4" />}
+                  className="w-full md:w-48"
+                  options={[
+                    { value: "all", label: "All Departments" },
+                    ...departments.map((dept) => ({
+                      value: dept,
+                      label: dept,
+                      icon: <Building2 className="h-3 w-3" />,
+                    })),
+                  ]}
+                />
+              )}
               <SearchableSelect
                 value={staffFilter}
                 onValueChange={setStaffFilter}
-                placeholder="All Staff"
+                placeholder={
+                  userProfile?.role === "lead" && departments.length > 0
+                    ? `All ${departments.length === 1 ? departments[0] : "Department"} Staff`
+                    : "All Staff"
+                }
                 searchPlaceholder="Search staff..."
                 icon={<User className="h-4 w-4" />}
                 className="w-full md:w-48"
                 options={[
-                  { value: "all", label: "All Staff" },
+                  { 
+                    value: "all", 
+                    label: userProfile?.role === "lead" && departments.length > 0
+                      ? `All ${departments.length === 1 ? departments[0] : "Department"} Staff`
+                      : "All Staff"
+                  },
                   ...staff.map((member) => ({
                     value: member.id,
                     label: `${formatName(member.first_name)} ${formatName(member.last_name)} - ${member.department}`,

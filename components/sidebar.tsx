@@ -43,6 +43,7 @@ interface SidebarProps {
     last_name?: string
     department?: string
     is_admin?: boolean
+    role?: string
   }
   isAdmin?: boolean
 }
@@ -152,7 +153,7 @@ export function Sidebar({ user, profile, isAdmin }: SidebarProps) {
           )
         })}
 
-        {isAdmin && (
+        {(isAdmin || profile?.role === "lead" || profile?.role === "admin" || profile?.role === "super_admin") && (
           <>
             <div className={cn("transition-all duration-300 overflow-hidden", isCollapsed ? "h-0 opacity-0" : "h-auto opacity-100")}>
               <div className="pt-4 pb-2">

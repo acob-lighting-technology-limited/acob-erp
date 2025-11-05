@@ -127,17 +127,24 @@ export default function AdminStaffPage() {
       // Get user profile
       const { data: profile } = await supabase
         .from("profiles")
-        .select("role")
+        .select("role, lead_departments")
         .eq("id", user.id)
         .single()
 
       setUserProfile(profile)
 
-      // Fetch all staff
-      const { data, error } = await supabase
+      // Fetch staff - leads can only see staff in their departments
+      let query = supabase
         .from("profiles")
         .select("*")
         .order("last_name", { ascending: true })
+
+      // If user is a lead, filter by their lead departments
+      if (profile?.role === "lead" && profile.lead_departments && profile.lead_departments.length > 0) {
+        query = query.in("department", profile.lead_departments)
+      }
+
+      const { data, error } = await query
 
       if (error) throw error
 

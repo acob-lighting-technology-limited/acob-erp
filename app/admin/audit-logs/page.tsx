@@ -84,6 +84,7 @@ export default function AuditLogsPage() {
   const [logs, setLogs] = useState<AuditLog[]>([])
   const [staff, setStaff] = useState<{ id: string; first_name: string; last_name: string; department: string }[]>([])
   const [departments, setDepartments] = useState<string[]>([])
+  const [userProfile, setUserProfile] = useState<{ role?: string; lead_departments?: string[] } | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [actionFilter, setActionFilter] = useState("all")
@@ -105,6 +106,18 @@ export default function AuditLogsPage() {
 
   const loadLogs = async () => {
     try {
+      // Get current user profile to check if they're a lead
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data: userProfile } = await supabase
+        .from("profiles")
+        .select("role, lead_departments")
+        .eq("id", user.id)
+        .single()
+
+      setUserProfile(userProfile || null)
+
       // Fetch audit logs without join first
       const { data: logsData, error: logsError } = await supabase
         .from("audit_logs")
@@ -125,6 +138,7 @@ export default function AuditLogsPage() {
         }
         throw logsError
       }
+
 
       // If we have logs, fetch user details for each unique user_id and entity_id
       if (logsData && logsData.length > 0) {
@@ -330,18 +344,31 @@ export default function AuditLogsPage() {
         setLogs([])
       }
 
-      // Load staff for filter
-      const { data: staffData } = await supabase
+      // Load staff for filter - leads can only see staff in their departments
+      let staffQuery = supabase
         .from("profiles")
         .select("id, first_name, last_name, department")
         .order("last_name", { ascending: true })
+
+      // If user is a lead, filter by their lead departments
+      if (userProfile?.role === "lead" && userProfile.lead_departments && userProfile.lead_departments.length > 0) {
+        staffQuery = staffQuery.in("department", userProfile.lead_departments)
+      }
+
+      const { data: staffData } = await staffQuery
       setStaff(staffData || [])
       
-      // Extract unique departments
-      const uniqueDepartments = Array.from(
-        new Set(staffData?.map((s: any) => s.department).filter(Boolean))
-      ) as string[]
-      setDepartments(uniqueDepartments.sort())
+      // Extract unique departments - for leads, only show their lead departments
+      let uniqueDepartments: string[] = []
+      if (userProfile?.role === "lead" && userProfile.lead_departments && userProfile.lead_departments.length > 0) {
+        uniqueDepartments = userProfile.lead_departments.sort()
+      } else {
+        uniqueDepartments = Array.from(
+          new Set(staffData?.map((s: any) => s.department).filter(Boolean))
+        ) as string[]
+        uniqueDepartments.sort()
+      }
+      setDepartments(uniqueDepartments)
     } catch (error: any) {
       console.error("Error loading audit logs:", error)
     } finally {
@@ -359,9 +386,19 @@ export default function AuditLogsPage() {
     const matchesAction = actionFilter === "all" || log.action === actionFilter
     const matchesEntity = entityFilter === "all" || log.entity_type === entityFilter
 
-    // Filter by department (based on user's department)
-    const matchesDepartment = departmentFilter === "all" || 
-      (log.user && staff.find((s) => s.id === log.user_id)?.department === departmentFilter)
+    // Filter by department - for leads, always filter by their departments
+    let matchesDepartment = true
+    if (userProfile?.role === "lead") {
+      // Leads: logs are already filtered, but ensure they match lead's departments
+      if (userProfile.lead_departments && userProfile.lead_departments.length > 0) {
+        const userDept = staff.find((s) => s.id === log.user_id)?.department
+        matchesDepartment = userDept ? userProfile.lead_departments.includes(userDept) : false
+      }
+    } else {
+      // Admins: use department filter
+      matchesDepartment = departmentFilter === "all" || 
+        (log.user && staff.find((s) => s.id === log.user_id)?.department === departmentFilter)
+    }
 
     // Filter by staff
     const matchesStaff = staffFilter === "all" || log.user_id === staffFilter
@@ -736,29 +773,41 @@ export default function AuditLogsPage() {
             </div>
             
             <div className="grid gap-4 md:grid-cols-2 mt-4">
-              <SearchableSelect
-                value={departmentFilter}
-                onValueChange={setDepartmentFilter}
-                placeholder="All Departments"
-                searchPlaceholder="Search departments..."
-                icon={<Building2 className="h-4 w-4" />}
-                options={[
-                  { value: "all", label: "All Departments" },
-                  ...departments.map((dept) => ({
-                    value: dept,
-                    label: dept,
-                    icon: <Building2 className="h-3 w-3" />,
-                  })),
-                ]}
-              />
+              {/* Department filter - hidden for leads */}
+              {userProfile?.role !== "lead" && (
+                <SearchableSelect
+                  value={departmentFilter}
+                  onValueChange={setDepartmentFilter}
+                  placeholder="All Departments"
+                  searchPlaceholder="Search departments..."
+                  icon={<Building2 className="h-4 w-4" />}
+                  options={[
+                    { value: "all", label: "All Departments" },
+                    ...departments.map((dept) => ({
+                      value: dept,
+                      label: dept,
+                      icon: <Building2 className="h-3 w-3" />,
+                    })),
+                  ]}
+                />
+              )}
               <SearchableSelect
                 value={staffFilter}
                 onValueChange={setStaffFilter}
-                placeholder="All Staff"
+                placeholder={
+                  userProfile?.role === "lead" && userProfile.lead_departments && userProfile.lead_departments.length > 0
+                    ? `All ${userProfile.lead_departments.length === 1 ? userProfile.lead_departments[0] : "Department"} Staff`
+                    : "All Staff"
+                }
                 searchPlaceholder="Search staff..."
                 icon={<User className="h-4 w-4" />}
                 options={[
-                  { value: "all", label: "All Staff" },
+                  { 
+                    value: "all", 
+                    label: userProfile?.role === "lead" && userProfile.lead_departments && userProfile.lead_departments.length > 0
+                      ? `All ${userProfile.lead_departments.length === 1 ? userProfile.lead_departments[0] : "Department"} Staff`
+                      : "All Staff"
+                  },
                   ...staff.map((member) => ({
                     value: member.id,
                     label: `${formatName(member.first_name)} ${formatName(member.last_name)} - ${member.department}`,

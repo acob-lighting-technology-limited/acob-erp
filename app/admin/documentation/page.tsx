@@ -104,11 +104,33 @@ export default function AdminDocumentationPage() {
 
       setUserProfile(profile)
 
-      // Fetch documentation without join first
-      const { data: docsData, error: docsError } = await supabase
+      // Fetch documentation - leads can only see documentation from their departments
+      let docsQuery = supabase
         .from("user_documentation")
         .select("*")
         .order("created_at", { ascending: false })
+
+      // If user is a lead, filter by their lead departments
+      if (profile?.role === "lead" && profile.lead_departments && profile.lead_departments.length > 0) {
+        // Get all user IDs in the lead's departments
+        const { data: deptUsers } = await supabase
+          .from("profiles")
+          .select("id")
+          .in("department", profile.lead_departments)
+
+        const userIds = deptUsers?.map(u => u.id) || []
+        if (userIds.length > 0) {
+          docsQuery = docsQuery.in("user_id", userIds)
+        } else {
+          // No users in departments, return empty
+          setDocumentation([])
+          setStaff([])
+          setIsLoading(false)
+          return
+        }
+      }
+
+      const { data: docsData, error: docsError } = await docsQuery
 
       if (docsError) {
         console.error("Documentation error:", docsError)
@@ -128,19 +150,11 @@ export default function AdminDocumentationPage() {
         // Create a map of user data
         const usersMap = new Map(usersData?.map(user => [user.id, user]))
 
-        // Combine docs with user data
-        let docsWithUsers = docsData.map(doc => ({
+        // Combine docs with user data (already filtered by RLS for leads)
+        const docsWithUsers = docsData.map(doc => ({
           ...doc,
           user: doc.user_id ? usersMap.get(doc.user_id) : null
         }))
-
-        // Role-based filtering
-        if (profile?.role === "lead" && profile.lead_departments) {
-          // Leads can only see their department's documentation
-          docsWithUsers = docsWithUsers.filter(doc =>
-            doc.user?.department && profile.lead_departments?.includes(doc.user.department)
-          )
-        }
 
         setDocumentation(docsWithUsers as any)
       } else {
@@ -181,8 +195,17 @@ export default function AdminDocumentationPage() {
       (statusFilter === "published" && !doc.is_draft) ||
       (statusFilter === "draft" && doc.is_draft)
 
-    const matchesDepartment =
-      departmentFilter === "all" || doc.user?.department === departmentFilter
+    // Filter by department - for leads, always filter by their departments
+    let matchesDepartment = true
+    if (userProfile?.role === "lead") {
+      // Leads: documentation is already filtered, but ensure it matches lead's departments
+      if (userProfile.lead_departments && userProfile.lead_departments.length > 0) {
+        matchesDepartment = doc.user?.department ? userProfile.lead_departments.includes(doc.user.department) : false
+      }
+    } else {
+      // Admins: use department filter
+      matchesDepartment = departmentFilter === "all" || doc.user?.department === departmentFilter
+    }
 
     const matchesStaff =
       staffFilter === "all" || doc.user_id === staffFilter
@@ -401,31 +424,43 @@ export default function AdminDocumentationPage() {
                     ))}
                   </SelectContent>
                 </Select>
-                <SearchableSelect
-                  value={departmentFilter}
-                  onValueChange={setDepartmentFilter}
-                  placeholder="All Departments"
-                  searchPlaceholder="Search departments..."
-                  icon={<Building2 className="h-4 w-4" />}
-                  className="w-full md:w-48"
-                  options={[
-                    { value: "all", label: "All Departments" },
-                    ...departments.map((dept) => ({
-                      value: dept,
-                      label: dept,
-                      icon: <Building2 className="h-3 w-3" />,
-                    })),
-                  ]}
-                />
+                {/* Department filter - hidden for leads */}
+                {userProfile?.role !== "lead" && (
+                  <SearchableSelect
+                    value={departmentFilter}
+                    onValueChange={setDepartmentFilter}
+                    placeholder="All Departments"
+                    searchPlaceholder="Search departments..."
+                    icon={<Building2 className="h-4 w-4" />}
+                    className="w-full md:w-48"
+                    options={[
+                      { value: "all", label: "All Departments" },
+                      ...departments.map((dept) => ({
+                        value: dept,
+                        label: dept,
+                        icon: <Building2 className="h-3 w-3" />,
+                      })),
+                    ]}
+                  />
+                )}
                 <SearchableSelect
                   value={staffFilter}
                   onValueChange={setStaffFilter}
-                  placeholder="All Staff"
+                  placeholder={
+                    userProfile?.role === "lead" && userProfile.lead_departments && userProfile.lead_departments.length > 0
+                      ? `All ${userProfile.lead_departments.length === 1 ? userProfile.lead_departments[0] : "Department"} Staff`
+                      : "All Staff"
+                  }
                   searchPlaceholder="Search staff..."
                   icon={<User className="h-4 w-4" />}
                   className="w-full md:w-48"
                   options={[
-                    { value: "all", label: "All Staff" },
+                    { 
+                      value: "all", 
+                      label: userProfile?.role === "lead" && userProfile.lead_departments && userProfile.lead_departments.length > 0
+                        ? `All ${userProfile.lead_departments.length === 1 ? userProfile.lead_departments[0] : "Department"} Staff`
+                        : "All Staff"
+                    },
                     ...staff.map((member) => ({
                       value: member.id,
                       label: `${formatName(member.first_name)} ${formatName(member.last_name)} - ${member.department}`,

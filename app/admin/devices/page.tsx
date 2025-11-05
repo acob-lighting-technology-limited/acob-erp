@@ -125,6 +125,7 @@ export default function AdminDevicesPage() {
   const [devices, setDevices] = useState<Device[]>([])
   const [staff, setStaff] = useState<Staff[]>([])
   const [departments, setDepartments] = useState<string[]>([])
+  const [userProfile, setUserProfile] = useState<{ role?: string; lead_departments?: string[] } | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
@@ -167,7 +168,17 @@ export default function AdminDevicesPage() {
 
   const loadData = async () => {
     try {
-      // Fetch devices first
+      // Get current user profile to check if they're a lead
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data: userProfile } = await supabase
+        .from("profiles")
+        .select("role, lead_departments")
+        .eq("id", user.id)
+        .single()
+
+      // Fetch devices - RLS will handle filtering for leads
       const { data: devicesData, error: devicesError } = await supabase
         .from("devices")
         .select("*")
@@ -188,7 +199,7 @@ export default function AdminDevicesPage() {
         if (assignment.assigned_to) {
           const { data: userProfile } = await supabase
             .from("profiles")
-            .select("first_name, last_name")
+            .select("first_name, last_name, department")
             .eq("id", assignment.assigned_to)
             .single()
           
@@ -200,34 +211,59 @@ export default function AdminDevicesPage() {
         return assignment
       }))
 
-      // Fetch staff
-      const { data: staffData, error: staffError } = await supabase
+      // Fetch staff - leads can only see staff in their departments
+      let staffQuery = supabase
         .from("profiles")
         .select("id, first_name, last_name, company_email, department")
         .order("last_name", { ascending: true })
 
+      // If user is a lead, filter by their lead departments
+      if (userProfile?.role === "lead" && userProfile.lead_departments && userProfile.lead_departments.length > 0) {
+        staffQuery = staffQuery.in("department", userProfile.lead_departments)
+      }
+
+      const { data: staffData, error: staffError } = await staffQuery
+
       if (staffError) throw staffError
 
+      // Filter devices for leads - only show devices assigned to their department staff
+      let filteredDevices = devicesData || []
+      if (userProfile?.role === "lead" && userProfile.lead_departments && userProfile.lead_departments.length > 0) {
+        const deptUserIds = (staffData || []).map((s: any) => s.id)
+        filteredDevices = filteredDevices.filter((device) => {
+          const assignment = (assignmentsWithUsers || []).find((a: any) => a.device_id === device.id)
+          return assignment && assignment.assigned_to && deptUserIds.includes(assignment.assigned_to)
+        })
+      }
+
       // Combine devices with their current assignments
-      const devicesWithAssignments = (devicesData || []).map((device) => {
+      const devicesWithAssignments = filteredDevices.map((device) => {
         const assignment = (assignmentsWithUsers || []).find((a: any) => a.device_id === device.id)
         return {
           ...device,
-          current_assignment: assignment ? {
+          current_assignment: assignment && assignment.assigned_to ? {
             assigned_to: assignment.assigned_to,
-            user: assignment.user
+            user: assignment.user || null
           } : undefined
         }
       })
 
       setDevices(devicesWithAssignments)
       setStaff(staffData || [])
+      setUserProfile(userProfile || null)
       
       // Extract unique departments
-      const uniqueDepartments = Array.from(
-        new Set(staffData?.map((s: any) => s.department).filter(Boolean))
-      ) as string[]
-      setDepartments(uniqueDepartments.sort())
+      // Get unique departments - for leads, only show their lead departments
+      let uniqueDepartments: string[] = []
+      if (userProfile?.role === "lead" && userProfile.lead_departments && userProfile.lead_departments.length > 0) {
+        uniqueDepartments = userProfile.lead_departments.sort()
+      } else {
+        uniqueDepartments = Array.from(
+          new Set(staffData?.map((s: any) => s.department).filter(Boolean))
+        ) as string[]
+        uniqueDepartments.sort()
+      }
+      setDepartments(uniqueDepartments)
     } catch (error: any) {
       console.error("Error loading data:", error)
       const errorMessage = error?.message || error?.toString() || "Failed to load data"
@@ -504,10 +540,22 @@ export default function AdminDevicesPage() {
 
     const matchesStatus = statusFilter === "all" || device.status === statusFilter
 
-    // Filter by department (based on assigned user's department)
-    const matchesDepartment = departmentFilter === "all" || 
-      (device.current_assignment?.assigned_to && 
-        staff.find((s) => s.id === device.current_assignment?.assigned_to)?.department === departmentFilter)
+    // Filter by department - for leads, always filter by their departments
+    let matchesDepartment = true
+    if (userProfile?.role === "lead") {
+      // Leads: devices are already filtered, but ensure they match lead's departments
+      if (userProfile.lead_departments && userProfile.lead_departments.length > 0) {
+        const assignedUserDept = device.current_assignment?.assigned_to 
+          ? staff.find((s) => s.id === device.current_assignment?.assigned_to)?.department
+          : null
+        matchesDepartment = assignedUserDept ? userProfile.lead_departments.includes(assignedUserDept) : false
+      }
+    } else {
+      // Admins: use department filter
+      matchesDepartment = departmentFilter === "all" || 
+        (device.current_assignment?.assigned_to && 
+          staff.find((s) => s.id === device.current_assignment?.assigned_to)?.department === departmentFilter)
+    }
 
     // Filter by staff
     const matchesStaff = staffFilter === "all" || 
@@ -643,10 +691,12 @@ export default function AdminDevicesPage() {
                 Card
               </Button>
             </div>
-            <Button onClick={() => handleOpenDeviceDialog()} className="gap-2">
-              <Plus className="h-4 w-4" />
-              Add Device
-            </Button>
+            {userProfile?.role !== "lead" && (
+              <Button onClick={() => handleOpenDeviceDialog()} className="gap-2">
+                <Plus className="h-4 w-4" />
+                Add Device
+              </Button>
+            )}
           </div>
         </div>
 
@@ -735,31 +785,43 @@ export default function AdminDevicesPage() {
                   <SelectItem value="retired">Retired</SelectItem>
                 </SelectContent>
               </Select>
-              <SearchableSelect
-                value={departmentFilter}
-                onValueChange={setDepartmentFilter}
-                placeholder="All Departments"
-                searchPlaceholder="Search departments..."
-                icon={<Building2 className="h-4 w-4" />}
-                className="w-full md:w-48"
-                options={[
-                  { value: "all", label: "All Departments" },
-                  ...departments.map((dept) => ({
-                    value: dept,
-                    label: dept,
-                    icon: <Building2 className="h-3 w-3" />,
-                  })),
-                ]}
-              />
+              {/* Department filter - hidden for leads */}
+              {userProfile?.role !== "lead" && (
+                <SearchableSelect
+                  value={departmentFilter}
+                  onValueChange={setDepartmentFilter}
+                  placeholder="All Departments"
+                  searchPlaceholder="Search departments..."
+                  icon={<Building2 className="h-4 w-4" />}
+                  className="w-full md:w-48"
+                  options={[
+                    { value: "all", label: "All Departments" },
+                    ...departments.map((dept) => ({
+                      value: dept,
+                      label: dept,
+                      icon: <Building2 className="h-3 w-3" />,
+                    })),
+                  ]}
+                />
+              )}
               <SearchableSelect
                 value={staffFilter}
                 onValueChange={setStaffFilter}
-                placeholder="All Staff"
+                placeholder={
+                  userProfile?.role === "lead" && departments.length > 0
+                    ? `All ${departments.length === 1 ? departments[0] : "Department"} Staff`
+                    : "All Staff"
+                }
                 searchPlaceholder="Search staff..."
                 icon={<User className="h-4 w-4" />}
                 className="w-full md:w-48"
                 options={[
-                  { value: "all", label: "All Staff" },
+                  { 
+                    value: "all", 
+                    label: userProfile?.role === "lead" && departments.length > 0
+                      ? `All ${departments.length === 1 ? departments[0] : "Department"} Staff`
+                      : "All Staff"
+                  },
                   ...staff.map((member) => ({
                     value: member.id,
                     label: `${formatName(member.first_name)} ${formatName(member.last_name)} - ${member.department}`,
@@ -818,13 +880,13 @@ export default function AdminDevicesPage() {
                         <Badge className={getStatusColor(device.status)}>{device.status}</Badge>
                       </TableCell>
                       <TableCell>
-                        {device.current_assignment ? (
-                                                      <div className="flex items-center gap-2 text-sm">
-                              <User className="h-3 w-3 text-muted-foreground" />
-                              <span className="text-foreground">
-                                {formatName(device.current_assignment.user.first_name)} {formatName(device.current_assignment.user.last_name)}
-                              </span>
-                            </div>
+                        {device.current_assignment?.user ? (
+                          <div className="flex items-center gap-2 text-sm">
+                            <User className="h-3 w-3 text-muted-foreground" />
+                            <span className="text-foreground">
+                              {formatName(device.current_assignment.user.first_name)} {formatName(device.current_assignment.user.last_name)}
+                            </span>
+                          </div>
                         ) : (
                           <span className="text-sm text-muted-foreground">Unassigned</span>
                         )}
@@ -840,14 +902,16 @@ export default function AdminDevicesPage() {
                             <UserPlus className="h-3 w-3 mr-1" />
                             {device.current_assignment ? "Reassign" : "Assign"}
                           </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleOpenDeviceDialog(device)}
-                            title="Edit device"
-                          >
-                            <Edit className="h-3 w-3" />
-                          </Button>
+                          {userProfile?.role !== "lead" && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleOpenDeviceDialog(device)}
+                              title="Edit device"
+                            >
+                              <Edit className="h-3 w-3" />
+                            </Button>
+                          )}
                           <Button
                             variant="outline"
                             size="sm"
@@ -856,18 +920,20 @@ export default function AdminDevicesPage() {
                           >
                             <Eye className="h-3 w-3" />
                           </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setDeviceToDelete(device)
-                              setIsDeleteDialogOpen(true)
-                            }}
-                            title="Delete device"
-                            className="text-red-600 hover:text-red-700"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
+                          {userProfile?.role !== "lead" && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setDeviceToDelete(device)
+                                setIsDeleteDialogOpen(true)
+                              }}
+                              title="Delete device"
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -912,7 +978,7 @@ export default function AdminDevicesPage() {
 
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-muted-foreground">Assigned To:</span>
-                      {device.current_assignment ? (
+                      {device.current_assignment?.user ? (
                         <div className="flex items-center gap-2">
                           <User className="h-3 w-3 text-muted-foreground" />
                           <span className="text-sm text-foreground font-medium">
@@ -934,14 +1000,16 @@ export default function AdminDevicesPage() {
                         <UserPlus className="h-3 w-3" />
                         {device.current_assignment ? "Reassign" : "Assign"}
                       </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleOpenDeviceDialog(device)}
-                        title="Edit device"
-                      >
-                        <Edit className="h-3 w-3" />
-                      </Button>
+                      {userProfile?.role !== "lead" && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleOpenDeviceDialog(device)}
+                          title="Edit device"
+                        >
+                          <Edit className="h-3 w-3" />
+                        </Button>
+                      )}
                       <Button
                         variant="outline"
                         size="sm"
@@ -950,18 +1018,20 @@ export default function AdminDevicesPage() {
                       >
                         <Eye className="h-3 w-3" />
                       </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setDeviceToDelete(device)
-                          setIsDeleteDialogOpen(true)
-                        }}
-                        title="Delete device"
-                        className="text-red-600 hover:text-red-700"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
+                      {userProfile?.role !== "lead" && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setDeviceToDelete(device)
+                            setIsDeleteDialogOpen(true)
+                          }}
+                          title="Delete device"
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      )}
                     </div>
                   </CardContent>
                 </Card>

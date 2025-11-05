@@ -12,14 +12,18 @@ export default async function AdminFeedbackPage() {
     redirect("/auth/login")
   }
 
-  // Check if user is admin
-  const { data: profile } = await supabase.from("profiles").select("is_admin").eq("id", data.user.id).single()
+  // Check if user is admin or lead
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role, lead_departments")
+    .eq("id", data.user.id)
+    .single()
 
-  if (!profile?.is_admin) {
+  if (!profile || !["super_admin", "admin", "lead"].includes(profile.role)) {
     redirect("/dashboard")
   }
 
-  // Fetch all feedback
+  // Fetch feedback - RLS will filter by department for leads
   const { data: feedbackData, error: feedbackError } = await supabase
     .from("feedback")
     .select("*")

@@ -131,6 +131,7 @@ export default function AdminAssetsPage() {
   const [assets, setAssets] = useState<Asset[]>([])
   const [staff, setStaff] = useState<Staff[]>([])
   const [departments, setDepartments] = useState<string[]>([])
+  const [userProfile, setUserProfile] = useState<{ role?: string; lead_departments?: string[] } | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
@@ -174,7 +175,17 @@ export default function AdminAssetsPage() {
 
   const loadData = async () => {
     try {
-      // Fetch assets first
+      // Get current user profile to check if they're a lead
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data: userProfile } = await supabase
+        .from("profiles")
+        .select("role, lead_departments")
+        .eq("id", user.id)
+        .single()
+
+      // Fetch assets - RLS will handle filtering for leads
       const { data: AssetsData, error: AssetsError } = await supabase
         .from("assets")
         .select("*")
@@ -182,11 +193,11 @@ export default function AdminAssetsPage() {
 
       if (AssetsError) throw AssetsError
 
-             // Fetch current assignments for all assets
-       const { data: assignmentsData, error: assignmentsError } = await supabase
-         .from("asset_assignments")
-         .select("asset_id, assigned_to, department")
-         .eq("is_current", true)
+      // Fetch current assignments for all assets
+      const { data: assignmentsData, error: assignmentsError } = await supabase
+        .from("asset_assignments")
+        .select("asset_id, assigned_to, department")
+        .eq("is_current", true)
 
       if (assignmentsError) throw assignmentsError
       
@@ -195,7 +206,7 @@ export default function AdminAssetsPage() {
         if (assignment.assigned_to) {
           const { data: userProfile } = await supabase
             .from("profiles")
-            .select("first_name, last_name")
+            .select("first_name, last_name, department")
             .eq("id", assignment.assigned_to)
             .single()
           
@@ -207,34 +218,70 @@ export default function AdminAssetsPage() {
         return assignment
       }))
 
-      // Fetch staff
-      const { data: staffData, error: staffError } = await supabase
+      // Fetch staff - leads can only see staff in their departments
+      let staffQuery = supabase
         .from("profiles")
         .select("id, first_name, last_name, company_email, department")
         .order("last_name", { ascending: true })
 
+      // If user is a lead, filter by their lead departments
+      if (userProfile?.role === "lead" && userProfile.lead_departments && userProfile.lead_departments.length > 0) {
+        staffQuery = staffQuery.in("department", userProfile.lead_departments)
+      }
+
+      const { data: staffData, error: staffError } = await staffQuery
+
       if (staffError) throw staffError
 
-             // Combine assets with their current assignments
-       const assetsWithAssignments = (AssetsData || []).map((asset) => {
-         const assignment = (assignmentsWithUsers || []).find((a: any) => a.asset_id === asset.id)
+      // Filter assets for leads - only show assets assigned to their department staff or department
+      let filteredAssets = AssetsData || []
+      if (userProfile?.role === "lead" && userProfile.lead_departments && userProfile.lead_departments.length > 0) {
+        const deptUserIds = (staffData || []).map((s: any) => s.id)
+        filteredAssets = filteredAssets.filter((asset) => {
+          const assignment = (assignmentsWithUsers || []).find((a: any) => a.asset_id === asset.id)
+          if (!assignment) return false
+          
+          // Check if assigned to individual in department
+          if (assignment.assigned_to && deptUserIds.includes(assignment.assigned_to)) {
+            return true
+          }
+          
+          // Check if assigned to department
+          if (assignment.department && userProfile.lead_departments.includes(assignment.department)) {
+            return true
+          }
+          
+          return false
+        })
+      }
+
+      // Combine assets with their current assignments
+      const assetsWithAssignments = filteredAssets.map((asset) => {
+        const assignment = (assignmentsWithUsers || []).find((a: any) => a.asset_id === asset.id)
         return {
           ...asset,
           current_assignment: assignment ? {
             assigned_to: assignment.assigned_to,
             department: assignment.department,
-            user: assignment.user
+            user: assignment.user || null
           } : undefined
         }
       })
 
-      // Get unique departments
-      const uniqueDepartments = Array.from(
-        new Set(staffData?.map((s: any) => s.department).filter(Boolean))
-      ) as string[]
-      setDepartments(uniqueDepartments.sort())
+      // Get unique departments - for leads, only show their lead departments
+      let uniqueDepartments: string[] = []
+      if (userProfile?.role === "lead" && userProfile.lead_departments && userProfile.lead_departments.length > 0) {
+        uniqueDepartments = userProfile.lead_departments.sort()
+      } else {
+        uniqueDepartments = Array.from(
+          new Set(staffData?.map((s: any) => s.department).filter(Boolean))
+        ) as string[]
+        uniqueDepartments.sort()
+      }
+      setDepartments(uniqueDepartments)
+      setUserProfile(userProfile || null)
 
-             setAssets(assetsWithAssignments)
+      setAssets(assetsWithAssignments)
       setStaff(staffData || [])
     } catch (error: any) {
       console.error("Error loading data:", error)
@@ -579,9 +626,24 @@ export default function AdminAssetsPage() {
 
     const matchesStatus = statusFilter === "all" || asset.status === statusFilter
 
-    // Filter by department
-    const matchesDepartment = departmentFilter === "all" || 
-      asset.current_assignment?.department === departmentFilter
+    // Filter by department - for leads, always filter by their departments
+    let matchesDepartment = true
+    if (userProfile?.role === "lead") {
+      // Leads: assets are already filtered, but ensure they match lead's departments
+      if (userProfile.lead_departments && userProfile.lead_departments.length > 0) {
+        const assignmentDept = asset.current_assignment?.department
+        const assignedUserDept = asset.current_assignment?.assigned_to 
+          ? staff.find((s) => s.id === asset.current_assignment?.assigned_to)?.department
+          : null
+        
+        matchesDepartment = assignmentDept ? userProfile.lead_departments.includes(assignmentDept) :
+          assignedUserDept ? userProfile.lead_departments.includes(assignedUserDept) : false
+      }
+    } else {
+      // Admins: use department filter
+      matchesDepartment = departmentFilter === "all" || 
+        asset.current_assignment?.department === departmentFilter
+    }
 
     // Filter by user
     const matchesUser = userFilter === "all" || 
@@ -718,10 +780,12 @@ export default function AdminAssetsPage() {
                 Card
               </Button>
             </div>
-                         <Button onClick={() => handleOpenAssetDialog()} className="gap-2">
-               <Plus className="h-4 w-4" />
-               Add Asset
-             </Button>
+            {userProfile?.role !== "lead" && (
+              <Button onClick={() => handleOpenAssetDialog()} className="gap-2">
+                <Plus className="h-4 w-4" />
+                Add Asset
+              </Button>
+            )}
           </div>
         </div>
 
@@ -810,31 +874,43 @@ export default function AdminAssetsPage() {
                   <SelectItem value="retired">Retired</SelectItem>
                 </SelectContent>
               </Select>
-              <SearchableSelect
-                value={departmentFilter}
-                onValueChange={setDepartmentFilter}
-                placeholder="All Departments"
-                searchPlaceholder="Search departments..."
-                icon={<Building2 className="h-4 w-4" />}
-                className="w-full md:w-48"
-                options={[
-                  { value: "all", label: "All Departments" },
-                  ...departments.map((dept) => ({
-                    value: dept,
-                    label: dept,
-                    icon: <Building2 className="h-3 w-3" />,
-                  })),
-                ]}
-              />
+              {/* Department filter - hidden for leads */}
+              {userProfile?.role !== "lead" && (
+                <SearchableSelect
+                  value={departmentFilter}
+                  onValueChange={setDepartmentFilter}
+                  placeholder="All Departments"
+                  searchPlaceholder="Search departments..."
+                  icon={<Building2 className="h-4 w-4" />}
+                  className="w-full md:w-48"
+                  options={[
+                    { value: "all", label: "All Departments" },
+                    ...departments.map((dept) => ({
+                      value: dept,
+                      label: dept,
+                      icon: <Building2 className="h-3 w-3" />,
+                    })),
+                  ]}
+                />
+              )}
               <SearchableSelect
                 value={userFilter}
                 onValueChange={setUserFilter}
-                placeholder="All Users"
+                placeholder={
+                  userProfile?.role === "lead" && departments.length > 0
+                    ? `All ${departments.length === 1 ? departments[0] : "Department"} Users`
+                    : "All Users"
+                }
                 searchPlaceholder="Search users..."
                 icon={<User className="h-4 w-4" />}
                 className="w-full md:w-48"
                 options={[
-                  { value: "all", label: "All Users" },
+                  { 
+                    value: "all", 
+                    label: userProfile?.role === "lead" && departments.length > 0
+                      ? `All ${departments.length === 1 ? departments[0] : "Department"} Users`
+                      : "All Users"
+                  },
                   ...staff.map((member) => ({
                     value: member.id,
                     label: `${formatName(member.first_name)} ${formatName(member.last_name)} - ${member.department}`,
@@ -903,7 +979,9 @@ export default function AdminAssetsPage() {
                             <div className="flex items-center gap-2 text-sm">
                               <User className="h-3 w-3 text-muted-foreground" />
                               <span className="text-foreground">
-                                {formatName(asset.current_assignment.user.first_name)} {formatName(asset.current_assignment.user.last_name)}
+                                {asset.current_assignment?.user 
+                                  ? `${formatName(asset.current_assignment.user.first_name)} ${formatName(asset.current_assignment.user.last_name)}`
+                                  : asset.current_assignment?.department || "Unassigned"}
                               </span>
                             </div>
                           ) : null
@@ -922,14 +1000,16 @@ export default function AdminAssetsPage() {
                             <UserPlus className="h-3 w-3 mr-1" />
                             {asset.current_assignment ? "Reassign" : "Assign"}
                           </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleOpenAssetDialog(asset)}
-                            title="Edit Asset"
-                          >
-                            <Edit className="h-3 w-3" />
-                          </Button>
+                          {userProfile?.role !== "lead" && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleOpenAssetDialog(asset)}
+                              title="Edit Asset"
+                            >
+                              <Edit className="h-3 w-3" />
+                            </Button>
+                          )}
                           <Button
                             variant="outline"
                             size="sm"
@@ -938,18 +1018,20 @@ export default function AdminAssetsPage() {
                           >
                             <Eye className="h-3 w-3" />
                           </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setAssetToDelete(asset)
-                              setIsDeleteDialogOpen(true)
-                            }}
-                            title="Delete asset"
-                            className="text-red-600 hover:text-red-700"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
+                          {userProfile?.role !== "lead" && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setAssetToDelete(asset)
+                                setIsDeleteDialogOpen(true)
+                              }}
+                              title="Delete asset"
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -1002,7 +1084,7 @@ export default function AdminAssetsPage() {
                               {asset.current_assignment.department}
                             </span>
                           </div>
-                        ) : asset.current_assignment.user ? (
+                        ) : asset.current_assignment?.user ? (
                           <div className="flex items-center gap-2">
                             <User className="h-3 w-3 text-muted-foreground" />
                             <span className="text-sm text-foreground font-medium">
@@ -1025,14 +1107,16 @@ export default function AdminAssetsPage() {
                         <UserPlus className="h-3 w-3" />
                         {asset.current_assignment ? "Reassign" : "Assign"}
                       </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleOpenAssetDialog(asset)}
-                        title="Edit Asset"
-                      >
-                        <Edit className="h-3 w-3" />
-                      </Button>
+                      {userProfile?.role !== "lead" && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleOpenAssetDialog(asset)}
+                          title="Edit Asset"
+                        >
+                          <Edit className="h-3 w-3" />
+                        </Button>
+                      )}
                                              <Button
                          variant="outline"
                          size="sm"
@@ -1041,18 +1125,20 @@ export default function AdminAssetsPage() {
                        >
                          <Eye className="h-3 w-3" />
                        </Button>
-                       <Button
-                         variant="outline"
-                         size="sm"
-                         onClick={() => {
-                           setAssetToDelete(asset)
-                           setIsDeleteDialogOpen(true)
-                         }}
-                         title="Delete Asset"
-                         className="text-red-600 hover:text-red-700"
-                       >
-                         <Trash2 className="h-3 w-3" />
-                       </Button>
+                       {userProfile?.role !== "lead" && (
+                         <Button
+                           variant="outline"
+                           size="sm"
+                           onClick={() => {
+                             setAssetToDelete(asset)
+                             setIsDeleteDialogOpen(true)
+                           }}
+                           title="Delete Asset"
+                           className="text-red-600 hover:text-red-700"
+                         >
+                           <Trash2 className="h-3 w-3" />
+                         </Button>
+                       )}
                      </div>
                    </CardContent>
                  </Card>
