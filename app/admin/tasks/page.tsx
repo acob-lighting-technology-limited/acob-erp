@@ -487,17 +487,18 @@ export default function AdminTasksPage() {
     if (userProfile?.role === "lead") {
       // Leads: tasks are already filtered, but ensure they match lead's departments
       if (userProfile.lead_departments && userProfile.lead_departments.length > 0) {
-        matchesDepartment = userProfile.lead_departments.includes(task.department || "") ||
-          (task.assigned_to_user && userProfile.lead_departments.includes(task.assigned_to_user.department || "")) ||
-          (task.assigned_users && task.assigned_users.some((u: any) => 
-            u.department && userProfile.lead_departments.includes(u.department)
-          ))
+        const leadDepartments = userProfile.lead_departments
+        matchesDepartment = leadDepartments.includes(task.department || "") ||
+          (task.assigned_to_user ? leadDepartments.includes(task.assigned_to_user.department || "") : false) ||
+          (task.assigned_users && task.assigned_users.some((u: any) =>
+            u.department && leadDepartments.includes(u.department)
+          )) || false
       }
     } else {
       // Admins: use department filter
       matchesDepartment = departmentFilter === "all" || 
         task.department === departmentFilter ||
-        (task.assigned_to_user && staff.find((s) => s.id === task.assigned_to)?.department === departmentFilter)
+        (task.assigned_to_user ? staff.find((s) => s.id === task.assigned_to)?.department === departmentFilter : false)
     }
 
     // Filter by staff
@@ -615,40 +616,41 @@ export default function AdminTasksPage() {
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 p-4 md:p-8">
       <div className="mx-auto max-w-7xl space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
-              <ClipboardList className="h-8 w-8 text-primary" />
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground flex items-center gap-2 sm:gap-3">
+              <ClipboardList className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
               Task Management
             </h1>
-            <p className="text-muted-foreground mt-2">
+            <p className="text-muted-foreground mt-2 text-sm sm:text-base">
               Create and manage tasks for your team
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <div className="flex items-center border rounded-lg p-1">
               <Button
                 variant={viewMode === "list" ? "default" : "ghost"}
                 size="sm"
                 onClick={() => setViewMode("list")}
-                className="gap-2"
+                className="gap-1 sm:gap-2"
               >
                 <List className="h-4 w-4" />
-                List
+                <span className="hidden sm:inline">List</span>
               </Button>
               <Button
                 variant={viewMode === "card" ? "default" : "ghost"}
                 size="sm"
                 onClick={() => setViewMode("card")}
-                className="gap-2"
+                className="gap-1 sm:gap-2"
               >
                 <LayoutGrid className="h-4 w-4" />
-                Card
+                <span className="hidden sm:inline">Card</span>
               </Button>
             </div>
-            <Button onClick={() => handleOpenTaskDialog()} className="gap-2">
+            <Button onClick={() => handleOpenTaskDialog()} className="gap-2" size="sm">
               <Plus className="h-4 w-4" />
-              Create Task
+              <span className="hidden sm:inline">Create Task</span>
+              <span className="sm:hidden">Create</span>
             </Button>
           </div>
         </div>
@@ -800,19 +802,20 @@ export default function AdminTasksPage() {
         {filteredTasks.length > 0 ? (
           viewMode === "list" ? (
             <Card className="border-2">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-12">#</TableHead>
-                    <TableHead>Task</TableHead>
-                    <TableHead>Assigned To</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Priority</TableHead>
-                    <TableHead>Due Date</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12">#</TableHead>
+                      <TableHead>Task</TableHead>
+                      <TableHead>Assigned To</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Priority</TableHead>
+                      <TableHead>Due Date</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                   {filteredTasks.map((task, index) => (
                     <TableRow key={task.id}>
                       <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
@@ -882,11 +885,13 @@ export default function AdminTasksPage() {
                         )}
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
+                        <div className="flex items-center justify-end gap-1 sm:gap-2 flex-wrap">
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => handleOpenTaskDialog(task)}
+                            className="h-8 w-8 p-0"
+                            title="Edit task"
                           >
                             <Edit className="h-3 w-3" />
                           </Button>
@@ -897,7 +902,8 @@ export default function AdminTasksPage() {
                               setTaskToDelete(task)
                               setIsDeleteDialogOpen(true)
                             }}
-                            className="text-red-600 hover:text-red-700"
+                            className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                            title="Delete task"
                           >
                             <Trash2 className="h-3 w-3" />
                           </Button>
@@ -907,6 +913,7 @@ export default function AdminTasksPage() {
                   ))}
                 </TableBody>
               </Table>
+              </div>
             </Card>
           ) : (
             <div className="grid gap-4 md:grid-cols-2">

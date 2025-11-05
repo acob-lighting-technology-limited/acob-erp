@@ -228,17 +228,35 @@ export function Sidebar({ user, profile, isAdmin }: SidebarProps) {
       </div>
 
       {/* Mobile Sidebar */}
-      {isMobileMenuOpen && (
-        <>
-          <div
-            className="lg:hidden fixed inset-0 bg-background/80 backdrop-blur-sm z-40"
-            onClick={() => setIsMobileMenuOpen(false)}
-          />
-          <aside className="lg:hidden fixed inset-y-0 left-0 z-50 w-64 bg-card border-r shadow-xl flex flex-col">
-            <SidebarContent />
-          </aside>
-        </>
-      )}
+      <>
+        <div
+          className={cn(
+            "lg:hidden fixed inset-0 bg-background/80 backdrop-blur-sm z-40 transition-opacity duration-300",
+            isMobileMenuOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+          )}
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+        <aside 
+          className={cn(
+            "lg:hidden fixed inset-y-0 left-0 z-50 w-64 bg-card border-r shadow-xl flex flex-col transition-transform duration-300 ease-out",
+            isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+          )}
+        >
+          {/* Close button for mobile */}
+          <div className="lg:hidden flex items-center justify-between px-4 py-3 border-b">
+            <Image src="/acob-logo.webp" alt="ACOB Lighting" width={100} height={100} />
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="h-8 w-8"
+            >
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
+          <SidebarContent />
+        </aside>
+      </>
     </>
   )
 }

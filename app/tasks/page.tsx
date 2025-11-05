@@ -21,6 +21,7 @@ import {
   CheckCircle2,
   Clock,
   ArrowRight,
+  Eye,
 } from "lucide-react"
 import {
   Dialog,
@@ -541,10 +542,10 @@ export default function TasksPage() {
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 p-4 md:p-8">
       <div className="mx-auto max-w-6xl space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between flex-wrap gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
-              <ClipboardList className="h-8 w-8 text-primary" />
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground flex items-center gap-2 sm:gap-3">
+              <ClipboardList className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
               My Tasks
             </h1>
             <p className="text-muted-foreground mt-2">Track and manage your assigned tasks</p>
@@ -613,20 +614,21 @@ export default function TasksPage() {
         {/* Tasks List */}
         {filteredTasks.length > 0 ? (
           <Card className="border-2">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-12">#</TableHead>
-                  <TableHead>Task</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Priority</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Due Date</TableHead>
-                  <TableHead>Assigned By</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-12">#</TableHead>
+                    <TableHead>Task</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Priority</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Due Date</TableHead>
+                    <TableHead>Assigned By</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                 {filteredTasks.map((task, index) => (
                   <TableRow 
                     key={task.id} 
@@ -701,14 +703,18 @@ export default function TasksPage() {
                           e.stopPropagation()
                           openTaskDetails(task)
                         }}
+                        className="h-8 w-8 sm:h-auto sm:w-auto p-0 sm:p-2"
+                        title="View task details"
                       >
-                        View
+                        <Eye className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-1" />
+                        <span className="hidden sm:inline">View</span>
                       </Button>
                     </TableCell>
                   </TableRow>
                 ))}
-              </TableBody>
-            </Table>
+                </TableBody>
+              </Table>
+            </div>
           </Card>
         ) : (
           <Card className="border-2">

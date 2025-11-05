@@ -397,7 +397,7 @@ export default function AuditLogsPage() {
     } else {
       // Admins: use department filter
       matchesDepartment = departmentFilter === "all" || 
-        (log.user && staff.find((s) => s.id === log.user_id)?.department === departmentFilter)
+        (log.user ? staff.find((s) => s.id === log.user_id)?.department === departmentFilter : false)
     }
 
     // Filter by staff
@@ -620,13 +620,13 @@ export default function AuditLogsPage() {
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 p-4 md:p-8">
       <div className="mx-auto max-w-7xl space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
-              <ScrollText className="h-8 w-8 text-primary" />
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground flex items-center gap-2 sm:gap-3">
+              <ScrollText className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
               Audit Logs
             </h1>
-            <p className="text-muted-foreground mt-2">
+            <p className="text-muted-foreground mt-2 text-sm sm:text-base">
               Complete audit trail of all system activities
             </p>
           </div>
@@ -635,19 +635,19 @@ export default function AuditLogsPage() {
               variant={viewMode === "list" ? "default" : "ghost"}
               size="sm"
               onClick={() => setViewMode("list")}
-              className="gap-2"
+              className="gap-1 sm:gap-2"
             >
               <List className="h-4 w-4" />
-              List
+              <span className="hidden sm:inline">List</span>
             </Button>
             <Button
               variant={viewMode === "card" ? "default" : "ghost"}
               size="sm"
               onClick={() => setViewMode("card")}
-              className="gap-2"
+              className="gap-1 sm:gap-2"
             >
               <LayoutGrid className="h-4 w-4" />
-              Card
+              <span className="hidden sm:inline">Card</span>
             </Button>
           </div>
         </div>
@@ -855,7 +855,8 @@ export default function AuditLogsPage() {
         {filteredLogs.length > 0 ? (
           viewMode === "list" ? (
             <Card className="border-2">
-              <Table>
+              <div className="overflow-x-auto">
+                <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-12">#</TableHead>
@@ -867,7 +868,7 @@ export default function AuditLogsPage() {
                       <TableHead className="w-20">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
-                <TableBody>
+                  <TableBody>
                   {filteredLogs.map((log, index) => (
                     <TableRow key={log.id}>
                       <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
@@ -912,8 +913,9 @@ export default function AuditLogsPage() {
                       </TableCell>
                     </TableRow>
                   ))}
-                </TableBody>
-              </Table>
+                  </TableBody>
+                </Table>
+              </div>
             </Card>
           ) : (
             <div className="space-y-3">

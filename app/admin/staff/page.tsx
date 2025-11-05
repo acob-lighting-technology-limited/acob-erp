@@ -318,36 +318,36 @@ export default function AdminStaffPage() {
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 p-4 md:p-8">
       <div className="mx-auto max-w-7xl space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
-              <Users className="h-8 w-8 text-primary" />
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground flex items-center gap-2 sm:gap-3">
+              <Users className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
               Staff Management
             </h1>
-            <p className="text-muted-foreground mt-2">
+            <p className="text-muted-foreground mt-2 text-sm sm:text-base">
               View and manage staff members, roles, and permissions
             </p>
           </div>
-                      <div className="flex items-center border rounded-lg p-1">
-              <Button
-                variant={viewMode === "list" ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setViewMode("list")}
-                className="gap-2"
-              >
-                <List className="h-4 w-4" />
-                List
-              </Button>
-              <Button
-                variant={viewMode === "card" ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setViewMode("card")}
-                className="gap-2"
-              >
-                <LayoutGrid className="h-4 w-4" />
-                Card
-              </Button>
-            </div>
+          <div className="flex items-center border rounded-lg p-1">
+            <Button
+              variant={viewMode === "list" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setViewMode("list")}
+              className="gap-1 sm:gap-2"
+            >
+              <List className="h-4 w-4" />
+              <span className="hidden sm:inline">List</span>
+            </Button>
+            <Button
+              variant={viewMode === "card" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setViewMode("card")}
+              className="gap-1 sm:gap-2"
+            >
+              <LayoutGrid className="h-4 w-4" />
+              <span className="hidden sm:inline">Card</span>
+            </Button>
+          </div>
         </div>
 
         {/* Stats */}
@@ -475,8 +475,9 @@ export default function AdminStaffPage() {
         {filteredStaff.length > 0 ? (
           viewMode === "list" ? (
             <Card className="border-2">
-              <Table>
-                                  <TableHeader>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
                     <TableRow>
                       <TableHead className="w-12">#</TableHead>
                       <TableHead>
@@ -545,17 +546,22 @@ export default function AdminStaffPage() {
                         </span>
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
+                        <div className="flex items-center justify-end gap-1 sm:gap-2 flex-wrap">
                           <Button
                             variant="outline"
                             size="sm"
                             asChild
+                            className="h-8 sm:h-auto text-xs sm:text-sm"
                           >
-                            <Link href={`/admin/staff/${member.id}`}>View</Link>
+                            <Link href={`/admin/staff/${member.id}`}>
+                              <span className="hidden sm:inline">View</span>
+                              <span className="sm:hidden">👁</span>
+                            </Link>
                           </Button>
                           <Button
                             variant="outline"
                             size="sm"
+                            className="h-8 w-8 sm:h-auto sm:w-auto p-0 sm:p-2"
                             onClick={() => handleEditStaff(member)}
                           >
                             <Edit className="h-3 w-3" />
@@ -566,6 +572,7 @@ export default function AdminStaffPage() {
                   ))}
                 </TableBody>
               </Table>
+              </div>
             </Card>
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">

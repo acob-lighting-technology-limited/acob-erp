@@ -306,13 +306,13 @@ export default function AdminDocumentationPage() {
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 p-4 md:p-8">
       <div className="mx-auto max-w-7xl space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
-              <FileText className="h-8 w-8 text-primary" />
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground flex items-center gap-2 sm:gap-3">
+              <FileText className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
               Staff Documentation
             </h1>
-            <p className="text-muted-foreground mt-2">
+            <p className="text-muted-foreground mt-2 text-sm sm:text-base">
               View all staff documentation and knowledge base articles
             </p>
           </div>
@@ -321,19 +321,19 @@ export default function AdminDocumentationPage() {
               variant={viewMode === "list" ? "default" : "ghost"}
               size="sm"
               onClick={() => setViewMode("list")}
-              className="gap-2"
+              className="gap-1 sm:gap-2"
             >
               <List className="h-4 w-4" />
-              List
+              <span className="hidden sm:inline">List</span>
             </Button>
             <Button
               variant={viewMode === "card" ? "default" : "ghost"}
               size="sm"
               onClick={() => setViewMode("card")}
-              className="gap-2"
+              className="gap-1 sm:gap-2"
             >
               <LayoutGrid className="h-4 w-4" />
-              Card
+              <span className="hidden sm:inline">Card</span>
             </Button>
           </div>
         </div>
@@ -487,8 +487,9 @@ export default function AdminDocumentationPage() {
           viewMode === "list" ? (
             <Card className="border-2">
               <CardContent className="p-6">
-                <Table>
-                                      <TableHeader>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
                       <TableRow>
                         <TableHead className="w-12">#</TableHead>
                         <TableHead>Author</TableHead>
@@ -500,7 +501,7 @@ export default function AdminDocumentationPage() {
                         <TableHead>Actions</TableHead>
                       </TableRow>
                     </TableHeader>
-                  <TableBody>
+                    <TableBody>
                     {filteredDocumentation.map((doc, index) => (
                       <TableRow key={doc.id}>
                         <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
@@ -535,16 +536,18 @@ export default function AdminDocumentationPage() {
                             variant="ghost"
                             size="sm"
                             onClick={() => handleViewDocument(doc)}
-                            className="gap-2"
+                            className="gap-1 sm:gap-2 h-8 w-8 sm:h-auto sm:w-auto p-0 sm:p-2"
+                            title="View document"
                           >
-                            <Eye className="h-4 w-4" />
-                            View
+                            <Eye className="h-3 w-3 sm:h-4 sm:w-4" />
+                            <span className="hidden sm:inline">View</span>
                           </Button>
                         </TableCell>
                       </TableRow>
                     ))}
-                  </TableBody>
-                </Table>
+                    </TableBody>
+                  </Table>
+                </div>
               </CardContent>
             </Card>
           ) : (

@@ -553,8 +553,8 @@ export default function AdminDevicesPage() {
     } else {
       // Admins: use department filter
       matchesDepartment = departmentFilter === "all" || 
-        (device.current_assignment?.assigned_to && 
-          staff.find((s) => s.id === device.current_assignment?.assigned_to)?.department === departmentFilter)
+        (device.current_assignment?.assigned_to ? 
+          staff.find((s) => s.id === device.current_assignment?.assigned_to)?.department === departmentFilter : false)
     }
 
     // Filter by staff
@@ -660,41 +660,42 @@ export default function AdminDevicesPage() {
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 p-4 md:p-8">
       <div className="mx-auto max-w-7xl space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
-              <Laptop className="h-8 w-8 text-primary" />
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground flex items-center gap-2 sm:gap-3">
+              <Laptop className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
               Device Management
             </h1>
-            <p className="text-muted-foreground mt-2">
+            <p className="text-muted-foreground mt-2 text-sm sm:text-base">
               Manage device inventory and assignments
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <div className="flex items-center border rounded-lg p-1">
               <Button
                 variant={viewMode === "list" ? "default" : "ghost"}
                 size="sm"
                 onClick={() => setViewMode("list")}
-                className="gap-2"
+                className="gap-1 sm:gap-2"
               >
                 <List className="h-4 w-4" />
-                List
+                <span className="hidden sm:inline">List</span>
               </Button>
               <Button
                 variant={viewMode === "card" ? "default" : "ghost"}
                 size="sm"
                 onClick={() => setViewMode("card")}
-                className="gap-2"
+                className="gap-1 sm:gap-2"
               >
                 <LayoutGrid className="h-4 w-4" />
-                Card
+                <span className="hidden sm:inline">Card</span>
               </Button>
             </div>
             {userProfile?.role !== "lead" && (
-              <Button onClick={() => handleOpenDeviceDialog()} className="gap-2">
+              <Button onClick={() => handleOpenDeviceDialog()} className="gap-2" size="sm">
                 <Plus className="h-4 w-4" />
-                Add Device
+                <span className="hidden sm:inline">Add Device</span>
+                <span className="sm:hidden">Add</span>
               </Button>
             )}
           </div>
@@ -837,19 +838,20 @@ export default function AdminDevicesPage() {
         {filteredDevices.length > 0 ? (
           viewMode === "list" ? (
             <Card className="border-2">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-12">#</TableHead>
-                    <TableHead>Device Name</TableHead>
-                    <TableHead>Type / Model</TableHead>
-                    <TableHead>Serial Number</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Assigned To</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12">#</TableHead>
+                      <TableHead>Device Name</TableHead>
+                      <TableHead>Type / Model</TableHead>
+                      <TableHead>Serial Number</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Assigned To</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                   {filteredDevices.map((device, index) => (
                     <TableRow key={device.id}>
                       <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
@@ -892,15 +894,16 @@ export default function AdminDevicesPage() {
                         )}
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
+                        <div className="flex items-center justify-end gap-1 sm:gap-2 flex-wrap">
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => handleOpenAssignDialog(device)}
                             title={device.current_assignment ? "Reassign device" : "Assign device"}
+                            className="h-8 w-8 sm:h-auto sm:w-auto p-0 sm:p-2"
                           >
-                            <UserPlus className="h-3 w-3 mr-1" />
-                            {device.current_assignment ? "Reassign" : "Assign"}
+                            <UserPlus className="h-3 w-3 sm:mr-1" />
+                            <span className="hidden sm:inline">{device.current_assignment ? "Reassign" : "Assign"}</span>
                           </Button>
                           {userProfile?.role !== "lead" && (
                             <Button
@@ -908,6 +911,7 @@ export default function AdminDevicesPage() {
                               size="sm"
                               onClick={() => handleOpenDeviceDialog(device)}
                               title="Edit device"
+                              className="h-8 w-8 p-0"
                             >
                               <Edit className="h-3 w-3" />
                             </Button>
@@ -917,6 +921,7 @@ export default function AdminDevicesPage() {
                             size="sm"
                             onClick={() => loadDeviceHistory(device)}
                             title="View assignment history"
+                            className="h-8 w-8 p-0"
                           >
                             <Eye className="h-3 w-3" />
                           </Button>
@@ -929,7 +934,7 @@ export default function AdminDevicesPage() {
                                 setIsDeleteDialogOpen(true)
                               }}
                               title="Delete device"
-                              className="text-red-600 hover:text-red-700"
+                              className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
                             >
                               <Trash2 className="h-3 w-3" />
                             </Button>
@@ -940,6 +945,7 @@ export default function AdminDevicesPage() {
                   ))}
                 </TableBody>
               </Table>
+              </div>
             </Card>
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
