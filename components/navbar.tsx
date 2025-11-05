@@ -15,8 +15,11 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { toast } from "sonner"
-import { LogOut, Menu, X, User, MessageSquare, LayoutDashboard, FileSignature, ShieldCheck, Droplet } from "lucide-react"
+import { LogOut, Menu, X, User, MessageSquare, LayoutDashboard, FileSignature, ShieldCheck, Droplet, ChevronLeft, ChevronRight } from "lucide-react"
+import { NotificationBell } from "@/components/notification-bell"
+import { UniversalSearch } from "@/components/universal-search"
 import Image from "next/image"
+import { useSidebarSafe } from "@/components/sidebar-context"
 
 interface NavbarProps {
   user?: {
@@ -31,6 +34,10 @@ interface NavbarProps {
 export function Navbar({ user, isAdmin = false }: NavbarProps) {
   const [isOpen, setIsOpen] = useState(false)
   const router = useRouter()
+  
+  // Get sidebar context safely (returns null if not available)
+  const sidebarContext = useSidebarSafe()
+  const { isCollapsed, setIsCollapsed } = sidebarContext || { isCollapsed: false, setIsCollapsed: () => {} }
 
   const handleLogout = async () => {
     const supabase = createClient()
@@ -57,19 +64,41 @@ export function Navbar({ user, isAdmin = false }: NavbarProps) {
 
   return (
     <nav className="border-b border-border bg-background sticky top-0 z-40">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center justify-between">
-            {/* Logo space */}
-            <div className="flex items-center gap-4">
-              {/* <div className="h-10 w-10 rounded-lg bg-green-100 flex items-center justify-center">
-                <span className="text-sm font-bold text-green-700">ACOB</span>
+      <div className="flex h-16 items-center w-full">
+        {/* Left side - Collapse Button and Logo (aligned with sidebar edge) */}
+        {sidebarContext && (
+          <div className="hidden lg:flex items-center h-full">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-full w-10 rounded-none"
+              onClick={() => setIsCollapsed(!isCollapsed)}
+              title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            >
+              {isCollapsed ? <ChevronRight className="h-5 w-5" /> : <ChevronLeft className="h-5 w-5" />}
+            </Button>
+            <Link href="/dashboard" className="flex items-center px-4 h-full border-r border-border">
+              <Image src="/acob-logo.webp" alt="ACOB Lighting" width={150} height={150} className="h-8 w-auto" />
+            </Link>
               </div>
-              <span className="hidden sm:inline text-sm font-semibold text-foreground">ACOB Lighting</span> */}
-              <Image src="/acob-logo.webp" alt="ACOB Lighting" width={200} height={200} />
+        )}
+        
+        {/* Mobile - Logo and Menu */}
+        <div className="lg:hidden flex items-center gap-4 px-4">
+          {!sidebarContext && (
+            <Link href="/dashboard" className="flex items-center">
+              <Image src="/acob-logo.webp" alt="ACOB Lighting" width={150} height={150} className="h-8 w-auto" />
+            </Link>
+          )}
             </div>
 
-            {/* Desktop menu */}
-            <div className="hidden md:flex items-center gap-6">
+          {/* Right side - search, notifications and user menu */}
+          <div className="flex-1 flex items-center justify-end gap-4 px-4 sm:px-6 lg:px-8">
+            <div className="hidden md:flex items-center gap-4 flex-1 max-w-md">
+              {isAdmin && <UniversalSearch />}
+            </div>
+            <div className="hidden md:flex items-center gap-4">
+            <NotificationBell isAdmin={isAdmin} />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative h-10 w-10 rounded-full">
@@ -144,6 +173,7 @@ export function Navbar({ user, isAdmin = false }: NavbarProps) {
             <button className="md:hidden" onClick={() => setIsOpen(!isOpen)}>
               {isOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
             </button>
+        </div>
           </div>
 
           {/* Mobile menu */}
@@ -196,7 +226,6 @@ export function Navbar({ user, isAdmin = false }: NavbarProps) {
               </Button>
             </div>
           )}
-        </div>
       </nav>
   )
 }

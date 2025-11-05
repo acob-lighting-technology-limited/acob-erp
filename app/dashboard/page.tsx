@@ -18,7 +18,6 @@ import {
   ArrowRight,
   Clock,
 } from "lucide-react"
-import { Notifications } from "@/components/notifications"
 import { formatName } from "@/lib/utils"
 
 export default async function DashboardPage() {
@@ -228,11 +227,6 @@ export default async function DashboardPage() {
           </h1>
           <p className="mt-2 text-muted-foreground">Here's what's happening with your account today.</p>
         </div>
-
-        {/* Notifications */}
-        {notifications.length > 0 && (
-          <Notifications notifications={notifications} title="Your Notifications" />
-        )}
 
         {/* User Info Card */}
         <Card className="border-2 shadow-lg overflow-hidden">

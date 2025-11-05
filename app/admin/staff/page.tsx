@@ -1,6 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useSearchParams, useRouter } from "next/navigation"
+import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -75,6 +77,8 @@ interface UserProfile {
 }
 
 export default function AdminStaffPage() {
+  const searchParams = useSearchParams()
+  const router = useRouter()
   const [staff, setStaff] = useState<Staff[]>([])
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -100,6 +104,17 @@ export default function AdminStaffPage() {
   useEffect(() => {
     loadData()
   }, [])
+
+  // Handle userId from search params (for edit dialog)
+  useEffect(() => {
+    const userId = searchParams?.get("userId")
+    if (userId && staff.length > 0 && !isEditDialogOpen) {
+      const user = staff.find((s) => s.id === userId)
+      if (user) {
+        handleEditStaff(user)
+      }
+    }
+  }, [searchParams, staff, isEditDialogOpen])
 
   const loadData = async () => {
     try {
@@ -423,14 +438,17 @@ export default function AdminStaffPage() {
                     <TableRow key={member.id}>
                       <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-2">
+                        <Link
+                          href={`/admin/staff/${member.id}`}
+                          className="flex items-center gap-2 hover:text-primary transition-colors"
+                        >
                           <div className="p-2 bg-primary/10 rounded-lg">
                             <Users className="h-4 w-4 text-primary" />
                           </div>
-                                                      <span className="font-medium text-foreground">
-                              {formatName(member.last_name)}, {formatName(member.first_name)}
-                            </span>
-                        </div>
+                          <span className="font-medium text-foreground">
+                            {formatName(member.last_name)}, {formatName(member.first_name)}
+                          </span>
+                        </Link>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -457,13 +475,22 @@ export default function AdminStaffPage() {
                         </span>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEditStaff(member)}
-                        >
-                          <Edit className="h-3 w-3" />
-                        </Button>
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            asChild
+                          >
+                            <Link href={`/admin/staff/${member.id}`}>View</Link>
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEditStaff(member)}
+                          >
+                            <Edit className="h-3 w-3" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -476,7 +503,10 @@ export default function AdminStaffPage() {
                 <Card key={member.id} className="border-2 hover:shadow-lg transition-shadow">
                   <CardHeader className="border-b bg-gradient-to-r from-primary/5 to-background">
                     <div className="flex items-start justify-between">
-                      <div className="flex items-start gap-3 flex-1">
+                      <Link
+                        href={`/admin/staff/${member.id}`}
+                        className="flex items-start gap-3 flex-1 hover:text-primary transition-colors"
+                      >
                         <div className="p-2 bg-primary/10 rounded-lg">
                           <Users className="h-5 w-5 text-primary" />
                         </div>
@@ -493,7 +523,17 @@ export default function AdminStaffPage() {
                             )}
                           </div>
                         </div>
-                      </div>
+                      </Link>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleEditStaff(member)
+                        }}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
                     </div>
                   </CardHeader>
                   <CardContent className="p-4 space-y-3">
@@ -544,15 +584,25 @@ export default function AdminStaffPage() {
                       </div>
                     )}
 
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleEditStaff(member)}
-                      className="w-full gap-2 mt-2"
-                    >
-                      <Edit className="h-4 w-4" />
-                      Edit Role & Permissions
-                    </Button>
+                    <div className="flex gap-2 mt-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        asChild
+                        className="flex-1"
+                      >
+                        <Link href={`/admin/staff/${member.id}`}>View Details</Link>
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleEditStaff(member)}
+                        className="flex-1 gap-2"
+                      >
+                        <Edit className="h-4 w-4" />
+                        Edit
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               ))}

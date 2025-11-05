@@ -5,7 +5,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { Progress } from "@/components/ui/progress"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { formatName } from "@/lib/utils"
@@ -13,6 +12,8 @@ import {
   ClipboardList,
   Calendar,
   User,
+  Users,
+  Building2,
   MessageSquare,
   Send,
   TrendingUp,
@@ -35,7 +36,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Slider } from "@/components/ui/slider"
 
 interface Task {
   id: string
@@ -43,16 +43,24 @@ interface Task {
   description?: string
   priority: string
   status: string
-  progress: number
   due_date?: string
   started_at?: string
   completed_at?: string
   created_at: string
+  assignment_type?: "individual" | "multiple" | "department"
   assigned_by_user?: {
     first_name: string
     last_name: string
   }
   department?: string
+  assigned_users?: Array<{
+    id: string
+    first_name: string
+    last_name: string
+    completed?: boolean
+  }>
+  user_completed?: boolean
+  can_change_status?: boolean
 }
 
 interface TaskUpdate {
@@ -76,7 +84,6 @@ export default function TasksPage() {
   const [newComment, setNewComment] = useState("")
   const [isSaving, setIsSaving] = useState(false)
   const [filterStatus, setFilterStatus] = useState("all")
-  const [newProgress, setNewProgress] = useState(0)
   const [newStatus, setNewStatus] = useState("")
   const supabase = createClient()
 
@@ -99,18 +106,59 @@ export default function TasksPage() {
       } = await supabase.auth.getUser()
       if (!user) return
 
-      const { data, error } = await supabase
-        .from("tasks")
-        .select(`
-          *
-        `)
-        .eq("assigned_to", user.id)
-        .order("created_at", { ascending: false })
+      // Get user profile to check department and role
+      const { data: userProfile } = await supabase
+        .from("profiles")
+        .select("department, role, lead_departments")
+        .eq("id", user.id)
+        .single()
 
-      if (error) throw error
-      
-      // Fetch the assigned_by user details separately
-      const tasksWithUsers = await Promise.all((data || []).map(async (task: any) => {
+      // Load tasks assigned to user individually
+      const { data: individualTasks } = await supabase
+        .from("tasks")
+        .select("*")
+        .eq("assigned_to", user.id)
+        .eq("assignment_type", "individual")
+
+      // Load tasks where user is in task_assignments (multiple-user tasks)
+      const { data: assignments } = await supabase
+        .from("task_assignments")
+        .select("task_id")
+        .eq("user_id", user.id)
+
+      const multipleTaskIds = assignments?.map((a: any) => a.task_id) || []
+      const { data: multipleTasks } = multipleTaskIds.length > 0
+        ? await supabase
+            .from("tasks")
+            .select("*")
+            .in("id", multipleTaskIds)
+            .eq("assignment_type", "multiple")
+        : { data: [] }
+
+      // Load department tasks if user has a department
+      const { data: departmentTasks } = userProfile?.department
+        ? await supabase
+            .from("tasks")
+            .select("*")
+            .eq("department", userProfile.department)
+            .eq("assignment_type", "department")
+        : { data: [] }
+
+      // Combine all tasks and remove duplicates
+      const allTasks = [
+        ...(individualTasks || []),
+        ...(multipleTasks || []),
+        ...(departmentTasks || []),
+      ]
+      const uniqueTasks = Array.from(
+        new Map(allTasks.map((t: any) => [t.id, t])).values()
+      )
+
+      // Fetch assigned_by user details and additional info
+      const tasksWithUsers = await Promise.all((uniqueTasks || []).map(async (task: any) => {
+        const taskData: any = { ...task }
+
+        // Fetch assigned_by user
         if (task.assigned_by) {
           const { data: profile } = await supabase
             .from("profiles")
@@ -118,13 +166,64 @@ export default function TasksPage() {
             .eq("id", task.assigned_by)
             .single()
           
-          return {
-            ...task,
-            assigned_by_user: profile
+          taskData.assigned_by_user = profile
+        }
+
+        // For multiple-user tasks, fetch all assigned users and completion status
+        if (task.assignment_type === "multiple") {
+          const { data: taskAssignments } = await supabase
+            .from("task_assignments")
+            .select("user_id")
+            .eq("task_id", task.id)
+
+          if (taskAssignments && taskAssignments.length > 0) {
+            const userIds = taskAssignments.map((a: any) => a.user_id)
+            const { data: userProfiles } = await supabase
+              .from("profiles")
+              .select("id, first_name, last_name")
+              .in("id", userIds)
+
+            // Check if current user has completed
+            const { data: userCompletion } = await supabase
+              .from("task_user_completion")
+              .select("user_id")
+              .eq("task_id", task.id)
+              .eq("user_id", user.id)
+              .single()
+
+            const completedUserIds = new Set(
+              (await supabase
+                .from("task_user_completion")
+                .select("user_id")
+                .eq("task_id", task.id)
+              ).data?.map((c: any) => c.user_id) || []
+            )
+
+            taskData.assigned_users = userProfiles?.map((profile: any) => ({
+              ...profile,
+              completed: completedUserIds.has(profile.id),
+            })) || []
+            taskData.user_completed = !!userCompletion
           }
         }
-        return task
+
+        // For department tasks, check if user can change status
+        if (task.assignment_type === "department") {
+          const canChangeStatus =
+            userProfile?.role === "admin" ||
+            userProfile?.role === "super_admin" ||
+            (userProfile?.role === "lead" &&
+             userProfile?.lead_departments?.includes(task.department))
+          taskData.can_change_status = canChangeStatus
+        }
+
+        return taskData
       }))
+
+      // Sort by created_at
+      tasksWithUsers.sort((a: any, b: any) => 
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      )
       
       setTasks(tasksWithUsers as any || [])
       setFilteredTasks(tasksWithUsers as any || [])
@@ -163,7 +262,6 @@ export default function TasksPage() {
 
   const openTaskDetails = async (task: Task) => {
     setSelectedTask(task)
-    setNewProgress(task.progress)
     setNewStatus(task.status)
     await loadTaskUpdates(task.id)
     setIsDetailsOpen(true)
@@ -199,8 +297,8 @@ export default function TasksPage() {
     }
   }
 
-  const handleUpdateProgress = async () => {
-    if (!selectedTask) return
+  const handleMarkAsDone = async () => {
+    if (!selectedTask || selectedTask.assignment_type !== "multiple") return
 
     setIsSaving(true)
     try {
@@ -209,20 +307,24 @@ export default function TasksPage() {
       } = await supabase.auth.getUser()
       if (!user) throw new Error("Not authenticated")
 
-      const updates: any = { progress: newProgress }
+      // Check if user is already marked as done
+      const { data: existingCompletion } = await supabase
+        .from("task_user_completion")
+        .select("id")
+        .eq("task_id", selectedTask.id)
+        .eq("user_id", user.id)
+        .single()
 
-      // Auto-update status based on progress
-      if (newProgress === 0 && selectedTask.status === "pending") {
-        // Keep as pending
-      } else if (newProgress > 0 && newProgress < 100 && selectedTask.status === "pending") {
-        updates.status = "in_progress"
-        updates.started_at = new Date().toISOString()
-      } else if (newProgress === 100) {
-        updates.status = "completed"
-        updates.completed_at = new Date().toISOString()
+      if (existingCompletion) {
+        toast.info("You've already marked this task as done")
+        return
       }
 
-      const { error } = await supabase.from("tasks").update(updates).eq("id", selectedTask.id)
+      // Mark user as done
+      const { error } = await supabase.from("task_user_completion").insert({
+        task_id: selectedTask.id,
+        user_id: user.id,
+      })
 
       if (error) throw error
 
@@ -230,19 +332,22 @@ export default function TasksPage() {
       await supabase.from("task_updates").insert({
         task_id: selectedTask.id,
         user_id: user.id,
-        update_type: "progress_update",
-        content: `Progress updated to ${newProgress}%`,
-        old_value: selectedTask.progress.toString(),
-        new_value: newProgress.toString(),
+        update_type: "comment",
+        content: "Marked task as done",
       })
 
-      toast.success("Progress updated")
+      toast.success("You've marked this task as done")
       await loadTasks()
-      setSelectedTask({ ...selectedTask, progress: newProgress, status: updates.status || selectedTask.status })
       await loadTaskUpdates(selectedTask.id)
+      
+      // Reload selected task to update completion status
+      const updatedTask = tasks.find((t) => t.id === selectedTask.id)
+      if (updatedTask) {
+        setSelectedTask({ ...updatedTask, user_completed: true })
+      }
     } catch (error) {
-      console.error("Error updating progress:", error)
-      toast.error("Failed to update progress")
+      console.error("Error marking task as done:", error)
+      toast.error("Failed to mark task as done")
     } finally {
       setIsSaving(false)
     }
@@ -250,6 +355,18 @@ export default function TasksPage() {
 
   const handleUpdateStatus = async (status: string) => {
     if (!selectedTask) return
+
+    // Check permissions for department tasks
+    if (selectedTask.assignment_type === "department" && !selectedTask.can_change_status) {
+      toast.error("Only department leads, admins, and super admins can change the status of department tasks")
+      return
+    }
+
+    // Multiple-user tasks should use individual completion
+    if (selectedTask.assignment_type === "multiple") {
+      toast.error("For group tasks, please mark yourself as done instead of changing the status")
+      return
+    }
 
     setIsSaving(true)
     try {
@@ -263,7 +380,6 @@ export default function TasksPage() {
         updates.started_at = new Date().toISOString()
       } else if (status === "completed") {
         updates.completed_at = new Date().toISOString()
-        updates.progress = 100
       }
 
       const { error } = await supabase.from("tasks").update(updates).eq("id", selectedTask.id)
@@ -493,15 +609,21 @@ export default function TasksPage() {
                           </span>
                         </Badge>
                         <Badge className={getPriorityColor(task.priority)}>{task.priority} priority</Badge>
-                        {task.department && <Badge variant="outline">{task.department}</Badge>}
-                      </div>
-
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground">Progress</span>
-                          <span className="font-semibold text-foreground">{task.progress}%</span>
-                        </div>
-                        <Progress value={task.progress} className="h-2" />
+                        {task.assignment_type === "multiple" && (
+                          <Badge variant="outline" className="flex items-center gap-1">
+                            <Users className="h-3 w-3" />
+                            Group Task
+                          </Badge>
+                        )}
+                        {task.assignment_type === "department" && (
+                          <Badge variant="outline" className="flex items-center gap-1">
+                            <Building2 className="h-3 w-3" />
+                            {task.department}
+                          </Badge>
+                        )}
+                        {task.assignment_type === "individual" && task.department && (
+                          <Badge variant="outline">{task.department}</Badge>
+                        )}
                       </div>
 
                       <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
@@ -566,13 +688,92 @@ export default function TasksPage() {
                   {selectedTask.department && <Badge variant="outline">{selectedTask.department}</Badge>}
                 </div>
 
+                {/* Group Task Info */}
+                {selectedTask.assignment_type === "multiple" && selectedTask.assigned_users && (
+                  <Card className="border bg-muted/30">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Users className="h-4 w-4" />
+                        Group Task - Assigned People
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="space-y-2">
+                        {selectedTask.assigned_users.map((user: any) => (
+                          <div key={user.id} className="flex items-center justify-between p-2 rounded-md bg-background">
+                            <span className="text-sm">
+                              {formatName(user.first_name)} {formatName(user.last_name)}
+                            </span>
+                            {user.completed ? (
+                              <Badge variant="outline" className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                                Done
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline">In Progress</Badge>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                      <div className="text-xs text-muted-foreground pt-2 border-t">
+                        {selectedTask.assigned_users.filter((u: any) => u.completed).length} of {selectedTask.assigned_users.length} completed
+                      </div>
+                      {!selectedTask.user_completed && (
+                        <Button
+                          onClick={handleMarkAsDone}
+                          disabled={isSaving}
+                          className="w-full gap-2"
+                          variant="default"
+                        >
+                          <CheckCircle2 className="h-4 w-4" />
+                          Mark Myself as Done
+                        </Button>
+                      )}
+                      {selectedTask.user_completed && (
+                        <div className="p-2 rounded-md bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400 text-sm text-center">
+                          ✓ You've marked this task as done
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Department Task Info */}
+                {selectedTask.assignment_type === "department" && (
+                  <Card className="border bg-muted/30">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Building2 className="h-4 w-4" />
+                        Department Task
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm text-muted-foreground">
+                        This task is assigned to the <strong>{selectedTask.department}</strong> department.
+                        {!selectedTask.can_change_status && (
+                          <span className="block mt-2 text-xs text-yellow-600 dark:text-yellow-400">
+                            Only department leads, admins, and super admins can change the status.
+                          </span>
+                        )}
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
+
                 {/* Update Status */}
                 <Card className="border bg-muted/30">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base">Update Status</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <Select value={newStatus} onValueChange={handleUpdateStatus} disabled={isSaving}>
+                    <Select
+                      value={newStatus}
+                      onValueChange={handleUpdateStatus}
+                      disabled={
+                        isSaving ||
+                        (selectedTask.assignment_type === "multiple") ||
+                        (selectedTask.assignment_type === "department" && !selectedTask.can_change_status)
+                      }
+                    >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
@@ -582,35 +783,16 @@ export default function TasksPage() {
                         <SelectItem value="completed">Completed</SelectItem>
                       </SelectContent>
                     </Select>
-                  </CardContent>
-                </Card>
-
-                {/* Update Progress */}
-                <Card className="border bg-muted/30">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base">Update Progress</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">Progress</span>
-                        <span className="font-semibold">{newProgress}%</span>
-                      </div>
-                      <Slider
-                        value={[newProgress]}
-                        onValueChange={(value) => setNewProgress(value[0])}
-                        max={100}
-                        step={5}
-                        disabled={isSaving}
-                      />
-                    </div>
-                    <Button
-                      onClick={handleUpdateProgress}
-                      disabled={isSaving || newProgress === selectedTask.progress}
-                      className="w-full"
-                    >
-                      {isSaving ? "Updating..." : "Update Progress"}
-                    </Button>
+                    {selectedTask.assignment_type === "multiple" && (
+                      <p className="text-xs text-muted-foreground">
+                        For group tasks, mark yourself as done above instead of changing the status.
+                      </p>
+                    )}
+                    {selectedTask.assignment_type === "department" && !selectedTask.can_change_status && (
+                      <p className="text-xs text-yellow-600 dark:text-yellow-400">
+                        Only department leads, admins, and super admins can change the status of department tasks.
+                      </p>
+                    )}
                   </CardContent>
                 </Card>
 

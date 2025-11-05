@@ -1,4 +1,5 @@
 -- Create transactional function for assigning devices
+-- Drop any existing version with the same signature
 DROP FUNCTION IF EXISTS assign_device(uuid, uuid, uuid, text);
 
 CREATE OR REPLACE FUNCTION assign_device(
@@ -60,8 +61,11 @@ END;
 $$;
 
 -- Grant execute permission to authenticated users
-GRANT EXECUTE ON FUNCTION assign_device(uuid, uuid, uuid, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.assign_device(uuid, uuid, uuid, text) TO authenticated;
 
 -- Grant execute permission to anon users (if needed for service role)
-GRANT EXECUTE ON FUNCTION assign_device(uuid, uuid, uuid, text) TO anon;
+GRANT EXECUTE ON FUNCTION public.assign_device(uuid, uuid, uuid, text) TO anon;
+
+-- Notify PostgREST to refresh schema cache
+NOTIFY pgrst, 'reload schema';
 

@@ -68,6 +68,14 @@ interface AuditLog {
       last_name: string
     }
   }
+  asset_info?: {
+    asset_name: string
+    assigned_to?: string
+    assigned_to_user?: {
+      first_name: string
+      last_name: string
+    }
+  }
 }
 
 export default function AuditLogsPage() {
@@ -136,14 +144,21 @@ export default function AuditLogsPage() {
             .filter(Boolean)
         ))
 
-        const deviceEntityIds = Array.from(new Set(
-          logsData
-            .filter(log => log.entity_id && (log.entity_type === 'device' || log.entity_type === 'device_assignment'))
-            .map(log => log.entity_id)
-            .filter(Boolean)
-        ))
+                  const deviceEntityIds = Array.from(new Set(
+            logsData
+              .filter(log => log.entity_id && (log.entity_type === 'device' || log.entity_type === 'device_assignment'))
+              .map(log => log.entity_id)
+              .filter(Boolean)
+          ))
 
-        // Combine all user IDs for a single query
+          const assetEntityIds = Array.from(new Set(
+            logsData
+              .filter(log => log.entity_id && (log.entity_type === 'asset' || log.entity_type === 'asset_assignment'))
+              .map(log => log.entity_id)
+              .filter(Boolean)
+          ))
+
+          // Combine all user IDs for a single query
         const allUserIds = Array.from(new Set([...uniqueUserIds, ...Array.from(userEntityIds) as string[]]))
 
         // Fetch all users
@@ -217,30 +232,78 @@ export default function AuditLogsPage() {
               deviceUsersMap = new Map(deviceUsersData?.map(u => [u.id, u]))
             }
 
-            devicesMap = new Map(devicesData.map(device => {
-              const assignedTo = assignmentsMap.get(device.id)
-              return [
-                device.id,
-                {
-                  device_name: device.device_name,
-                  assigned_to: assignedTo,
-                  assigned_to_user: assignedTo ? deviceUsersMap.get(assignedTo) : null
-                }
-              ]
-            }))
+                          devicesMap = new Map(devicesData.map(device => {
+                const assignedTo = assignmentsMap.get(device.id)
+                return [
+                  device.id,
+                  {
+                    device_name: device.device_name,
+                    assigned_to: assignedTo,
+                    assigned_to_user: assignedTo ? deviceUsersMap.get(assignedTo) : null
+                  }
+                ]
+              }))
+            }
           }
-        }
 
-        // Combine logs with all fetched data
+          // Fetch assets and their current assignments if needed
+          let assetsMap = new Map()
+          if (assetEntityIds.length > 0) {
+            const { data: assetsData } = await supabase
+              .from("assets")
+              .select("id, asset_name")
+              .in("id", assetEntityIds)
+
+            if (assetsData) {
+              // Get current asset assignments
+              const { data: assignmentsData } = await supabase
+                .from("asset_assignments")
+                .select("asset_id, assigned_to")
+                .in("asset_id", assetEntityIds)
+                .eq("is_current", true)
+
+              const assignmentsMap = new Map(assignmentsData?.map(a => [a.asset_id, a.assigned_to]))
+              
+              // Get assigned users
+              const assetUserIds = Array.from(new Set(Array.from(assignmentsMap.values()).filter(Boolean)))
+              let assetUsersMap = new Map()
+              if (assetUserIds.length > 0) {
+                const { data: assetUsersData } = await supabase
+                  .from("profiles")
+                  .select("id, first_name, last_name")
+                  .in("id", assetUserIds)
+
+                assetUsersMap = new Map(assetUsersData?.map(u => [u.id, u]))
+              }
+
+              assetsMap = new Map(assetsData.map(asset => {
+                const assignedTo = assignmentsMap.get(asset.id)
+                return [
+                  asset.id,
+                  {
+                    asset_name: asset.asset_name,
+                    assigned_to: assignedTo,
+                    assigned_to_user: assignedTo ? assetUsersMap.get(assignedTo) : null
+                  }
+                ]
+              }))
+            }
+          }
+
+          // Combine logs with all fetched data
         const logsWithUsers = logsData.map(log => {
           let targetFromNewValues = null
           
-          // Check new_values for assigned_to if we don't have task/device info
+          // Check new_values for assigned_to if we don't have task/device/asset info yet
           if (log.entity_type === 'task' && !tasksMap.get(log.entity_id) && log.new_values?.assigned_to) {
             targetFromNewValues = usersMap.get(log.new_values.assigned_to)
           }
           
           if ((log.entity_type === 'device' || log.entity_type === 'device_assignment') && !devicesMap.get(log.entity_id) && log.new_values?.assigned_to) {
+            targetFromNewValues = usersMap.get(log.new_values.assigned_to)
+          }
+
+          if ((log.entity_type === 'asset' || log.entity_type === 'asset_assignment') && !assetsMap.get(log.entity_id) && log.new_values?.assigned_to) {
             targetFromNewValues = usersMap.get(log.new_values.assigned_to)
           }
           
@@ -249,7 +312,8 @@ export default function AuditLogsPage() {
             user: log.user_id ? usersMap.get(log.user_id) : null,
             target_user: log.entity_id ? usersMap.get(log.entity_id) : (targetFromNewValues || null),
             task_info: log.entity_id && log.entity_type === 'task' ? tasksMap.get(log.entity_id) : null,
-            device_info: log.entity_id && (log.entity_type === 'device' || log.entity_type === 'device_assignment') ? devicesMap.get(log.entity_id) : null
+            device_info: log.entity_id && (log.entity_type === 'device' || log.entity_type === 'device_assignment') ? devicesMap.get(log.entity_id) : null,
+            asset_info: log.entity_id && (log.entity_type === 'asset' || log.entity_type === 'asset_assignment') ? assetsMap.get(log.entity_id) : null
           }
         })
 
@@ -344,7 +408,7 @@ export default function AuditLogsPage() {
     const entityType = log.entity_type.toLowerCase()
     
     // First priority: Check if we have target_user (this handles all user-related targets including tasks)
-    if (log.target_user && (entityType === 'profile' || entityType === 'user' || entityType === 'pending_user' || entityType === 'task' || entityType === 'device' || entityType === 'device_assignment' || entityType === 'job_description')) {
+    if (log.target_user && (entityType === 'profile' || entityType === 'user' || entityType === 'pending_user' || entityType === 'task' || entityType === 'device' || entityType === 'device_assignment' || entityType === 'asset' || entityType === 'asset_assignment' || entityType === 'job_description')) {
       const name = `${formatName(log.target_user.first_name)} ${formatName(log.target_user.last_name)}`
       return name
     }
@@ -364,6 +428,16 @@ export default function AuditLogsPage() {
         return name
       }
       // Devices can be unassigned
+      return "-"
+    }
+    
+    // Handle asset-related logs with asset_info
+    if ((entityType === 'asset' || entityType === 'asset_assignment') && log.asset_info) {
+      if (log.asset_info.assigned_to_user) {
+        const name = `${formatName(log.asset_info.assigned_to_user.first_name)} ${formatName(log.asset_info.assigned_to_user.last_name)}`
+        return name
+      }
+      // Assets can be unassigned
       return "-"
     }
     
@@ -394,10 +468,10 @@ export default function AuditLogsPage() {
       return "Feedback"
     }
     
-    // Fallback for devices without assignment
-    if (entityType === 'device' || entityType === 'device_assignment') {
-      return "-"
-    }
+            // Fallback for devices/assets without assignment
+        if (entityType === 'device' || entityType === 'device_assignment' || entityType === 'asset' || entityType === 'asset_assignment') {
+          return "-"
+        }
     
     // For any other entity types, capitalize and show nicely
     if (log.entity_id) {
