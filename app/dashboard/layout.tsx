@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import { Sidebar } from "@/components/sidebar"
+import { SidebarContent } from "@/components/sidebar-content"
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 
@@ -35,10 +36,7 @@ export default async function DashboardLayout({
   return (
     <div className="flex min-h-screen">
       <Sidebar user={userData} profile={profile || undefined} isAdmin={profile?.is_admin === true} />
-      <main className="flex-1 lg:pl-64">
-        <div className="lg:hidden h-16" /> {/* Spacer for mobile header */}
-        {children}
-      </main>
+      <SidebarContent>{children}</SidebarContent>
     </div>
   )
 }

@@ -14,7 +14,6 @@ import {
   Shield,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
-import { Notifications } from "@/components/notifications"
 import { formatName } from "@/lib/utils"
 
 export default async function AdminDashboardPage() {
@@ -52,23 +51,57 @@ export default async function AdminDashboardPage() {
       status,
       priority,
       created_at,
-      assigned_to_user:profiles!tasks_assigned_to_fkey(first_name, last_name)
+      assigned_to
     `)
     .order("created_at", { ascending: false })
     .limit(5)
+
+  // Fetch user profiles for tasks
+  let tasksWithUsers = []
+  if (recentTasks && recentTasks.length > 0) {
+    const userIds = recentTasks.map((t: any) => t.assigned_to).filter(Boolean)
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("id, first_name, last_name")
+      .in("id", userIds)
+
+    const profilesMap = new Map(profiles?.map((p: any) => [p.id, p]) || [])
+    
+    tasksWithUsers = recentTasks.map((task: any) => ({
+      ...task,
+      assigned_to_user: profilesMap.get(task.assigned_to) || null,
+    }))
+  }
 
   const { data: recentFeedback } = await supabase
     .from("feedback")
     .select(`
       id,
       title,
-      category,
+      feedback_type,
       status,
       created_at,
-      user:profiles!feedback_user_id_fkey(first_name, last_name)
+      user_id
     `)
     .order("created_at", { ascending: false })
     .limit(5)
+
+  // Fetch user profiles for feedback
+  let feedbackWithUsers = []
+  if (recentFeedback && recentFeedback.length > 0) {
+    const userIds = recentFeedback.map((f: any) => f.user_id).filter(Boolean)
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("id, first_name, last_name")
+      .in("id", userIds)
+
+    const profilesMap = new Map(profiles?.map((p: any) => [p.id, p]) || [])
+    
+    feedbackWithUsers = recentFeedback.map((feedback: any) => ({
+      ...feedback,
+      user: profilesMap.get(feedback.user_id) || null,
+    }))
+  }
 
   // Fetch notifications for admin
   const notifications = []
@@ -270,11 +303,6 @@ export default async function AdminDashboardPage() {
             </p>
         </div>
 
-        {/* Notifications */}
-        {notifications.length > 0 && (
-          <Notifications notifications={notifications} title="Admin Notifications" />
-        )}
-
         {/* Stats Grid */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
           <Card className="border-2">
@@ -390,20 +418,30 @@ export default async function AdminDashboardPage() {
                 </Link>
               </div>
             </CardHeader>
-            <CardContent className="p-6">
-              {recentTasks && recentTasks.length > 0 ? (
-                <div className="space-y-4">
-                  {recentTasks.map((task: any) => (
-                    <div key={task.id} className="flex items-start justify-between pb-4 border-b last:border-0">
-                      <div className="flex-1">
-                        <p className="font-medium text-foreground">{task.title}</p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <Badge className={getStatusColor(task.status)} variant="outline">
-                            {task.status}
-                          </Badge>
-                          <span className="text-xs text-muted-foreground">{formatDate(task.created_at)}</span>
-                        </div>
-                      </div>
+            <CardContent className="p-4">
+              {tasksWithUsers && tasksWithUsers.length > 0 ? (
+                <div className="space-y-2">
+                  {tasksWithUsers.map((task: any) => (
+                    <div key={task.id} className="flex items-center gap-2 py-2 border-b last:border-0">
+                      <p className="font-medium text-sm text-foreground truncate flex-1 min-w-0">
+                        {task.title}
+                      </p>
+                      <Badge className={`${getStatusColor(task.status)} text-xs shrink-0`} variant="outline">
+                        {task.status}
+                      </Badge>
+                      {task.priority && (
+                        <Badge variant="outline" className="text-xs shrink-0">
+                          {task.priority}
+                        </Badge>
+                      )}
+                      {task.assigned_to_user && (
+                        <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
+                          {formatName(task.assigned_to_user.first_name)} {formatName(task.assigned_to_user.last_name)}
+                        </span>
+                      )}
+                      <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
+                        {formatDate(task.created_at)}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -428,21 +466,28 @@ export default async function AdminDashboardPage() {
                 </Link>
               </div>
             </CardHeader>
-            <CardContent className="p-6">
-              {recentFeedback && recentFeedback.length > 0 ? (
-                <div className="space-y-4">
-                  {recentFeedback.map((feedback: any) => (
-                    <div key={feedback.id} className="flex items-start justify-between pb-4 border-b last:border-0">
-                      <div className="flex-1">
-                        <p className="font-medium text-foreground">{feedback.title}</p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <Badge variant="outline">{feedback.category}</Badge>
-                          <Badge className={getStatusColor(feedback.status)} variant="outline">
-                            {feedback.status}
-                          </Badge>
-                        </div>
-                        <span className="text-xs text-muted-foreground">{formatDate(feedback.created_at)}</span>
-                      </div>
+            <CardContent className="p-4">
+              {feedbackWithUsers && feedbackWithUsers.length > 0 ? (
+                <div className="space-y-2">
+                  {feedbackWithUsers.map((feedback: any) => (
+                    <div key={feedback.id} className="flex items-center gap-2 py-2 border-b last:border-0">
+                      <p className="font-medium text-sm text-foreground truncate flex-1 min-w-0">
+                        {feedback.title}
+                      </p>
+                      <Badge variant="outline" className="text-xs shrink-0">
+                        {feedback.feedback_type || "N/A"}
+                      </Badge>
+                      <Badge className={`${getStatusColor(feedback.status)} text-xs shrink-0`} variant="outline">
+                        {feedback.status}
+                      </Badge>
+                      {feedback.user && (
+                        <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
+                          {formatName(feedback.user.first_name)} {formatName(feedback.user.last_name)}
+                        </span>
+                      )}
+                      <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
+                        {formatDate(feedback.created_at)}
+                      </span>
                     </div>
                   ))}
                 </div>

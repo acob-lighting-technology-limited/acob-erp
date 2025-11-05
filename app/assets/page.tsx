@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { formatName } from "@/lib/utils"
-import { Package, Calendar, User, FileText, Package } from "lucide-react"
+import { Package, Calendar, User, FileText, Building2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -52,28 +52,63 @@ export default function AssetsPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-      const { data, error } = await supabase
-        .from("Asset_assignments")
+      // Get user's department
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("department")
+        .eq("id", user.id)
+        .single()
+
+      // Fetch individual assignments
+      const { data: individualAssignments, error: individualError } = await supabase
+        .from("asset_assignments")
         .select(`
           id,
           assigned_at,
           assignment_notes,
           assigned_by,
-          Asset_id
+          asset_id,
+          department
         `)
         .eq("assigned_to", user.id)
         .eq("is_current", true)
         .order("assigned_at", { ascending: false })
 
-      if (error) throw error
-      
+      if (individualError) throw individualError
+
+      // Fetch department assignments if user has a department
+      let departmentAssignments: any[] = []
+      if (profile?.department) {
+        const { data: deptAssignments, error: deptError } = await supabase
+          .from("asset_assignments")
+          .select(`
+            id,
+            assigned_at,
+            assignment_notes,
+            assigned_by,
+            asset_id,
+            department
+          `)
+          .eq("department", profile.department)
+          .eq("is_current", true)
+          .is("assigned_to", null)
+          .order("assigned_at", { ascending: false })
+
+        if (!deptError) {
+          departmentAssignments = deptAssignments || []
+        }
+      }
+
+      // Combine both assignment types
+      const allAssignments = [...(individualAssignments || []), ...departmentAssignments]
+
       // Fetch Asset and assigner details separately
-      const assignmentsWithDetails = await Promise.all((data || []).map(async (assignment: any) => {
+      const assignmentsWithDetails = await Promise.all(allAssignments.map(async (assignment: any) => {
         const [AssetResult, assignerResult] = await Promise.all([
           supabase
-            .from("Assets")
-            .select("id, Asset_name, Asset_type, Asset_model, serial_number, status")
-            .eq("id", assignment.Asset_id)
+            .from("assets")
+            .select("id, asset_name, asset_type, asset_model, serial_number, status")
+            .eq("id", assignment.asset_id)
             .single(),
           assignment.assigned_by ? supabase
             .from("profiles")
@@ -209,7 +244,13 @@ export default function AssetsPage() {
                     <span className="text-foreground">{formatDate(assignment.assigned_at)}</span>
                   </div>
 
-                  {assignment.assigner && (
+                  {(assignment as any).department ? (
+                    <div className="flex items-center gap-2 text-sm">
+                      <Building2 className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">Department Assignment:</span>
+                      <span className="text-foreground font-medium">{(assignment as any).department}</span>
+                    </div>
+                  ) : assignment.assigner && (
                     <div className="flex items-center gap-2 text-sm">
                       <User className="h-4 w-4 text-muted-foreground" />
                       <span className="text-muted-foreground">Assigned by:</span>
