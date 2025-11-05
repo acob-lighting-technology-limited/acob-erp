@@ -35,6 +35,7 @@ import {
   Edit,
 } from "lucide-react"
 import { getRoleDisplayName, getRoleBadgeColor } from "@/lib/permissions"
+import type { UserRole } from "@/types/database"
 import Link from "next/link"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 
@@ -385,8 +386,8 @@ export default function UserDetailPage() {
               <div>
                 <p className="text-sm text-muted-foreground">Role</p>
                 <div className="flex gap-2 mt-1">
-                  <Badge className={getRoleBadgeColor(profile.role)}>
-                    {getRoleDisplayName(profile.role)}
+                  <Badge className={getRoleBadgeColor(profile.role as UserRole)}>
+                    {getRoleDisplayName(profile.role as UserRole)}
                   </Badge>
                   {profile.is_department_lead && (
                     <Badge variant="outline">Department Lead</Badge>

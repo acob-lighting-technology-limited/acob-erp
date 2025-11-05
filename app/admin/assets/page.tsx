@@ -96,10 +96,11 @@ interface Staff {
 
 interface AssetAssignment {
   id: string
-  assigned_to: string
+  assigned_to?: string
+  department?: string
   assigned_at: string
   is_current: boolean
-  user: {
+  user?: {
     first_name: string
     last_name: string
   }
@@ -111,6 +112,7 @@ interface AssignmentHistory {
   handed_over_at?: string
   assignment_notes?: string
   handover_notes?: string
+  department?: string
   assigned_from_user?: {
     first_name: string
     last_name: string
@@ -535,7 +537,7 @@ export default function AdminAssetsPage() {
 
   const handleDeleteAsset = async () => {
     try {
-      if (!AssetToDelete) return
+      if (!assetToDelete) return
 
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
