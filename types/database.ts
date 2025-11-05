@@ -2,6 +2,8 @@ export type UserRole = 'visitor' | 'staff' | 'lead' | 'admin' | 'super_admin'
 
 export type DeviceStatus = 'available' | 'assigned' | 'maintenance' | 'retired'
 
+export type AssetStatus = 'available' | 'assigned' | 'maintenance' | 'retired'
+
 export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled'
 
 export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent'
@@ -47,6 +49,35 @@ export interface Device {
 export interface DeviceAssignment {
   id: string
   device_id: string
+  assigned_to: string
+  assigned_from?: string
+  assigned_by: string
+  assigned_at: string
+  handed_over_at?: string
+  assignment_notes?: string
+  handover_notes?: string
+  is_current: boolean
+  created_at: string
+}
+
+export interface Asset {
+  id: string
+  asset_name: string
+  asset_type: string
+  asset_model?: string
+  serial_number?: string
+  purchase_date?: string
+  purchase_cost?: number
+  notes?: string
+  status: AssetStatus
+  created_at: string
+  updated_at: string
+  created_by: string
+}
+
+export interface AssetAssignment {
+  id: string
+  asset_id: string
   assigned_to: string
   assigned_from?: string
   assigned_by: string

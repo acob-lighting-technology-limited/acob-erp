@@ -18,6 +18,7 @@ import {
   ArrowRight,
   Clock,
 } from "lucide-react"
+import { formatName } from "@/lib/utils"
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -35,6 +36,129 @@ export default async function DashboardPage() {
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
     .limit(5)
+
+  // Fetch notifications for user
+  const notifications = []
+
+  // Assigned tasks (pending or in progress)
+  const { data: assignedTasks } = await supabase
+    .from("tasks")
+    .select("id, title, status, priority, due_date")
+    .eq("assigned_to", userId)
+    .in("status", ["pending", "in_progress"])
+
+  if (assignedTasks && assignedTasks.length > 0) {
+    const pendingTasks = assignedTasks.filter(t => t.status === "pending")
+    if (pendingTasks.length > 0) {
+      notifications.push({
+        id: "pending-tasks",
+        type: "info" as const,
+        title: "Pending Tasks",
+        message: `You have ${pendingTasks.length} pending task${pendingTasks.length > 1 ? "s" : ""} assigned to you.`,
+        timestamp: "Active",
+        link: "/tasks",
+        linkText: "View Tasks",
+      })
+    }
+
+    // Urgent tasks
+    const urgentTasks = assignedTasks.filter(t => t.priority === "urgent")
+    if (urgentTasks.length > 0) {
+      notifications.push({
+        id: "urgent-tasks",
+        type: "error" as const,
+        title: "Urgent Tasks",
+        message: `You have ${urgentTasks.length} urgent task${urgentTasks.length > 1 ? "s" : ""} that need immediate attention.`,
+        timestamp: "Urgent",
+        link: "/tasks",
+        linkText: "View Tasks",
+      })
+    }
+
+    // Overdue tasks
+    const today = new Date().toISOString().split("T")[0]
+    const overdueTasks = assignedTasks.filter(
+      t => t.due_date && t.due_date < today
+    )
+    if (overdueTasks.length > 0) {
+      notifications.push({
+        id: "overdue-tasks",
+        type: "error" as const,
+        title: "Overdue Tasks",
+        message: `You have ${overdueTasks.length} overdue task${overdueTasks.length > 1 ? "s" : ""} that need to be completed.`,
+        timestamp: "Overdue",
+        link: "/tasks",
+        linkText: "View Tasks",
+      })
+    }
+
+    // Tasks due soon (within 3 days)
+    const threeDaysFromNow = new Date()
+    threeDaysFromNow.setDate(threeDaysFromNow.getDate() + 3)
+    const dueSoonTasks = assignedTasks.filter(
+      t => t.due_date && t.due_date >= today && t.due_date <= threeDaysFromNow.toISOString().split("T")[0]
+    )
+    if (dueSoonTasks.length > 0) {
+      notifications.push({
+        id: "due-soon-tasks",
+        type: "warning" as const,
+        title: "Tasks Due Soon",
+        message: `You have ${dueSoonTasks.length} task${dueSoonTasks.length > 1 ? "s" : ""} due within 3 days.`,
+        timestamp: "Upcoming",
+        link: "/tasks",
+        linkText: "View Tasks",
+      })
+    }
+  }
+
+  // Feedback status updates
+  const { data: resolvedFeedback } = await supabase
+    .from("feedback")
+    .select("id, title, status, updated_at")
+    .eq("user_id", userId)
+    .eq("status", "resolved")
+    .order("updated_at", { ascending: false })
+    .limit(3)
+
+  if (resolvedFeedback && resolvedFeedback.length > 0) {
+    const recentResolved = resolvedFeedback.filter(f => {
+      const updatedAt = new Date(f.updated_at)
+      const oneDayAgo = new Date()
+      oneDayAgo.setDate(oneDayAgo.getDate() - 1)
+      return updatedAt >= oneDayAgo
+    })
+
+    if (recentResolved.length > 0) {
+      notifications.push({
+        id: "resolved-feedback",
+        type: "success" as const,
+        title: "Feedback Resolved",
+        message: `${recentResolved.length} of your feedback item${recentResolved.length > 1 ? "s have" : " has"} been resolved recently.`,
+        timestamp: "Recent",
+        link: "/feedback",
+        linkText: "View Feedback",
+      })
+    }
+  }
+
+  // Profile completeness check
+  const incompleteFields = []
+  if (!profile?.phone_number) incompleteFields.push("phone number")
+  if (!profile?.date_of_birth) incompleteFields.push("date of birth")
+  if (!profile?.employment_date) incompleteFields.push("employment date")
+  if (!profile?.job_description) incompleteFields.push("job description")
+
+  if (incompleteFields.length > 0) {
+    notifications.push({
+      id: "incomplete-profile",
+      type: "warning" as const,
+      title: "Complete Your Profile",
+      message: `Your profile is missing ${incompleteFields.slice(0, 2).join(" and ")}${incompleteFields.length > 2 ? " and more" : ""}.`,
+      timestamp: "Reminder",
+      link: "/profile",
+      linkText: "Update Profile",
+    })
+  }
 
   const getInitials = (firstName?: string, lastName?: string, email?: string): string => {
     if (firstName && lastName) {
@@ -116,8 +240,8 @@ export default async function DashboardPage() {
               <div className="flex-1 space-y-4">
                 <div>
                   <h2 className="text-2xl font-bold text-foreground">
-                    {profile?.first_name} {profile?.last_name}
-                    {profile?.other_names && ` ${profile.other_names}`}
+                    {formatName(profile?.first_name)} {formatName(profile?.last_name)}
+                    {profile?.other_names && ` ${formatName(profile.other_names)}`}
                   </h2>
                   <p className="text-muted-foreground">{profile?.company_role || "Staff Member"}</p>
                 </div>
@@ -188,7 +312,7 @@ export default async function DashboardPage() {
           <CardHeader className="border-b bg-muted/30">
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2">
-                <MessageSquare className="h-5 w-5" />
+                <MessageSquare className="h-5 w-5 text-primary" />
                 Recent Feedback
               </CardTitle>
               <Link href="/feedback">
@@ -201,35 +325,32 @@ export default async function DashboardPage() {
           </CardHeader>
           <CardContent className="p-6">
             {feedbacks && feedbacks.length > 0 ? (
-              <div className="space-y-4">
+              <div className="space-y-2">
                 {feedbacks.map((feedback) => (
                   <div
                     key={feedback.id}
-                    className="p-4 rounded-lg border bg-card hover:shadow-md transition-shadow"
+                    className="flex items-center justify-between gap-3 p-2.5 rounded-lg border hover:bg-muted/50 transition-colors"
                   >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1 space-y-2">
-                        <div className="flex items-center gap-2">
-                          <Badge className={getStatusColor(feedback.status)}>
-                            {feedback.status?.replace("_", " ") || "Pending"}
-                          </Badge>
-                          <Badge variant="outline">{feedback.category}</Badge>
-                        </div>
-                        <h4 className="font-semibold text-foreground">{feedback.title}</h4>
-                        <p className="text-sm text-muted-foreground line-clamp-2">{feedback.description}</p>
-                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                          <div className="flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            {formatDate(feedback.created_at)}
-                          </div>
-                          {feedback.priority && (
-                            <span className="font-medium text-orange-600 dark:text-orange-400">
-                              {feedback.priority} priority
-                            </span>
-                          )}
-                        </div>
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className="p-1.5 bg-primary/10 rounded">
+                        <MessageSquare className="h-3.5 w-3.5 text-primary" />
                       </div>
+                      <p className="font-medium text-sm text-foreground truncate flex-1">{feedback.title}</p>
+                      <Badge className={`text-xs ${getStatusColor(feedback.status)}`}>
+                        {feedback.status?.replace("_", " ") || "Pending"}
+                      </Badge>
+                      {feedback.feedback_type && (
+                        <Badge variant="outline" className="text-xs">{feedback.feedback_type}</Badge>
+                      )}
+                      <span className="text-xs text-muted-foreground whitespace-nowrap">
+                        {formatDate(feedback.created_at)}
+                      </span>
                     </div>
+                    <Link href="/feedback">
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                        <ArrowRight className="h-3.5 w-3.5" />
+                      </Button>
+                    </Link>
                   </div>
                 ))}
               </div>

@@ -5,13 +5,15 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { Progress } from "@/components/ui/progress"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
+import { formatName } from "@/lib/utils"
 import {
   ClipboardList,
   Calendar,
   User,
+  Users,
+  Building2,
   MessageSquare,
   Send,
   TrendingUp,
@@ -34,7 +36,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Slider } from "@/components/ui/slider"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 
 interface Task {
   id: string
@@ -42,16 +51,24 @@ interface Task {
   description?: string
   priority: string
   status: string
-  progress: number
   due_date?: string
   started_at?: string
   completed_at?: string
   created_at: string
+  assignment_type?: "individual" | "multiple" | "department"
   assigned_by_user?: {
     first_name: string
     last_name: string
   }
   department?: string
+  assigned_users?: Array<{
+    id: string
+    first_name: string
+    last_name: string
+    completed?: boolean
+  }>
+  user_completed?: boolean
+  can_change_status?: boolean
 }
 
 interface TaskUpdate {
@@ -75,7 +92,6 @@ export default function TasksPage() {
   const [newComment, setNewComment] = useState("")
   const [isSaving, setIsSaving] = useState(false)
   const [filterStatus, setFilterStatus] = useState("all")
-  const [newProgress, setNewProgress] = useState(0)
   const [newStatus, setNewStatus] = useState("")
   const supabase = createClient()
 
@@ -98,32 +114,131 @@ export default function TasksPage() {
       } = await supabase.auth.getUser()
       if (!user) return
 
-      const { data, error } = await supabase
-        .from("tasks")
-        .select(`
-          id,
-          title,
-          description,
-          priority,
-          status,
-          progress,
-          due_date,
-          created_at,
-          department,
-          assigned_by_user:profiles!tasks_assigned_by_fkey (
-            first_name,
-            last_name
-          )
-        `)
-        .eq("assigned_to", user.id)
-        .order("created_at", { ascending: false })
+      // Get user profile to check department and role
+      const { data: userProfile } = await supabase
+        .from("profiles")
+        .select("department, role, lead_departments")
+        .eq("id", user.id)
+        .single()
 
-      if (error) throw error
-      setTasks(data as any || [])
-      setFilteredTasks(data as any || [])
-    } catch (error) {
+      // Load tasks assigned to user individually
+      const { data: individualTasks } = await supabase
+        .from("tasks")
+        .select("*")
+        .eq("assigned_to", user.id)
+        .eq("assignment_type", "individual")
+
+      // Load tasks where user is in task_assignments (multiple-user tasks)
+      const { data: assignments } = await supabase
+        .from("task_assignments")
+        .select("task_id")
+        .eq("user_id", user.id)
+
+      const multipleTaskIds = assignments?.map((a: any) => a.task_id) || []
+      const { data: multipleTasks } = multipleTaskIds.length > 0
+        ? await supabase
+            .from("tasks")
+            .select("*")
+            .in("id", multipleTaskIds)
+            .eq("assignment_type", "multiple")
+        : { data: [] }
+
+      // Load department tasks if user has a department
+      const { data: departmentTasks } = userProfile?.department
+        ? await supabase
+            .from("tasks")
+            .select("*")
+            .eq("department", userProfile.department)
+            .eq("assignment_type", "department")
+        : { data: [] }
+
+      // Combine all tasks and remove duplicates
+      const allTasks = [
+        ...(individualTasks || []),
+        ...(multipleTasks || []),
+        ...(departmentTasks || []),
+      ]
+      const uniqueTasks = Array.from(
+        new Map(allTasks.map((t: any) => [t.id, t])).values()
+      )
+
+      // Fetch assigned_by user details and additional info
+      const tasksWithUsers = await Promise.all((uniqueTasks || []).map(async (task: any) => {
+        const taskData: any = { ...task }
+
+        // Fetch assigned_by user
+        if (task.assigned_by) {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("first_name, last_name")
+            .eq("id", task.assigned_by)
+            .single()
+          
+          taskData.assigned_by_user = profile
+        }
+
+        // For multiple-user tasks, fetch all assigned users and completion status
+        if (task.assignment_type === "multiple") {
+          const { data: taskAssignments } = await supabase
+            .from("task_assignments")
+            .select("user_id")
+            .eq("task_id", task.id)
+
+          if (taskAssignments && taskAssignments.length > 0) {
+            const userIds = taskAssignments.map((a: any) => a.user_id)
+            const { data: userProfiles } = await supabase
+              .from("profiles")
+              .select("id, first_name, last_name")
+              .in("id", userIds)
+
+            // Check if current user has completed
+            const { data: userCompletion } = await supabase
+              .from("task_user_completion")
+              .select("user_id")
+              .eq("task_id", task.id)
+              .eq("user_id", user.id)
+              .single()
+
+            const completedUserIds = new Set(
+              (await supabase
+                .from("task_user_completion")
+                .select("user_id")
+                .eq("task_id", task.id)
+              ).data?.map((c: any) => c.user_id) || []
+            )
+
+            taskData.assigned_users = userProfiles?.map((profile: any) => ({
+              ...profile,
+              completed: completedUserIds.has(profile.id),
+            })) || []
+            taskData.user_completed = !!userCompletion
+          }
+        }
+
+        // For department tasks, check if user can change status
+        if (task.assignment_type === "department") {
+          const canChangeStatus =
+            userProfile?.role === "admin" ||
+            userProfile?.role === "super_admin" ||
+            (userProfile?.role === "lead" &&
+             userProfile?.lead_departments?.includes(task.department))
+          taskData.can_change_status = canChangeStatus
+        }
+
+        return taskData
+      }))
+
+      // Sort by created_at
+      tasksWithUsers.sort((a: any, b: any) => 
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      )
+      
+      setTasks(tasksWithUsers as any || [])
+      setFilteredTasks(tasksWithUsers as any || [])
+    } catch (error: any) {
       console.error("Error loading tasks:", error)
-      toast.error("Failed to load tasks")
+      const errorMessage = error?.message || error?.toString() || "Failed to load tasks"
+      toast.error(`Failed to load tasks: ${errorMessage}`)
     } finally {
       setIsLoading(false)
     }
@@ -155,7 +270,6 @@ export default function TasksPage() {
 
   const openTaskDetails = async (task: Task) => {
     setSelectedTask(task)
-    setNewProgress(task.progress)
     setNewStatus(task.status)
     await loadTaskUpdates(task.id)
     setIsDetailsOpen(true)
@@ -191,8 +305,8 @@ export default function TasksPage() {
     }
   }
 
-  const handleUpdateProgress = async () => {
-    if (!selectedTask) return
+  const handleMarkAsDone = async () => {
+    if (!selectedTask || selectedTask.assignment_type !== "multiple") return
 
     setIsSaving(true)
     try {
@@ -201,20 +315,24 @@ export default function TasksPage() {
       } = await supabase.auth.getUser()
       if (!user) throw new Error("Not authenticated")
 
-      const updates: any = { progress: newProgress }
+      // Check if user is already marked as done
+      const { data: existingCompletion } = await supabase
+        .from("task_user_completion")
+        .select("id")
+        .eq("task_id", selectedTask.id)
+        .eq("user_id", user.id)
+        .single()
 
-      // Auto-update status based on progress
-      if (newProgress === 0 && selectedTask.status === "pending") {
-        // Keep as pending
-      } else if (newProgress > 0 && newProgress < 100 && selectedTask.status === "pending") {
-        updates.status = "in_progress"
-        updates.started_at = new Date().toISOString()
-      } else if (newProgress === 100) {
-        updates.status = "completed"
-        updates.completed_at = new Date().toISOString()
+      if (existingCompletion) {
+        toast.info("You've already marked this task as done")
+        return
       }
 
-      const { error } = await supabase.from("tasks").update(updates).eq("id", selectedTask.id)
+      // Mark user as done
+      const { error } = await supabase.from("task_user_completion").insert({
+        task_id: selectedTask.id,
+        user_id: user.id,
+      })
 
       if (error) throw error
 
@@ -222,19 +340,22 @@ export default function TasksPage() {
       await supabase.from("task_updates").insert({
         task_id: selectedTask.id,
         user_id: user.id,
-        update_type: "progress_update",
-        content: `Progress updated to ${newProgress}%`,
-        old_value: selectedTask.progress.toString(),
-        new_value: newProgress.toString(),
+        update_type: "comment",
+        content: "Marked task as done",
       })
 
-      toast.success("Progress updated")
+      toast.success("You've marked this task as done")
       await loadTasks()
-      setSelectedTask({ ...selectedTask, progress: newProgress, status: updates.status || selectedTask.status })
       await loadTaskUpdates(selectedTask.id)
+      
+      // Reload selected task to update completion status
+      const updatedTask = tasks.find((t) => t.id === selectedTask.id)
+      if (updatedTask) {
+        setSelectedTask({ ...updatedTask, user_completed: true })
+      }
     } catch (error) {
-      console.error("Error updating progress:", error)
-      toast.error("Failed to update progress")
+      console.error("Error marking task as done:", error)
+      toast.error("Failed to mark task as done")
     } finally {
       setIsSaving(false)
     }
@@ -242,6 +363,18 @@ export default function TasksPage() {
 
   const handleUpdateStatus = async (status: string) => {
     if (!selectedTask) return
+
+    // Check permissions for department tasks
+    if (selectedTask.assignment_type === "department" && !selectedTask.can_change_status) {
+      toast.error("Only department leads, admins, and super admins can change the status of department tasks")
+      return
+    }
+
+    // Multiple-user tasks should use individual completion
+    if (selectedTask.assignment_type === "multiple") {
+      toast.error("For group tasks, please mark yourself as done instead of changing the status")
+      return
+    }
 
     setIsSaving(true)
     try {
@@ -255,7 +388,6 @@ export default function TasksPage() {
         updates.started_at = new Date().toISOString()
       } else if (status === "completed") {
         updates.completed_at = new Date().toISOString()
-        updates.progress = 100
       }
 
       const { error } = await supabase.from("tasks").update(updates).eq("id", selectedTask.id)
@@ -362,18 +494,43 @@ export default function TasksPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 p-4 md:p-8">
-        <div className="mx-auto max-w-6xl">
-          <div className="animate-pulse space-y-4">
-            <div className="h-8 bg-muted rounded w-1/3"></div>
+        <div className="mx-auto max-w-6xl space-y-6">
+          <div className="animate-pulse space-y-6">
+            {/* Header Skeleton */}
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <div className="space-y-2">
+                <div className="h-8 bg-muted rounded w-48"></div>
+                <div className="h-5 bg-muted rounded w-64"></div>
+              </div>
+              <div className="h-10 bg-muted rounded w-48"></div>
+            </div>
+
+            {/* Stats Skeleton */}
             <div className="grid gap-4 md:grid-cols-4">
               {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="h-24 bg-muted rounded"></div>
+                <Card key={i} className="border-2">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-2">
+                        <div className="h-4 bg-muted rounded w-24"></div>
+                        <div className="h-8 bg-muted rounded w-16"></div>
+                      </div>
+                      <div className="h-8 w-8 bg-muted rounded"></div>
+                    </div>
+                  </CardContent>
+                </Card>
               ))}
             </div>
-            <div className="space-y-4">
-              <div className="h-32 bg-muted rounded"></div>
-              <div className="h-32 bg-muted rounded"></div>
-            </div>
+
+            {/* Table Skeleton */}
+            <Card className="border-2">
+              <div className="p-4 space-y-3">
+                <div className="h-10 bg-muted rounded mb-2"></div>
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <div key={i} className="h-12 bg-muted rounded"></div>
+                ))}
+              </div>
+            </Card>
           </div>
         </div>
       </div>
@@ -455,69 +612,104 @@ export default function TasksPage() {
 
         {/* Tasks List */}
         {filteredTasks.length > 0 ? (
-          <div className="space-y-4">
-            {filteredTasks.map((task) => (
-              <Card
-                key={task.id}
-                className="border-2 shadow-md hover:shadow-lg transition-all cursor-pointer"
-                onClick={() => openTaskDetails(task)}
-              >
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 space-y-3">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
-                            {task.title}
-                            <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                          </h3>
-                          {task.description && (
-                            <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{task.description}</p>
-                          )}
+          <Card className="border-2">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-12">#</TableHead>
+                  <TableHead>Task</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Priority</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Due Date</TableHead>
+                  <TableHead>Assigned By</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredTasks.map((task, index) => (
+                  <TableRow 
+                    key={task.id} 
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => openTaskDetails(task)}
+                  >
+                    <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <div className="p-2 bg-primary/10 rounded-lg">
+                          <ClipboardList className="h-4 w-4 text-primary" />
                         </div>
+                        <span className="font-medium text-foreground">{task.title}</span>
                       </div>
-
-                      <div className="flex items-center gap-3 flex-wrap">
-                        <Badge className={getStatusColor(task.status)}>
-                          <span className="flex items-center gap-1">
-                            {getStatusIcon(task.status)}
-                            {task.status.replace("_", " ")}
-                          </span>
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={getStatusColor(task.status)}>
+                        <span className="flex items-center gap-1">
+                          {getStatusIcon(task.status)}
+                          {task.status.replace("_", " ")}
+                        </span>
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={getPriorityColor(task.priority)}>{task.priority}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      {task.assignment_type === "multiple" && (
+                        <Badge variant="outline" className="flex items-center gap-1 w-fit">
+                          <Users className="h-3 w-3" />
+                          Group
                         </Badge>
-                        <Badge className={getPriorityColor(task.priority)}>{task.priority} priority</Badge>
-                        {task.department && <Badge variant="outline">{task.department}</Badge>}
-                      </div>
-
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground">Progress</span>
-                          <span className="font-semibold text-foreground">{task.progress}%</span>
+                      )}
+                      {task.assignment_type === "department" && (
+                        <Badge variant="outline" className="flex items-center gap-1 w-fit">
+                          <Building2 className="h-3 w-3" />
+                          {task.department}
+                        </Badge>
+                      )}
+                      {task.assignment_type === "individual" && (
+                        <Badge variant="outline" className="flex items-center gap-1 w-fit">
+                          <User className="h-3 w-3" />
+                          Individual
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {task.due_date ? (
+                        <div className="flex items-center gap-1 text-sm">
+                          <Calendar className="h-3 w-3 text-muted-foreground" />
+                          <span>{formatDate(task.due_date)}</span>
                         </div>
-                        <Progress value={task.progress} className="h-2" />
-                      </div>
-
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
-                        {task.due_date && (
-                          <div className="flex items-center gap-1">
-                            <Calendar className="h-4 w-4" />
-                            <span>Due: {formatDate(task.due_date)}</span>
-                          </div>
-                        )}
-                        {task.assigned_by_user && (
-                          <div className="flex items-center gap-1">
-                            <User className="h-4 w-4" />
-                            <span>
-                              By: {task.assigned_by_user.first_name} {task.assigned_by_user.last_name}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {task.assigned_by_user ? (
+                        <div className="flex items-center gap-1 text-sm">
+                          <User className="h-3 w-3 text-muted-foreground" />
+                          <span>{formatName(task.assigned_by_user.first_name)} {formatName(task.assigned_by_user.last_name)}</span>
+                        </div>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          openTaskDetails(task)
+                        }}
+                      >
+                        View
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Card>
         ) : (
           <Card className="border-2">
             <CardContent className="p-12 text-center">
@@ -558,13 +750,92 @@ export default function TasksPage() {
                   {selectedTask.department && <Badge variant="outline">{selectedTask.department}</Badge>}
                 </div>
 
+                {/* Group Task Info */}
+                {selectedTask.assignment_type === "multiple" && selectedTask.assigned_users && (
+                  <Card className="border bg-muted/30">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Users className="h-4 w-4" />
+                        Group Task - Assigned People
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="space-y-2">
+                        {selectedTask.assigned_users.map((user: any) => (
+                          <div key={user.id} className="flex items-center justify-between p-2 rounded-md bg-background">
+                            <span className="text-sm">
+                              {formatName(user.first_name)} {formatName(user.last_name)}
+                            </span>
+                            {user.completed ? (
+                              <Badge variant="outline" className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                                Done
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline">In Progress</Badge>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                      <div className="text-xs text-muted-foreground pt-2 border-t">
+                        {selectedTask.assigned_users.filter((u: any) => u.completed).length} of {selectedTask.assigned_users.length} completed
+                      </div>
+                      {!selectedTask.user_completed && (
+                        <Button
+                          onClick={handleMarkAsDone}
+                          disabled={isSaving}
+                          className="w-full gap-2"
+                          variant="default"
+                        >
+                          <CheckCircle2 className="h-4 w-4" />
+                          Mark Myself as Done
+                        </Button>
+                      )}
+                      {selectedTask.user_completed && (
+                        <div className="p-2 rounded-md bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400 text-sm text-center">
+                          ✓ You've marked this task as done
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Department Task Info */}
+                {selectedTask.assignment_type === "department" && (
+                  <Card className="border bg-muted/30">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Building2 className="h-4 w-4" />
+                        Department Task
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm text-muted-foreground">
+                        This task is assigned to the <strong>{selectedTask.department}</strong> department.
+                        {!selectedTask.can_change_status && (
+                          <span className="block mt-2 text-xs text-yellow-600 dark:text-yellow-400">
+                            Only department leads, admins, and super admins can change the status.
+                          </span>
+                        )}
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
+
                 {/* Update Status */}
                 <Card className="border bg-muted/30">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base">Update Status</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <Select value={newStatus} onValueChange={handleUpdateStatus} disabled={isSaving}>
+                    <Select
+                      value={newStatus}
+                      onValueChange={handleUpdateStatus}
+                      disabled={
+                        isSaving ||
+                        (selectedTask.assignment_type === "multiple") ||
+                        (selectedTask.assignment_type === "department" && !selectedTask.can_change_status)
+                      }
+                    >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
@@ -574,35 +845,16 @@ export default function TasksPage() {
                         <SelectItem value="completed">Completed</SelectItem>
                       </SelectContent>
                     </Select>
-                  </CardContent>
-                </Card>
-
-                {/* Update Progress */}
-                <Card className="border bg-muted/30">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base">Update Progress</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">Progress</span>
-                        <span className="font-semibold">{newProgress}%</span>
-                      </div>
-                      <Slider
-                        value={[newProgress]}
-                        onValueChange={(value) => setNewProgress(value[0])}
-                        max={100}
-                        step={5}
-                        disabled={isSaving}
-                      />
-                    </div>
-                    <Button
-                      onClick={handleUpdateProgress}
-                      disabled={isSaving || newProgress === selectedTask.progress}
-                      className="w-full"
-                    >
-                      {isSaving ? "Updating..." : "Update Progress"}
-                    </Button>
+                    {selectedTask.assignment_type === "multiple" && (
+                      <p className="text-xs text-muted-foreground">
+                        For group tasks, mark yourself as done above instead of changing the status.
+                      </p>
+                    )}
+                    {selectedTask.assignment_type === "department" && !selectedTask.can_change_status && (
+                      <p className="text-xs text-yellow-600 dark:text-yellow-400">
+                        Only department leads, admins, and super admins can change the status of department tasks.
+                      </p>
+                    )}
                   </CardContent>
                 </Card>
 

@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { cn } from "@/lib/utils"
+import { cn, formatName } from "@/lib/utils"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -10,6 +10,7 @@ import {
   LayoutDashboard,
   Users,
   Laptop,
+  Package,
   ClipboardList,
   FileText,
   MessageSquare,
@@ -25,6 +26,7 @@ import { useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
+import { useSidebar } from "@/components/sidebar-context"
 import type { UserRole } from "@/types/database"
 import { getRoleDisplayName, getRoleBadgeColor } from "@/lib/permissions"
 
@@ -47,11 +49,12 @@ interface AdminSidebarProps {
 
 const adminNavigation = [
   { name: "Admin Dashboard", href: "/admin", icon: LayoutDashboard, roles: ["super_admin", "admin", "lead"] },
-  { name: "Staff Management", href: "/admin/staff", icon: Users, roles: ["super_admin", "admin"] },
-  { name: "Device Management", href: "/admin/devices", icon: Laptop, roles: ["super_admin", "admin"] },
+  { name: "Staff Management", href: "/admin/staff", icon: Users, roles: ["super_admin", "admin", "lead"] },
+  { name: "Device Management", href: "/admin/devices", icon: Laptop, roles: ["super_admin", "admin", "lead"] },
+  { name: "Asset Management", href: "/admin/assets", icon: Package, roles: ["super_admin", "admin", "lead"] },
   { name: "Task Management", href: "/admin/tasks", icon: ClipboardList, roles: ["super_admin", "admin", "lead"] },
   { name: "Documentation", href: "/admin/documentation", icon: FileText, roles: ["super_admin", "admin", "lead"] },
-  { name: "Job Descriptions", href: "/admin/job-descriptions", icon: Briefcase, roles: ["super_admin", "admin", "lead"] },
+  { name: "Job Descriptions", href: "/admin/job-descriptions", icon: Briefcase, roles: ["super_admin", "admin"] },
   { name: "Feedback", href: "/admin/feedback", icon: MessageSquare, roles: ["super_admin", "admin", "lead"] },
   { name: "Audit Logs", href: "/admin/audit-logs", icon: ScrollText, roles: ["super_admin", "admin", "lead"] },
 ]
@@ -60,6 +63,7 @@ export function AdminSidebar({ user, profile }: AdminSidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const { isCollapsed } = useSidebar()
   const supabase = createClient()
 
   const getInitials = (email?: string, firstName?: string, lastName?: string): string => {
@@ -93,92 +97,130 @@ export function AdminSidebar({ user, profile }: AdminSidebarProps) {
 
   const SidebarContent = () => (
     <>
-      {/* Logo */}
-      <div className="flex items-center gap-3 px-6 py-5 border-b">
-        <Image src="/acob-logo.webp" alt="ACOB Lighting" width={150} height={150} />
+      {/* Empty space for logo (moved to navbar) */}
+      <div className={cn("", isCollapsed ? "px-2 py-8" : "px-6 py-8")}>
+        {/* Logo space maintained but empty */}
       </div>
 
-      {/* Admin Badge & User Profile */}
-      <div className="px-6 py-6 border-b space-y-4">
+      {/* Admin Badge & User Profile - Fixed height container */}
+      <div className={cn(
+        "border-b transition-all duration-300 pt-10 min-h-[100px] flex flex-col py-6",
+        isCollapsed ? "items-center mx-0 px-0" : "mx-6"
+      )}>
+        {/* Admin Panel Badge - Commented out */}
+        {/* <div className={cn("transition-all duration-300 overflow-hidden", isCollapsed ? "max-h-0 opacity-0" : "max-h-10 opacity-100")}>
         <div className="flex items-center gap-2">
           <Badge className="bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">
             <ShieldCheck className="h-3 w-3 mr-1" />
             Admin Panel
           </Badge>
         </div>
+        </div> */}
 
-        <div className="flex items-center gap-3">
-          <Avatar className="h-12 w-12 ring-2 ring-primary/10">
+        {/* User Profile - Fixed height container */}
+        <div className={cn("flex items-center transition-all duration-300 flex-shrink-0", isCollapsed ? "justify-center" : "gap-3")}>
+          <Avatar className={cn("ring-2 ring-primary/10 transition-all duration-300 flex-shrink-0", "h-12 w-12")}>
             <AvatarFallback className="bg-primary text-primary-foreground text-lg font-semibold">
               {getInitials(user?.email, profile?.first_name, profile?.last_name)}
             </AvatarFallback>
           </Avatar>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-foreground truncate">
+          <div className={cn(
+            "transition-all duration-300 overflow-hidden",
+            isCollapsed 
+              ? "w-0 opacity-0 max-w-0" 
+              : "w-auto opacity-100 max-w-full flex-1 min-w-0 ml-0"
+          )}>
+            <div className={cn("transition-all duration-300 overflow-hidden", isCollapsed ? "max-h-0 opacity-0" : "max-h-24 opacity-100")}>
+              <p className="text-sm font-semibold text-foreground truncate whitespace-nowrap">
               {profile?.first_name && profile?.last_name
-                ? `${profile.first_name} ${profile.last_name}`
+                ? `${formatName(profile.first_name)} ${formatName(profile.last_name)}`
                 : user?.email?.split("@")[0]}
             </p>
             {profile?.role && (
-              <Badge variant="outline" className={cn("text-xs mt-1", getRoleBadgeColor(profile.role))}>
+                <Badge variant="outline" className={cn("text-xs mt-1 whitespace-nowrap", getRoleBadgeColor(profile.role))}>
                 {getRoleDisplayName(profile.role)}
               </Badge>
             )}
+            </div>
           </div>
         </div>
 
-        {profile?.lead_departments && profile.lead_departments.length > 0 && (
+        {/* Leading Departments - Fixed height container */}
+        <div className={cn(
+          "transition-all duration-300 overflow-hidden flex-shrink-0",
+          isCollapsed || !profile?.lead_departments || profile.lead_departments.length === 0 
+            ? "max-h-0 opacity-0" 
+            : "max-h-32 opacity-100"
+        )}>
           <div className="pt-2 text-xs">
             <p className="text-muted-foreground mb-1">Leading:</p>
             <div className="flex flex-wrap gap-1">
-              {profile.lead_departments.map((dept) => (
+              {profile?.lead_departments?.map((dept) => (
                 <Badge key={dept} variant="outline" className="text-xs">
                   {dept}
                 </Badge>
               ))}
             </div>
           </div>
-        )}
+        </div>
       </div>
 
       {/* Navigation */}
       <nav className="flex-1 px-4 py-6 space-y-1">
         {filteredNavigation.map((item) => {
-          const isActive = pathname === item.href || pathname?.startsWith(item.href + "/")
+          const isActive = item.href === "/admin" 
+            ? pathname === "/admin"
+            : pathname === item.href || pathname?.startsWith(item.href + "/")
           return (
             <Link
               key={item.name}
               href={item.href}
               onClick={() => setIsMobileMenuOpen(false)}
               className={cn(
-                "flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-all",
+                "flex items-center rounded-lg transition-all duration-300 min-h-[44px]",
+                isCollapsed
+                  ? "justify-center px-3 py-3"
+                  : "gap-3 px-4 py-3",
+                "text-sm font-medium",
                 isActive
                   ? "bg-primary text-primary-foreground shadow-sm"
                   : "text-muted-foreground hover:bg-accent hover:text-foreground"
               )}
+              title={isCollapsed ? item.name : undefined}
             >
-              <item.icon className="h-5 w-5" />
-              {item.name}
+              <item.icon className="h-5 w-5 flex-shrink-0" />
+              <span className={cn("transition-all duration-300 overflow-hidden whitespace-nowrap", isCollapsed ? "w-0 opacity-0" : "w-auto opacity-100 ml-0")}>{item.name}</span>
             </Link>
           )
         })}
       </nav>
 
-      {/* Back to Portal & Logout */}
+      {/* Back to Dashboard & Logout */}
       <div className="px-4 py-4 border-t space-y-2">
         <Link href="/dashboard">
-          <Button variant="outline" className="w-full justify-start gap-3">
-            <LayoutDashboard className="h-5 w-5" />
-            Back to Portal
+          <Button
+            variant="outline"
+            className={cn(
+              "w-full mb-2 text-muted-foreground hover:text-foreground transition-all duration-300 min-h-[44px]",
+              isCollapsed ? "justify-center px-3" : "justify-start gap-3"
+            )}
+            title={isCollapsed ? "Back to Dashboard" : undefined}
+          >
+            <LayoutDashboard className="h-5 w-5 flex-shrink-0" />
+            <span className={cn("transition-all duration-300 overflow-hidden whitespace-nowrap", isCollapsed ? "w-0 opacity-0" : "w-auto opacity-100 ml-0")}>Back to Dashboard</span>
           </Button>
         </Link>
         <Button
           variant="outline"
-          className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground"
+          className={cn(
+            "w-full text-muted-foreground hover:text-foreground transition-all duration-300 min-h-[44px]",
+            isCollapsed ? "justify-center px-3" : "justify-start gap-3"
+          )}
           onClick={handleLogout}
+          title={isCollapsed ? "Logout" : undefined}
         >
-          <LogOut className="h-5 w-5" />
-          Logout
+          <LogOut className="h-5 w-5 flex-shrink-0" />
+          <span className={cn("transition-all duration-300 overflow-hidden whitespace-nowrap", isCollapsed ? "w-0 opacity-0" : "w-auto opacity-100 ml-0")}>Logout</span>
         </Button>
       </div>
     </>
@@ -187,7 +229,12 @@ export function AdminSidebar({ user, profile }: AdminSidebarProps) {
   return (
     <>
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:fixed lg:inset-y-0 bg-card border-r">
+      <aside
+        className={cn(
+          "hidden lg:flex lg:flex-col lg:fixed lg:inset-y-0 bg-card border-r transition-all duration-300",
+          isCollapsed ? "lg:w-20" : "lg:w-64"
+        )}
+      >
         <SidebarContent />
       </aside>
 

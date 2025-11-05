@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label"
 import Link from "next/link"
 import { toast } from "sonner"
 import { Eye, List, LayoutGrid, MessageSquare } from "lucide-react"
+import { formatName } from "@/lib/utils"
 
 interface FeedbackViewerProps {
   feedback: any[]
@@ -92,6 +93,19 @@ export function FeedbackViewer({ feedback }: FeedbackViewerProps) {
         .eq("id", selectedFeedback.id)
 
       if (error) throw error
+
+      // Log audit
+      await supabase.rpc("log_audit", {
+        p_action: "update",
+        p_entity_type: "feedback",
+        p_entity_id: selectedFeedback.id,
+        p_old_values: {
+          status: selectedFeedback.status,
+        },
+        p_new_values: {
+          status: newStatus,
+        },
+      })
 
       toast.success("Status updated successfully!")
       
@@ -205,7 +219,7 @@ export function FeedbackViewer({ feedback }: FeedbackViewerProps) {
                         <TableCell>
                           <div className="text-sm">
                             <p className="font-medium">
-                              {item.profiles?.first_name} {item.profiles?.last_name}
+                              {formatName(item.profiles?.first_name)} {formatName(item.profiles?.last_name)}
                             </p>
                             <p className="text-xs text-muted-foreground">{item.profiles?.company_email}</p>
                           </div>
@@ -377,42 +391,23 @@ export function FeedbackViewer({ feedback }: FeedbackViewerProps) {
               </div>
 
               {/* Update Status */}
-              <div className="space-y-3">
+              <div className="space-y-2">
                 <Label className="text-sm font-semibold">Update Status</Label>
-                <div className="grid grid-cols-2 gap-3">
-                  <Button
-                    variant={selectedFeedback.status === "open" ? "default" : "outline"}
-                    onClick={() => handleUpdateStatus("open")}
-                    disabled={isUpdating}
-                    className="w-full border-2 hover:shadow-md transition-all"
-                  >
-                    Open
-                  </Button>
-                  <Button
-                    variant={selectedFeedback.status === "in_progress" ? "default" : "outline"}
-                    onClick={() => handleUpdateStatus("in_progress")}
-                    disabled={isUpdating}
-                    className="w-full border-2 hover:shadow-md transition-all"
-                  >
-                    In Progress
-                  </Button>
-                  <Button
-                    variant={selectedFeedback.status === "resolved" ? "default" : "outline"}
-                    onClick={() => handleUpdateStatus("resolved")}
-                    disabled={isUpdating}
-                    className="w-full border-2 hover:shadow-md transition-all"
-                  >
-                    Resolved
-                  </Button>
-                  <Button
-                    variant={selectedFeedback.status === "closed" ? "default" : "outline"}
-                    onClick={() => handleUpdateStatus("closed")}
-                    disabled={isUpdating}
-                    className="w-full border-2 hover:shadow-md transition-all"
-                  >
-                    Closed
-                  </Button>
-                </div>
+                <Select
+                  value={selectedFeedback.status}
+                  onValueChange={(value) => handleUpdateStatus(value)}
+                  disabled={isUpdating}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="open">Open</SelectItem>
+                    <SelectItem value="in_progress">In Progress</SelectItem>
+                    <SelectItem value="resolved">Resolved</SelectItem>
+                    <SelectItem value="closed">Closed</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Actions */}

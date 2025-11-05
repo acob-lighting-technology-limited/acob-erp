@@ -12,6 +12,7 @@ import { Copy, Download, Edit2, Eye, Upload } from "lucide-react"
 import { toast } from "sonner"
 import Link from "next/link"
 import { AdminUserModal } from "./admin-user-modal"
+import { formatName } from "@/lib/utils"
 
 const DEPARTMENTS = [
   "All Departments",
@@ -591,8 +592,8 @@ export function AdminDashboard({ users, currentUserId, feedbackByUserId = {} }: 
               {/* Profile card */}
               <div className="rounded-lg border p-4">
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <div><Label>First Name</Label><div className="mt-1 font-medium">{properCase(detailsUser.first_name)}</div></div>
-                  <div><Label>Last Name</Label><div className="mt-1 font-medium">{properCase(detailsUser.last_name)}</div></div>
+                  <div><Label>First Name</Label><div className="mt-1 font-medium">{formatName(detailsUser.first_name)}</div></div>
+                  <div><Label>Last Name</Label><div className="mt-1 font-medium">{formatName(detailsUser.last_name)}</div></div>
                   <div className="sm:col-span-2"><Label>Email</Label><div className="mt-1 font-medium break-all">{(detailsUser.company_email || "").toLowerCase()}</div></div>
                   <div><Label>Department</Label><div className="mt-1">{properCase(detailsUser.department)}</div></div>
                   <div><Label>Phone</Label><div className="mt-1">{detailsUser.phone_number}</div></div>

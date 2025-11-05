@@ -27,8 +27,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { SearchableSelect } from "@/components/ui/searchable-select"
+import { Building2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
+import { formatName } from "@/lib/utils"
 import {
   FileText,
   Search,
@@ -69,11 +72,14 @@ interface UserProfile {
 
 export default function AdminDocumentationPage() {
   const [documentation, setDocumentation] = useState<Documentation[]>([])
+  const [staff, setStaff] = useState<{ id: string; first_name: string; last_name: string; department: string }[]>([])
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [categoryFilter, setCategoryFilter] = useState("all")
   const [statusFilter, setStatusFilter] = useState("all")
+  const [departmentFilter, setDepartmentFilter] = useState("all")
+  const [staffFilter, setStaffFilter] = useState("all")
   const [viewMode, setViewMode] = useState<"list" | "card">("list")
   const [selectedDoc, setSelectedDoc] = useState<Documentation | null>(null)
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
@@ -98,11 +104,33 @@ export default function AdminDocumentationPage() {
 
       setUserProfile(profile)
 
-      // Fetch documentation without join first
-      const { data: docsData, error: docsError } = await supabase
+      // Fetch documentation - leads can only see documentation from their departments
+      let docsQuery = supabase
         .from("user_documentation")
         .select("*")
         .order("created_at", { ascending: false })
+
+      // If user is a lead, filter by their lead departments
+      if (profile?.role === "lead" && profile.lead_departments && profile.lead_departments.length > 0) {
+        // Get all user IDs in the lead's departments
+        const { data: deptUsers } = await supabase
+          .from("profiles")
+          .select("id")
+          .in("department", profile.lead_departments)
+
+        const userIds = deptUsers?.map(u => u.id) || []
+        if (userIds.length > 0) {
+          docsQuery = docsQuery.in("user_id", userIds)
+        } else {
+          // No users in departments, return empty
+          setDocumentation([])
+          setStaff([])
+          setIsLoading(false)
+          return
+        }
+      }
+
+      const { data: docsData, error: docsError } = await docsQuery
 
       if (docsError) {
         console.error("Documentation error:", docsError)
@@ -122,24 +150,23 @@ export default function AdminDocumentationPage() {
         // Create a map of user data
         const usersMap = new Map(usersData?.map(user => [user.id, user]))
 
-        // Combine docs with user data
-        let docsWithUsers = docsData.map(doc => ({
+        // Combine docs with user data (already filtered by RLS for leads)
+        const docsWithUsers = docsData.map(doc => ({
           ...doc,
           user: doc.user_id ? usersMap.get(doc.user_id) : null
         }))
-
-        // Role-based filtering
-        if (profile?.role === "lead" && profile.lead_departments) {
-          // Leads can only see their department's documentation
-          docsWithUsers = docsWithUsers.filter(doc =>
-            doc.user?.department && profile.lead_departments?.includes(doc.user.department)
-          )
-        }
 
         setDocumentation(docsWithUsers as any)
       } else {
         setDocumentation([])
       }
+
+      // Load staff for filter
+      const { data: staffData } = await supabase
+        .from("profiles")
+        .select("id, first_name, last_name, department")
+        .order("last_name", { ascending: true })
+      setStaff(staffData || [])
     } catch (error: any) {
       console.error("Error loading documentation:", error)
       toast.error("Failed to load documentation")
@@ -168,11 +195,30 @@ export default function AdminDocumentationPage() {
       (statusFilter === "published" && !doc.is_draft) ||
       (statusFilter === "draft" && doc.is_draft)
 
-    return matchesSearch && matchesCategory && matchesStatus
+    // Filter by department - for leads, always filter by their departments
+    let matchesDepartment = true
+    if (userProfile?.role === "lead") {
+      // Leads: documentation is already filtered, but ensure it matches lead's departments
+      if (userProfile.lead_departments && userProfile.lead_departments.length > 0) {
+        matchesDepartment = doc.user?.department ? userProfile.lead_departments.includes(doc.user.department) : false
+      }
+    } else {
+      // Admins: use department filter
+      matchesDepartment = departmentFilter === "all" || doc.user?.department === departmentFilter
+    }
+
+    const matchesStaff =
+      staffFilter === "all" || doc.user_id === staffFilter
+
+    return matchesSearch && matchesCategory && matchesStatus && matchesDepartment && matchesStaff
   })
 
   const categories = Array.from(
     new Set(documentation.map((d) => d.category).filter(Boolean))
+  ) as string[]
+
+  const departments = Array.from(
+    new Set(documentation.map((d) => d.user?.department).filter(Boolean))
   ) as string[]
 
   const stats = {
@@ -203,15 +249,53 @@ export default function AdminDocumentationPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 p-4 md:p-8">
-        <div className="mx-auto max-w-7xl">
-          <div className="animate-pulse space-y-4">
-            <div className="h-8 bg-muted rounded w-1/3"></div>
-            <div className="grid gap-4 md:grid-cols-4">
-              <div className="h-24 bg-muted rounded"></div>
-              <div className="h-24 bg-muted rounded"></div>
-              <div className="h-24 bg-muted rounded"></div>
-              <div className="h-24 bg-muted rounded"></div>
+        <div className="mx-auto max-w-7xl space-y-6">
+          <div className="animate-pulse space-y-6">
+            {/* Header Skeleton */}
+            <div className="flex items-center justify-between">
+              <div className="space-y-2">
+                <div className="h-8 bg-muted rounded w-64"></div>
+                <div className="h-5 bg-muted rounded w-96"></div>
+              </div>
+              <div className="h-10 bg-muted rounded w-32"></div>
             </div>
+
+            {/* Stats Skeleton */}
+            <div className="grid gap-4 md:grid-cols-4">
+              {[1, 2, 3, 4].map((i) => (
+                <Card key={i} className="border-2">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-2">
+                        <div className="h-4 bg-muted rounded w-24"></div>
+                        <div className="h-8 bg-muted rounded w-16"></div>
+                      </div>
+                      <div className="h-12 w-12 bg-muted rounded-lg"></div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            {/* Filters Skeleton */}
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex flex-col md:flex-row gap-4">
+                  <div className="h-10 bg-muted rounded flex-1"></div>
+                  <div className="h-10 bg-muted rounded w-48"></div>
+                  <div className="h-10 bg-muted rounded w-48"></div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Table/List Skeleton */}
+            <Card className="border-2">
+              <div className="p-4 space-y-3">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <div key={i} className="h-16 bg-muted rounded"></div>
+                ))}
+              </div>
+            </Card>
           </div>
         </div>
       </div>
@@ -326,30 +410,74 @@ export default function AdminDocumentationPage() {
                   className="pl-10"
                 />
               </div>
-              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                <SelectTrigger className="w-full md:w-48">
-                  <Filter className="h-4 w-4 mr-2" />
-                  <SelectValue placeholder="All Categories" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Categories</SelectItem>
-                  {categories.map((category) => (
-                    <SelectItem key={category} value={category}>
-                      {category}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-full md:w-48">
-                  <SelectValue placeholder="All Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="published">Published</SelectItem>
-                  <SelectItem value="draft">Draft</SelectItem>
-                </SelectContent>
-              </Select>
+                              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                  <SelectTrigger className="w-full md:w-48">
+                    <Filter className="h-4 w-4 mr-2" />
+                    <SelectValue placeholder="All Categories" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Categories</SelectItem>
+                    {categories.map((category) => (
+                      <SelectItem key={category} value={category}>
+                        {category}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {/* Department filter - hidden for leads */}
+                {userProfile?.role !== "lead" && (
+                  <SearchableSelect
+                    value={departmentFilter}
+                    onValueChange={setDepartmentFilter}
+                    placeholder="All Departments"
+                    searchPlaceholder="Search departments..."
+                    icon={<Building2 className="h-4 w-4" />}
+                    className="w-full md:w-48"
+                    options={[
+                      { value: "all", label: "All Departments" },
+                      ...departments.map((dept) => ({
+                        value: dept,
+                        label: dept,
+                        icon: <Building2 className="h-3 w-3" />,
+                      })),
+                    ]}
+                  />
+                )}
+                <SearchableSelect
+                  value={staffFilter}
+                  onValueChange={setStaffFilter}
+                  placeholder={
+                    userProfile?.role === "lead" && userProfile.lead_departments && userProfile.lead_departments.length > 0
+                      ? `All ${userProfile.lead_departments.length === 1 ? userProfile.lead_departments[0] : "Department"} Staff`
+                      : "All Staff"
+                  }
+                  searchPlaceholder="Search staff..."
+                  icon={<User className="h-4 w-4" />}
+                  className="w-full md:w-48"
+                  options={[
+                    { 
+                      value: "all", 
+                      label: userProfile?.role === "lead" && userProfile.lead_departments && userProfile.lead_departments.length > 0
+                        ? `All ${userProfile.lead_departments.length === 1 ? userProfile.lead_departments[0] : "Department"} Staff`
+                        : "All Staff"
+                    },
+                    ...staff.map((member) => ({
+                      value: member.id,
+                      label: `${formatName(member.first_name)} ${formatName(member.last_name)} - ${member.department}`,
+                      icon: <User className="h-3 w-3" />,
+                    })),
+                  ]}
+                />
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-full md:w-48">
+                    <SelectValue placeholder="All Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="published">Published</SelectItem>
+                    <SelectItem value="draft">Draft</SelectItem>
+                  </SelectContent>
+                </Select>
             </div>
           </CardContent>
         </Card>
@@ -360,27 +488,31 @@ export default function AdminDocumentationPage() {
             <Card className="border-2">
               <CardContent className="p-6">
                 <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-12">#</TableHead>
-                      <TableHead>Title</TableHead>
-                      <TableHead>Author</TableHead>
-                      <TableHead>Department</TableHead>
-                      <TableHead>Category</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Created</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
+                                      <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-12">#</TableHead>
+                        <TableHead>Author</TableHead>
+                        <TableHead>Department</TableHead>
+                        <TableHead>Title</TableHead>
+                        <TableHead>Category</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Created</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
                   <TableBody>
                     {filteredDocumentation.map((doc, index) => (
                       <TableRow key={doc.id}>
                         <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
-                        <TableCell className="font-medium">{doc.title}</TableCell>
                         <TableCell>
-                          {doc.user?.first_name} {doc.user?.last_name}
+                          {doc.user?.first_name && doc.user?.last_name
+                            ? `${formatName(doc.user.last_name)}, ${formatName(doc.user.first_name)}`
+                            : doc.user?.first_name || doc.user?.last_name
+                            ? formatName(doc.user.first_name || doc.user.last_name)
+                            : "-"}
                         </TableCell>
                         <TableCell>{doc.user?.department || "No Department"}</TableCell>
+                        <TableCell className="font-medium">{doc.title}</TableCell>
                         <TableCell>
                           {doc.category ? (
                             <Badge variant="outline" className="text-xs">
@@ -502,7 +634,7 @@ export default function AdminDocumentationPage() {
                 No Documentation Found
               </h3>
               <p className="text-muted-foreground">
-                {searchQuery || categoryFilter !== "all" || statusFilter !== "all"
+                {searchQuery || categoryFilter !== "all" || statusFilter !== "all" || departmentFilter !== "all" || staffFilter !== "all"
                   ? "No documentation matches your filters"
                   : "No documentation has been created yet"}
               </p>

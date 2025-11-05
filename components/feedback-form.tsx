@@ -49,6 +49,21 @@ export function FeedbackForm({ userId, onFeedbackSubmitted }: FeedbackFormProps)
 
       if (error) throw error
 
+      // Log audit
+      if (data && data.length > 0) {
+        await supabase.rpc("log_audit", {
+          p_action: "create",
+          p_entity_type: "feedback",
+          p_entity_id: data[0].id,
+          p_new_values: {
+            feedback_type: formData.feedbackType,
+            title: formData.title,
+            description: formData.description,
+            status: "open",
+          },
+        })
+      }
+
       toast.success("Feedback submitted successfully!")
       setFormData({
         feedbackType: "",
