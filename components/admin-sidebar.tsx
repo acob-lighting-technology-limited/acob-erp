@@ -20,6 +20,7 @@ import {
   Menu,
   X,
   Briefcase,
+  FolderKanban,
 } from "lucide-react"
 import Image from "next/image"
 import { useState } from "react"
@@ -52,6 +53,7 @@ const adminNavigation = [
   { name: "Staff Management", href: "/admin/staff", icon: Users, roles: ["super_admin", "admin", "lead"] },
   { name: "Device Management", href: "/admin/devices", icon: Laptop, roles: ["super_admin", "admin", "lead"] },
   { name: "Asset Management", href: "/admin/assets", icon: Package, roles: ["super_admin", "admin", "lead"] },
+  { name: "Project Management", href: "/admin/projects", icon: FolderKanban, roles: ["super_admin", "admin", "lead"] },
   { name: "Task Management", href: "/admin/tasks", icon: ClipboardList, roles: ["super_admin", "admin", "lead"] },
   { name: "Documentation", href: "/admin/documentation", icon: FileText, roles: ["super_admin", "admin", "lead"] },
   { name: "Job Descriptions", href: "/admin/job-descriptions", icon: Briefcase, roles: ["super_admin", "admin"] },

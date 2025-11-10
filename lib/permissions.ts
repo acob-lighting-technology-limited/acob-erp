@@ -63,6 +63,48 @@ export function canViewAuditLogs(role: UserRole): boolean {
   return hasRoleOrHigher(role, 'lead') // lead, admin, and super_admin
 }
 
+export function canCreateProjects(role: UserRole): boolean {
+  return hasRoleOrHigher(role, 'lead') // lead, admin, and super_admin
+}
+
+export function canViewProject(
+  role: UserRole,
+  leadDepartments: string[],
+  project: { created_by: string; project_manager_id?: string },
+  userId: string,
+  isProjectMember: boolean
+): boolean {
+  if (hasRoleOrHigher(role, 'admin')) return true // admin and super_admin see all
+  if (project.created_by === userId || project.project_manager_id === userId) return true
+  if (isProjectMember) return true
+  if (role === 'lead') return true // leads can see all projects
+  return false
+}
+
+export function canEditProject(
+  role: UserRole,
+  project: { created_by: string; project_manager_id?: string },
+  userId: string
+): boolean {
+  if (hasRoleOrHigher(role, 'admin')) return true // admin and super_admin can edit all
+  if (project.created_by === userId || project.project_manager_id === userId) return true
+  return false
+}
+
+export function canDeleteProject(role: UserRole): boolean {
+  return hasRoleOrHigher(role, 'admin') // only admin and super_admin
+}
+
+export function canManageProjectMembers(
+  role: UserRole,
+  project: { created_by: string; project_manager_id?: string },
+  userId: string
+): boolean {
+  if (hasRoleOrHigher(role, 'admin')) return true // admin and super_admin can manage all
+  if (project.created_by === userId || project.project_manager_id === userId) return true
+  return false
+}
+
 export function canAssignRoles(assignerRole: UserRole, targetRole: UserRole): boolean {
   // super_admin can assign any role
   if (assignerRole === 'super_admin') return true

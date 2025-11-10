@@ -22,6 +22,7 @@ import {
   Package,
   ChevronLeft,
   ChevronRight,
+  FolderKanban,
 } from "lucide-react"
 import Image from "next/image"
 import { useState } from "react"
@@ -52,6 +53,7 @@ const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Profile", href: "/profile", icon: User },
   { name: "Job Description", href: "/job-description", icon: Briefcase },
+  { name: "My Projects", href: "/projects", icon: FolderKanban },
   { name: "My Tasks", href: "/tasks", icon: ClipboardList },
   { name: "My Devices", href: "/devices", icon: Laptop },
   { name: "My Assets", href: "/assets", icon: Package },

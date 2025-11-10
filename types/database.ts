@@ -8,6 +8,12 @@ export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled'
 
 export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent'
 
+export type ProjectStatus = 'planning' | 'active' | 'on_hold' | 'completed' | 'cancelled'
+
+export type ProjectMemberRole = 'member' | 'lead' | 'manager'
+
+export type ProjectItemStatus = 'pending' | 'ordered' | 'received' | 'installed'
+
 export interface Profile {
   id: string
   company_email: string
@@ -102,6 +108,9 @@ export interface Task {
   started_at?: string
   completed_at?: string
   progress: number
+  project_id?: string
+  task_start_date?: string
+  task_end_date?: string
   created_at: string
   updated_at: string
 }
@@ -139,5 +148,59 @@ export interface AuditLog {
   new_values?: any
   ip_address?: string
   user_agent?: string
+  created_at: string
+}
+
+export interface Project {
+  id: string
+  project_name: string
+  location: string
+  deployment_start_date: string
+  deployment_end_date: string
+  capacity_w?: number
+  technology_type?: string
+  project_manager_id?: string
+  description?: string
+  status: ProjectStatus
+  created_by: string
+  created_at: string
+  updated_at: string
+  completed_at?: string
+}
+
+export interface ProjectMember {
+  id: string
+  project_id: string
+  user_id: string
+  role: ProjectMemberRole
+  assigned_by: string
+  assigned_at: string
+  removed_at?: string
+  is_active: boolean
+  created_at: string
+}
+
+export interface ProjectItem {
+  id: string
+  project_id: string
+  item_name: string
+  description?: string
+  quantity: number
+  unit?: string
+  status: ProjectItemStatus
+  notes?: string
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
+export interface ProjectUpdate {
+  id: string
+  project_id: string
+  user_id: string
+  update_type: 'comment' | 'status_change' | 'milestone' | 'member_added' | 'member_removed'
+  content?: string
+  old_value?: string
+  new_value?: string
   created_at: string
 }

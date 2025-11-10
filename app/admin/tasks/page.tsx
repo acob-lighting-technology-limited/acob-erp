@@ -71,6 +71,9 @@ interface Task {
   assigned_by: string
   department?: string
   due_date?: string
+  project_id?: string
+  task_start_date?: string
+  task_end_date?: string
   created_at: string
   assignment_type?: "individual" | "multiple" | "department"
   assigned_to_user?: {
@@ -85,6 +88,9 @@ interface Task {
     department: string
     completed?: boolean
   }>
+  project?: {
+    project_name: string
+  }
 }
 
 interface Staff {
@@ -100,10 +106,16 @@ interface UserProfile {
   lead_departments?: string[]
 }
 
+interface Project {
+  id: string
+  project_name: string
+}
+
 export default function AdminTasksPage() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [staff, setStaff] = useState<Staff[]>([])
   const [departments, setDepartments] = useState<string[]>([])
+  const [projects, setProjects] = useState<Project[]>([])
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
@@ -130,6 +142,9 @@ export default function AdminTasksPage() {
     due_date: "",
     assignment_type: "individual" as "individual" | "multiple" | "department",
     assigned_users: [] as string[],
+    project_id: "",
+    task_start_date: "",
+    task_end_date: "",
   })
 
   const supabase = createClient()
@@ -174,13 +189,18 @@ export default function AdminTasksPage() {
         staffQuery = staffQuery.in("department", profile.lead_departments)
       }
 
-      const [tasksData, staffData] = await Promise.all([
+      const [tasksData, staffData, projectsData] = await Promise.all([
         tasksQuery,
         staffQuery,
+        supabase
+          .from("projects")
+          .select("id, project_name")
+          .order("project_name", { ascending: true }),
       ])
 
       if (tasksData.error) throw tasksData.error
       if (staffData.error) throw staffData.error
+      if (projectsData.error) throw projectsData.error
 
       console.log("Loaded staff count:", staffData.data?.length)
 
@@ -255,7 +275,8 @@ export default function AdminTasksPage() {
 
       setTasks(filteredTasks)
       setStaff(staffData.data || [])
-      
+      setProjects(projectsData.data || [])
+
       // Get unique departments - for leads, only show their lead departments
       let uniqueDepartments: string[] = []
       if (profile?.role === "lead" && profile?.lead_departments && profile.lead_departments.length > 0) {
@@ -301,6 +322,9 @@ export default function AdminTasksPage() {
         due_date: task.due_date ? task.due_date.split("T")[0] : "",
         assignment_type: task.assignment_type || "individual",
         assigned_users: assignedUsers,
+        project_id: task.project_id || "",
+        task_start_date: task.task_start_date || "",
+        task_end_date: task.task_end_date || "",
       })
     } else {
       setSelectedTask(null)
@@ -314,6 +338,9 @@ export default function AdminTasksPage() {
         due_date: "",
         assignment_type: "individual",
         assigned_users: [],
+        project_id: "",
+        task_start_date: "",
+        task_end_date: "",
       })
     }
     setIsTaskDialogOpen(true)
@@ -344,10 +371,13 @@ export default function AdminTasksPage() {
         priority: taskForm.priority,
         status: taskForm.status,
         due_date: taskForm.due_date || null,
-        department: taskForm.assignment_type === "department" ? taskForm.department : null,
+        department: taskForm.assignment_type === "department" ? taskForm.department : (taskForm.department || null),
         assignment_type: taskForm.assignment_type,
         assigned_to: taskForm.assignment_type === "individual" ? taskForm.assigned_to : null,
         assigned_by: user.id,
+        project_id: taskForm.project_id || null,
+        task_start_date: taskForm.task_start_date || null,
+        task_end_date: taskForm.task_end_date || null,
       }
 
       if (selectedTask) {
@@ -1270,6 +1300,26 @@ export default function AdminTasksPage() {
             )}
 
             <div>
+              <Label htmlFor="project_id">Project (Optional)</Label>
+              <Select
+                value={taskForm.project_id}
+                onValueChange={(value) => setTaskForm({ ...taskForm, project_id: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select project (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">None</SelectItem>
+                  {projects.map((project) => (
+                    <SelectItem key={project.id} value={project.id}>
+                      {project.project_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
               <Label htmlFor="due_date">Due Date</Label>
               <Input
                 id="due_date"
@@ -1278,6 +1328,30 @@ export default function AdminTasksPage() {
                 onChange={(e) => setTaskForm({ ...taskForm, due_date: e.target.value })}
               />
             </div>
+
+            {taskForm.project_id && (
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="task_start_date">Task Start Date</Label>
+                  <Input
+                    id="task_start_date"
+                    type="date"
+                    value={taskForm.task_start_date}
+                    onChange={(e) => setTaskForm({ ...taskForm, task_start_date: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="task_end_date">Task End Date</Label>
+                  <Input
+                    id="task_end_date"
+                    type="date"
+                    value={taskForm.task_end_date}
+                    onChange={(e) => setTaskForm({ ...taskForm, task_end_date: e.target.value })}
+                  />
+                </div>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsTaskDialogOpen(false)}>
