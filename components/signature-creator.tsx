@@ -1,29 +1,35 @@
-"use client"
-import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Copy } from "lucide-react"
-import { useTheme } from "next-themes"
-import { toast } from "sonner"
-import Link from "next/link"
+"use client";
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Copy } from "lucide-react";
+import { useTheme } from "next-themes";
+import { toast } from "sonner";
+import Link from "next/link";
 
 interface SignatureCreatorProps {
-  profile: any
+  profile: any;
 }
 
 interface FormData {
-  firstName: string
-  middleName: string
-  lastName: string
-  companyRole: string
-  phoneNumber: string
-  companyEmail: string
+  firstName: string;
+  middleName: string;
+  lastName: string;
+  companyRole: string;
+  phoneNumber: string;
+  companyEmail: string;
 }
 
 export function SignatureCreator({ profile }: SignatureCreatorProps) {
-  const { theme, setTheme } = useTheme()
+  const { theme, setTheme } = useTheme();
   const [formData, setFormData] = useState<FormData>({
     firstName: profile?.first_name || "",
     middleName: profile?.other_names || "",
@@ -31,54 +37,62 @@ export function SignatureCreator({ profile }: SignatureCreatorProps) {
     companyRole: profile?.company_role || "",
     phoneNumber: profile?.phone_number || "",
     companyEmail: profile?.company_email || "",
-  })
+  });
 
-  const [emailError, setEmailError] = useState("")
-  const [phoneError, setPhoneError] = useState("")
+  const [emailError, setEmailError] = useState("");
+  const [phoneError, setPhoneError] = useState("");
 
   useEffect(() => {
     if (formData.firstName && formData.lastName) {
-      const firstLetter = formData.lastName.charAt(0).toLowerCase()
-      const firstName = formData.firstName.toLowerCase().replace(/\s+/g, "")
-      const autoEmail = `${firstLetter}.${firstName}@org.acoblighting.com`
+      const firstLetter = formData.lastName.charAt(0).toLowerCase();
+      const firstName = formData.firstName.toLowerCase().replace(/\s+/g, "");
+      const autoEmail = `${firstLetter}.${firstName}@org.acoblighting.com`;
 
       if (
         !formData.companyEmail ||
         formData.companyEmail.endsWith("@org.acoblighting.com") ||
         formData.companyEmail.endsWith("@acoblighting.com")
       ) {
-        setFormData((prev) => ({ ...prev, companyEmail: autoEmail }))
+        setFormData((prev) => ({ ...prev, companyEmail: autoEmail }));
       }
     }
-  }, [formData.firstName, formData.lastName])
+  }, [formData.firstName, formData.lastName]);
 
   const formatPhoneNumber = (phone: string) => {
-    const digits = phone.replace(/\D/g, "")
+    const digits = phone.replace(/\D/g, "");
 
     if (digits.startsWith("0") && digits.length === 11) {
-      const withoutLeadingZero = digits.substring(1)
-      return `+234 ${withoutLeadingZero.substring(0, 3)} ${withoutLeadingZero.substring(3, 6)} ${withoutLeadingZero.substring(6)}`
+      const withoutLeadingZero = digits.substring(1);
+      return `+234 ${withoutLeadingZero.substring(
+        0,
+        3
+      )} ${withoutLeadingZero.substring(3, 6)} ${withoutLeadingZero.substring(
+        6
+      )}`;
     }
 
-    return phone
-  }
+    return phone;
+  };
 
   const validateEmail = (email: string) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    const isValidFormat = emailRegex.test(email)
-    const isAllowedDomain = email.endsWith("@org.acoblighting.com") || email.endsWith("@acoblighting.com")
-    return isValidFormat && isAllowedDomain
-  }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const isValidFormat = emailRegex.test(email);
+    const isAllowedDomain =
+      email.endsWith("@org.acoblighting.com") ||
+      email.endsWith("@acoblighting.com");
+    return isValidFormat && isAllowedDomain;
+  };
 
   const validatePhone = (phone: string) => {
-    const digits = phone.replace(/\D/g, "")
-    return digits.length >= 11
-  }
+    const digits = phone.replace(/\D/g, "");
+    return digits.length >= 11;
+  };
 
   const generateSignature = () => {
-    const fullName =
-      `${formData.firstName}${formData.middleName ? " " + formData.middleName : ""} ${formData.lastName}`.trim()
-    const formattedPhone = formatPhoneNumber(formData.phoneNumber)
+    const fullName = `${formData.firstName}${
+      formData.middleName ? " " + formData.middleName : ""
+    } ${formData.lastName}`.trim();
+    const formattedPhone = formatPhoneNumber(formData.phoneNumber);
 
     return `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; max-width: 1000px; margin: 0; padding: 12px 0; line-height: 1.5;">
   <!-- Thin green line -->
@@ -90,15 +104,24 @@ export function SignatureCreator({ profile }: SignatureCreatorProps) {
   <!-- Name & Role -->
   <div style="border-bottom: 1.5px solid #e5e7eb; padding-bottom: 6px; margin-bottom: 6px;">
     <p style="margin: 0 0 0 0; line-height: 1; font-size: 18px; font-weight: bold; color: #1f2937; letter-spacing: -0.025em;">${fullName}</p>
-    <p style="margin: 0 0 10px 0; font-size: 14px; font-weight: 500; color: #1f2937; text-transform: uppercase; letter-spacing: 0.05em; ">${formData.companyRole}</p>
+    <p style="margin: 0 0 10px 0; font-size: 14px; font-weight: 500; color: #1f2937; text-transform: uppercase; letter-spacing: 0.05em; ">${
+      formData.companyRole
+    }</p>
     
     <!-- Contact details -->
     <div style="font-size: 14px; color: #374151; line-height: 1.3;">
       <div style="margin: 0 0 1px 0;">
-        <img src="https://www.acoblighting.com/wp-includes/images/signature/phone.png" width="14" height="14" style="vertical-align: middle; opacity: 0.8; margin-right: 6px; display: inline-block;" alt="Phone" /><a href="tel:${formData.phoneNumber.replace(/\s+/g, "")}" style="color: #1f2937; text-decoration: none; vertical-align: middle;">${formattedPhone}</a>
+        <img src="https://www.acoblighting.com/wp-includes/images/signature/phone.png" width="14" height="14" style="vertical-align: middle; opacity: 0.8; margin-right: 6px; display: inline-block;" alt="Phone" /><a href="tel:${formData.phoneNumber.replace(
+          /\s+/g,
+          ""
+        )}" style="color: #1f2937; text-decoration: none; vertical-align: middle;">${formattedPhone}</a>
       </div>
       <div style="margin: 0 0 1px 0;">
-        <img src="https://www.acoblighting.com/wp-includes/images/signature/mail.png" width="14" height="14" style="vertical-align: middle; opacity: 0.8; margin-right: 6px; display: inline-block;" alt="Email" /><a href="mailto:${formData.companyEmail}" style="color: #1f2937; text-decoration: none; vertical-align: middle;">${formData.companyEmail}</a>
+        <img src="https://www.acoblighting.com/wp-includes/images/signature/mail.png" width="14" height="14" style="vertical-align: middle; opacity: 0.8; margin-right: 6px; display: inline-block;" alt="Email" /><a href="mailto:${
+          formData.companyEmail
+        }" style="color: #1f2937; text-decoration: none; vertical-align: middle;">${
+      formData.companyEmail
+    }</a>
       </div>
       <div>
         <img src="https://www.acoblighting.com/wp-includes/images/signature/web.png" width="14" height="14" style="vertical-align: middle; opacity: 0.8; margin-right: 6px; display: inline-block;" alt="Website" /><a href="http://www.acoblighting.com" style="color: #1f2937; text-decoration: none; vertical-align: middle;">www.acoblighting.com</a>
@@ -125,45 +148,47 @@ export function SignatureCreator({ profile }: SignatureCreatorProps) {
     <p style="margin: 0 0 2px 0; font-weight: 600; font-style: italic;">We are a leading provider of solar and energy solutions for homes, businesses, and communities.</p>
     <p style="margin: 0; font-weight: 600; font-style: italic;">Lighting up Nigeria!</p>
   </div>
-</div>`
-  }
+</div>`;
+  };
 
   const copyToClipboard = async () => {
-    const signature = generateSignature()
+    const signature = generateSignature();
     try {
-      await navigator.clipboard.writeText(signature)
-      toast.success("Signature copied to clipboard!")
+      await navigator.clipboard.writeText(signature);
+      toast.success("Signature copied to clipboard!");
     } catch (err) {
-      toast.error("Failed to copy signature")
+      toast.error("Failed to copy signature");
     }
-  }
+  };
 
   const handleInputChange = (field: keyof FormData, value: string) => {
     if (field === "phoneNumber") {
-      const numbersOnly = value.replace(/\D/g, "")
-      setFormData((prev) => ({ ...prev, [field]: numbersOnly }))
+      const numbersOnly = value.replace(/\D/g, "");
+      setFormData((prev) => ({ ...prev, [field]: numbersOnly }));
 
       if (numbersOnly && !validatePhone(numbersOnly)) {
-        setPhoneError("Phone number must be at least 11 digits")
+        setPhoneError("Phone number must be at least 11 digits");
       } else {
-        setPhoneError("")
+        setPhoneError("");
       }
-      return
+      return;
     }
 
     if (field === "companyEmail") {
-      setFormData((prev) => ({ ...prev, [field]: value }))
+      setFormData((prev) => ({ ...prev, [field]: value }));
 
       if (value && !validateEmail(value)) {
-        setEmailError("Email must end with @org.acoblighting.com or @acoblighting.com")
+        setEmailError(
+          "Email must end with @org.acoblighting.com or @acoblighting.com"
+        );
       } else {
-        setEmailError("")
+        setEmailError("");
       }
-      return
+      return;
     }
 
-    setFormData((prev) => ({ ...prev, [field]: value }))
-  }
+    setFormData((prev) => ({ ...prev, [field]: value }));
+  };
 
   const isFormValid =
     formData.firstName &&
@@ -174,7 +199,7 @@ export function SignatureCreator({ profile }: SignatureCreatorProps) {
     formData.companyEmail &&
     validateEmail(formData.companyEmail) &&
     !emailError &&
-    !phoneError
+    !phoneError;
 
   return (
     <div className="grid gap-8 lg:grid-cols-2">
@@ -182,7 +207,9 @@ export function SignatureCreator({ profile }: SignatureCreatorProps) {
       <Card>
         <CardHeader>
           <CardTitle>Personal Information</CardTitle>
-          <CardDescription>Fill in your details to generate your signature</CardDescription>
+          <CardDescription>
+            Fill in your details to generate your signature
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
@@ -200,7 +227,9 @@ export function SignatureCreator({ profile }: SignatureCreatorProps) {
               <Input
                 id="middleName"
                 value={formData.middleName}
-                onChange={(e) => handleInputChange("middleName", e.target.value)}
+                onChange={(e) =>
+                  handleInputChange("middleName", e.target.value)
+                }
                 placeholder="Optional"
               />
             </div>
@@ -235,9 +264,12 @@ export function SignatureCreator({ profile }: SignatureCreatorProps) {
               placeholder="07012345678"
             />
             <p className="text-sm text-muted-foreground">
-              Enter numbers only, minimum 11 digits (e.g., 07012345678) - will be formatted as +234 701 234 5678
+              Enter numbers only, minimum 11 digits (e.g., 07012345678) - will
+              be formatted as +234 701 234 5678
             </p>
-            {phoneError && <p className="text-sm text-destructive">{phoneError}</p>}
+            {phoneError && (
+              <p className="text-sm text-destructive">{phoneError}</p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -246,19 +278,28 @@ export function SignatureCreator({ profile }: SignatureCreatorProps) {
               id="companyEmail"
               type="email"
               value={formData.companyEmail}
-              onChange={(e) => handleInputChange("companyEmail", e.target.value)}
+              onChange={(e) =>
+                handleInputChange("companyEmail", e.target.value)
+              }
               placeholder="a.john@org.acoblighting.com"
             />
             <p className="text-sm text-muted-foreground">
-              Auto-generated from your name. You can edit if needed (e.g., a.john@acoblighting.com)
+              Auto-generated from your name. You can edit if needed (e.g.,
+              a.john@acoblighting.com)
             </p>
-            {emailError && <p className="text-sm text-destructive">{emailError}</p>}
+            {emailError && (
+              <p className="text-sm text-destructive">{emailError}</p>
+            )}
           </div>
 
           <div className="flex gap-2">
-            <Button onClick={copyToClipboard} disabled={!isFormValid} className="flex-1">
+            <Button
+              onClick={copyToClipboard}
+              disabled={!isFormValid}
+              className="flex-1"
+            >
               <Copy className="mr-2 h-4 w-4" />
-              Generate & Copy Signature
+              Copy Signature
             </Button>
             <Link href="/dashboard" className="flex-1">
               <Button variant="outline" className="w-full bg-transparent">
@@ -273,7 +314,9 @@ export function SignatureCreator({ profile }: SignatureCreatorProps) {
       <Card>
         <CardHeader>
           <CardTitle>Signature Preview</CardTitle>
-          <CardDescription>This is how your signature will look</CardDescription>
+          <CardDescription>
+            This is how your signature will look
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {isFormValid ? (
@@ -283,11 +326,13 @@ export function SignatureCreator({ profile }: SignatureCreatorProps) {
             />
           ) : (
             <div className="flex h-64 items-center justify-center rounded-lg border border-dashed">
-              <p className="text-muted-foreground">Fill in the required fields to see preview</p>
+              <p className="text-muted-foreground">
+                Fill in the required fields to see preview
+              </p>
             </div>
           )}
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }

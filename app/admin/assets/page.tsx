@@ -45,6 +45,12 @@ import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { formatName } from "@/lib/utils"
 import {
+  ASSET_TYPES,
+  ASSET_TYPE_MAP,
+  generateUniqueCodePreview,
+  requiresSerialAndModel
+} from "@/lib/asset-types"
+import {
   Package,
   Plus,
   Search,
@@ -60,21 +66,21 @@ import {
   History,
   Calendar,
   FileText,
+  Building,
 } from "lucide-react"
 
 interface Asset {
   id: string
-  asset_name: string
+  unique_code: string
   asset_type: string
+  acquisition_year: number
   asset_model?: string
   serial_number?: string
-  purchase_date?: string
-  purchase_cost?: number
   status: string
   notes?: string
   created_at: string
   created_by: string
-  assignment_type?: "individual" | "department"
+  assignment_type?: "individual" | "department" | "office"
   department?: string
   current_assignment?: {
     assigned_to?: string
@@ -127,12 +133,14 @@ interface AssignmentHistory {
   }
 }
 
+const currentYear = new Date().getFullYear()
+
 export default function AdminAssetsPage() {
   const [assets, setAssets] = useState<Asset[]>([])
   const [staff, setStaff] = useState<Staff[]>([])
   const [departments, setDepartments] = useState<string[]>([])
   const [userProfile, setUserProfile] = useState<{ role?: string; lead_departments?: string[] } | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const [, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [departmentFilter, setDepartmentFilter] = useState("all")
@@ -151,15 +159,17 @@ export default function AdminAssetsPage() {
 
   // Form states
   const [assetForm, setAssetForm] = useState({
-    asset_name: "",
     asset_type: "",
+    acquisition_year: currentYear,
+    asset_model: "",
     serial_number: "",
+    unique_code: "",
     status: "available",
     notes: "",
   })
 
   const [assignForm, setAssignForm] = useState({
-    assignment_type: "individual" as "individual" | "department",
+    assignment_type: "individual" as "individual" | "department" | "office",
     assigned_to: "",
     department: "",
     assignment_notes: "",
@@ -200,7 +210,7 @@ export default function AdminAssetsPage() {
         .eq("is_current", true)
 
       if (assignmentsError) throw assignmentsError
-      
+
       // Fetch user details for assignments
       const assignmentsWithUsers = await Promise.all((assignmentsData || []).map(async (assignment: any) => {
         if (assignment.assigned_to) {
@@ -209,7 +219,7 @@ export default function AdminAssetsPage() {
             .select("first_name, last_name, department")
             .eq("id", assignment.assigned_to)
             .single()
-          
+
           return {
             ...assignment,
             user: userProfile
@@ -240,17 +250,17 @@ export default function AdminAssetsPage() {
         filteredAssets = filteredAssets.filter((asset) => {
           const assignment = (assignmentsWithUsers || []).find((a: any) => a.asset_id === asset.id)
           if (!assignment) return false
-          
+
           // Check if assigned to individual in department
           if (assignment.assigned_to && deptUserIds.includes(assignment.assigned_to)) {
             return true
           }
-          
+
           // Check if assigned to department
           if (assignment.department && userProfile.lead_departments.includes(assignment.department)) {
             return true
           }
-          
+
           return false
         })
       }
@@ -292,24 +302,24 @@ export default function AdminAssetsPage() {
     }
   }
 
-     const loadCurrentAssignment = async (assetId: string) => {
-     try {
-       // Get asset to check assignment type
-       const { data: assetData } = await supabase
-         .from("assets")
-         .select("assignment_type, department")
-         .eq("id", assetId)
-         .single()
+  const loadCurrentAssignment = async (assetId: string) => {
+    try {
+      // Get asset to check assignment type
+      await supabase
+        .from("assets")
+        .select("assignment_type, department")
+        .eq("id", assetId)
+        .single()
 
-       const { data, error } = await supabase
-         .from("asset_assignments")
-         .select("id, assigned_to, assigned_at, is_current, department")
-         .eq("asset_id", assetId)
-         .eq("is_current", true)
-         .single()
+      const { data, error } = await supabase
+        .from("asset_assignments")
+        .select("id, assigned_to, assigned_at, is_current, department")
+        .eq("asset_id", assetId)
+        .eq("is_current", true)
+        .single()
 
       if (error && error.code !== "PGRST116") throw error
-      
+
       if (data) {
         if (data.assigned_to) {
           // Fetch user details separately
@@ -318,7 +328,7 @@ export default function AdminAssetsPage() {
             .select("first_name, last_name")
             .eq("id", data.assigned_to)
             .single()
-          
+
           setCurrentAssignment({
             ...data,
             user: userProfile
@@ -338,16 +348,16 @@ export default function AdminAssetsPage() {
     }
   }
 
-     const loadAssetHistory = async (asset: Asset) => {
-     try {
-       const { data, error } = await supabase
-         .from("asset_assignments")
-         .select("id, assigned_at, handed_over_at, assignment_notes, handover_notes, assigned_from, assigned_by, assigned_to, department")
-         .eq("asset_id", asset.id)
-         .order("assigned_at", { ascending: false })
+  const loadAssetHistory = async (asset: Asset) => {
+    try {
+      const { data, error } = await supabase
+        .from("asset_assignments")
+        .select("id, assigned_at, handed_over_at, assignment_notes, handover_notes, assigned_from, assigned_by, assigned_to, department")
+        .eq("asset_id", asset.id)
+        .order("assigned_at", { ascending: false })
 
       if (error) throw error
-      
+
       // Fetch user details separately for each assignment
       const historyWithUsers = await Promise.all((data || []).map(async (assignment: any) => {
         const [assignedFromResult, assignedByResult, assignedToResult] = await Promise.all([
@@ -367,7 +377,7 @@ export default function AdminAssetsPage() {
             .eq("id", assignment.assigned_to)
             .single() : Promise.resolve({ data: null })
         ])
-        
+
         return {
           ...assignment,
           assigned_from_user: assignedFromResult.data,
@@ -375,7 +385,7 @@ export default function AdminAssetsPage() {
           assigned_to_user: assignedToResult.data
         }
       }))
-      
+
       setAssetHistory(historyWithUsers as any || [])
       setSelectedAsset(asset)
       setIsHistoryOpen(true)
@@ -386,30 +396,34 @@ export default function AdminAssetsPage() {
     }
   }
 
-     const handleOpenAssetDialog = (asset?: Asset) => {
-     if (asset) {
-       setSelectedAsset(asset)
-       setAssetForm({
-         asset_name: asset.asset_name,
-         asset_type: asset.asset_type,
-         serial_number: asset.serial_number || "",
-         status: asset.status,
-         notes: asset.notes || "",
-       })
+  const handleOpenAssetDialog = (asset?: Asset) => {
+    if (asset) {
+      setSelectedAsset(asset)
+      setAssetForm({
+        asset_type: asset.asset_type,
+        acquisition_year: asset.acquisition_year,
+        asset_model: asset.asset_model || "",
+        serial_number: asset.serial_number || "",
+        unique_code: asset.unique_code,
+        status: asset.status,
+        notes: asset.notes || "",
+      })
     } else {
       setSelectedAsset(null)
-             setAssetForm({
-         asset_name: "",
-         asset_type: "",
-         serial_number: "",
-         status: "available",
-         notes: "",
-       })
+      setAssetForm({
+        asset_type: "",
+        acquisition_year: currentYear,
+        asset_model: "",
+        serial_number: "",
+        unique_code: "",
+        status: "available",
+        notes: "",
+      })
     }
     setIsAssetDialogOpen(true)
   }
 
-     const handleOpenAssignDialog = async (asset: Asset) => {
+  const handleOpenAssignDialog = async (asset: Asset) => {
     setSelectedAsset(asset)
     await loadCurrentAssignment(asset.id)
     setAssignForm({
@@ -426,63 +440,114 @@ export default function AdminAssetsPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
+      // Validate required fields
+      if (!assetForm.asset_type) {
+        toast.error("Please select an asset type")
+        return
+      }
+
+      // Validate serial and model for Desktop and Laptop
+      if (requiresSerialAndModel(assetForm.asset_type)) {
+        if (!assetForm.asset_model || !assetForm.serial_number) {
+          toast.error("Asset model and serial number are required for this asset type")
+          return
+        }
+      }
+
       if (selectedAsset) {
-                 // Update existing asset
-         const updateData = {
-           ...assetForm,
-         }
-         const { error } = await supabase
-           .from("assets")
-           .update(updateData)
-           .eq("id", selectedAsset.id)
+        // Update existing asset
+        const updateData: any = {
+          asset_type: assetForm.asset_type,
+          acquisition_year: assetForm.acquisition_year,
+          status: assetForm.status,
+          notes: assetForm.notes || null,
+        }
 
-         if (error) throw error
+        // Only include these fields if asset type requires them
+        if (requiresSerialAndModel(assetForm.asset_type)) {
+          updateData.asset_model = assetForm.asset_model
+          updateData.serial_number = assetForm.serial_number
+        } else {
+          updateData.asset_model = null
+          updateData.serial_number = null
+        }
 
-         // Log audit
-         await supabase.rpc("log_audit", {
-           p_action: "update",
-           p_entity_type: "asset",
-           p_entity_id: selectedAsset.id,
-           p_old_values: selectedAsset,
-           p_new_values: updateData,
-         })
+        const { error } = await supabase
+          .from("assets")
+          .update(updateData)
+          .eq("id", selectedAsset.id)
 
-         toast.success("Asset updated successfully")
+        if (error) throw error
+
+        // Log audit
+        await supabase.rpc("log_audit", {
+          p_action: "update",
+          p_entity_type: "asset",
+          p_entity_id: selectedAsset.id,
+          p_old_values: selectedAsset,
+          p_new_values: updateData,
+        })
+
+        toast.success("Asset updated successfully")
       } else {
-                 // Create new asset
-         const insertData = {
-           ...assetForm,
-           created_by: user.id,
-         }
-         const { data: newAsset, error } = await supabase.from("assets").insert(insertData).select().single()
+        // Create new asset - get next serial number
+        const { data: uniqueCodeData, error: serialError } = await supabase
+          .rpc("get_next_asset_serial", {
+            asset_code: assetForm.asset_type,
+            year: assetForm.acquisition_year,
+          })
 
-         if (error) throw error
+        if (serialError) throw serialError
 
-         // Log audit
-         await supabase.rpc("log_audit", {
-           p_action: "create",
-           p_entity_type: "asset",
-           p_entity_id: newAsset?.id || null,
-           p_new_values: insertData,
-         })
+        const insertData: any = {
+          asset_type: assetForm.asset_type,
+          acquisition_year: assetForm.acquisition_year,
+          unique_code: uniqueCodeData,
+          status: assetForm.status,
+          notes: assetForm.notes || null,
+          created_by: user.id,
+        }
 
-         toast.success("Asset created successfully")
+        // Only include these fields if asset type requires them
+        if (requiresSerialAndModel(assetForm.asset_type)) {
+          insertData.asset_model = assetForm.asset_model
+          insertData.serial_number = assetForm.serial_number
+        }
+
+        const { data: newAsset, error } = await supabase
+          .from("assets")
+          .insert(insertData)
+          .select()
+          .single()
+
+        if (error) throw error
+
+        // Log audit
+        await supabase.rpc("log_audit", {
+          p_action: "create",
+          p_entity_type: "asset",
+          p_entity_id: newAsset?.id || null,
+          p_new_values: insertData,
+        })
+
+        toast.success(`Asset created successfully with code: ${uniqueCodeData}`)
       }
 
       setIsAssetDialogOpen(false)
       loadData()
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error saving asset:", error)
-      toast.error("Failed to save asset")
+      const errorMessage = error?.message || error?.toString() || "Failed to save asset"
+      toast.error(`Failed to save asset: ${errorMessage}`)
     }
   }
 
   const handleAssignAsset = async () => {
     if (isAssigning) return // Prevent duplicate submissions
-    
+
     try {
       if (!selectedAsset) return
-      
+
       // Validate based on assignment type
       if (assignForm.assignment_type === "individual" && !assignForm.assigned_to) {
         toast.error("Please select a user")
@@ -492,6 +557,7 @@ export default function AdminAssetsPage() {
         toast.error("Please select a department")
         return
       }
+      // Office assignment doesn't need validation
 
       setIsAssigning(true)
 
@@ -520,9 +586,10 @@ export default function AdminAssetsPage() {
       if (assignForm.assignment_type === "individual") {
         assignmentData.assigned_to = assignForm.assigned_to
         assignmentData.assigned_from = previousAssignedTo
-      } else {
+      } else if (assignForm.assignment_type === "department") {
         assignmentData.department = assignForm.department
       }
+      // For office assignment, we don't set assigned_to or department
 
       const { error: assignError } = await supabase
         .from("asset_assignments")
@@ -535,7 +602,7 @@ export default function AdminAssetsPage() {
         assignment_type: assignForm.assignment_type,
         status: "assigned",
       }
-      
+
       if (assignForm.assignment_type === "department") {
         assetUpdate.department = assignForm.department
       } else {
@@ -550,17 +617,28 @@ export default function AdminAssetsPage() {
       if (assetError) throw assetError
 
       // Log audit
+      const oldValues = previousAssignedTo
+        ? { assigned_to: previousAssignedTo }
+        : previousDepartment
+        ? { department: previousDepartment }
+        : null
+
+      const newValues: any = { assignment_type: assignForm.assignment_type, notes: assignForm.assignment_notes }
+      if (assignForm.assignment_type === "individual") {
+        newValues.assigned_to = assignForm.assigned_to
+      } else if (assignForm.assignment_type === "department") {
+        newValues.department = assignForm.department
+      }
+
       await supabase.rpc("log_audit", {
         p_action: currentAssignment ? "reassign" : "assign",
         p_entity_type: "asset",
         p_entity_id: selectedAsset.id,
-        p_old_values: previousAssignedTo ? { assigned_to: previousAssignedTo } : previousDepartment ? { department: previousDepartment } : null,
-        p_new_values: assignForm.assignment_type === "individual" 
-          ? { assigned_to: assignForm.assigned_to, notes: assignForm.assignment_notes }
-          : { department: assignForm.department, notes: assignForm.assignment_notes },
+        p_old_values: oldValues,
+        p_new_values: newValues,
       })
 
-             toast.success(`Asset ${currentAssignment ? "reassigned" : "assigned"} successfully`)
+      toast.success(`Asset ${currentAssignment ? "reassigned" : "assigned"} successfully`)
       setIsAssignDialogOpen(false)
       setCurrentAssignment(null)
       loadData()
@@ -580,47 +658,50 @@ export default function AdminAssetsPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-             // Check if asset has active assignments
-       const { data: assignments } = await supabase
-         .from("asset_assignments")
-         .select("*")
-         .eq("asset_id", assetToDelete.id)
-         .eq("is_current", true)
+      // Check if asset has active assignments
+      const { data: assignments } = await supabase
+        .from("asset_assignments")
+        .select("*")
+        .eq("asset_id", assetToDelete.id)
+        .eq("is_current", true)
 
       if (assignments && assignments.length > 0) {
         toast.error("Cannot delete asset with active assignments")
         return
       }
 
-             const { error } = await supabase
-         .from("assets")
-         .delete()
-         .eq("id", assetToDelete.id)
+      const { error } = await supabase
+        .from("assets")
+        .delete()
+        .eq("id", assetToDelete.id)
 
-       if (error) throw error
+      if (error) throw error
 
-       // Log audit
-       await supabase.rpc("log_audit", {
-         p_action: "delete",
-         p_entity_type: "asset",
-         p_entity_id: assetToDelete.id,
-         p_old_values: assetToDelete,
-       })
+      // Log audit
+      await supabase.rpc("log_audit", {
+        p_action: "delete",
+        p_entity_type: "asset",
+        p_entity_id: assetToDelete.id,
+        p_old_values: assetToDelete,
+      })
 
-       toast.success("Asset deleted successfully")
-       setIsDeleteDialogOpen(false)
-       setAssetToDelete(null)
+      toast.success("Asset deleted successfully")
+      setIsDeleteDialogOpen(false)
+      setAssetToDelete(null)
       loadData()
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting asset:", error)
-      toast.error("Failed to delete asset")
+      const errorMessage = error?.message || error?.toString() || "Failed to delete asset"
+      toast.error(`Failed to delete asset: ${errorMessage}`)
     }
   }
 
   const filteredAssets = assets.filter((asset) => {
+    const assetTypeLabel = ASSET_TYPE_MAP[asset.asset_type]?.label || asset.asset_type
+
     const matchesSearch =
-      asset.asset_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      asset.asset_type.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      asset.unique_code.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      assetTypeLabel.toLowerCase().includes(searchQuery.toLowerCase()) ||
       asset.asset_model?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       asset.serial_number?.toLowerCase().includes(searchQuery.toLowerCase())
 
@@ -632,21 +713,21 @@ export default function AdminAssetsPage() {
       // Leads: assets are already filtered, but ensure they match lead's departments
       if (userProfile.lead_departments && userProfile.lead_departments.length > 0) {
         const assignmentDept = asset.current_assignment?.department
-        const assignedUserDept = asset.current_assignment?.assigned_to 
+        const assignedUserDept = asset.current_assignment?.assigned_to
           ? staff.find((s) => s.id === asset.current_assignment?.assigned_to)?.department
           : null
-        
+
         matchesDepartment = assignmentDept ? userProfile.lead_departments.includes(assignmentDept) :
           assignedUserDept ? userProfile.lead_departments.includes(assignedUserDept) : false
       }
     } else {
       // Admins: use department filter
-      matchesDepartment = departmentFilter === "all" || 
+      matchesDepartment = departmentFilter === "all" ||
         asset.current_assignment?.department === departmentFilter
     }
 
     // Filter by user
-    const matchesUser = userFilter === "all" || 
+    const matchesUser = userFilter === "all" ||
       asset.current_assignment?.assigned_to === userFilter
 
     return matchesSearch && matchesStatus && matchesDepartment && matchesUser
@@ -684,8 +765,16 @@ export default function AdminAssetsPage() {
     }
   }
 
+
+  const getUniqueCodePreview = () => {
+    if (!assetForm.asset_type || !assetForm.acquisition_year) {
+      return "ACOB/HQ/???/????/???"
+    }
+    return generateUniqueCodePreview(assetForm.asset_type, assetForm.acquisition_year, "???")
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 p-4 md:p-8">
+    <div className="min-h-screen bg-linear-to-br from-background via-background to-muted/20 p-4 md:p-8">
       <div className="mx-auto max-w-7xl space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -795,7 +884,7 @@ export default function AdminAssetsPage() {
               <div className="flex-1 relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search assets by name, type, model, or serial number..."
+                  placeholder="Search assets by unique code, type, model, or serial number..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10"
@@ -845,8 +934,8 @@ export default function AdminAssetsPage() {
                 icon={<User className="h-4 w-4" />}
                 className="w-full md:w-48"
                 options={[
-                  { 
-                    value: "all", 
+                  {
+                    value: "all",
                     label: userProfile?.role === "lead" && departments.length > 0
                       ? `All ${departments.length === 1 ? departments[0] : "Department"} Users`
                       : "All Users"
@@ -871,134 +960,150 @@ export default function AdminAssetsPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-12">#</TableHead>
-                      <TableHead>Asset Name</TableHead>
-                      <TableHead>Type / Model</TableHead>
-                      <TableHead>Serial Number</TableHead>
+                      <TableHead>Unique Code</TableHead>
+                      <TableHead>Asset Type</TableHead>
+                      <TableHead>Model / Serial</TableHead>
+                      <TableHead>Year</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Assigned To</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                  {filteredAssets.map((asset, index) => (
-                    <TableRow key={asset.id}>
-                      <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <div className="p-2 bg-primary/10 rounded-lg">
-                            <Package className="h-4 w-4 text-primary" />
+                    {filteredAssets.map((asset, index) => (
+                      <TableRow key={asset.id}>
+                        <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <div className="p-2 bg-primary/10 rounded-lg">
+                              <Package className="h-4 w-4 text-primary" />
+                            </div>
+                            <span className="font-medium text-foreground font-mono text-xs">
+                              {asset.unique_code}
+                            </span>
                           </div>
-                          <span className="font-medium text-foreground">{asset.asset_name}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm">
-                          <div className="text-foreground">{asset.asset_type}</div>
-                          {asset.asset_model && (
-                            <div className="text-xs text-muted-foreground">{asset.asset_model}</div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm font-medium text-foreground">
+                            {ASSET_TYPE_MAP[asset.asset_type]?.label || asset.asset_type}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {asset.asset_model || asset.serial_number ? (
+                            <div className="text-sm">
+                              {asset.asset_model && (
+                                <div className="text-foreground">{asset.asset_model}</div>
+                              )}
+                              {asset.serial_number && (
+                                <div className="text-xs text-muted-foreground font-mono">
+                                  {asset.serial_number}
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">-</span>
                           )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {asset.serial_number ? (
-                          <span className="text-sm font-mono text-foreground">{asset.serial_number}</span>
-                        ) : (
-                          <span className="text-sm text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={getStatusColor(asset.status)}>{asset.status}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        {asset.current_assignment ? (
-                          asset.current_assignment.department ? (
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm text-foreground">{asset.acquisition_year}</span>
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={getStatusColor(asset.status)}>{asset.status}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          {asset.assignment_type === "office" ? (
                             <div className="flex items-center gap-2 text-sm">
-                              <Building2 className="h-3 w-3 text-muted-foreground" />
-                              <span className="text-foreground">{asset.current_assignment.department}</span>
+                              <Building className="h-3 w-3 text-muted-foreground" />
+                              <span className="text-foreground">Office</span>
                             </div>
-                          ) : asset.current_assignment.user ? (
-                            <div className="flex items-center gap-2 text-sm">
-                              <User className="h-3 w-3 text-muted-foreground" />
-                              <span className="text-foreground">
-                                {asset.current_assignment?.user 
-                                  ? `${formatName(asset.current_assignment.user.first_name)} ${formatName(asset.current_assignment.user.last_name)}`
-                                  : asset.current_assignment?.department || "Unassigned"}
-                              </span>
-                            </div>
-                          ) : null
-                        ) : (
-                          <span className="text-sm text-muted-foreground">Unassigned</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1 sm:gap-2 flex-wrap">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleOpenAssignDialog(asset)}
-                            title={asset.current_assignment ? "Reassign Asset" : "Assign Asset"}
-                            className="h-8 w-8 sm:h-auto sm:w-auto p-0 sm:p-2"
-                          >
-                            <UserPlus className="h-3 w-3 sm:mr-1" />
-                            <span className="hidden sm:inline">{asset.current_assignment ? "Reassign" : "Assign"}</span>
-                          </Button>
-                          {userProfile?.role !== "lead" && (
+                          ) : asset.current_assignment ? (
+                            asset.current_assignment.department ? (
+                              <div className="flex items-center gap-2 text-sm">
+                                <Building2 className="h-3 w-3 text-muted-foreground" />
+                                <span className="text-foreground">{asset.current_assignment.department}</span>
+                              </div>
+                            ) : asset.current_assignment.user ? (
+                              <div className="flex items-center gap-2 text-sm">
+                                <User className="h-3 w-3 text-muted-foreground" />
+                                <span className="text-foreground">
+                                  {formatName(asset.current_assignment.user.first_name)} {formatName(asset.current_assignment.user.last_name)}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-sm text-muted-foreground">Unassigned</span>
+                            )
+                          ) : (
+                            <span className="text-sm text-muted-foreground">Unassigned</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1 sm:gap-2">
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleOpenAssetDialog(asset)}
-                              title="Edit Asset"
+                              onClick={() => handleOpenAssignDialog(asset)}
+                              title={asset.current_assignment ? "Reassign Asset" : "Assign Asset"}
+                              className="h-8 w-8 sm:h-auto sm:w-auto p-0 sm:p-2"
+                            >
+                              <UserPlus className="h-3 w-3 sm:mr-1" />
+                              <span className="hidden sm:inline">{asset.current_assignment ? "Reassign" : "Assign"}</span>
+                            </Button>
+                            {userProfile?.role !== "lead" && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleOpenAssetDialog(asset)}
+                                title="Edit Asset"
+                                className="h-8 w-8 p-0"
+                              >
+                                <Edit className="h-3 w-3" />
+                              </Button>
+                            )}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => loadAssetHistory(asset)}
+                              title="View assignment history"
                               className="h-8 w-8 p-0"
                             >
-                              <Edit className="h-3 w-3" />
+                              <Eye className="h-3 w-3" />
                             </Button>
-                          )}
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => loadAssetHistory(asset)}
-                            title="View assignment history"
-                            className="h-8 w-8 p-0"
-                          >
-                            <Eye className="h-3 w-3" />
-                          </Button>
-                          {userProfile?.role !== "lead" && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                setAssetToDelete(asset)
-                                setIsDeleteDialogOpen(true)
-                              }}
-                              title="Delete asset"
-                              className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                            {userProfile?.role !== "lead" && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setAssetToDelete(asset)
+                                  setIsDeleteDialogOpen(true)
+                                }}
+                                title="Delete asset"
+                                className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
             </Card>
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {filteredAssets.map((asset) => (
                 <Card key={asset.id} className="border-2 hover:shadow-lg transition-shadow">
-                  <CardHeader className="border-b bg-gradient-to-r from-primary/5 to-background">
+                  <CardHeader className="border-b bg-linear-to-r from-primary/5 to-background">
                     <div className="flex items-start justify-between">
                       <div className="flex items-start gap-3">
                         <div className="p-2 bg-primary/10 rounded-lg">
                           <Package className="h-5 w-5 text-primary" />
                         </div>
                         <div>
-                          <CardTitle className="text-lg">{asset.asset_name}</CardTitle>
+                          <CardTitle className="text-sm font-mono">{asset.unique_code}</CardTitle>
                           <p className="text-sm text-muted-foreground mt-1">
-                            {asset.asset_type}
-                            {asset.asset_model && ` • ${asset.asset_model}`}
+                            {ASSET_TYPE_MAP[asset.asset_type]?.label || asset.asset_type}
                           </p>
                         </div>
                       </div>
@@ -1009,6 +1114,20 @@ export default function AdminAssetsPage() {
                       <span className="text-sm text-muted-foreground">Status:</span>
                       <Badge className={getStatusColor(asset.status)}>{asset.status}</Badge>
                     </div>
+
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Year:</span>
+                      <span className="text-sm text-foreground font-medium">
+                        {asset.acquisition_year}
+                      </span>
+                    </div>
+
+                    {asset.asset_model && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">Model:</span>
+                        <span className="text-sm text-foreground">{asset.asset_model}</span>
+                      </div>
+                    )}
 
                     {asset.serial_number && (
                       <div className="flex items-center justify-between">
@@ -1021,7 +1140,12 @@ export default function AdminAssetsPage() {
 
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-muted-foreground">Assigned To:</span>
-                      {asset.current_assignment ? (
+                      {asset.assignment_type === "office" ? (
+                        <div className="flex items-center gap-2">
+                          <Building className="h-3 w-3 text-muted-foreground" />
+                          <span className="text-sm text-foreground font-medium">Office</span>
+                        </div>
+                      ) : asset.current_assignment ? (
                         asset.current_assignment.department ? (
                           <div className="flex items-center gap-2">
                             <Building2 className="h-3 w-3 text-muted-foreground" />
@@ -1029,14 +1153,16 @@ export default function AdminAssetsPage() {
                               {asset.current_assignment.department}
                             </span>
                           </div>
-                        ) : asset.current_assignment?.user ? (
+                        ) : asset.current_assignment.user ? (
                           <div className="flex items-center gap-2">
                             <User className="h-3 w-3 text-muted-foreground" />
                             <span className="text-sm text-foreground font-medium">
                               {formatName(asset.current_assignment.user.first_name)} {formatName(asset.current_assignment.user.last_name)}
                             </span>
                           </div>
-                        ) : null
+                        ) : (
+                          <span className="text-sm text-muted-foreground">Unassigned</span>
+                        )
                       ) : (
                         <span className="text-sm text-muted-foreground">Unassigned</span>
                       )}
@@ -1062,32 +1188,32 @@ export default function AdminAssetsPage() {
                           <Edit className="h-3 w-3" />
                         </Button>
                       )}
-                                             <Button
-                         variant="outline"
-                         size="sm"
-                         onClick={() => loadAssetHistory(asset)}
-                         title="View assignment history"
-                       >
-                         <Eye className="h-3 w-3" />
-                       </Button>
-                       {userProfile?.role !== "lead" && (
-                         <Button
-                           variant="outline"
-                           size="sm"
-                           onClick={() => {
-                             setAssetToDelete(asset)
-                             setIsDeleteDialogOpen(true)
-                           }}
-                           title="Delete Asset"
-                           className="text-red-600 hover:text-red-700"
-                         >
-                           <Trash2 className="h-3 w-3" />
-                         </Button>
-                       )}
-                     </div>
-                   </CardContent>
-                 </Card>
-               ))}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => loadAssetHistory(asset)}
+                        title="View assignment history"
+                      >
+                        <Eye className="h-3 w-3" />
+                      </Button>
+                      {userProfile?.role !== "lead" && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setAssetToDelete(asset)
+                            setIsDeleteDialogOpen(true)
+                          }}
+                          title="Delete Asset"
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
           )
         ) : (
@@ -1107,62 +1233,104 @@ export default function AdminAssetsPage() {
 
       {/* asset Dialog */}
       <Dialog open={isAssetDialogOpen} onOpenChange={setIsAssetDialogOpen}>
-        <DialogContent className="max-w-2xl">
-                     <DialogHeader>
-             <DialogTitle>
-               {selectedAsset ? "Edit Asset" : "Add New Asset"}
-             </DialogTitle>
-             <DialogDescription>
-               {selectedAsset
-                 ? "Update the asset information below"
-                 : "Enter the details for the new asset"}
-             </DialogDescription>
-           </DialogHeader>
-           <div className="space-y-4 py-4">
-             <div className="grid gap-4 md:grid-cols-2">
-               <div>
-                 <Label htmlFor="asset_name">Asset Name *</Label>
-                 <Input
-                   id="asset_name"
-                   value={assetForm.asset_name}
-                   onChange={(e) =>
-                     setAssetForm({ ...assetForm, asset_name: e.target.value })
-                   }
-                   placeholder="e.g., Office Desk"
-                 />
-               </div>
-               <div>
-                 <Label htmlFor="asset_type">Asset Type *</Label>
-                 <Select
-                   value={assetForm.asset_type}
-                   onValueChange={(value) =>
-                     setAssetForm({ ...assetForm, asset_type: value })
-                   }
-                 >
-                   <SelectTrigger id="asset_type">
-                     <SelectValue placeholder="Select asset type" />
-                   </SelectTrigger>
-                   <SelectContent>
-                     <SelectItem value="furniture">Furniture</SelectItem>
-                     <SelectItem value="equipment">Equipment</SelectItem>
-                     <SelectItem value="vehicle">Vehicle</SelectItem>
-                     <SelectItem value="other">Other</SelectItem>
-                   </SelectContent>
-                 </Select>
-               </div>
-             </div>
-
-            <div>
-              <Label htmlFor="serial_number">Serial Number</Label>
-              <Input
-                id="serial_number"
-                value={assetForm.serial_number}
-                onChange={(e) =>
-                  setAssetForm({ ...assetForm, serial_number: e.target.value })
-                }
-                placeholder="e.g., ABC123XYZ"
-              />
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {selectedAsset ? "Edit Asset" : "Add New Asset"}
+            </DialogTitle>
+            <DialogDescription>
+              {selectedAsset
+                ? "Update the asset information below"
+                : "Enter the details for the new asset"}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <Label htmlFor="asset_type">Asset Type *</Label>
+                <SearchableSelect
+                  value={assetForm.asset_type}
+                  onValueChange={(value) =>
+                    setAssetForm({ ...assetForm, asset_type: value })
+                  }
+                  placeholder="Select asset type"
+                  searchPlaceholder="Search asset types..."
+                  disabled={!!selectedAsset}
+                  options={ASSET_TYPES.map((type) => ({
+                    value: type.code,
+                    label: type.label,
+                  }))}
+                />
+                {selectedAsset && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Asset type cannot be changed after creation
+                  </p>
+                )}
+              </div>
+              <div>
+                <Label htmlFor="acquisition_year">Acquisition Year *</Label>
+                <Input
+                  id="acquisition_year"
+                  type="number"
+                  min={2000}
+                  max={currentYear + 1}
+                  value={assetForm.acquisition_year}
+                  onChange={(e) =>
+                    setAssetForm({ ...assetForm, acquisition_year: parseInt(e.target.value) || currentYear })
+                  }
+                  disabled={!!selectedAsset}
+                />
+                {selectedAsset && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Year cannot be changed after creation
+                  </p>
+                )}
+              </div>
             </div>
+
+            {/* Unique Code Preview */}
+            <div>
+              <Label htmlFor="unique_code">Unique Code</Label>
+              <Input
+                id="unique_code"
+                value={selectedAsset ? assetForm.unique_code : getUniqueCodePreview()}
+                readOnly
+                className="font-mono text-sm bg-muted"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                {selectedAsset
+                  ? "Asset unique code (auto-generated)"
+                  : "Preview - Serial number will be auto-generated on save"}
+              </p>
+            </div>
+
+            {/* Conditional Model and Serial Number fields */}
+            {requiresSerialAndModel(assetForm.asset_type) && (
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <Label htmlFor="asset_model">Asset Model *</Label>
+                  <Input
+                    id="asset_model"
+                    value={assetForm.asset_model}
+                    onChange={(e) =>
+                      setAssetForm({ ...assetForm, asset_model: e.target.value })
+                    }
+                    placeholder="e.g., Dell Latitude 5420"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="serial_number">Serial Number *</Label>
+                  <Input
+                    id="serial_number"
+                    value={assetForm.serial_number}
+                    onChange={(e) =>
+                      setAssetForm({ ...assetForm, serial_number: e.target.value })
+                    }
+                    placeholder="e.g., ABC123XYZ"
+                  />
+                </div>
+              </div>
+            )}
 
             <div>
               <Label htmlFor="status">Status</Label>
@@ -1199,9 +1367,12 @@ export default function AdminAssetsPage() {
             </Button>
             <Button
               onClick={handleSaveAsset}
-              disabled={!assetForm.asset_name || !assetForm.asset_type}
+              disabled={
+                !assetForm.asset_type ||
+                (requiresSerialAndModel(assetForm.asset_type) && (!assetForm.asset_model || !assetForm.serial_number))
+              }
             >
-                             {selectedAsset ? "Update Asset" : "Create Asset"}
+              {selectedAsset ? "Update Asset" : "Create Asset"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1211,17 +1382,19 @@ export default function AdminAssetsPage() {
       <Dialog open={isAssignDialogOpen} onOpenChange={setIsAssignDialogOpen}>
         <DialogContent>
           <DialogHeader>
-                         <DialogTitle>{currentAssignment ? "Reassign" : "Assign"} Asset</DialogTitle>
-             <DialogDescription>
-               {currentAssignment ? "Reassign" : "Assign"} {selectedAsset?.asset_name} to a staff member
-             </DialogDescription>
+            <DialogTitle>{currentAssignment ? "Reassign" : "Assign"} Asset</DialogTitle>
+            <DialogDescription>
+              {currentAssignment ? "Reassign" : "Assign"} {selectedAsset?.unique_code} ({ASSET_TYPE_MAP[selectedAsset?.asset_type || ""]?.label})
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             {currentAssignment && (
               <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
                 <p className="text-sm font-medium text-yellow-900 dark:text-yellow-200">
                   Currently assigned to:{" "}
-                  {currentAssignment.department ? (
+                  {selectedAsset?.assignment_type === "office" ? (
+                    <span>Office</span>
+                  ) : currentAssignment.department ? (
                     <span>{currentAssignment.department} (Department)</span>
                   ) : currentAssignment.user ? (
                     <span>
@@ -1241,7 +1414,7 @@ export default function AdminAssetsPage() {
               <Label htmlFor="assignment_type">Assignment Type *</Label>
               <Select
                 value={assignForm.assignment_type}
-                onValueChange={(value: "individual" | "department") =>
+                onValueChange={(value: "individual" | "department" | "office") =>
                   setAssignForm({ ...assignForm, assignment_type: value, assigned_to: "", department: "" })
                 }
               >
@@ -1261,11 +1434,17 @@ export default function AdminAssetsPage() {
                       <span>Department Assignment</span>
                     </div>
                   </SelectItem>
+                  <SelectItem value="office">
+                    <div className="flex items-center gap-2">
+                      <Building className="h-4 w-4" />
+                      <span>Office Assignment</span>
+                    </div>
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            {assignForm.assignment_type === "individual" ? (
+            {assignForm.assignment_type === "individual" && (
               <div>
                 <Label htmlFor="assigned_to">Assign To *</Label>
                 <SearchableSelect
@@ -1285,7 +1464,9 @@ export default function AdminAssetsPage() {
                   {staff.length} staff members available
                 </p>
               </div>
-            ) : (
+            )}
+
+            {assignForm.assignment_type === "department" && (
               <div>
                 <Label htmlFor="department">Department *</Label>
                 <Select
@@ -1307,6 +1488,14 @@ export default function AdminAssetsPage() {
                 </Select>
                 <p className="text-xs text-muted-foreground mt-1">
                   {departments.length} departments available
+                </p>
+              </div>
+            )}
+
+            {assignForm.assignment_type === "office" && (
+              <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <p className="text-sm text-blue-900 dark:text-blue-200">
+                  This asset will be assigned to the office (general use).
                 </p>
               </div>
             )}
@@ -1347,10 +1536,9 @@ export default function AdminAssetsPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                         <AlertDialogDescription>
-               This will permanently delete "{assetToDelete?.asset_name}". This action cannot be
-               undone.
-             </AlertDialogDescription>
+            <AlertDialogDescription>
+              This will permanently delete "{assetToDelete?.unique_code}" ({ASSET_TYPE_MAP[assetToDelete?.asset_type || ""]?.label}). This action cannot be undone.
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setAssetToDelete(null)}>
@@ -1370,21 +1558,21 @@ export default function AdminAssetsPage() {
       <Dialog open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
         <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-                         <DialogTitle className="flex items-center gap-2">
-               <History className="h-5 w-5 text-primary" />
-               Asset Assignment History
-             </DialogTitle>
-             <DialogDescription>
-               Complete history of assignments for {selectedAsset?.asset_name}
-             </DialogDescription>
+            <DialogTitle className="flex items-center gap-2">
+              <History className="h-5 w-5 text-primary" />
+              Asset Assignment History
+            </DialogTitle>
+            <DialogDescription>
+              Complete history of assignments for {selectedAsset?.unique_code} ({ASSET_TYPE_MAP[selectedAsset?.asset_type || ""]?.label})
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 mt-4">
             {assetHistory.map((history, index) => (
               <div
                 key={history.id}
                 className={`p-4 rounded-lg border-2 ${
-                  index === 0 
-                    ? "bg-primary/5 border-primary/30 shadow-sm" 
+                  index === 0
+                    ? "bg-primary/5 border-primary/30 shadow-sm"
                     : "bg-muted/30 border-muted"
                 }`}
               >
@@ -1398,41 +1586,43 @@ export default function AdminAssetsPage() {
                   </div>
                 </div>
 
-                                  {(history.assigned_to_user || (history as any).department) && (
-                    <div className="mb-2">
-                      <p className="text-sm text-muted-foreground">
-                        Assigned to:{" "}
-                        {(history as any).department ? (
-                          <span className="text-foreground font-semibold flex items-center gap-1">
-                            <Building2 className="h-3 w-3" />
-                            {(history as any).department} (Department)
-                          </span>
-                        ) : history.assigned_to_user ? (
-                          <span className="text-foreground font-semibold">
-                            {formatName(history.assigned_to_user.first_name)} {formatName(history.assigned_to_user.last_name)}
-                          </span>
-                        ) : null}
-                      </p>
-                    </div>
-                  )}
-
-                                  {history.assigned_by_user && (
-                    <p className="text-sm text-muted-foreground mb-2">
-                      Assigned by:{" "}
-                      <span className="text-foreground font-medium">
-                        {formatName(history.assigned_by_user.first_name)} {formatName(history.assigned_by_user.last_name)}
-                      </span>
+                {(history.assigned_to_user || (history as any).department) && (
+                  <div className="mb-2">
+                    <p className="text-sm text-muted-foreground">
+                      Assigned to:{" "}
+                      {(history as any).department ? (
+                        <span className="text-foreground font-semibold flex items-center gap-1">
+                          <Building2 className="h-3 w-3" />
+                          {(history as any).department} (Department)
+                        </span>
+                      ) : history.assigned_to_user ? (
+                        <span className="text-foreground font-semibold">
+                          {formatName(history.assigned_to_user.first_name)} {formatName(history.assigned_to_user.last_name)}
+                        </span>
+                      ) : (
+                        <span className="text-foreground font-semibold">Office</span>
+                      )}
                     </p>
-                  )}
+                  </div>
+                )}
 
-                                  {history.assigned_from_user && (
-                    <p className="text-sm text-muted-foreground mb-2">
-                      Transferred from:{" "}
-                      <span className="text-foreground font-medium">
-                        {formatName(history.assigned_from_user.first_name)} {formatName(history.assigned_from_user.last_name)}
-                      </span>
-                    </p>
-                  )}
+                {history.assigned_by_user && (
+                  <p className="text-sm text-muted-foreground mb-2">
+                    Assigned by:{" "}
+                    <span className="text-foreground font-medium">
+                      {formatName(history.assigned_by_user.first_name)} {formatName(history.assigned_by_user.last_name)}
+                    </span>
+                  </p>
+                )}
+
+                {history.assigned_from_user && (
+                  <p className="text-sm text-muted-foreground mb-2">
+                    Transferred from:{" "}
+                    <span className="text-foreground font-medium">
+                      {formatName(history.assigned_from_user.first_name)} {formatName(history.assigned_from_user.last_name)}
+                    </span>
+                  </p>
+                )}
 
                 {history.assignment_notes && (
                   <div className="mt-3 p-3 bg-background/50 rounded border">
@@ -1471,4 +1661,3 @@ export default function AdminAssetsPage() {
     </div>
   )
 }
-

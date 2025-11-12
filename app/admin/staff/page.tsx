@@ -52,6 +52,7 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
+  FileSignature,
 } from "lucide-react"
 import type { UserRole } from "@/types/database"
 import { getRoleDisplayName, getRoleBadgeColor, canAssignRoles, DEPARTMENTS } from "@/lib/permissions"
@@ -80,10 +81,9 @@ interface UserProfile {
 
 export default function AdminStaffPage() {
   const searchParams = useSearchParams()
-  const router = useRouter()
   const [staff, setStaff] = useState<Staff[]>([])
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const [, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [departmentFilter, setDepartmentFilter] = useState("all")
   const [staffFilter, setStaffFilter] = useState("all")
@@ -98,7 +98,6 @@ export default function AdminStaffPage() {
     role: "staff" as UserRole,
     department: "",
     company_role: "",
-    is_department_lead: false,
     lead_departments: [] as string[],
   })
 
@@ -163,7 +162,6 @@ export default function AdminStaffPage() {
       role: staffMember.role,
       department: staffMember.department,
       company_role: staffMember.company_role || "",
-      is_department_lead: staffMember.is_department_lead,
       lead_departments: staffMember.lead_departments || [],
     })
     setIsEditDialogOpen(true)
@@ -179,14 +177,23 @@ export default function AdminStaffPage() {
         return
       }
 
+      // Validate: If role is lead, at least one department must be selected
+      if (editForm.role === "lead" && editForm.lead_departments.length === 0) {
+        toast.error("Please select at least one department for this lead")
+        return
+      }
+
+      // If role is lead, automatically set is_department_lead to true
+      const isLead = editForm.role === "lead"
+
       const { error } = await supabase
         .from("profiles")
         .update({
           role: editForm.role,
           department: editForm.department,
           company_role: editForm.company_role || null,
-          is_department_lead: editForm.is_department_lead,
-          lead_departments: editForm.lead_departments,
+          is_department_lead: isLead,
+          lead_departments: isLead ? editForm.lead_departments : [],
           is_admin: ['super_admin', 'admin'].includes(editForm.role),
         })
         .eq("id", selectedStaff.id)
@@ -258,7 +265,7 @@ export default function AdminStaffPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 p-4 md:p-8">
+    <div className="min-h-screen bg-linear-to-br from-background via-background to-muted/20 p-4 md:p-8">
       <div className="mx-auto max-w-7xl space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -489,7 +496,18 @@ export default function AdminStaffPage() {
                         </span>
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1 sm:gap-2 flex-wrap">
+                        <div className="flex items-center justify-end gap-1 sm:gap-2 ">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            asChild
+                            className="h-8 w-8 sm:h-auto sm:w-auto p-0 sm:p-2"
+                            title="View Signature"
+                          >
+                            <Link href={`/admin/staff/signature/${member.id}`}>
+                              <FileSignature className="h-3 w-3" />
+                            </Link>
+                          </Button>
                           <Button
                             variant="outline"
                             size="sm"
@@ -521,7 +539,7 @@ export default function AdminStaffPage() {
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {filteredStaff.map((member) => (
                 <Card key={member.id} className="border-2 hover:shadow-lg transition-shadow">
-                  <CardHeader className="border-b bg-gradient-to-r from-primary/5 to-background">
+                  <CardHeader className="border-b bg-linear-to-r from-primary/5 to-background">
                     <div className="flex items-start justify-between">
                       <Link
                         href={`/admin/staff/${member.id}`}
@@ -712,54 +730,53 @@ export default function AdminStaffPage() {
 
             {editForm.role === "lead" && (
               <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id="is_department_lead"
-                    checked={editForm.is_department_lead}
-                    onChange={(e) =>
-                      setEditForm({ ...editForm, is_department_lead: e.target.checked })
-                    }
-                    className="rounded"
-                  />
-                  <Label htmlFor="is_department_lead">Is Department Lead</Label>
+                <div className="p-3 bg-primary/10 border border-primary/20 rounded-lg">
+                  <p className="text-sm font-medium text-primary mb-2">
+                    Lead Department Selection Required
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Select at least one department that this person will lead
+                  </p>
                 </div>
 
-                {editForm.is_department_lead && (
-                  <div>
-                    <Label>Lead Departments</Label>
-                    <div className="grid grid-cols-2 gap-2 mt-2">
-                      {DEPARTMENTS.map((dept) => (
-                        <div key={dept} className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            id={`dept-${dept}`}
-                            checked={editForm.lead_departments.includes(dept)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setEditForm({
-                                  ...editForm,
-                                  lead_departments: [...editForm.lead_departments, dept],
-                                })
-                              } else {
-                                setEditForm({
-                                  ...editForm,
-                                  lead_departments: editForm.lead_departments.filter(
-                                    (d) => d !== dept
-                                  ),
-                                })
-                              }
-                            }}
-                            className="rounded"
-                          />
-                          <Label htmlFor={`dept-${dept}`} className="text-sm">
-                            {dept}
-                          </Label>
-                        </div>
-                      ))}
-                    </div>
+                <div>
+                  <Label>Lead Departments *</Label>
+                  <div className="grid grid-cols-2 gap-2 mt-2">
+                    {DEPARTMENTS.map((dept) => (
+                      <div key={dept} className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id={`dept-${dept}`}
+                          checked={editForm.lead_departments.includes(dept)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setEditForm({
+                                ...editForm,
+                                lead_departments: [...editForm.lead_departments, dept],
+                              })
+                            } else {
+                              setEditForm({
+                                ...editForm,
+                                lead_departments: editForm.lead_departments.filter(
+                                  (d) => d !== dept
+                                ),
+                              })
+                            }
+                          }}
+                          className="rounded"
+                        />
+                        <Label htmlFor={`dept-${dept}`} className="text-sm">
+                          {dept}
+                        </Label>
+                      </div>
+                    ))}
                   </div>
-                )}
+                  {editForm.lead_departments.length === 0 && (
+                    <p className="text-xs text-destructive mt-2">
+                      Please select at least one department
+                    </p>
+                  )}
+                </div>
               </div>
             )}
           </div>

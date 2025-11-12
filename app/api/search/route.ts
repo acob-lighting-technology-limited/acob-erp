@@ -85,36 +85,6 @@ export async function GET(request: NextRequest) {
           })
         }
 
-        // Search for related items: Devices assigned to this user
-        const { data: deviceAssignments } = await supabase
-          .from("device_assignments")
-          .select("id, device_id, assigned_at, is_current")
-          .eq("assigned_to", profile.id)
-          .eq("is_current", true)
-          .limit(3)
-
-        if (deviceAssignments && deviceAssignments.length > 0) {
-          const deviceIds = deviceAssignments.map((da) => da.device_id)
-          const { data: devices } = await supabase
-            .from("devices")
-            .select("id, device_name, device_type, device_model, serial_number")
-            .in("id", deviceIds)
-
-          if (devices) {
-            devices.forEach((device) => {
-              results.push({
-                id: `device-${device.id}`,
-                type: "device",
-                title: device.device_name || device.device_type || "Device",
-                subtitle: `Assigned to ${name}`,
-                description: device.serial_number ? `SN: ${device.serial_number}` : device.device_model || undefined,
-                href: `/admin/devices?deviceId=${device.id}`,
-                metadata: { ...device, related_user: profile.id },
-              })
-            })
-          }
-        }
-
         // Search for related items: Assets assigned to this user
         const { data: assetAssignments } = await supabase
           .from("asset_assignments")
@@ -127,7 +97,7 @@ export async function GET(request: NextRequest) {
           const assetIds = assetAssignments.map((aa) => aa.asset_id)
           const { data: assets } = await supabase
             .from("assets")
-            .select("id, asset_name, asset_type, asset_model, serial_number")
+            .select("id, unique_code, asset_type, asset_model, serial_number")
             .in("id", assetIds)
 
           if (assets) {
@@ -135,9 +105,9 @@ export async function GET(request: NextRequest) {
               results.push({
                 id: `asset-${asset.id}`,
                 type: "asset",
-                title: asset.asset_name || asset.asset_type || "Asset",
+                title: asset.unique_code || asset.asset_type || "Asset",
                 subtitle: `Assigned to ${name}`,
-                description: asset.serial_number ? `SN: ${asset.serial_number}` : asset.asset_model || undefined,
+                description: asset.asset_model ? `Model: ${asset.asset_model}` : asset.serial_number ? `SN: ${asset.serial_number}` : undefined,
                 href: `/admin/assets?assetId=${asset.id}`,
                 metadata: { ...asset, related_user: profile.id },
               })
@@ -168,32 +138,11 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Search Devices
-    const { data: devices } = await supabase
-      .from("devices")
-      .select("id, device_name, device_type, device_model, serial_number, status")
-      .or(`device_name.ilike.%${searchQuery}%,device_type.ilike.%${searchQuery}%,device_model.ilike.%${searchQuery}%,serial_number.ilike.%${searchQuery}%`)
-      .limit(5)
-
-    if (devices) {
-      devices.forEach((device) => {
-        results.push({
-          id: device.id,
-          type: "device",
-          title: device.device_name || device.device_type || "Device",
-          subtitle: device.device_model || device.device_type || undefined,
-          description: device.serial_number ? `SN: ${device.serial_number}` : device.status || undefined,
-          href: `/admin/devices?deviceId=${device.id}`,
-          metadata: device,
-        })
-      })
-    }
-
-    // Search Assets
+    // Search Assets (including unique_code)
     const { data: assets } = await supabase
       .from("assets")
-      .select("id, asset_name, asset_type, asset_model, serial_number, status")
-      .or(`asset_name.ilike.%${searchQuery}%,asset_type.ilike.%${searchQuery}%,asset_model.ilike.%${searchQuery}%,serial_number.ilike.%${searchQuery}%`)
+      .select("id, unique_code, asset_type, asset_model, serial_number, status, acquisition_year")
+      .or(`unique_code.ilike.%${searchQuery}%,asset_type.ilike.%${searchQuery}%,asset_model.ilike.%${searchQuery}%,serial_number.ilike.%${searchQuery}%`)
       .limit(5)
 
     if (assets) {
@@ -201,9 +150,9 @@ export async function GET(request: NextRequest) {
         results.push({
           id: asset.id,
           type: "asset",
-          title: asset.asset_name || asset.asset_type || "Asset",
-          subtitle: asset.asset_model || asset.asset_type || undefined,
-          description: asset.serial_number ? `SN: ${asset.serial_number}` : asset.status || undefined,
+          title: asset.unique_code || "Asset",
+          subtitle: asset.asset_type || undefined,
+          description: asset.asset_model ? `Model: ${asset.asset_model}` : asset.serial_number ? `SN: ${asset.serial_number}` : asset.status || undefined,
           href: `/admin/assets?assetId=${asset.id}`,
           metadata: asset,
         })

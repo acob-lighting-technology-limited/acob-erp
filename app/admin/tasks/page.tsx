@@ -855,7 +855,7 @@ export default function AdminTasksPage() {
                         )}
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1 sm:gap-2 flex-wrap">
+                        <div className="flex items-center justify-end gap-1 sm:gap-2 ">
                           <Button
                             variant="outline"
                             size="sm"

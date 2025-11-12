@@ -14,6 +14,7 @@ interface SearchableSelectProps {
   searchPlaceholder?: string
   icon?: React.ReactNode
   className?: string
+  disabled?: boolean
 }
 
 export function SearchableSelect({
@@ -24,6 +25,7 @@ export function SearchableSelect({
   searchPlaceholder = "Search...",
   icon,
   className,
+  disabled = false,
 }: SearchableSelectProps) {
   const [searchQuery, setSearchQuery] = React.useState("")
   const [open, setOpen] = React.useState(false)
@@ -38,12 +40,13 @@ export function SearchableSelect({
   const selectedOption = options.find((opt) => opt.value === value)
 
   return (
-    <SelectPrimitive.Root value={value} onValueChange={onValueChange} open={open} onOpenChange={setOpen}>
+    <SelectPrimitive.Root value={value} onValueChange={onValueChange} open={open} onOpenChange={setOpen} disabled={disabled}>
       <SelectPrimitive.Trigger
         className={cn(
           "flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background data-[placeholder]:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1",
           className
         )}
+        disabled={disabled}
       >
         <div className="flex items-center gap-2 flex-1 min-w-0">
           {icon && <span className="flex-shrink-0">{icon}</span>}
