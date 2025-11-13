@@ -167,12 +167,15 @@ export default function AdminAssetsPage() {
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null)
   const [assetToDelete, setAssetToDelete] = useState<Asset | null>(null)
   const [isAssigning, setIsAssigning] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
   const [assetHistory, setAssetHistory] = useState<AssignmentHistory[]>([])
 
   // Issue tracking states
   const [assetIssues, setAssetIssues] = useState<AssetIssue[]>([])
   const [newIssueDescription, setNewIssueDescription] = useState("")
   const [issueStatusFilter, setIssueStatusFilter] = useState("all")
+  const [isAddingIssue, setIsAddingIssue] = useState(false)
 
   // Track original form values for change detection
   const [originalAssetForm, setOriginalAssetForm] = useState({
@@ -470,13 +473,17 @@ export default function AdminAssetsPage() {
   }
 
   const handleAddIssue = async () => {
-    if (!newIssueDescription.trim() || !selectedAsset) return
+    if (!newIssueDescription.trim() || !selectedAsset || isAddingIssue) return
 
+    setIsAddingIssue(true)
     try {
       const {
         data: { user },
       } = await supabase.auth.getUser()
-      if (!user) return
+      if (!user) {
+        setIsAddingIssue(false)
+        return
+      }
 
       const { error } = await supabase.from("asset_issues").insert({
         asset_id: selectedAsset.id,
@@ -493,6 +500,8 @@ export default function AdminAssetsPage() {
     } catch (error: any) {
       console.error("Error adding issue:", error)
       toast.error("Failed to add issue")
+    } finally {
+      setIsAddingIssue(false)
     }
   }
 
@@ -608,15 +617,21 @@ export default function AdminAssetsPage() {
   }
 
   const handleSaveAsset = async () => {
+    if (isSaving) return // Prevent duplicate submissions
+    setIsSaving(true)
     try {
       const {
         data: { user },
       } = await supabase.auth.getUser()
-      if (!user) return
+      if (!user) {
+        setIsSaving(false)
+        return
+      }
 
       // Validate required fields
       if (!assetForm.asset_type) {
         toast.error("Please select an asset type")
+        setIsSaving(false)
         return
       }
 
@@ -695,6 +710,7 @@ export default function AdminAssetsPage() {
               `Latest ${assetTypeName} was acquired in ${latestAsset.acquisition_year}. ` +
               `New assets must be from year ${latestAsset.acquisition_year} or later.`
           )
+          setIsSaving(false)
           return
         }
 
@@ -796,6 +812,8 @@ export default function AdminAssetsPage() {
       console.error("Error saving asset:", error)
       const errorMessage = error?.message || error?.toString() || "Failed to save asset"
       toast.error(`Failed to save asset: ${errorMessage}`)
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -915,13 +933,21 @@ export default function AdminAssetsPage() {
   }
 
   const handleDeleteAsset = async () => {
+    if (isDeleting) return // Prevent duplicate submissions
+    setIsDeleting(true)
     try {
-      if (!assetToDelete) return
+      if (!assetToDelete) {
+        setIsDeleting(false)
+        return
+      }
 
       const {
         data: { user },
       } = await supabase.auth.getUser()
-      if (!user) return
+      if (!user) {
+        setIsDeleting(false)
+        return
+      }
 
       // Only check for active assignments if the asset status is "assigned"
       if (assetToDelete.status === "assigned") {
@@ -933,6 +959,7 @@ export default function AdminAssetsPage() {
 
         if (assignments && assignments.length > 0) {
           toast.error("Cannot delete asset with active assignments. Please change the status first.")
+          setIsDeleting(false)
           return
         }
       }
@@ -972,6 +999,7 @@ export default function AdminAssetsPage() {
                 `Higher-numbered ${assetTypeName} assets exist (serial number ${currentSerialNumber + 1} or higher). ` +
                 `Delete assets in reverse order (highest number first) to maintain sequential numbering.`
             )
+            setIsDeleting(false)
             return
           }
         }
@@ -997,6 +1025,8 @@ export default function AdminAssetsPage() {
       console.error("Error deleting asset:", error)
       const errorMessage = error?.message || error?.toString() || "Failed to delete asset"
       toast.error(`Failed to delete asset: ${errorMessage}`)
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -2393,6 +2423,7 @@ export default function AdminAssetsPage() {
             </Button>
             <Button
               onClick={handleSaveAsset}
+              loading={isSaving}
               disabled={
                 // For both create and edit: asset_type is required
                 !assetForm.asset_type ||
@@ -2566,14 +2597,14 @@ export default function AdminAssetsPage() {
             </Button>
             <Button
               onClick={handleAssignAsset}
+              loading={isAssigning}
               disabled={
-                isAssigning ||
                 (assignForm.assignment_type === "individual" && !assignForm.assigned_to) ||
                 (assignForm.assignment_type === "department" && !assignForm.department) ||
                 (assignForm.assignment_type === "office" && !assignForm.office_location)
               }
             >
-              {isAssigning ? "Processing..." : currentAssignment ? "Reassign Asset" : "Assign Asset"}
+              {currentAssignment ? "Reassign Asset" : "Assign Asset"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -2590,10 +2621,12 @@ export default function AdminAssetsPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setAssetToDelete(null)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteAsset} className="bg-red-600 hover:bg-red-700">
+            <AlertDialogCancel onClick={() => setAssetToDelete(null)} disabled={isDeleting}>
+              Cancel
+            </AlertDialogCancel>
+            <Button onClick={handleDeleteAsset} loading={isDeleting} className="bg-red-600 text-white hover:bg-red-700">
               Delete
-            </AlertDialogAction>
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -2752,7 +2785,12 @@ export default function AdminAssetsPage() {
                     }
                   }}
                 />
-                <Button onClick={handleAddIssue} disabled={!newIssueDescription.trim()} size="sm">
+                <Button
+                  onClick={handleAddIssue}
+                  loading={isAddingIssue}
+                  disabled={!newIssueDescription.trim()}
+                  size="sm"
+                >
                   <Plus className="mr-1 h-4 w-4" />
                   Add
                 </Button>

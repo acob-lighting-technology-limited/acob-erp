@@ -186,8 +186,8 @@ export default function LoginPage() {
                         {error && (
                           <p className="rounded-md bg-red-50 p-3 text-sm text-red-500 dark:bg-red-950/30">{error}</p>
                         )}
-                        <Button type="submit" className="h-11 w-full text-base font-semibold" disabled={isLoading}>
-                          {isLoading ? "Logging in..." : "Login with Password"}
+                        <Button type="submit" className="h-11 w-full text-base font-semibold" loading={isLoading}>
+                          Login with Password
                         </Button>
                       </div>
                     </form>
@@ -212,8 +212,8 @@ export default function LoginPage() {
                         {error && (
                           <p className="rounded-md bg-red-50 p-3 text-sm text-red-500 dark:bg-red-950/30">{error}</p>
                         )}
-                        <Button type="submit" className="h-11 w-full text-base font-semibold" disabled={isLoading}>
-                          {isLoading ? "Sending OTP..." : "Request OTP"}
+                        <Button type="submit" className="h-11 w-full text-base font-semibold" loading={isLoading}>
+                          Request OTP
                         </Button>
                       </div>
                     </form>

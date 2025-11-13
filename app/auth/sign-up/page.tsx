@@ -225,8 +225,8 @@ export default function SignUpPage() {
                   </div>
 
                   {error && <p className="rounded-md bg-red-50 p-3 text-sm text-red-500 dark:bg-red-950/30">{error}</p>}
-                  <Button type="submit" className="mt-2 h-12 w-full text-base font-semibold" disabled={isLoading}>
-                    {isLoading ? "Creating account..." : "Create Account"}
+                  <Button type="submit" className="mt-2 h-12 w-full text-base font-semibold" loading={isLoading}>
+                    Create Account
                   </Button>
                 </div>
                 <div className="mt-6 text-center">
