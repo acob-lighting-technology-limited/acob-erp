@@ -90,6 +90,7 @@ export default function AdminProjectsPage() {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null)
   const [isSaving, setIsSaving] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   // Form states
   const [projectForm, setProjectForm] = useState({
@@ -302,8 +303,9 @@ export default function AdminProjectsPage() {
   }
 
   const handleDeleteProject = async () => {
-    if (!projectToDelete) return
+    if (!projectToDelete || isDeleting) return
 
+    setIsDeleting(true)
     try {
       console.log("🗑️ Deleting project:", projectToDelete.id)
 
@@ -328,6 +330,8 @@ export default function AdminProjectsPage() {
       console.error("❌ Error deleting project:", error)
       console.error("Error details:", JSON.stringify(error, null, 2))
       toast.error(`Failed to delete project: ${error instanceof Error ? error.message : "Unknown error"}`)
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -705,8 +709,8 @@ export default function AdminProjectsPage() {
             <Button variant="outline" onClick={() => setIsProjectDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSaveProject} disabled={isSaving}>
-              {isSaving ? "Saving..." : selectedProject ? "Update" : "Create"}
+            <Button onClick={handleSaveProject} loading={isSaving}>
+              {selectedProject ? "Update" : "Create"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -722,10 +726,16 @@ export default function AdminProjectsPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setProjectToDelete(null)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteProject} className="bg-red-600 hover:bg-red-700">
+            <AlertDialogCancel onClick={() => setProjectToDelete(null)} disabled={isDeleting}>
+              Cancel
+            </AlertDialogCancel>
+            <Button
+              onClick={handleDeleteProject}
+              loading={isDeleting}
+              className="bg-red-600 text-white hover:bg-red-700"
+            >
               Delete
-            </AlertDialogAction>
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

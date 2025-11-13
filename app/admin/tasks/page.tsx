@@ -20,7 +20,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { SearchableSelect } from "@/components/ui/searchable-select"
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -118,6 +117,8 @@ export default function AdminTasksPage() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   // Form states
   const [taskForm, setTaskForm] = useState({
@@ -332,23 +333,31 @@ export default function AdminTasksPage() {
   }
 
   const handleSaveTask = async () => {
+    if (isSaving) return
+    setIsSaving(true)
     try {
       const {
         data: { user },
       } = await supabase.auth.getUser()
-      if (!user) return
+      if (!user) {
+        setIsSaving(false)
+        return
+      }
 
       // Validate based on assignment type
       if (taskForm.assignment_type === "individual" && !taskForm.assigned_to) {
         toast.error("Please select a staff member for individual assignment")
+        setIsSaving(false)
         return
       }
       if (taskForm.assignment_type === "multiple" && taskForm.assigned_users.length === 0) {
         toast.error("Please select at least one staff member for multiple assignment")
+        setIsSaving(false)
         return
       }
       if (taskForm.assignment_type === "department" && !taskForm.department) {
         toast.error("Please select a department for department assignment")
+        setIsSaving(false)
         return
       }
 
@@ -455,13 +464,15 @@ export default function AdminTasksPage() {
     } catch (error: any) {
       console.error("Error saving task:", error)
       toast.error(`Failed to save task: ${error.message || "Unknown error"}`)
+    } finally {
+      setIsSaving(false)
     }
   }
 
   const handleDeleteTask = async () => {
+    if (!taskToDelete || isDeleting) return
+    setIsDeleting(true)
     try {
-      if (!taskToDelete) return
-
       const {
         data: { user },
       } = await supabase.auth.getUser()
@@ -486,6 +497,8 @@ export default function AdminTasksPage() {
     } catch (error) {
       console.error("Error deleting task:", error)
       toast.error("Failed to delete task")
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -1260,6 +1273,7 @@ export default function AdminTasksPage() {
             </Button>
             <Button
               onClick={handleSaveTask}
+              loading={isSaving}
               disabled={
                 !taskForm.title ||
                 (taskForm.assignment_type === "individual" && !taskForm.assigned_to) ||
@@ -1283,10 +1297,12 @@ export default function AdminTasksPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setTaskToDelete(null)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteTask} className="bg-red-600 hover:bg-red-700">
+            <AlertDialogCancel onClick={() => setTaskToDelete(null)} disabled={isDeleting}>
+              Cancel
+            </AlertDialogCancel>
+            <Button onClick={handleDeleteTask} loading={isDeleting} className="bg-red-600 text-white hover:bg-red-700">
               Delete
-            </AlertDialogAction>
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

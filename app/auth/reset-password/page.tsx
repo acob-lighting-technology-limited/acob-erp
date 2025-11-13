@@ -165,8 +165,8 @@ export default function ResetPasswordPage() {
                       </div>
                     )}
 
-                    <Button type="submit" className="h-11 w-full text-base font-semibold" disabled={isLoading}>
-                      {isLoading ? "Resetting Password..." : "Reset Password"}
+                    <Button type="submit" className="h-11 w-full text-base font-semibold" loading={isLoading}>
+                      Reset Password
                     </Button>
 
                     <Link href="/auth/login" className="block">

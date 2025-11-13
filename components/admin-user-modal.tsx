@@ -179,8 +179,8 @@ export function AdminUserModal({ user, onClose, onSave }: AdminUserModalProps) {
           </div>
 
           <div className="flex gap-2 pt-4">
-            <Button onClick={handleSave} disabled={isLoading} className="flex-1">
-              {isLoading ? "Saving..." : "Save Changes"}
+            <Button onClick={handleSave} loading={isLoading} className="flex-1">
+              Save Changes
             </Button>
             <Button onClick={onClose} variant="outline" className="flex-1 bg-transparent">
               Cancel

@@ -85,6 +85,7 @@ export default function AdminStaffPage() {
   const [nameSortOrder, setNameSortOrder] = useState<"asc" | "desc">("asc")
   const [viewMode, setViewMode] = useState<"list" | "card">("list")
   const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isSignatureDialogOpen, setIsSignatureDialogOpen] = useState(false)
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
@@ -236,18 +237,25 @@ export default function AdminStaffPage() {
   }
 
   const handleSaveStaff = async () => {
+    if (isSaving) return // Prevent duplicate submissions
+    setIsSaving(true)
     try {
-      if (!selectedStaff) return
+      if (!selectedStaff) {
+        setIsSaving(false)
+        return
+      }
 
       // Check if user can assign this role
       if (userProfile && !canAssignRoles(userProfile.role, editForm.role)) {
         toast.error("You don't have permission to assign this role")
+        setIsSaving(false)
         return
       }
 
       // Validate: If role is lead, at least one department must be selected
       if (editForm.role === "lead" && editForm.lead_departments.length === 0) {
         toast.error("Please select at least one department for this lead")
+        setIsSaving(false)
         return
       }
 
@@ -274,6 +282,8 @@ export default function AdminStaffPage() {
     } catch (error: any) {
       console.error("Error updating staff:", error)
       toast.error("Failed to update staff member")
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -1170,10 +1180,12 @@ export default function AdminStaffPage() {
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)} disabled={isSaving}>
               Cancel
             </Button>
-            <Button onClick={handleSaveStaff}>Save Changes</Button>
+            <Button onClick={handleSaveStaff} loading={isSaving}>
+              Save Changes
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -130,8 +130,8 @@ export function FeedbackForm({ userId, onFeedbackSubmitted }: FeedbackFormProps)
             />
           </div>
 
-          <Button type="submit" disabled={isLoading} className="w-full">
-            {isLoading ? "Submitting..." : "Submit Feedback"}
+          <Button type="submit" loading={isLoading} className="w-full">
+            Submit Feedback
           </Button>
         </form>
       </CardContent>

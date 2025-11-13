@@ -441,8 +441,8 @@ export function ProfileForm({ user, profile }: ProfileFormProps) {
 
             {/* Action Buttons */}
             <div className="flex gap-4 border-t pt-6">
-              <Button type="submit" disabled={isLoading}>
-                {isLoading ? "Saving..." : "Save Changes"}
+              <Button type="submit" loading={isLoading}>
+                Save Changes
               </Button>
               <Link href="/dashboard">
                 <Button variant="outline">Back to Dashboard</Button>

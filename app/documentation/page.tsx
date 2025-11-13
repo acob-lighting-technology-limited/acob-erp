@@ -505,13 +505,13 @@ export default function DocumentationPage() {
             <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={isSaving}>
               Cancel
             </Button>
-            <Button variant="outline" onClick={() => handleSave(true)} disabled={isSaving} className="gap-2">
+            <Button variant="outline" onClick={() => handleSave(true)} loading={isSaving} className="gap-2">
               <EyeOff className="h-4 w-4" />
               Save as Draft
             </Button>
-            <Button onClick={() => handleSave(false)} disabled={isSaving} className="gap-2">
+            <Button onClick={() => handleSave(false)} loading={isSaving} className="gap-2">
               <Save className="h-4 w-4" />
-              {isSaving ? "Saving..." : "Publish"}
+              Publish
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -528,9 +528,9 @@ export default function DocumentationPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isSaving}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} disabled={isSaving} className="bg-red-600 hover:bg-red-700">
-              {isSaving ? "Deleting..." : "Delete"}
-            </AlertDialogAction>
+            <Button onClick={handleDelete} loading={isSaving} className="bg-red-600 text-white hover:bg-red-700">
+              Delete
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

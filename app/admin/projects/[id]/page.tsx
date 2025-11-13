@@ -20,7 +20,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { SearchableSelect } from "@/components/ui/searchable-select"
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -105,6 +104,12 @@ export default function AdminProjectDetailPage() {
   // Delete dialogs
   const [memberToDelete, setMemberToDelete] = useState<ProjectMember | null>(null)
   const [itemToDelete, setItemToDelete] = useState<ProjectItem | null>(null)
+
+  // Loading states
+  const [isAddingMember, setIsAddingMember] = useState(false)
+  const [isRemovingMember, setIsRemovingMember] = useState(false)
+  const [isSavingItem, setIsSavingItem] = useState(false)
+  const [isDeletingItem, setIsDeletingItem] = useState(false)
 
   const supabase = createClient()
 
@@ -206,6 +211,7 @@ export default function AdminProjectDetailPage() {
   }
 
   const handleAddMember = async () => {
+    if (isAddingMember) return // Prevent duplicate submissions
     if (!memberForm.user_id) {
       toast.error("Please select a staff member")
       return
@@ -217,6 +223,7 @@ export default function AdminProjectDetailPage() {
       return
     }
 
+    setIsAddingMember(true)
     try {
       const {
         data: { user },
@@ -247,12 +254,15 @@ export default function AdminProjectDetailPage() {
     } catch (error) {
       console.error("Error adding member:", error)
       toast.error("Failed to add member")
+    } finally {
+      setIsAddingMember(false)
     }
   }
 
   const handleRemoveMember = async () => {
-    if (!memberToDelete) return
+    if (!memberToDelete || isRemovingMember) return
 
+    setIsRemovingMember(true)
     try {
       const { error } = await supabase
         .from("project_members")
@@ -279,6 +289,8 @@ export default function AdminProjectDetailPage() {
     } catch (error) {
       console.error("Error removing member:", error)
       toast.error("Failed to remove member")
+    } finally {
+      setIsRemovingMember(false)
     }
   }
 
@@ -308,11 +320,13 @@ export default function AdminProjectDetailPage() {
   }
 
   const handleSaveItem = async () => {
+    if (isSavingItem) return // Prevent duplicate submissions
     if (!itemForm.item_name) {
       toast.error("Please enter item name")
       return
     }
 
+    setIsSavingItem(true)
     try {
       const {
         data: { user },
@@ -349,12 +363,15 @@ export default function AdminProjectDetailPage() {
     } catch (error) {
       console.error("Error saving item:", error)
       toast.error("Failed to save item")
+    } finally {
+      setIsSavingItem(false)
     }
   }
 
   const handleDeleteItem = async () => {
-    if (!itemToDelete) return
+    if (!itemToDelete || isDeletingItem) return
 
+    setIsDeletingItem(true)
     try {
       const { error } = await supabase.from("project_items").delete().eq("id", itemToDelete.id)
 
@@ -366,6 +383,8 @@ export default function AdminProjectDetailPage() {
     } catch (error) {
       console.error("Error deleting item:", error)
       toast.error("Failed to delete item")
+    } finally {
+      setIsDeletingItem(false)
     }
   }
 
@@ -577,10 +596,12 @@ export default function AdminProjectDetailPage() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsMemberDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setIsMemberDialogOpen(false)} disabled={isAddingMember}>
               Cancel
             </Button>
-            <Button onClick={handleAddMember}>Add Member</Button>
+            <Button onClick={handleAddMember} loading={isAddingMember}>
+              Add Member
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -667,10 +688,12 @@ export default function AdminProjectDetailPage() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsItemDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setIsItemDialogOpen(false)} disabled={isSavingItem}>
               Cancel
             </Button>
-            <Button onClick={handleSaveItem}>{selectedItem ? "Update" : "Add"}</Button>
+            <Button onClick={handleSaveItem} loading={isSavingItem}>
+              {selectedItem ? "Update" : "Add"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -687,10 +710,14 @@ export default function AdminProjectDetailPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleRemoveMember} className="bg-red-600 hover:bg-red-700">
+            <AlertDialogCancel disabled={isRemovingMember}>Cancel</AlertDialogCancel>
+            <Button
+              onClick={handleRemoveMember}
+              loading={isRemovingMember}
+              className="bg-red-600 text-white hover:bg-red-700"
+            >
               Remove
-            </AlertDialogAction>
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -705,10 +732,14 @@ export default function AdminProjectDetailPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteItem} className="bg-red-600 hover:bg-red-700">
+            <AlertDialogCancel disabled={isDeletingItem}>Cancel</AlertDialogCancel>
+            <Button
+              onClick={handleDeleteItem}
+              loading={isDeletingItem}
+              className="bg-red-600 text-white hover:bg-red-700"
+            >
               Delete
-            </AlertDialogAction>
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

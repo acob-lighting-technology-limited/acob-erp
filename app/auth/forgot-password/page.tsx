@@ -102,8 +102,8 @@ export default function ForgotPasswordPage() {
                       </p>
                     </div>
 
-                    <Button type="submit" className="h-11 w-full text-base font-semibold" disabled={isLoading}>
-                      {isLoading ? "Sending..." : "Send Reset Link"}
+                    <Button type="submit" className="h-11 w-full text-base font-semibold" loading={isLoading}>
+                      Send Reset Link
                     </Button>
 
                     <Link href="/auth/login" className="block">
