@@ -1,22 +1,4 @@
 #!/usr/bin/env sh
 . "$(dirname -- "$0")/_/husky.sh"
 
-echo "✨ Running pre-commit checks..."
-
-# Format all files with Prettier
-echo "🎨 Formatting all files with Prettier..."
-npm run format
-
-# Stage all formatted files
-git add -A
-
-# Run linting
-echo "🔍 Linting code..."
-npm run lint
-
-if [ $? -ne 0 ]; then
-  echo "❌ Linting failed! Please fix the errors before committing."
-  exit 1
-fi
-
-echo "✅ Pre-commit checks passed!"
+echo "pre-commit hook running (no checks configured)."

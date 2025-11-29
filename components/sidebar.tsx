@@ -24,11 +24,12 @@ import {
   FolderKanban,
 } from "lucide-react"
 import Image from "next/image"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { useSidebar } from "./sidebar-context"
+import { motion, AnimatePresence } from "framer-motion"
 
 interface SidebarProps {
   user?: {
@@ -61,11 +62,38 @@ const navigation = [
   { name: "Watermark", href: "/watermark", icon: Droplet },
 ]
 
+const adminNavigation = [
+  { name: "Admin Dashboard", href: "/admin", icon: ShieldCheck },
+]
+
 export function Sidebar({ user, profile, isAdmin }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const { isCollapsed, setIsCollapsed } = useSidebar()
+
+  // Listen for toggle event from navbar
+  useEffect(() => {
+    const handleToggle = (e: Event) => {
+      e.preventDefault()
+      e.stopPropagation()
+      setIsMobileMenuOpen((prev) => !prev)
+    }
+    window.addEventListener('toggle-mobile-sidebar', handleToggle)
+    document.addEventListener('toggle-mobile-sidebar', handleToggle)
+    return () => {
+      window.removeEventListener('toggle-mobile-sidebar', handleToggle)
+      document.removeEventListener('toggle-mobile-sidebar', handleToggle)
+    }
+  }, [])
+
+  // Notify navbar of sidebar state changes
+  useEffect(() => {
+    const event = new CustomEvent('sidebar-state-change', {
+      detail: { isOpen: isMobileMenuOpen }
+    })
+    window.dispatchEvent(event)
+  }, [isMobileMenuOpen])
 
   const getInitials = (email?: string, firstName?: string, lastName?: string): string => {
     if (firstName && lastName) {
@@ -93,43 +121,111 @@ export function Sidebar({ user, profile, isAdmin }: SidebarProps) {
   const SidebarContent = () => (
     <>
       {/* Empty space for logo (moved to navbar) */}
-      <div className={cn("", isCollapsed ? "px-2 py-8" : "px-6 py-8")}>{/* Logo space maintained but empty */}</div>
+      <div className={cn("transition-[padding] duration-300 ease-in-out", isCollapsed ? "px-2 py-2" : "px-3 py-2")}>{/* Logo space maintained but empty */}</div>
+
+      {/* Admin Dashboard Indicator */}
+      {pathname?.startsWith("/admin") && (
+        <div className={cn("bg-primary/10 border-primary/20 mx-2 mb-2 rounded-lg border p-1.5 transition-[padding] duration-300 ease-in-out", isCollapsed ? "px-1.5" : "px-2")}>
+          <div className="flex items-center gap-1.5">
+            <ShieldCheck className="text-primary h-3.5 w-3.5 flex-shrink-0" />
+            <AnimatePresence mode="wait">
+              {!isCollapsed && (
+                <motion.span
+                  initial={{ width: 0, opacity: 0 }}
+                  animate={{ width: "auto", opacity: 1 }}
+                  exit={{ width: 0, opacity: 0 }}
+                  transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                  className="text-primary text-xs font-semibold whitespace-nowrap overflow-hidden"
+                >
+                  Admin Mode
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
+      )}
 
       {/* User Profile Section */}
-      <div className={cn("border-b py-6 transition-all duration-300", isCollapsed ? "mx-auto" : "px-6")}>
-        <div className="flex items-center gap-3">
-          <Avatar className={cn("ring-primary/10 h-12 w-12 flex-shrink-0 ring-2 transition-all duration-300")}>
-            <AvatarFallback className="bg-primary text-primary-foreground text-lg font-semibold">
+      <div className={cn("border-b py-2.5 transition-[padding,margin] duration-300 ease-in-out", isCollapsed ? "mx-auto" : "px-3")}>
+        <div className="flex items-center gap-2.5">
+          <Avatar className={cn("ring-primary/10 h-9 w-9 flex-shrink-0 ring-2")}>
+            <AvatarFallback className="bg-primary text-primary-foreground text-sm font-semibold">
               {getInitials(user?.email, profile?.first_name, profile?.last_name)}
             </AvatarFallback>
           </Avatar>
-          <div
-            className={cn(
-              "overflow-hidden transition-all duration-300",
-              isCollapsed ? "w-0 max-w-0 opacity-0" : "w-auto max-w-full min-w-0 flex-1 opacity-100"
+          <AnimatePresence mode="wait">
+            {!isCollapsed && (
+              <motion.div
+                initial={{ width: 0, opacity: 0 }}
+                animate={{ width: "auto", opacity: 1 }}
+                exit={{ width: 0, opacity: 0 }}
+                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                className="overflow-hidden min-w-0 flex-1"
+              >
+                <p className="text-foreground truncate text-sm font-semibold whitespace-nowrap">
+                  {profile?.first_name && profile?.last_name
+                    ? `${formatName(profile.first_name)} ${formatName(profile.last_name)}`
+                    : user?.email?.split("@")[0]}
+                </p>
+                <p className="text-muted-foreground truncate text-xs whitespace-nowrap">
+                  {profile?.department || "Staff Member"}
+                </p>
+              </motion.div>
             )}
-          >
-            <div
-              className={cn(
-                "overflow-hidden transition-all duration-300",
-                isCollapsed ? "max-h-0 opacity-0" : "max-h-20 opacity-100"
-              )}
-            >
-              <p className="text-foreground truncate text-sm font-semibold whitespace-nowrap">
-                {profile?.first_name && profile?.last_name
-                  ? `${formatName(profile.first_name)} ${formatName(profile.last_name)}`
-                  : user?.email?.split("@")[0]}
-              </p>
-              <p className="text-muted-foreground truncate text-xs whitespace-nowrap">
-                {profile?.department || "Staff Member"}
-              </p>
-            </div>
-          </div>
+          </AnimatePresence>
         </div>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 space-y-1 px-4 py-6">
+      <nav className="scrollbar-custom flex-1 space-y-0.5 overflow-y-auto px-2.5 py-3">
+        {/* Admin Dashboard - Show at top if user has admin access */}
+        {(isAdmin || profile?.role === "lead" || profile?.role === "admin" || profile?.role === "super_admin") && (
+          <>
+            {adminNavigation.map((item) => {
+              const isActive = pathname?.startsWith(item.href)
+              return (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className={cn(
+                    "flex items-center rounded-md transition-[padding,gap,background-color,color] duration-300 ease-in-out",
+                    isCollapsed ? "justify-center px-2.5 py-2" : "gap-2.5 px-3 py-2",
+                    "min-h-[36px] text-sm font-medium",
+                    isActive
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                  )}
+                  title={isCollapsed ? item.name : undefined}
+                >
+                  <item.icon className="h-4 w-4 flex-shrink-0" />
+                  <AnimatePresence mode="wait">
+                    {!isCollapsed && (
+                      <motion.span
+                        initial={{ width: 0, opacity: 0 }}
+                        animate={{ width: "auto", opacity: 1 }}
+                        exit={{ width: 0, opacity: 0 }}
+                        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                        className="overflow-hidden whitespace-nowrap"
+                      >
+                        {item.name}
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
+                </Link>
+              )
+            })}
+            {/* Divider after admin section */}
+            <div
+              className={cn(
+                "my-1.5 border-t transition-[margin] duration-300 ease-in-out",
+                isCollapsed ? "mx-1.5" : "mx-0"
+              )}
+            />
+          </>
+        )}
+
+        {/* Regular Navigation */}
         {navigation.map((item) => {
           const isActive = pathname === item.href
           return (
@@ -138,87 +234,59 @@ export function Sidebar({ user, profile, isAdmin }: SidebarProps) {
               href={item.href}
               onClick={() => setIsMobileMenuOpen(false)}
               className={cn(
-                "flex items-center rounded-lg transition-all duration-300",
-                isCollapsed ? "justify-center px-3 py-3" : "gap-3 px-4 py-3",
-                "min-h-[44px] text-sm font-medium",
+                "flex items-center rounded-md transition-[padding,gap,background-color,color] duration-300 ease-in-out",
+                isCollapsed ? "justify-center px-2.5 py-2" : "gap-2.5 px-3 py-2",
+                "min-h-[36px] text-sm font-medium",
                 isActive
                   ? "bg-primary text-primary-foreground shadow-sm"
                   : "text-muted-foreground hover:bg-accent hover:text-foreground"
               )}
               title={isCollapsed ? item.name : undefined}
             >
-              <item.icon className="h-5 w-5 flex-shrink-0" />
-              <span
-                className={cn(
-                  "overflow-hidden whitespace-nowrap transition-all duration-300",
-                  isCollapsed ? "w-0 opacity-0" : "ml-0 w-auto opacity-100"
+              <item.icon className="h-4 w-4 flex-shrink-0" />
+              <AnimatePresence mode="wait">
+                {!isCollapsed && (
+                  <motion.span
+                    initial={{ width: 0, opacity: 0 }}
+                    animate={{ width: "auto", opacity: 1 }}
+                    exit={{ width: 0, opacity: 0 }}
+                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                    className="overflow-hidden whitespace-nowrap"
+                  >
+                    {item.name}
+                  </motion.span>
                 )}
-              >
-                {item.name}
-              </span>
+              </AnimatePresence>
             </Link>
           )
         })}
-
-        {(isAdmin || profile?.role === "lead" || profile?.role === "admin" || profile?.role === "super_admin") && (
-          <>
-            <div
-              className={cn(
-                "overflow-hidden transition-all duration-300",
-                isCollapsed ? "h-0 opacity-0" : "h-auto opacity-100"
-              )}
-            >
-              <div className="pt-4 pb-2">
-                <p className="text-muted-foreground px-4 text-xs font-semibold tracking-wider uppercase">Admin</p>
-              </div>
-            </div>
-            <Link
-              href="/admin"
-              onClick={() => setIsMobileMenuOpen(false)}
-              className={cn(
-                "flex min-h-[44px] items-center rounded-lg transition-all duration-300",
-                isCollapsed ? "justify-center px-3 py-3" : "gap-3 px-4 py-3",
-                "text-sm font-medium",
-                pathname === "/admin"
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
-              )}
-              title={isCollapsed ? "Admin Dashboard" : undefined}
-            >
-              <ShieldCheck className="h-5 w-5 flex-shrink-0" />
-              <span
-                className={cn(
-                  "overflow-hidden whitespace-nowrap transition-all duration-300",
-                  isCollapsed ? "w-0 opacity-0" : "ml-0 w-auto opacity-100"
-                )}
-              >
-                Admin Dashboard
-              </span>
-            </Link>
-          </>
-        )}
       </nav>
 
       {/* Logout Button */}
-      <div className="border-t px-4 py-4">
+      <div className="border-t px-2.5 py-2.5">
         <Button
           variant="outline"
           className={cn(
-            "text-muted-foreground hover:text-foreground min-h-[44px] w-full transition-all duration-300",
-            isCollapsed ? "justify-center px-3" : "justify-start gap-3"
+            "text-muted-foreground hover:text-foreground min-h-[36px] w-full transition-[padding,gap] duration-300 ease-in-out text-sm",
+            isCollapsed ? "justify-center px-2.5" : "justify-start gap-2.5"
           )}
           onClick={handleLogout}
           title={isCollapsed ? "Logout" : undefined}
         >
-          <LogOut className="h-5 w-5 flex-shrink-0" />
-          <span
-            className={cn(
-              "overflow-hidden whitespace-nowrap transition-all duration-300",
-              isCollapsed ? "w-0 opacity-0" : "ml-0 w-auto opacity-100"
+          <LogOut className="h-4 w-4 flex-shrink-0" />
+          <AnimatePresence mode="wait">
+            {!isCollapsed && (
+              <motion.span
+                initial={{ width: 0, opacity: 0 }}
+                animate={{ width: "auto", opacity: 1 }}
+                exit={{ width: 0, opacity: 0 }}
+                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                className="overflow-hidden whitespace-nowrap"
+              >
+                Logout
+              </motion.span>
             )}
-          >
-            Logout
-          </span>
+          </AnimatePresence>
         </Button>
       </div>
     </>
@@ -227,52 +295,38 @@ export function Sidebar({ user, profile, isAdmin }: SidebarProps) {
   return (
     <>
       {/* Desktop Sidebar */}
-      <aside
-        className={cn(
-          "bg-card hidden border-r transition-all duration-300 lg:fixed lg:inset-y-0 lg:flex lg:flex-col",
-          isCollapsed ? "lg:w-20" : "lg:w-64"
-        )}
+      <motion.aside
+        initial={false}
+        animate={{
+          width: isCollapsed ? 80 : 256,
+        }}
+        transition={{
+          type: "spring",
+          stiffness: 300,
+          damping: 30,
+        }}
+        className="bg-card hidden border-r lg:fixed lg:top-16 lg:bottom-0 lg:flex lg:flex-col overflow-hidden"
       >
         <SidebarContent />
-      </aside>
+      </motion.aside>
 
-      {/* Mobile Header */}
-      <div className="bg-card fixed top-0 right-0 left-0 z-40 border-b lg:hidden">
-        <div className="flex items-center justify-between px-4 py-3">
-          <Image src="/acob-logo.webp" alt="ACOB Lighting" width={120} height={120} />
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="h-10 w-10"
-          >
-            {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-          </Button>
-        </div>
-      </div>
+      {/* Mobile Header - Hidden, using navbar instead */}
 
       {/* Mobile Sidebar */}
       <>
         <div
           className={cn(
-            "bg-background/80 fixed inset-0 z-40 backdrop-blur-sm transition-opacity duration-300 lg:hidden",
+            "bg-background/80 fixed inset-0 z-[55] backdrop-blur-sm transition-opacity duration-300 lg:hidden",
             isMobileMenuOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
           )}
           onClick={() => setIsMobileMenuOpen(false)}
         />
         <aside
           className={cn(
-            "bg-card fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r shadow-xl transition-transform duration-300 ease-out lg:hidden",
-            isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+            "bg-card fixed inset-y-0 right-0 z-[60] flex w-64 flex-col border-l shadow-xl transition-transform duration-300 ease-out lg:hidden",
+            isMobileMenuOpen ? "translate-x-0" : "translate-x-full"
           )}
         >
-          {/* Close button for mobile */}
-          <div className="flex items-center justify-between border-b px-4 py-3 lg:hidden">
-            <Image src="/acob-logo.webp" alt="ACOB Lighting" width={100} height={100} />
-            <Button variant="ghost" size="icon" onClick={() => setIsMobileMenuOpen(false)} className="h-8 w-8">
-              <X className="h-5 w-5" />
-            </Button>
-          </div>
           <SidebarContent />
         </aside>
       </>

@@ -22,13 +22,14 @@ import {
   FolderKanban,
 } from "lucide-react"
 import Image from "next/image"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { useSidebar } from "@/components/sidebar-context"
 import type { UserRole } from "@/types/database"
 import { getRoleDisplayName, getRoleBadgeColor } from "@/lib/permissions"
+import { motion, AnimatePresence } from "framer-motion"
 
 interface AdminSidebarProps {
   user?: {
@@ -66,6 +67,29 @@ export function AdminSidebar({ user, profile }: AdminSidebarProps) {
   const { isCollapsed } = useSidebar()
   const supabase = createClient()
 
+  // Listen for toggle event from navbar
+  useEffect(() => {
+    const handleToggle = (e: Event) => {
+      e.preventDefault()
+      e.stopPropagation()
+      setIsMobileMenuOpen((prev) => !prev)
+    }
+    window.addEventListener('toggle-mobile-sidebar', handleToggle)
+    document.addEventListener('toggle-mobile-sidebar', handleToggle)
+    return () => {
+      window.removeEventListener('toggle-mobile-sidebar', handleToggle)
+      document.removeEventListener('toggle-mobile-sidebar', handleToggle)
+    }
+  }, [])
+
+  // Notify navbar of sidebar state changes
+  useEffect(() => {
+    const event = new CustomEvent('sidebar-state-change', {
+      detail: { isOpen: isMobileMenuOpen }
+    })
+    window.dispatchEvent(event)
+  }, [isMobileMenuOpen])
+
   const getInitials = (email?: string, firstName?: string, lastName?: string): string => {
     if (firstName && lastName) {
       return (firstName[0] + lastName[0]).toUpperCase()
@@ -98,13 +122,13 @@ export function AdminSidebar({ user, profile }: AdminSidebarProps) {
   const SidebarContent = () => (
     <>
       {/* Empty space for logo (moved to navbar) */}
-      <div className={cn("", isCollapsed ? "px-2 py-8" : "px-6 py-8")}>{/* Logo space maintained but empty */}</div>
+      <div className={cn("transition-[padding] duration-300 ease-in-out", isCollapsed ? "px-2 py-2" : "px-3 py-2")}>{/* Logo space maintained but empty */}</div>
 
       {/* Admin Badge & User Profile - Fixed height container */}
       <div
         className={cn(
-          "flex min-h-[100px] flex-col border-b py-6 pt-10 transition-all duration-300",
-          isCollapsed ? "mx-0 items-center px-0" : "mx-6"
+          "flex min-h-[80px] flex-col border-b py-2.5 transition-[padding,margin] duration-300 ease-in-out",
+          isCollapsed ? "mx-0 items-center px-0" : "px-3"
         )}
       >
         {/* Admin Panel Badge - Commented out */}
@@ -120,68 +144,69 @@ export function AdminSidebar({ user, profile }: AdminSidebarProps) {
         {/* User Profile - Fixed height container */}
         <div
           className={cn(
-            "flex flex-shrink-0 items-center transition-all duration-300",
-            isCollapsed ? "justify-center" : "gap-3"
+            "flex flex-shrink-0 items-center transition-[gap] duration-300 ease-in-out",
+            isCollapsed ? "justify-center" : "gap-2.5"
           )}
         >
-          <Avatar className={cn("ring-primary/10 flex-shrink-0 ring-2 transition-all duration-300", "h-12 w-12")}>
-            <AvatarFallback className="bg-primary text-primary-foreground text-lg font-semibold">
+          <Avatar className={cn("ring-primary/10 flex-shrink-0 ring-2", "h-9 w-9")}>
+            <AvatarFallback className="bg-primary text-primary-foreground text-sm font-semibold">
               {getInitials(user?.email, profile?.first_name, profile?.last_name)}
             </AvatarFallback>
           </Avatar>
-          <div
-            className={cn(
-              "overflow-hidden transition-all duration-300",
-              isCollapsed ? "w-0 max-w-0 opacity-0" : "ml-0 w-auto max-w-full min-w-0 flex-1 opacity-100"
+          <AnimatePresence mode="wait">
+            {!isCollapsed && (
+              <motion.div
+                initial={{ width: 0, opacity: 0 }}
+                animate={{ width: "auto", opacity: 1 }}
+                exit={{ width: 0, opacity: 0 }}
+                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                className="overflow-hidden min-w-0 flex-1"
+              >
+                <p className="text-foreground truncate text-sm font-semibold whitespace-nowrap">
+                  {profile?.first_name && profile?.last_name
+                    ? `${formatName(profile.first_name)} ${formatName(profile.last_name)}`
+                    : user?.email?.split("@")[0]}
+                </p>
+                {profile?.role && (
+                  <Badge
+                    variant="outline"
+                    className={cn("mt-0.5 text-xs whitespace-nowrap", getRoleBadgeColor(profile.role))}
+                  >
+                    {getRoleDisplayName(profile.role)}
+                  </Badge>
+                )}
+              </motion.div>
             )}
-          >
-            <div
-              className={cn(
-                "overflow-hidden transition-all duration-300",
-                isCollapsed ? "max-h-0 opacity-0" : "max-h-24 opacity-100"
-              )}
-            >
-              <p className="text-foreground truncate text-sm font-semibold whitespace-nowrap">
-                {profile?.first_name && profile?.last_name
-                  ? `${formatName(profile.first_name)} ${formatName(profile.last_name)}`
-                  : user?.email?.split("@")[0]}
-              </p>
-              {profile?.role && (
-                <Badge
-                  variant="outline"
-                  className={cn("mt-1 text-xs whitespace-nowrap", getRoleBadgeColor(profile.role))}
-                >
-                  {getRoleDisplayName(profile.role)}
-                </Badge>
-              )}
-            </div>
-          </div>
+          </AnimatePresence>
         </div>
 
         {/* Leading Departments - Fixed height container */}
-        <div
-          className={cn(
-            "flex-shrink-0 overflow-hidden transition-all duration-300",
-            isCollapsed || !profile?.lead_departments || profile.lead_departments.length === 0
-              ? "max-h-0 opacity-0"
-              : "max-h-32 opacity-100"
+        <AnimatePresence mode="wait">
+          {!isCollapsed && profile?.lead_departments && profile.lead_departments.length > 0 && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 300, damping: 30 }}
+              className="flex-shrink-0 overflow-hidden"
+            >
+              <div className="pt-2 text-xs">
+                <p className="text-muted-foreground mb-1">Leading:</p>
+                <div className="flex flex-wrap gap-1">
+                  {profile?.lead_departments?.map((dept) => (
+                    <Badge key={dept} variant="outline" className="text-xs">
+                      {dept}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
           )}
-        >
-          <div className="pt-2 text-xs">
-            <p className="text-muted-foreground mb-1">Leading:</p>
-            <div className="flex flex-wrap gap-1">
-              {profile?.lead_departments?.map((dept) => (
-                <Badge key={dept} variant="outline" className="text-xs">
-                  {dept}
-                </Badge>
-              ))}
-            </div>
-          </div>
-        </div>
+        </AnimatePresence>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 space-y-1 px-4 py-6">
+      <nav className="scrollbar-custom flex-1 space-y-0.5 overflow-y-auto px-2.5 py-3">
         {filteredNavigation.map((item) => {
           const isActive =
             item.href === "/admin"
@@ -193,8 +218,8 @@ export function AdminSidebar({ user, profile }: AdminSidebarProps) {
               href={item.href}
               onClick={() => setIsMobileMenuOpen(false)}
               className={cn(
-                "flex min-h-[44px] items-center rounded-lg transition-all duration-300",
-                isCollapsed ? "justify-center px-3 py-3" : "gap-3 px-4 py-3",
+                "flex min-h-[36px] items-center rounded-md transition-[padding,gap,background-color,color] duration-300 ease-in-out",
+                isCollapsed ? "justify-center px-2.5 py-2" : "gap-2.5 px-3 py-2",
                 "text-sm font-medium",
                 isActive
                   ? "bg-primary text-primary-foreground shadow-sm"
@@ -202,60 +227,75 @@ export function AdminSidebar({ user, profile }: AdminSidebarProps) {
               )}
               title={isCollapsed ? item.name : undefined}
             >
-              <item.icon className="h-5 w-5 flex-shrink-0" />
-              <span
-                className={cn(
-                  "overflow-hidden whitespace-nowrap transition-all duration-300",
-                  isCollapsed ? "w-0 opacity-0" : "ml-0 w-auto opacity-100"
+              <item.icon className="h-4 w-4 flex-shrink-0" />
+              <AnimatePresence mode="wait">
+                {!isCollapsed && (
+                  <motion.span
+                    initial={{ width: 0, opacity: 0 }}
+                    animate={{ width: "auto", opacity: 1 }}
+                    exit={{ width: 0, opacity: 0 }}
+                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                    className="overflow-hidden whitespace-nowrap"
+                  >
+                    {item.name}
+                  </motion.span>
                 )}
-              >
-                {item.name}
-              </span>
+              </AnimatePresence>
             </Link>
           )
         })}
       </nav>
 
       {/* Back to Dashboard & Logout */}
-      <div className="space-y-2 border-t px-4 py-4">
+      <div className="space-y-1.5 border-t px-2.5 py-2.5">
         <Link href="/dashboard">
           <Button
             variant="outline"
             className={cn(
-              "text-muted-foreground hover:text-foreground mb-2 min-h-[44px] w-full transition-all duration-300",
-              isCollapsed ? "justify-center px-3" : "justify-start gap-3"
+              "text-muted-foreground hover:text-foreground min-h-[36px] w-full transition-[padding,gap] duration-300 ease-in-out text-sm",
+              isCollapsed ? "justify-center px-2.5" : "justify-start gap-2.5"
             )}
             title={isCollapsed ? "Back to Dashboard" : undefined}
           >
-            <LayoutDashboard className="h-5 w-5 flex-shrink-0" />
-            <span
-              className={cn(
-                "overflow-hidden whitespace-nowrap transition-all duration-300",
-                isCollapsed ? "w-0 opacity-0" : "ml-0 w-auto opacity-100"
+            <LayoutDashboard className="h-4 w-4 flex-shrink-0" />
+            <AnimatePresence mode="wait">
+              {!isCollapsed && (
+                <motion.span
+                  initial={{ width: 0, opacity: 0 }}
+                  animate={{ width: "auto", opacity: 1 }}
+                  exit={{ width: 0, opacity: 0 }}
+                  transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                  className="overflow-hidden whitespace-nowrap"
+                >
+                  Back to Dashboard
+                </motion.span>
               )}
-            >
-              Back to Dashboard
-            </span>
+            </AnimatePresence>
           </Button>
         </Link>
         <Button
           variant="outline"
           className={cn(
-            "text-muted-foreground hover:text-foreground min-h-[44px] w-full transition-all duration-300",
-            isCollapsed ? "justify-center px-3" : "justify-start gap-3"
+            "text-muted-foreground hover:text-foreground min-h-[36px] w-full transition-[padding,gap] duration-300 ease-in-out text-sm",
+            isCollapsed ? "justify-center px-2.5" : "justify-start gap-2.5"
           )}
           onClick={handleLogout}
           title={isCollapsed ? "Logout" : undefined}
         >
-          <LogOut className="h-5 w-5 flex-shrink-0" />
-          <span
-            className={cn(
-              "overflow-hidden whitespace-nowrap transition-all duration-300",
-              isCollapsed ? "w-0 opacity-0" : "ml-0 w-auto opacity-100"
+          <LogOut className="h-4 w-4 flex-shrink-0" />
+          <AnimatePresence mode="wait">
+            {!isCollapsed && (
+              <motion.span
+                initial={{ width: 0, opacity: 0 }}
+                animate={{ width: "auto", opacity: 1 }}
+                exit={{ width: 0, opacity: 0 }}
+                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                className="overflow-hidden whitespace-nowrap"
+              >
+                Logout
+              </motion.span>
             )}
-          >
-            Logout
-          </span>
+          </AnimatePresence>
         </Button>
       </div>
     </>
@@ -264,58 +304,38 @@ export function AdminSidebar({ user, profile }: AdminSidebarProps) {
   return (
     <>
       {/* Desktop Sidebar */}
-      <aside
-        className={cn(
-          "bg-card hidden border-r transition-all duration-300 lg:fixed lg:inset-y-0 lg:flex lg:flex-col",
-          isCollapsed ? "lg:w-20" : "lg:w-64"
-        )}
+      <motion.aside
+        initial={false}
+        animate={{
+          width: isCollapsed ? 80 : 256,
+        }}
+        transition={{
+          type: "spring",
+          stiffness: 300,
+          damping: 30,
+        }}
+        className="bg-card hidden border-r lg:fixed lg:top-16 lg:bottom-0 lg:flex lg:flex-col overflow-hidden"
       >
         <SidebarContent />
-      </aside>
+      </motion.aside>
 
-      {/* Mobile Header */}
-      <div className="bg-card fixed top-0 right-0 left-0 z-40 border-b lg:hidden">
-        <div className="flex items-center justify-between px-4 py-3">
-          <div className="flex items-center gap-2">
-            <Image src="/acob-logo.webp" alt="ACOB Lighting" width={120} height={120} />
-            <Badge className="bg-red-100 text-xs text-red-800 dark:bg-red-900/30 dark:text-red-400">Admin</Badge>
-          </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="h-10 w-10"
-          >
-            {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-          </Button>
-        </div>
-      </div>
+      {/* Mobile Header - Hidden, using navbar instead */}
 
       {/* Mobile Sidebar */}
       <>
         <div
           className={cn(
-            "bg-background/80 fixed inset-0 z-40 backdrop-blur-sm transition-opacity duration-300 lg:hidden",
+            "bg-background/80 fixed inset-0 z-[55] backdrop-blur-sm transition-opacity duration-300 lg:hidden",
             isMobileMenuOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
           )}
           onClick={() => setIsMobileMenuOpen(false)}
         />
         <aside
           className={cn(
-            "bg-card fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r shadow-xl transition-transform duration-300 ease-out lg:hidden",
-            isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+            "bg-card fixed inset-y-0 right-0 z-[60] flex w-64 flex-col border-l shadow-xl transition-transform duration-300 ease-out lg:hidden",
+            isMobileMenuOpen ? "translate-x-0" : "translate-x-full"
           )}
         >
-          {/* Close button for mobile */}
-          <div className="flex items-center justify-between border-b px-4 py-3 lg:hidden">
-            <div className="flex items-center gap-2">
-              <Image src="/acob-logo.webp" alt="ACOB Lighting" width={100} height={100} />
-              <Badge className="bg-red-100 text-xs text-red-800 dark:bg-red-900/30 dark:text-red-400">Admin</Badge>
-            </div>
-            <Button variant="ghost" size="icon" onClick={() => setIsMobileMenuOpen(false)} className="h-8 w-8">
-              <X className="h-5 w-5" />
-            </Button>
-          </div>
           <SidebarContent />
         </aside>
       </>

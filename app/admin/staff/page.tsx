@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { SearchableSelect } from "@/components/ui/searchable-select"
+import { SearchableMultiSelect } from "@/components/ui/searchable-multi-select"
 import { User } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
@@ -42,6 +43,8 @@ import {
   FileSignature,
   Download,
   FileText,
+  Plus,
+  CheckCircle2,
 } from "lucide-react"
 import type { UserRole } from "@/types/database"
 import { getRoleDisplayName, getRoleBadgeColor, canAssignRoles, DEPARTMENTS } from "@/lib/permissions"
@@ -50,6 +53,8 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Calendar, User as UserIcon } from "lucide-react"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Textarea } from "@/components/ui/textarea"
 
 interface Staff {
   id: string
@@ -79,9 +84,9 @@ export default function AdminStaffPage() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
-  const [departmentFilter, setDepartmentFilter] = useState("all")
-  const [staffFilter, setStaffFilter] = useState("all")
-  const [roleFilter, setRoleFilter] = useState("all")
+  const [departmentFilter, setDepartmentFilter] = useState<string[]>([])
+  const [staffFilter, setStaffFilter] = useState<string[]>([])
+  const [roleFilter, setRoleFilter] = useState<string[]>([])
   const [nameSortOrder, setNameSortOrder] = useState<"asc" | "desc">("asc")
   const [viewMode, setViewMode] = useState<"list" | "card">("list")
   const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null)
@@ -95,6 +100,18 @@ export default function AdminStaffPage() {
     assets: any[]
     documentation: any[]
   }>({ tasks: [], assets: [], documentation: [] })
+  const [isCreateUserDialogOpen, setIsCreateUserDialogOpen] = useState(false)
+  const [isCreatingUser, setIsCreatingUser] = useState(false)
+  const [createUserForm, setCreateUserForm] = useState({
+    firstName: "",
+    lastName: "",
+    otherNames: "",
+    email: "",
+    department: "",
+    companyRole: "",
+    phoneNumber: "",
+    role: "staff" as UserRole,
+  })
 
   // Form states
   const [editForm, setEditForm] = useState({
@@ -287,6 +304,61 @@ export default function AdminStaffPage() {
     }
   }
 
+  const handleCreateUser = async () => {
+    if (isCreatingUser) return
+    setIsCreatingUser(true)
+
+    try {
+      // Validate required fields
+      if (!createUserForm.firstName.trim() || !createUserForm.lastName.trim() || !createUserForm.email.trim() || !createUserForm.department) {
+        toast.error("First name, last name, email, and department are required")
+        setIsCreatingUser(false)
+        return
+      }
+
+      // Check if user can assign this role
+      if (userProfile && !canAssignRoles(userProfile.role, createUserForm.role)) {
+        toast.error("You don't have permission to assign this role")
+        setIsCreatingUser(false)
+        return
+      }
+
+      const response = await fetch("/api/admin/create-user", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(createUserForm),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to create user")
+      }
+
+      toast.success("User created successfully! They can now login with their email and receive an OTP.")
+      setIsCreateUserDialogOpen(false)
+      setCreateUserForm({
+        firstName: "",
+        lastName: "",
+        otherNames: "",
+        email: "",
+        department: "",
+        companyRole: "",
+        phoneNumber: "",
+        role: "staff",
+      })
+      loadData()
+    } catch (error: any) {
+      console.error("Error creating user:", error)
+      toast.error(error.message || "Failed to create user")
+    } finally {
+      setIsCreatingUser(false)
+    }
+  }
+
+
   const filteredStaff = staff
     .filter((member) => {
       const matchesSearch =
@@ -295,11 +367,11 @@ export default function AdminStaffPage() {
         member.company_email.toLowerCase().includes(searchQuery.toLowerCase()) ||
         member.company_role?.toLowerCase().includes(searchQuery.toLowerCase())
 
-      const matchesDepartment = departmentFilter === "all" || member.department === departmentFilter
+      const matchesDepartment = departmentFilter.length === 0 || departmentFilter.includes(member.department)
 
-      const matchesStaff = staffFilter === "all" || member.id === staffFilter
+      const matchesStaff = staffFilter.length === 0 || staffFilter.includes(member.id)
 
-      const matchesRole = roleFilter === "all" || member.role === roleFilter
+      const matchesRole = roleFilter.length === 0 || roleFilter.includes(member.role)
 
       return matchesSearch && matchesDepartment && matchesStaff && matchesRole
     })
@@ -620,25 +692,37 @@ export default function AdminStaffPage() {
               View and manage staff members, roles, and permissions
             </p>
           </div>
-          <div className="flex items-center rounded-lg border p-1">
-            <Button
-              variant={viewMode === "list" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setViewMode("list")}
-              className="gap-1 sm:gap-2"
-            >
-              <List className="h-4 w-4" />
-              <span className="hidden sm:inline">List</span>
-            </Button>
-            <Button
-              variant={viewMode === "card" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setViewMode("card")}
-              className="gap-1 sm:gap-2"
-            >
-              <LayoutGrid className="h-4 w-4" />
-              <span className="hidden sm:inline">Card</span>
-            </Button>
+          <div className="flex items-center gap-2">
+            {(userProfile?.role === "admin" || userProfile?.role === "super_admin") && (
+              <Button
+                onClick={() => setIsCreateUserDialogOpen(true)}
+                className="gap-2"
+                size="sm"
+              >
+                <Plus className="h-4 w-4" />
+                <span className="hidden sm:inline">Create User</span>
+              </Button>
+            )}
+            <div className="flex items-center rounded-lg border p-1">
+              <Button
+                variant={viewMode === "list" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setViewMode("list")}
+                className="gap-1 sm:gap-2"
+              >
+                <List className="h-4 w-4" />
+                <span className="hidden sm:inline">List</span>
+              </Button>
+              <Button
+                variant={viewMode === "card" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setViewMode("card")}
+                className="gap-1 sm:gap-2"
+              >
+                <LayoutGrid className="h-4 w-4" />
+                <span className="hidden sm:inline">Card</span>
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -750,63 +834,56 @@ export default function AdminStaffPage() {
         {/* Filters */}
         <Card className="border-2">
           <CardContent className="p-6">
-            <div className="flex flex-col gap-4 md:flex-row">
-              <div className="relative flex-1">
-                <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform" />
+            <div className="space-y-4">
+              {/* Search Bar */}
+              <div className="relative w-full">
+                <Search className="text-muted-foreground absolute top-1/2 left-3 h-5 w-5 -translate-y-1/2 transform" />
                 <Input
-                  placeholder="Search staff..."
+                  placeholder="Search staff by name, email, or position..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
+                  className="h-12 pl-11 text-base"
                 />
               </div>
-              <SearchableSelect
-                value={departmentFilter}
-                onValueChange={setDepartmentFilter}
-                placeholder="All Departments"
-                searchPlaceholder="Search departments..."
+              
+              {/* Filter Buttons */}
+              <div className="flex flex-col gap-3 md:flex-row">
+              <SearchableMultiSelect
+                label="Departments"
                 icon={<Building2 className="h-4 w-4" />}
-                className="w-full md:w-48"
-                options={[
-                  { value: "all", label: "All Departments" },
-                  ...departments.map((dept) => ({
-                    value: dept,
-                    label: dept,
-                    icon: <Building2 className="h-3 w-3" />,
-                  })),
-                ]}
+                values={departmentFilter}
+                options={DEPARTMENTS.map((dept) => ({
+                  value: dept,
+                  label: dept,
+                  icon: <Building2 className="h-3 w-3" />,
+                }))}
+                onChange={setDepartmentFilter}
+                placeholder="All Departments"
               />
-              <SearchableSelect
-                value={staffFilter}
-                onValueChange={setStaffFilter}
-                placeholder="All Staff"
-                searchPlaceholder="Search staff..."
+              <SearchableMultiSelect
+                label="Staff Members"
                 icon={<User className="h-4 w-4" />}
-                className="w-full md:w-48"
-                options={[
-                  { value: "all", label: "All Staff" },
-                  ...staff.map((member) => ({
-                    value: member.id,
-                    label: `${formatName(member.first_name)} ${formatName(
-                      member.last_name
-                    )} - ${member.department || "No Dept"}`,
-                    icon: <User className="h-3 w-3" />,
-                  })),
-                ]}
+                values={staffFilter}
+                options={staff.map((member) => ({
+                  value: member.id,
+                  label: `${formatName(member.first_name)} ${formatName(member.last_name)} - ${member.department || "No Dept"}`,
+                  icon: <User className="h-3 w-3" />,
+                }))}
+                onChange={setStaffFilter}
+                placeholder="All Staff"
               />
-              <Select value={roleFilter} onValueChange={setRoleFilter}>
-                <SelectTrigger className="w-full md:w-48">
-                  <SelectValue placeholder="All Roles" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Roles</SelectItem>
-                  {roles.map((role) => (
-                    <SelectItem key={role} value={role}>
-                      {getRoleDisplayName(role)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableMultiSelect
+                label="Roles"
+                icon={<Shield className="h-4 w-4" />}
+                values={roleFilter}
+                options={roles.map((role) => ({
+                  value: role,
+                  label: getRoleDisplayName(role),
+                }))}
+                onChange={setRoleFilter}
+                placeholder="All Roles"
+              />
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -1046,7 +1123,7 @@ export default function AdminStaffPage() {
               <Users className="text-muted-foreground mx-auto mb-4 h-16 w-16" />
               <h3 className="text-foreground mb-2 text-xl font-semibold">No Staff Found</h3>
               <p className="text-muted-foreground">
-                {searchQuery || departmentFilter !== "all" || roleFilter !== "all"
+                {searchQuery || departmentFilter.length > 0 || roleFilter.length > 0 || staffFilter.length > 0
                   ? "No staff matches your filters"
                   : "No staff members found"}
               </p>
@@ -1054,6 +1131,163 @@ export default function AdminStaffPage() {
           </Card>
         )}
       </div>
+
+      {/* Create User Dialog */}
+      <Dialog open={isCreateUserDialogOpen} onOpenChange={setIsCreateUserDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader className="space-y-3 border-b pb-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                <Plus className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <DialogTitle className="text-xl">Create New User</DialogTitle>
+                <DialogDescription className="mt-1">
+                  Add a new staff member to the system. Name, email, and department are required.
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <Label htmlFor="create_first_name">
+                  First Name * <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="create_first_name"
+                  value={createUserForm.firstName}
+                  onChange={(e) => setCreateUserForm({ ...createUserForm, firstName: e.target.value })}
+                  placeholder="John"
+                  className="mt-1.5"
+                />
+              </div>
+              <div>
+                <Label htmlFor="create_last_name">
+                  Last Name * <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="create_last_name"
+                  value={createUserForm.lastName}
+                  onChange={(e) => setCreateUserForm({ ...createUserForm, lastName: e.target.value })}
+                  placeholder="Doe"
+                  className="mt-1.5"
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="create_other_names">Other Names</Label>
+              <Input
+                id="create_other_names"
+                value={createUserForm.otherNames}
+                onChange={(e) => setCreateUserForm({ ...createUserForm, otherNames: e.target.value })}
+                placeholder="Middle name or other names (optional)"
+                className="mt-1.5"
+              />
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <Label htmlFor="create_email">
+                  Email * <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="create_email"
+                  type="email"
+                  value={createUserForm.email}
+                  onChange={(e) => setCreateUserForm({ ...createUserForm, email: e.target.value })}
+                  placeholder="john.doe@company.com"
+                  className="mt-1.5"
+                />
+              </div>
+              <div>
+                <Label htmlFor="create_phone">Phone Number</Label>
+                <Input
+                  id="create_phone"
+                  type="tel"
+                  value={createUserForm.phoneNumber}
+                  onChange={(e) => setCreateUserForm({ ...createUserForm, phoneNumber: e.target.value })}
+                  placeholder="+234 800 000 0000"
+                  className="mt-1.5"
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <Label htmlFor="create_department">
+                  Department * <span className="text-destructive">*</span>
+                </Label>
+                <Select
+                  value={createUserForm.department}
+                  onValueChange={(value) => setCreateUserForm({ ...createUserForm, department: value })}
+                >
+                  <SelectTrigger className="mt-1.5">
+                    <SelectValue placeholder="Select department" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DEPARTMENTS.map((dept) => (
+                      <SelectItem key={dept} value={dept}>
+                        {dept}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="create_role">Role</Label>
+                <Select
+                  value={createUserForm.role}
+                  onValueChange={(value: UserRole) => setCreateUserForm({ ...createUserForm, role: value })}
+                >
+                  <SelectTrigger className="mt-1.5">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {getAvailableRoles().map((role) => (
+                      <SelectItem key={role} value={role}>
+                        {getRoleDisplayName(role)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="create_company_role">Position/Title</Label>
+              <Input
+                id="create_company_role"
+                value={createUserForm.companyRole}
+                onChange={(e) => setCreateUserForm({ ...createUserForm, companyRole: e.target.value })}
+                placeholder="e.g., Senior Developer, Manager"
+                className="mt-1.5"
+              />
+            </div>
+
+          </div>
+          <DialogFooter className="border-t pt-4">
+            <Button variant="outline" onClick={() => setIsCreateUserDialogOpen(false)} disabled={isCreatingUser}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreateUser}
+              disabled={isCreatingUser || !createUserForm.firstName.trim() || !createUserForm.lastName.trim() || !createUserForm.email.trim() || !createUserForm.department}
+              className="gap-2"
+            >
+              {isCreatingUser ? (
+                "Creating..."
+              ) : (
+                <>
+                  <Plus className="h-4 w-4" />
+                  Create User
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Staff Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>

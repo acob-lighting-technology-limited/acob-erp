@@ -3,20 +3,22 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { formatName } from "@/lib/utils"
-import { Package, Calendar, User, FileText, Building2 } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Package, Calendar, User, FileText, Building2, LayoutGrid, List, Hash } from "lucide-react"
+import { ASSET_TYPE_MAP } from "@/lib/asset-types"
 
 interface Asset {
   id: string
-  Asset_name: string
-  Asset_type: string
-  Asset_model?: string
+  unique_code: string
+  asset_type: string
+  asset_model?: string
   serial_number?: string
   status: string
+  acquisition_year?: number
 }
 
 interface AssetAssignment {
@@ -24,15 +26,17 @@ interface AssetAssignment {
   assigned_at: string
   assignment_notes?: string
   assigned_by: string
-  Asset: Asset
+  asset: Asset
   assigner?: {
     first_name: string
     last_name: string
   }
+  department?: string
 }
 
 export default function AssetsPage() {
   const [assignments, setAssignments] = useState<AssetAssignment[]>([])
+  const [viewMode, setViewMode] = useState<"list" | "card">("list")
   const supabase = createClient()
 
   useEffect(() => {
@@ -99,10 +103,10 @@ export default function AssetsPage() {
       // Fetch Asset and assigner details separately
       const assignmentsWithDetails = await Promise.all(
         allAssignments.map(async (assignment: any) => {
-          const [AssetResult, assignerResult] = await Promise.all([
+          const [assetResult, assignerResult] = await Promise.all([
             supabase
               .from("assets")
-              .select("id, asset_name, asset_type, asset_model, serial_number, status")
+              .select("id, unique_code, asset_type, asset_model, serial_number, status, acquisition_year")
               .eq("id", assignment.asset_id)
               .single(),
             assignment.assigned_by
@@ -112,7 +116,7 @@ export default function AssetsPage() {
 
           return {
             ...assignment,
-            Asset: AssetResult.data,
+            asset: assetResult.data,
             assigner: assignerResult.data,
           }
         })
@@ -149,16 +153,42 @@ export default function AssetsPage() {
     }
   }
 
+  const getAssetTypeLabel = (assetTypeCode: string) => {
+    return ASSET_TYPE_MAP[assetTypeCode]?.label || assetTypeCode
+  }
+
   return (
     <div className="from-background via-background to-muted/20 min-h-screen bg-gradient-to-br p-4 md:p-8">
-      <div className="mx-auto max-w-6xl space-y-6">
+      <div className="mx-auto max-w-7xl space-y-6">
         {/* Header */}
-        <div>
-          <h1 className="text-foreground flex items-center gap-3 text-3xl font-bold">
-            <Package className="text-primary h-8 w-8" />
-            My Assets
-          </h1>
-          <p className="text-muted-foreground mt-2">View your currently assigned Assets and equipment</p>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-foreground flex items-center gap-3 text-2xl font-bold sm:text-3xl">
+              <Package className="text-primary h-6 w-6 sm:h-8 sm:w-8" />
+              My Assets
+            </h1>
+            <p className="text-muted-foreground mt-2">View your currently assigned assets and equipment</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant={viewMode === "list" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setViewMode("list")}
+              className="gap-2"
+            >
+              <List className="h-4 w-4" />
+              List
+            </Button>
+            <Button
+              variant={viewMode === "card" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setViewMode("card")}
+              className="gap-2"
+            >
+              <LayoutGrid className="h-4 w-4" />
+              Card
+            </Button>
+          </div>
         </div>
 
         {/* Stats */}
@@ -178,77 +208,145 @@ export default function AssetsPage() {
           </Card>
         </div>
 
-        {/* Assets List */}
+        {/* Assets List/Grid */}
         {assignments.length > 0 ? (
-          <div className="grid gap-6 md:grid-cols-2">
-            {assignments.map((assignment) => (
-              <Card key={assignment.id} className="border-2 shadow-lg transition-shadow hover:shadow-xl">
-                <CardHeader className="from-primary/5 to-background border-b bg-gradient-to-r">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start gap-3">
-                      <div className="bg-primary/10 rounded-lg p-3">
-                        <Package className="text-primary h-6 w-6" />
+          viewMode === "list" ? (
+            <Card className="border-2">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Asset Name</TableHead>
+                      <TableHead>Unique Code</TableHead>
+                      <TableHead>Model</TableHead>
+                      <TableHead>Serial Number</TableHead>
+                      <TableHead>Year</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Assigned</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {assignments.map((assignment) => (
+                      <TableRow key={assignment.id}>
+                        <TableCell className="font-medium">
+                          {getAssetTypeLabel(assignment.asset?.asset_type || "")}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1.5">
+                            <Hash className="h-3.5 w-3.5 text-muted-foreground" />
+                            <span className="font-mono text-sm">{assignment.asset?.unique_code || "-"}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>{assignment.asset?.asset_model || "-"}</TableCell>
+                        <TableCell>
+                          {assignment.asset?.serial_number ? (
+                            <span className="font-mono text-sm">{assignment.asset.serial_number}</span>
+                          ) : (
+                            "-"
+                          )}
+                        </TableCell>
+                        <TableCell>{assignment.asset?.acquisition_year || "-"}</TableCell>
+                        <TableCell>
+                          <Badge className={getStatusColor(assignment.asset?.status || "available")}>
+                            {assignment.asset?.status || "available"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{formatDate(assignment.assigned_at)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </Card>
+          ) : (
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {assignments.map((assignment) => (
+                <Card key={assignment.id} className="border-2 shadow-lg transition-shadow hover:shadow-xl">
+                  <CardHeader className="from-primary/5 to-background border-b bg-gradient-to-r">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-start gap-3">
+                        <div className="bg-primary/10 rounded-lg p-3">
+                          <Package className="text-primary h-6 w-6" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <CardTitle className="text-lg">{getAssetTypeLabel(assignment.asset?.asset_type || "")}</CardTitle>
+                          <CardDescription className="mt-1 flex items-center gap-1.5">
+                            <Hash className="h-3.5 w-3.5" />
+                            <span className="font-mono text-xs">{assignment.asset?.unique_code || "-"}</span>
+                          </CardDescription>
+                        </div>
                       </div>
-                      <div>
-                        <CardTitle className="text-xl">{assignment.Asset.Asset_name}</CardTitle>
-                        <CardDescription className="mt-1">
-                          {assignment.Asset.Asset_type}
-                          {assignment.Asset.Asset_model && ` • ${assignment.Asset.Asset_model}`}
-                        </CardDescription>
-                      </div>
+                      <Badge className={getStatusColor(assignment.asset?.status || "available")}>
+                        {assignment.asset?.status || "available"}
+                      </Badge>
                     </div>
-                    <Badge className={getStatusColor(assignment.Asset.status)}>{assignment.Asset.status}</Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4 p-6">
-                  {assignment.Asset.serial_number && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <FileText className="text-muted-foreground h-4 w-4" />
-                      <span className="text-muted-foreground">Serial:</span>
-                      <span className="text-foreground font-mono">{assignment.Asset.serial_number}</span>
-                    </div>
-                  )}
-
-                  <div className="flex items-center gap-2 text-sm">
-                    <Calendar className="text-muted-foreground h-4 w-4" />
-                    <span className="text-muted-foreground">Assigned:</span>
-                    <span className="text-foreground">{formatDate(assignment.assigned_at)}</span>
-                  </div>
-
-                  {(assignment as any).department ? (
-                    <div className="flex items-center gap-2 text-sm">
-                      <Building2 className="text-muted-foreground h-4 w-4" />
-                      <span className="text-muted-foreground">Department Assignment:</span>
-                      <span className="text-foreground font-medium">{(assignment as any).department}</span>
-                    </div>
-                  ) : (
-                    assignment.assigner && (
+                  </CardHeader>
+                  <CardContent className="space-y-3 p-6">
+                    {assignment.asset?.asset_model && (
                       <div className="flex items-center gap-2 text-sm">
-                        <User className="text-muted-foreground h-4 w-4" />
-                        <span className="text-muted-foreground">Assigned by:</span>
-                        <span className="text-foreground">
-                          {formatName(assignment.assigner.first_name)} {formatName(assignment.assigner.last_name)}
-                        </span>
+                        <FileText className="text-muted-foreground h-4 w-4" />
+                        <span className="text-muted-foreground">Model:</span>
+                        <span className="text-foreground font-medium">{assignment.asset.asset_model}</span>
                       </div>
-                    )
-                  )}
+                    )}
 
-                  {assignment.assignment_notes && (
-                    <div className="bg-muted/50 mt-4 rounded-lg p-3">
-                      <p className="text-foreground mb-1 text-sm font-medium">Notes:</p>
-                      <p className="text-muted-foreground text-sm">{assignment.assignment_notes}</p>
+                    {assignment.asset?.serial_number && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <FileText className="text-muted-foreground h-4 w-4" />
+                        <span className="text-muted-foreground">Serial:</span>
+                        <span className="text-foreground font-mono">{assignment.asset.serial_number}</span>
+                      </div>
+                    )}
+
+                    {assignment.asset?.acquisition_year && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <Calendar className="text-muted-foreground h-4 w-4" />
+                        <span className="text-muted-foreground">Year:</span>
+                        <span className="text-foreground font-medium">{assignment.asset.acquisition_year}</span>
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-2 text-sm">
+                      <Calendar className="text-muted-foreground h-4 w-4" />
+                      <span className="text-muted-foreground">Assigned:</span>
+                      <span className="text-foreground">{formatDate(assignment.assigned_at)}</span>
                     </div>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+
+                    {assignment.department ? (
+                      <div className="flex items-center gap-2 text-sm">
+                        <Building2 className="text-muted-foreground h-4 w-4" />
+                        <span className="text-muted-foreground">Department:</span>
+                        <span className="text-foreground font-medium">{assignment.department}</span>
+                      </div>
+                    ) : (
+                      assignment.assigner && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <User className="text-muted-foreground h-4 w-4" />
+                          <span className="text-muted-foreground">Assigned by:</span>
+                          <span className="text-foreground">
+                            {formatName(assignment.assigner.first_name)} {formatName(assignment.assigner.last_name)}
+                          </span>
+                        </div>
+                      )
+                    )}
+
+                    {assignment.assignment_notes && (
+                      <div className="bg-muted/50 mt-4 rounded-lg p-3">
+                        <p className="text-foreground mb-1 text-sm font-medium">Notes:</p>
+                        <p className="text-muted-foreground text-sm">{assignment.assignment_notes}</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )
         ) : (
           <Card className="border-2">
             <CardContent className="p-12 text-center">
               <Package className="text-muted-foreground mx-auto mb-4 h-16 w-16" />
               <h3 className="text-foreground mb-2 text-xl font-semibold">No Assets Assigned</h3>
-              <p className="text-muted-foreground">You don't have any Assets assigned to you at the moment.</p>
+              <p className="text-muted-foreground">You don't have any assets assigned to you at the moment.</p>
             </CardContent>
           </Card>
         )}

@@ -1,20 +1,27 @@
 "use client"
 
 import { useSidebar } from "./sidebar-context"
-import { cn } from "@/lib/utils"
+import { motion } from "framer-motion"
+import { useIsMobile } from "@/hooks/use-mobile"
 
 export function SidebarContent({ children }: { children: React.ReactNode }) {
   const { isCollapsed } = useSidebar()
+  const isMobile = useIsMobile()
 
   return (
-    <main
-      className={cn(
-        "flex-1 transition-all duration-300",
-        isCollapsed ? "lg:pl-20" : "lg:pl-64",
-        "pt-16" // Padding top for fixed navbar (h-16 = 64px)
-      )}
+    <motion.main
+      initial={false}
+      animate={{
+        paddingLeft: isMobile ? 0 : (isCollapsed ? 80 : 256),
+      }}
+      transition={{
+        type: "spring",
+        stiffness: 300,
+        damping: 30,
+      }}
+      className="flex-1 pt-16 max-lg:pl-0"
     >
       {children}
-    </main>
+    </motion.main>
   )
 }

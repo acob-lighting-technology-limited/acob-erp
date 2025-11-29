@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { toast } from "sonner"
 import {
   LogOut,
@@ -32,6 +32,7 @@ import { ProfessionalNotificationBell } from "@/components/professional-notifica
 import { UniversalSearch } from "@/components/universal-search"
 import Image from "next/image"
 import { useSidebarSafe } from "@/components/sidebar-context"
+import { useTheme } from "next-themes"
 
 interface NavbarProps {
   user?: {
@@ -45,11 +46,37 @@ interface NavbarProps {
 
 export function Navbar({ user, isAdmin = false }: NavbarProps) {
   const [isOpen, setIsOpen] = useState(false)
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const [mounted, setMounted] = useState(false)
   const router = useRouter()
+  const { resolvedTheme } = useTheme()
 
   // Get sidebar context safely (returns null if not available)
   const sidebarContext = useSidebarSafe()
   const { isCollapsed, setIsCollapsed } = sidebarContext || { isCollapsed: false, setIsCollapsed: () => {} }
+
+  // Default to light logo for SSR to prevent hydration mismatch
+  const logoSrc = !mounted
+    ? '/acob-logo-light.webp'
+    : resolvedTheme === 'dark'
+      ? '/acob-logo-dark.webp'
+      : '/acob-logo-light.webp'
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  // Listen for sidebar state changes
+  useEffect(() => {
+    const handleSidebarStateChange = (e: Event) => {
+      const customEvent = e as CustomEvent
+      setIsSidebarOpen(customEvent.detail?.isOpen ?? false)
+    }
+    window.addEventListener('sidebar-state-change', handleSidebarStateChange)
+    return () => {
+      window.removeEventListener('sidebar-state-change', handleSidebarStateChange)
+    }
+  }, [])
 
   const handleLogout = async () => {
     const supabase = createClient()
@@ -90,18 +117,32 @@ export function Navbar({ user, isAdmin = false }: NavbarProps) {
               {isCollapsed ? <ChevronRight className="h-5 w-5" /> : <ChevronLeft className="h-5 w-5" />}
             </Button>
             <Link href="/dashboard" className="flex h-full items-center px-4">
-              <Image src="/acob-logo.webp" alt="ACOB Lighting" width={150} height={150} className="h-8 w-auto" />
+              <Image
+                key={logoSrc}
+                src={logoSrc}
+                alt="ACOB Lighting"
+                width={150}
+                height={150}
+                priority
+                className="h-8 w-auto"
+              />
             </Link>
           </div>
         )}
 
-        {/* Mobile - Logo and Menu */}
-        <div className="flex items-center gap-4 px-4 lg:hidden">
-          {!sidebarContext && (
-            <Link href="/dashboard" className="flex items-center">
-              <Image src="/acob-logo.webp" alt="ACOB Lighting" width={150} height={150} className="h-8 w-auto" />
-            </Link>
-          )}
+        {/* Mobile - Logo only */}
+        <div className="flex items-center gap-2 px-4 lg:hidden">
+          <Link href="/dashboard" className="flex items-center">
+            <Image
+              key={logoSrc}
+              src={logoSrc}
+              alt="ACOB Lighting"
+              width={150}
+              height={150}
+              priority
+              className="h-8 w-auto"
+            />
+          </Link>
         </div>
 
         {/* Right side - search, notifications and user menu */}
@@ -111,9 +152,9 @@ export function Navbar({ user, isAdmin = false }: NavbarProps) {
             <ProfessionalNotificationBell isAdmin={isAdmin} />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-10 w-10 rounded-full lg:h-12 lg:w-12">
-                  <Avatar className="h-10 w-10 lg:h-12 lg:w-12">
-                    <AvatarFallback className="bg-primary text-primary-foreground text-base font-semibold lg:text-lg">
+                <Button variant="ghost" className="relative h-10 w-10 rounded-full p-0 lg:h-11 lg:w-11">
+                  <Avatar className="h-10 w-10 lg:h-11 lg:w-11">
+                    <AvatarFallback className="bg-primary text-primary-foreground text-sm font-semibold lg:text-base">
                       {getInitials(user?.email)}
                     </AvatarFallback>
                   </Avatar>
@@ -178,14 +219,29 @@ export function Navbar({ user, isAdmin = false }: NavbarProps) {
           </div>
 
           {/* Mobile menu button */}
-          <button className="md:hidden" onClick={() => setIsOpen(!isOpen)}>
-            {isOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+          <button
+            className="md:hidden"
+            onClick={() => {
+              // If sidebar context exists, toggle the sidebar instead of navbar menu
+              if (sidebarContext) {
+                const event = new CustomEvent('toggle-mobile-sidebar')
+                window.dispatchEvent(event)
+              } else {
+                setIsOpen(!isOpen)
+              }
+            }}
+          >
+            {sidebarContext && isSidebarOpen ? (
+              <X className="h-6 w-6" />
+            ) : (
+              <Menu className="h-6 w-6" />
+            )}
           </button>
         </div>
       </div>
 
-      {/* Mobile menu */}
-      {isOpen && (
+      {/* Mobile menu - Only show if no sidebar context */}
+      {isOpen && !sidebarContext && (
         <div className="border-border space-y-2 border-t py-4 md:hidden">
           <div className={`flex items-center px-4 py-2 mb-2${isCollapsed ? "" : "gap-3"}`}>
             <Avatar className="h-10 w-10">

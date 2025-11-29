@@ -18,6 +18,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { SearchableSelect } from "@/components/ui/searchable-select"
+import { SearchableMultiSelect } from "@/components/ui/searchable-multi-select"
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -32,6 +33,7 @@ import { toast } from "sonner"
 import { formatName } from "@/lib/utils"
 import { ASSET_TYPES, ASSET_TYPE_MAP, generateUniqueCodePreview } from "@/lib/asset-types"
 import { DEPARTMENTS, OFFICE_LOCATIONS } from "@/lib/permissions"
+import { getDepartmentForOffice } from "@/lib/office-locations"
 import { assignmentValidation } from "@/lib/validation"
 import {
   Package,
@@ -58,6 +60,7 @@ import {
   CheckCircle2,
   X,
 } from "lucide-react"
+import { Checkbox } from "@/components/ui/checkbox"
 
 interface Asset {
   id: string
@@ -148,14 +151,32 @@ export default function AdminAssetsPage() {
   const [userProfile, setUserProfile] = useState<{ role?: string; lead_departments?: string[] } | null>(null)
   const [, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
-  const [statusFilter, setStatusFilter] = useState("all")
-  const [departmentFilter, setDepartmentFilter] = useState("all")
-  const [userFilter, setUserFilter] = useState("all")
-  const [yearFilter, setYearFilter] = useState("all")
-  const [officeLocationFilter, setOfficeLocationFilter] = useState("all")
-  const [assetTypeFilter, setAssetTypeFilter] = useState("all")
+  const [statusFilter, setStatusFilter] = useState<string[]>([])
+  const [departmentFilter, setDepartmentFilter] = useState<string[]>([])
+  const [userFilter, setUserFilter] = useState<string[]>([])
+  const [yearFilter, setYearFilter] = useState<string[]>([])
+  const [officeLocationFilter, setOfficeLocationFilter] = useState<string[]>([])
+  const [assetTypeFilter, setAssetTypeFilter] = useState<string[]>([])
+  const [issueStatusFilter, setIssueStatusFilter] = useState<string[]>([])
   const [viewMode, setViewMode] = useState<"list" | "card">("list")
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" } | null>(null)
+  
+  // Export dialog state
+  const [exportDialogOpen, setExportDialogOpen] = useState(false)
+  const [exportType, setExportType] = useState<"excel" | "pdf" | "word" | null>(null)
+  const [selectedColumns, setSelectedColumns] = useState<Record<string, boolean>>({
+    "#": true,
+    "Unique Code": true,
+    "Asset Type": true,
+    "Model": true,
+    "Serial Number": true,
+    "Year": true,
+    "Status": true,
+    "Assigned To": true,
+    "Department": true,
+    "Office Location": true,
+    "Notes": true,
+  })
 
   // Dialog states
   const [isAssetDialogOpen, setIsAssetDialogOpen] = useState(false)
@@ -173,8 +194,13 @@ export default function AdminAssetsPage() {
   // Issue tracking states
   const [assetIssues, setAssetIssues] = useState<AssetIssue[]>([])
   const [newIssueDescription, setNewIssueDescription] = useState("")
-  const [issueStatusFilter, setIssueStatusFilter] = useState("all")
   const [isAddingIssue, setIsAddingIssue] = useState(false)
+
+  // Asset type creation states
+  const [isCreateAssetTypeDialogOpen, setIsCreateAssetTypeDialogOpen] = useState(false)
+  const [newAssetType, setNewAssetType] = useState({ label: "", code: "", requiresSerialModel: false })
+  const [isCreatingAssetType, setIsCreatingAssetType] = useState(false)
+  const [assetTypes, setAssetTypes] = useState<{ label: string; code: string; requiresSerialModel: boolean }[]>(ASSET_TYPES)
 
   // Track original form values for change detection
   const [originalAssetForm, setOriginalAssetForm] = useState({
@@ -218,7 +244,86 @@ export default function AdminAssetsPage() {
 
   useEffect(() => {
     loadData()
+    loadAssetTypes()
   }, [])
+
+  const loadAssetTypes = async () => {
+    try {
+      const { data, error } = await supabase.from("asset_types").select("*").order("label", { ascending: true })
+      if (error) {
+        // Fallback to hardcoded types if table doesn't exist yet
+        console.warn("Could not load asset types from database:", error)
+        return
+      }
+      if (data && data.length > 0) {
+        setAssetTypes(
+          data.map((t) => ({
+            label: t.label,
+            code: t.code,
+            requiresSerialModel: t.requires_serial_model || false,
+          }))
+        )
+      }
+    } catch (error) {
+      console.error("Error loading asset types:", error)
+    }
+  }
+
+  const handleCreateAssetType = async () => {
+    if (!newAssetType.label.trim() || !newAssetType.code.trim()) {
+      toast.error("Please provide both full name and short name")
+      return
+    }
+
+    // Validate code format (should be uppercase, no spaces)
+    const code = newAssetType.code.trim().toUpperCase().replace(/\s+/g, "")
+    if (!code) {
+      toast.error("Short name must contain at least one character")
+      return
+    }
+
+    setIsCreatingAssetType(true)
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) {
+        toast.error("You must be logged in to create asset types")
+        setIsCreatingAssetType(false)
+        return
+      }
+
+      const { error } = await supabase.from("asset_types").insert({
+        label: newAssetType.label.trim(),
+        code: code,
+        requires_serial_model: newAssetType.requiresSerialModel,
+        created_by: user.id,
+      })
+
+      if (error) {
+        if (error.code === "23505") {
+          // Unique constraint violation
+          toast.error("An asset type with this name or code already exists")
+        } else {
+          throw error
+        }
+        setIsCreatingAssetType(false)
+        return
+      }
+
+      toast.success("Asset type created successfully")
+      setNewAssetType({ label: "", code: "", requiresSerialModel: false })
+      setIsCreateAssetTypeDialogOpen(false)
+      await loadAssetTypes()
+      // Auto-select the newly created asset type
+      setAssetForm({ ...assetForm, asset_type: code })
+    } catch (error: any) {
+      console.error("Error creating asset type:", error)
+      toast.error("Failed to create asset type: " + (error.message || "Unknown error"))
+    } finally {
+      setIsCreatingAssetType(false)
+    }
+  }
 
   const loadData = async () => {
     try {
@@ -770,6 +875,19 @@ export default function AdminAssetsPage() {
 
           if (assetForm.assignment_type === "individual") {
             assignmentData.assigned_to = assetForm.assigned_to
+            
+            // Fetch user's profile to get their department and office location
+            const { data: userProfile } = await supabase
+              .from("profiles")
+              .select("department, current_work_location")
+              .eq("id", assetForm.assigned_to)
+              .single()
+            
+            if (userProfile) {
+              // Populate department and office_location from user's profile
+              assignmentData.department = userProfile.department || null
+              assignmentData.office_location = userProfile.current_work_location || null
+            }
           } else if (assetForm.assignment_type === "department") {
             assignmentData.department = assetForm.assignment_department
           } else if (assetForm.assignment_type === "office") {
@@ -788,11 +906,18 @@ export default function AdminAssetsPage() {
 
           if (assetForm.assignment_type === "department") {
             assetUpdate.department = assetForm.assignment_department
+            assetUpdate.office_location = null
           } else if (assetForm.assignment_type === "office") {
             assetUpdate.office_location = assetForm.office_location
-          } else {
             assetUpdate.department = null
-            assetUpdate.office_location = null
+          } else {
+            // For individual assignments, populate from user's profile
+            if (assignmentData.department) {
+              assetUpdate.department = assignmentData.department
+            }
+            if (assignmentData.office_location) {
+              assetUpdate.office_location = assignmentData.office_location
+            }
           }
 
           const { error: assetError } = await supabase.from("assets").update(assetUpdate).eq("id", newAsset.id)
@@ -863,6 +988,19 @@ export default function AdminAssetsPage() {
       if (assignForm.assignment_type === "individual") {
         assignmentData.assigned_to = assignForm.assigned_to
         assignmentData.assigned_from = previousAssignedTo
+        
+        // Fetch user's profile to get their department and office location
+        const { data: userProfile } = await supabase
+          .from("profiles")
+          .select("department, current_work_location")
+          .eq("id", assignForm.assigned_to)
+          .single()
+        
+        if (userProfile) {
+          // Populate department and office_location from user's profile
+          assignmentData.department = userProfile.department || null
+          assignmentData.office_location = userProfile.current_work_location || null
+        }
       } else if (assignForm.assignment_type === "department") {
         assignmentData.department = assignForm.department
       } else if (assignForm.assignment_type === "office") {
@@ -886,8 +1024,13 @@ export default function AdminAssetsPage() {
         assetUpdate.office_location = assignForm.office_location
         assetUpdate.department = null
       } else {
-        assetUpdate.department = null
-        assetUpdate.office_location = null
+        // For individual assignments, populate from user's profile
+        if (assignmentData.department) {
+          assetUpdate.department = assignmentData.department
+        }
+        if (assignmentData.office_location) {
+          assetUpdate.office_location = assignmentData.office_location
+        }
       }
 
       const { error: assetError } = await supabase.from("assets").update(assetUpdate).eq("id", selectedAsset.id)
@@ -1100,21 +1243,19 @@ export default function AdminAssetsPage() {
     return sorted
   }
 
-  // Export functions
-  const exportToExcel = async () => {
-    try {
-      const XLSX = await import("xlsx")
-      const { default: saveAs } = await import("file-saver")
-
-      const dataToExport = getSortedAssets(filteredAssets).map((asset, index) => ({
-        "#": index + 1,
-        "Unique Code": asset.unique_code,
-        "Asset Type": ASSET_TYPE_MAP[asset.asset_type]?.label || asset.asset_type,
-        Model: asset.asset_model || "-",
-        "Serial Number": asset.serial_number || "-",
-        Year: asset.acquisition_year,
-        Status: asset.status,
-        "Assigned To":
+  // Helper function to get export data with selected columns
+  const getExportData = (assets: Asset[]) => {
+    const baseData = getSortedAssets(assets).map((asset, index) => {
+      const row: Record<string, any> = {}
+      if (selectedColumns["#"]) row["#"] = index + 1
+      if (selectedColumns["Unique Code"]) row["Unique Code"] = asset.unique_code
+      if (selectedColumns["Asset Type"]) row["Asset Type"] = ASSET_TYPE_MAP[asset.asset_type]?.label || asset.asset_type
+      if (selectedColumns["Model"]) row["Model"] = asset.asset_model || "-"
+      if (selectedColumns["Serial Number"]) row["Serial Number"] = asset.serial_number || "-"
+      if (selectedColumns["Year"]) row["Year"] = asset.acquisition_year
+      if (selectedColumns["Status"]) row["Status"] = asset.status
+      if (selectedColumns["Assigned To"]) {
+        row["Assigned To"] =
           asset.status === "assigned" || asset.status === "retired" || asset.status === "maintenance"
             ? asset.assignment_type === "office"
               ? `${asset.office_location || "Office"}${asset.status === "retired" ? " (retired)" : asset.status === "maintenance" ? " (maintenance)" : ""}`
@@ -1123,11 +1264,52 @@ export default function AdminAssetsPage() {
                 : asset.current_assignment?.department
                   ? `${asset.current_assignment.department}${asset.status === "retired" ? " (retired)" : asset.status === "maintenance" ? " (maintenance)" : ""}`
                   : "Unassigned"
-            : "Unassigned",
-        Department: asset.department || "-",
-        "Office Location": asset.office_location || "-",
-        Notes: asset.notes || "-",
-      }))
+            : "Unassigned"
+      }
+      if (selectedColumns["Department"]) {
+        // For individual assignments: use user's department
+        // For department assignments: use assigned department
+        // For office assignments: use office's linked department (if department office)
+        let department = "-"
+        if (asset.assignment_type === "individual" && asset.current_assignment?.assigned_to) {
+          // Get user's department from staff list
+          const assignedUser = staff.find((s) => s.id === asset.current_assignment?.assigned_to)
+          department = assignedUser?.department || "-"
+        } else if (asset.assignment_type === "department") {
+          // Department assignment: use the assigned department
+          department = asset.current_assignment?.department || asset.department || "-"
+        } else if (asset.assignment_type === "office" && asset.office_location) {
+          // Office assignment: get department from office location if it's a department office
+          const officeDept = getDepartmentForOffice(asset.office_location)
+          department = officeDept || "-"
+        } else {
+          // Fallback
+          department = asset.current_assignment?.department || asset.department || "-"
+        }
+        row["Department"] = department
+      }
+      if (selectedColumns["Office Location"]) {
+        // Priority: assignment office_location > asset office_location > user's office_location (for individual assignments)
+        row["Office Location"] = asset.current_assignment?.office_location || asset.office_location || "-"
+      }
+      if (selectedColumns["Notes"]) row["Notes"] = asset.notes || "-"
+      return row
+    })
+    return baseData
+  }
+
+  // Export functions
+  const handleExportClick = (type: "excel" | "pdf" | "word") => {
+    setExportType(type)
+    setExportDialogOpen(true)
+  }
+
+  const exportToExcel = async () => {
+    try {
+      const XLSX = await import("xlsx")
+      const { default: saveAs } = await import("file-saver")
+
+      const dataToExport = getExportData(filteredAssets)
 
       const ws = XLSX.utils.json_to_sheet(dataToExport)
       const wb = XLSX.utils.book_new()
@@ -1169,28 +1351,90 @@ export default function AdminAssetsPage() {
       doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 22)
       doc.text(`Total Assets: ${getSortedAssets(filteredAssets).length}`, 14, 28)
 
-      // Prepare data
-      const dataToExport = getSortedAssets(filteredAssets).map((asset, index) => [
-        index + 1,
-        asset.unique_code,
-        ASSET_TYPE_MAP[asset.asset_type]?.label || asset.asset_type,
-        asset.asset_model || "-",
-        asset.acquisition_year,
-        asset.status,
-        asset.status === "assigned" || asset.status === "retired" || asset.status === "maintenance"
-          ? asset.assignment_type === "office"
-            ? `${asset.office_location || "Office"}${asset.status === "retired" ? " (retired)" : asset.status === "maintenance" ? " (maintenance)" : ""}`
-            : asset.current_assignment?.user
-              ? `${formatName(asset.current_assignment.user.first_name)} ${formatName(asset.current_assignment.user.last_name)}${asset.status === "retired" ? " (retired)" : asset.status === "maintenance" ? " (maintenance)" : ""}`
-              : asset.current_assignment?.department
-                ? `${asset.current_assignment.department}${asset.status === "retired" ? " (retired)" : asset.status === "maintenance" ? " (maintenance)" : ""}`
-                : "Unassigned"
-          : "Unassigned",
-      ])
+      // Prepare data with selected columns
+      const dataToExport = getSortedAssets(filteredAssets).map((asset, index) => {
+        const row: any[] = []
+        const headers: string[] = []
+        
+        if (selectedColumns["#"]) {
+          row.push(index + 1)
+          headers.push("#")
+        }
+        if (selectedColumns["Unique Code"]) {
+          row.push(asset.unique_code)
+          headers.push("Code")
+        }
+        if (selectedColumns["Asset Type"]) {
+          row.push(ASSET_TYPE_MAP[asset.asset_type]?.label || asset.asset_type)
+          headers.push("Type")
+        }
+        if (selectedColumns["Model"]) {
+          row.push(asset.asset_model || "-")
+          headers.push("Model")
+        }
+        if (selectedColumns["Serial Number"]) {
+          row.push(asset.serial_number || "-")
+          headers.push("Serial Number")
+        }
+        if (selectedColumns["Year"]) {
+          row.push(asset.acquisition_year)
+          headers.push("Year")
+        }
+        if (selectedColumns["Status"]) {
+          row.push(asset.status)
+          headers.push("Status")
+        }
+        if (selectedColumns["Assigned To"]) {
+          row.push(
+            asset.status === "assigned" || asset.status === "retired" || asset.status === "maintenance"
+              ? asset.assignment_type === "office"
+                ? `${asset.office_location || "Office"}${asset.status === "retired" ? " (retired)" : asset.status === "maintenance" ? " (maintenance)" : ""}`
+                : asset.current_assignment?.user
+                  ? `${formatName(asset.current_assignment.user.first_name)} ${formatName(asset.current_assignment.user.last_name)}${asset.status === "retired" ? " (retired)" : asset.status === "maintenance" ? " (maintenance)" : ""}`
+                  : asset.current_assignment?.department
+                    ? `${asset.current_assignment.department}${asset.status === "retired" ? " (retired)" : asset.status === "maintenance" ? " (maintenance)" : ""}`
+                    : "Unassigned"
+              : "Unassigned"
+          )
+          headers.push("Assigned To")
+        }
+        if (selectedColumns["Department"]) {
+          // For individual assignments: use user's department
+          // For department assignments: use assigned department
+          // For office assignments: use office's linked department (if department office)
+          let department = "-"
+          if (asset.assignment_type === "individual" && asset.current_assignment?.assigned_to) {
+            const assignedUser = staff.find((s) => s.id === asset.current_assignment?.assigned_to)
+            department = assignedUser?.department || "-"
+          } else if (asset.assignment_type === "department") {
+            department = asset.current_assignment?.department || asset.department || "-"
+          } else if (asset.assignment_type === "office" && asset.office_location) {
+            const officeDept = getDepartmentForOffice(asset.office_location)
+            department = officeDept || "-"
+          } else {
+            department = asset.current_assignment?.department || asset.department || "-"
+          }
+          row.push(department)
+          headers.push("Department")
+        }
+        if (selectedColumns["Office Location"]) {
+          row.push(asset.current_assignment?.office_location || asset.office_location || "-")
+          headers.push("Office Location")
+        }
+        if (selectedColumns["Notes"]) {
+          row.push(asset.notes || "-")
+          headers.push("Notes")
+        }
+        
+        return { row, headers }
+      })
+
+      const headers = dataToExport[0]?.headers || []
+      const body = dataToExport.map((d) => d.row)
 
       autoTable(doc, {
-        head: [["#", "Code", "Type", "Model", "Year", "Status", "Assigned To"]],
-        body: dataToExport,
+        head: [headers],
+        body: body,
         startY: 35,
         styles: { fontSize: 8, cellPadding: 2 },
         headStyles: { fillColor: [59, 130, 246], textColor: 255 },
@@ -1199,6 +1443,7 @@ export default function AdminAssetsPage() {
 
       doc.save(`assets-export-${new Date().toISOString().split("T")[0]}.pdf`)
       toast.success("Assets exported to PDF successfully")
+      setExportDialogOpen(false)
     } catch (error: any) {
       console.error("Error exporting to PDF:", error)
       toast.error("Failed to export to PDF")
@@ -1223,55 +1468,113 @@ export default function AdminAssetsPage() {
 
       const dataToExport = getSortedAssets(filteredAssets)
 
-      // Create header rows
+      // Build header row based on selected columns
+      const headerCells: any[] = []
+      if (selectedColumns["#"]) {
+        headerCells.push(new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "#", bold: true })] })] }))
+      }
+      if (selectedColumns["Unique Code"]) {
+        headerCells.push(new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Unique Code", bold: true })] })] }))
+      }
+      if (selectedColumns["Asset Type"]) {
+        headerCells.push(new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Asset Type", bold: true })] })] }))
+      }
+      if (selectedColumns["Model"]) {
+        headerCells.push(new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Model", bold: true })] })] }))
+      }
+      if (selectedColumns["Serial Number"]) {
+        headerCells.push(new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Serial Number", bold: true })] })] }))
+      }
+      if (selectedColumns["Year"]) {
+        headerCells.push(new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Year", bold: true })] })] }))
+      }
+      if (selectedColumns["Status"]) {
+        headerCells.push(new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Status", bold: true })] })] }))
+      }
+      if (selectedColumns["Assigned To"]) {
+        headerCells.push(new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Assigned To", bold: true })] })] }))
+      }
+      if (selectedColumns["Department"]) {
+        headerCells.push(new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Department", bold: true })] })] }))
+      }
+      if (selectedColumns["Office Location"]) {
+        headerCells.push(new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Office Location", bold: true })] })] }))
+      }
+      if (selectedColumns["Notes"]) {
+        headerCells.push(new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Notes", bold: true })] })] }))
+      }
+
+      // Create header row
       const tableRows = [
-        new TableRow({
-          children: [
-            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "#", bold: true })] })] }),
-            new TableCell({
-              children: [new Paragraph({ children: [new TextRun({ text: "Unique Code", bold: true })] })],
-            }),
-            new TableCell({
-              children: [new Paragraph({ children: [new TextRun({ text: "Asset Type", bold: true })] })],
-            }),
-            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Model", bold: true })] })] }),
-            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Year", bold: true })] })] }),
-            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Status", bold: true })] })] }),
-            new TableCell({
-              children: [new Paragraph({ children: [new TextRun({ text: "Assigned To", bold: true })] })],
-            }),
-          ],
+        new TableRow({ children: headerCells }),
+        ...dataToExport.map((asset, index) => {
+          const rowCells: any[] = []
+          if (selectedColumns["#"]) {
+            rowCells.push(new TableCell({ children: [new Paragraph((index + 1).toString())] }))
+          }
+          if (selectedColumns["Unique Code"]) {
+            rowCells.push(new TableCell({ children: [new Paragraph(asset.unique_code)] }))
+          }
+          if (selectedColumns["Asset Type"]) {
+            rowCells.push(new TableCell({ children: [new Paragraph(ASSET_TYPE_MAP[asset.asset_type]?.label || asset.asset_type)] }))
+          }
+          if (selectedColumns["Model"]) {
+            rowCells.push(new TableCell({ children: [new Paragraph(asset.asset_model || "-")] }))
+          }
+          if (selectedColumns["Serial Number"]) {
+            rowCells.push(new TableCell({ children: [new Paragraph(asset.serial_number || "-")] }))
+          }
+          if (selectedColumns["Year"]) {
+            rowCells.push(new TableCell({ children: [new Paragraph(asset.acquisition_year?.toString() || "-")] }))
+          }
+          if (selectedColumns["Status"]) {
+            rowCells.push(new TableCell({ children: [new Paragraph(asset.status)] }))
+          }
+          if (selectedColumns["Assigned To"]) {
+            rowCells.push(
+              new TableCell({
+                children: [
+                  new Paragraph(
+                    asset.status === "assigned" || asset.status === "retired" || asset.status === "maintenance"
+                      ? asset.assignment_type === "office"
+                        ? `${asset.office_location || "Office"}${asset.status === "retired" ? " (retired)" : asset.status === "maintenance" ? " (maintenance)" : ""}`
+                        : asset.current_assignment?.user
+                          ? `${formatName(asset.current_assignment.user.first_name)} ${formatName(asset.current_assignment.user.last_name)}${asset.status === "retired" ? " (retired)" : asset.status === "maintenance" ? " (maintenance)" : ""}`
+                          : asset.current_assignment?.department
+                            ? `${asset.current_assignment.department}${asset.status === "retired" ? " (retired)" : asset.status === "maintenance" ? " (maintenance)" : ""}`
+                            : "Unassigned"
+                      : "Unassigned"
+                  ),
+                ],
+              })
+            )
+          }
+          if (selectedColumns["Department"]) {
+            // For individual assignments: use user's department
+            // For department assignments: use assigned department
+            // For office assignments: use office's linked department (if department office)
+            let department = "-"
+            if (asset.assignment_type === "individual" && asset.current_assignment?.assigned_to) {
+              const assignedUser = staff.find((s) => s.id === asset.current_assignment?.assigned_to)
+              department = assignedUser?.department || "-"
+            } else if (asset.assignment_type === "department") {
+              department = asset.current_assignment?.department || asset.department || "-"
+            } else if (asset.assignment_type === "office" && asset.office_location) {
+              const officeDept = getDepartmentForOffice(asset.office_location)
+              department = officeDept || "-"
+            } else {
+              department = asset.current_assignment?.department || asset.department || "-"
+            }
+            rowCells.push(new TableCell({ children: [new Paragraph(department)] }))
+          }
+          if (selectedColumns["Office Location"]) {
+            rowCells.push(new TableCell({ children: [new Paragraph(asset.current_assignment?.office_location || asset.office_location || "-")] }))
+          }
+          if (selectedColumns["Notes"]) {
+            rowCells.push(new TableCell({ children: [new Paragraph(asset.notes || "-")] }))
+          }
+          return new TableRow({ children: rowCells })
         }),
-        ...dataToExport.map(
-          (asset, index) =>
-            new TableRow({
-              children: [
-                new TableCell({ children: [new Paragraph((index + 1).toString())] }),
-                new TableCell({ children: [new Paragraph(asset.unique_code)] }),
-                new TableCell({
-                  children: [new Paragraph(ASSET_TYPE_MAP[asset.asset_type]?.label || asset.asset_type)],
-                }),
-                new TableCell({ children: [new Paragraph(asset.asset_model || "-")] }),
-                new TableCell({ children: [new Paragraph(asset.acquisition_year?.toString() || "-")] }),
-                new TableCell({ children: [new Paragraph(asset.status)] }),
-                new TableCell({
-                  children: [
-                    new Paragraph(
-                      asset.status === "assigned" || asset.status === "retired" || asset.status === "maintenance"
-                        ? asset.assignment_type === "office"
-                          ? `${asset.office_location || "Office"}${asset.status === "retired" ? " (retired)" : asset.status === "maintenance" ? " (maintenance)" : ""}`
-                          : asset.current_assignment?.user
-                            ? `${formatName(asset.current_assignment.user.first_name)} ${formatName(asset.current_assignment.user.last_name)}${asset.status === "retired" ? " (retired)" : asset.status === "maintenance" ? " (maintenance)" : ""}`
-                            : asset.current_assignment?.department
-                              ? `${asset.current_assignment.department}${asset.status === "retired" ? " (retired)" : asset.status === "maintenance" ? " (maintenance)" : ""}`
-                              : "Unassigned"
-                        : "Unassigned"
-                    ),
-                  ],
-                }),
-              ],
-            })
-        ),
       ]
 
       const doc = new Document({
@@ -1304,11 +1607,23 @@ export default function AdminAssetsPage() {
       const blob = await Packer.toBlob(doc)
       saveAs(blob, `assets-export-${new Date().toISOString().split("T")[0]}.docx`)
       toast.success("Assets exported to Word successfully")
+      setExportDialogOpen(false)
     } catch (error: any) {
       console.error("Error exporting to Word:", error)
       toast.error("Failed to export to Word")
     }
   }
+
+  const handleExportConfirm = async () => {
+    if (exportType === "excel") {
+      await exportToExcel()
+    } else if (exportType === "pdf") {
+      await exportToPDF()
+    } else if (exportType === "word") {
+      await exportToWord()
+    }
+  }
+
 
   const filteredAssets = assets.filter((asset) => {
     const assetTypeLabel = ASSET_TYPE_MAP[asset.asset_type]?.label || asset.asset_type
@@ -1332,19 +1647,19 @@ export default function AdminAssetsPage() {
         asset.current_assignment?.department,
       ].some((field) => field?.toLowerCase().includes(searchQuery.toLowerCase()))
 
-    const matchesStatus = statusFilter === "all" || asset.status === statusFilter
-    const matchesYear = yearFilter === "all" || asset.acquisition_year?.toString() === yearFilter
-    const matchesAssetType = assetTypeFilter === "all" || asset.asset_type === assetTypeFilter
+    const matchesStatus = statusFilter.length === 0 || statusFilter.includes(asset.status)
+    const matchesYear = yearFilter.length === 0 || yearFilter.includes(asset.acquisition_year?.toString() || "")
+    const matchesAssetType = assetTypeFilter.length === 0 || assetTypeFilter.includes(asset.asset_type)
     const matchesOfficeLocation =
-      officeLocationFilter === "all" ||
-      asset.office_location === officeLocationFilter ||
-      asset.current_assignment?.office_location === officeLocationFilter
+      officeLocationFilter.length === 0 ||
+      officeLocationFilter.includes(asset.office_location || "") ||
+      officeLocationFilter.includes(asset.current_assignment?.office_location || "")
 
     // Filter by issue status
     const matchesIssueStatus =
-      issueStatusFilter === "all" ||
-      (issueStatusFilter === "has_issues" && (asset.unresolved_issues_count || 0) > 0) ||
-      (issueStatusFilter === "no_issues" && (asset.unresolved_issues_count || 0) === 0)
+      issueStatusFilter.length === 0 ||
+      (issueStatusFilter.includes("has_issues") && (asset.unresolved_issues_count || 0) > 0) ||
+      (issueStatusFilter.includes("no_issues") && (asset.unresolved_issues_count || 0) === 0)
 
     // Filter by department - for leads, always filter by their departments
     let matchesDepartment = true
@@ -1364,11 +1679,11 @@ export default function AdminAssetsPage() {
       }
     } else {
       // Admins: use department filter
-      matchesDepartment = departmentFilter === "all" || asset.current_assignment?.department === departmentFilter
+      matchesDepartment = departmentFilter.length === 0 || departmentFilter.includes(asset.current_assignment?.department || "")
     }
 
     // Filter by user
-    const matchesUser = userFilter === "all" || asset.current_assignment?.assigned_to === userFilter
+    const matchesUser = userFilter.length === 0 || userFilter.includes(asset.current_assignment?.assigned_to || "")
 
     return (
       matchesSearch &&
@@ -1561,7 +1876,7 @@ export default function AdminAssetsPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={exportToExcel}
+                  onClick={() => handleExportClick("excel")}
                   className="gap-2"
                   disabled={getSortedAssets(filteredAssets).length === 0}
                 >
@@ -1571,7 +1886,7 @@ export default function AdminAssetsPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={exportToPDF}
+                  onClick={() => handleExportClick("pdf")}
                   className="gap-2"
                   disabled={getSortedAssets(filteredAssets).length === 0}
                 >
@@ -1581,7 +1896,7 @@ export default function AdminAssetsPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={exportToWord}
+                  onClick={() => handleExportClick("word")}
                   className="gap-2"
                   disabled={getSortedAssets(filteredAssets).length === 0}
                 >
@@ -1610,79 +1925,61 @@ export default function AdminAssetsPage() {
 
               {/* Second row - Filters */}
               <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
-                <SearchableSelect
-                  value={assetTypeFilter}
-                  onValueChange={setAssetTypeFilter}
-                  placeholder="All Types"
-                  searchPlaceholder="Search types..."
+                <SearchableMultiSelect
+                  label="Asset Types"
                   icon={<Package className="h-4 w-4" />}
-                  className="w-full"
-                  options={[
-                    { value: "all", label: "All Types" },
-                    ...ASSET_TYPES.map((type) => ({
-                      value: type.code,
-                      label: type.label,
-                    })),
-                  ]}
+                  values={assetTypeFilter}
+                  options={ASSET_TYPES.map((type) => ({
+                    value: type.code,
+                    label: type.label,
+                  }))}
+                  onChange={setAssetTypeFilter}
+                  placeholder="All Types"
                 />
-                <SearchableSelect
-                  value={statusFilter}
-                  onValueChange={setStatusFilter}
-                  placeholder="All Status"
-                  searchPlaceholder="Search status..."
+                <SearchableMultiSelect
+                  label="Status"
                   icon={<Filter className="h-4 w-4" />}
-                  className="w-full"
+                  values={statusFilter}
                   options={[
-                    { value: "all", label: "All Status" },
                     { value: "available", label: "Available" },
                     { value: "assigned", label: "Assigned" },
                     { value: "maintenance", label: "Maintenance" },
                     { value: "retired", label: "Retired" },
                   ]}
+                  onChange={setStatusFilter}
+                  placeholder="All Status"
                 />
-                <SearchableSelect
-                  value={yearFilter}
-                  onValueChange={setYearFilter}
-                  placeholder="All Years"
-                  searchPlaceholder="Search years..."
+                <SearchableMultiSelect
+                  label="Years"
                   icon={<Calendar className="h-4 w-4" />}
-                  className="w-full"
-                  options={[
-                    { value: "all", label: "All Years" },
-                    ...Array.from(new Set(assets.map((a) => a.acquisition_year)))
-                      .filter(Boolean)
-                      .sort((a, b) => (b || 0) - (a || 0))
-                      .map((year) => ({
-                        value: year?.toString() || "",
-                        label: year?.toString() || "",
-                      })),
-                  ]}
+                  values={yearFilter}
+                  options={Array.from(new Set(assets.map((a) => a.acquisition_year)))
+                    .filter(Boolean)
+                    .sort((a, b) => (b || 0) - (a || 0))
+                    .map((year) => ({
+                      value: year?.toString() || "",
+                      label: year?.toString() || "",
+                    }))}
+                  onChange={setYearFilter}
+                  placeholder="All Years"
                 />
-                <SearchableSelect
-                  value={officeLocationFilter}
-                  onValueChange={setOfficeLocationFilter}
-                  placeholder="All Locations"
-                  searchPlaceholder="Search locations..."
+                <SearchableMultiSelect
+                  label="Office Locations"
                   icon={<Building className="h-4 w-4" />}
-                  className="w-full"
-                  options={[
-                    { value: "all", label: "All Locations" },
-                    ...OFFICE_LOCATIONS.map((location) => ({
-                      value: location,
-                      label: location,
-                      icon: <Building className="h-3 w-3" />,
-                    })),
-                  ]}
+                  values={officeLocationFilter}
+                  options={OFFICE_LOCATIONS.map((location) => ({
+                    value: location,
+                    label: location,
+                    icon: <Building className="h-3 w-3" />,
+                  }))}
+                  onChange={setOfficeLocationFilter}
+                  placeholder="All Locations"
                 />
-                <SearchableSelect
-                  value={issueStatusFilter}
-                  onValueChange={setIssueStatusFilter}
-                  placeholder="All Assets"
-                  searchPlaceholder="Filter by issues..."
+                <SearchableMultiSelect
+                  label="Issue Status"
                   icon={<AlertCircle className="h-4 w-4" />}
-                  className="w-full"
+                  values={issueStatusFilter}
                   options={[
-                    { value: "all", label: "All Assets" },
                     {
                       value: "has_issues",
                       label: "Has Issues",
@@ -1694,51 +1991,39 @@ export default function AdminAssetsPage() {
                       icon: <CheckCircle2 className="h-3 w-3 text-green-500" />,
                     },
                   ]}
+                  onChange={setIssueStatusFilter}
+                  placeholder="All Assets"
                 />
                 {/* Department filter - hidden for leads */}
                 {userProfile?.role !== "lead" && (
-                  <SearchableSelect
-                    value={departmentFilter}
-                    onValueChange={setDepartmentFilter}
-                    placeholder="All Departments"
-                    searchPlaceholder="Search departments..."
+                  <SearchableMultiSelect
+                    label="Departments"
                     icon={<Building2 className="h-4 w-4" />}
-                    className="w-full"
-                    options={[
-                      { value: "all", label: "All Departments" },
-                      ...departments.map((dept) => ({
-                        value: dept,
-                        label: dept,
-                        icon: <Building2 className="h-3 w-3" />,
-                      })),
-                    ]}
+                    values={departmentFilter}
+                    options={departments.map((dept) => ({
+                      value: dept,
+                      label: dept,
+                      icon: <Building2 className="h-3 w-3" />,
+                    }))}
+                    onChange={setDepartmentFilter}
+                    placeholder="All Departments"
                   />
                 )}
-                <SearchableSelect
-                  value={userFilter}
-                  onValueChange={setUserFilter}
+                <SearchableMultiSelect
+                  label="Users"
+                  icon={<User className="h-4 w-4" />}
+                  values={userFilter}
+                  options={staff.map((member) => ({
+                    value: member.id,
+                    label: `${formatName(member.first_name)} ${formatName(member.last_name)} - ${member.department}`,
+                    icon: <User className="h-3 w-3" />,
+                  }))}
+                  onChange={setUserFilter}
                   placeholder={
                     userProfile?.role === "lead" && departments.length > 0
                       ? `All ${departments.length === 1 ? departments[0] : "Department"} Users`
                       : "All Users"
                   }
-                  searchPlaceholder="Search users..."
-                  icon={<User className="h-4 w-4" />}
-                  className="w-full"
-                  options={[
-                    {
-                      value: "all",
-                      label:
-                        userProfile?.role === "lead" && departments.length > 0
-                          ? `All ${departments.length === 1 ? departments[0] : "Department"} Users`
-                          : "All Users",
-                    },
-                    ...staff.map((member) => ({
-                      value: member.id,
-                      label: `${formatName(member.first_name)} ${formatName(member.last_name)} - ${member.department}`,
-                      icon: <User className="h-3 w-3" />,
-                    })),
-                  ]}
                 />
               </div>
             </div>
@@ -2193,7 +2478,7 @@ export default function AdminAssetsPage() {
               <Package className="text-muted-foreground mx-auto mb-4 h-16 w-16" />
               <h3 className="text-foreground mb-2 text-xl font-semibold">No Assets Found</h3>
               <p className="text-muted-foreground">
-                {searchQuery || statusFilter !== "all" || departmentFilter !== "all" || userFilter !== "all"
+                {searchQuery || statusFilter.length > 0 || departmentFilter.length > 0 || userFilter.length > 0 || assetTypeFilter.length > 0 || yearFilter.length > 0 || officeLocationFilter.length > 0 || issueStatusFilter.length > 0
                   ? "No assets match your filters"
                   : "Get started by adding your first asset"}
               </p>
@@ -2214,14 +2499,28 @@ export default function AdminAssetsPage() {
           <div className="space-y-4 py-4">
             <div className="grid gap-4 md:grid-cols-2">
               <div>
-                <Label htmlFor="asset_type">Asset Type *</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="asset_type">Asset Type *</Label>
+                  {!selectedAsset && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setIsCreateAssetTypeDialogOpen(true)}
+                      className="h-7 gap-1.5 text-xs"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      Create New
+                    </Button>
+                  )}
+                </div>
                 <SearchableSelect
                   value={assetForm.asset_type}
                   onValueChange={(value) => setAssetForm({ ...assetForm, asset_type: value })}
                   placeholder="Select asset type"
                   searchPlaceholder="Search asset types..."
                   disabled={!!selectedAsset}
-                  options={ASSET_TYPES.map((type) => ({
+                  options={assetTypes.map((type) => ({
                     value: type.code,
                     label: type.label,
                   }))}
@@ -2883,6 +3182,164 @@ export default function AdminAssetsPage() {
 
           <DialogFooter>
             <Button onClick={() => setIsIssuesDialogOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Asset Type Dialog */}
+      <Dialog open={isCreateAssetTypeDialogOpen} onOpenChange={setIsCreateAssetTypeDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader className="space-y-3 border-b pb-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                <Plus className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <DialogTitle className="text-xl">Create New Asset Type</DialogTitle>
+                <DialogDescription className="mt-1">
+                  Add a new asset type that will be available for all assets
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="asset_type_label">Full Name *</Label>
+              <Input
+                id="asset_type_label"
+                placeholder="e.g., Office Chair, Desktop Computer"
+                value={newAssetType.label}
+                onChange={(e) => setNewAssetType({ ...newAssetType, label: e.target.value })}
+                className="mt-1.5"
+              />
+              <p className="text-muted-foreground mt-1 text-xs">The full name of the asset type</p>
+            </div>
+            <div>
+              <Label htmlFor="asset_type_code">Short Name (Code) *</Label>
+              <Input
+                id="asset_type_code"
+                placeholder="e.g., CHAIR, DSKST"
+                value={newAssetType.code}
+                onChange={(e) => {
+                  const code = e.target.value.toUpperCase().replace(/\s+/g, "")
+                  setNewAssetType({ ...newAssetType, code })
+                }}
+                className="mt-1.5 font-mono"
+                maxLength={20}
+              />
+              <p className="text-muted-foreground mt-1 text-xs">
+                Short code used in unique asset codes (e.g., ACOB/HQ/CHAIR/24/001)
+              </p>
+            </div>
+            <div className="flex items-center space-x-2 rounded-lg border bg-muted/50 p-3">
+              <Checkbox
+                id="requires_serial"
+                checked={newAssetType.requiresSerialModel}
+                onCheckedChange={(checked) =>
+                  setNewAssetType({ ...newAssetType, requiresSerialModel: checked === true })
+                }
+              />
+              <Label htmlFor="requires_serial" className="cursor-pointer text-sm font-normal">
+                Requires Serial Number & Model
+              </Label>
+            </div>
+          </div>
+          <DialogFooter className="border-t pt-4">
+            <Button variant="outline" onClick={() => setIsCreateAssetTypeDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreateAssetType} disabled={isCreatingAssetType || !newAssetType.label.trim() || !newAssetType.code.trim()}>
+              {isCreatingAssetType ? "Creating..." : "Create Asset Type"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Export Column Selection Dialog */}
+      <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader className="space-y-3 border-b pb-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                <Download className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <DialogTitle className="text-xl">Select Columns to Export</DialogTitle>
+                <DialogDescription className="mt-1">
+                  Choose which columns you want to include in your{" "}
+                  <span className="font-semibold text-primary">{exportType?.toUpperCase()}</span> export
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+          <div className="space-y-2 py-4">
+            <div className="mb-3 flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2">
+              <span className="text-sm font-medium text-muted-foreground">
+                {Object.values(selectedColumns).filter((v) => v).length} of {Object.keys(selectedColumns).length} columns selected
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  const allSelected = Object.values(selectedColumns).every((v) => v)
+                  setSelectedColumns(
+                    Object.keys(selectedColumns).reduce(
+                      (acc, key) => ({ ...acc, [key]: !allSelected }),
+                      {} as Record<string, boolean>
+                    )
+                  )
+                }}
+                className="h-7 text-xs"
+              >
+                {Object.values(selectedColumns).every((v) => v) ? "Deselect All" : "Select All"}
+              </Button>
+            </div>
+            <div className="max-h-96 space-y-1.5 overflow-y-auto rounded-lg border bg-background/50 p-2">
+              {Object.keys(selectedColumns).map((column) => (
+                <div
+                  key={column}
+                  className={`group flex items-center space-x-3 rounded-md px-3 py-2.5 transition-colors hover:bg-muted/80 ${
+                    selectedColumns[column] ? "bg-primary/5 hover:bg-primary/10" : ""
+                  }`}
+                >
+                  <Checkbox
+                    id={column}
+                    checked={selectedColumns[column]}
+                    onCheckedChange={(checked) => {
+                      setSelectedColumns((prev) => ({
+                        ...prev,
+                        [column]: checked === true,
+                      }))
+                    }}
+                    className="data-[state=checked]:border-primary data-[state=checked]:bg-primary"
+                  />
+                  <Label
+                    htmlFor={column}
+                    className={`flex-1 cursor-pointer text-sm font-medium transition-colors ${
+                      selectedColumns[column] ? "text-foreground" : "text-muted-foreground group-hover:text-foreground dark:group-hover:text-foreground"
+                    }`}
+                  >
+                    {column}
+                  </Label>
+                  {selectedColumns[column] && (
+                    <CheckCircle2 className="h-4 w-4 text-primary" />
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+          <DialogFooter className="border-t pt-4">
+            <Button variant="outline" onClick={() => setExportDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleExportConfirm}
+              disabled={!Object.values(selectedColumns).some((v) => v)}
+              className="gap-2"
+            >
+              <Download className="h-4 w-4" />
+              Export to {exportType?.toUpperCase()}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
