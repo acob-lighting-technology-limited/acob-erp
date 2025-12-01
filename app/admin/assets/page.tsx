@@ -59,6 +59,7 @@ import {
   AlertCircle,
   CheckCircle2,
   X,
+  Loader2,
 } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 
@@ -149,7 +150,7 @@ export default function AdminAssetsPage() {
   const [staff, setStaff] = useState<Staff[]>([])
   const [departments, setDepartments] = useState<string[]>([])
   const [userProfile, setUserProfile] = useState<{ role?: string; lead_departments?: string[] } | null>(null)
-  const [, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState<string[]>([])
   const [departmentFilter, setDepartmentFilter] = useState<string[]>([])
@@ -875,23 +876,25 @@ export default function AdminAssetsPage() {
 
           if (assetForm.assignment_type === "individual") {
             assignmentData.assigned_to = assetForm.assigned_to
+            assignmentData.office_location = null // Office location is NOT related to work location
             
-            // Fetch user's profile to get their department and office location
+            // Fetch user's profile to get their department only
             const { data: userProfile } = await supabase
               .from("profiles")
-              .select("department, current_work_location")
+              .select("department")
               .eq("id", assetForm.assigned_to)
               .single()
             
             if (userProfile) {
-              // Populate department and office_location from user's profile
+              // Only populate department from user's profile, NOT office_location
               assignmentData.department = userProfile.department || null
-              assignmentData.office_location = userProfile.current_work_location || null
             }
           } else if (assetForm.assignment_type === "department") {
             assignmentData.department = assetForm.assignment_department
+            assignmentData.office_location = null
           } else if (assetForm.assignment_type === "office") {
             assignmentData.office_location = assetForm.office_location
+            assignmentData.department = null
           }
 
           const { error: assignError } = await supabase.from("asset_assignments").insert(assignmentData)
@@ -911,13 +914,12 @@ export default function AdminAssetsPage() {
             assetUpdate.office_location = assetForm.office_location
             assetUpdate.department = null
           } else {
-            // For individual assignments, populate from user's profile
+            // For individual assignments, only use department from user's profile
+            // Office location is NOT used for individual assignments (work location is separate)
             if (assignmentData.department) {
               assetUpdate.department = assignmentData.department
             }
-            if (assignmentData.office_location) {
-              assetUpdate.office_location = assignmentData.office_location
-            }
+            assetUpdate.office_location = null // Individual assignments don't use office_location
           }
 
           const { error: assetError } = await supabase.from("assets").update(assetUpdate).eq("id", newAsset.id)
@@ -988,23 +990,25 @@ export default function AdminAssetsPage() {
       if (assignForm.assignment_type === "individual") {
         assignmentData.assigned_to = assignForm.assigned_to
         assignmentData.assigned_from = previousAssignedTo
+        assignmentData.office_location = null // Office location is NOT related to work location
         
-        // Fetch user's profile to get their department and office location
+        // Fetch user's profile to get their department only
         const { data: userProfile } = await supabase
           .from("profiles")
-          .select("department, current_work_location")
+          .select("department")
           .eq("id", assignForm.assigned_to)
           .single()
         
         if (userProfile) {
-          // Populate department and office_location from user's profile
+          // Only populate department from user's profile, NOT office_location
           assignmentData.department = userProfile.department || null
-          assignmentData.office_location = userProfile.current_work_location || null
         }
       } else if (assignForm.assignment_type === "department") {
         assignmentData.department = assignForm.department
+        assignmentData.office_location = null
       } else if (assignForm.assignment_type === "office") {
         assignmentData.office_location = assignForm.office_location
+        assignmentData.department = null
       }
 
       const { error: assignError } = await supabase.from("asset_assignments").insert(assignmentData)
@@ -1024,13 +1028,12 @@ export default function AdminAssetsPage() {
         assetUpdate.office_location = assignForm.office_location
         assetUpdate.department = null
       } else {
-        // For individual assignments, populate from user's profile
+        // For individual assignments, only use department from user's profile
+        // Office location is NOT used for individual assignments
         if (assignmentData.department) {
           assetUpdate.department = assignmentData.department
         }
-        if (assignmentData.office_location) {
-          assetUpdate.office_location = assignmentData.office_location
-        }
+        assetUpdate.office_location = null // Individual assignments don't use office_location
       }
 
       const { error: assetError } = await supabase.from("assets").update(assetUpdate).eq("id", selectedAsset.id)
@@ -1737,6 +1740,17 @@ export default function AdminAssetsPage() {
     return generateUniqueCodePreview(assetForm.asset_type, assetForm.acquisition_year, "???")
   }
 
+  if (isLoading) {
+    return (
+      <div className="from-background via-background to-muted/20 flex min-h-screen w-full items-center justify-center bg-gradient-to-br">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="text-primary h-8 w-8 animate-spin" />
+          <p className="text-muted-foreground text-sm">Loading assets...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="from-background via-background to-muted/20 min-h-screen w-full overflow-x-hidden bg-gradient-to-br">
       <div className="mx-auto max-w-7xl space-y-6 p-4 md:p-8">
@@ -2202,21 +2216,21 @@ export default function AdminAssetsPage() {
                                 )}
                               </div>
                             ) : asset.current_assignment ? (
-                              asset.current_assignment.department ? (
-                                <div className="flex items-center gap-2 text-sm">
-                                  <Building2 className="text-muted-foreground h-3 w-3" />
-                                  <span className="text-foreground">{asset.current_assignment.department}</span>
-                                  {(asset.status === "retired" || asset.status === "maintenance") && (
-                                    <span className="text-muted-foreground text-xs">({asset.status})</span>
-                                  )}
-                                </div>
-                              ) : asset.current_assignment.user ? (
+                              asset.assignment_type === "individual" && asset.current_assignment.user ? (
                                 <div className="flex items-center gap-2 text-sm">
                                   <User className="text-muted-foreground h-3 w-3" />
                                   <span className="text-foreground">
                                     {formatName(asset.current_assignment.user.first_name)}{" "}
                                     {formatName(asset.current_assignment.user.last_name)}
                                   </span>
+                                  {(asset.status === "retired" || asset.status === "maintenance") && (
+                                    <span className="text-muted-foreground text-xs">({asset.status})</span>
+                                  )}
+                                </div>
+                              ) : asset.assignment_type === "department" && asset.current_assignment.department ? (
+                                <div className="flex items-center gap-2 text-sm">
+                                  <Building2 className="text-muted-foreground h-3 w-3" />
+                                  <span className="text-foreground">{asset.current_assignment.department}</span>
                                   {(asset.status === "retired" || asset.status === "maintenance") && (
                                     <span className="text-muted-foreground text-xs">({asset.status})</span>
                                   )}

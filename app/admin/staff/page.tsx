@@ -45,6 +45,7 @@ import {
   FileText,
   Plus,
   CheckCircle2,
+  Loader2,
 } from "lucide-react"
 import type { UserRole } from "@/types/database"
 import { getRoleDisplayName, getRoleBadgeColor, canAssignRoles, DEPARTMENTS } from "@/lib/permissions"
@@ -82,7 +83,7 @@ export default function AdminStaffPage() {
   const searchParams = useSearchParams()
   const [staff, setStaff] = useState<Staff[]>([])
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
-  const [, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [departmentFilter, setDepartmentFilter] = useState<string[]>([])
   const [staffFilter, setStaffFilter] = useState<string[]>([])
@@ -676,6 +677,17 @@ export default function AdminStaffPage() {
     }
 
     return []
+  }
+
+  if (isLoading) {
+    return (
+      <div className="from-background via-background to-muted/20 flex min-h-screen w-full items-center justify-center bg-gradient-to-br">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="text-primary h-8 w-8 animate-spin" />
+          <p className="text-muted-foreground text-sm">Loading staff...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
