@@ -17,6 +17,11 @@ interface HeaderWrapperProps {
 export function HeaderWrapper({ user, isAdmin = false }: HeaderWrapperProps) {
   const pathname = usePathname()
 
+  // Don't show header on root page (shutdown page)
+  if (pathname === "/") {
+    return null
+  }
+
   // Show simple header on auth pages
   const isAuthPage = pathname?.startsWith("/auth")
 

@@ -11,6 +11,7 @@ import { SidebarProvider } from "@/components/sidebar-context"
 import { createClient } from "@/lib/supabase/server"
 import { NProgressProvider } from "@/components/nprogress-provider"
 import { NProgressHandler } from "@/components/nprogress-handler"
+import { cookies } from "next/headers"
 import "./globals.css"
 
 export const metadata: Metadata = {
@@ -26,6 +27,14 @@ export const viewport: Viewport = {
 }
 
 async function HeaderWrapperWithData() {
+  const cookieStore = await cookies()
+  const bypassCookie = cookieStore.get("shutdown_bypass")
+  
+  // Don't show header if no bypass cookie (shutdown mode)
+  if (!bypassCookie || bypassCookie.value !== "true") {
+    return null
+  }
+
   const supabase = await createClient()
   const { data } = await supabase.auth.getUser()
 
