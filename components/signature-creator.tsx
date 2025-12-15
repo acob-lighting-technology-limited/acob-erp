@@ -94,39 +94,39 @@ export function SignatureCreator({ profile }: SignatureCreatorProps) {
   <!-- Name & Role -->
   <div style="border-bottom: 1.5px solid #e5e7eb; padding-bottom: 6px; margin-bottom: 6px;">
     <p style="margin: 0 0 0 0; line-height: 1; font-size: 18px; font-weight: bold; color: #1f2937; letter-spacing: -0.025em;">${fullName}</p>
-    <p style="margin: 0 0 10px 0; font-size: 14px; font-weight: 500; color: #1f2937; text-transform: uppercase; letter-spacing: 0.05em; ">${
+    <p style="margin: 0 0 10px 0; font-size: 14px; font-weight: 500; color: #1f2937;">${
       formData.companyRole
     }</p>
     
     <!-- Contact details -->
     <div style="font-size: 14px; color: #374151; line-height: 1.3;">
       <div style="margin: 0 0 1px 0;">
-        <img src="https://www.acoblighting.com/wp-includes/images/signature/phone.png" width="14" height="14" style="vertical-align: middle; opacity: 0.8; margin-right: 6px; display: inline-block;" alt="Phone" /><a href="tel:${formData.phoneNumber.replace(
+        <img src="https://www.acoblighting.com/images/signature/phone.png" width="18" height="18" style="vertical-align: middle; opacity: 0.8; margin-right: 6px; display: inline-block;" alt="Phone" /><a href="tel:${formData.phoneNumber.replace(
           /\s+/g,
           ""
         )}" style="color: #1f2937; text-decoration: none; vertical-align: middle;">${formattedPhone}</a>
       </div>
       <div style="margin: 0 0 1px 0;">
-        <img src="https://www.acoblighting.com/wp-includes/images/signature/mail.png" width="14" height="14" style="vertical-align: middle; opacity: 0.8; margin-right: 6px; display: inline-block;" alt="Email" /><a href="mailto:${
+        <img src="https://www.acoblighting.com/images/signature/mail.png" width="18" height="18" style="vertical-align: middle; opacity: 0.8; margin-right: 6px; display: inline-block;" alt="Email" /><a href="mailto:${
           formData.companyEmail
         }" style="color: #1f2937; text-decoration: none; vertical-align: middle;">${formData.companyEmail}</a>
       </div>
       <div>
-        <img src="https://www.acoblighting.com/wp-includes/images/signature/web.png" width="14" height="14" style="vertical-align: middle; opacity: 0.8; margin-right: 6px; display: inline-block;" alt="Website" /><a href="http://www.acoblighting.com" style="color: #1f2937; text-decoration: none; vertical-align: middle;">www.acoblighting.com</a>
+        <img src="https://www.acoblighting.com/images/signature/web.png" width="18" height="18" style="vertical-align: middle; opacity: 0.8; margin-right: 6px; display: inline-block;" alt="Website" /><a href="http://www.acoblighting.com" style="color: #1f2937; text-decoration: none; vertical-align: middle;">www.acoblighting.com</a>
       </div>
     </div>
   </div>
   
   <!-- Logo + Socials (stacked vertically) -->
   <div style="margin-bottom: 8px;">
-    <img src="https://www.acoblighting.com/wp-includes/images/signature/acob-logo.png" width="200" height="47" alt="ACOB Lighting Technology Limited" style="display: block; margin-bottom: 8px;" />
+    <img src="https://www.acoblighting.com/images/signature/acob-logo.png" width="200" height="47" alt="ACOB Lighting Technology Limited" style="display: block; margin-bottom: 8px;" />
     
-    <div style="display: inline-block;">
-      <a href="https://www.linkedin.com/company/acob-lighting-technology-limited" style="text-decoration: none; display: inline-block;"><img src="https://www.acoblighting.com/wp-includes/images/signature/linkedin.png" width="25" height="25" alt="LinkedIn" style="border-radius: 4px; display: inline-block;" /></a>
-      <a href="https://twitter.com/AcobLimited" style="text-decoration: none; display: inline-block; margin-left: 4px;"><img src="https://www.acoblighting.com/wp-includes/images/signature/x.png" width="25" height="25" alt="X (Twitter)" style="border-radius: 4px; display: inline-block;" /></a>
-      <a href="https://www.facebook.com/acoblightingtechltd" style="text-decoration: none; display: inline-block; margin-left: 4px;"><img src="https://www.acoblighting.com/wp-includes/images/signature/facebook.png" width="25" height="25" alt="Facebook" style="border-radius: 4px; display: inline-block;" /></a>
-      <a href="https://www.instagram.com/acob_lighting/" style="text-decoration: none; display: inline-block; margin-left: 4px;"><img src="https://www.acoblighting.com/wp-includes/images/signature/instagram.png" width="25" height="25" alt="Instagram" style="border-radius: 4px; display: inline-block;" /></a>
-    </div>
+   <div style="display: inline-block;">
+  <a href="https://www.linkedin.com/company/acob-lighting-technology-limited" style="text-decoration: none; display: inline-block;"><img src="https://www.acoblighting.com/images/signature/linkedin.png" width="22" height="22" alt="LinkedIn" style="border-radius: 4px; display: inline-block;" /></a>
+  <a href="https://twitter.com/AcobLimited" style="text-decoration: none; display: inline-block; margin-left: 4px;"><img src="https://www.acoblighting.com/images/signature/x.png" width="22" height="22" alt="X (Twitter)" style="border-radius: 4px; display: inline-block;" /></a>
+  <a href="https://www.facebook.com/acoblightingtechltd" style="text-decoration: none; display: inline-block; margin-left: 4px;"><img src="https://www.acoblighting.com/images/signature/facebook.png" width="22" height="22" alt="Facebook" style="border-radius: 4px; display: inline-block;" /></a>
+  <a href="https://www.instagram.com/acob_lighting/" style="text-decoration: none; display: inline-block; margin-left: 4px;"><img src="https://www.acoblighting.com/images/signature/instagram.png" width="22" height="22" alt="Instagram" style="border-radius: 4px; display: inline-block;" /></a>
+</div>
   </div>
   
   <!-- Footer -->
