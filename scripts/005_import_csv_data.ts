@@ -91,8 +91,6 @@ async function importCSVData() {
           residential_address: record["Residential Address"] || "",
           current_work_location:
             record["Current Work Location (Office or Site – indicate site name & state if Site)"] || "",
-          site_name: record["Site Name (eg. MST Site)"] || "",
-          site_state: record["Site State Location (eg. Kogi)"] || "",
           device_allocated: record["Device allocated"] || "",
           device_type: record["Desktop/ Laptop"] || "",
           is_admin: false,

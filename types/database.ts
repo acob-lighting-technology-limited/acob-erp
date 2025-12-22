@@ -26,8 +26,6 @@ export interface Profile {
   additional_phone?: string
   residential_address?: string
   current_work_location?: string
-  site_name?: string
-  site_state?: string
   is_admin: boolean
   role: UserRole
   is_department_lead: boolean

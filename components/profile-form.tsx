@@ -50,8 +50,6 @@ export function ProfileForm({ user, profile }: ProfileFormProps) {
     additionalPhone: profile?.additional_phone || "",
     residentialAddress: profile?.residential_address || "",
     currentWorkLocation: profile?.current_work_location || "",
-    siteName: profile?.site_name || "",
-    siteState: profile?.site_state || "",
     bankName: profile?.bank_name || "",
     bankAccountNumber: profile?.bank_account_number || "",
     bankAccountName: profile?.bank_account_name || "",
@@ -71,14 +69,9 @@ export function ProfileForm({ user, profile }: ProfileFormProps) {
   )
 
   const [isLoading, setIsLoading] = useState(false)
-  const [showLocationFields, setShowLocationFields] = useState(formData.currentWorkLocation === "Site")
 
   const handleInputChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
-
-    if (field === "currentWorkLocation") {
-      setShowLocationFields(value === "Site")
-    }
   }
 
   const handleDeviceChange = (index: number, field: string, value: string) => {
@@ -132,8 +125,6 @@ export function ProfileForm({ user, profile }: ProfileFormProps) {
           additional_phone: additionalPhone,
           residential_address: formData.residentialAddress,
           current_work_location: formData.currentWorkLocation,
-          site_name: formData.siteName,
-          site_state: formData.siteState,
           device_type: devices[0]?.type || "",
           device_allocated: devices[0]?.brand || "",
           device_model: devices[0]?.model || "",
@@ -289,26 +280,6 @@ export function ProfileForm({ user, profile }: ProfileFormProps) {
                 </Select>
               </div>
 
-              {showLocationFields && (
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="siteName">Site Name</Label>
-                    <Input
-                      id="siteName"
-                      value={formData.siteName}
-                      onChange={(e) => handleInputChange("siteName", e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="siteState">Site State</Label>
-                    <Input
-                      id="siteState"
-                      value={formData.siteState}
-                      onChange={(e) => handleInputChange("siteState", e.target.value)}
-                    />
-                  </div>
-                </div>
-              )}
             </div>
 
             {/* Device Information - Multiple Devices */}

@@ -45,8 +45,6 @@ interface UserProfile {
   additional_phone: string | null
   residential_address: string | null
   current_work_location: string | null
-  site_name: string | null
-  site_state: string | null
   is_admin: boolean
   is_department_lead: boolean
   lead_departments: string[]

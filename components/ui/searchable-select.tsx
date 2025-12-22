@@ -29,6 +29,7 @@ export function SearchableSelect({
 }: SearchableSelectProps) {
   const [searchQuery, setSearchQuery] = React.useState("")
   const [open, setOpen] = React.useState(false)
+  const inputRef = React.useRef<HTMLInputElement>(null)
 
   const filteredOptions = React.useMemo(() => {
     if (!searchQuery) return options
@@ -36,6 +37,18 @@ export function SearchableSelect({
   }, [options, searchQuery])
 
   const selectedOption = options.find((opt) => opt.value === value)
+
+  // Clear search when dropdown closes
+  React.useEffect(() => {
+    if (!open) {
+      setSearchQuery("")
+    } else {
+      // Focus the input when dropdown opens
+      setTimeout(() => {
+        inputRef.current?.focus()
+      }, 100)
+    }
+  }, [open])
 
   return (
     <SelectPrimitive.Root
@@ -69,16 +82,33 @@ export function SearchableSelect({
           className="bg-popover text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 relative z-50 max-h-[300px] min-w-[8rem] overflow-hidden rounded-md border shadow-md"
           position="popper"
         >
-          <div className="border-b p-2">
+          <div className="border-b p-2" onPointerDownOutside={(e) => e.preventDefault()}>
             <div className="relative">
-              <Search className="text-muted-foreground absolute top-1/2 left-2 h-4 w-4 -translate-y-1/2 transform" />
-              <Input
+              <Search className="text-muted-foreground absolute top-1/2 left-2 h-4 w-4 -translate-y-1/2 transform z-10 pointer-events-none" />
+              <input
+                ref={inputRef}
+                type="text"
                 placeholder={searchPlaceholder}
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-8 pl-8"
-                onClick={(e) => e.stopPropagation()}
-                onKeyDown={(e) => e.stopPropagation()}
+                onChange={(e) => {
+                  const newValue = e.target.value
+                  setSearchQuery(newValue)
+                }}
+                className="border-input file:text-foreground placeholder:text-muted-foreground focus-visible:ring-ring flex h-8 w-full rounded-md border bg-transparent pl-8 pr-2 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:ring-1 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={(e) => {
+                  e.stopPropagation()
+                }}
+                onKeyDown={(e) => {
+                  e.stopPropagation()
+                  // Allow Escape to close the dropdown
+                  if (e.key === "Escape") {
+                    setOpen(false)
+                  }
+                }}
+                onMouseDown={(e) => {
+                  e.stopPropagation()
+                }}
+                autoFocus
               />
             </div>
           </div>

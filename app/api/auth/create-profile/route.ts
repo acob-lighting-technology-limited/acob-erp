@@ -32,8 +32,6 @@ export async function POST(request: Request) {
       additional_phone: "",
       residential_address: "",
       current_work_location: "",
-      site_name: "",
-      site_state: "",
       device_allocated: "",
       device_type: "",
       device_model: "",

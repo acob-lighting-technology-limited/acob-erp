@@ -57,9 +57,7 @@ async function importCSV() {
           email,
           phone_number,
           residential_address,
-          current_work_location,
-          site_name,
-          site_state
+          current_work_location
         )
         VALUES (
           ${row.firstName},

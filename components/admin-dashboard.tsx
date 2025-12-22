@@ -625,12 +625,6 @@ export function AdminDashboard({ users, currentUserId, feedbackByUserId = {} }: 
                     <div className="mt-1">{properCase(detailsUser.current_work_location)}</div>
                   </div>
                   <div>
-                    <Label>Site</Label>
-                    <div className="mt-1">
-                      {properCase(detailsUser.site_name)} {properCase(detailsUser.site_state)}
-                    </div>
-                  </div>
-                  <div>
                     <Label>Bank</Label>
                     <div className="mt-1">
                       {properCase(detailsUser.bank_name)} {detailsUser.bank_account_number}
@@ -686,7 +680,6 @@ export function AdminDashboard({ users, currentUserId, feedbackByUserId = {} }: 
                       `Device: ${properCase(detailsUser.device_type)} ${properCase(detailsUser.device_model)}`,
                       `Address: ${properCase(detailsUser.residential_address)}`,
                       `Work Location: ${properCase(detailsUser.current_work_location)}`,
-                      `Site: ${properCase(detailsUser.site_name)} ${properCase(detailsUser.site_state)}`,
                       `Bank: ${properCase(detailsUser.bank_name)} ${detailsUser.bank_account_number || ""}`,
                       `Account Name: ${properCase(detailsUser.bank_account_name)}`,
                       `DOB: ${detailsUser.date_of_birth || ""}`,

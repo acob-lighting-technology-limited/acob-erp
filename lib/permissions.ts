@@ -164,6 +164,7 @@ export const OFFICE_LOCATIONS = [
   "MD Office",
   "Operations",
   "Reception",
+  "Site",
   "Technical",
   "Technical Extension",
 ] as const

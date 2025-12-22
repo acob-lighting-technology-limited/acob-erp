@@ -46,10 +46,15 @@ import {
   Plus,
   CheckCircle2,
   Loader2,
+  ChevronDown,
+  ChevronUp,
+  Trash2,
+  AlertTriangle,
 } from "lucide-react"
 import type { UserRole } from "@/types/database"
-import { getRoleDisplayName, getRoleBadgeColor, canAssignRoles, DEPARTMENTS } from "@/lib/permissions"
+import { getRoleDisplayName, getRoleBadgeColor, canAssignRoles, DEPARTMENTS, OFFICE_LOCATIONS } from "@/lib/permissions"
 import { SignatureCreator } from "@/components/signature-creator"
+import { ASSET_TYPE_MAP } from "@/lib/asset-types"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -67,8 +72,15 @@ interface Staff {
   company_role: string | null
   role: UserRole
   phone_number: string | null
+  additional_phone: string | null
   residential_address: string | null
   current_work_location: string | null
+  office_location: string | null
+  bank_name: string | null
+  bank_account_number: string | null
+  bank_account_name: string | null
+  date_of_birth: string | null
+  employment_date: string | null
   is_admin: boolean
   is_department_lead: boolean
   lead_departments: string[]
@@ -95,6 +107,52 @@ export default function AdminStaffPage() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isSignatureDialogOpen, setIsSignatureDialogOpen] = useState(false)
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [assignedItems, setAssignedItems] = useState<{
+    tasks: any[]
+    taskAssignments: any[]
+    assets: any[]
+    projects: any[]
+    projectMemberships: any[]
+    feedback: any[]
+    documentation: any[]
+  }>({
+    tasks: [],
+    taskAssignments: [],
+    assets: [],
+    projects: [],
+    projectMemberships: [],
+    feedback: [],
+    documentation: [],
+  })
+  
+  // Export dialog state
+  const [exportDialogOpen, setExportDialogOpen] = useState(false)
+  const [exportType, setExportType] = useState<"excel" | "pdf" | "word" | null>(null)
+  const [selectedColumns, setSelectedColumns] = useState<Record<string, boolean>>({
+    "#": true,
+    "First Name": true,
+    "Last Name": true,
+    "Other Names": true,
+    "Email": true,
+    "Department": true,
+    "Role": true,
+    "Position": true,
+    "Phone Number": true,
+    "Additional Phone": true,
+    "Residential Address": true,
+    "Work Location": true,
+    "Office Location": true,
+    "Bank Name": true,
+    "Bank Account Number": true,
+    "Bank Account Name": true,
+    "Date of Birth": true,
+    "Employment Date": true,
+    "Is Lead": true,
+    "Lead Departments": true,
+    "Created At": true,
+  })
   const [viewStaffProfile, setViewStaffProfile] = useState<any>(null)
   const [viewStaffData, setViewStaffData] = useState<{
     tasks: any[]
@@ -118,9 +176,26 @@ export default function AdminStaffPage() {
   const [editForm, setEditForm] = useState({
     role: "staff" as UserRole,
     department: "",
+    office_location: "",
     company_role: "",
     lead_departments: [] as string[],
+    // Expanded fields
+    first_name: "",
+    last_name: "",
+    other_names: "",
+    company_email: "",
+    phone_number: "",
+    additional_phone: "",
+    residential_address: "",
+    current_work_location: "",
+    bank_name: "",
+    bank_account_number: "",
+    bank_account_name: "",
+    date_of_birth: "",
+    employment_date: "",
+    job_description: "",
   })
+  const [showMoreOptions, setShowMoreOptions] = useState(false)
 
   const supabase = createClient()
 
@@ -176,15 +251,71 @@ export default function AdminStaffPage() {
     }
   }
 
-  const handleEditStaff = (staffMember: Staff) => {
-    setSelectedStaff(staffMember)
-    setEditForm({
-      role: staffMember.role,
-      department: staffMember.department,
-      company_role: staffMember.company_role || "",
-      lead_departments: staffMember.lead_departments || [],
-    })
-    setIsEditDialogOpen(true)
+  const handleEditStaff = async (staffMember: Staff) => {
+    try {
+      setSelectedStaff(staffMember)
+      
+      // Load full profile data to get all fields
+      const { data: fullProfile } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", staffMember.id)
+        .single()
+
+      if (fullProfile) {
+        setEditForm({
+          role: fullProfile.role || "staff",
+          department: fullProfile.department || "",
+          office_location: fullProfile.office_location || "",
+          company_role: fullProfile.company_role || "",
+          lead_departments: fullProfile.lead_departments || [],
+          // Expanded fields
+          first_name: fullProfile.first_name || "",
+          last_name: fullProfile.last_name || "",
+          other_names: fullProfile.other_names || "",
+          company_email: fullProfile.company_email || "",
+          phone_number: fullProfile.phone_number || "",
+          additional_phone: fullProfile.additional_phone || "",
+          residential_address: fullProfile.residential_address || "",
+          current_work_location: fullProfile.current_work_location || "",
+          bank_name: fullProfile.bank_name || "",
+          bank_account_number: fullProfile.bank_account_number || "",
+          bank_account_name: fullProfile.bank_account_name || "",
+          date_of_birth: fullProfile.date_of_birth || "",
+          employment_date: fullProfile.employment_date || "",
+          job_description: fullProfile.job_description || "",
+        })
+      } else {
+        // Fallback to basic fields if full profile not found
+        setEditForm({
+          role: staffMember.role,
+          department: staffMember.department,
+          office_location: staffMember.office_location || "",
+          company_role: staffMember.company_role || "",
+          lead_departments: staffMember.lead_departments || [],
+          first_name: staffMember.first_name || "",
+          last_name: staffMember.last_name || "",
+          other_names: staffMember.other_names || "",
+          company_email: staffMember.company_email || "",
+          phone_number: staffMember.phone_number || "",
+          additional_phone: "",
+          residential_address: staffMember.residential_address || "",
+          current_work_location: staffMember.current_work_location || "",
+          bank_name: "",
+          bank_account_number: "",
+          bank_account_name: "",
+          date_of_birth: "",
+          employment_date: "",
+          job_description: "",
+        })
+      }
+      
+      setShowMoreOptions(false) // Reset expanded state
+      setIsEditDialogOpen(true)
+    } catch (error: any) {
+      console.error("Error loading staff for edit:", error)
+      toast.error("Failed to load staff details")
+    }
   }
 
   const handleViewSignature = async (staffMember: Staff) => {
@@ -216,24 +347,30 @@ export default function AdminStaffPage() {
         setViewStaffProfile(profileData)
 
         // Load related data
-        const [tasksResult, assetsResult, docsResult] = await Promise.all([
+        const [tasksResult, assetAssignmentsResult, officeAssetsResult, docsResult] = await Promise.all([
           supabase
             .from("tasks")
             .select("*")
             .eq("assigned_to", staffMember.id)
             .order("created_at", { ascending: false })
             .limit(10),
+          // Individual asset assignments
           supabase
             .from("asset_assignments")
-            .select(
-              `
-              *,
-              Asset:assets(id, asset_name, asset_type, status)
-            `
-            )
+            .select("id, asset_id, assigned_at, is_current, assignment_type")
             .eq("assigned_to", staffMember.id)
             .eq("is_current", true)
             .limit(10),
+          // Office location asset assignments (if user has office_location)
+          profileData.office_location
+            ? supabase
+                .from("asset_assignments")
+                .select("id, asset_id, assigned_at, is_current, assignment_type, office_location")
+                .eq("office_location", profileData.office_location)
+                .eq("is_current", true)
+                .eq("assignment_type", "office")
+                .limit(10)
+            : Promise.resolve({ data: [] }),
           supabase
             .from("user_documentation")
             .select("*")
@@ -242,15 +379,205 @@ export default function AdminStaffPage() {
             .limit(10),
         ])
 
+        // Fetch asset details separately for individual assignments
+        const individualAssetsWithDetails = await Promise.all(
+          (assetAssignmentsResult.data || []).map(async (assignment: any) => {
+            const { data: assetData } = await supabase
+              .from("assets")
+              .select("id, asset_name, asset_type, asset_model, serial_number, unique_code, status")
+              .eq("id", assignment.asset_id)
+              .single()
+
+            return {
+              ...assignment,
+              Asset: assetData,
+              assignmentType: "individual" as const,
+            }
+          })
+        )
+
+        // Fetch asset details separately for office assignments
+        const officeAssetsWithDetails = await Promise.all(
+          (officeAssetsResult.data || []).map(async (assignment: any) => {
+            const { data: assetData } = await supabase
+              .from("assets")
+              .select("id, asset_name, asset_type, asset_model, serial_number, unique_code, status")
+              .eq("id", assignment.asset_id)
+              .single()
+
+            return {
+              ...assignment,
+              Asset: assetData,
+              assignmentType: "office" as const,
+              officeLocation: assignment.office_location || profileData.office_location,
+            }
+          })
+        )
+
+        // Combine both types of assignments
+        const allAssets = [...individualAssetsWithDetails, ...officeAssetsWithDetails]
+
         setViewStaffData({
           tasks: tasksResult.data || [],
-          assets: assetsResult.data || [],
+          assets: allAssets || [],
           documentation: docsResult.data || [],
         })
       }
     } catch (error: any) {
       console.error("Error loading staff details:", error)
       toast.error("Failed to load staff details")
+    }
+  }
+
+  const checkAssignedItems = async (staffMember: Staff) => {
+    try {
+      const [
+        tasksResult,
+        taskAssignmentsResult,
+        assetsResult,
+        projectsResult,
+        projectMembersResult,
+        feedbackResult,
+        docsResult,
+      ] = await Promise.all([
+        // Tasks assigned to this user
+        supabase.from("tasks").select("id, title, status").eq("assigned_to", staffMember.id),
+        // Task assignments (multiple user assignments)
+        supabase.from("task_assignments").select("id, task_id, Task:tasks(id, title, status)").eq("user_id", staffMember.id),
+        // Current asset assignments
+        supabase
+          .from("asset_assignments")
+          .select("id, Asset:assets(id, asset_name, asset_type)")
+          .eq("assigned_to", staffMember.id)
+          .eq("is_current", true),
+        // Projects managed or created by this user
+        supabase
+          .from("projects")
+          .select("id, project_name, status")
+          .or(`project_manager_id.eq.${staffMember.id},created_by.eq.${staffMember.id}`),
+        // Active project memberships
+        supabase
+          .from("project_members")
+          .select("id, Project:projects(id, project_name)")
+          .eq("user_id", staffMember.id)
+          .eq("is_active", true),
+        // Feedback submitted by this user
+        supabase.from("feedback").select("id, title, status").eq("user_id", staffMember.id),
+        // User documentation
+        supabase.from("user_documentation").select("id, title").eq("user_id", staffMember.id),
+      ])
+
+      const assigned = {
+        tasks: tasksResult.data || [],
+        taskAssignments: taskAssignmentsResult.data || [],
+        assets: assetsResult.data || [],
+        projects: projectsResult.data || [],
+        projectMemberships: projectMembersResult.data || [],
+        feedback: feedbackResult.data || [],
+        documentation: docsResult.data || [],
+      }
+
+      setAssignedItems(assigned)
+      return assigned
+    } catch (error: any) {
+      console.error("Error checking assigned items:", error)
+      toast.error("Failed to check assigned items")
+      return null
+    }
+  }
+
+  const handleDeleteStaff = async (staffMember: Staff) => {
+    try {
+      setSelectedStaff(staffMember)
+      const assigned = await checkAssignedItems(staffMember)
+
+      if (!assigned) {
+        return
+      }
+
+      // Check if user has any assigned items
+      const hasAssignments =
+        assigned.tasks.length > 0 ||
+        assigned.taskAssignments.length > 0 ||
+        assigned.assets.length > 0 ||
+        assigned.projects.length > 0 ||
+        assigned.projectMemberships.length > 0 ||
+        assigned.feedback.length > 0 ||
+        assigned.documentation.length > 0
+
+      if (hasAssignments) {
+        setIsDeleteDialogOpen(true)
+        return
+      }
+
+      // If no assignments, proceed with deletion confirmation
+      setIsDeleteDialogOpen(true)
+    } catch (error: any) {
+      console.error("Error preparing delete:", error)
+      toast.error("Failed to prepare deletion")
+    }
+  }
+
+  const confirmDeleteStaff = async () => {
+    if (isDeleting || !selectedStaff) return
+
+    setIsDeleting(true)
+    try {
+      // Check permissions - only super_admin can delete users
+      if (userProfile?.role !== "super_admin") {
+        toast.error("Only super admins can delete users")
+        setIsDeleting(false)
+        return
+      }
+
+      // Double-check for assignments before deleting
+      const assigned = await checkAssignedItems(selectedStaff)
+      if (!assigned) {
+        setIsDeleting(false)
+        return
+      }
+
+      const hasAssignments =
+        assigned.tasks.length > 0 ||
+        assigned.taskAssignments.length > 0 ||
+        assigned.assets.length > 0 ||
+        assigned.projects.length > 0 ||
+        assigned.projectMemberships.length > 0 ||
+        assigned.feedback.length > 0 ||
+        assigned.documentation.length > 0
+
+      if (hasAssignments) {
+        toast.error("Cannot delete user with assigned items. Please reassign items first.")
+        setIsDeleting(false)
+        return
+      }
+
+      // Try to delete from profiles first (this is safer and will cascade)
+      // Note: Deleting from auth.users requires admin API which may not be available
+      const { error: profileError } = await supabase.from("profiles").delete().eq("id", selectedStaff.id)
+
+      if (profileError) {
+        // If that fails, try using admin API (if available)
+        try {
+          const { error: authError } = await supabase.auth.admin.deleteUser(selectedStaff.id)
+          if (authError) {
+            throw authError
+          }
+        } catch (adminError: any) {
+          // Admin API might not be available, throw the original error
+          throw profileError
+        }
+      }
+
+      toast.success("Staff member deleted successfully")
+      setIsDeleteDialogOpen(false)
+      setSelectedStaff(null)
+      loadData()
+    } catch (error: any) {
+      console.error("Error deleting staff:", error)
+      toast.error(error.message || "Failed to delete staff member")
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -280,16 +607,36 @@ export default function AdminStaffPage() {
       // If role is lead, automatically set is_department_lead to true
       const isLead = editForm.role === "lead"
 
+      // Build update object with all fields
+      const updateData: any = {
+        role: editForm.role,
+        department: editForm.department,
+        office_location: editForm.office_location || null,
+        company_role: editForm.company_role || null,
+        is_department_lead: isLead,
+        lead_departments: isLead ? editForm.lead_departments : [],
+        is_admin: ["super_admin", "admin"].includes(editForm.role),
+        updated_at: new Date().toISOString(),
+        // Always include expanded fields if they exist in form state
+        first_name: editForm.first_name || null,
+        last_name: editForm.last_name || null,
+        other_names: editForm.other_names || null,
+        company_email: editForm.company_email || null,
+        phone_number: editForm.phone_number || null,
+        additional_phone: editForm.additional_phone || null,
+        residential_address: editForm.residential_address || null,
+        current_work_location: editForm.current_work_location || null,
+        bank_name: editForm.bank_name || null,
+        bank_account_number: editForm.bank_account_number || null,
+        bank_account_name: editForm.bank_account_name || null,
+        date_of_birth: editForm.date_of_birth || null,
+        employment_date: editForm.employment_date || null,
+        job_description: editForm.job_description || null,
+      }
+
       const { error } = await supabase
         .from("profiles")
-        .update({
-          role: editForm.role,
-          department: editForm.department,
-          company_role: editForm.company_role || null,
-          is_department_lead: isLead,
-          lead_departments: isLead ? editForm.lead_departments : [],
-          is_admin: ["super_admin", "admin"].includes(editForm.role),
-        })
+        .update(updateData)
         .eq("id", selectedStaff.id)
 
       if (error) throw error
@@ -398,6 +745,41 @@ export default function AdminStaffPage() {
     staff: staff.filter((s) => s.role === "staff").length,
   }
 
+  // Helper function to get export data with selected columns
+  const getExportData = (staffMembers: Staff[]) => {
+    return staffMembers.map((member, index) => {
+      const row: Record<string, any> = {}
+      if (selectedColumns["#"]) row["#"] = index + 1
+      if (selectedColumns["First Name"]) row["First Name"] = formatName(member.first_name) || "-"
+      if (selectedColumns["Last Name"]) row["Last Name"] = formatName(member.last_name) || "-"
+      if (selectedColumns["Other Names"]) row["Other Names"] = member.other_names || "-"
+      if (selectedColumns["Email"]) row["Email"] = member.company_email || "-"
+      if (selectedColumns["Department"]) row["Department"] = member.department || "-"
+      if (selectedColumns["Role"]) row["Role"] = getRoleDisplayName(member.role)
+      if (selectedColumns["Position"]) row["Position"] = member.company_role || "-"
+      if (selectedColumns["Phone Number"]) row["Phone Number"] = member.phone_number || "-"
+      if (selectedColumns["Additional Phone"]) row["Additional Phone"] = member.additional_phone || "-"
+      if (selectedColumns["Residential Address"]) row["Residential Address"] = member.residential_address || "-"
+      if (selectedColumns["Work Location"]) row["Work Location"] = member.current_work_location || "-"
+      if (selectedColumns["Office Location"]) row["Office Location"] = member.office_location || "-"
+      if (selectedColumns["Bank Name"]) row["Bank Name"] = member.bank_name || "-"
+      if (selectedColumns["Bank Account Number"]) row["Bank Account Number"] = member.bank_account_number || "-"
+      if (selectedColumns["Bank Account Name"]) row["Bank Account Name"] = member.bank_account_name || "-"
+      if (selectedColumns["Date of Birth"]) row["Date of Birth"] = member.date_of_birth || "-"
+      if (selectedColumns["Employment Date"]) row["Employment Date"] = member.employment_date || "-"
+      if (selectedColumns["Is Lead"]) row["Is Lead"] = member.is_department_lead ? "Yes" : "No"
+      if (selectedColumns["Lead Departments"]) row["Lead Departments"] = member.lead_departments?.length ? member.lead_departments.join(", ") : "-"
+      if (selectedColumns["Created At"]) row["Created At"] = member.created_at ? new Date(member.created_at).toLocaleDateString() : "-"
+      return row
+    })
+  }
+
+  // Export functions
+  const handleExportClick = (type: "excel" | "pdf" | "word") => {
+    setExportType(type)
+    setExportDialogOpen(true)
+  }
+
   const exportStaffToExcel = async () => {
     try {
       if (filteredStaff.length === 0) {
@@ -408,19 +790,7 @@ export default function AdminStaffPage() {
       const XLSX = await import("xlsx")
       const { default: saveAs } = await import("file-saver")
 
-      const dataToExport = filteredStaff.map((member, index) => ({
-        "#": index + 1,
-        Name: `${formatName(member.first_name)} ${formatName(member.last_name)}`,
-        Email: member.company_email,
-        Department: member.department || "-",
-        Role: getRoleDisplayName(member.role),
-        Position: member.company_role || "-",
-        Phone: member.phone_number || "-",
-        "Work Location": member.current_work_location || "-",
-        "Is Lead": member.is_department_lead ? "Yes" : "No",
-        "Lead Departments": member.lead_departments?.length ? member.lead_departments.join(", ") : "-",
-        "Created At": member.created_at ? new Date(member.created_at).toLocaleDateString() : "-",
-      }))
+      const dataToExport = getExportData(filteredStaff)
 
       const ws = XLSX.utils.json_to_sheet(dataToExport)
       const wb = XLSX.utils.book_new()
@@ -441,6 +811,7 @@ export default function AdminStaffPage() {
       })
       saveAs(data, `staff-export-${new Date().toISOString().split("T")[0]}.xlsx`)
       toast.success("Staff exported to Excel successfully")
+      setExportDialogOpen(false)
     } catch (error: any) {
       console.error("Error exporting staff to Excel:", error)
       toast.error("Failed to export staff to Excel")
@@ -464,24 +835,105 @@ export default function AdminStaffPage() {
       doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 22)
       doc.text(`Total Staff: ${filteredStaff.length}`, 14, 28)
 
-      const dataToExport = filteredStaff.map((member, index) => [
-        index + 1,
-        `${formatName(member.first_name)} ${formatName(member.last_name)}`,
-        member.company_email,
-        member.department || "-",
-        getRoleDisplayName(member.role),
-        member.company_role || "-",
-        member.phone_number || "-",
-        member.is_department_lead
-          ? member.lead_departments?.length
-            ? member.lead_departments.join(", ")
-            : "Yes"
-          : "-",
-      ])
+      // Prepare data with selected columns
+      const dataToExport = filteredStaff.map((member, index) => {
+        const row: any[] = []
+        const headers: string[] = []
+        
+        if (selectedColumns["#"]) {
+          row.push(index + 1)
+          headers.push("#")
+        }
+        if (selectedColumns["First Name"]) {
+          row.push(formatName(member.first_name) || "-")
+          headers.push("First Name")
+        }
+        if (selectedColumns["Last Name"]) {
+          row.push(formatName(member.last_name) || "-")
+          headers.push("Last Name")
+        }
+        if (selectedColumns["Other Names"]) {
+          row.push(member.other_names || "-")
+          headers.push("Other Names")
+        }
+        if (selectedColumns["Email"]) {
+          row.push(member.company_email || "-")
+          headers.push("Email")
+        }
+        if (selectedColumns["Department"]) {
+          row.push(member.department || "-")
+          headers.push("Department")
+        }
+        if (selectedColumns["Role"]) {
+          row.push(getRoleDisplayName(member.role))
+          headers.push("Role")
+        }
+        if (selectedColumns["Position"]) {
+          row.push(member.company_role || "-")
+          headers.push("Position")
+        }
+        if (selectedColumns["Phone Number"]) {
+          row.push(member.phone_number || "-")
+          headers.push("Phone Number")
+        }
+        if (selectedColumns["Additional Phone"]) {
+          row.push(member.additional_phone || "-")
+          headers.push("Additional Phone")
+        }
+        if (selectedColumns["Residential Address"]) {
+          row.push(member.residential_address || "-")
+          headers.push("Residential Address")
+        }
+        if (selectedColumns["Work Location"]) {
+          row.push(member.current_work_location || "-")
+          headers.push("Work Location")
+        }
+        if (selectedColumns["Office Location"]) {
+          row.push(member.office_location || "-")
+          headers.push("Office Location")
+        }
+        if (selectedColumns["Bank Name"]) {
+          row.push(member.bank_name || "-")
+          headers.push("Bank Name")
+        }
+        if (selectedColumns["Bank Account Number"]) {
+          row.push(member.bank_account_number || "-")
+          headers.push("Bank Account Number")
+        }
+        if (selectedColumns["Bank Account Name"]) {
+          row.push(member.bank_account_name || "-")
+          headers.push("Bank Account Name")
+        }
+        if (selectedColumns["Date of Birth"]) {
+          row.push(member.date_of_birth || "-")
+          headers.push("Date of Birth")
+        }
+        if (selectedColumns["Employment Date"]) {
+          row.push(member.employment_date || "-")
+          headers.push("Employment Date")
+        }
+        if (selectedColumns["Is Lead"]) {
+          row.push(member.is_department_lead ? "Yes" : "No")
+          headers.push("Is Lead")
+        }
+        if (selectedColumns["Lead Departments"]) {
+          row.push(member.lead_departments?.length ? member.lead_departments.join(", ") : "-")
+          headers.push("Lead Departments")
+        }
+        if (selectedColumns["Created At"]) {
+          row.push(member.created_at ? new Date(member.created_at).toLocaleDateString() : "-")
+          headers.push("Created At")
+        }
+        
+        return { row, headers }
+      })
+
+      const headers = dataToExport[0]?.headers || []
+      const body = dataToExport.map((d) => d.row)
 
       autoTable(doc, {
-        head: [["#", "Name", "Email", "Department", "Role", "Position", "Phone", "Lead Departments"]],
-        body: dataToExport,
+        head: [headers],
+        body: body,
         startY: 35,
         styles: { fontSize: 8, cellPadding: 2 },
         headStyles: { fillColor: [59, 130, 246], textColor: 255 },
@@ -490,6 +942,7 @@ export default function AdminStaffPage() {
 
       doc.save(`staff-export-${new Date().toISOString().split("T")[0]}.pdf`)
       toast.success("Staff exported to PDF successfully")
+      setExportDialogOpen(false)
     } catch (error: any) {
       console.error("Error exporting staff to PDF:", error)
       toast.error("Failed to export staff to PDF")
@@ -517,118 +970,32 @@ export default function AdminStaffPage() {
       } = await import("docx")
       const { default: saveAs } = await import("file-saver")
 
-      const tableRows = [
-        new TableRow({
-          children: [
+      const dataToExport = getExportData(filteredStaff)
+
+      // Build header row based on selected columns
+      const headerCells: any[] = []
+      Object.keys(selectedColumns).forEach((column) => {
+        if (selectedColumns[column]) {
+          headerCells.push(
             new TableCell({
-              children: [
-                new Paragraph({
-                  children: [new TextRun({ text: "#", bold: true })],
-                }),
-              ],
-            }),
-            new TableCell({
-              children: [
-                new Paragraph({
-                  children: [new TextRun({ text: "Name", bold: true })],
-                }),
-              ],
-            }),
-            new TableCell({
-              children: [
-                new Paragraph({
-                  children: [new TextRun({ text: "Email", bold: true })],
-                }),
-              ],
-            }),
-            new TableCell({
-              children: [
-                new Paragraph({
-                  children: [new TextRun({ text: "Department", bold: true })],
-                }),
-              ],
-            }),
-            new TableCell({
-              children: [
-                new Paragraph({
-                  children: [new TextRun({ text: "Role", bold: true })],
-                }),
-              ],
-            }),
-            new TableCell({
-              children: [
-                new Paragraph({
-                  children: [new TextRun({ text: "Position", bold: true })],
-                }),
-              ],
-            }),
-            new TableCell({
-              children: [
-                new Paragraph({
-                  children: [new TextRun({ text: "Phone", bold: true })],
-                }),
-              ],
-            }),
-            new TableCell({
-              children: [
-                new Paragraph({
-                  children: [new TextRun({ text: "Work Location", bold: true })],
-                }),
-              ],
-            }),
-            new TableCell({
-              children: [
-                new Paragraph({
-                  children: [new TextRun({ text: "Is Lead", bold: true })],
-                }),
-              ],
-            }),
-            new TableCell({
-              children: [
-                new Paragraph({
-                  children: [new TextRun({ text: "Lead Departments", bold: true })],
-                }),
-              ],
-            }),
-          ],
-        }),
-        ...filteredStaff.map(
-          (member, index) =>
-            new TableRow({
-              children: [
-                new TableCell({
-                  children: [new Paragraph((index + 1).toString())],
-                }),
-                new TableCell({
-                  children: [new Paragraph(`${formatName(member.first_name)} ${formatName(member.last_name)}`)],
-                }),
-                new TableCell({
-                  children: [new Paragraph(member.company_email)],
-                }),
-                new TableCell({
-                  children: [new Paragraph(member.department || "-")],
-                }),
-                new TableCell({
-                  children: [new Paragraph(getRoleDisplayName(member.role))],
-                }),
-                new TableCell({
-                  children: [new Paragraph(member.company_role || "-")],
-                }),
-                new TableCell({
-                  children: [new Paragraph(member.phone_number || "-")],
-                }),
-                new TableCell({
-                  children: [new Paragraph(member.current_work_location || "-")],
-                }),
-                new TableCell({
-                  children: [new Paragraph(member.is_department_lead ? "Yes" : "No")],
-                }),
-                new TableCell({
-                  children: [new Paragraph(member.lead_departments?.length ? member.lead_departments.join(", ") : "-")],
-                }),
-              ],
+              children: [new Paragraph({ children: [new TextRun({ text: column, bold: true })] })],
             })
-        ),
+          )
+        }
+      })
+
+      // Create header row
+      const tableRows = [
+        new TableRow({ children: headerCells }),
+        ...dataToExport.map((row) => {
+          const rowCells: any[] = []
+          Object.keys(selectedColumns).forEach((column) => {
+            if (selectedColumns[column]) {
+              rowCells.push(new TableCell({ children: [new Paragraph(String(row[column] || "-"))] }))
+            }
+          })
+          return new TableRow({ children: rowCells })
+        }),
       ]
 
       const doc = new Document({
@@ -811,7 +1178,7 @@ export default function AdminStaffPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={exportStaffToExcel}
+                  onClick={() => handleExportClick("excel")}
                   className="gap-2"
                   disabled={filteredStaff.length === 0}
                 >
@@ -821,7 +1188,7 @@ export default function AdminStaffPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={exportStaffToPDF}
+                  onClick={() => handleExportClick("pdf")}
                   className="gap-2"
                   disabled={filteredStaff.length === 0}
                 >
@@ -831,7 +1198,7 @@ export default function AdminStaffPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={exportStaffToWord}
+                  onClick={() => handleExportClick("word")}
                   className="gap-2"
                   disabled={filteredStaff.length === 0}
                 >
@@ -1003,6 +1370,17 @@ export default function AdminStaffPage() {
                             >
                               <Edit className="h-3 w-3" />
                             </Button>
+                            {userProfile?.role === "super_admin" && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10 sm:h-auto sm:w-auto sm:p-2"
+                                onClick={() => handleDeleteStaff(member)}
+                                title="Delete Staff Member"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>
@@ -1123,6 +1501,17 @@ export default function AdminStaffPage() {
                         <Edit className="h-4 w-4" />
                         Edit
                       </Button>
+                      {userProfile?.role === "super_admin" && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDeleteStaff(member)}
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                          title="Delete Staff Member"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -1302,15 +1691,24 @@ export default function AdminStaffPage() {
       </Dialog>
 
       {/* Edit Staff Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-2xl">
+      <Dialog
+        open={isEditDialogOpen}
+        onOpenChange={(open) => {
+          setIsEditDialogOpen(open)
+          if (!open) {
+            setShowMoreOptions(false) // Reset expanded state when dialog closes
+          }
+        }}
+      >
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               Edit {selectedStaff?.first_name} {selectedStaff?.last_name}
             </DialogTitle>
             <DialogDescription>Update staff member's role, department, and permissions</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <ScrollArea className="max-h-[70vh] pr-4">
+            <div className="space-y-4 py-4">
             <div>
               <Label htmlFor="role">Role *</Label>
               <Select
@@ -1370,6 +1768,22 @@ export default function AdminStaffPage() {
             </div>
 
             <div>
+              <Label htmlFor="office_location">Office Location</Label>
+              <SearchableSelect
+                value={editForm.office_location}
+                onValueChange={(value) => setEditForm({ ...editForm, office_location: value })}
+                placeholder="Select office location"
+                searchPlaceholder="Search office locations..."
+                icon={<Building2 className="h-4 w-4" />}
+                options={OFFICE_LOCATIONS.map((location) => ({
+                  value: location,
+                  label: location,
+                  icon: <Building2 className="h-3 w-3" />,
+                }))}
+              />
+            </div>
+
+            <div>
               <Label htmlFor="company_role">Position/Title</Label>
               <Input
                 id="company_role"
@@ -1424,7 +1838,188 @@ export default function AdminStaffPage() {
                 </div>
               </div>
             )}
-          </div>
+
+            {/* More Options Section */}
+            <div className="border-t pt-4">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setShowMoreOptions(!showMoreOptions)}
+                className="w-full justify-between"
+              >
+                <span className="font-medium">More Options</span>
+                {showMoreOptions ? (
+                  <ChevronUp className="h-4 w-4" />
+                ) : (
+                  <ChevronDown className="h-4 w-4" />
+                )}
+              </Button>
+
+              {showMoreOptions && (
+                <div className="mt-4 space-y-4 animate-in slide-in-from-top-2">
+                  {/* Personal Information */}
+                  <div className="space-y-4">
+                    <h4 className="text-sm font-semibold text-foreground">Personal Information</h4>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div>
+                        <Label htmlFor="edit_first_name">First Name</Label>
+                        <Input
+                          id="edit_first_name"
+                          value={editForm.first_name}
+                          onChange={(e) => setEditForm({ ...editForm, first_name: e.target.value })}
+                          placeholder="First name"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="edit_last_name">Last Name</Label>
+                        <Input
+                          id="edit_last_name"
+                          value={editForm.last_name}
+                          onChange={(e) => setEditForm({ ...editForm, last_name: e.target.value })}
+                          placeholder="Last name"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <Label htmlFor="edit_other_names">Other Names</Label>
+                      <Input
+                        id="edit_other_names"
+                        value={editForm.other_names}
+                        onChange={(e) => setEditForm({ ...editForm, other_names: e.target.value })}
+                        placeholder="Middle name or other names"
+                      />
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div>
+                        <Label htmlFor="edit_company_email">Company Email</Label>
+                        <Input
+                          id="edit_company_email"
+                          type="email"
+                          value={editForm.company_email}
+                          onChange={(e) => setEditForm({ ...editForm, company_email: e.target.value })}
+                          placeholder="email@company.com"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="edit_phone_number">Phone Number</Label>
+                        <Input
+                          id="edit_phone_number"
+                          type="tel"
+                          value={editForm.phone_number}
+                          onChange={(e) => setEditForm({ ...editForm, phone_number: e.target.value })}
+                          placeholder="+234 800 000 0000"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <Label htmlFor="edit_additional_phone">Additional Phone</Label>
+                      <Input
+                        id="edit_additional_phone"
+                        type="tel"
+                        value={editForm.additional_phone}
+                        onChange={(e) => setEditForm({ ...editForm, additional_phone: e.target.value })}
+                        placeholder="Alternative phone number"
+                      />
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div>
+                        <Label htmlFor="edit_date_of_birth">Date of Birth</Label>
+                        <Input
+                          id="edit_date_of_birth"
+                          type="date"
+                          value={editForm.date_of_birth}
+                          onChange={(e) => setEditForm({ ...editForm, date_of_birth: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="edit_employment_date">Employment Date</Label>
+                        <Input
+                          id="edit_employment_date"
+                          type="date"
+                          value={editForm.employment_date}
+                          onChange={(e) => setEditForm({ ...editForm, employment_date: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Address Information */}
+                  <div className="space-y-4 border-t pt-4">
+                    <h4 className="text-sm font-semibold text-foreground">Address Information</h4>
+                    <div>
+                      <Label htmlFor="edit_residential_address">Residential Address</Label>
+                      <Textarea
+                        id="edit_residential_address"
+                        value={editForm.residential_address}
+                        onChange={(e) => setEditForm({ ...editForm, residential_address: e.target.value })}
+                        placeholder="Full residential address"
+                        rows={2}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit_current_work_location">Current Work Location</Label>
+                      <Input
+                        id="edit_current_work_location"
+                        value={editForm.current_work_location}
+                        onChange={(e) => setEditForm({ ...editForm, current_work_location: e.target.value })}
+                        placeholder="Office location or site"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Banking Information */}
+                  <div className="space-y-4 border-t pt-4">
+                    <h4 className="text-sm font-semibold text-foreground">Banking Information</h4>
+                    <div>
+                      <Label htmlFor="edit_bank_name">Bank Name</Label>
+                      <Input
+                        id="edit_bank_name"
+                        value={editForm.bank_name}
+                        onChange={(e) => setEditForm({ ...editForm, bank_name: e.target.value })}
+                        placeholder="Bank name"
+                      />
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div>
+                        <Label htmlFor="edit_bank_account_number">Account Number</Label>
+                        <Input
+                          id="edit_bank_account_number"
+                          value={editForm.bank_account_number}
+                          onChange={(e) => setEditForm({ ...editForm, bank_account_number: e.target.value })}
+                          placeholder="Account number"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="edit_bank_account_name">Account Name</Label>
+                        <Input
+                          id="edit_bank_account_name"
+                          value={editForm.bank_account_name}
+                          onChange={(e) => setEditForm({ ...editForm, bank_account_name: e.target.value })}
+                          placeholder="Account holder name"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Job Description */}
+                  <div className="space-y-4 border-t pt-4">
+                    <h4 className="text-sm font-semibold text-foreground">Job Information</h4>
+                    <div>
+                      <Label htmlFor="edit_job_description">Job Description</Label>
+                      <Textarea
+                        id="edit_job_description"
+                        value={editForm.job_description}
+                        onChange={(e) => setEditForm({ ...editForm, job_description: e.target.value })}
+                        placeholder="Job description or responsibilities"
+                        rows={4}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+            </div>
+          </ScrollArea>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)} disabled={isSaving}>
               Cancel
@@ -1600,14 +2195,73 @@ export default function AdminStaffPage() {
                 </Card>
 
                 {/* Related Data Tabs */}
-                <Tabs defaultValue="tasks" className="space-y-4">
+                <Tabs defaultValue="assets" className="space-y-4">
                   <TabsList>
-                    <TabsTrigger value="tasks">Tasks ({viewStaffData.tasks.length})</TabsTrigger>
                     <TabsTrigger value="assets">Assets ({viewStaffData.assets.length})</TabsTrigger>
+                    <TabsTrigger value="tasks">Tasks ({viewStaffData.tasks.length})</TabsTrigger>
                     <TabsTrigger value="documentation">
                       Documentation ({viewStaffData.documentation.length})
                     </TabsTrigger>
                   </TabsList>
+
+                  <TabsContent value="assets">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Assigned Assets</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {viewStaffData.assets.length > 0 ? (
+                          <div className="space-y-3">
+                            {viewStaffData.assets.map((assignment: any) => {
+                              const asset = assignment.Asset
+                              const assetTypeLabel = asset?.asset_type ? (ASSET_TYPE_MAP[asset.asset_type]?.label || asset.asset_type) : "Unknown"
+                              const isOfficeAssignment = assignment.assignmentType === "office"
+                              
+                              return (
+                                <div key={assignment.id} className="rounded-lg border p-4">
+                                  <div className="flex items-start justify-between mb-3">
+                                    <div className="flex items-center gap-2">
+                                      <p className="font-semibold text-base">{assetTypeLabel}</p>
+                                      {isOfficeAssignment ? (
+                                        <Badge variant="outline" className="bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+                                          Office: {assignment.officeLocation || viewStaffProfile?.office_location || "Office"}
+                                        </Badge>
+                                      ) : (
+                                        <Badge variant="outline" className="bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300">
+                                          Personal Assignment
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    {asset?.status && (
+                                      <Badge variant={asset.status === "assigned" ? "default" : "secondary"}>
+                                        {asset.status}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <div className="space-y-2 text-sm">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-muted-foreground font-medium min-w-[120px]">Unique Code:</span>
+                                      <span className="font-mono">{asset?.unique_code || "-"}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-muted-foreground font-medium min-w-[120px]">Model Number:</span>
+                                      <span>{asset?.asset_model || "-"}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-muted-foreground font-medium min-w-[120px]">Serial Number:</span>
+                                      <span className="font-mono">{asset?.serial_number || "-"}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        ) : (
+                          <p className="text-muted-foreground text-sm">No assets assigned</p>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
 
                   <TabsContent value="tasks">
                     <Card>
@@ -1626,28 +2280,6 @@ export default function AdminStaffPage() {
                           </div>
                         ) : (
                           <p className="text-muted-foreground text-sm">No tasks assigned</p>
-                        )}
-                      </CardContent>
-                    </Card>
-                  </TabsContent>
-
-                  <TabsContent value="assets">
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>Assigned Assets</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        {viewStaffData.assets.length > 0 ? (
-                          <div className="space-y-2">
-                            {viewStaffData.assets.map((assignment: any) => (
-                              <div key={assignment.id} className="rounded-lg border p-3">
-                                <p className="font-medium">{assignment.Asset?.asset_name || "N/A"}</p>
-                                <p className="text-muted-foreground text-sm">{assignment.Asset?.asset_type || "N/A"}</p>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-muted-foreground text-sm">No assets assigned</p>
                         )}
                       </CardContent>
                     </Card>
@@ -1683,6 +2315,361 @@ export default function AdminStaffPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsViewDialogOpen(false)}>
               Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Staff Confirmation Dialog */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" />
+              Delete Staff Member
+            </DialogTitle>
+            <DialogDescription>
+              {selectedStaff
+                ? `Are you sure you want to delete ${formatName(selectedStaff.first_name)} ${formatName(selectedStaff.last_name)}?`
+                : "Are you sure you want to delete this staff member?"}
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Check for assigned items */}
+          {(() => {
+            const hasAssignments =
+              assignedItems.tasks.length > 0 ||
+              assignedItems.taskAssignments.length > 0 ||
+              assignedItems.assets.length > 0 ||
+              assignedItems.projects.length > 0 ||
+              assignedItems.projectMemberships.length > 0 ||
+              assignedItems.feedback.length > 0 ||
+              assignedItems.documentation.length > 0
+
+            if (hasAssignments) {
+              return (
+                <div className="space-y-4 py-4">
+                  <div className="bg-destructive/10 border-destructive/20 rounded-lg border p-4">
+                    <div className="flex items-start gap-3">
+                      <AlertTriangle className="text-destructive mt-0.5 h-5 w-5 shrink-0" />
+                      <div className="flex-1">
+                        <h4 className="text-destructive mb-2 font-semibold">Cannot Delete Staff Member</h4>
+                        <p className="text-muted-foreground mb-4 text-sm">
+                          This staff member has items assigned to them. Please reassign or remove all items before
+                          deleting.
+                        </p>
+
+                        <div className="space-y-3">
+                          {assignedItems.tasks.length > 0 && (
+                            <div>
+                              <p className="text-foreground mb-1 text-sm font-medium">
+                                Tasks ({assignedItems.tasks.length})
+                              </p>
+                              <div className="max-h-32 space-y-1 overflow-y-auto">
+                                {assignedItems.tasks.slice(0, 5).map((task: any) => (
+                                  <div key={task.id} className="text-muted-foreground rounded bg-background p-2 text-xs">
+                                    • {task.title} ({task.status})
+                                  </div>
+                                ))}
+                                {assignedItems.tasks.length > 5 && (
+                                  <p className="text-muted-foreground text-xs">
+                                    ...and {assignedItems.tasks.length - 5} more
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {assignedItems.taskAssignments.length > 0 && (
+                            <div>
+                              <p className="text-foreground mb-1 text-sm font-medium">
+                                Task Assignments ({assignedItems.taskAssignments.length})
+                              </p>
+                              <div className="max-h-32 space-y-1 overflow-y-auto">
+                                {assignedItems.taskAssignments.slice(0, 5).map((assignment: any) => (
+                                  <div
+                                    key={assignment.id}
+                                    className="text-muted-foreground rounded bg-background p-2 text-xs"
+                                  >
+                                    • {assignment.Task?.title || "Unknown Task"} ({assignment.Task?.status || "N/A"})
+                                  </div>
+                                ))}
+                                {assignedItems.taskAssignments.length > 5 && (
+                                  <p className="text-muted-foreground text-xs">
+                                    ...and {assignedItems.taskAssignments.length - 5} more
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {assignedItems.assets.length > 0 && (
+                            <div>
+                              <p className="text-foreground mb-1 text-sm font-medium">
+                                Assets ({assignedItems.assets.length})
+                              </p>
+                              <div className="max-h-32 space-y-1 overflow-y-auto">
+                                {assignedItems.assets.slice(0, 5).map((assignment: any) => (
+                                  <div
+                                    key={assignment.id}
+                                    className="text-muted-foreground rounded bg-background p-2 text-xs"
+                                  >
+                                    • {assignment.Asset?.asset_name || "Unknown Asset"} (
+                                    {assignment.Asset?.asset_type || "N/A"})
+                                  </div>
+                                ))}
+                                {assignedItems.assets.length > 5 && (
+                                  <p className="text-muted-foreground text-xs">
+                                    ...and {assignedItems.assets.length - 5} more
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {assignedItems.projects.length > 0 && (
+                            <div>
+                              <p className="text-foreground mb-1 text-sm font-medium">
+                                Projects ({assignedItems.projects.length})
+                              </p>
+                              <div className="max-h-32 space-y-1 overflow-y-auto">
+                                {assignedItems.projects.slice(0, 5).map((project: any) => (
+                                  <div
+                                    key={project.id}
+                                    className="text-muted-foreground rounded bg-background p-2 text-xs"
+                                  >
+                                    • {project.project_name} ({project.status})
+                                  </div>
+                                ))}
+                                {assignedItems.projects.length > 5 && (
+                                  <p className="text-muted-foreground text-xs">
+                                    ...and {assignedItems.projects.length - 5} more
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {assignedItems.projectMemberships.length > 0 && (
+                            <div>
+                              <p className="text-foreground mb-1 text-sm font-medium">
+                                Project Memberships ({assignedItems.projectMemberships.length})
+                              </p>
+                              <div className="max-h-32 space-y-1 overflow-y-auto">
+                                {assignedItems.projectMemberships.slice(0, 5).map((membership: any) => (
+                                  <div
+                                    key={membership.id}
+                                    className="text-muted-foreground rounded bg-background p-2 text-xs"
+                                  >
+                                    • {membership.Project?.project_name || "Unknown Project"}
+                                  </div>
+                                ))}
+                                {assignedItems.projectMemberships.length > 5 && (
+                                  <p className="text-muted-foreground text-xs">
+                                    ...and {assignedItems.projectMemberships.length - 5} more
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {assignedItems.feedback.length > 0 && (
+                            <div>
+                              <p className="text-foreground mb-1 text-sm font-medium">
+                                Feedback ({assignedItems.feedback.length})
+                              </p>
+                              <div className="max-h-32 space-y-1 overflow-y-auto">
+                                {assignedItems.feedback.slice(0, 5).map((fb: any) => (
+                                  <div key={fb.id} className="text-muted-foreground rounded bg-background p-2 text-xs">
+                                    • {fb.title} ({fb.status})
+                                  </div>
+                                ))}
+                                {assignedItems.feedback.length > 5 && (
+                                  <p className="text-muted-foreground text-xs">
+                                    ...and {assignedItems.feedback.length - 5} more
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {assignedItems.documentation.length > 0 && (
+                            <div>
+                              <p className="text-foreground mb-1 text-sm font-medium">
+                                Documentation ({assignedItems.documentation.length})
+                              </p>
+                              <div className="max-h-32 space-y-1 overflow-y-auto">
+                                {assignedItems.documentation.slice(0, 5).map((doc: any) => (
+                                  <div key={doc.id} className="text-muted-foreground rounded bg-background p-2 text-xs">
+                                    • {doc.title}
+                                  </div>
+                                ))}
+                                {assignedItems.documentation.length > 5 && (
+                                  <p className="text-muted-foreground text-xs">
+                                    ...and {assignedItems.documentation.length - 5} more
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )
+            }
+
+            return (
+              <div className="space-y-4 py-4">
+                <div className="bg-destructive/10 border-destructive/20 rounded-lg border p-4">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="text-destructive mt-0.5 h-5 w-5 shrink-0" />
+                    <div className="flex-1">
+                      <h4 className="text-destructive mb-2 font-semibold">Warning: This action cannot be undone</h4>
+                      <p className="text-muted-foreground text-sm">
+                        Deleting this staff member will permanently remove their profile and all associated data from
+                        the system. This action cannot be reversed.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)} disabled={isDeleting}>
+              Cancel
+            </Button>
+            {(() => {
+              const hasAssignments =
+                assignedItems.tasks.length > 0 ||
+                assignedItems.taskAssignments.length > 0 ||
+                assignedItems.assets.length > 0 ||
+                assignedItems.projects.length > 0 ||
+                assignedItems.projectMemberships.length > 0 ||
+                assignedItems.feedback.length > 0 ||
+                assignedItems.documentation.length > 0
+
+              if (hasAssignments) {
+                return (
+                  <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
+                    Close
+                  </Button>
+                )
+              }
+
+              return (
+                <Button variant="destructive" onClick={confirmDeleteStaff} disabled={isDeleting}>
+                  {isDeleting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Deleting...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete Staff Member
+                    </>
+                  )}
+                </Button>
+              )
+            })()}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Export Column Selection Dialog */}
+      <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader className="space-y-3 border-b pb-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                <Download className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <DialogTitle className="text-xl">Select Columns to Export</DialogTitle>
+                <DialogDescription className="mt-1">
+                  Choose which columns you want to include in your{" "}
+                  <span className="font-semibold text-primary">{exportType?.toUpperCase()}</span> export
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+          <div className="space-y-2 py-4">
+            <div className="mb-3 flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2">
+              <span className="text-sm font-medium text-muted-foreground">
+                {Object.values(selectedColumns).filter((v) => v).length} of {Object.keys(selectedColumns).length} columns selected
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  const allSelected = Object.values(selectedColumns).every((v) => v)
+                  setSelectedColumns(
+                    Object.keys(selectedColumns).reduce(
+                      (acc, key) => ({ ...acc, [key]: !allSelected }),
+                      {} as Record<string, boolean>
+                    )
+                  )
+                }}
+                className="h-7 text-xs"
+              >
+                {Object.values(selectedColumns).every((v) => v) ? "Deselect All" : "Select All"}
+              </Button>
+            </div>
+            <div className="max-h-96 space-y-1.5 overflow-y-auto rounded-lg border bg-background/50 p-2">
+              {Object.keys(selectedColumns).map((column) => (
+                <div
+                  key={column}
+                  className={`group flex items-center space-x-3 rounded-md px-3 py-2.5 transition-colors hover:bg-muted/80 ${
+                    selectedColumns[column] ? "bg-primary/5 hover:bg-primary/10" : ""
+                  }`}
+                >
+                  <Checkbox
+                    id={column}
+                    checked={selectedColumns[column]}
+                    onCheckedChange={(checked) => {
+                      setSelectedColumns((prev) => ({
+                        ...prev,
+                        [column]: checked === true,
+                      }))
+                    }}
+                    className="data-[state=checked]:border-primary data-[state=checked]:bg-primary"
+                  />
+                  <Label
+                    htmlFor={column}
+                    className={`flex-1 cursor-pointer text-sm font-medium transition-colors ${
+                      selectedColumns[column] ? "text-foreground" : "text-muted-foreground group-hover:text-foreground dark:group-hover:text-foreground"
+                    }`}
+                  >
+                    {column}
+                  </Label>
+                  {selectedColumns[column] && (
+                    <CheckCircle2 className="h-4 w-4 text-primary" />
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+          <DialogFooter className="border-t pt-4">
+            <Button variant="outline" onClick={() => setExportDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (exportType === "excel") {
+                  exportStaffToExcel()
+                } else if (exportType === "pdf") {
+                  exportStaffToPDF()
+                } else if (exportType === "word") {
+                  exportStaffToWord()
+                }
+              }}
+              disabled={Object.values(selectedColumns).filter((v) => v).length === 0}
+            >
+              Export to {exportType?.toUpperCase()}
             </Button>
           </DialogFooter>
         </DialogContent>

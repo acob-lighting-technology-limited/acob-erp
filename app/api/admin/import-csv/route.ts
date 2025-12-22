@@ -185,8 +185,6 @@ export async function POST(request: Request) {
             "Current Work Location (Office or Site – indicate site name & state if Site)",
             "Current Work Location",
           ]) || ""
-        const site_name = get(record, ["Site Name (eg. MST Site)", "Site Name"]) || ""
-        const site_state = get(record, ["Site State Location (eg. Kogi)", "Site State Location"]) || ""
         const device_allocated = get(record, ["Device allocated", "Device allocated "]) || ""
         const device_type = get(record, ["Desktop/ Laptop", "Desktop / Laptop", "Desktop", "Laptop"]) || ""
 
@@ -206,8 +204,6 @@ export async function POST(request: Request) {
           maybeSet("phone_number", phone_number)
           maybeSet("residential_address", residential_address)
           maybeSet("current_work_location", current_work_location)
-          maybeSet("site_name", site_name)
-          maybeSet("site_state", site_state)
           maybeSet("device_allocated", device_allocated)
           maybeSet("device_type", device_type)
 
@@ -255,8 +251,6 @@ export async function POST(request: Request) {
           phone_number,
           residential_address,
           current_work_location,
-          site_name,
-          site_state,
           device_allocated,
           device_type,
           is_admin: false,
