@@ -1,5 +1,16 @@
 const nextConfig = {
   transpilePackages: ["xlsx", "jspdf", "jspdf-autotable", "docx", "file-saver"],
+
+  // Ensure build fails on TypeScript errors (matches Vercel behavior)
+  typescript: {
+    ignoreBuildErrors: false,
+  },
+
+  // Ensure build fails on ESLint errors (matches Vercel behavior)
+  eslint: {
+    ignoreDuringBuilds: false,
+  },
+
   webpack: (config, { isServer }) => {
     // Handle canvas module for jsPDF
     config.resolve.alias.canvas = false
