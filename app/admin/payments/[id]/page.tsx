@@ -93,7 +93,7 @@ interface Payment {
   description?: string
   amount: number
   currency: string
-  status: "pending" | "paid" | "overdue" | "cancelled"
+  status: "due" | "paid" | "overdue" | "cancelled"
   recurrence_period?: "monthly" | "quarterly" | "yearly"
   next_payment_due?: string
   payment_date?: string
@@ -594,7 +594,7 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
           body: JSON.stringify({
             next_payment_due: format(nextDue, "yyyy-MM-dd"),
             last_payment_date: format(dateToPay, "yyyy-MM-dd"),
-            status: "pending",
+            status: "due",
             amount_paid: (payment.amount_paid || 0) + payment.amount,
           }),
         })
@@ -621,7 +621,7 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           status: newStatus,
-          amount_paid: newStatus === "paid" ? payment.amount : newStatus === "pending" ? 0 : payment.amount_paid,
+          amount_paid: newStatus === "paid" ? payment.amount : newStatus === "due" ? 0 : payment.amount_paid,
         }),
       })
 
@@ -678,7 +678,6 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
     switch (status) {
       case "paid":
         return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-      case "pending":
       case "due":
         return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
       case "overdue":
@@ -736,13 +735,7 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
             </Link>
             <div className="flex flex-wrap items-center gap-3">
               <h1 className="text-foreground text-2xl font-bold md:text-3xl">{payment.title}</h1>
-              <Badge
-                className={getStatusColor(
-                  payment.status === "pending" && payment.payment_type === "recurring" ? "due" : payment.status
-                )}
-              >
-                {payment.status}
-              </Badge>
+              <Badge className={getStatusColor(payment.status)}>{payment.status}</Badge>
               {/* Highlight Next Due Date */}
               {payment.payment_type === "recurring" && payment.next_payment_due && (
                 <Badge
@@ -761,7 +754,7 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
             </p>
           </div>
           <div className="flex gap-2">
-            {(payment.status === "pending" || payment.status === "overdue") && (
+            {(payment.status === "due" || payment.status === "overdue") && (
               <Button onClick={(e) => markAsPaid(e)}>
                 <CheckCircle className="mr-2 h-4 w-4" />
                 {payment.payment_type === "recurring" ? "Mark Current Due as Paid" : "Mark as Paid"}

@@ -19,6 +19,9 @@ interface Asset {
   serial_number?: string
   status: string
   acquisition_year?: number
+  assignment_type?: "individual" | "department" | "office"
+  department?: string
+  office_location?: string
 }
 
 interface AssetAssignment {
@@ -50,8 +53,12 @@ export default function AssetsPage() {
       } = await supabase.auth.getUser()
       if (!user) return
 
-      // Get user's department
-      const { data: profile } = await supabase.from("profiles").select("department").eq("id", user.id).single()
+      // Get user's department and office location
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("department, office_location")
+        .eq("id", user.id)
+        .single()
 
       // Fetch individual assignments
       const { data: individualAssignments, error: individualError } = await supabase
@@ -72,37 +79,61 @@ export default function AssetsPage() {
 
       if (individualError) throw individualError
 
-      // Fetch department assignments if user has a department
-      let departmentAssignments: any[] = []
-      if (profile?.department) {
-        const { data: deptAssignments, error: deptError } = await supabase
-          .from("asset_assignments")
+      // Fetch department and office assignments if user has a department or office
+      let departmentAndOfficeAssets: any[] = []
+      if (profile?.department || profile?.office_location) {
+        // Fetch assets assigned to user's department or office
+        const { data: sharedAssets, error: sharedError } = await supabase
+          .from("assets")
           .select(
             `
             id,
-            assigned_at,
-            assignment_notes,
-            assigned_by,
-            asset_id,
-            department
+            unique_code,
+            asset_type,
+            asset_model,
+            serial_number,
+            status,
+            acquisition_year,
+            assignment_type,
+            department,
+            office_location,
+            created_at
           `
           )
-          .eq("department", profile.department)
-          .eq("is_current", true)
-          .is("assigned_to", null)
-          .order("assigned_at", { ascending: false })
+          .eq("status", "assigned")
+          .or(
+            `and(assignment_type.eq.department,department.eq.${profile.department}),and(assignment_type.eq.office,office_location.eq.${profile.office_location})`
+          )
 
-        if (!deptError) {
-          departmentAssignments = deptAssignments || []
+        if (!sharedError && sharedAssets) {
+          // Convert shared assets to assignment format
+          departmentAndOfficeAssets = sharedAssets.map((asset) => ({
+            id: `shared-${asset.id}`,
+            assigned_at: asset.created_at, // Use the asset's creation date
+            assignment_notes:
+              asset.assignment_type === "department"
+                ? `Assigned to ${asset.department} department`
+                : `Assigned to ${asset.office_location} office`,
+            assigned_by: null,
+            asset_id: asset.id,
+            department: asset.department,
+            asset: asset,
+            assigner: null,
+          }))
         }
       }
 
       // Combine both assignment types
-      const allAssignments = [...(individualAssignments || []), ...departmentAssignments]
+      const allAssignments = [...(individualAssignments || []), ...departmentAndOfficeAssets]
 
-      // Fetch Asset and assigner details separately
+      // Fetch Asset and assigner details separately (only for individual assignments)
       const assignmentsWithDetails = await Promise.all(
         allAssignments.map(async (assignment: any) => {
+          // If asset data already exists (from department assignments), skip fetching
+          if (assignment.asset) {
+            return assignment
+          }
+
           const [assetResult, assignerResult] = await Promise.all([
             supabase
               .from("assets")
@@ -155,6 +186,32 @@ export default function AssetsPage() {
 
   const getAssetTypeLabel = (assetTypeCode: string) => {
     return ASSET_TYPE_MAP[assetTypeCode]?.label || assetTypeCode
+  }
+
+  const getAssignmentTypeLabel = (assignment: AssetAssignment) => {
+    // Check if it's from department/office (has department field or starts with 'shared-')
+    if (assignment.id.startsWith("shared-")) {
+      // Check the asset's assignment_type
+      if (assignment.asset?.assignment_type === "department") {
+        return "Department"
+      } else if (assignment.asset?.assignment_type === "office") {
+        return "Office"
+      }
+    }
+    return "Personal"
+  }
+
+  const getAssignmentTypeBadgeColor = (type: string) => {
+    switch (type) {
+      case "Personal":
+        return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
+      case "Department":
+        return "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400"
+      case "Office":
+        return "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400"
+      default:
+        return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
+    }
   }
 
   return (
@@ -216,129 +273,148 @@ export default function AssetsPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-[50px]">S/N</TableHead>
                       <TableHead>Asset Name</TableHead>
                       <TableHead>Unique Code</TableHead>
                       <TableHead>Model</TableHead>
                       <TableHead>Serial Number</TableHead>
                       <TableHead>Year</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead>Assignment Type</TableHead>
                       <TableHead>Assigned</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {assignments.map((assignment) => (
-                      <TableRow key={assignment.id}>
-                        <TableCell className="font-medium">
-                          {getAssetTypeLabel(assignment.asset?.asset_type || "")}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1.5">
-                            <Hash className="h-3.5 w-3.5 text-muted-foreground" />
-                            <span className="font-mono text-sm">{assignment.asset?.unique_code || "-"}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>{assignment.asset?.asset_model || "-"}</TableCell>
-                        <TableCell>
-                          {assignment.asset?.serial_number ? (
-                            <span className="font-mono text-sm">{assignment.asset.serial_number}</span>
-                          ) : (
-                            "-"
-                          )}
-                        </TableCell>
-                        <TableCell>{assignment.asset?.acquisition_year || "-"}</TableCell>
-                        <TableCell>
-                          <Badge className={getStatusColor(assignment.asset?.status || "available")}>
-                            {assignment.asset?.status || "available"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">{formatDate(assignment.assigned_at)}</TableCell>
-                      </TableRow>
-                    ))}
+                    {assignments.map((assignment, index) => {
+                      const assignmentType = getAssignmentTypeLabel(assignment)
+                      return (
+                        <TableRow key={assignment.id}>
+                          <TableCell className="font-medium">{index + 1}</TableCell>
+                          <TableCell className="font-medium">
+                            {getAssetTypeLabel(assignment.asset?.asset_type || "")}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1.5">
+                              <Hash className="text-muted-foreground h-3.5 w-3.5" />
+                              <span className="font-mono text-sm">{assignment.asset?.unique_code || "-"}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>{assignment.asset?.asset_model || "-"}</TableCell>
+                          <TableCell>
+                            {assignment.asset?.serial_number ? (
+                              <span className="font-mono text-sm">{assignment.asset.serial_number}</span>
+                            ) : (
+                              "-"
+                            )}
+                          </TableCell>
+                          <TableCell>{assignment.asset?.acquisition_year || "-"}</TableCell>
+                          <TableCell>
+                            <Badge className={getStatusColor(assignment.asset?.status || "available")}>
+                              {assignment.asset?.status || "available"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge className={getAssignmentTypeBadgeColor(assignmentType)}>{assignmentType}</Badge>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground text-sm">
+                            {formatDate(assignment.assigned_at)}
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
                   </TableBody>
                 </Table>
               </div>
             </Card>
           ) : (
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {assignments.map((assignment) => (
-                <Card key={assignment.id} className="border-2 shadow-lg transition-shadow hover:shadow-xl">
-                  <CardHeader className="from-primary/5 to-background border-b bg-gradient-to-r">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-start gap-3">
-                        <div className="bg-primary/10 rounded-lg p-3">
-                          <Package className="text-primary h-6 w-6" />
+              {assignments.map((assignment) => {
+                const assignmentType = getAssignmentTypeLabel(assignment)
+                return (
+                  <Card key={assignment.id} className="border-2 shadow-lg transition-shadow hover:shadow-xl">
+                    <CardHeader className="from-primary/5 to-background border-b bg-gradient-to-r">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-start gap-3">
+                          <div className="bg-primary/10 rounded-lg p-3">
+                            <Package className="text-primary h-6 w-6" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <CardTitle className="text-lg">
+                              {getAssetTypeLabel(assignment.asset?.asset_type || "")}
+                            </CardTitle>
+                            <CardDescription className="mt-1 flex items-center gap-1.5">
+                              <Hash className="h-3.5 w-3.5" />
+                              <span className="font-mono text-xs">{assignment.asset?.unique_code || "-"}</span>
+                            </CardDescription>
+                          </div>
                         </div>
-                        <div className="min-w-0 flex-1">
-                          <CardTitle className="text-lg">{getAssetTypeLabel(assignment.asset?.asset_type || "")}</CardTitle>
-                          <CardDescription className="mt-1 flex items-center gap-1.5">
-                            <Hash className="h-3.5 w-3.5" />
-                            <span className="font-mono text-xs">{assignment.asset?.unique_code || "-"}</span>
-                          </CardDescription>
+                        <div className="flex flex-col gap-2">
+                          <Badge className={getStatusColor(assignment.asset?.status || "available")}>
+                            {assignment.asset?.status || "available"}
+                          </Badge>
+                          <Badge className={getAssignmentTypeBadgeColor(assignmentType)}>{assignmentType}</Badge>
                         </div>
                       </div>
-                      <Badge className={getStatusColor(assignment.asset?.status || "available")}>
-                        {assignment.asset?.status || "available"}
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-3 p-6">
-                    {assignment.asset?.asset_model && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <FileText className="text-muted-foreground h-4 w-4" />
-                        <span className="text-muted-foreground">Model:</span>
-                        <span className="text-foreground font-medium">{assignment.asset.asset_model}</span>
-                      </div>
-                    )}
+                    </CardHeader>
+                    <CardContent className="space-y-3 p-6">
+                      {assignment.asset?.asset_model && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <FileText className="text-muted-foreground h-4 w-4" />
+                          <span className="text-muted-foreground">Model:</span>
+                          <span className="text-foreground font-medium">{assignment.asset.asset_model}</span>
+                        </div>
+                      )}
 
-                    {assignment.asset?.serial_number && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <FileText className="text-muted-foreground h-4 w-4" />
-                        <span className="text-muted-foreground">Serial:</span>
-                        <span className="text-foreground font-mono">{assignment.asset.serial_number}</span>
-                      </div>
-                    )}
+                      {assignment.asset?.serial_number && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <FileText className="text-muted-foreground h-4 w-4" />
+                          <span className="text-muted-foreground">Serial:</span>
+                          <span className="text-foreground font-mono">{assignment.asset.serial_number}</span>
+                        </div>
+                      )}
 
-                    {assignment.asset?.acquisition_year && (
+                      {assignment.asset?.acquisition_year && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <Calendar className="text-muted-foreground h-4 w-4" />
+                          <span className="text-muted-foreground">Year:</span>
+                          <span className="text-foreground font-medium">{assignment.asset.acquisition_year}</span>
+                        </div>
+                      )}
+
                       <div className="flex items-center gap-2 text-sm">
                         <Calendar className="text-muted-foreground h-4 w-4" />
-                        <span className="text-muted-foreground">Year:</span>
-                        <span className="text-foreground font-medium">{assignment.asset.acquisition_year}</span>
+                        <span className="text-muted-foreground">Assigned:</span>
+                        <span className="text-foreground">{formatDate(assignment.assigned_at)}</span>
                       </div>
-                    )}
 
-                    <div className="flex items-center gap-2 text-sm">
-                      <Calendar className="text-muted-foreground h-4 w-4" />
-                      <span className="text-muted-foreground">Assigned:</span>
-                      <span className="text-foreground">{formatDate(assignment.assigned_at)}</span>
-                    </div>
-
-                    {assignment.department ? (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Building2 className="text-muted-foreground h-4 w-4" />
-                        <span className="text-muted-foreground">Department:</span>
-                        <span className="text-foreground font-medium">{assignment.department}</span>
-                      </div>
-                    ) : (
-                      assignment.assigner && (
+                      {assignment.department ? (
                         <div className="flex items-center gap-2 text-sm">
-                          <User className="text-muted-foreground h-4 w-4" />
-                          <span className="text-muted-foreground">Assigned by:</span>
-                          <span className="text-foreground">
-                            {formatName(assignment.assigner.first_name)} {formatName(assignment.assigner.last_name)}
-                          </span>
+                          <Building2 className="text-muted-foreground h-4 w-4" />
+                          <span className="text-muted-foreground">Department:</span>
+                          <span className="text-foreground font-medium">{assignment.department}</span>
                         </div>
-                      )
-                    )}
+                      ) : (
+                        assignment.assigner && (
+                          <div className="flex items-center gap-2 text-sm">
+                            <User className="text-muted-foreground h-4 w-4" />
+                            <span className="text-muted-foreground">Assigned by:</span>
+                            <span className="text-foreground">
+                              {formatName(assignment.assigner.first_name)} {formatName(assignment.assigner.last_name)}
+                            </span>
+                          </div>
+                        )
+                      )}
 
-                    {assignment.assignment_notes && (
-                      <div className="bg-muted/50 mt-4 rounded-lg p-3">
-                        <p className="text-foreground mb-1 text-sm font-medium">Notes:</p>
-                        <p className="text-muted-foreground text-sm">{assignment.assignment_notes}</p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
+                      {assignment.assignment_notes && (
+                        <div className="bg-muted/50 mt-4 rounded-lg p-3">
+                          <p className="text-foreground mb-1 text-sm font-medium">Notes:</p>
+                          <p className="text-muted-foreground text-sm">{assignment.assignment_notes}</p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )
+              })}
             </div>
           )
         ) : (

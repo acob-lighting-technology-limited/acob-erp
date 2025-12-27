@@ -51,8 +51,8 @@ interface SidebarProps {
 }
 
 const navigation = [
-  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { name: "Profile", href: "/profile", icon: User },
+  { name: "Home", href: "/profile", icon: LayoutDashboard }, // Renamed Profile to Home, changed icon to Dashboard icon, points to /profile
+  // Removed original Dashboard entry
   { name: "Job Description", href: "/job-description", icon: Briefcase },
   { name: "My Projects", href: "/projects", icon: FolderKanban },
   { name: "My Tasks", href: "/tasks", icon: ClipboardList },
@@ -64,9 +64,7 @@ const navigation = [
   { name: "Watermark", href: "/watermark", icon: Droplet },
 ]
 
-const adminNavigation = [
-  { name: "Admin Dashboard", href: "/admin", icon: ShieldCheck },
-]
+const adminNavigation = [{ name: "Admin Dashboard", href: "/admin", icon: ShieldCheck }]
 
 export function Sidebar({ user, profile, isAdmin }: SidebarProps) {
   const pathname = usePathname()
@@ -81,18 +79,18 @@ export function Sidebar({ user, profile, isAdmin }: SidebarProps) {
       e.stopPropagation()
       setIsMobileMenuOpen((prev) => !prev)
     }
-    window.addEventListener('toggle-mobile-sidebar', handleToggle)
-    document.addEventListener('toggle-mobile-sidebar', handleToggle)
+    window.addEventListener("toggle-mobile-sidebar", handleToggle)
+    document.addEventListener("toggle-mobile-sidebar", handleToggle)
     return () => {
-      window.removeEventListener('toggle-mobile-sidebar', handleToggle)
-      document.removeEventListener('toggle-mobile-sidebar', handleToggle)
+      window.removeEventListener("toggle-mobile-sidebar", handleToggle)
+      document.removeEventListener("toggle-mobile-sidebar", handleToggle)
     }
   }, [])
 
   // Notify navbar of sidebar state changes
   useEffect(() => {
-    const event = new CustomEvent('sidebar-state-change', {
-      detail: { isOpen: isMobileMenuOpen }
+    const event = new CustomEvent("sidebar-state-change", {
+      detail: { isOpen: isMobileMenuOpen },
     })
     window.dispatchEvent(event)
   }, [isMobileMenuOpen])
@@ -123,11 +121,18 @@ export function Sidebar({ user, profile, isAdmin }: SidebarProps) {
   const SidebarContent = () => (
     <>
       {/* Empty space for logo (moved to navbar) */}
-      <div className={cn("transition-[padding] duration-300 ease-in-out", isCollapsed ? "px-2 py-2" : "px-3 py-2")}>{/* Logo space maintained but empty */}</div>
+      <div className={cn("transition-[padding] duration-300 ease-in-out", isCollapsed ? "px-2 py-2" : "px-3 py-2")}>
+        {/* Logo space maintained but empty */}
+      </div>
 
       {/* Admin Dashboard Indicator */}
       {pathname?.startsWith("/admin") && (
-        <div className={cn("bg-primary/10 border-primary/20 mx-2 mb-2 rounded-lg border p-1.5 transition-[padding] duration-300 ease-in-out", isCollapsed ? "px-1.5" : "px-2")}>
+        <div
+          className={cn(
+            "bg-primary/10 border-primary/20 mx-2 mb-2 rounded-lg border p-1.5 transition-[padding] duration-300 ease-in-out",
+            isCollapsed ? "px-1.5" : "px-2"
+          )}
+        >
           <div className="flex items-center gap-1.5">
             <ShieldCheck className="text-primary h-3.5 w-3.5 flex-shrink-0" />
             <AnimatePresence mode="wait">
@@ -137,7 +142,7 @@ export function Sidebar({ user, profile, isAdmin }: SidebarProps) {
                   animate={{ width: "auto", opacity: 1 }}
                   exit={{ width: 0, opacity: 0 }}
                   transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                  className="text-primary text-xs font-semibold whitespace-nowrap overflow-hidden"
+                  className="text-primary overflow-hidden text-xs font-semibold whitespace-nowrap"
                 >
                   Admin Mode
                 </motion.span>
@@ -148,7 +153,12 @@ export function Sidebar({ user, profile, isAdmin }: SidebarProps) {
       )}
 
       {/* User Profile Section */}
-      <div className={cn("border-b py-2.5 transition-[padding,margin] duration-300 ease-in-out", isCollapsed ? "mx-auto" : "px-3")}>
+      <div
+        className={cn(
+          "border-b py-2.5 transition-[padding,margin] duration-300 ease-in-out",
+          isCollapsed ? "mx-auto" : "px-3"
+        )}
+      >
         <div className="flex items-center gap-2.5">
           <Avatar className={cn("ring-primary/10 h-9 w-9 flex-shrink-0 ring-2")}>
             <AvatarFallback className="bg-primary text-primary-foreground text-sm font-semibold">
@@ -162,7 +172,7 @@ export function Sidebar({ user, profile, isAdmin }: SidebarProps) {
                 animate={{ width: "auto", opacity: 1 }}
                 exit={{ width: 0, opacity: 0 }}
                 transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                className="overflow-hidden min-w-0 flex-1"
+                className="min-w-0 flex-1 overflow-hidden"
               >
                 <p className="text-foreground truncate text-sm font-semibold whitespace-nowrap">
                   {profile?.first_name && profile?.last_name
@@ -269,7 +279,7 @@ export function Sidebar({ user, profile, isAdmin }: SidebarProps) {
         <Button
           variant="outline"
           className={cn(
-            "text-muted-foreground hover:text-foreground min-h-[36px] w-full transition-[padding,gap] duration-300 ease-in-out text-sm",
+            "text-muted-foreground hover:text-foreground min-h-[36px] w-full text-sm transition-[padding,gap] duration-300 ease-in-out",
             isCollapsed ? "justify-center px-2.5" : "justify-start gap-2.5"
           )}
           onClick={handleLogout}
@@ -307,7 +317,7 @@ export function Sidebar({ user, profile, isAdmin }: SidebarProps) {
           stiffness: 300,
           damping: 30,
         }}
-        className="bg-card hidden border-r lg:fixed lg:top-16 lg:bottom-0 lg:flex lg:flex-col overflow-hidden"
+        className="bg-card hidden overflow-hidden border-r lg:fixed lg:top-16 lg:bottom-0 lg:flex lg:flex-col"
       >
         <SidebarContent />
       </motion.aside>

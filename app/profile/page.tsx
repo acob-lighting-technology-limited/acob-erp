@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { createClient } from "@/lib/supabase/client"
@@ -19,11 +19,14 @@ import {
   Shield,
   Calendar,
   FileText,
-  Laptop,
   Package,
   CheckSquare,
   MessageSquare,
   Edit,
+  ArrowRight,
+  Droplet,
+  FileSignature,
+  CreditCard,
 } from "lucide-react"
 import { getRoleDisplayName, getRoleBadgeColor } from "@/lib/permissions"
 import type { UserRole } from "@/types/database"
@@ -62,26 +65,18 @@ interface Task {
   assignment_type?: "individual" | "multiple" | "department"
 }
 
-interface Device {
-  id: string
-  device_name: string
-  device_type: string
-  device_model: string | null
-  serial_number: string | null
-  status: string
-  assigned_at: string
-}
-
 interface Asset {
   id: string
-  asset_name: string
+  asset_name?: string
   asset_type: string
   asset_model: string | null
   serial_number: string | null
+  unique_code: string | null
   status: string
   assigned_at: string
-  assignment_type?: "individual" | "department"
+  assignment_type?: "individual" | "department" | "office"
   department?: string
+  office_location?: string
 }
 
 interface Documentation {
@@ -105,7 +100,6 @@ export default function ProfilePage() {
 
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [tasks, setTasks] = useState<Task[]>([])
-  const [devices, setDevices] = useState<Device[]>([])
   const [assets, setAssets] = useState<Asset[]>([])
   const [documentation, setDocumentation] = useState<Documentation[]>([])
   const [feedback, setFeedback] = useState<Feedback[]>([])
@@ -179,60 +173,60 @@ export default function ProfilePage() {
       const allTasks = [...(individualTasks || []), ...multipleUserTasks, ...(departmentTasks || [])]
       setTasks(allTasks)
 
-      // Load devices assigned to user
-      const { data: deviceAssignments } = await supabase
-        .from("device_assignments")
-        .select("device_id, assigned_at")
+      setTasks(allTasks)
+
+      // Load assets assigned to user (individual)
+      const { data: individualAssignments } = await supabase
+        .from("asset_assignments")
+        .select(
+          `
+          assigned_at,
+          asset:assets(
+            id,
+            asset_type,
+            asset_model,
+            serial_number,
+            status,
+            unique_code,
+            created_at
+          )
+        `
+        )
         .eq("assigned_to", userId)
         .eq("is_current", true)
 
-      if (deviceAssignments && deviceAssignments.length > 0) {
-        const deviceIds = deviceAssignments.map((da) => da.device_id)
-        const { data: devicesData } = await supabase.from("devices").select("*").in("id", deviceIds)
+      // Load department and office assets
+      const { data: sharedAssets } = await supabase
+        .from("assets")
+        .select("*")
+        .eq("status", "assigned")
+        .or(
+          `and(assignment_type.eq.department,department.eq.${profileData.department}),and(assignment_type.eq.office,office_location.eq.${profileData.office_location})`
+        )
 
-        if (devicesData) {
-          const devicesWithAssignment = devicesData.map((device) => {
-            const assignment = deviceAssignments.find((da) => da.device_id === device.id)
-            return {
-              ...device,
-              assigned_at: assignment?.assigned_at || device.created_at,
-            }
-          })
-          setDevices(devicesWithAssignment)
-        }
+      let allAssets: Asset[] = []
+
+      // Process individual assignments
+      if (individualAssignments) {
+        const indAssets = individualAssignments.map((a: any) => ({
+          ...a.asset,
+          assigned_at: a.assigned_at,
+          assignment_type: "individual" as const,
+        }))
+        allAssets = [...allAssets, ...indAssets]
       }
 
-      // Load assets assigned to user (individual and department)
-      const { data: individualAssetAssignments } = await supabase
-        .from("asset_assignments")
-        .select("asset_id, assigned_at")
-        .eq("assigned_to", userId)
-        .eq("is_current", true)
-
-      // Load department assets
-      const { data: departmentAssetAssignments } = await supabase
-        .from("asset_assignments")
-        .select("asset_id, assigned_at")
-        .eq("department", profileData.department)
-        .eq("is_current", true)
-
-      const allAssetAssignments = [...(individualAssetAssignments || []), ...(departmentAssetAssignments || [])]
-
-      if (allAssetAssignments.length > 0) {
-        const assetIds = allAssetAssignments.map((aa) => aa.asset_id)
-        const { data: assetsData } = await supabase.from("assets").select("*").in("id", assetIds)
-
-        if (assetsData) {
-          const assetsWithAssignment = assetsData.map((asset) => {
-            const assignment = allAssetAssignments.find((aa) => aa.asset_id === asset.id)
-            return {
-              ...asset,
-              assigned_at: assignment?.assigned_at || asset.created_at,
-            }
-          })
-          setAssets(assetsWithAssignment)
-        }
+      // Process shared assets
+      if (sharedAssets) {
+        const shAssets = sharedAssets.map((a: any) => ({
+          ...a,
+          assigned_at: a.created_at, // Use created_at for shared assets
+          assignment_type: a.assignment_type,
+        }))
+        allAssets = [...allAssets, ...shAssets]
       }
+
+      setAssets(allAssets)
 
       // Load documentation created by user
       const { data: docsData } = await supabase
@@ -287,6 +281,10 @@ export default function ProfilePage() {
     }
   }
 
+  const getInitials = (firstName?: string, lastName?: string) => {
+    return `${firstName?.[0] || ""}${lastName?.[0] || ""}`.toUpperCase()
+  }
+
   if (!profile) {
     return (
       <div className="container mx-auto p-6">
@@ -300,400 +298,429 @@ export default function ProfilePage() {
   }
 
   const fullName = `${formatName(profile.first_name)} ${formatName(profile.last_name)}`
-  const initials = `${profile.first_name?.[0] || ""}${profile.last_name?.[0] || ""}`.toUpperCase()
+  const quickActions = [
+    {
+      name: "Email Signature",
+      href: "/signature",
+      icon: FileSignature,
+      description: "Create professional signature",
+      color: "bg-blue-500",
+    },
+    {
+      name: "Submit Feedback",
+      href: "/feedback",
+      icon: MessageSquare,
+      description: "Share your thoughts",
+      color: "bg-green-500",
+    },
+    {
+      name: "Watermark Tool",
+      href: "/watermark",
+      icon: Droplet,
+      description: "Add watermarks",
+      color: "bg-purple-500",
+    },
+    {
+      name: "Payments",
+      href: "/payments",
+      icon: CreditCard,
+      description: "Manage department payments",
+      color: "bg-orange-500",
+    },
+  ]
 
   return (
-    <div className="container mx-auto space-y-6 p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+    <div className="from-background via-background to-muted/20 min-h-screen bg-gradient-to-br">
+      <div className="mx-auto max-w-7xl space-y-8 p-4 md:p-8">
+        {/* Header */}
         <div>
-          <h1 className="text-3xl font-bold">{fullName}</h1>
-          <p className="text-muted-foreground">{profile.company_email}</p>
+          <h1 className="text-foreground text-3xl font-bold md:text-4xl">
+            Welcome back, {profile?.first_name || "Staff Member"}!
+          </h1>
+          <p className="text-muted-foreground mt-2">Here's what's happening with your account today.</p>
         </div>
-        <Button onClick={() => router.push("/profile/edit")}>
-          <Edit className="mr-2 h-4 w-4" />
-          Edit Profile
-        </Button>
-      </div>
 
-      {/* Profile Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <User className="h-5 w-5" />
-            Profile Information
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-            <div className="flex items-center gap-3">
-              <Avatar className="h-12 w-12">
-                <AvatarFallback className="bg-primary text-primary-foreground">{initials}</AvatarFallback>
-              </Avatar>
-              <div>
-                <p className="text-muted-foreground text-sm">Full Name</p>
-                <p className="font-medium">{fullName}</p>
-                {profile.other_names && <p className="text-muted-foreground text-xs">({profile.other_names})</p>}
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <Mail className="text-muted-foreground h-5 w-5" />
-              <div>
-                <p className="text-muted-foreground text-sm">Email</p>
-                <p className="font-medium">{profile.company_email}</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <Building2 className="text-muted-foreground h-5 w-5" />
-              <div>
-                <p className="text-muted-foreground text-sm">Department</p>
-                <p className="font-medium">{profile.department || "N/A"}</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <Shield className="text-muted-foreground h-5 w-5" />
-              <div>
-                <p className="text-muted-foreground text-sm">Role</p>
-                <div className="mt-1 flex gap-2">
-                  <Badge className={getRoleBadgeColor(profile.role as UserRole)}>
-                    {getRoleDisplayName(profile.role as UserRole)}
-                  </Badge>
-                  {profile.is_department_lead && <Badge variant="outline">Department Lead</Badge>}
+        {/* Profile Card */}
+        <Card className="overflow-hidden border-2 shadow-lg">
+          <div className="from-primary/10 via-primary/5 to-background bg-gradient-to-r p-6 md:p-8">
+            <div className="flex flex-col gap-8">
+              {/* Top Section: Avatar, Name & Edit Button */}
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-4">
+                  <Avatar className="ring-background h-20 w-20 shadow-xl ring-4">
+                    <AvatarFallback className="bg-primary text-primary-foreground text-2xl font-bold">
+                      {getInitials(profile?.first_name, profile?.last_name)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <h2 className="text-foreground text-2xl font-bold">
+                      {formatName(profile?.first_name)}
+                      {profile?.other_names && ` ${formatName(profile.other_names)}`}
+                      {` ${formatName(profile?.last_name)}`}
+                    </h2>
+                    <p className="text-muted-foreground">{profile?.company_role || "Staff Member"}</p>
+                  </div>
                 </div>
+                <Button onClick={() => router.push("/profile/edit")} variant="outline" className="gap-2">
+                  <Edit className="h-4 w-4" />
+                  Edit Profile
+                </Button>
               </div>
-            </div>
 
-            <div className="flex items-center gap-3">
-              <User className="text-muted-foreground h-5 w-5" />
-              <div>
-                <p className="text-muted-foreground text-sm">Position</p>
-                <p className="font-medium">{profile.company_role || "N/A"}</p>
-              </div>
-            </div>
-
-            {profile.phone_number && (
-              <div className="flex items-center gap-3">
-                <Phone className="text-muted-foreground h-5 w-5" />
-                <div>
-                  <p className="text-muted-foreground text-sm">Phone</p>
-                  <p className="font-medium">{profile.phone_number}</p>
-                  {profile.additional_phone && (
-                    <p className="text-muted-foreground text-xs">{profile.additional_phone}</p>
-                  )}
+              {/* Info Grid */}
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                <div className="flex items-center gap-3">
+                  <User className="text-muted-foreground h-5 w-5" />
+                  <div>
+                    <p className="text-muted-foreground text-sm">Full Name</p>
+                    <p className="font-medium">
+                      {formatName(profile?.first_name)}
+                      {profile?.other_names && ` ${formatName(profile.other_names)}`}
+                      {` ${formatName(profile?.last_name)}`}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            )}
 
-            {profile.residential_address && (
-              <div className="flex items-center gap-3">
-                <MapPin className="text-muted-foreground h-5 w-5" />
-                <div>
-                  <p className="text-muted-foreground text-sm">Address</p>
-                  <p className="font-medium">{profile.residential_address}</p>
+                <div className="flex items-center gap-3">
+                  <Mail className="text-muted-foreground h-5 w-5" />
+                  <div>
+                    <p className="text-muted-foreground text-sm">Email</p>
+                    <p className="font-medium">{profile?.company_email}</p>
+                  </div>
                 </div>
-              </div>
-            )}
 
-            {profile.current_work_location && (
-              <div className="flex items-center gap-3">
-                <MapPin className="text-muted-foreground h-5 w-5" />
-                <div>
-                  <p className="text-muted-foreground text-sm">Work Location</p>
-                  <p className="font-medium">{profile.current_work_location}</p>
+                <div className="flex items-center gap-3">
+                  <Building2 className="text-muted-foreground h-5 w-5" />
+                  <div>
+                    <p className="text-muted-foreground text-sm">Department</p>
+                    <p className="font-medium">{profile?.department || "N/A"}</p>
+                  </div>
                 </div>
-              </div>
-            )}
 
-            {profile.lead_departments && profile.lead_departments.length > 0 && (
-              <div className="flex items-center gap-3">
-                <Building2 className="text-muted-foreground h-5 w-5" />
-                <div>
-                  <p className="text-muted-foreground text-sm">Leading Departments</p>
-                  <div className="mt-1 flex flex-wrap gap-1">
-                    {profile.lead_departments.map((dept) => (
-                      <Badge key={dept} variant="outline">
-                        {dept}
+                <div className="flex items-center gap-3">
+                  <Shield className="text-muted-foreground h-5 w-5" />
+                  <div>
+                    <p className="text-muted-foreground text-sm">Role</p>
+                    <div className="mt-1">
+                      <Badge className={getRoleBadgeColor(profile.role as UserRole)}>
+                        {getRoleDisplayName(profile.role as UserRole)}
                       </Badge>
-                    ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <User className="text-muted-foreground h-5 w-5" />
+                  <div>
+                    <p className="text-muted-foreground text-sm">Position</p>
+                    <p className="font-medium">{profile?.company_role || "N/A"}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <Phone className="text-muted-foreground h-5 w-5" />
+                  <div>
+                    <p className="text-muted-foreground text-sm">Phone</p>
+                    <p className="font-medium">{profile?.phone_number || "N/A"}</p>
+                    {profile?.additional_phone && (
+                      <p className="text-muted-foreground text-xs">{profile.additional_phone}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <MapPin className="text-muted-foreground h-5 w-5" />
+                  <div>
+                    <p className="text-muted-foreground text-sm">Address</p>
+                    <p className="font-medium">{profile?.residential_address || "N/A"}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <MapPin className="text-muted-foreground h-5 w-5" />
+                  <div>
+                    <p className="text-muted-foreground text-sm">Work Location</p>
+                    <p className="font-medium">{profile?.current_work_location || "N/A"}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <Calendar className="text-muted-foreground h-5 w-5" />
+                  <div>
+                    <p className="text-muted-foreground text-sm">Member Since</p>
+                    <p className="font-medium">{new Date(profile.created_at).toLocaleDateString()}</p>
                   </div>
                 </div>
               </div>
-            )}
-
-            <div className="flex items-center gap-3">
-              <Calendar className="text-muted-foreground h-5 w-5" />
-              <div>
-                <p className="text-muted-foreground text-sm">Member Since</p>
-                <p className="font-medium">{new Date(profile.created_at).toLocaleDateString()}</p>
-              </div>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </Card>
 
-      {/* Tabs for Related Data */}
-      <Tabs defaultValue="tasks" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="tasks">
-            <CheckSquare className="mr-2 h-4 w-4" />
-            Tasks ({tasks.length})
-          </TabsTrigger>
-          <TabsTrigger value="devices">
-            <Laptop className="mr-2 h-4 w-4" />
-            Devices ({devices.length})
-          </TabsTrigger>
-          <TabsTrigger value="assets">
-            <Package className="mr-2 h-4 w-4" />
-            Assets ({assets.length})
-          </TabsTrigger>
-          <TabsTrigger value="documentation">
-            <FileText className="mr-2 h-4 w-4" />
-            Documentation ({documentation.length})
-          </TabsTrigger>
-          <TabsTrigger value="feedback">
-            <MessageSquare className="mr-2 h-4 w-4" />
-            Feedback ({feedback.length})
-          </TabsTrigger>
-        </TabsList>
+        {/* Quick Actions */}
+        <div>
+          <h3 className="mb-4 text-xl font-semibold">Quick Actions</h3>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {quickActions.map((action) => (
+              <Link key={action.name} href={action.href} className="h-full">
+                <Card className="group hover:border-primary flex h-full cursor-pointer flex-col border-2 transition-all duration-200 hover:-translate-y-1 hover:shadow-lg">
+                  <CardContent className="flex-1 p-4">
+                    <div className="flex h-full items-start gap-4">
+                      <div className={`${action.color} shrink-0 rounded-lg p-2 text-white`}>
+                        <action.icon className="h-6 w-6" />
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="text-foreground group-hover:text-primary font-semibold transition-colors">
+                          {action.name}
+                        </h4>
+                        <p className="text-muted-foreground mt-1 text-sm">{action.description}</p>
+                      </div>
+                      <ArrowRight className="text-muted-foreground group-hover:text-primary h-5 w-5 shrink-0 transition-all group-hover:translate-x-1" />
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        </div>
 
-        {/* Tasks Tab */}
-        <TabsContent value="tasks">
-          <Card>
-            <CardHeader>
-              <CardTitle>Assigned Tasks</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {tasks.length > 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Title</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Priority</TableHead>
-                      <TableHead>Department</TableHead>
-                      <TableHead>Due Date</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {tasks.map((task) => (
-                      <TableRow key={task.id}>
-                        <TableCell className="font-medium">{task.title}</TableCell>
-                        <TableCell>
-                          <Badge className={getStatusColor(task.status)}>{task.status}</Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={getPriorityColor(task.priority)}>{task.priority}</Badge>
-                        </TableCell>
-                        <TableCell>{task.department || "N/A"}</TableCell>
-                        <TableCell>{task.due_date ? new Date(task.due_date).toLocaleDateString() : "N/A"}</TableCell>
-                        <TableCell>
-                          <Button variant="ghost" size="sm" asChild>
-                            <Link href={`/tasks?taskId=${task.id}`}>View</Link>
-                          </Button>
-                        </TableCell>
+        {/* Tabs for Related Data */}
+        <Tabs defaultValue="assets" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="assets">
+              <Package className="mr-2 h-4 w-4" />
+              Assets ({assets.length})
+            </TabsTrigger>
+            <TabsTrigger value="tasks">
+              <CheckSquare className="mr-2 h-4 w-4" />
+              Tasks ({tasks.length})
+            </TabsTrigger>
+            <TabsTrigger value="documentation">
+              <FileText className="mr-2 h-4 w-4" />
+              Documentation ({documentation.length})
+            </TabsTrigger>
+            <TabsTrigger value="feedback">
+              <MessageSquare className="mr-2 h-4 w-4" />
+              Feedback ({feedback.length})
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Tasks Tab */}
+          <TabsContent value="tasks">
+            <Card>
+              <CardHeader>
+                <CardTitle>Assigned Tasks</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {tasks.length > 0 ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Title</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Priority</TableHead>
+                        <TableHead>Department</TableHead>
+                        <TableHead>Due Date</TableHead>
+                        <TableHead>Actions</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              ) : (
-                <p className="text-muted-foreground py-8 text-center">No tasks assigned</p>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
+                    </TableHeader>
+                    <TableBody>
+                      {tasks.map((task) => (
+                        <TableRow key={task.id}>
+                          <TableCell className="font-medium">{task.title}</TableCell>
+                          <TableCell>
+                            <Badge className={getStatusColor(task.status)}>{task.status}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge className={getPriorityColor(task.priority)}>{task.priority}</Badge>
+                          </TableCell>
+                          <TableCell>{task.department || "N/A"}</TableCell>
+                          <TableCell>{task.due_date ? new Date(task.due_date).toLocaleDateString() : "N/A"}</TableCell>
+                          <TableCell>
+                            <Link
+                              href={`/tasks?taskId=${task.id}`}
+                              className={buttonVariants({ variant: "ghost", size: "sm" })}
+                            >
+                              View
+                            </Link>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <p className="text-muted-foreground py-8 text-center">No tasks assigned</p>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-        {/* Devices Tab */}
-        <TabsContent value="devices">
-          <Card>
-            <CardHeader>
-              <CardTitle>Assigned Devices</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {devices.length > 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Device Name</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Model</TableHead>
-                      <TableHead>Serial Number</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Assigned Date</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {devices.map((device) => (
-                      <TableRow key={device.id}>
-                        <TableCell className="font-medium">{device.device_name}</TableCell>
-                        <TableCell>{device.device_type}</TableCell>
-                        <TableCell>{device.device_model || "N/A"}</TableCell>
-                        <TableCell>{device.serial_number || "N/A"}</TableCell>
-                        <TableCell>
-                          <Badge className={getStatusColor(device.status)}>{device.status}</Badge>
-                        </TableCell>
-                        <TableCell>{new Date(device.assigned_at).toLocaleDateString()}</TableCell>
-                        <TableCell>
-                          <Button variant="ghost" size="sm" asChild>
-                            <Link href={`/devices?deviceId=${device.id}`}>View</Link>
-                          </Button>
-                        </TableCell>
+          {/* Assets Tab */}
+          <TabsContent value="assets">
+            <Card>
+              <CardHeader>
+                <CardTitle>Assigned Assets</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {assets.length > 0 ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[50px]">S/N</TableHead>
+                        <TableHead>Asset Type</TableHead>
+                        <TableHead>Unique Code</TableHead>
+                        <TableHead>Model</TableHead>
+                        <TableHead>Serial Number</TableHead>
+                        <TableHead>Assignment</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Assigned Date</TableHead>
+                        <TableHead>Actions</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              ) : (
-                <p className="text-muted-foreground py-8 text-center">No devices assigned</p>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Assets Tab */}
-        <TabsContent value="assets">
-          <Card>
-            <CardHeader>
-              <CardTitle>Assigned Assets</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {assets.length > 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Asset Name</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Model</TableHead>
-                      <TableHead>Serial Number</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Assigned Date</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {assets.map((asset) => (
-                      <TableRow key={asset.id}>
-                        <TableCell className="font-medium">
-                          {asset.asset_name}
-                          {asset.assignment_type === "department" && (
-                            <Badge variant="outline" className="ml-2">
-                              <Building2 className="mr-1 h-3 w-3" />
-                              Department
+                    </TableHeader>
+                    <TableBody>
+                      {assets.map((asset, index) => (
+                        <TableRow key={asset.id}>
+                          <TableCell className="font-medium">{index + 1}</TableCell>
+                          <TableCell className="font-medium">{asset.asset_type}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="font-mono">
+                              {asset.unique_code || "-"}
                             </Badge>
-                          )}
-                        </TableCell>
-                        <TableCell>{asset.asset_type}</TableCell>
-                        <TableCell>{asset.asset_model || "N/A"}</TableCell>
-                        <TableCell>{asset.serial_number || "N/A"}</TableCell>
-                        <TableCell>
-                          <Badge className={getStatusColor(asset.status)}>{asset.status}</Badge>
-                        </TableCell>
-                        <TableCell>{new Date(asset.assigned_at).toLocaleDateString()}</TableCell>
-                        <TableCell>
-                          <Button variant="ghost" size="sm" asChild>
-                            <Link href={`/assets?assetId=${asset.id}`}>View</Link>
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              ) : (
-                <p className="text-muted-foreground py-8 text-center">No assets assigned</p>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
+                          </TableCell>
+                          <TableCell>{asset.asset_model || "-"}</TableCell>
+                          <TableCell>{asset.serial_number || "-"}</TableCell>
+                          <TableCell>
+                            {asset.assignment_type === "department" && (
+                              <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400">
+                                <Building2 className="mr-1 h-3 w-3" />
+                                Department
+                              </Badge>
+                            )}
+                            {asset.assignment_type === "office" && (
+                              <Badge className="bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400">
+                                <MapPin className="mr-1 h-3 w-3" />
+                                Office
+                              </Badge>
+                            )}
+                            {asset.assignment_type === "individual" && (
+                              <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
+                                <User className="mr-1 h-3 w-3" />
+                                Personal
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <Badge className={getStatusColor(asset.status)}>{asset.status}</Badge>
+                          </TableCell>
+                          <TableCell>{new Date(asset.assigned_at).toLocaleDateString()}</TableCell>
+                          <TableCell>
+                            <Link href={`/assets`} className={buttonVariants({ variant: "ghost", size: "sm" })}>
+                              View
+                            </Link>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <p className="text-muted-foreground py-8 text-center">No assets assigned</p>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-        {/* Documentation Tab */}
-        <TabsContent value="documentation">
-          <Card>
-            <CardHeader>
-              <CardTitle>Documentation Created</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {documentation.length > 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Title</TableHead>
-                      <TableHead>Category</TableHead>
-                      <TableHead>Created Date</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {documentation.map((doc) => (
-                      <TableRow key={doc.id}>
-                        <TableCell className="font-medium">{doc.title}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{doc.category || "N/A"}</Badge>
-                        </TableCell>
-                        <TableCell>{new Date(doc.created_at).toLocaleDateString()}</TableCell>
-                        <TableCell>
-                          <Button variant="ghost" size="sm" asChild>
-                            <Link href={`/documentation?docId=${doc.id}`}>View</Link>
-                          </Button>
-                        </TableCell>
+          {/* Documentation Tab */}
+          <TabsContent value="documentation">
+            <Card>
+              <CardHeader>
+                <CardTitle>Documentation Created</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {documentation.length > 0 ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Title</TableHead>
+                        <TableHead>Category</TableHead>
+                        <TableHead>Created Date</TableHead>
+                        <TableHead>Actions</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              ) : (
-                <p className="text-muted-foreground py-8 text-center">No documentation created</p>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
+                    </TableHeader>
+                    <TableBody>
+                      {documentation.map((doc) => (
+                        <TableRow key={doc.id}>
+                          <TableCell className="font-medium">{doc.title}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{doc.category || "N/A"}</Badge>
+                          </TableCell>
+                          <TableCell>{new Date(doc.created_at).toLocaleDateString()}</TableCell>
+                          <TableCell>
+                            <Link
+                              href={`/documentation?docId=${doc.id}`}
+                              className={buttonVariants({ variant: "ghost", size: "sm" })}
+                            >
+                              View
+                            </Link>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <p className="text-muted-foreground py-8 text-center">No documentation created</p>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-        {/* Feedback Tab */}
-        <TabsContent value="feedback">
-          <Card>
-            <CardHeader>
-              <CardTitle>Feedback Submitted</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {feedback.length > 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Title</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Created Date</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {feedback.map((item) => (
-                      <TableRow key={item.id}>
-                        <TableCell className="font-medium">{item.title}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{item.feedback_type}</Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={getStatusColor(item.status)}>{item.status}</Badge>
-                        </TableCell>
-                        <TableCell>{new Date(item.created_at).toLocaleDateString()}</TableCell>
-                        <TableCell>
-                          <Button variant="ghost" size="sm" asChild>
-                            <Link href={`/feedback?feedbackId=${item.id}`}>View</Link>
-                          </Button>
-                        </TableCell>
+          {/* Feedback Tab */}
+          <TabsContent value="feedback">
+            <Card>
+              <CardHeader>
+                <CardTitle>Feedback Submitted</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {feedback.length > 0 ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Title</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Created Date</TableHead>
+                        <TableHead>Actions</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              ) : (
-                <p className="text-muted-foreground py-8 text-center">No feedback submitted</p>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+                    </TableHeader>
+                    <TableBody>
+                      {feedback.map((item) => (
+                        <TableRow key={item.id}>
+                          <TableCell className="font-medium">{item.title}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{item.feedback_type}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge className={getStatusColor(item.status)}>{item.status}</Badge>
+                          </TableCell>
+                          <TableCell>{new Date(item.created_at).toLocaleDateString()}</TableCell>
+                          <TableCell>
+                            <Link
+                              href={`/feedback?feedbackId=${item.id}`}
+                              className={buttonVariants({ variant: "ghost", size: "sm" })}
+                            >
+                              View
+                            </Link>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <p className="text-muted-foreground py-8 text-center">No feedback submitted</p>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
     </div>
   )
 }

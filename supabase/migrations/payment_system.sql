@@ -58,7 +58,7 @@ CREATE TABLE IF NOT EXISTS department_payments (
     payment_date DATE,
     
     -- Status
-    status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'paid', 'overdue', 'cancelled')),
+    status TEXT DEFAULT 'due' CHECK (status IN ('due', 'paid', 'overdue', 'cancelled')),
     
     -- Additional Info,
     issuer_name TEXT,
