@@ -1,7 +1,7 @@
 import { updateSession } from "@/lib/supabase/middleware"
 import type { NextRequest } from "next/server"
 import { NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { createServerClient } from "@supabase/ssr"
 
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
@@ -12,11 +12,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // Allow other API routes and static assets through with session update
-  if (
-    pathname.startsWith("/api/") ||
-    pathname.startsWith("/_next/") ||
-    pathname.startsWith("/favicon.ico")
-  ) {
+  if (pathname.startsWith("/api/") || pathname.startsWith("/_next/") || pathname.startsWith("/favicon.ico")) {
     return await updateSession(request)
   }
 
@@ -25,7 +21,20 @@ export async function middleware(request: NextRequest) {
   let isMaintenanceEnabled = false
 
   try {
-    const supabase = await createClient()
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return request.cookies.getAll()
+          },
+          setAll(cookiesToSet) {
+            cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
+          },
+        },
+      }
+    )
     const { data: settings, error } = await supabase
       .from("system_settings")
       .select("setting_key, setting_value")
@@ -33,8 +42,8 @@ export async function middleware(request: NextRequest) {
 
     // If table doesn't exist or query fails, allow normal access
     if (!error && settings) {
-      const shutdownMode = settings?.find(s => s.setting_key === "shutdown_mode")?.setting_value as any
-      const maintenanceMode = settings?.find(s => s.setting_key === "maintenance_mode")?.setting_value as any
+      const shutdownMode = settings?.find((s) => s.setting_key === "shutdown_mode")?.setting_value as any
+      const maintenanceMode = settings?.find((s) => s.setting_key === "maintenance_mode")?.setting_value as any
 
       isShutdownEnabled = shutdownMode?.enabled === true
       isMaintenanceEnabled = maintenanceMode?.enabled === true
