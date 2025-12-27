@@ -11,6 +11,8 @@ import {
   Briefcase,
   ArrowRight,
   Shield,
+  Settings,
+  Satellite,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { formatName } from "@/lib/utils"
@@ -252,6 +254,22 @@ export default async function AdminDashboardPage() {
       icon: ScrollText,
       color: "bg-red-500",
       roles: ["super_admin", "admin", "lead"],
+    },
+    {
+      title: "Starlink Payments",
+      description: "Manage Starlink payment schedules and documents",
+      href: "/admin/starlink",
+      icon: Satellite,
+      color: "bg-indigo-500",
+      roles: ["super_admin", "admin"],
+    },
+    {
+      title: "System Settings",
+      description: "Configure shutdown and maintenance modes",
+      href: "/admin/settings",
+      icon: Settings,
+      color: "bg-gray-500",
+      roles: ["super_admin"],
     },
   ]
 
