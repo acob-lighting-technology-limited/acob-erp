@@ -76,16 +76,21 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     const { data: profile } = await supabase.from("profiles").select("is_admin, department").eq("id", user.id).single()
 
     if (!profile?.is_admin) {
-      // Check if payment belongs to user's department
+      // Check if payment belongs to user's department AND was created by user
       const { data: payment } = await supabase
         .from("department_payments")
-        .select("department:departments(name)")
+        .select("department:departments(name), created_by")
         .eq("id", id)
         .single()
 
       // @ts-expect-error: Payment relation typing issue
       if (payment?.department?.name !== profile.department) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+        return NextResponse.json({ error: "Forbidden: Department mismatch" }, { status: 403 })
+      }
+
+      // Enforce "can only edit his own"
+      if (payment?.created_by !== user.id) {
+        return NextResponse.json({ error: "Forbidden: You can only edit payments you created" }, { status: 403 })
       }
     }
 
@@ -120,11 +125,16 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // Only admins can delete payments (enforced by RLS too, but good to check)
-    const { data: profile } = await supabase.from("profiles").select("is_admin").eq("id", user.id).single()
+    // Check permissions
+    const { data: profile } = await supabase.from("profiles").select("is_admin, department").eq("id", user.id).single()
 
     if (!profile?.is_admin) {
-      return NextResponse.json({ error: "Only admins can delete payments" }, { status: 403 })
+      // Non-admins can only delete their own payments
+      const { data: payment } = await supabase.from("department_payments").select("created_by").eq("id", id).single()
+
+      if (!payment || payment.created_by !== user.id) {
+        return NextResponse.json({ error: "Forbidden: You can only delete payments you created" }, { status: 403 })
+      }
     }
 
     const { error } = await supabase.from("department_payments").delete().eq("id", id)

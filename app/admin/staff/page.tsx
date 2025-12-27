@@ -126,7 +126,7 @@ export default function AdminStaffPage() {
     feedback: [],
     documentation: [],
   })
-  
+
   // Export dialog state
   const [exportDialogOpen, setExportDialogOpen] = useState(false)
   const [exportType, setExportType] = useState<"excel" | "pdf" | "word" | null>(null)
@@ -135,10 +135,10 @@ export default function AdminStaffPage() {
     "First Name": true,
     "Last Name": true,
     "Other Names": true,
-    "Email": true,
-    "Department": true,
-    "Role": true,
-    "Position": true,
+    Email: true,
+    Department: true,
+    Role: true,
+    Position: true,
     "Phone Number": true,
     "Additional Phone": true,
     "Residential Address": true,
@@ -254,13 +254,9 @@ export default function AdminStaffPage() {
   const handleEditStaff = async (staffMember: Staff) => {
     try {
       setSelectedStaff(staffMember)
-      
+
       // Load full profile data to get all fields
-      const { data: fullProfile } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", staffMember.id)
-        .single()
+      const { data: fullProfile } = await supabase.from("profiles").select("*").eq("id", staffMember.id).single()
 
       if (fullProfile) {
         setEditForm({
@@ -309,7 +305,7 @@ export default function AdminStaffPage() {
           job_description: "",
         })
       }
-      
+
       setShowMoreOptions(false) // Reset expanded state
       setIsEditDialogOpen(true)
     } catch (error: any) {
@@ -347,37 +343,52 @@ export default function AdminStaffPage() {
         setViewStaffProfile(profileData)
 
         // Load related data
-        const [tasksResult, assetAssignmentsResult, officeAssetsResult, docsResult] = await Promise.all([
-          supabase
-            .from("tasks")
-            .select("*")
-            .eq("assigned_to", staffMember.id)
-            .order("created_at", { ascending: false })
-            .limit(10),
-          // Individual asset assignments
-          supabase
-            .from("asset_assignments")
-            .select("id, asset_id, assigned_at, is_current, assignment_type")
-            .eq("assigned_to", staffMember.id)
-            .eq("is_current", true)
-            .limit(10),
-          // Office location asset assignments (if user has office_location)
-          profileData.office_location
-            ? supabase
-                .from("asset_assignments")
-                .select("id, asset_id, assigned_at, is_current, assignment_type, office_location")
-                .eq("office_location", profileData.office_location)
-                .eq("is_current", true)
-                .eq("assignment_type", "office")
-                .limit(10)
-            : Promise.resolve({ data: [] }),
-          supabase
-            .from("user_documentation")
-            .select("*")
-            .eq("user_id", staffMember.id)
-            .order("created_at", { ascending: false })
-            .limit(10),
-        ])
+        const [tasksResult, assetAssignmentsResult, deptAssetsResult, officeAssetsResult, docsResult] =
+          await Promise.all([
+            supabase
+              .from("tasks")
+              .select("*")
+              .eq("assigned_to", staffMember.id)
+              .order("created_at", { ascending: false })
+              .limit(10),
+            // Individual asset assignments
+            supabase
+              .from("asset_assignments")
+              .select("id, asset_id, assigned_at, is_current, assignment_type")
+              .eq("assigned_to", staffMember.id)
+              .eq("is_current", true)
+              .limit(10),
+            // Department assets (if user has department)
+            profileData.department
+              ? supabase
+                  .from("assets")
+                  .select(
+                    "id, asset_name, asset_type, asset_model, serial_number, unique_code, status, assignment_type, department, created_at"
+                  )
+                  .eq("assignment_type", "department")
+                  .eq("department", profileData.department)
+                  .eq("status", "assigned")
+                  .limit(10)
+              : Promise.resolve({ data: [] }),
+            // Office location assets (if user has office_location)
+            profileData.office_location
+              ? supabase
+                  .from("assets")
+                  .select(
+                    "id, asset_name, asset_type, asset_model, serial_number, unique_code, status, assignment_type, office_location, created_at"
+                  )
+                  .eq("assignment_type", "office")
+                  .eq("office_location", profileData.office_location)
+                  .eq("status", "assigned")
+                  .limit(10)
+              : Promise.resolve({ data: [] }),
+            supabase
+              .from("user_documentation")
+              .select("*")
+              .eq("user_id", staffMember.id)
+              .order("created_at", { ascending: false })
+              .limit(10),
+          ])
 
         // Fetch asset details separately for individual assignments
         const individualAssetsWithDetails = await Promise.all(
@@ -396,26 +407,32 @@ export default function AdminStaffPage() {
           })
         )
 
-        // Fetch asset details separately for office assignments
-        const officeAssetsWithDetails = await Promise.all(
-          (officeAssetsResult.data || []).map(async (assignment: any) => {
-            const { data: assetData } = await supabase
-              .from("assets")
-              .select("id, asset_name, asset_type, asset_model, serial_number, unique_code, status")
-              .eq("id", assignment.asset_id)
-              .single()
+        // Convert department assets to assignment format
+        const deptAssetsWithDetails = (deptAssetsResult.data || []).map((asset: any) => ({
+          id: `dept-${asset.id}`,
+          asset_id: asset.id,
+          assigned_at: asset.created_at, // Use the asset's creation date
+          is_current: true,
+          assignment_type: "department",
+          Asset: asset,
+          assignmentType: "department" as const,
+          department: asset.department,
+        }))
 
-            return {
-              ...assignment,
-              Asset: assetData,
-              assignmentType: "office" as const,
-              officeLocation: assignment.office_location || profileData.office_location,
-            }
-          })
-        )
+        // Convert office assets to assignment format
+        const officeAssetsWithDetails = (officeAssetsResult.data || []).map((asset: any) => ({
+          id: `office-${asset.id}`,
+          asset_id: asset.id,
+          assigned_at: asset.created_at, // Use the asset's creation date
+          is_current: true,
+          assignment_type: "office",
+          Asset: asset,
+          assignmentType: "office" as const,
+          officeLocation: asset.office_location || profileData.office_location,
+        }))
 
-        // Combine both types of assignments
-        const allAssets = [...individualAssetsWithDetails, ...officeAssetsWithDetails]
+        // Combine all types of assignments
+        const allAssets = [...individualAssetsWithDetails, ...deptAssetsWithDetails, ...officeAssetsWithDetails]
 
         setViewStaffData({
           tasks: tasksResult.data || [],
@@ -443,7 +460,10 @@ export default function AdminStaffPage() {
         // Tasks assigned to this user
         supabase.from("tasks").select("id, title, status").eq("assigned_to", staffMember.id),
         // Task assignments (multiple user assignments)
-        supabase.from("task_assignments").select("id, task_id, Task:tasks(id, title, status)").eq("user_id", staffMember.id),
+        supabase
+          .from("task_assignments")
+          .select("id, task_id, Task:tasks(id, title, status)")
+          .eq("user_id", staffMember.id),
         // Current asset assignments
         supabase
           .from("asset_assignments")
@@ -634,10 +654,7 @@ export default function AdminStaffPage() {
         job_description: editForm.job_description || null,
       }
 
-      const { error } = await supabase
-        .from("profiles")
-        .update(updateData)
-        .eq("id", selectedStaff.id)
+      const { error } = await supabase.from("profiles").update(updateData).eq("id", selectedStaff.id)
 
       if (error) throw error
 
@@ -658,7 +675,12 @@ export default function AdminStaffPage() {
 
     try {
       // Validate required fields
-      if (!createUserForm.firstName.trim() || !createUserForm.lastName.trim() || !createUserForm.email.trim() || !createUserForm.department) {
+      if (
+        !createUserForm.firstName.trim() ||
+        !createUserForm.lastName.trim() ||
+        !createUserForm.email.trim() ||
+        !createUserForm.department
+      ) {
         toast.error("First name, last name, email, and department are required")
         setIsCreatingUser(false)
         return
@@ -705,7 +727,6 @@ export default function AdminStaffPage() {
       setIsCreatingUser(false)
     }
   }
-
 
   const filteredStaff = staff
     .filter((member) => {
@@ -768,8 +789,10 @@ export default function AdminStaffPage() {
       if (selectedColumns["Date of Birth"]) row["Date of Birth"] = member.date_of_birth || "-"
       if (selectedColumns["Employment Date"]) row["Employment Date"] = member.employment_date || "-"
       if (selectedColumns["Is Lead"]) row["Is Lead"] = member.is_department_lead ? "Yes" : "No"
-      if (selectedColumns["Lead Departments"]) row["Lead Departments"] = member.lead_departments?.length ? member.lead_departments.join(", ") : "-"
-      if (selectedColumns["Created At"]) row["Created At"] = member.created_at ? new Date(member.created_at).toLocaleDateString() : "-"
+      if (selectedColumns["Lead Departments"])
+        row["Lead Departments"] = member.lead_departments?.length ? member.lead_departments.join(", ") : "-"
+      if (selectedColumns["Created At"])
+        row["Created At"] = member.created_at ? new Date(member.created_at).toLocaleDateString() : "-"
       return row
     })
   }
@@ -839,7 +862,7 @@ export default function AdminStaffPage() {
       const dataToExport = filteredStaff.map((member, index) => {
         const row: any[] = []
         const headers: string[] = []
-        
+
         if (selectedColumns["#"]) {
           row.push(index + 1)
           headers.push("#")
@@ -924,7 +947,7 @@ export default function AdminStaffPage() {
           row.push(member.created_at ? new Date(member.created_at).toLocaleDateString() : "-")
           headers.push("Created At")
         }
-        
+
         return { row, headers }
       })
 
@@ -1073,11 +1096,7 @@ export default function AdminStaffPage() {
           </div>
           <div className="flex items-center gap-2">
             {(userProfile?.role === "admin" || userProfile?.role === "super_admin") && (
-              <Button
-                onClick={() => setIsCreateUserDialogOpen(true)}
-                className="gap-2"
-                size="sm"
-              >
+              <Button onClick={() => setIsCreateUserDialogOpen(true)} className="gap-2" size="sm">
                 <Plus className="h-4 w-4" />
                 <span className="hidden sm:inline">Create User</span>
               </Button>
@@ -1224,44 +1243,44 @@ export default function AdminStaffPage() {
                   className="h-12 pl-11 text-base"
                 />
               </div>
-              
+
               {/* Filter Buttons */}
               <div className="flex flex-col gap-3 md:flex-row">
-              <SearchableMultiSelect
-                label="Departments"
-                icon={<Building2 className="h-4 w-4" />}
-                values={departmentFilter}
-                options={DEPARTMENTS.map((dept) => ({
-                  value: dept,
-                  label: dept,
-                  icon: <Building2 className="h-3 w-3" />,
-                }))}
-                onChange={setDepartmentFilter}
-                placeholder="All Departments"
-              />
-              <SearchableMultiSelect
-                label="Staff Members"
-                icon={<User className="h-4 w-4" />}
-                values={staffFilter}
-                options={staff.map((member) => ({
-                  value: member.id,
-                  label: `${formatName(member.first_name)} ${formatName(member.last_name)} - ${member.department || "No Dept"}`,
-                  icon: <User className="h-3 w-3" />,
-                }))}
-                onChange={setStaffFilter}
-                placeholder="All Staff"
-              />
-              <SearchableMultiSelect
-                label="Roles"
-                icon={<Shield className="h-4 w-4" />}
-                values={roleFilter}
-                options={roles.map((role) => ({
-                  value: role,
-                  label: getRoleDisplayName(role),
-                }))}
-                onChange={setRoleFilter}
-                placeholder="All Roles"
-              />
+                <SearchableMultiSelect
+                  label="Departments"
+                  icon={<Building2 className="h-4 w-4" />}
+                  values={departmentFilter}
+                  options={DEPARTMENTS.map((dept) => ({
+                    value: dept,
+                    label: dept,
+                    icon: <Building2 className="h-3 w-3" />,
+                  }))}
+                  onChange={setDepartmentFilter}
+                  placeholder="All Departments"
+                />
+                <SearchableMultiSelect
+                  label="Staff Members"
+                  icon={<User className="h-4 w-4" />}
+                  values={staffFilter}
+                  options={staff.map((member) => ({
+                    value: member.id,
+                    label: `${formatName(member.first_name)} ${formatName(member.last_name)} - ${member.department || "No Dept"}`,
+                    icon: <User className="h-3 w-3" />,
+                  }))}
+                  onChange={setStaffFilter}
+                  placeholder="All Staff"
+                />
+                <SearchableMultiSelect
+                  label="Roles"
+                  icon={<Shield className="h-4 w-4" />}
+                  values={roleFilter}
+                  options={roles.map((role) => ({
+                    value: role,
+                    label: getRoleDisplayName(role),
+                  }))}
+                  onChange={setRoleFilter}
+                  placeholder="All Roles"
+                />
               </div>
             </div>
           </CardContent>
@@ -1374,7 +1393,7 @@ export default function AdminStaffPage() {
                               <Button
                                 variant="outline"
                                 size="sm"
-                                className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10 sm:h-auto sm:w-auto sm:p-2"
+                                className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 w-8 p-0 sm:h-auto sm:w-auto sm:p-2"
                                 onClick={() => handleDeleteStaff(member)}
                                 title="Delete Staff Member"
                               >
@@ -1538,8 +1557,8 @@ export default function AdminStaffPage() {
         <DialogContent className="max-w-2xl">
           <DialogHeader className="space-y-3 border-b pb-4">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                <Plus className="h-5 w-5 text-primary" />
+              <div className="bg-primary/10 flex h-10 w-10 items-center justify-center rounded-lg">
+                <Plus className="text-primary h-5 w-5" />
               </div>
               <div>
                 <DialogTitle className="text-xl">Create New User</DialogTitle>
@@ -1666,7 +1685,6 @@ export default function AdminStaffPage() {
                 className="mt-1.5"
               />
             </div>
-
           </div>
           <DialogFooter className="border-t pt-4">
             <Button variant="outline" onClick={() => setIsCreateUserDialogOpen(false)} disabled={isCreatingUser}>
@@ -1674,7 +1692,13 @@ export default function AdminStaffPage() {
             </Button>
             <Button
               onClick={handleCreateUser}
-              disabled={isCreatingUser || !createUserForm.firstName.trim() || !createUserForm.lastName.trim() || !createUserForm.email.trim() || !createUserForm.department}
+              disabled={
+                isCreatingUser ||
+                !createUserForm.firstName.trim() ||
+                !createUserForm.lastName.trim() ||
+                !createUserForm.email.trim() ||
+                !createUserForm.department
+              }
               className="gap-2"
             >
               {isCreatingUser ? (
@@ -1700,7 +1724,7 @@ export default function AdminStaffPage() {
           }
         }}
       >
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               Edit {selectedStaff?.first_name} {selectedStaff?.last_name}
@@ -1709,315 +1733,311 @@ export default function AdminStaffPage() {
           </DialogHeader>
           <ScrollArea className="max-h-[70vh] pr-4">
             <div className="space-y-4 py-4">
-            <div>
-              <Label htmlFor="role">Role *</Label>
-              <Select
-                value={editForm.role}
-                onValueChange={(value: UserRole) => {
-                  setEditForm({ ...editForm, role: value })
-                  // Clear lead departments when role is not lead
-                  if (value !== "lead") {
-                    setEditForm((prev) => ({
-                      ...prev,
-                      role: value,
-                      lead_departments: [],
-                    }))
-                  }
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {getAvailableRoles().map((role) => (
-                    <SelectItem key={role} value={role}>
-                      {getRoleDisplayName(role)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-muted-foreground mt-1 text-xs">
-                {userProfile?.role === "admin"
-                  ? "As Admin, you can assign: Visitor, Staff, and Lead roles"
-                  : "As Super Admin, you can assign any role"}
-              </p>
-              {editForm.role === "lead" && (
-                <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
-                  ⚠️ Lead role requires selecting at least one department below
-                </p>
-              )}
-            </div>
-
-            <div>
-              <Label htmlFor="department">Department *</Label>
-              <Select
-                value={editForm.department}
-                onValueChange={(value) => setEditForm({ ...editForm, department: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select department" />
-                </SelectTrigger>
-                <SelectContent>
-                  {DEPARTMENTS.map((dept) => (
-                    <SelectItem key={dept} value={dept}>
-                      {dept}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label htmlFor="office_location">Office Location</Label>
-              <SearchableSelect
-                value={editForm.office_location}
-                onValueChange={(value) => setEditForm({ ...editForm, office_location: value })}
-                placeholder="Select office location"
-                searchPlaceholder="Search office locations..."
-                icon={<Building2 className="h-4 w-4" />}
-                options={OFFICE_LOCATIONS.map((location) => ({
-                  value: location,
-                  label: location,
-                  icon: <Building2 className="h-3 w-3" />,
-                }))}
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="company_role">Position/Title</Label>
-              <Input
-                id="company_role"
-                value={editForm.company_role}
-                onChange={(e) => setEditForm({ ...editForm, company_role: e.target.value })}
-                placeholder="e.g., Senior Developer"
-              />
-            </div>
-
-            {editForm.role === "lead" && (
-              <div className="space-y-2">
-                <div className="bg-primary/10 border-primary/20 rounded-lg border p-3">
-                  <p className="text-primary mb-2 text-sm font-medium">Lead Department Selection Required</p>
-                  <p className="text-muted-foreground text-xs">
-                    Select at least one department that this person will lead
-                  </p>
-                </div>
-
-                <div>
-                  <Label>Lead Departments *</Label>
-                  <div className="mt-2 grid grid-cols-2 gap-2">
-                    {DEPARTMENTS.map((dept) => (
-                      <div key={dept} className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          id={`dept-${dept}`}
-                          checked={editForm.lead_departments.includes(dept)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setEditForm({
-                                ...editForm,
-                                lead_departments: [...editForm.lead_departments, dept],
-                              })
-                            } else {
-                              setEditForm({
-                                ...editForm,
-                                lead_departments: editForm.lead_departments.filter((d) => d !== dept),
-                              })
-                            }
-                          }}
-                          className="rounded"
-                        />
-                        <Label htmlFor={`dept-${dept}`} className="text-sm">
-                          {dept}
-                        </Label>
-                      </div>
+              <div>
+                <Label htmlFor="role">Role *</Label>
+                <Select
+                  value={editForm.role}
+                  onValueChange={(value: UserRole) => {
+                    setEditForm({ ...editForm, role: value })
+                    // Clear lead departments when role is not lead
+                    if (value !== "lead") {
+                      setEditForm((prev) => ({
+                        ...prev,
+                        role: value,
+                        lead_departments: [],
+                      }))
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {getAvailableRoles().map((role) => (
+                      <SelectItem key={role} value={role}>
+                        {getRoleDisplayName(role)}
+                      </SelectItem>
                     ))}
-                  </div>
-                  {editForm.lead_departments.length === 0 && (
-                    <p className="text-destructive mt-2 text-xs">Please select at least one department</p>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* More Options Section */}
-            <div className="border-t pt-4">
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => setShowMoreOptions(!showMoreOptions)}
-                className="w-full justify-between"
-              >
-                <span className="font-medium">More Options</span>
-                {showMoreOptions ? (
-                  <ChevronUp className="h-4 w-4" />
-                ) : (
-                  <ChevronDown className="h-4 w-4" />
+                  </SelectContent>
+                </Select>
+                <p className="text-muted-foreground mt-1 text-xs">
+                  {userProfile?.role === "admin"
+                    ? "As Admin, you can assign: Visitor, Staff, and Lead roles"
+                    : "As Super Admin, you can assign any role"}
+                </p>
+                {editForm.role === "lead" && (
+                  <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                    ⚠️ Lead role requires selecting at least one department below
+                  </p>
                 )}
-              </Button>
+              </div>
 
-              {showMoreOptions && (
-                <div className="mt-4 space-y-4 animate-in slide-in-from-top-2">
-                  {/* Personal Information */}
-                  <div className="space-y-4">
-                    <h4 className="text-sm font-semibold text-foreground">Personal Information</h4>
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <div>
-                        <Label htmlFor="edit_first_name">First Name</Label>
-                        <Input
-                          id="edit_first_name"
-                          value={editForm.first_name}
-                          onChange={(e) => setEditForm({ ...editForm, first_name: e.target.value })}
-                          placeholder="First name"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="edit_last_name">Last Name</Label>
-                        <Input
-                          id="edit_last_name"
-                          value={editForm.last_name}
-                          onChange={(e) => setEditForm({ ...editForm, last_name: e.target.value })}
-                          placeholder="Last name"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <Label htmlFor="edit_other_names">Other Names</Label>
-                      <Input
-                        id="edit_other_names"
-                        value={editForm.other_names}
-                        onChange={(e) => setEditForm({ ...editForm, other_names: e.target.value })}
-                        placeholder="Middle name or other names"
-                      />
-                    </div>
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <div>
-                        <Label htmlFor="edit_company_email">Company Email</Label>
-                        <Input
-                          id="edit_company_email"
-                          type="email"
-                          value={editForm.company_email}
-                          onChange={(e) => setEditForm({ ...editForm, company_email: e.target.value })}
-                          placeholder="email@company.com"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="edit_phone_number">Phone Number</Label>
-                        <Input
-                          id="edit_phone_number"
-                          type="tel"
-                          value={editForm.phone_number}
-                          onChange={(e) => setEditForm({ ...editForm, phone_number: e.target.value })}
-                          placeholder="+234 800 000 0000"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <Label htmlFor="edit_additional_phone">Additional Phone</Label>
-                      <Input
-                        id="edit_additional_phone"
-                        type="tel"
-                        value={editForm.additional_phone}
-                        onChange={(e) => setEditForm({ ...editForm, additional_phone: e.target.value })}
-                        placeholder="Alternative phone number"
-                      />
-                    </div>
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <div>
-                        <Label htmlFor="edit_date_of_birth">Date of Birth</Label>
-                        <Input
-                          id="edit_date_of_birth"
-                          type="date"
-                          value={editForm.date_of_birth}
-                          onChange={(e) => setEditForm({ ...editForm, date_of_birth: e.target.value })}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="edit_employment_date">Employment Date</Label>
-                        <Input
-                          id="edit_employment_date"
-                          type="date"
-                          value={editForm.employment_date}
-                          onChange={(e) => setEditForm({ ...editForm, employment_date: e.target.value })}
-                        />
-                      </div>
-                    </div>
+              <div>
+                <Label htmlFor="department">Department *</Label>
+                <Select
+                  value={editForm.department}
+                  onValueChange={(value) => setEditForm({ ...editForm, department: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select department" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DEPARTMENTS.map((dept) => (
+                      <SelectItem key={dept} value={dept}>
+                        {dept}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="office_location">Office Location</Label>
+                <SearchableSelect
+                  value={editForm.office_location}
+                  onValueChange={(value) => setEditForm({ ...editForm, office_location: value })}
+                  placeholder="Select office location"
+                  searchPlaceholder="Search office locations..."
+                  icon={<Building2 className="h-4 w-4" />}
+                  options={OFFICE_LOCATIONS.map((location) => ({
+                    value: location,
+                    label: location,
+                    icon: <Building2 className="h-3 w-3" />,
+                  }))}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="company_role">Position/Title</Label>
+                <Input
+                  id="company_role"
+                  value={editForm.company_role}
+                  onChange={(e) => setEditForm({ ...editForm, company_role: e.target.value })}
+                  placeholder="e.g., Senior Developer"
+                />
+              </div>
+
+              {editForm.role === "lead" && (
+                <div className="space-y-2">
+                  <div className="bg-primary/10 border-primary/20 rounded-lg border p-3">
+                    <p className="text-primary mb-2 text-sm font-medium">Lead Department Selection Required</p>
+                    <p className="text-muted-foreground text-xs">
+                      Select at least one department that this person will lead
+                    </p>
                   </div>
 
-                  {/* Address Information */}
-                  <div className="space-y-4 border-t pt-4">
-                    <h4 className="text-sm font-semibold text-foreground">Address Information</h4>
-                    <div>
-                      <Label htmlFor="edit_residential_address">Residential Address</Label>
-                      <Textarea
-                        id="edit_residential_address"
-                        value={editForm.residential_address}
-                        onChange={(e) => setEditForm({ ...editForm, residential_address: e.target.value })}
-                        placeholder="Full residential address"
-                        rows={2}
-                      />
+                  <div>
+                    <Label>Lead Departments *</Label>
+                    <div className="mt-2 grid grid-cols-2 gap-2">
+                      {DEPARTMENTS.map((dept) => (
+                        <div key={dept} className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id={`dept-${dept}`}
+                            checked={editForm.lead_departments.includes(dept)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setEditForm({
+                                  ...editForm,
+                                  lead_departments: [...editForm.lead_departments, dept],
+                                })
+                              } else {
+                                setEditForm({
+                                  ...editForm,
+                                  lead_departments: editForm.lead_departments.filter((d) => d !== dept),
+                                })
+                              }
+                            }}
+                            className="rounded"
+                          />
+                          <Label htmlFor={`dept-${dept}`} className="text-sm">
+                            {dept}
+                          </Label>
+                        </div>
+                      ))}
                     </div>
-                    <div>
-                      <Label htmlFor="edit_current_work_location">Current Work Location</Label>
-                      <Input
-                        id="edit_current_work_location"
-                        value={editForm.current_work_location}
-                        onChange={(e) => setEditForm({ ...editForm, current_work_location: e.target.value })}
-                        placeholder="Office location or site"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Banking Information */}
-                  <div className="space-y-4 border-t pt-4">
-                    <h4 className="text-sm font-semibold text-foreground">Banking Information</h4>
-                    <div>
-                      <Label htmlFor="edit_bank_name">Bank Name</Label>
-                      <Input
-                        id="edit_bank_name"
-                        value={editForm.bank_name}
-                        onChange={(e) => setEditForm({ ...editForm, bank_name: e.target.value })}
-                        placeholder="Bank name"
-                      />
-                    </div>
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <div>
-                        <Label htmlFor="edit_bank_account_number">Account Number</Label>
-                        <Input
-                          id="edit_bank_account_number"
-                          value={editForm.bank_account_number}
-                          onChange={(e) => setEditForm({ ...editForm, bank_account_number: e.target.value })}
-                          placeholder="Account number"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="edit_bank_account_name">Account Name</Label>
-                        <Input
-                          id="edit_bank_account_name"
-                          value={editForm.bank_account_name}
-                          onChange={(e) => setEditForm({ ...editForm, bank_account_name: e.target.value })}
-                          placeholder="Account holder name"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Job Description */}
-                  <div className="space-y-4 border-t pt-4">
-                    <h4 className="text-sm font-semibold text-foreground">Job Information</h4>
-                    <div>
-                      <Label htmlFor="edit_job_description">Job Description</Label>
-                      <Textarea
-                        id="edit_job_description"
-                        value={editForm.job_description}
-                        onChange={(e) => setEditForm({ ...editForm, job_description: e.target.value })}
-                        placeholder="Job description or responsibilities"
-                        rows={4}
-                      />
-                    </div>
+                    {editForm.lead_departments.length === 0 && (
+                      <p className="text-destructive mt-2 text-xs">Please select at least one department</p>
+                    )}
                   </div>
                 </div>
               )}
-            </div>
+
+              {/* More Options Section */}
+              <div className="border-t pt-4">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setShowMoreOptions(!showMoreOptions)}
+                  className="w-full justify-between"
+                >
+                  <span className="font-medium">More Options</span>
+                  {showMoreOptions ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </Button>
+
+                {showMoreOptions && (
+                  <div className="animate-in slide-in-from-top-2 mt-4 space-y-4">
+                    {/* Personal Information */}
+                    <div className="space-y-4">
+                      <h4 className="text-foreground text-sm font-semibold">Personal Information</h4>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div>
+                          <Label htmlFor="edit_first_name">First Name</Label>
+                          <Input
+                            id="edit_first_name"
+                            value={editForm.first_name}
+                            onChange={(e) => setEditForm({ ...editForm, first_name: e.target.value })}
+                            placeholder="First name"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="edit_last_name">Last Name</Label>
+                          <Input
+                            id="edit_last_name"
+                            value={editForm.last_name}
+                            onChange={(e) => setEditForm({ ...editForm, last_name: e.target.value })}
+                            placeholder="Last name"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <Label htmlFor="edit_other_names">Other Names</Label>
+                        <Input
+                          id="edit_other_names"
+                          value={editForm.other_names}
+                          onChange={(e) => setEditForm({ ...editForm, other_names: e.target.value })}
+                          placeholder="Middle name or other names"
+                        />
+                      </div>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div>
+                          <Label htmlFor="edit_company_email">Company Email</Label>
+                          <Input
+                            id="edit_company_email"
+                            type="email"
+                            value={editForm.company_email}
+                            onChange={(e) => setEditForm({ ...editForm, company_email: e.target.value })}
+                            placeholder="email@company.com"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="edit_phone_number">Phone Number</Label>
+                          <Input
+                            id="edit_phone_number"
+                            type="tel"
+                            value={editForm.phone_number}
+                            onChange={(e) => setEditForm({ ...editForm, phone_number: e.target.value })}
+                            placeholder="+234 800 000 0000"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <Label htmlFor="edit_additional_phone">Additional Phone</Label>
+                        <Input
+                          id="edit_additional_phone"
+                          type="tel"
+                          value={editForm.additional_phone}
+                          onChange={(e) => setEditForm({ ...editForm, additional_phone: e.target.value })}
+                          placeholder="Alternative phone number"
+                        />
+                      </div>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div>
+                          <Label htmlFor="edit_date_of_birth">Date of Birth</Label>
+                          <Input
+                            id="edit_date_of_birth"
+                            type="date"
+                            value={editForm.date_of_birth}
+                            onChange={(e) => setEditForm({ ...editForm, date_of_birth: e.target.value })}
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="edit_employment_date">Employment Date</Label>
+                          <Input
+                            id="edit_employment_date"
+                            type="date"
+                            value={editForm.employment_date}
+                            onChange={(e) => setEditForm({ ...editForm, employment_date: e.target.value })}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Address Information */}
+                    <div className="space-y-4 border-t pt-4">
+                      <h4 className="text-foreground text-sm font-semibold">Address Information</h4>
+                      <div>
+                        <Label htmlFor="edit_residential_address">Residential Address</Label>
+                        <Textarea
+                          id="edit_residential_address"
+                          value={editForm.residential_address}
+                          onChange={(e) => setEditForm({ ...editForm, residential_address: e.target.value })}
+                          placeholder="Full residential address"
+                          rows={2}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="edit_current_work_location">Current Work Location</Label>
+                        <Input
+                          id="edit_current_work_location"
+                          value={editForm.current_work_location}
+                          onChange={(e) => setEditForm({ ...editForm, current_work_location: e.target.value })}
+                          placeholder="Office location or site"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Banking Information */}
+                    <div className="space-y-4 border-t pt-4">
+                      <h4 className="text-foreground text-sm font-semibold">Banking Information</h4>
+                      <div>
+                        <Label htmlFor="edit_bank_name">Bank Name</Label>
+                        <Input
+                          id="edit_bank_name"
+                          value={editForm.bank_name}
+                          onChange={(e) => setEditForm({ ...editForm, bank_name: e.target.value })}
+                          placeholder="Bank name"
+                        />
+                      </div>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div>
+                          <Label htmlFor="edit_bank_account_number">Account Number</Label>
+                          <Input
+                            id="edit_bank_account_number"
+                            value={editForm.bank_account_number}
+                            onChange={(e) => setEditForm({ ...editForm, bank_account_number: e.target.value })}
+                            placeholder="Account number"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="edit_bank_account_name">Account Name</Label>
+                          <Input
+                            id="edit_bank_account_name"
+                            value={editForm.bank_account_name}
+                            onChange={(e) => setEditForm({ ...editForm, bank_account_name: e.target.value })}
+                            placeholder="Account holder name"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Job Description */}
+                    <div className="space-y-4 border-t pt-4">
+                      <h4 className="text-foreground text-sm font-semibold">Job Information</h4>
+                      <div>
+                        <Label htmlFor="edit_job_description">Job Description</Label>
+                        <Textarea
+                          id="edit_job_description"
+                          value={editForm.job_description}
+                          onChange={(e) => setEditForm({ ...editForm, job_description: e.target.value })}
+                          placeholder="Job description or responsibilities"
+                          rows={4}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </ScrollArea>
           <DialogFooter>
@@ -2214,20 +2234,29 @@ export default function AdminStaffPage() {
                           <div className="space-y-3">
                             {viewStaffData.assets.map((assignment: any) => {
                               const asset = assignment.Asset
-                              const assetTypeLabel = asset?.asset_type ? (ASSET_TYPE_MAP[asset.asset_type]?.label || asset.asset_type) : "Unknown"
+                              const assetTypeLabel = asset?.asset_type
+                                ? ASSET_TYPE_MAP[asset.asset_type]?.label || asset.asset_type
+                                : "Unknown"
                               const isOfficeAssignment = assignment.assignmentType === "office"
-                              
+
                               return (
                                 <div key={assignment.id} className="rounded-lg border p-4">
-                                  <div className="flex items-start justify-between mb-3">
+                                  <div className="mb-3 flex items-start justify-between">
                                     <div className="flex items-center gap-2">
-                                      <p className="font-semibold text-base">{assetTypeLabel}</p>
+                                      <p className="text-base font-semibold">{assetTypeLabel}</p>
                                       {isOfficeAssignment ? (
-                                        <Badge variant="outline" className="bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
-                                          Office: {assignment.officeLocation || viewStaffProfile?.office_location || "Office"}
+                                        <Badge
+                                          variant="outline"
+                                          className="bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
+                                        >
+                                          Office:{" "}
+                                          {assignment.officeLocation || viewStaffProfile?.office_location || "Office"}
                                         </Badge>
                                       ) : (
-                                        <Badge variant="outline" className="bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300">
+                                        <Badge
+                                          variant="outline"
+                                          className="bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300"
+                                        >
                                           Personal Assignment
                                         </Badge>
                                       )}
@@ -2240,15 +2269,21 @@ export default function AdminStaffPage() {
                                   </div>
                                   <div className="space-y-2 text-sm">
                                     <div className="flex items-center gap-2">
-                                      <span className="text-muted-foreground font-medium min-w-[120px]">Unique Code:</span>
+                                      <span className="text-muted-foreground min-w-[120px] font-medium">
+                                        Unique Code:
+                                      </span>
                                       <span className="font-mono">{asset?.unique_code || "-"}</span>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                      <span className="text-muted-foreground font-medium min-w-[120px]">Model Number:</span>
+                                      <span className="text-muted-foreground min-w-[120px] font-medium">
+                                        Model Number:
+                                      </span>
                                       <span>{asset?.asset_model || "-"}</span>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                      <span className="text-muted-foreground font-medium min-w-[120px]">Serial Number:</span>
+                                      <span className="text-muted-foreground min-w-[120px] font-medium">
+                                        Serial Number:
+                                      </span>
                                       <span className="font-mono">{asset?.serial_number || "-"}</span>
                                     </div>
                                   </div>
@@ -2324,7 +2359,7 @@ export default function AdminStaffPage() {
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-destructive">
+            <DialogTitle className="text-destructive flex items-center gap-2">
               <AlertTriangle className="h-5 w-5" />
               Delete Staff Member
             </DialogTitle>
@@ -2367,7 +2402,10 @@ export default function AdminStaffPage() {
                               </p>
                               <div className="max-h-32 space-y-1 overflow-y-auto">
                                 {assignedItems.tasks.slice(0, 5).map((task: any) => (
-                                  <div key={task.id} className="text-muted-foreground rounded bg-background p-2 text-xs">
+                                  <div
+                                    key={task.id}
+                                    className="text-muted-foreground bg-background rounded p-2 text-xs"
+                                  >
                                     • {task.title} ({task.status})
                                   </div>
                                 ))}
@@ -2389,7 +2427,7 @@ export default function AdminStaffPage() {
                                 {assignedItems.taskAssignments.slice(0, 5).map((assignment: any) => (
                                   <div
                                     key={assignment.id}
-                                    className="text-muted-foreground rounded bg-background p-2 text-xs"
+                                    className="text-muted-foreground bg-background rounded p-2 text-xs"
                                   >
                                     • {assignment.Task?.title || "Unknown Task"} ({assignment.Task?.status || "N/A"})
                                   </div>
@@ -2412,7 +2450,7 @@ export default function AdminStaffPage() {
                                 {assignedItems.assets.slice(0, 5).map((assignment: any) => (
                                   <div
                                     key={assignment.id}
-                                    className="text-muted-foreground rounded bg-background p-2 text-xs"
+                                    className="text-muted-foreground bg-background rounded p-2 text-xs"
                                   >
                                     • {assignment.Asset?.asset_name || "Unknown Asset"} (
                                     {assignment.Asset?.asset_type || "N/A"})
@@ -2436,7 +2474,7 @@ export default function AdminStaffPage() {
                                 {assignedItems.projects.slice(0, 5).map((project: any) => (
                                   <div
                                     key={project.id}
-                                    className="text-muted-foreground rounded bg-background p-2 text-xs"
+                                    className="text-muted-foreground bg-background rounded p-2 text-xs"
                                   >
                                     • {project.project_name} ({project.status})
                                   </div>
@@ -2459,7 +2497,7 @@ export default function AdminStaffPage() {
                                 {assignedItems.projectMemberships.slice(0, 5).map((membership: any) => (
                                   <div
                                     key={membership.id}
-                                    className="text-muted-foreground rounded bg-background p-2 text-xs"
+                                    className="text-muted-foreground bg-background rounded p-2 text-xs"
                                   >
                                     • {membership.Project?.project_name || "Unknown Project"}
                                   </div>
@@ -2480,7 +2518,7 @@ export default function AdminStaffPage() {
                               </p>
                               <div className="max-h-32 space-y-1 overflow-y-auto">
                                 {assignedItems.feedback.slice(0, 5).map((fb: any) => (
-                                  <div key={fb.id} className="text-muted-foreground rounded bg-background p-2 text-xs">
+                                  <div key={fb.id} className="text-muted-foreground bg-background rounded p-2 text-xs">
                                     • {fb.title} ({fb.status})
                                   </div>
                                 ))}
@@ -2500,7 +2538,7 @@ export default function AdminStaffPage() {
                               </p>
                               <div className="max-h-32 space-y-1 overflow-y-auto">
                                 {assignedItems.documentation.slice(0, 5).map((doc: any) => (
-                                  <div key={doc.id} className="text-muted-foreground rounded bg-background p-2 text-xs">
+                                  <div key={doc.id} className="text-muted-foreground bg-background rounded p-2 text-xs">
                                     • {doc.title}
                                   </div>
                                 ))}
@@ -2585,22 +2623,23 @@ export default function AdminStaffPage() {
         <DialogContent className="max-w-lg">
           <DialogHeader className="space-y-3 border-b pb-4">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                <Download className="h-5 w-5 text-primary" />
+              <div className="bg-primary/10 flex h-10 w-10 items-center justify-center rounded-lg">
+                <Download className="text-primary h-5 w-5" />
               </div>
               <div>
                 <DialogTitle className="text-xl">Select Columns to Export</DialogTitle>
                 <DialogDescription className="mt-1">
                   Choose which columns you want to include in your{" "}
-                  <span className="font-semibold text-primary">{exportType?.toUpperCase()}</span> export
+                  <span className="text-primary font-semibold">{exportType?.toUpperCase()}</span> export
                 </DialogDescription>
               </div>
             </div>
           </DialogHeader>
           <div className="space-y-2 py-4">
-            <div className="mb-3 flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2">
-              <span className="text-sm font-medium text-muted-foreground">
-                {Object.values(selectedColumns).filter((v) => v).length} of {Object.keys(selectedColumns).length} columns selected
+            <div className="bg-muted/50 mb-3 flex items-center justify-between rounded-lg px-3 py-2">
+              <span className="text-muted-foreground text-sm font-medium">
+                {Object.values(selectedColumns).filter((v) => v).length} of {Object.keys(selectedColumns).length}{" "}
+                columns selected
               </span>
               <Button
                 variant="ghost"
@@ -2619,11 +2658,11 @@ export default function AdminStaffPage() {
                 {Object.values(selectedColumns).every((v) => v) ? "Deselect All" : "Select All"}
               </Button>
             </div>
-            <div className="max-h-96 space-y-1.5 overflow-y-auto rounded-lg border bg-background/50 p-2">
+            <div className="bg-background/50 max-h-96 space-y-1.5 overflow-y-auto rounded-lg border p-2">
               {Object.keys(selectedColumns).map((column) => (
                 <div
                   key={column}
-                  className={`group flex items-center space-x-3 rounded-md px-3 py-2.5 transition-colors hover:bg-muted/80 ${
+                  className={`group hover:bg-muted/80 flex items-center space-x-3 rounded-md px-3 py-2.5 transition-colors ${
                     selectedColumns[column] ? "bg-primary/5 hover:bg-primary/10" : ""
                   }`}
                 >
@@ -2641,14 +2680,14 @@ export default function AdminStaffPage() {
                   <Label
                     htmlFor={column}
                     className={`flex-1 cursor-pointer text-sm font-medium transition-colors ${
-                      selectedColumns[column] ? "text-foreground" : "text-muted-foreground group-hover:text-foreground dark:group-hover:text-foreground"
+                      selectedColumns[column]
+                        ? "text-foreground"
+                        : "text-muted-foreground group-hover:text-foreground dark:group-hover:text-foreground"
                     }`}
                   >
                     {column}
                   </Label>
-                  {selectedColumns[column] && (
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                  )}
+                  {selectedColumns[column] && <CheckCircle2 className="text-primary h-4 w-4" />}
                 </div>
               ))}
             </div>

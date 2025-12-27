@@ -59,6 +59,21 @@ interface AuditLog {
       last_name: string
     }
   }
+  payment_info?: {
+    title: string
+    amount: number
+    currency: string
+  }
+  document_info?: {
+    file_name: string
+    document_type: string
+  }
+  department_info?: {
+    name: string
+  }
+  category_info?: {
+    name: string
+  }
 }
 
 export default function AuditLogsPage() {
@@ -164,6 +179,42 @@ export default function AuditLogsPage() {
           new Set(
             logsData
               .filter((log) => log.entity_id && (log.entity_type === "asset" || log.entity_type === "asset_assignment"))
+              .map((log) => log.entity_id)
+              .filter(Boolean)
+          )
+        )
+
+        const paymentEntityIds = Array.from(
+          new Set(
+            logsData
+              .filter((log) => log.entity_id && log.entity_type === "department_payments")
+              .map((log) => log.entity_id)
+              .filter(Boolean)
+          )
+        )
+
+        const documentEntityIds = Array.from(
+          new Set(
+            logsData
+              .filter((log) => log.entity_id && log.entity_type === "payment_documents")
+              .map((log) => log.entity_id)
+              .filter(Boolean)
+          )
+        )
+
+        const departmentEntityIds = Array.from(
+          new Set(
+            logsData
+              .filter((log) => log.entity_id && log.entity_type === "departments")
+              .map((log) => log.entity_id)
+              .filter(Boolean)
+          )
+        )
+
+        const categoryEntityIds = Array.from(
+          new Set(
+            logsData
+              .filter((log) => log.entity_id && log.entity_type === "payment_categories")
               .map((log) => log.entity_id)
               .filter(Boolean)
           )
@@ -304,6 +355,58 @@ export default function AuditLogsPage() {
           }
         }
 
+        // Fetch payments if needed
+        let paymentsMap = new Map()
+        if (paymentEntityIds.length > 0) {
+          const { data: paymentsData } = await supabase
+            .from("department_payments")
+            .select("id, title, amount, currency")
+            .in("id", paymentEntityIds)
+
+          if (paymentsData) {
+            paymentsMap = new Map(paymentsData.map((p) => [p.id, p]))
+          }
+        }
+
+        // Fetch documents if needed
+        let documentsMap = new Map()
+        if (documentEntityIds.length > 0) {
+          const { data: documentsData } = await supabase
+            .from("payment_documents")
+            .select("id, file_name, document_type")
+            .in("id", documentEntityIds)
+
+          if (documentsData) {
+            documentsMap = new Map(documentsData.map((d) => [d.id, d]))
+          }
+        }
+
+        // Fetch departments if needed (for department entity logs)
+        let departmentsMap = new Map()
+        if (departmentEntityIds.length > 0) {
+          const { data: departmentsData } = await supabase
+            .from("departments")
+            .select("id, name")
+            .in("id", departmentEntityIds)
+
+          if (departmentsData) {
+            departmentsMap = new Map(departmentsData.map((d) => [d.id, d]))
+          }
+        }
+
+        // Fetch categories if needed
+        let categoriesMap = new Map()
+        if (categoryEntityIds.length > 0) {
+          const { data: categoriesData } = await supabase
+            .from("payment_categories")
+            .select("id, name")
+            .in("id", categoryEntityIds)
+
+          if (categoriesData) {
+            categoriesMap = new Map(categoriesData.map((c) => [c.id, c]))
+          }
+        }
+
         // Combine logs with all fetched data
         const logsWithUsers = logsData.map((log) => {
           let targetFromNewValues = null
@@ -342,6 +445,14 @@ export default function AuditLogsPage() {
               log.entity_id && (log.entity_type === "asset" || log.entity_type === "asset_assignment")
                 ? assetsMap.get(log.entity_id)
                 : null,
+            payment_info:
+              log.entity_id && log.entity_type === "department_payments" ? paymentsMap.get(log.entity_id) : null,
+            document_info:
+              log.entity_id && log.entity_type === "payment_documents" ? documentsMap.get(log.entity_id) : null,
+            department_info:
+              log.entity_id && log.entity_type === "departments" ? departmentsMap.get(log.entity_id) : null,
+            category_info:
+              log.entity_id && log.entity_type === "payment_categories" ? categoriesMap.get(log.entity_id) : null,
           }
         })
 
@@ -564,6 +675,43 @@ export default function AuditLogsPage() {
         return name
       }
       return "Feedback"
+    }
+
+    // Handle Payments
+    if (entityType === "department_payments") {
+      if (log.payment_info) {
+        return `${log.payment_info.title} (${log.payment_info.currency} ${log.payment_info.amount})`
+      }
+      // Fallback to title in values
+      const title = log.new_values?.title || log.old_values?.title
+      if (title) return title
+      return "Payment"
+    }
+
+    // Handle Payment Documents
+    if (entityType === "payment_documents") {
+      if (log.document_info) {
+        return `${log.document_info.file_name} (${log.document_info.document_type})`
+      }
+      const fileName = log.new_values?.file_name || log.old_values?.file_name
+      if (fileName) return fileName
+      return "Payment Document"
+    }
+
+    // Handle Departments
+    if (entityType === "departments") {
+      if (log.department_info) return log.department_info.name
+      const name = log.new_values?.name || log.old_values?.name
+      if (name) return name
+      return "Department"
+    }
+
+    // Handle Payment Categories
+    if (entityType === "payment_categories") {
+      if (log.category_info) return log.category_info.name
+      const name = log.new_values?.name || log.old_values?.name
+      if (name) return name
+      return "Payment Category"
     }
 
     // Fallback for devices/assets without assignment
@@ -930,6 +1078,10 @@ export default function AuditLogsPage() {
                   <SelectItem value="job_description">Job Descriptions</SelectItem>
                   <SelectItem value="user_documentation">Documentation</SelectItem>
                   <SelectItem value="profile">Profiles</SelectItem>
+                  <SelectItem value="department_payments">Payments</SelectItem>
+                  <SelectItem value="payment_documents">Documents</SelectItem>
+                  <SelectItem value="departments">Departments</SelectItem>
+                  <SelectItem value="payment_categories">Payment Categories</SelectItem>
                 </SelectContent>
               </Select>
 

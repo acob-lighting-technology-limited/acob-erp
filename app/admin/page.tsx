@@ -12,7 +12,7 @@ import {
   ArrowRight,
   Shield,
   Settings,
-  Satellite,
+  CreditCard,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { formatName } from "@/lib/utils"
@@ -256,10 +256,10 @@ export default async function AdminDashboardPage() {
       roles: ["super_admin", "admin", "lead"],
     },
     {
-      title: "Starlink Payments",
-      description: "Manage Starlink payment schedules and documents",
-      href: "/admin/starlink",
-      icon: Satellite,
+      title: "Payments",
+      description: "Manage department payments",
+      href: "/admin/payments",
+      icon: CreditCard,
       color: "bg-indigo-500",
       roles: ["super_admin", "admin"],
     },
@@ -392,7 +392,7 @@ export default async function AdminDashboardPage() {
         {/* Quick Actions */}
         <div>
           <h2 className="mb-3 text-xl font-bold">Quick Actions</h2>
-          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
             {filteredActions.map((action) => (
               <Link key={action.href} href={action.href} className="h-full">
                 <Card className="flex h-full cursor-pointer flex-col border transition-all hover:-translate-y-0.5 hover:shadow-md">
