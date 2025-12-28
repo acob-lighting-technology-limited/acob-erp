@@ -26,6 +26,18 @@ interface AssetIssue {
     unique_code: string
     asset_type: string
     status: string
+    assignment_type?: string
+    department?: string
+    office_location?: string
+    current_assignment?: {
+      type?: "individual" | "department" | "office"
+      department?: string
+      office_location?: string
+      user?: {
+        first_name: string
+        last_name: string
+      }
+    }
   }
   creator?: {
     first_name: string
@@ -68,9 +80,66 @@ export default function AssetIssuesPage() {
           // Get asset details
           const { data: assetData } = await supabase
             .from("assets")
-            .select("unique_code, asset_type, status")
+            .select("unique_code, asset_type, status, assignment_type, department, office_location")
             .eq("id", issue.asset_id)
             .single()
+
+          // Get current assignment if asset is assigned
+          let assignmentData = null
+          if (assetData) {
+            // First try to get from asset_assignments table
+            const { data: assignment } = await supabase
+              .from("asset_assignments")
+              .select("assigned_to, department, office_location")
+              .eq("asset_id", issue.asset_id)
+              .eq("is_current", true)
+              .maybeSingle()
+
+            if (assignment) {
+              // If assigned to individual, get user details
+              if (assignment.assigned_to) {
+                const { data: userData } = await supabase
+                  .from("profiles")
+                  .select("first_name, last_name")
+                  .eq("id", assignment.assigned_to)
+                  .single()
+
+                assignmentData = {
+                  type: "individual",
+                  user: userData,
+                  department: assignment.department,
+                  office_location: assignment.office_location,
+                }
+              } else if (assignment.department) {
+                assignmentData = {
+                  type: "department",
+                  department: assignment.department,
+                }
+              } else if (assignment.office_location) {
+                assignmentData = {
+                  type: "office",
+                  office_location: assignment.office_location,
+                }
+              }
+            } else if (
+              assetData.status === "assigned" ||
+              assetData.status === "retired" ||
+              assetData.status === "maintenance"
+            ) {
+              // Fallback: check asset table fields
+              if (assetData.assignment_type === "department" && assetData.department) {
+                assignmentData = {
+                  type: "department",
+                  department: assetData.department,
+                }
+              } else if (assetData.assignment_type === "office" && assetData.office_location) {
+                assignmentData = {
+                  type: "office",
+                  office_location: assetData.office_location,
+                }
+              }
+            }
+          }
 
           // Get creator details
           const { data: creatorData } = await supabase
@@ -92,7 +161,10 @@ export default function AssetIssuesPage() {
 
           return {
             ...issue,
-            asset: assetData,
+            asset: {
+              ...assetData,
+              current_assignment: assignmentData,
+            },
             creator: creatorData,
             resolver: resolverData,
           }
@@ -295,6 +367,7 @@ export default function AssetIssuesPage() {
                     <TableHead className="w-[50px]">Status</TableHead>
                     <TableHead>Asset</TableHead>
                     <TableHead>Issue Description</TableHead>
+                    <TableHead>Assigned To</TableHead>
                     <TableHead>Reported By</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -359,6 +432,34 @@ export default function AssetIssuesPage() {
                             </div>
                           )}
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        {issue.asset?.current_assignment ? (
+                          issue.asset.current_assignment.type === "individual" &&
+                          issue.asset.current_assignment.user ? (
+                            <div className="flex items-center gap-1.5">
+                              <User className="text-muted-foreground h-3 w-3" />
+                              <span className="text-sm">
+                                {formatName(issue.asset.current_assignment.user.first_name)}{" "}
+                                {formatName(issue.asset.current_assignment.user.last_name)}
+                              </span>
+                            </div>
+                          ) : issue.asset.current_assignment.type === "department" &&
+                            issue.asset.current_assignment.department ? (
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-sm">{issue.asset.current_assignment.department}</span>
+                            </div>
+                          ) : issue.asset.current_assignment.type === "office" &&
+                            issue.asset.current_assignment.office_location ? (
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-sm">{issue.asset.current_assignment.office_location}</span>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">-</span>
+                          )
+                        ) : (
+                          <span className="text-muted-foreground text-sm">Unassigned</span>
+                        )}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1.5">

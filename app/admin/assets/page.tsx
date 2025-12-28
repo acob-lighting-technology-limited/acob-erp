@@ -161,7 +161,7 @@ export default function AdminAssetsPage() {
   const [issueStatusFilter, setIssueStatusFilter] = useState<string[]>([])
   const [viewMode, setViewMode] = useState<"list" | "card">("list")
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" } | null>(null)
-  
+
   // Export dialog state
   const [exportDialogOpen, setExportDialogOpen] = useState(false)
   const [exportType, setExportType] = useState<"excel" | "pdf" | "word" | null>(null)
@@ -169,14 +169,14 @@ export default function AdminAssetsPage() {
     "#": true,
     "Unique Code": true,
     "Asset Type": true,
-    "Model": true,
+    Model: true,
     "Serial Number": true,
-    "Year": true,
-    "Status": true,
+    Year: true,
+    Status: true,
     "Assigned To": true,
-    "Department": true,
+    Department: true,
     "Office Location": true,
-    "Notes": true,
+    Notes: true,
   })
 
   // Dialog states
@@ -201,7 +201,8 @@ export default function AdminAssetsPage() {
   const [isCreateAssetTypeDialogOpen, setIsCreateAssetTypeDialogOpen] = useState(false)
   const [newAssetType, setNewAssetType] = useState({ label: "", code: "", requiresSerialModel: false })
   const [isCreatingAssetType, setIsCreatingAssetType] = useState(false)
-  const [assetTypes, setAssetTypes] = useState<{ label: string; code: string; requiresSerialModel: boolean }[]>(ASSET_TYPES)
+  const [assetTypes, setAssetTypes] =
+    useState<{ label: string; code: string; requiresSerialModel: boolean }[]>(ASSET_TYPES)
 
   // Track original form values for change detection
   const [originalAssetForm, setOriginalAssetForm] = useState({
@@ -877,14 +878,14 @@ export default function AdminAssetsPage() {
           if (assetForm.assignment_type === "individual") {
             assignmentData.assigned_to = assetForm.assigned_to
             assignmentData.office_location = null // Office location is NOT related to work location
-            
+
             // Fetch user's profile to get their department only
             const { data: userProfile } = await supabase
               .from("profiles")
               .select("department")
               .eq("id", assetForm.assigned_to)
               .single()
-            
+
             if (userProfile) {
               // Only populate department from user's profile, NOT office_location
               assignmentData.department = userProfile.department || null
@@ -991,14 +992,14 @@ export default function AdminAssetsPage() {
         assignmentData.assigned_to = assignForm.assigned_to
         assignmentData.assigned_from = previousAssignedTo
         assignmentData.office_location = null // Office location is NOT related to work location
-        
+
         // Fetch user's profile to get their department only
         const { data: userProfile } = await supabase
           .from("profiles")
           .select("department")
           .eq("id", assignForm.assigned_to)
           .single()
-        
+
         if (userProfile) {
           // Only populate department from user's profile, NOT office_location
           assignmentData.department = userProfile.department || null
@@ -1358,7 +1359,7 @@ export default function AdminAssetsPage() {
       const dataToExport = getSortedAssets(filteredAssets).map((asset, index) => {
         const row: any[] = []
         const headers: string[] = []
-        
+
         if (selectedColumns["#"]) {
           row.push(index + 1)
           headers.push("#")
@@ -1428,7 +1429,7 @@ export default function AdminAssetsPage() {
           row.push(asset.notes || "-")
           headers.push("Notes")
         }
-        
+
         return { row, headers }
       })
 
@@ -1474,37 +1475,63 @@ export default function AdminAssetsPage() {
       // Build header row based on selected columns
       const headerCells: any[] = []
       if (selectedColumns["#"]) {
-        headerCells.push(new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "#", bold: true })] })] }))
+        headerCells.push(
+          new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "#", bold: true })] })] })
+        )
       }
       if (selectedColumns["Unique Code"]) {
-        headerCells.push(new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Unique Code", bold: true })] })] }))
+        headerCells.push(
+          new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Unique Code", bold: true })] })] })
+        )
       }
       if (selectedColumns["Asset Type"]) {
-        headerCells.push(new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Asset Type", bold: true })] })] }))
+        headerCells.push(
+          new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Asset Type", bold: true })] })] })
+        )
       }
       if (selectedColumns["Model"]) {
-        headerCells.push(new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Model", bold: true })] })] }))
+        headerCells.push(
+          new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Model", bold: true })] })] })
+        )
       }
       if (selectedColumns["Serial Number"]) {
-        headerCells.push(new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Serial Number", bold: true })] })] }))
+        headerCells.push(
+          new TableCell({
+            children: [new Paragraph({ children: [new TextRun({ text: "Serial Number", bold: true })] })],
+          })
+        )
       }
       if (selectedColumns["Year"]) {
-        headerCells.push(new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Year", bold: true })] })] }))
+        headerCells.push(
+          new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Year", bold: true })] })] })
+        )
       }
       if (selectedColumns["Status"]) {
-        headerCells.push(new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Status", bold: true })] })] }))
+        headerCells.push(
+          new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Status", bold: true })] })] })
+        )
       }
       if (selectedColumns["Assigned To"]) {
-        headerCells.push(new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Assigned To", bold: true })] })] }))
+        headerCells.push(
+          new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Assigned To", bold: true })] })] })
+        )
       }
       if (selectedColumns["Department"]) {
-        headerCells.push(new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Department", bold: true })] })] }))
+        headerCells.push(
+          new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Department", bold: true })] })] })
+        )
       }
       if (selectedColumns["Office Location"]) {
-        headerCells.push(new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Office Location", bold: true })] })] }))
+        headerCells.push(
+          new TableCell({
+            children: [new Paragraph({ children: [new TextRun({ text: "Office Location", bold: true })] })],
+          })
+        )
       }
       if (selectedColumns["Notes"]) {
-        headerCells.push(new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Notes", bold: true })] })] }))
+        headerCells.push(
+          new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Notes", bold: true })] })] })
+        )
       }
 
       // Create header row
@@ -1519,7 +1546,9 @@ export default function AdminAssetsPage() {
             rowCells.push(new TableCell({ children: [new Paragraph(asset.unique_code)] }))
           }
           if (selectedColumns["Asset Type"]) {
-            rowCells.push(new TableCell({ children: [new Paragraph(ASSET_TYPE_MAP[asset.asset_type]?.label || asset.asset_type)] }))
+            rowCells.push(
+              new TableCell({ children: [new Paragraph(ASSET_TYPE_MAP[asset.asset_type]?.label || asset.asset_type)] })
+            )
           }
           if (selectedColumns["Model"]) {
             rowCells.push(new TableCell({ children: [new Paragraph(asset.asset_model || "-")] }))
@@ -1571,7 +1600,11 @@ export default function AdminAssetsPage() {
             rowCells.push(new TableCell({ children: [new Paragraph(department)] }))
           }
           if (selectedColumns["Office Location"]) {
-            rowCells.push(new TableCell({ children: [new Paragraph(asset.current_assignment?.office_location || asset.office_location || "-")] }))
+            rowCells.push(
+              new TableCell({
+                children: [new Paragraph(asset.current_assignment?.office_location || asset.office_location || "-")],
+              })
+            )
           }
           if (selectedColumns["Notes"]) {
             rowCells.push(new TableCell({ children: [new Paragraph(asset.notes || "-")] }))
@@ -1627,7 +1660,6 @@ export default function AdminAssetsPage() {
     }
   }
 
-
   const filteredAssets = assets.filter((asset) => {
     const assetTypeLabel = ASSET_TYPE_MAP[asset.asset_type]?.label || asset.asset_type
 
@@ -1682,7 +1714,8 @@ export default function AdminAssetsPage() {
       }
     } else {
       // Admins: use department filter
-      matchesDepartment = departmentFilter.length === 0 || departmentFilter.includes(asset.current_assignment?.department || "")
+      matchesDepartment =
+        departmentFilter.length === 0 || departmentFilter.includes(asset.current_assignment?.department || "")
     }
 
     // Filter by user
@@ -2163,21 +2196,16 @@ export default function AdminAssetsPage() {
                       <TableRow key={asset.id}>
                         <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
                         <TableCell>
-                          <div className="flex items-center gap-2">
-                            <div className="bg-primary/10 rounded-lg p-2">
-                              <Package className="text-primary h-4 w-4" />
-                            </div>
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-foreground font-mono text-xs font-medium">{asset.unique_code}</span>
-                              {asset.unresolved_issues_count! > 0 && (
-                                <div className="flex items-center gap-0.5 rounded-full bg-orange-100 px-1.5 py-0.5 dark:bg-orange-900/30">
-                                  <AlertCircle className="h-3 w-3 text-orange-600 dark:text-orange-400" />
-                                  <span className="text-[10px] font-medium text-orange-700 dark:text-orange-300">
-                                    {asset.unresolved_issues_count}
-                                  </span>
-                                </div>
-                              )}
-                            </div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-foreground font-mono text-xs font-medium">{asset.unique_code}</span>
+                            {asset.unresolved_issues_count! > 0 && (
+                              <div className="flex items-center gap-0.5 rounded-full bg-orange-100 px-1.5 py-0.5 dark:bg-orange-900/30">
+                                <AlertCircle className="h-3 w-3 text-orange-600 dark:text-orange-400" />
+                                <span className="text-[10px] font-medium text-orange-700 dark:text-orange-300">
+                                  {asset.unresolved_issues_count}
+                                </span>
+                              </div>
+                            )}
                           </div>
                         </TableCell>
                         <TableCell>
@@ -2492,7 +2520,14 @@ export default function AdminAssetsPage() {
               <Package className="text-muted-foreground mx-auto mb-4 h-16 w-16" />
               <h3 className="text-foreground mb-2 text-xl font-semibold">No Assets Found</h3>
               <p className="text-muted-foreground">
-                {searchQuery || statusFilter.length > 0 || departmentFilter.length > 0 || userFilter.length > 0 || assetTypeFilter.length > 0 || yearFilter.length > 0 || officeLocationFilter.length > 0 || issueStatusFilter.length > 0
+                {searchQuery ||
+                statusFilter.length > 0 ||
+                departmentFilter.length > 0 ||
+                userFilter.length > 0 ||
+                assetTypeFilter.length > 0 ||
+                yearFilter.length > 0 ||
+                officeLocationFilter.length > 0 ||
+                issueStatusFilter.length > 0
                   ? "No assets match your filters"
                   : "Get started by adding your first asset"}
               </p>
@@ -3205,8 +3240,8 @@ export default function AdminAssetsPage() {
         <DialogContent className="max-w-md">
           <DialogHeader className="space-y-3 border-b pb-4">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                <Plus className="h-5 w-5 text-primary" />
+              <div className="bg-primary/10 flex h-10 w-10 items-center justify-center rounded-lg">
+                <Plus className="text-primary h-5 w-5" />
               </div>
               <div>
                 <DialogTitle className="text-xl">Create New Asset Type</DialogTitle>
@@ -3245,7 +3280,7 @@ export default function AdminAssetsPage() {
                 Short code used in unique asset codes (e.g., ACOB/HQ/CHAIR/24/001)
               </p>
             </div>
-            <div className="flex items-center space-x-2 rounded-lg border bg-muted/50 p-3">
+            <div className="bg-muted/50 flex items-center space-x-2 rounded-lg border p-3">
               <Checkbox
                 id="requires_serial"
                 checked={newAssetType.requiresSerialModel}
@@ -3262,7 +3297,10 @@ export default function AdminAssetsPage() {
             <Button variant="outline" onClick={() => setIsCreateAssetTypeDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleCreateAssetType} disabled={isCreatingAssetType || !newAssetType.label.trim() || !newAssetType.code.trim()}>
+            <Button
+              onClick={handleCreateAssetType}
+              disabled={isCreatingAssetType || !newAssetType.label.trim() || !newAssetType.code.trim()}
+            >
               {isCreatingAssetType ? "Creating..." : "Create Asset Type"}
             </Button>
           </DialogFooter>
@@ -3274,22 +3312,23 @@ export default function AdminAssetsPage() {
         <DialogContent className="max-w-lg">
           <DialogHeader className="space-y-3 border-b pb-4">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                <Download className="h-5 w-5 text-primary" />
+              <div className="bg-primary/10 flex h-10 w-10 items-center justify-center rounded-lg">
+                <Download className="text-primary h-5 w-5" />
               </div>
               <div>
                 <DialogTitle className="text-xl">Select Columns to Export</DialogTitle>
                 <DialogDescription className="mt-1">
                   Choose which columns you want to include in your{" "}
-                  <span className="font-semibold text-primary">{exportType?.toUpperCase()}</span> export
+                  <span className="text-primary font-semibold">{exportType?.toUpperCase()}</span> export
                 </DialogDescription>
               </div>
             </div>
           </DialogHeader>
           <div className="space-y-2 py-4">
-            <div className="mb-3 flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2">
-              <span className="text-sm font-medium text-muted-foreground">
-                {Object.values(selectedColumns).filter((v) => v).length} of {Object.keys(selectedColumns).length} columns selected
+            <div className="bg-muted/50 mb-3 flex items-center justify-between rounded-lg px-3 py-2">
+              <span className="text-muted-foreground text-sm font-medium">
+                {Object.values(selectedColumns).filter((v) => v).length} of {Object.keys(selectedColumns).length}{" "}
+                columns selected
               </span>
               <Button
                 variant="ghost"
@@ -3308,11 +3347,11 @@ export default function AdminAssetsPage() {
                 {Object.values(selectedColumns).every((v) => v) ? "Deselect All" : "Select All"}
               </Button>
             </div>
-            <div className="max-h-96 space-y-1.5 overflow-y-auto rounded-lg border bg-background/50 p-2">
+            <div className="bg-background/50 max-h-96 space-y-1.5 overflow-y-auto rounded-lg border p-2">
               {Object.keys(selectedColumns).map((column) => (
                 <div
                   key={column}
-                  className={`group flex items-center space-x-3 rounded-md px-3 py-2.5 transition-colors hover:bg-muted/80 ${
+                  className={`group hover:bg-muted/80 flex items-center space-x-3 rounded-md px-3 py-2.5 transition-colors ${
                     selectedColumns[column] ? "bg-primary/5 hover:bg-primary/10" : ""
                   }`}
                 >
@@ -3330,14 +3369,14 @@ export default function AdminAssetsPage() {
                   <Label
                     htmlFor={column}
                     className={`flex-1 cursor-pointer text-sm font-medium transition-colors ${
-                      selectedColumns[column] ? "text-foreground" : "text-muted-foreground group-hover:text-foreground dark:group-hover:text-foreground"
+                      selectedColumns[column]
+                        ? "text-foreground"
+                        : "text-muted-foreground group-hover:text-foreground dark:group-hover:text-foreground"
                     }`}
                   >
                     {column}
                   </Label>
-                  {selectedColumns[column] && (
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                  )}
+                  {selectedColumns[column] && <CheckCircle2 className="text-primary h-4 w-4" />}
                 </div>
               ))}
             </div>

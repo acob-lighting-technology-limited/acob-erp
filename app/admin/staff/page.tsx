@@ -1125,60 +1125,58 @@ export default function AdminStaffPage() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-2 sm:gap-3 md:grid-cols-4 md:gap-4">
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4">
           <Card className="border-2">
-            <CardContent className="p-3 sm:p-4 md:p-6">
+            <CardContent className="p-2.5">
               <div className="flex items-center justify-between">
                 <div className="min-w-0 flex-1">
-                  <p className="xs:text-xs text-muted-foreground truncate text-[10px] font-medium">Total Staff</p>
-                  <p className="text-foreground mt-1 text-lg font-bold sm:text-xl md:mt-2 md:text-3xl">{stats.total}</p>
+                  <p className="text-muted-foreground truncate text-[10px] font-medium">Total Staff</p>
+                  <p className="text-foreground mt-0.5 text-base font-bold md:text-2xl">{stats.total}</p>
                 </div>
-                <div className="ml-1 shrink-0 rounded-lg bg-blue-100 p-1.5 sm:p-2 md:p-3 dark:bg-blue-900/30">
-                  <Users className="h-4 w-4 text-blue-600 sm:h-5 sm:w-5 md:h-6 md:w-6 dark:text-blue-400" />
+                <div className="ml-1 shrink-0 rounded-lg bg-blue-100 p-1.5 dark:bg-blue-900/30">
+                  <Users className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
           <Card className="border-2">
-            <CardContent className="p-3 sm:p-4 md:p-6">
+            <CardContent className="p-2.5">
               <div className="flex items-center justify-between">
                 <div className="min-w-0 flex-1">
-                  <p className="xs:text-xs text-muted-foreground truncate text-[10px] font-medium">Admins</p>
-                  <p className="text-foreground mt-1 text-lg font-bold sm:text-xl md:mt-2 md:text-3xl">
-                    {stats.admins}
-                  </p>
+                  <p className="text-muted-foreground truncate text-[10px] font-medium">Admins</p>
+                  <p className="text-foreground mt-0.5 text-base font-bold md:text-2xl">{stats.admins}</p>
                 </div>
-                <div className="ml-1 flex-shrink-0 rounded-lg bg-red-100 p-1.5 sm:p-2 md:p-3 dark:bg-red-900/30">
-                  <Shield className="h-4 w-4 text-red-600 sm:h-5 sm:w-5 md:h-6 md:w-6 dark:text-red-400" />
+                <div className="ml-1 flex-shrink-0 rounded-lg bg-red-100 p-1.5 dark:bg-red-900/30">
+                  <Shield className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
           <Card className="border-2">
-            <CardContent className="p-3 sm:p-4 md:p-6">
+            <CardContent className="p-2.5">
               <div className="flex items-center justify-between">
                 <div className="min-w-0 flex-1">
-                  <p className="xs:text-xs text-muted-foreground truncate text-[10px] font-medium">Leads</p>
-                  <p className="text-foreground mt-1 text-lg font-bold sm:text-xl md:mt-2 md:text-3xl">{stats.leads}</p>
+                  <p className="text-muted-foreground truncate text-[10px] font-medium">Leads</p>
+                  <p className="text-foreground mt-0.5 text-base font-bold md:text-2xl">{stats.leads}</p>
                 </div>
-                <div className="ml-1 flex-shrink-0 rounded-lg bg-purple-100 p-1.5 sm:p-2 md:p-3 dark:bg-purple-900/30">
-                  <UserCog className="h-4 w-4 text-purple-600 sm:h-5 sm:w-5 md:h-6 md:w-6 dark:text-purple-400" />
+                <div className="ml-1 flex-shrink-0 rounded-lg bg-purple-100 p-1.5 dark:bg-purple-900/30">
+                  <UserCog className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
           <Card className="border-2">
-            <CardContent className="p-3 sm:p-4 md:p-6">
+            <CardContent className="p-2.5">
               <div className="flex items-center justify-between">
                 <div className="min-w-0 flex-1">
-                  <p className="xs:text-xs text-muted-foreground truncate text-[10px] font-medium">Staff Members</p>
-                  <p className="text-foreground mt-1 text-lg font-bold sm:text-xl md:mt-2 md:text-3xl">{stats.staff}</p>
+                  <p className="text-muted-foreground truncate text-[10px] font-medium">Staff Members</p>
+                  <p className="text-foreground mt-0.5 text-base font-bold md:text-2xl">{stats.staff}</p>
                 </div>
-                <div className="ml-1 flex-shrink-0 rounded-lg bg-green-100 p-1.5 sm:p-2 md:p-3 dark:bg-green-900/30">
-                  <Users className="h-4 w-4 text-green-600 sm:h-5 sm:w-5 md:h-6 md:w-6 dark:text-green-400" />
+                <div className="ml-1 flex-shrink-0 rounded-lg bg-green-100 p-1.5 dark:bg-green-900/30">
+                  <Users className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
                 </div>
               </div>
             </CardContent>
@@ -1188,7 +1186,7 @@ export default function AdminStaffPage() {
         {/* Export Buttons */}
         <Card className="border-2">
           <CardContent className="p-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-2">
                 <Download className="text-muted-foreground h-4 w-4" />
                 <span className="text-foreground text-sm font-medium">Export Filtered Staff:</span>
@@ -1198,31 +1196,31 @@ export default function AdminStaffPage() {
                   variant="outline"
                   size="sm"
                   onClick={() => handleExportClick("excel")}
-                  className="gap-2"
+                  className="flex-1 gap-2 sm:flex-none"
                   disabled={filteredStaff.length === 0}
                 >
                   <FileText className="h-4 w-4" />
-                  Excel (.xlsx)
+                  <span className="text-xs sm:text-sm">Excel (.xlsx)</span>
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => handleExportClick("pdf")}
-                  className="gap-2"
+                  className="flex-1 gap-2 sm:flex-none"
                   disabled={filteredStaff.length === 0}
                 >
                   <FileText className="h-4 w-4" />
-                  PDF
+                  <span className="text-xs sm:text-sm">PDF</span>
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => handleExportClick("word")}
-                  className="gap-2"
+                  className="flex-1 gap-2 sm:flex-none"
                   disabled={filteredStaff.length === 0}
                 >
                   <FileText className="h-4 w-4" />
-                  Word (.docx)
+                  <span className="text-xs sm:text-sm">Word (.docx)</span>
                 </Button>
               </div>
             </div>
@@ -1245,7 +1243,7 @@ export default function AdminStaffPage() {
               </div>
 
               {/* Filter Buttons */}
-              <div className="flex flex-col gap-3 md:flex-row">
+              <div className="flex gap-3 overflow-hidden">
                 <SearchableMultiSelect
                   label="Departments"
                   icon={<Building2 className="h-4 w-4" />}
@@ -1256,7 +1254,7 @@ export default function AdminStaffPage() {
                     icon: <Building2 className="h-3 w-3" />,
                   }))}
                   onChange={setDepartmentFilter}
-                  placeholder="All Departments"
+                  placeholder="Department"
                 />
                 <SearchableMultiSelect
                   label="Staff Members"
@@ -1268,7 +1266,7 @@ export default function AdminStaffPage() {
                     icon: <User className="h-3 w-3" />,
                   }))}
                   onChange={setStaffFilter}
-                  placeholder="All Staff"
+                  placeholder="Staff"
                 />
                 <SearchableMultiSelect
                   label="Roles"
@@ -1279,7 +1277,7 @@ export default function AdminStaffPage() {
                     label: getRoleDisplayName(role),
                   }))}
                   onChange={setRoleFilter}
-                  placeholder="All Roles"
+                  placeholder="Role"
                 />
               </div>
             </div>
@@ -1290,7 +1288,7 @@ export default function AdminStaffPage() {
         {filteredStaff.length > 0 ? (
           viewMode === "list" ? (
             <Card className="border-2">
-              <div className="table-responsive">
+              <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -1326,11 +1324,8 @@ export default function AdminStaffPage() {
                         <TableCell>
                           <Link
                             href={`/admin/staff/${member.id}`}
-                            className="hover:text-primary flex items-center gap-2 transition-colors"
+                            className="hover:text-primary whitespace-nowrap transition-colors"
                           >
-                            <div className="bg-primary/10 rounded-lg p-2">
-                              <Users className="text-primary h-4 w-4" />
-                            </div>
                             <span className="text-foreground font-medium">
                               {formatName(member.last_name)}, {formatName(member.first_name)}
                             </span>

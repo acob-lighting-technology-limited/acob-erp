@@ -317,72 +317,72 @@ export default async function AdminDashboardPage() {
         </div>
 
         {/* Stats Grid */}
-        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-2 lg:grid-cols-5">
           <Card className="border">
-            <CardContent className="p-4">
+            <CardContent className="p-2.5">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-muted-foreground text-xs font-medium">Total Staff</p>
-                  <p className="text-foreground mt-1 text-2xl font-bold">{staffCount || 0}</p>
+                  <p className="text-muted-foreground text-[10px] font-medium">Total Staff</p>
+                  <p className="text-foreground mt-0.5 text-lg font-bold">{staffCount || 0}</p>
                 </div>
-                <div className="rounded-lg bg-blue-100 p-2 dark:bg-blue-900/30">
-                  <Users className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                <div className="rounded-lg bg-blue-100 p-1.5 dark:bg-blue-900/30">
+                  <Users className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
           <Card className="border">
-            <CardContent className="p-4">
+            <CardContent className="p-2.5">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-muted-foreground text-xs font-medium">Assets</p>
-                  <p className="text-foreground mt-1 text-2xl font-bold">{assetCount || 0}</p>
+                  <p className="text-muted-foreground text-[10px] font-medium">Assets</p>
+                  <p className="text-foreground mt-0.5 text-lg font-bold">{assetCount || 0}</p>
                 </div>
-                <div className="rounded-lg bg-purple-100 p-2 dark:bg-purple-900/30">
-                  <Package className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                <div className="rounded-lg bg-purple-100 p-1.5 dark:bg-purple-900/30">
+                  <Package className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
           <Card className="border">
-            <CardContent className="p-4">
+            <CardContent className="p-2.5">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-muted-foreground text-xs font-medium">Active Tasks</p>
-                  <p className="text-foreground mt-1 text-2xl font-bold">{taskCount || 0}</p>
+                  <p className="text-muted-foreground text-[10px] font-medium">Active Tasks</p>
+                  <p className="text-foreground mt-0.5 text-lg font-bold">{taskCount || 0}</p>
                 </div>
-                <div className="rounded-lg bg-green-100 p-2 dark:bg-green-900/30">
-                  <ClipboardList className="h-4 w-4 text-green-600 dark:text-green-400" />
+                <div className="rounded-lg bg-green-100 p-1.5 dark:bg-green-900/30">
+                  <ClipboardList className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
           <Card className="border">
-            <CardContent className="p-4">
+            <CardContent className="p-2.5">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-muted-foreground text-xs font-medium">Documents</p>
-                  <p className="text-foreground mt-1 text-2xl font-bold">{docCount || 0}</p>
+                  <p className="text-muted-foreground text-[10px] font-medium">Documents</p>
+                  <p className="text-foreground mt-0.5 text-lg font-bold">{docCount || 0}</p>
                 </div>
-                <div className="rounded-lg bg-orange-100 p-2 dark:bg-orange-900/30">
-                  <FileText className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                <div className="rounded-lg bg-orange-100 p-1.5 dark:bg-orange-900/30">
+                  <FileText className="h-3.5 w-3.5 text-orange-600 dark:text-orange-400" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
           <Card className="border">
-            <CardContent className="p-4">
+            <CardContent className="p-2.5">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-muted-foreground text-xs font-medium">Feedback</p>
-                  <p className="text-foreground mt-1 text-2xl font-bold">{feedbackCount || 0}</p>
+                  <p className="text-muted-foreground text-[10px] font-medium">Feedback</p>
+                  <p className="text-foreground mt-0.5 text-lg font-bold">{feedbackCount || 0}</p>
                 </div>
-                <div className="rounded-lg bg-cyan-100 p-2 dark:bg-cyan-900/30">
-                  <MessageSquare className="h-4 w-4 text-cyan-600 dark:text-cyan-400" />
+                <div className="rounded-lg bg-cyan-100 p-1.5 dark:bg-cyan-900/30">
+                  <MessageSquare className="h-3.5 w-3.5 text-cyan-600 dark:text-cyan-400" />
                 </div>
               </div>
             </CardContent>
@@ -391,21 +391,21 @@ export default async function AdminDashboardPage() {
 
         {/* Quick Actions */}
         <div>
-          <h2 className="mb-3 text-xl font-bold">Quick Actions</h2>
-          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+          <h2 className="mb-2 text-base font-bold md:text-lg">Quick Actions</h2>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {filteredActions.map((action) => (
               <Link key={action.href} href={action.href} className="h-full">
                 <Card className="flex h-full cursor-pointer flex-col border transition-all hover:-translate-y-0.5 hover:shadow-md">
-                  <CardContent className="flex flex-1 flex-col p-4">
-                    <div className="flex items-center gap-3">
-                      <div className={`${action.color} shrink-0 rounded-lg p-2 text-white`}>
-                        <action.icon className="h-4 w-4" />
+                  <CardContent className="flex flex-1 flex-col p-2.5">
+                    <div className="flex items-center gap-2">
+                      <div className={`${action.color} shrink-0 rounded-lg p-1.5 text-white`}>
+                        <action.icon className="h-3.5 w-3.5" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <h3 className="text-foreground mb-0.5 truncate text-sm font-semibold">{action.title}</h3>
-                        <p className="text-muted-foreground line-clamp-1 text-xs">{action.description}</p>
+                        <h3 className="text-foreground mb-0.5 truncate text-xs font-semibold">{action.title}</h3>
+                        <p className="text-muted-foreground line-clamp-2 text-[10px]">{action.description}</p>
                       </div>
-                      <ArrowRight className="text-muted-foreground group-hover:text-primary h-4 w-4 flex-shrink-0 transition-colors" />
+                      <ArrowRight className="text-muted-foreground group-hover:text-primary hidden h-3.5 w-3.5 flex-shrink-0 transition-colors sm:block" />
                     </div>
                   </CardContent>
                 </Card>
@@ -415,12 +415,12 @@ export default async function AdminDashboardPage() {
         </div>
 
         {/* Recent Activity */}
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           {/* Recent Tasks */}
           <Card className="border">
             <CardHeader className="bg-muted/30 border-b px-4 py-3">
               <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2 text-base">
+                <CardTitle className="flex items-center gap-2 text-sm md:text-base">
                   <ClipboardList className="h-4 w-4" />
                   Recent Tasks
                 </CardTitle>
@@ -435,24 +435,29 @@ export default async function AdminDashboardPage() {
               {tasksWithUsers && tasksWithUsers.length > 0 ? (
                 <div className="space-y-2">
                   {tasksWithUsers.map((task: any) => (
-                    <div key={task.id} className="flex items-center gap-2 border-b py-2 last:border-0">
+                    <div
+                      key={task.id}
+                      className="flex flex-col gap-2 border-b py-2 last:border-0 sm:flex-row sm:items-center"
+                    >
                       <p className="text-foreground min-w-0 flex-1 truncate text-sm font-medium">{task.title}</p>
-                      <Badge className={`${getStatusColor(task.status)} shrink-0 text-xs`} variant="outline">
-                        {task.status}
-                      </Badge>
-                      {task.priority && (
-                        <Badge variant="outline" className="shrink-0 text-xs">
-                          {task.priority}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge className={`${getStatusColor(task.status)} shrink-0 text-xs`} variant="outline">
+                          {task.status}
                         </Badge>
-                      )}
-                      {task.assigned_to_user && (
+                        {task.priority && (
+                          <Badge variant="outline" className="shrink-0 text-xs">
+                            {task.priority}
+                          </Badge>
+                        )}
+                        {task.assigned_to_user && (
+                          <span className="text-muted-foreground shrink-0 text-xs whitespace-nowrap">
+                            {formatName(task.assigned_to_user.first_name)} {formatName(task.assigned_to_user.last_name)}
+                          </span>
+                        )}
                         <span className="text-muted-foreground shrink-0 text-xs whitespace-nowrap">
-                          {formatName(task.assigned_to_user.first_name)} {formatName(task.assigned_to_user.last_name)}
+                          {formatDate(task.created_at)}
                         </span>
-                      )}
-                      <span className="text-muted-foreground shrink-0 text-xs whitespace-nowrap">
-                        {formatDate(task.created_at)}
-                      </span>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -466,7 +471,7 @@ export default async function AdminDashboardPage() {
           <Card className="border">
             <CardHeader className="bg-muted/30 border-b px-4 py-3">
               <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2 text-base">
+                <CardTitle className="flex items-center gap-2 text-sm md:text-base">
                   <MessageSquare className="h-4 w-4" />
                   Recent Feedback
                 </CardTitle>
@@ -481,22 +486,27 @@ export default async function AdminDashboardPage() {
               {feedbackWithUsers && feedbackWithUsers.length > 0 ? (
                 <div className="space-y-2">
                   {feedbackWithUsers.map((feedback: any) => (
-                    <div key={feedback.id} className="flex items-center gap-2 border-b py-2 last:border-0">
+                    <div
+                      key={feedback.id}
+                      className="flex flex-col gap-2 border-b py-2 last:border-0 sm:flex-row sm:items-center"
+                    >
                       <p className="text-foreground min-w-0 flex-1 truncate text-sm font-medium">{feedback.title}</p>
-                      <Badge variant="outline" className="shrink-0 text-xs">
-                        {feedback.feedback_type || "N/A"}
-                      </Badge>
-                      <Badge className={`${getStatusColor(feedback.status)} shrink-0 text-xs`} variant="outline">
-                        {feedback.status}
-                      </Badge>
-                      {feedback.user && (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant="outline" className="shrink-0 text-xs">
+                          {feedback.feedback_type || "N/A"}
+                        </Badge>
+                        <Badge className={`${getStatusColor(feedback.status)} shrink-0 text-xs`} variant="outline">
+                          {feedback.status}
+                        </Badge>
+                        {feedback.user && (
+                          <span className="text-muted-foreground shrink-0 text-xs whitespace-nowrap">
+                            {formatName(feedback.user.first_name)} {formatName(feedback.user.last_name)}
+                          </span>
+                        )}
                         <span className="text-muted-foreground shrink-0 text-xs whitespace-nowrap">
-                          {formatName(feedback.user.first_name)} {formatName(feedback.user.last_name)}
+                          {formatDate(feedback.created_at)}
                         </span>
-                      )}
-                      <span className="text-muted-foreground shrink-0 text-xs whitespace-nowrap">
-                        {formatDate(feedback.created_at)}
-                      </span>
+                      </div>
                     </div>
                   ))}
                 </div>

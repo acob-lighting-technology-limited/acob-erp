@@ -964,18 +964,20 @@ export default function PaymentsPage() {
   }
 
   return (
-    <div className="space-y-6 p-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-4 p-4 md:space-y-6 md:p-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Payments</h1>
-          <p className="text-muted-foreground">Manage and track department payments and recurring subscriptions.</p>
+          <h1 className="text-2xl font-bold tracking-tight md:text-3xl">Payments</h1>
+          <p className="text-muted-foreground text-sm md:text-base">
+            Manage and track department payments and recurring subscriptions.
+          </p>
         </div>
         <div className="flex gap-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline">
+              <Button variant="outline" className="flex-1 sm:flex-none" size="sm">
                 <Download className="mr-2 h-4 w-4" />
-                Export
+                <span className="text-xs sm:text-sm">Export</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
@@ -990,81 +992,81 @@ export default function PaymentsPage() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Button onClick={() => setIsModalOpen(true)}>
+          <Button onClick={() => setIsModalOpen(true)} className="flex-1 sm:flex-none" size="sm">
             <Plus className="mr-2 h-4 w-4" />
-            New Payment
+            <span className="text-xs sm:text-sm">New Payment</span>
           </Button>
         </div>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Outstanding</CardTitle>
-            <CreditCard className="text-muted-foreground h-4 w-4" />
+      <div className="grid grid-cols-6 gap-2 md:gap-3 lg:grid-cols-5">
+        <Card className="col-span-6 lg:col-span-1">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-2">
+            <CardTitle className="text-[10px] font-medium md:text-sm">Total Outstanding</CardTitle>
+            <CreditCard className="text-muted-foreground h-3.5 w-3.5" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(stats.totalDue, "NGN")}</div>
-            <p className="text-muted-foreground text-xs">Overdue + Up Next (7 days)</p>
+          <CardContent className="p-3 pt-0">
+            <div className="text-base font-bold md:text-2xl">{formatCurrency(stats.totalDue, "NGN")}</div>
+            <p className="text-muted-foreground text-[9px] md:text-xs">Overdue + Up Next (7 days)</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Paid</CardTitle>
-            <Building2 className="text-muted-foreground h-4 w-4" />
+        <Card className="col-span-6 lg:col-span-1">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-2">
+            <CardTitle className="text-[10px] font-medium md:text-sm">Total Paid</CardTitle>
+            <Building2 className="text-muted-foreground h-3.5 w-3.5" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(stats.totalPaid, "NGN")}</div>
-            <p className="text-muted-foreground text-xs">Lifetime collected</p>
+          <CardContent className="p-3 pt-0">
+            <div className="text-base font-bold md:text-2xl">{formatCurrency(stats.totalPaid, "NGN")}</div>
+            <p className="text-muted-foreground text-[9px] md:text-xs">Lifetime collected</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Completed</CardTitle>
-            <CheckCircle className="h-4 w-4 text-green-500" />
+        <Card className="col-span-2 lg:col-span-1">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-2">
+            <CardTitle className="text-[10px] font-medium md:text-sm">Completed</CardTitle>
+            <CheckCircle className="h-3.5 w-3.5 text-green-500" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{stats.countCompleted}</div>
-            <p className="text-muted-foreground text-xs">Paid Items & History</p>
+          <CardContent className="p-3 pt-0">
+            <div className="text-base font-bold text-green-600 md:text-2xl">{stats.countCompleted}</div>
+            <p className="text-muted-foreground text-[9px] md:text-xs">Paid Items & History</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Overdue Payments</CardTitle>
-            <CreditCard className="h-4 w-4 text-red-500" />
+        <Card className="col-span-2 lg:col-span-1">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-2">
+            <CardTitle className="text-[10px] font-medium md:text-sm">Overdue Payments</CardTitle>
+            <CreditCard className="h-3.5 w-3.5 text-red-500" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">{stats.countOverdue}</div>
-            <p className="text-muted-foreground text-xs">Requires immediate attention</p>
+          <CardContent className="p-3 pt-0">
+            <div className="text-base font-bold text-red-600 md:text-2xl">{stats.countOverdue}</div>
+            <p className="text-muted-foreground text-[9px] md:text-xs">Requires immediate attention</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Due Payments</CardTitle>
-            <Calendar className="h-4 w-4 text-yellow-500" />
+        <Card className="col-span-2 lg:col-span-1">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-2">
+            <CardTitle className="text-[10px] font-medium md:text-sm">Due Payments</CardTitle>
+            <Calendar className="h-3.5 w-3.5 text-yellow-500" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">{stats.countDue}</div>
-            <p className="text-muted-foreground text-xs">Due within 7 days</p>
+          <CardContent className="p-3 pt-0">
+            <div className="text-base font-bold text-yellow-600 md:text-2xl">{stats.countDue}</div>
+            <p className="text-muted-foreground text-[9px] md:text-xs">Due within 7 days</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center">
         <div className="relative flex-1">
           <Search className="text-muted-foreground absolute top-2.5 left-2.5 h-4 w-4" />
           <Input
-            placeholder="Search payments by title, department or issuer..."
-            className="pl-9"
+            placeholder="Search payments..."
+            className="pl-9 text-sm"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
         <div className="flex gap-2">
           <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="flex-1 sm:w-[180px]">
               <SelectValue placeholder="Department" />
             </SelectTrigger>
             <SelectContent>
@@ -1077,7 +1079,7 @@ export default function PaymentsPage() {
             </SelectContent>
           </Select>
           <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="flex-1 sm:w-[180px]">
               <SelectValue placeholder="Category" />
             </SelectTrigger>
             <SelectContent>
@@ -1090,7 +1092,7 @@ export default function PaymentsPage() {
             </SelectContent>
           </Select>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[150px]">
+            <SelectTrigger className="flex-1 sm:w-[150px]">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
@@ -1120,7 +1122,7 @@ export default function PaymentsPage() {
           </Button>
         </div>
       ) : (
-        <div className="rounded-md border">
+        <div className="overflow-x-auto rounded-md border">
           <Table>
             <TableHeader>
               <TableRow>
