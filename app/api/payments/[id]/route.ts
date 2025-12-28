@@ -76,7 +76,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     const { data: profile } = await supabase.from("profiles").select("is_admin, department").eq("id", user.id).single()
 
     if (!profile?.is_admin) {
-      // Check if payment belongs to user's department AND was created by user
+      // Check if payment belongs to user's department
       const { data: payment } = await supabase
         .from("department_payments")
         .select("department:departments(name), created_by")
@@ -84,12 +84,27 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         .single()
 
       // @ts-expect-error: Payment relation typing issue
-      if (payment?.department?.name !== profile.department) {
+      const paymentDept = payment?.department?.name
+      const userDept = profile?.department
+
+      if (paymentDept !== userDept) {
         return NextResponse.json({ error: "Forbidden: Department mismatch" }, { status: 403 })
       }
 
-      // Enforce "can only edit his own"
-      if (payment?.created_by !== user.id) {
+      // Determine if this is a "status update" or "full edit"
+      // Status updates (marking as paid, recording payments) are allowed for all department members
+      // Full edits (changing title, amount, etc.) require being the creator
+      const bodyKeys = Object.keys(body)
+      const allowedStatusKeys = ["status", "amount_paid", "next_payment_due", "last_payment_date"]
+      const isStatusUpdate =
+        (body.status !== undefined ||
+          body.amount_paid !== undefined ||
+          body.next_payment_due !== undefined ||
+          body.last_payment_date !== undefined) &&
+        bodyKeys.every((key) => allowedStatusKeys.includes(key))
+
+      // If it's a full edit (not just status update), enforce creator check
+      if (!isStatusUpdate && payment?.created_by !== user.id) {
         return NextResponse.json({ error: "Forbidden: You can only edit payments you created" }, { status: 403 })
       }
     }

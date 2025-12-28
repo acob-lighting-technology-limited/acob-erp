@@ -161,6 +161,34 @@ export default function DepartmentPaymentsPage() {
     init()
   }, [])
 
+  // Cleanup effect to remove any stuck modal backdrops
+  useEffect(() => {
+    return () => {
+      // Remove any stuck modal backdrops on unmount
+      const backdrops = document.querySelectorAll("[data-radix-dialog-overlay]")
+      backdrops.forEach((backdrop) => backdrop.remove())
+    }
+  }, [])
+
+  // Clean up backdrop when modal closes
+  useEffect(() => {
+    if (!isModalOpen) {
+      // Small delay to let the dialog close animation finish
+      const timer = setTimeout(() => {
+        const backdrops = document.querySelectorAll("[data-radix-dialog-overlay]")
+        backdrops.forEach((backdrop) => {
+          if (backdrop.getAttribute("data-state") === "closed") {
+            backdrop.remove()
+          }
+        })
+        // Also remove any orphaned backdrops
+        document.body.style.pointerEvents = ""
+        document.body.style.overflow = ""
+      }, 300)
+      return () => clearTimeout(timer)
+    }
+  }, [isModalOpen])
+
   const fetchData = async () => {
     try {
       const response = await fetch("/api/payments")

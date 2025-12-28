@@ -493,7 +493,7 @@ export default function PaymentsPage() {
       }
 
       if (selectedColumns["Recurrence"]) row["Recurrence"] = p.recurrence_period || "-"
-      if (selectedColumns["Reference"]) row["Reference"] = p.id.substring(0, 8)
+      if (selectedColumns["Reference"]) row["Reference"] = p.payment_reference || p.id.substring(0, 8)
 
       return row
     })
@@ -604,10 +604,16 @@ export default function PaymentsPage() {
   }
 
   const handleExportConfirm = async () => {
-    if (exportType === "excel") {
-      await exportToExcel()
-    } else if (exportType === "pdf") {
-      await exportToPDF()
+    try {
+      if (exportType === "excel") {
+        await exportToExcel()
+      } else if (exportType === "pdf") {
+        await exportToPDF()
+      }
+    } catch (error) {
+      console.error("Error during export:", error)
+      toast.error("Export failed")
+      setExportDialogOpen(false)
     }
   }
 
@@ -628,7 +634,8 @@ export default function PaymentsPage() {
     doc.setTextColor(0, 0, 0)
     doc.setFont("helvetica", "normal")
     doc.setFontSize(10)
-    doc.text(`Reference: ${payment.id.substring(0, 8).toUpperCase()}`, 14, 50)
+    const reference = payment.payment_reference || payment.id.substring(0, 8).toUpperCase()
+    doc.text(`Reference: ${reference}`, 14, 50)
 
     const date = payment.payment_type === "recurring" ? payment.next_payment_due : payment.payment_date
     const formattedDate = date && isValid(parseISO(date)) ? format(parseISO(date), "MMM d, yyyy") : "N/A"
@@ -683,17 +690,29 @@ export default function PaymentsPage() {
     printRow("Type:", payment.payment_type === "recurring" ? "Recurring" : "One-time", rightCol)
     y += rowHeight
 
-    // Row 4
+    // Row 4 - Address (full width to avoid clash)
     if (payment.issuer_address) {
-      printRow("Address:", payment.issuer_address, leftCol)
+      doc.setFont("helvetica", "bold")
+      doc.text("Address:", leftCol, y)
+      doc.setFont("helvetica", "normal")
+      const addressLines = doc.splitTextToSize(payment.issuer_address, 160)
+      doc.text(addressLines, leftCol + labelOffset, y)
+      y += rowHeight * Math.max(1, addressLines.length)
     }
+
+    // Row 5 - Period (if recurring)
     if (payment.recurrence_period) {
-      printRow("Period:", payment.recurrence_period, rightCol)
+      printRow(
+        "Period:",
+        payment.recurrence_period.charAt(0).toUpperCase() + payment.recurrence_period.slice(1),
+        leftCol
+      )
+      y += rowHeight
     }
 
     // Description / Notes
     if (payment.description) {
-      y += rowHeight * 1.5
+      y += rowHeight * 0.5
       doc.setFont("helvetica", "bold")
       doc.text("Description:", leftCol, y)
       y += 7
@@ -701,6 +720,68 @@ export default function PaymentsPage() {
       doc.setFontSize(10)
       const splitDesc = doc.splitTextToSize(payment.description, 180)
       doc.text(splitDesc, leftCol, y)
+      y += splitDesc.length * 5
+    }
+
+    // Billing Periods Table (for recurring payments)
+    if (payment.payment_type === "recurring" && payment.documents && payment.documents.length > 0) {
+      y += rowHeight * 1.5
+
+      // Get all receipts with dates
+      const receipts = payment.documents
+        .filter((d) => d.document_type === "receipt" && d.applicable_date)
+        .sort((a, b) => {
+          const dateA = a.applicable_date ? new Date(a.applicable_date).getTime() : 0
+          const dateB = b.applicable_date ? new Date(b.applicable_date).getTime() : 0
+          return dateA - dateB
+        })
+
+      if (receipts.length > 0) {
+        doc.setFont("helvetica", "bold")
+        doc.setFontSize(12)
+        doc.text("Billing Periods", leftCol, y)
+        y += 8
+
+        // Table headers
+        doc.setFontSize(9)
+        doc.setFillColor(240, 240, 240)
+        doc.rect(leftCol, y - 5, 182, 8, "F")
+        doc.text("#", leftCol + 2, y)
+        doc.text("Period", leftCol + 15, y)
+        doc.text("Amount", leftCol + 100, y)
+        doc.text("Status", leftCol + 150, y)
+        y += 10
+
+        // Paid periods
+        doc.setFont("helvetica", "normal")
+        receipts.forEach((receipt, index) => {
+          const periodDate = receipt.applicable_date ? format(parseISO(receipt.applicable_date), "do MMM yyyy") : "-"
+          doc.text(`${index + 1}`, leftCol + 2, y)
+          doc.text(periodDate, leftCol + 15, y)
+          doc.text(`${payment.currency} ${payment.amount.toLocaleString()}`, leftCol + 100, y)
+          doc.setTextColor(22, 163, 74)
+          doc.text("PAID", leftCol + 150, y)
+          doc.setTextColor(0, 0, 0)
+          y += 7
+        })
+
+        // Next billing period
+        if (payment.next_payment_due) {
+          y += 3
+          doc.setDrawColor(200, 200, 200)
+          doc.line(leftCol, y - 2, 196, y - 2)
+          y += 5
+
+          const nextPeriod = format(parseISO(payment.next_payment_due), "do MMM yyyy")
+          doc.setFont("helvetica", "bold")
+          doc.text(`${receipts.length + 1}`, leftCol + 2, y)
+          doc.text(nextPeriod, leftCol + 15, y)
+          doc.text(`${payment.currency} ${payment.amount.toLocaleString()}`, leftCol + 100, y)
+          doc.setTextColor(255, 165, 0)
+          doc.text("UPCOMING", leftCol + 150, y)
+          doc.setTextColor(0, 0, 0)
+        }
+      }
     }
 
     // Footer
@@ -709,10 +790,82 @@ export default function PaymentsPage() {
     doc.setTextColor(150, 150, 150)
     doc.text("Generated by Payment System", 105, pageHeight - 10, { align: "center" })
 
-    doc.save(`payment_${payment.id}_details.pdf`)
+    doc.save(`payment_${reference}_details.pdf`)
   }
 
-  const handlePrintDocument = (payment: Payment, type: "invoice" | "receipt") => {
+  const downloadFile = async (url: string, filename: string) => {
+    try {
+      const response = await fetch(url)
+      if (!response.ok) throw new Error("Failed to fetch file")
+
+      const blob = await response.blob()
+      const blobUrl = window.URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      link.href = blobUrl
+      link.download = filename
+      link.style.display = "none"
+      document.body.appendChild(link)
+      link.click()
+
+      // Cleanup
+      setTimeout(() => {
+        document.body.removeChild(link)
+        window.URL.revokeObjectURL(blobUrl)
+      }, 100)
+    } catch (error) {
+      console.error("Error downloading file:", error)
+      throw error
+    }
+  }
+
+  // Cleanup effect to remove any stuck modal backdrops
+  useEffect(() => {
+    return () => {
+      // Remove any stuck modal backdrops on unmount
+      const backdrops = document.querySelectorAll("[data-radix-dialog-overlay]")
+      backdrops.forEach((backdrop) => backdrop.remove())
+    }
+  }, [])
+
+  // Clean up backdrop when receipt dialog closes
+  useEffect(() => {
+    if (!receiptDialogOpen) {
+      // Small delay to let the dialog close animation finish
+      const timer = setTimeout(() => {
+        const backdrops = document.querySelectorAll("[data-radix-dialog-overlay]")
+        backdrops.forEach((backdrop) => {
+          if (backdrop.getAttribute("data-state") === "closed") {
+            backdrop.remove()
+          }
+        })
+        // Also remove any orphaned backdrops
+        document.body.style.pointerEvents = ""
+        document.body.style.overflow = ""
+      }, 300)
+      return () => clearTimeout(timer)
+    }
+  }, [receiptDialogOpen])
+
+  // Clean up backdrop when export dialog closes
+  useEffect(() => {
+    if (!exportDialogOpen) {
+      // Small delay to let the dialog close animation finish
+      const timer = setTimeout(() => {
+        const backdrops = document.querySelectorAll("[data-radix-dialog-overlay]")
+        backdrops.forEach((backdrop) => {
+          if (backdrop.getAttribute("data-state") === "closed") {
+            backdrop.remove()
+          }
+        })
+        // Also remove any orphaned backdrops
+        document.body.style.pointerEvents = ""
+        document.body.style.overflow = ""
+      }, 300)
+      return () => clearTimeout(timer)
+    }
+  }, [exportDialogOpen])
+
+  const handlePrintDocument = async (payment: Payment, type: "invoice" | "receipt") => {
     if (type === "receipt") {
       // Check if there are multiple receipts
       const receipts = payment.documents?.filter((d) => d.document_type === "receipt") || []
@@ -722,13 +875,24 @@ export default function PaymentsPage() {
         setReceiptDialogOpen(true)
         return
       } else if (receipts.length === 1) {
-        // Directly open the single receipt
-        const supabase = createClient()
-        const { data } = supabase.storage.from("payment_documents").getPublicUrl(receipts[0].file_path)
-        if (data?.publicUrl) {
-          window.open(data.publicUrl, "_blank")
-        } else {
-          toast.error("Could not get document URL")
+        // Directly download the single receipt
+        try {
+          const supabase = createClient()
+          const { data, error } = await supabase.storage
+            .from("payment_documents")
+            .createSignedUrl(receipts[0].file_path, 3600)
+          if (data?.signedUrl) {
+            const filename =
+              receipts[0].file_name || `receipt_${payment.payment_reference || payment.id.substring(0, 8)}.pdf`
+            await downloadFile(data.signedUrl, filename)
+            toast.success("Receipt downloaded successfully")
+          } else {
+            console.error("Error creating signed URL:", error)
+            toast.error("Could not get document URL")
+          }
+        } catch (error) {
+          console.error("Error downloading receipt:", error)
+          toast.error("Error downloading document")
         }
         return
       }
@@ -737,24 +901,43 @@ export default function PaymentsPage() {
     // Handle invoice or no receipts found
     const doc = payment.documents?.find((d) => d.document_type === type)
     if (doc) {
-      const supabase = createClient()
-      const { data } = supabase.storage.from("payment_documents").getPublicUrl(doc.file_path)
-      if (data?.publicUrl) {
-        window.open(data.publicUrl, "_blank")
-      } else {
-        toast.error("Could not get document URL")
+      try {
+        const supabase = createClient()
+        const { data, error } = await supabase.storage.from("payment_documents").createSignedUrl(doc.file_path, 3600)
+        if (data?.signedUrl) {
+          const filename = doc.file_name || `${type}_${payment.payment_reference || payment.id.substring(0, 8)}.pdf`
+          await downloadFile(data.signedUrl, filename)
+          toast.success(`${type.charAt(0).toUpperCase() + type.slice(1)} downloaded successfully`)
+        } else {
+          console.error("Error creating signed URL:", error)
+          toast.error("Could not get document URL")
+        }
+      } catch (error) {
+        console.error("Error downloading document:", error)
+        toast.error("Error downloading document")
       }
     }
   }
 
-  const handleViewReceipt = (receiptPath: string) => {
-    const supabase = createClient()
-    const { data } = supabase.storage.from("payment_documents").getPublicUrl(receiptPath)
-    if (data?.publicUrl) {
-      window.open(data.publicUrl, "_blank")
-      setReceiptDialogOpen(false)
-    } else {
-      toast.error("Could not get document URL")
+  const handleViewReceipt = async (receiptPath: string) => {
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase.storage.from("payment_documents").createSignedUrl(receiptPath, 3600)
+      if (data?.signedUrl) {
+        setReceiptDialogOpen(false)
+        // Extract filename from path
+        const filename = receiptPath.split("/").pop() || "receipt.pdf"
+        // Small delay to ensure dialog closes
+        await new Promise((resolve) => setTimeout(resolve, 100))
+        await downloadFile(data.signedUrl, filename)
+        toast.success("Receipt downloaded successfully")
+      } else {
+        console.error("Error creating signed URL:", error)
+        toast.error("Could not get document URL")
+      }
+    } catch (error) {
+      console.error("Error downloading receipt:", error)
+      toast.error("Error downloading document")
     }
   }
 

@@ -450,6 +450,59 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
     setSchedule(items)
   }
 
+  const downloadFile = async (url: string, filename: string) => {
+    try {
+      const response = await fetch(url)
+      if (!response.ok) throw new Error("Failed to fetch file")
+
+      const blob = await response.blob()
+      const blobUrl = window.URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      link.href = blobUrl
+      link.download = filename
+      link.style.display = "none"
+      document.body.appendChild(link)
+      link.click()
+
+      // Cleanup
+      setTimeout(() => {
+        document.body.removeChild(link)
+        window.URL.revokeObjectURL(blobUrl)
+      }, 100)
+    } catch (error) {
+      console.error("Error downloading file:", error)
+      throw error
+    }
+  }
+
+  // Cleanup effect to remove any stuck modal backdrops
+  useEffect(() => {
+    return () => {
+      // Remove any stuck modal backdrops on unmount
+      const backdrops = document.querySelectorAll("[data-radix-dialog-overlay]")
+      backdrops.forEach((backdrop) => backdrop.remove())
+    }
+  }, [])
+
+  // Clean up backdrop when print dialog closes
+  useEffect(() => {
+    if (!printDialogOpen) {
+      // Small delay to let the dialog close animation finish
+      const timer = setTimeout(() => {
+        const backdrops = document.querySelectorAll("[data-radix-dialog-overlay]")
+        backdrops.forEach((backdrop) => {
+          if (backdrop.getAttribute("data-state") === "closed") {
+            backdrop.remove()
+          }
+        })
+        // Also remove any orphaned backdrops
+        document.body.style.pointerEvents = ""
+        document.body.style.overflow = ""
+      }, 300)
+      return () => clearTimeout(timer)
+    }
+  }, [printDialogOpen])
+
   const handleViewDocument = async (e: React.MouseEvent, doc?: PaymentDocument) => {
     e.preventDefault()
     if (!doc) return
@@ -458,13 +511,16 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
       const supabase = createClient()
       const { data, error } = await supabase.storage.from("payment_documents").createSignedUrl(doc.file_path, 3600)
       if (data?.signedUrl) {
-        window.open(data.signedUrl, "_blank")
+        const filename = doc.file_name || doc.file_path.split("/").pop() || "document.pdf"
+        await downloadFile(data.signedUrl, filename)
+        toast.success("Document downloaded successfully")
       } else {
         toast.error("Could not get secure document URL")
         if (error) console.error("Error signing URL:", error)
       }
     } catch (error) {
-      toast.error("Error opening document")
+      console.error("Error downloading document:", error)
+      toast.error("Error downloading document")
     }
   }
 
@@ -698,6 +754,32 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
     }).format(amount)
   }
 
+  const getRealStatus = (p: Payment): "due" | "paid" | "overdue" | "cancelled" => {
+    if (p.status === "paid" || p.status === "cancelled") return p.status
+
+    const dateStr = p.payment_type === "recurring" ? p.next_payment_due : p.payment_date
+    if (!dateStr) return "due"
+
+    const date = parseISO(dateStr)
+    if (!isValid(date)) return "due"
+
+    const today = startOfDay(new Date())
+    const daysDiff = differenceInDays(date, today)
+
+    // If date has passed, it's overdue
+    if (isBefore(date, today)) {
+      return "overdue"
+    }
+
+    // If next due date is within 7 days, it's due
+    if (daysDiff <= 7) {
+      return "due"
+    }
+
+    // If next due date is more than 7 days away, it's paid (not due yet)
+    return "paid"
+  }
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -735,7 +817,7 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
             </Link>
             <div className="flex flex-wrap items-center gap-3">
               <h1 className="text-foreground text-2xl font-bold md:text-3xl">{payment.title}</h1>
-              <Badge className={getStatusColor(payment.status)}>{payment.status}</Badge>
+              <Badge className={getStatusColor(getRealStatus(payment))}>{getRealStatus(payment)}</Badge>
               {/* Highlight Next Due Date */}
               {payment.payment_type === "recurring" && payment.next_payment_due && (
                 <Badge
@@ -754,7 +836,7 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
             </p>
           </div>
           <div className="flex gap-2">
-            {(payment.status === "due" || payment.status === "overdue") && (
+            {(getRealStatus(payment) === "due" || getRealStatus(payment) === "overdue") && (
               <Button onClick={(e) => markAsPaid(e)}>
                 <CheckCircle className="mr-2 h-4 w-4" />
                 {payment.payment_type === "recurring" ? "Mark Current Due as Paid" : "Mark as Paid"}
@@ -1210,9 +1292,16 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={(e) => {
-                        setPrintDialogOpen(false)
-                        handleViewDocument(e, item.doc)
+                      onClick={async (e) => {
+                        try {
+                          setPrintDialogOpen(false)
+                          // Small delay to ensure dialog closes before downloading
+                          await new Promise((resolve) => setTimeout(resolve, 100))
+                          await handleViewDocument(e, item.doc)
+                        } catch (error) {
+                          console.error("Error in print dialog:", error)
+                          setPrintDialogOpen(false)
+                        }
                       }}
                     >
                       <Printer className="mr-1 h-4 w-4" />
