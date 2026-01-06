@@ -22,6 +22,7 @@ import {
   FolderKanban,
   CreditCard,
   Calendar,
+  Target,
 } from "lucide-react"
 import Image from "next/image"
 import { useState, useEffect } from "react"
@@ -57,6 +58,7 @@ const adminNavigation = [
   { name: "Project Management", href: "/admin/projects", icon: FolderKanban, roles: ["super_admin", "admin", "lead"] },
   { name: "Task Management", href: "/admin/tasks", icon: ClipboardList, roles: ["super_admin", "admin", "lead"] },
   { name: "Payment Management", href: "/admin/payments", icon: CreditCard, roles: ["super_admin", "admin", "lead"] },
+  { name: "CRM", href: "/admin/crm", icon: Target, roles: ["super_admin", "admin", "lead"] },
   { name: "HR Administration", href: "/admin/hr", icon: Calendar, roles: ["super_admin", "admin", "lead"] },
   { name: "Documentation", href: "/admin/documentation", icon: FileText, roles: ["super_admin", "admin", "lead"] },
   { name: "Job Descriptions", href: "/admin/job-descriptions", icon: Briefcase, roles: ["super_admin", "admin"] },
