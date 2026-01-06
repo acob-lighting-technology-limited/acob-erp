@@ -28,7 +28,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react"
-import { ProfessionalNotificationBell } from "@/components/professional-notification-bell"
+import { NotificationBell } from "@/components/notification-bell"
 import { UniversalSearch } from "@/components/universal-search"
 import Image from "next/image"
 import { useSidebarSafe } from "@/components/sidebar-context"
@@ -57,10 +57,10 @@ export function Navbar({ user, isAdmin = false }: NavbarProps) {
 
   // Default to light logo for SSR to prevent hydration mismatch
   const logoSrc = !mounted
-    ? '/acob-logo-light.webp'
-    : resolvedTheme === 'dark'
-      ? '/acob-logo-dark.webp'
-      : '/acob-logo-light.webp'
+    ? "/acob-logo-light.webp"
+    : resolvedTheme === "dark"
+      ? "/acob-logo-dark.webp"
+      : "/acob-logo-light.webp"
 
   useEffect(() => {
     setMounted(true)
@@ -72,9 +72,9 @@ export function Navbar({ user, isAdmin = false }: NavbarProps) {
       const customEvent = e as CustomEvent
       setIsSidebarOpen(customEvent.detail?.isOpen ?? false)
     }
-    window.addEventListener('sidebar-state-change', handleSidebarStateChange)
+    window.addEventListener("sidebar-state-change", handleSidebarStateChange)
     return () => {
-      window.removeEventListener('sidebar-state-change', handleSidebarStateChange)
+      window.removeEventListener("sidebar-state-change", handleSidebarStateChange)
     }
   }, [])
 
@@ -149,7 +149,7 @@ export function Navbar({ user, isAdmin = false }: NavbarProps) {
         <div className="flex flex-1 items-center justify-end gap-2 px-2 sm:gap-4 sm:px-4 lg:px-8">
           <div className="hidden max-w-md flex-1 items-center gap-4 md:flex">{isAdmin && <UniversalSearch />}</div>
           <div className="hidden items-center gap-4 md:flex">
-            <ProfessionalNotificationBell isAdmin={isAdmin} />
+            <NotificationBell isAdmin={isAdmin} />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-10 w-10 rounded-full p-0 lg:h-11 lg:w-11">
@@ -224,18 +224,14 @@ export function Navbar({ user, isAdmin = false }: NavbarProps) {
             onClick={() => {
               // If sidebar context exists, toggle the sidebar instead of navbar menu
               if (sidebarContext) {
-                const event = new CustomEvent('toggle-mobile-sidebar')
+                const event = new CustomEvent("toggle-mobile-sidebar")
                 window.dispatchEvent(event)
               } else {
                 setIsOpen(!isOpen)
               }
             }}
           >
-            {sidebarContext && isSidebarOpen ? (
-              <X className="h-6 w-6" />
-            ) : (
-              <Menu className="h-6 w-6" />
-            )}
+            {sidebarContext && isSidebarOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
           </button>
         </div>
       </div>

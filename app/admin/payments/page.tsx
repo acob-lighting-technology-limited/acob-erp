@@ -139,6 +139,7 @@ export default function PaymentsPage() {
   // Modal
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [receiptFile, setReceiptFile] = useState<File | null>(null)
 
   // Receipt Selection Dialog
   const [receiptDialogOpen, setReceiptDialogOpen] = useState(false)
@@ -250,6 +251,12 @@ export default function PaymentsPage() {
         return
       }
 
+      if (formData.payment_type === "one-time" && !receiptFile) {
+        toast.error("One-time payments require a receipt to be uploaded")
+        setSubmitting(false)
+        return
+      }
+
       const response = await fetch("/api/payments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -260,8 +267,31 @@ export default function PaymentsPage() {
       })
 
       if (response.ok) {
+        const data = await response.json()
+        const paymentId = data.data.id
+
+        // If one-time payment and receipt file exists, upload it
+        if (formData.payment_type === "one-time" && receiptFile) {
+          const formDataUpload = new FormData()
+          formDataUpload.append("file", receiptFile)
+          formDataUpload.append("payment_id", paymentId)
+          formDataUpload.append("document_type", "receipt")
+          formDataUpload.append("applicable_date", formData.payment_date)
+
+          const uploadResponse = await fetch("/api/payments/documents", {
+            method: "POST",
+            body: formDataUpload,
+          })
+
+          if (!uploadResponse.ok) {
+            console.error("Failed to upload receipt, but payment was created")
+            toast.warning("Payment created, but receipt upload failed. You can upload it later.")
+          }
+        }
+
         toast.success("Payment created successfully")
         setIsModalOpen(false)
+        setReceiptFile(null)
         setFormData({
           department_id: "",
           category: "",
@@ -293,6 +323,9 @@ export default function PaymentsPage() {
 
   // Compute dynamic status based on due dates
   const getRealStatus = (p: Payment): "due" | "paid" | "overdue" | "cancelled" => {
+    // One-time payments are always paid (they are recorded after the fact)
+    if (p.payment_type === "one-time") return "paid"
+
     if (p.status === "paid" || p.status === "cancelled") return p.status
 
     const dateStr = p.payment_type === "recurring" ? p.next_payment_due : p.payment_date
@@ -964,18 +997,20 @@ export default function PaymentsPage() {
   }
 
   return (
-    <div className="space-y-6 p-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-4 p-4 md:space-y-6 md:p-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Payments</h1>
-          <p className="text-muted-foreground">Manage and track department payments and recurring subscriptions.</p>
+          <h1 className="text-2xl font-bold tracking-tight md:text-3xl">Payments</h1>
+          <p className="text-muted-foreground text-sm md:text-base">
+            Manage and track department payments and recurring subscriptions.
+          </p>
         </div>
         <div className="flex gap-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline">
+              <Button variant="outline" className="flex-1 sm:flex-none" size="sm">
                 <Download className="mr-2 h-4 w-4" />
-                Export
+                <span className="text-xs sm:text-sm">Export</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
@@ -990,81 +1025,81 @@ export default function PaymentsPage() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Button onClick={() => setIsModalOpen(true)}>
+          <Button onClick={() => setIsModalOpen(true)} className="flex-1 sm:flex-none" size="sm">
             <Plus className="mr-2 h-4 w-4" />
-            New Payment
+            <span className="text-xs sm:text-sm">New Payment</span>
           </Button>
         </div>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Outstanding</CardTitle>
-            <CreditCard className="text-muted-foreground h-4 w-4" />
+      <div className="grid grid-cols-6 gap-2 md:gap-3 lg:grid-cols-5">
+        <Card className="col-span-6 lg:col-span-1">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-2">
+            <CardTitle className="text-[10px] font-medium md:text-sm">Total Outstanding</CardTitle>
+            <CreditCard className="text-muted-foreground h-3.5 w-3.5" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(stats.totalDue, "NGN")}</div>
-            <p className="text-muted-foreground text-xs">Overdue + Up Next (7 days)</p>
+          <CardContent className="p-3 pt-0">
+            <div className="text-base font-bold md:text-2xl">{formatCurrency(stats.totalDue, "NGN")}</div>
+            <p className="text-muted-foreground text-[9px] md:text-xs">Overdue + Up Next (7 days)</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Paid</CardTitle>
-            <Building2 className="text-muted-foreground h-4 w-4" />
+        <Card className="col-span-6 lg:col-span-1">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-2">
+            <CardTitle className="text-[10px] font-medium md:text-sm">Total Paid</CardTitle>
+            <Building2 className="text-muted-foreground h-3.5 w-3.5" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(stats.totalPaid, "NGN")}</div>
-            <p className="text-muted-foreground text-xs">Lifetime collected</p>
+          <CardContent className="p-3 pt-0">
+            <div className="text-base font-bold md:text-2xl">{formatCurrency(stats.totalPaid, "NGN")}</div>
+            <p className="text-muted-foreground text-[9px] md:text-xs">Lifetime collected</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Completed</CardTitle>
-            <CheckCircle className="h-4 w-4 text-green-500" />
+        <Card className="col-span-2 lg:col-span-1">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-2">
+            <CardTitle className="text-[10px] font-medium md:text-sm">Completed</CardTitle>
+            <CheckCircle className="h-3.5 w-3.5 text-green-500" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{stats.countCompleted}</div>
-            <p className="text-muted-foreground text-xs">Paid Items & History</p>
+          <CardContent className="p-3 pt-0">
+            <div className="text-base font-bold text-green-600 md:text-2xl">{stats.countCompleted}</div>
+            <p className="text-muted-foreground text-[9px] md:text-xs">Paid Items & History</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Overdue Payments</CardTitle>
-            <CreditCard className="h-4 w-4 text-red-500" />
+        <Card className="col-span-2 lg:col-span-1">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-2">
+            <CardTitle className="text-[10px] font-medium md:text-sm">Overdue Payments</CardTitle>
+            <CreditCard className="h-3.5 w-3.5 text-red-500" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">{stats.countOverdue}</div>
-            <p className="text-muted-foreground text-xs">Requires immediate attention</p>
+          <CardContent className="p-3 pt-0">
+            <div className="text-base font-bold text-red-600 md:text-2xl">{stats.countOverdue}</div>
+            <p className="text-muted-foreground text-[9px] md:text-xs">Requires immediate attention</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Due Payments</CardTitle>
-            <Calendar className="h-4 w-4 text-yellow-500" />
+        <Card className="col-span-2 lg:col-span-1">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-2">
+            <CardTitle className="text-[10px] font-medium md:text-sm">Due Payments</CardTitle>
+            <Calendar className="h-3.5 w-3.5 text-yellow-500" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">{stats.countDue}</div>
-            <p className="text-muted-foreground text-xs">Due within 7 days</p>
+          <CardContent className="p-3 pt-0">
+            <div className="text-base font-bold text-yellow-600 md:text-2xl">{stats.countDue}</div>
+            <p className="text-muted-foreground text-[9px] md:text-xs">Due within 7 days</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center">
         <div className="relative flex-1">
           <Search className="text-muted-foreground absolute top-2.5 left-2.5 h-4 w-4" />
           <Input
-            placeholder="Search payments by title, department or issuer..."
-            className="pl-9"
+            placeholder="Search payments..."
+            className="pl-9 text-sm"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
         <div className="flex gap-2">
           <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="flex-1 sm:w-[180px]">
               <SelectValue placeholder="Department" />
             </SelectTrigger>
             <SelectContent>
@@ -1077,7 +1112,7 @@ export default function PaymentsPage() {
             </SelectContent>
           </Select>
           <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="flex-1 sm:w-[180px]">
               <SelectValue placeholder="Category" />
             </SelectTrigger>
             <SelectContent>
@@ -1090,7 +1125,7 @@ export default function PaymentsPage() {
             </SelectContent>
           </Select>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[150px]">
+            <SelectTrigger className="flex-1 sm:w-[150px]">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
@@ -1120,7 +1155,7 @@ export default function PaymentsPage() {
           </Button>
         </div>
       ) : (
-        <div className="rounded-md border">
+        <div className="overflow-x-auto rounded-md border">
           <Table>
             <TableHeader>
               <TableRow>
@@ -1419,6 +1454,31 @@ export default function PaymentsPage() {
                 </div>
               )}
             </div>
+
+            {/* Receipt Upload for One-Time Payments */}
+            {formData.payment_type === "one-time" && (
+              <div className="rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-800 dark:bg-green-900/20">
+                <div className="space-y-2">
+                  <Label htmlFor="receipt" className="flex items-center gap-2">
+                    <Receipt className="h-4 w-4 text-green-600" />
+                    Payment Receipt *
+                  </Label>
+                  <p className="text-muted-foreground mb-2 text-sm">
+                    Since this is a one-time payment, please upload the payment receipt as proof of payment.
+                  </p>
+                  <Input
+                    id="receipt"
+                    type="file"
+                    accept="image/*,.pdf"
+                    onChange={(e) => setReceiptFile(e.target.files?.[0] || null)}
+                    className="cursor-pointer"
+                  />
+                  {receiptFile && (
+                    <p className="text-sm text-green-600 dark:text-green-400">✓ Selected: {receiptFile.name}</p>
+                  )}
+                </div>
+              </div>
+            )}
 
             {formData.payment_type === "recurring" && (
               <div className="space-y-2">

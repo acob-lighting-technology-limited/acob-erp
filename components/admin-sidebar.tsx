@@ -21,6 +21,8 @@ import {
   Briefcase,
   FolderKanban,
   CreditCard,
+  Calendar,
+  Target,
 } from "lucide-react"
 import Image from "next/image"
 import { useState, useEffect } from "react"
@@ -56,6 +58,8 @@ const adminNavigation = [
   { name: "Project Management", href: "/admin/projects", icon: FolderKanban, roles: ["super_admin", "admin", "lead"] },
   { name: "Task Management", href: "/admin/tasks", icon: ClipboardList, roles: ["super_admin", "admin", "lead"] },
   { name: "Payment Management", href: "/admin/payments", icon: CreditCard, roles: ["super_admin", "admin", "lead"] },
+  { name: "CRM", href: "/admin/crm", icon: Target, roles: ["super_admin", "admin", "lead"] },
+  { name: "HR Administration", href: "/admin/hr", icon: Calendar, roles: ["super_admin", "admin", "lead"] },
   { name: "Documentation", href: "/admin/documentation", icon: FileText, roles: ["super_admin", "admin", "lead"] },
   { name: "Job Descriptions", href: "/admin/job-descriptions", icon: Briefcase, roles: ["super_admin", "admin"] },
   { name: "Feedback", href: "/admin/feedback", icon: MessageSquare, roles: ["super_admin", "admin", "lead"] },
@@ -76,18 +80,18 @@ export function AdminSidebar({ user, profile }: AdminSidebarProps) {
       e.stopPropagation()
       setIsMobileMenuOpen((prev) => !prev)
     }
-    window.addEventListener('toggle-mobile-sidebar', handleToggle)
-    document.addEventListener('toggle-mobile-sidebar', handleToggle)
+    window.addEventListener("toggle-mobile-sidebar", handleToggle)
+    document.addEventListener("toggle-mobile-sidebar", handleToggle)
     return () => {
-      window.removeEventListener('toggle-mobile-sidebar', handleToggle)
-      document.removeEventListener('toggle-mobile-sidebar', handleToggle)
+      window.removeEventListener("toggle-mobile-sidebar", handleToggle)
+      document.removeEventListener("toggle-mobile-sidebar", handleToggle)
     }
   }, [])
 
   // Notify navbar of sidebar state changes
   useEffect(() => {
-    const event = new CustomEvent('sidebar-state-change', {
-      detail: { isOpen: isMobileMenuOpen }
+    const event = new CustomEvent("sidebar-state-change", {
+      detail: { isOpen: isMobileMenuOpen },
     })
     window.dispatchEvent(event)
   }, [isMobileMenuOpen])
@@ -124,7 +128,9 @@ export function AdminSidebar({ user, profile }: AdminSidebarProps) {
   const SidebarContent = () => (
     <>
       {/* Empty space for logo (moved to navbar) */}
-      <div className={cn("transition-[padding] duration-300 ease-in-out", isCollapsed ? "px-2 py-2" : "px-3 py-2")}>{/* Logo space maintained but empty */}</div>
+      <div className={cn("transition-[padding] duration-300 ease-in-out", isCollapsed ? "px-2 py-2" : "px-3 py-2")}>
+        {/* Logo space maintained but empty */}
+      </div>
 
       {/* Admin Badge & User Profile - Fixed height container */}
       <div
@@ -162,7 +168,7 @@ export function AdminSidebar({ user, profile }: AdminSidebarProps) {
                 animate={{ width: "auto", opacity: 1 }}
                 exit={{ width: 0, opacity: 0 }}
                 transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                className="overflow-hidden min-w-0 flex-1"
+                className="min-w-0 flex-1 overflow-hidden"
               >
                 <p className="text-foreground truncate text-sm font-semibold whitespace-nowrap">
                   {profile?.first_name && profile?.last_name
@@ -254,7 +260,7 @@ export function AdminSidebar({ user, profile }: AdminSidebarProps) {
           <Button
             variant="outline"
             className={cn(
-              "text-muted-foreground hover:text-foreground min-h-[36px] w-full transition-[padding,gap] duration-300 ease-in-out text-sm",
+              "text-muted-foreground hover:text-foreground min-h-[36px] w-full text-sm transition-[padding,gap] duration-300 ease-in-out",
               isCollapsed ? "justify-center px-2.5" : "justify-start gap-2.5"
             )}
             title={isCollapsed ? "Back to Dashboard" : undefined}
@@ -278,7 +284,7 @@ export function AdminSidebar({ user, profile }: AdminSidebarProps) {
         <Button
           variant="outline"
           className={cn(
-            "text-muted-foreground hover:text-foreground min-h-[36px] w-full transition-[padding,gap] duration-300 ease-in-out text-sm",
+            "text-muted-foreground hover:text-foreground min-h-[36px] w-full text-sm transition-[padding,gap] duration-300 ease-in-out",
             isCollapsed ? "justify-center px-2.5" : "justify-start gap-2.5"
           )}
           onClick={handleLogout}
@@ -316,7 +322,7 @@ export function AdminSidebar({ user, profile }: AdminSidebarProps) {
           stiffness: 300,
           damping: 30,
         }}
-        className="bg-card hidden border-r lg:fixed lg:top-16 lg:bottom-0 lg:flex lg:flex-col overflow-hidden"
+        className="bg-card hidden overflow-hidden border-r lg:fixed lg:top-16 lg:bottom-0 lg:flex lg:flex-col"
       >
         <SidebarContent />
       </motion.aside>

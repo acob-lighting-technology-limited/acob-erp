@@ -84,6 +84,18 @@ export function MediaPreview({
             x: (img.width - watermarkWidth) / 2,
             y: (img.height - watermarkHeight) / 2,
           },
+          "center-down-10": {
+            x: (img.width - watermarkWidth) / 2,
+            y: (img.height - watermarkHeight) / 2 + img.height * 0.1,
+          },
+          "center-down-20": {
+            x: (img.width - watermarkWidth) / 2,
+            y: (img.height - watermarkHeight) / 2 + img.height * 0.2,
+          },
+          "center-down-25": {
+            x: (img.width - watermarkWidth) / 2,
+            y: (img.height - watermarkHeight) / 2 + img.height * 0.25,
+          },
           "middle-right": {
             x: img.width - watermarkWidth - 20,
             y: (img.height - watermarkHeight) / 2,

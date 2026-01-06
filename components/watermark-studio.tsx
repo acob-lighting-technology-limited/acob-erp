@@ -8,6 +8,7 @@ import JSZip from "jszip"
 import { Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
 import { Slider } from "@/components/ui/slider"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "sonner"
@@ -23,6 +24,9 @@ export type Position =
   | "top-right"
   | "middle-left"
   | "center"
+  | "center-down-10"
+  | "center-down-20"
+  | "center-down-25"
   | "middle-right"
   | "bottom-left"
   | "bottom-center"
@@ -33,6 +37,57 @@ export interface WatermarkConfig {
   opacity: number
   size: number
 }
+
+export interface WatermarkPreset {
+  id: string
+  name: string
+  description: string
+  config: WatermarkConfig
+}
+
+// Watermark Presets - Pre-configured settings for different use cases
+const WATERMARK_PRESETS: WatermarkPreset[] = [
+  {
+    id: "custom",
+    name: "Custom",
+    description: "Manually configure all settings",
+    config: {
+      position: "middle-right",
+      opacity: 0.44,
+      size: 25,
+    },
+  },
+  {
+    id: "website-optimized",
+    name: "Website Optimized",
+    description: "Perfect for website images - balanced protection & aesthetics",
+    config: {
+      position: "center-down-20",
+      opacity: 0.3,
+      size: 18,
+    },
+  },
+  {
+    id: "subtle",
+    name: "Subtle Corner",
+    description: "Minimal watermark in bottom-right corner",
+    config: {
+      position: "bottom-right",
+      opacity: 0.3,
+      size: 15,
+    },
+  },
+  {
+    id: "prominent",
+    name: "Prominent Center",
+    description: "Bold watermark for maximum protection",
+    config: {
+      position: "center",
+      opacity: 0.5,
+      size: 30,
+    },
+  },
+]
 
 // Default watermark images - Change these paths to use different default watermarks
 const DEFAULT_WATERMARKS = [
@@ -47,6 +102,8 @@ export function WatermarkStudio() {
   const [mediaType, setMediaType] = useState<"image" | "video" | null>(null)
   const [watermarks, setWatermarks] = useState(DEFAULT_WATERMARKS)
   const [selectedWatermark, setSelectedWatermark] = useState(DEFAULT_WATERMARKS[0].path)
+  const [selectedPreset, setSelectedPreset] = useState<string>("custom")
+  const [customFileName, setCustomFileName] = useState<string>("")
 
   // Watermark configuration - Adjust these defaults as needed
   const [config, setConfig] = useState<WatermarkConfig>({
@@ -148,6 +205,17 @@ export function WatermarkStudio() {
     })
   }, [])
 
+  const handlePresetChange = useCallback((presetId: string) => {
+    setSelectedPreset(presetId)
+    const preset = WATERMARK_PRESETS.find((p) => p.id === presetId)
+    if (preset) {
+      setConfig(preset.config)
+      toast.success("Preset applied", {
+        description: preset.description,
+      })
+    }
+  }, [])
+
   const handleApplyWatermark = async (applyToAll = false) => {
     if ((mediaType === "image" && mediaFiles.length === 0) || (mediaType === "video" && !mediaFile) || !mediaType) {
       toast.error("No media selected", {
@@ -165,7 +233,12 @@ export function WatermarkStudio() {
           const zip = new JSZip()
           const total = mediaFiles.length
           let successCount = 0
-          for (const file of mediaFiles) {
+
+          // Sanitize custom file name if provided
+          const baseName = customFileName.trim() ? customFileName.trim().replace(/[^a-zA-Z0-9_-]/g, "_") : "watermarked"
+
+          for (let i = 0; i < mediaFiles.length; i++) {
+            const file = mediaFiles[i]
             try {
               const url = await processImage(file, selectedWatermark, config)
               const resp = await fetch(url)
@@ -179,7 +252,9 @@ export function WatermarkStudio() {
                   : blob.type.includes("webp")
                     ? "webp"
                     : originalExt
-              zip.file(`watermarked-${file.name.replace(/\.[^.]+$/, "")}.${outExt}`, arrayBuffer)
+              // Use custom name with sequential numbering: Name_1, Name_2, etc.
+              const fileName = `${baseName}_${i + 1}.${outExt}`
+              zip.file(fileName, arrayBuffer)
               successCount += 1
               URL.revokeObjectURL(url)
             } catch (err) {
@@ -196,7 +271,7 @@ export function WatermarkStudio() {
           const zipUrl = URL.createObjectURL(zipBlob)
           const link = document.createElement("a")
           link.href = zipUrl
-          link.download = `watermarked-${Date.now()}.zip`
+          link.download = `${baseName}.zip`
           link.style.display = "none"
           document.body.appendChild(link)
           link.click()
@@ -264,6 +339,26 @@ export function WatermarkStudio() {
             ) : null}
           </div> */}
 
+          {/* Preset Selection */}
+          <div className="space-y-2">
+            <Label>Watermark Preset</Label>
+            <Select value={selectedPreset} onValueChange={handlePresetChange}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {WATERMARK_PRESETS.map((preset) => (
+                  <SelectItem key={preset.id} value={preset.id}>
+                    <div className="flex flex-col">
+                      <span className="font-medium">{preset.name}</span>
+                      <span className="text-muted-foreground text-xs">{preset.description}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           {/* Watermark Selection */}
           <div className="space-y-2">
             <Label>Watermark Image</Label>
@@ -296,6 +391,26 @@ export function WatermarkStudio() {
               />
             </div>
           </div>
+
+          {/* Custom File Name */}
+          {mediaType === "image" && mediaFiles.length > 1 && (
+            <div className="space-y-2">
+              <Label htmlFor="custom-file-name">Custom File Name (Optional)</Label>
+              <Input
+                id="custom-file-name"
+                type="text"
+                placeholder="e.g., Home (will create Home_1, Home_2, ...)"
+                value={customFileName}
+                onChange={(e) => setCustomFileName(e.target.value)}
+                className="w-full"
+              />
+              <p className="text-muted-foreground text-xs">
+                {customFileName.trim()
+                  ? `Files will be named: ${customFileName.trim().replace(/[^a-zA-Z0-9_-]/g, "_")}_1, ${customFileName.trim().replace(/[^a-zA-Z0-9_-]/g, "_")}_2, etc.`
+                  : "Leave empty for default naming (watermarked_1, watermarked_2, ...)"}
+              </p>
+            </div>
+          )}
 
           {/* Position Grid */}
           <div className="space-y-2">

@@ -415,13 +415,21 @@ export function FeedbackViewerClient({ feedback }: FeedbackViewerClientProps) {
                         <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
                         <TableCell>
                           <div className="text-sm">
-                            <p className="font-medium">
-                              {formatName(item.profiles?.last_name)}, {formatName(item.profiles?.first_name)}
-                            </p>
-                            <p className="text-muted-foreground text-xs">{item.profiles?.company_email}</p>
+                            {item.user_id ? (
+                              <>
+                                <p className="font-medium">
+                                  {formatName(item.profiles?.last_name)}, {formatName(item.profiles?.first_name)}
+                                </p>
+                                <p className="text-muted-foreground text-xs">{item.profiles?.company_email}</p>
+                              </>
+                            ) : (
+                              <p className="text-muted-foreground font-medium italic">Anonymous</p>
+                            )}
                           </div>
                         </TableCell>
-                        <TableCell className="text-sm">{item.profiles?.department || "-"}</TableCell>
+                        <TableCell className="text-sm">
+                          {item.user_id ? item.profiles?.department || "-" : "-"}
+                        </TableCell>
                         <TableCell>
                           <Badge className={getTypeColor(item.feedback_type)}>{item.feedback_type}</Badge>
                         </TableCell>
@@ -475,11 +483,17 @@ export function FeedbackViewerClient({ feedback }: FeedbackViewerClientProps) {
                 </CardHeader>
                 <CardContent className="space-y-3 p-4">
                   <div className="text-sm">
-                    <p className="font-medium">
-                      {formatName(item.profiles?.last_name)}, {formatName(item.profiles?.first_name)}
-                    </p>
-                    <p className="text-muted-foreground text-xs">{item.profiles?.company_email}</p>
-                    <p className="text-muted-foreground text-xs">{item.profiles?.department}</p>
+                    {item.user_id ? (
+                      <>
+                        <p className="font-medium">
+                          {formatName(item.profiles?.last_name)}, {formatName(item.profiles?.first_name)}
+                        </p>
+                        <p className="text-muted-foreground text-xs">{item.profiles?.company_email}</p>
+                        <p className="text-muted-foreground text-xs">{item.profiles?.department}</p>
+                      </>
+                    ) : (
+                      <p className="text-muted-foreground font-medium italic">Anonymous</p>
+                    )}
                   </div>
                   <p className="text-muted-foreground line-clamp-2 text-sm">
                     {item.description || "No description provided."}
@@ -530,12 +544,18 @@ export function FeedbackViewerClient({ feedback }: FeedbackViewerClientProps) {
               <div className="space-y-2">
                 <Label className="text-sm font-semibold">Submitted By</Label>
                 <div className="bg-muted/50 rounded-lg border p-4">
-                  <p className="text-lg font-medium">
-                    {formatName(selectedFeedback.profiles?.first_name)}{" "}
-                    {formatName(selectedFeedback.profiles?.last_name)}
-                  </p>
-                  <p className="text-muted-foreground text-sm">{selectedFeedback.profiles?.company_email}</p>
-                  <p className="text-muted-foreground text-sm">{selectedFeedback.profiles?.department}</p>
+                  {selectedFeedback.user_id ? (
+                    <>
+                      <p className="text-lg font-medium">
+                        {formatName(selectedFeedback.profiles?.first_name)}{" "}
+                        {formatName(selectedFeedback.profiles?.last_name)}
+                      </p>
+                      <p className="text-muted-foreground text-sm">{selectedFeedback.profiles?.company_email}</p>
+                      <p className="text-muted-foreground text-sm">{selectedFeedback.profiles?.department}</p>
+                    </>
+                  ) : (
+                    <p className="text-muted-foreground text-lg font-medium italic">Anonymous Submission</p>
+                  )}
                   <div className="mt-2 border-t pt-2">
                     <p className="text-muted-foreground text-xs">
                       Submitted: {new Date(selectedFeedback.created_at).toLocaleString()}

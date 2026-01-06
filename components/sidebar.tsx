@@ -23,6 +23,9 @@ import {
   ChevronRight,
   FolderKanban,
   CreditCard,
+  Calendar,
+  Clock,
+  Target,
 } from "lucide-react"
 import Image from "next/image"
 import { useState, useEffect } from "react"
@@ -62,6 +65,12 @@ const navigation = [
   { name: "Feedback", href: "/feedback", icon: MessageSquare },
   { name: "Signature", href: "/signature", icon: FileSignature },
   { name: "Watermark", href: "/watermark", icon: Droplet },
+]
+
+const hrNavigation = [
+  { name: "My Leave", href: "/dashboard/leave", icon: Calendar },
+  { name: "My Attendance", href: "/dashboard/attendance", icon: Clock },
+  { name: "My Goals", href: "/dashboard/goals", icon: Target },
 ]
 
 const adminNavigation = [{ name: "Admin Dashboard", href: "/admin", icon: ShieldCheck }]
@@ -240,6 +249,50 @@ export function Sidebar({ user, profile, isAdmin }: SidebarProps) {
         {/* Regular Navigation */}
         {navigation.map((item) => {
           const isActive = pathname === item.href
+          return (
+            <Link
+              key={item.name}
+              href={item.href}
+              onClick={() => setIsMobileMenuOpen(false)}
+              className={cn(
+                "flex items-center rounded-md transition-[padding,gap,background-color,color] duration-300 ease-in-out",
+                isCollapsed ? "justify-center px-2.5 py-2" : "gap-2.5 px-3 py-2",
+                "min-h-[36px] text-sm font-medium",
+                isActive
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
+              )}
+              title={isCollapsed ? item.name : undefined}
+            >
+              <item.icon className="h-4 w-4 flex-shrink-0" />
+              <AnimatePresence mode="wait">
+                {!isCollapsed && (
+                  <motion.span
+                    initial={{ width: 0, opacity: 0 }}
+                    animate={{ width: "auto", opacity: 1 }}
+                    exit={{ width: 0, opacity: 0 }}
+                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                    className="overflow-hidden whitespace-nowrap"
+                  >
+                    {item.name}
+                  </motion.span>
+                )}
+              </AnimatePresence>
+            </Link>
+          )
+        })}
+
+        {/* HR Section Divider */}
+        <div
+          className={cn(
+            "my-1.5 border-t transition-[margin] duration-300 ease-in-out",
+            isCollapsed ? "mx-1.5" : "mx-0"
+          )}
+        />
+
+        {/* HR Navigation */}
+        {hrNavigation.map((item) => {
+          const isActive = pathname === item.href || pathname?.startsWith(item.href + "/")
           return (
             <Link
               key={item.name}

@@ -216,10 +216,16 @@ export function FeedbackViewer({ feedback }: FeedbackViewerProps) {
                         <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
                         <TableCell>
                           <div className="text-sm">
-                            <p className="font-medium">
-                              {formatName(item.profiles?.first_name)} {formatName(item.profiles?.last_name)}
-                            </p>
-                            <p className="text-muted-foreground text-xs">{item.profiles?.company_email}</p>
+                            {item.user_id ? (
+                              <>
+                                <p className="font-medium">
+                                  {formatName(item.profiles?.first_name)} {formatName(item.profiles?.last_name)}
+                                </p>
+                                <p className="text-muted-foreground text-xs">{item.profiles?.company_email}</p>
+                              </>
+                            ) : (
+                              <p className="text-muted-foreground font-medium italic">Anonymous</p>
+                            )}
                           </div>
                         </TableCell>
                         <TableCell>
@@ -274,10 +280,16 @@ export function FeedbackViewer({ feedback }: FeedbackViewerProps) {
                 </CardHeader>
                 <CardContent className="space-y-3 p-4">
                   <div className="text-sm">
-                    <p className="font-medium">
-                      {item.profiles?.first_name} {item.profiles?.last_name}
-                    </p>
-                    <p className="text-muted-foreground text-xs">{item.profiles?.company_email}</p>
+                    {item.user_id ? (
+                      <>
+                        <p className="font-medium">
+                          {item.profiles?.first_name} {item.profiles?.last_name}
+                        </p>
+                        <p className="text-muted-foreground text-xs">{item.profiles?.company_email}</p>
+                      </>
+                    ) : (
+                      <p className="text-muted-foreground font-medium italic">Anonymous</p>
+                    )}
                   </div>
                   <p className="text-muted-foreground line-clamp-2 text-sm">
                     {item.description || "No description provided."}
@@ -328,10 +340,16 @@ export function FeedbackViewer({ feedback }: FeedbackViewerProps) {
               <div className="space-y-2">
                 <Label className="text-sm font-semibold">Submitted By</Label>
                 <div className="bg-muted rounded-md p-3">
-                  <p className="font-medium">
-                    {selectedFeedback.profiles?.first_name} {selectedFeedback.profiles?.last_name}
-                  </p>
-                  <p className="text-muted-foreground text-sm">{selectedFeedback.profiles?.company_email}</p>
+                  {selectedFeedback.user_id ? (
+                    <>
+                      <p className="font-medium">
+                        {selectedFeedback.profiles?.first_name} {selectedFeedback.profiles?.last_name}
+                      </p>
+                      <p className="text-muted-foreground text-sm">{selectedFeedback.profiles?.company_email}</p>
+                    </>
+                  ) : (
+                    <p className="text-muted-foreground font-medium italic">Anonymous Submission</p>
+                  )}
                   <p className="text-muted-foreground mt-1 text-xs">
                     Submitted: {new Date(selectedFeedback.created_at).toLocaleString()}
                   </p>

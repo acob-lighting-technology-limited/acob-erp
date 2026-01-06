@@ -232,6 +232,131 @@ export function NotificationBell({ isAdmin = false }: NotificationBellProps) {
             read: readIds.has("overdue-tasks"),
           })
         }
+
+        // Overdue payments
+        try {
+          const { data: overduePayments } = await supabase
+            .from("department_payments")
+            .select("id")
+            .lt("next_payment_due", now.toISOString())
+            .eq("status", "due")
+
+          if (overduePayments && overduePayments.length > 0) {
+            notificationList.push({
+              id: "overdue-payments",
+              type: "error",
+              title: "Overdue Payments",
+              message: `${overduePayments.length} payment${overduePayments.length > 1 ? "s" : ""} past due date`,
+              timestamp: formatRelativeTime(now.toISOString()),
+              createdAt: now.toISOString(),
+              link: "/admin/payments",
+              linkText: "View Payments",
+              read: readIds.has("overdue-payments"),
+            })
+          }
+        } catch (e) {
+          // Table might not exist, ignore
+        }
+
+        // Payments due soon (within 7 days)
+        try {
+          const sevenDaysFromNow = new Date()
+          sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7)
+          const { data: dueSoonPayments } = await supabase
+            .from("department_payments")
+            .select("id")
+            .gte("next_payment_due", now.toISOString())
+            .lte("next_payment_due", sevenDaysFromNow.toISOString())
+            .eq("status", "due")
+
+          if (dueSoonPayments && dueSoonPayments.length > 0) {
+            notificationList.push({
+              id: "due-soon-payments",
+              type: "warning",
+              title: "Payments Due Soon",
+              message: `${dueSoonPayments.length} payment${dueSoonPayments.length > 1 ? "s" : ""} due within 7 days`,
+              timestamp: formatRelativeTime(now.toISOString()),
+              createdAt: now.toISOString(),
+              link: "/admin/payments",
+              linkText: "View Payments",
+              read: readIds.has("due-soon-payments"),
+            })
+          }
+        } catch (e) {
+          // Table might not exist, ignore
+        }
+
+        // Pending leave requests
+        try {
+          const { count: pendingLeaveCount } = await supabase
+            .from("leave_requests")
+            .select("*", { count: "exact", head: true })
+            .eq("status", "pending")
+
+          if (pendingLeaveCount && pendingLeaveCount > 0) {
+            notificationList.push({
+              id: "pending-leave",
+              type: "warning",
+              title: "Pending Leave Requests",
+              message: `${pendingLeaveCount} leave request${pendingLeaveCount > 1 ? "s" : ""} awaiting approval`,
+              timestamp: formatRelativeTime(now.toISOString()),
+              createdAt: now.toISOString(),
+              link: "/admin/hr/leave",
+              linkText: "Review Requests",
+              read: readIds.has("pending-leave"),
+            })
+          }
+        } catch (e) {
+          // Table might not exist, ignore
+        }
+
+        // Unresolved asset issues
+        try {
+          const { count: assetIssuesCount } = await supabase
+            .from("asset_issues")
+            .select("*", { count: "exact", head: true })
+            .in("status", ["open", "in_progress"])
+
+          if (assetIssuesCount && assetIssuesCount > 0) {
+            notificationList.push({
+              id: "asset-issues",
+              type: "warning",
+              title: "Unresolved Asset Issues",
+              message: `${assetIssuesCount} asset issue${assetIssuesCount > 1 ? "s" : ""} need attention`,
+              timestamp: formatRelativeTime(now.toISOString()),
+              createdAt: now.toISOString(),
+              link: "/admin/assets/issues",
+              linkText: "View Issues",
+              read: readIds.has("asset-issues"),
+            })
+          }
+        } catch (e) {
+          // Table might not exist, ignore
+        }
+
+        // Assets in maintenance
+        try {
+          const { count: maintenanceCount } = await supabase
+            .from("assets")
+            .select("*", { count: "exact", head: true })
+            .eq("status", "maintenance")
+
+          if (maintenanceCount && maintenanceCount > 0) {
+            notificationList.push({
+              id: "assets-maintenance",
+              type: "info",
+              title: "Assets in Maintenance",
+              message: `${maintenanceCount} asset${maintenanceCount > 1 ? "s" : ""} currently in maintenance`,
+              timestamp: formatRelativeTime(now.toISOString()),
+              createdAt: now.toISOString(),
+              link: "/admin/assets",
+              linkText: "View Assets",
+              read: readIds.has("assets-maintenance"),
+            })
+          }
+        } catch (e) {
+          // Table might not exist, ignore
+        }
       } else {
         // User notifications
         // Pending tasks
@@ -309,6 +434,59 @@ export function NotificationBell({ isAdmin = false }: NotificationBellProps) {
               read: readIds.has("due-soon-tasks"),
             })
           }
+        }
+
+        // User's pending leave requests
+        try {
+          const { count: myPendingLeave } = await supabase
+            .from("leave_requests")
+            .select("*", { count: "exact", head: true })
+            .eq("user_id", user.id)
+            .eq("status", "pending")
+
+          if (myPendingLeave && myPendingLeave > 0) {
+            notificationList.push({
+              id: "my-pending-leave",
+              type: "info",
+              title: "Leave Requests Pending",
+              message: `${myPendingLeave} leave request${myPendingLeave > 1 ? "s" : ""} awaiting approval`,
+              timestamp: formatRelativeTime(now.toISOString()),
+              createdAt: now.toISOString(),
+              link: "/hr/leave",
+              linkText: "View Requests",
+              read: readIds.has("my-pending-leave"),
+            })
+          }
+        } catch (e) {
+          // Table might not exist, ignore
+        }
+
+        // User's recently approved leave
+        try {
+          const sevenDaysAgo = new Date()
+          sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+          const { count: approvedLeave } = await supabase
+            .from("leave_requests")
+            .select("*", { count: "exact", head: true })
+            .eq("user_id", user.id)
+            .eq("status", "approved")
+            .gte("updated_at", sevenDaysAgo.toISOString())
+
+          if (approvedLeave && approvedLeave > 0) {
+            notificationList.push({
+              id: "approved-leave",
+              type: "success",
+              title: "Leave Approved",
+              message: `${approvedLeave} leave request${approvedLeave > 1 ? "s" : ""} recently approved`,
+              timestamp: formatRelativeTime(now.toISOString()),
+              createdAt: now.toISOString(),
+              link: "/hr/leave",
+              linkText: "View Details",
+              read: readIds.has("approved-leave"),
+            })
+          }
+        } catch (e) {
+          // Table might not exist, ignore
         }
       }
 
