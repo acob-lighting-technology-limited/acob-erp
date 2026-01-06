@@ -1,31 +1,261 @@
-export type UserRole = "visitor" | "staff" | "lead" | "admin" | "super_admin"
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
+
+export type Database = {
+  public: {
+    Tables: {
+      profiles: {
+        Row: {
+          id: string
+          company_email: string
+          first_name: string
+          last_name: string
+          full_name: string | null // NEW: Computed column
+          other_names: string | null
+          department: string | null // DEPRECATED: Use department_id
+          department_id: string | null // NEW: Foreign key to departments
+          company_role: string | null
+          phone_number: string | null
+          additional_phone: string | null
+          residential_address: string | null
+          current_work_location: string | null
+          office_location: string | null
+          is_admin: boolean
+          role: Database["public"]["Enums"]["user_role"]
+          is_department_lead: boolean
+          lead_departments: string[]
+          job_description: string | null
+          job_description_updated_at: string | null
+          created_at: string
+          updated_at: string
+          // DEPRECATED fields (use assets table instead)
+          device_allocated: boolean | null
+          device_type: string | null
+          device_model: string | null
+          devices: string[] | null
+        }
+        Insert: {
+          id: string
+          company_email: string
+          first_name: string
+          last_name: string
+          other_names?: string | null
+          department?: string | null
+          department_id?: string | null
+          company_role?: string | null
+          phone_number?: string | null
+          additional_phone?: string | null
+          residential_address?: string | null
+          current_work_location?: string | null
+          office_location?: string | null
+          is_admin?: boolean
+          role?: Database["public"]["Enums"]["user_role"]
+          is_department_lead?: boolean
+          lead_departments?: string[]
+          job_description?: string | null
+          job_description_updated_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          company_email?: string
+          first_name?: string
+          last_name?: string
+          other_names?: string | null
+          department?: string | null
+          department_id?: string | null
+          company_role?: string | null
+          phone_number?: string | null
+          additional_phone?: string | null
+          residential_address?: string | null
+          current_work_location?: string | null
+          office_location?: string | null
+          is_admin?: boolean
+          role?: Database["public"]["Enums"]["user_role"]
+          is_department_lead?: boolean
+          lead_departments?: string[]
+          job_description?: string | null
+          job_description_updated_at?: string | null
+          updated_at?: string
+        }
+      }
+      department_payments: {
+        Row: {
+          id: string
+          department_id: string
+          payment_type: string
+          category: string
+          title: string
+          description: string | null
+          amount: number | null
+          currency: string
+          recurrence_period: string | null
+          next_payment_due: string | null
+          last_payment_date: string | null
+          payment_date: string | null
+          status: string
+          payment_reference: string | null
+          notes: string | null
+          created_by: string
+          created_at: string
+          updated_at: string
+          issuer_name: string | null
+          issuer_phone_number: string | null
+          issuer_address: string | null
+          amount_paid: number | null
+          // NEW: Starlink consolidation fields
+          invoice_number: string | null
+          site_id: string | null
+          site_name: string | null
+          site_state: string | null
+          site_serial_number: string | null
+        }
+        Insert: {
+          id?: string
+          department_id: string
+          payment_type: string
+          category: string
+          title: string
+          description?: string | null
+          amount?: number | null
+          currency?: string
+          recurrence_period?: string | null
+          next_payment_due?: string | null
+          last_payment_date?: string | null
+          payment_date?: string | null
+          status?: string
+          payment_reference?: string | null
+          notes?: string | null
+          created_by: string
+          created_at?: string
+          updated_at?: string
+          issuer_name?: string | null
+          issuer_phone_number?: string | null
+          issuer_address?: string | null
+          amount_paid?: number | null
+          invoice_number?: string | null
+          site_id?: string | null
+          site_name?: string | null
+          site_state?: string | null
+          site_serial_number?: string | null
+        }
+        Update: {
+          department_id?: string
+          payment_type?: string
+          category?: string
+          title?: string
+          description?: string | null
+          amount?: number | null
+          currency?: string
+          recurrence_period?: string | null
+          next_payment_due?: string | null
+          last_payment_date?: string | null
+          payment_date?: string | null
+          status?: string
+          payment_reference?: string | null
+          notes?: string | null
+          updated_at?: string
+          issuer_name?: string | null
+          issuer_phone_number?: string | null
+          issuer_address?: string | null
+          amount_paid?: number | null
+          invoice_number?: string | null
+          site_id?: string | null
+          site_name?: string | null
+          site_state?: string | null
+          site_serial_number?: string | null
+        }
+      }
+      office_locations: {
+        Row: {
+          id: string
+          name: string
+          type: string
+          department: string | null
+          description: string | null
+          is_active: boolean
+          created_at: string
+          updated_at: string
+          site: string | null // NEW: Site location
+        }
+        Insert: {
+          id?: string
+          name: string
+          type: string
+          department?: string | null
+          description?: string | null
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+          site?: string | null
+        }
+        Update: {
+          name?: string
+          type?: string
+          department?: string | null
+          description?: string | null
+          is_active?: boolean
+          updated_at?: string
+          site?: string | null
+        }
+      }
+      departments: {
+        Row: {
+          id: string
+          name: string
+          description: string | null
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          description?: string | null
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          name?: string
+          description?: string | null
+          is_active?: boolean
+          updated_at?: string
+        }
+      }
+    }
+    Enums: {
+      user_role: "visitor" | "staff" | "lead" | "admin" | "super_admin"
+    }
+  }
+}
+
+// Legacy type exports for backward compatibility
+export type UserRole = Database["public"]["Enums"]["user_role"]
 
 export type DeviceStatus = "available" | "assigned" | "maintenance" | "retired"
-
 export type AssetStatus = "available" | "assigned" | "maintenance" | "retired"
-
 export type TaskStatus = "pending" | "in_progress" | "completed" | "cancelled"
-
 export type TaskPriority = "low" | "medium" | "high" | "urgent"
-
 export type ProjectStatus = "planning" | "active" | "on_hold" | "completed" | "cancelled"
-
 export type ProjectMemberRole = "member" | "lead" | "manager"
-
 export type ProjectItemStatus = "pending" | "ordered" | "received" | "installed"
 
+// Updated Profile interface with new fields
 export interface Profile {
   id: string
   company_email: string
   first_name: string
   last_name: string
+  full_name?: string | null // NEW: Computed full name
   other_names?: string
-  department: string
+  department?: string // DEPRECATED: Use department_id
+  department_id?: string | null // NEW: Foreign key
   company_role?: string
   phone_number?: string
   additional_phone?: string
   residential_address?: string
   current_work_location?: string
+  office_location?: string
   is_admin: boolean
   role: UserRole
   is_department_lead: boolean
@@ -36,6 +266,61 @@ export interface Profile {
   updated_at: string
 }
 
+// Updated DepartmentPayment interface with new fields
+export interface DepartmentPayment {
+  id: string
+  department_id: string
+  payment_type: string
+  category: string
+  title: string
+  description?: string
+  amount?: number
+  currency: string
+  recurrence_period?: string
+  next_payment_due?: string
+  last_payment_date?: string
+  payment_date?: string
+  status: string
+  payment_reference?: string
+  notes?: string
+  created_by: string
+  created_at: string
+  updated_at: string
+  issuer_name?: string
+  issuer_phone_number?: string
+  issuer_address?: string
+  amount_paid?: number
+  // NEW: Starlink consolidation fields
+  invoice_number?: string
+  site_id?: string
+  site_name?: string
+  site_state?: string
+  site_serial_number?: string
+}
+
+// Updated OfficeLocation interface with new field
+export interface OfficeLocation {
+  id: string
+  name: string
+  type: string
+  department?: string
+  description?: string
+  is_active: boolean
+  created_at: string
+  updated_at: string
+  site?: string | null // NEW: Site location
+}
+
+export interface Department {
+  id: string
+  name: string
+  description?: string
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+// Keep existing interfaces for backward compatibility
 export interface Device {
   id: string
   device_name: string

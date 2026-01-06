@@ -74,6 +74,14 @@ interface AuditLog {
   category_info?: {
     name: string
   }
+  leave_request_info?: {
+    user_id: string
+    leave_type_name: string
+    requester_user?: {
+      first_name: string
+      last_name: string
+    }
+  }
 }
 
 export default function AuditLogsPage() {
@@ -215,6 +223,25 @@ export default function AuditLogsPage() {
           new Set(
             logsData
               .filter((log) => log.entity_id && log.entity_type === "payment_categories")
+              .map((log) => log.entity_id)
+              .filter(Boolean)
+          )
+        )
+
+        // Leave request entity IDs (for leave_requests and leave_approvals)
+        const leaveRequestEntityIds = Array.from(
+          new Set(
+            logsData
+              .filter((log) => log.entity_id && log.entity_type === "leave_requests")
+              .map((log) => log.entity_id)
+              .filter(Boolean)
+          )
+        )
+
+        const leaveApprovalEntityIds = Array.from(
+          new Set(
+            logsData
+              .filter((log) => log.entity_id && log.entity_type === "leave_approvals")
               .map((log) => log.entity_id)
               .filter(Boolean)
           )
@@ -407,6 +434,71 @@ export default function AuditLogsPage() {
           }
         }
 
+        // Fetch leave requests if needed
+        let leaveRequestsMap = new Map()
+        if (leaveRequestEntityIds.length > 0 || leaveApprovalEntityIds.length > 0) {
+          // Get leave request IDs from approvals
+          let approvalRequestIds: string[] = []
+          if (leaveApprovalEntityIds.length > 0) {
+            const { data: approvalsData } = await supabase
+              .from("leave_approvals")
+              .select("id, leave_request_id")
+              .in("id", leaveApprovalEntityIds)
+
+            if (approvalsData) {
+              approvalRequestIds = approvalsData.map((a) => a.leave_request_id).filter(Boolean)
+            }
+          }
+
+          const allLeaveRequestIds = Array.from(new Set([...leaveRequestEntityIds, ...approvalRequestIds]))
+
+          if (allLeaveRequestIds.length > 0) {
+            const { data: leaveData } = await supabase
+              .from("leave_requests")
+              .select("id, user_id, leave_type:leave_types(name)")
+              .in("id", allLeaveRequestIds)
+
+            if (leaveData) {
+              // Fetch requester profiles
+              const requesterIds = Array.from(new Set(leaveData.map((l) => l.user_id).filter(Boolean)))
+              let requesterMap = new Map()
+              if (requesterIds.length > 0) {
+                const { data: requesterData } = await supabase
+                  .from("profiles")
+                  .select("id, first_name, last_name")
+                  .in("id", requesterIds)
+                requesterMap = new Map(requesterData?.map((u) => [u.id, u]) || [])
+              }
+
+              leaveRequestsMap = new Map(
+                leaveData.map((l) => [
+                  l.id,
+                  {
+                    user_id: l.user_id,
+                    leave_type_name: (l.leave_type as any)?.name || "Leave",
+                    requester_user: requesterMap.get(l.user_id),
+                  },
+                ])
+              )
+
+              // Also map approval IDs to leave request info
+              if (leaveApprovalEntityIds.length > 0) {
+                const { data: approvalsData } = await supabase
+                  .from("leave_approvals")
+                  .select("id, leave_request_id")
+                  .in("id", leaveApprovalEntityIds)
+
+                approvalsData?.forEach((approval) => {
+                  const leaveInfo = leaveRequestsMap.get(approval.leave_request_id)
+                  if (leaveInfo) {
+                    leaveRequestsMap.set(approval.id, leaveInfo)
+                  }
+                })
+              }
+            }
+          }
+        }
+
         // Combine logs with all fetched data
         const logsWithUsers = logsData.map((log) => {
           let targetFromNewValues = null
@@ -453,6 +545,10 @@ export default function AuditLogsPage() {
               log.entity_id && log.entity_type === "departments" ? departmentsMap.get(log.entity_id) : null,
             category_info:
               log.entity_id && log.entity_type === "payment_categories" ? categoriesMap.get(log.entity_id) : null,
+            leave_request_info:
+              log.entity_id && (log.entity_type === "leave_requests" || log.entity_type === "leave_approvals")
+                ? leaveRequestsMap.get(log.entity_id)
+                : null,
           }
         })
 
@@ -584,6 +680,19 @@ export default function AuditLogsPage() {
     })
   }
 
+  // Get the "performed by" text - show Anonymous for anonymous feedback
+  const getPerformedBy = (log: AuditLog): string => {
+    // Check if this is anonymous feedback
+    if (log.entity_type === "feedback" && log.new_values?.is_anonymous) {
+      return "Anonymous"
+    }
+    // Normal case - show user name
+    if (log.user) {
+      return `${formatName(log.user.first_name)} ${formatName(log.user.last_name)}`
+    }
+    return "N/A"
+  }
+
   const getTargetDescription = (log: AuditLog) => {
     const action = log.action.toLowerCase()
     const entityType = log.entity_type.toLowerCase()
@@ -668,11 +777,12 @@ export default function AuditLogsPage() {
       return "Documentation"
     }
 
-    // Handle feedback - target is the person who submitted it
+    // Handle feedback - show the feedback title and type
     if (entityType === "feedback") {
-      if (log.user) {
-        const name = `${formatName(log.user.first_name)} ${formatName(log.user.last_name)}`
-        return name
+      const title = log.new_values?.title || log.old_values?.title
+      const feedbackType = log.new_values?.feedback_type || log.old_values?.feedback_type
+      if (title) {
+        return feedbackType ? `${title} (${feedbackType})` : title
       }
       return "Feedback"
     }
@@ -712,6 +822,28 @@ export default function AuditLogsPage() {
       const name = log.new_values?.name || log.old_values?.name
       if (name) return name
       return "Payment Category"
+    }
+
+    // Handle Leave Requests - show requester's name
+    if (entityType === "leave_requests") {
+      if (log.leave_request_info?.requester_user) {
+        const name = `${formatName(log.leave_request_info.requester_user.first_name)} ${formatName(log.leave_request_info.requester_user.last_name)}`
+        return `${name} (${log.leave_request_info.leave_type_name})`
+      }
+      // Fallback to new_values user_id lookup
+      if (log.new_values?.user_id && log.target_user) {
+        return `${formatName(log.target_user.first_name)} ${formatName(log.target_user.last_name)}`
+      }
+      return "Leave Request"
+    }
+
+    // Handle Leave Approvals - show the person whose leave was approved
+    if (entityType === "leave_approvals") {
+      if (log.leave_request_info?.requester_user) {
+        const name = `${formatName(log.leave_request_info.requester_user.first_name)} ${formatName(log.leave_request_info.requester_user.last_name)}`
+        return `${name} (${log.leave_request_info.leave_type_name})`
+      }
+      return "Leave Approval"
     }
 
     // Fallback for devices/assets without assignment
@@ -770,7 +902,7 @@ export default function AuditLogsPage() {
         Action: log.action,
         "Entity Type": log.entity_type,
         "Target/Affected": getTargetDescription(log),
-        "Performed By": log.user ? `${formatName(log.user.first_name)} ${formatName(log.user.last_name)}` : "N/A",
+        "Performed By": getPerformedBy(log),
         Date: formatDate(log.created_at),
         Email: log.user?.company_email || "N/A",
       }))
@@ -822,7 +954,7 @@ export default function AuditLogsPage() {
         log.action,
         log.entity_type,
         getTargetDescription(log),
-        log.user ? `${formatName(log.user.first_name)} ${formatName(log.user.last_name)}` : "N/A",
+        getPerformedBy(log),
         formatDate(log.created_at),
       ])
 
@@ -890,11 +1022,7 @@ export default function AuditLogsPage() {
                 new TableCell({ children: [new Paragraph(log.entity_type)] }),
                 new TableCell({ children: [new Paragraph(getTargetDescription(log))] }),
                 new TableCell({
-                  children: [
-                    new Paragraph(
-                      log.user ? `${formatName(log.user.first_name)} ${formatName(log.user.last_name)}` : "N/A"
-                    ),
-                  ],
+                  children: [new Paragraph(getPerformedBy(log))],
                 }),
                 new TableCell({ children: [new Paragraph(formatDate(log.created_at))] }),
               ],
@@ -1078,10 +1206,13 @@ export default function AuditLogsPage() {
                   <SelectItem value="job_description">Job Descriptions</SelectItem>
                   <SelectItem value="user_documentation">Documentation</SelectItem>
                   <SelectItem value="profile">Profiles</SelectItem>
+                  <SelectItem value="feedback">Feedback</SelectItem>
                   <SelectItem value="department_payments">Payments</SelectItem>
                   <SelectItem value="payment_documents">Documents</SelectItem>
                   <SelectItem value="departments">Departments</SelectItem>
                   <SelectItem value="payment_categories">Payment Categories</SelectItem>
+                  <SelectItem value="leave_requests">Leave Requests</SelectItem>
+                  <SelectItem value="leave_approvals">Leave Approvals</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -1271,8 +1402,10 @@ export default function AuditLogsPage() {
                         <TableCell>
                           <div className="flex items-center gap-2 text-sm">
                             <User className="text-muted-foreground h-3 w-3" />
-                            <span className="text-foreground">
-                              {formatName((log.user as any)?.first_name)} {formatName((log.user as any)?.last_name)}
+                            <span
+                              className={`${log.entity_type === "feedback" && log.new_values?.is_anonymous ? "text-muted-foreground italic" : "text-foreground"}`}
+                            >
+                              {getPerformedBy(log)}
                             </span>
                           </div>
                         </TableCell>
@@ -1312,8 +1445,10 @@ export default function AuditLogsPage() {
                           <div className="flex items-center gap-2">
                             <User className="text-muted-foreground h-4 w-4" />
                             <span className="text-muted-foreground">By:</span>
-                            <span className="text-foreground">
-                              {formatName((log.user as any)?.first_name)} {formatName((log.user as any)?.last_name)}
+                            <span
+                              className={`${log.entity_type === "feedback" && log.new_values?.is_anonymous ? "text-muted-foreground italic" : "text-foreground"}`}
+                            >
+                              {getPerformedBy(log)}
                             </span>
                           </div>
                           <div className="flex items-center gap-2">
@@ -1440,12 +1575,15 @@ export default function AuditLogsPage() {
                 <div className="bg-muted/50 rounded-lg border p-3">
                   <div className="flex items-center gap-2">
                     <User className="text-muted-foreground h-4 w-4" />
-                    <span className="text-sm font-medium">
-                      {formatName((selectedLog.user as any)?.first_name)}{" "}
-                      {formatName((selectedLog.user as any)?.last_name)}
+                    <span
+                      className={`text-sm font-medium ${selectedLog.entity_type === "feedback" && selectedLog.new_values?.is_anonymous ? "text-muted-foreground italic" : ""}`}
+                    >
+                      {getPerformedBy(selectedLog)}
                     </span>
                   </div>
-                  <p className="text-muted-foreground mt-1 text-xs">{(selectedLog.user as any)?.company_email}</p>
+                  {selectedLog.entity_type !== "feedback" || !selectedLog.new_values?.is_anonymous ? (
+                    <p className="text-muted-foreground mt-1 text-xs">{(selectedLog.user as any)?.company_email}</p>
+                  ) : null}
                 </div>
               </div>
 

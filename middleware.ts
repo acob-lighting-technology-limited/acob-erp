@@ -54,11 +54,17 @@ export async function middleware(request: NextRequest) {
   }
 
   // If neither mode is enabled, continue with normal flow
+  // But if user is visiting root (/), redirect them to /profile
   if (!isShutdownEnabled && !isMaintenanceEnabled) {
+    if (pathname === "/") {
+      const url = request.nextUrl.clone()
+      url.pathname = "/profile"
+      return NextResponse.redirect(url)
+    }
     return await updateSession(request)
   }
 
-  // Allow access to root page (status page)
+  // Allow access to root page (status page) when modes are enabled
   if (pathname === "/") {
     return await updateSession(request)
   }

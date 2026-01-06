@@ -182,7 +182,7 @@ export async function POST(request: Request) {
         description,
         amount,
         currency,
-        status: "due", // Explicitly set status to 'due'
+        status: payment_type === "one-time" ? "paid" : "due", // One-time payments are already paid
         recurrence_period: payment_type === "recurring" ? recurrence_period : null,
         next_payment_due: payment_type === "recurring" ? next_payment_due : null,
         payment_date: payment_type === "one-time" ? payment_date : null,

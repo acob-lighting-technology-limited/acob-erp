@@ -43,25 +43,24 @@ export default function StatusPage() {
           const data = await response.json()
           setSystemStatus(data)
 
-          // If neither mode is enabled, redirect to the appropriate page
+          // If neither mode is enabled, redirect to the profile page directly
           if (!data.shutdownMode?.enabled && !data.maintenanceMode?.enabled) {
-            console.log("No shutdown/maintenance mode active, redirecting...")
-            // Check if user is logged in by trying to access dashboard
-            window.location.href = "/dashboard"
+            // Use router.replace for smoother transition
+            router.replace("/profile")
             return
           }
         }
       } catch (error) {
         console.error("Error fetching system status:", error)
-        // On error, redirect to dashboard (will handle auth there)
-        window.location.href = "/dashboard"
+        // On error, redirect to profile (will handle auth there)
+        router.replace("/profile")
         return
       } finally {
         setCheckingStatus(false)
       }
     }
     fetchStatus()
-  }, [])
+  }, [router])
 
   // Check for ?admin=1 query parameter
   useEffect(() => {
@@ -198,13 +197,17 @@ export default function StatusPage() {
 
   const Icon = displayIcon
 
-  // Show nothing while checking status (will redirect if modes are off)
+  // Show minimal loading while checking status (will redirect if modes are off)
   if (checkingStatus) {
-    return null
+    return (
+      <div className="bg-background flex min-h-screen w-full items-center justify-center">
+        <div className="border-primary h-8 w-8 animate-spin rounded-full border-4 border-t-transparent"></div>
+      </div>
+    )
   }
 
   return (
-    <div className="flex min-h-screen w-full items-center justify-center bg-background p-6">
+    <div className="bg-background flex min-h-screen w-full items-center justify-center p-6">
       <div className="w-full max-w-2xl space-y-8">
         {/* Logo - clickable for bypass */}
         <div className="flex justify-center">
@@ -238,32 +241,25 @@ export default function StatusPage() {
               <Icon className={`h-8 w-8 ${iconColor}`} />
             </div>
             <CardTitle className="text-4xl">{displayTitle}</CardTitle>
-            <CardDescription className="text-xl mt-4">
-              {displayMessage}
-            </CardDescription>
+            <CardDescription className="mt-4 text-xl">{displayMessage}</CardDescription>
           </CardHeader>
           <CardContent>
             {isMaintenanceMode && systemStatus?.maintenanceMode?.estimated_end && (
-              <p className="text-muted-foreground text-center text-base mb-4">
-                Estimated completion:{" "}
-                {new Date(systemStatus.maintenanceMode.estimated_end).toLocaleString()}
+              <p className="text-muted-foreground mb-4 text-center text-base">
+                Estimated completion: {new Date(systemStatus.maintenanceMode.estimated_end).toLocaleString()}
               </p>
             )}
             {isShutdownMode && (
               <>
-                <p className="text-muted-foreground text-center text-lg">
-                  Thank you for your support.
-                </p>
-                <p className="text-muted-foreground text-center text-base mt-2">
-                  Best regards, Chibuikem
-                </p>
+                <p className="text-muted-foreground text-center text-lg">Thank you for your support.</p>
+                <p className="text-muted-foreground mt-2 text-center text-base">Best regards, Chibuikem</p>
               </>
             )}
 
             {/* Password Form - Hidden until triggered */}
             {showPasswordForm && (
               <div className="mt-8 space-y-4 border-t pt-6">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <div className="text-muted-foreground flex items-center gap-2 text-sm">
                   <Lock className="h-4 w-4" />
                   <span>Administrative Access</span>
                 </div>
@@ -278,9 +274,7 @@ export default function StatusPage() {
                       disabled={loading}
                     />
                   </div>
-                  {error && (
-                    <p className="text-destructive text-sm">{error}</p>
-                  )}
+                  {error && <p className="text-destructive text-sm">{error}</p>}
                   <Button type="submit" className="w-full" disabled={loading}>
                     {loading ? "Verifying..." : "Access Website"}
                   </Button>
@@ -293,4 +287,3 @@ export default function StatusPage() {
     </div>
   )
 }
-

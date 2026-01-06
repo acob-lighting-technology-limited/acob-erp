@@ -1,3 +1,102 @@
+import { z } from "zod"
+import { NextRequest, NextResponse } from "next/server"
+
+/**
+ * API Validation Middleware
+ * Validates request bodies and query parameters using Zod schemas
+ */
+
+/**
+ * Validate request body against a Zod schema
+ */
+export async function validateRequestBody<T>(
+  request: NextRequest,
+  schema: z.ZodSchema<T>
+): Promise<{ success: true; data: T } | { success: false; error: NextResponse }> {
+  try {
+    const body = await request.json()
+    const validatedData = schema.parse(body)
+    return { success: true, data: validatedData }
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return {
+        success: false,
+        error: NextResponse.json(
+          {
+            error: "Validation failed",
+            details: error.errors.map((err) => ({
+              field: err.path.join("."),
+              message: err.message,
+            })),
+          },
+          { status: 400 }
+        ),
+      }
+    }
+    return {
+      success: false,
+      error: NextResponse.json({ error: "Invalid request body" }, { status: 400 }),
+    }
+  }
+}
+
+/**
+ * Common validation schemas
+ */
+export const commonSchemas = {
+  uuid: z.string().uuid({ message: "Invalid UUID format" }),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format (YYYY-MM-DD)"),
+  email: z.string().email({ message: "Invalid email address" }),
+  positiveNumber: z.number().positive("Must be a positive number"),
+  nonNegativeNumber: z.number().min(0, "Cannot be negative"),
+}
+
+/**
+ * HR Module Validation Schemas
+ */
+export const hrSchemas = {
+  createLeaveRequest: z
+    .object({
+      leave_type_id: commonSchemas.uuid,
+      start_date: commonSchemas.date,
+      end_date: commonSchemas.date,
+      reason: z.string().min(10, "Reason must be at least 10 characters").max(500),
+    })
+    .refine((data) => new Date(data.end_date) >= new Date(data.start_date), {
+      message: "End date must be after or equal to start date",
+      path: ["end_date"],
+    }),
+
+  approveLeave: z.object({
+    leave_request_id: commonSchemas.uuid,
+    status: z.enum(["approved", "rejected"]),
+    comments: z.string().max(500).optional(),
+  }),
+
+  createGoal: z.object({
+    user_id: commonSchemas.uuid,
+    title: z.string().min(5).max(200),
+    description: z.string().max(1000).optional(),
+    target_value: commonSchemas.positiveNumber.optional(),
+    priority: z.enum(["low", "medium", "high"]).optional(),
+    due_date: commonSchemas.date.optional(),
+  }),
+}
+
+/**
+ * Payment Validation Schemas
+ */
+export const paymentSchemas = {
+  createPayment: z.object({
+    department_id: commonSchemas.uuid,
+    title: z.string().min(3).max(200),
+    amount: commonSchemas.positiveNumber.optional(),
+    currency: z.string().length(3, "Currency must be 3 characters"),
+    payment_type: z.enum(["one-time", "recurring"]),
+    category: z.string().min(2).max(100),
+  }),
+}
+
 /**
  * Date validation utilities
  * Prevents database issues caused by invalid date ranges

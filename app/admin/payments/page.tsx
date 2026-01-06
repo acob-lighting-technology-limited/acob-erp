@@ -139,6 +139,7 @@ export default function PaymentsPage() {
   // Modal
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [receiptFile, setReceiptFile] = useState<File | null>(null)
 
   // Receipt Selection Dialog
   const [receiptDialogOpen, setReceiptDialogOpen] = useState(false)
@@ -250,6 +251,12 @@ export default function PaymentsPage() {
         return
       }
 
+      if (formData.payment_type === "one-time" && !receiptFile) {
+        toast.error("One-time payments require a receipt to be uploaded")
+        setSubmitting(false)
+        return
+      }
+
       const response = await fetch("/api/payments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -260,8 +267,31 @@ export default function PaymentsPage() {
       })
 
       if (response.ok) {
+        const data = await response.json()
+        const paymentId = data.data.id
+
+        // If one-time payment and receipt file exists, upload it
+        if (formData.payment_type === "one-time" && receiptFile) {
+          const formDataUpload = new FormData()
+          formDataUpload.append("file", receiptFile)
+          formDataUpload.append("payment_id", paymentId)
+          formDataUpload.append("document_type", "receipt")
+          formDataUpload.append("applicable_date", formData.payment_date)
+
+          const uploadResponse = await fetch("/api/payments/documents", {
+            method: "POST",
+            body: formDataUpload,
+          })
+
+          if (!uploadResponse.ok) {
+            console.error("Failed to upload receipt, but payment was created")
+            toast.warning("Payment created, but receipt upload failed. You can upload it later.")
+          }
+        }
+
         toast.success("Payment created successfully")
         setIsModalOpen(false)
+        setReceiptFile(null)
         setFormData({
           department_id: "",
           category: "",
@@ -293,6 +323,9 @@ export default function PaymentsPage() {
 
   // Compute dynamic status based on due dates
   const getRealStatus = (p: Payment): "due" | "paid" | "overdue" | "cancelled" => {
+    // One-time payments are always paid (they are recorded after the fact)
+    if (p.payment_type === "one-time") return "paid"
+
     if (p.status === "paid" || p.status === "cancelled") return p.status
 
     const dateStr = p.payment_type === "recurring" ? p.next_payment_due : p.payment_date
@@ -1421,6 +1454,31 @@ export default function PaymentsPage() {
                 </div>
               )}
             </div>
+
+            {/* Receipt Upload for One-Time Payments */}
+            {formData.payment_type === "one-time" && (
+              <div className="rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-800 dark:bg-green-900/20">
+                <div className="space-y-2">
+                  <Label htmlFor="receipt" className="flex items-center gap-2">
+                    <Receipt className="h-4 w-4 text-green-600" />
+                    Payment Receipt *
+                  </Label>
+                  <p className="text-muted-foreground mb-2 text-sm">
+                    Since this is a one-time payment, please upload the payment receipt as proof of payment.
+                  </p>
+                  <Input
+                    id="receipt"
+                    type="file"
+                    accept="image/*,.pdf"
+                    onChange={(e) => setReceiptFile(e.target.files?.[0] || null)}
+                    className="cursor-pointer"
+                  />
+                  {receiptFile && (
+                    <p className="text-sm text-green-600 dark:text-green-400">✓ Selected: {receiptFile.name}</p>
+                  )}
+                </div>
+              </div>
+            )}
 
             {formData.payment_type === "recurring" && (
               <div className="space-y-2">

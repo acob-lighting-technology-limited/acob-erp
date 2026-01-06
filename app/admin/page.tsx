@@ -264,6 +264,14 @@ export default async function AdminDashboardPage() {
       roles: ["super_admin", "admin"],
     },
     {
+      title: "HR Administration",
+      description: "Manage leave, attendance, and performance",
+      href: "/admin/hr",
+      icon: Users,
+      color: "bg-teal-500",
+      roles: ["super_admin", "admin", "lead"],
+    },
+    {
       title: "System Settings",
       description: "Configure shutdown and maintenance modes",
       href: "/admin/settings",
