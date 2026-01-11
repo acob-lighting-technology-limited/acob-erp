@@ -29,7 +29,7 @@ export const viewport: Viewport = {
 async function HeaderWrapperWithData() {
   const cookieStore = await cookies()
   const bypassCookie = cookieStore.get("shutdown_bypass")
-  
+
   // Don't show header if no bypass cookie (shutdown mode)
   if (!bypassCookie || bypassCookie.value !== "true") {
     return null

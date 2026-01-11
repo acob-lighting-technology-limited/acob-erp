@@ -130,12 +130,13 @@ export default function ContactsPage() {
           <h1 className="text-3xl font-bold">Contacts</h1>
           <p className="text-muted-foreground">Manage your leads, customers, vendors, and partners</p>
         </div>
-        <Button asChild>
-          <Link href="/admin/crm/contacts/new">
-            <Plus className="mr-2 h-4 w-4" />
-            Add Contact
-          </Link>
-        </Button>
+        <Link
+          href="/admin/crm/contacts/new"
+          className="bg-primary text-primary-foreground ring-offset-background hover:bg-primary/90 inline-flex h-10 items-center justify-center rounded-md px-4 py-2 text-sm font-medium transition-colors"
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          Add Contact
+        </Link>
       </div>
 
       {/* Filters */}
@@ -275,17 +276,13 @@ export default function ContactsPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem asChild>
-                            <Link href={`/admin/crm/contacts/${contact.id}`}>
-                              <Eye className="mr-2 h-4 w-4" />
-                              View
-                            </Link>
+                          <DropdownMenuItem onClick={() => router.push(`/admin/crm/contacts/${contact.id}`)}>
+                            <Eye className="mr-2 h-4 w-4" />
+                            View
                           </DropdownMenuItem>
-                          <DropdownMenuItem asChild>
-                            <Link href={`/admin/crm/contacts/${contact.id}/edit`}>
-                              <Pencil className="mr-2 h-4 w-4" />
-                              Edit
-                            </Link>
+                          <DropdownMenuItem onClick={() => router.push(`/admin/crm/contacts/${contact.id}/edit`)}>
+                            <Pencil className="mr-2 h-4 w-4" />
+                            Edit
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(contact.id)}>
@@ -308,12 +305,13 @@ export default function ContactsPage() {
                   ? "Try adjusting your filters"
                   : "Get started by adding your first contact"}
               </p>
-              <Button asChild>
-                <Link href="/admin/crm/contacts/new">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Contact
-                </Link>
-              </Button>
+              <Link
+                href="/admin/crm/contacts/new"
+                className="bg-primary text-primary-foreground ring-offset-background hover:bg-primary/90 inline-flex h-10 items-center justify-center rounded-md px-4 py-2 text-sm font-medium transition-colors"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Add Contact
+              </Link>
             </div>
           )}
         </CardContent>

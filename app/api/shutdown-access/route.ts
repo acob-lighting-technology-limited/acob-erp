@@ -16,27 +16,21 @@ export async function POST(request: NextRequest) {
     console.log("3. Environment check:", {
       hasEnvPassword: !!process.env.SHUTDOWN_ACCESS_PASSWORD,
       usingDefault: !process.env.SHUTDOWN_ACCESS_PASSWORD,
-      expectedPasswordLength: shutdownPassword.length
+      expectedPasswordLength: shutdownPassword.length,
     })
 
     if (!password) {
       console.log("4. ERROR: No password provided")
-      return NextResponse.json(
-        { error: "Password is required" },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: "Password is required" }, { status: 400 })
     }
 
     if (password !== shutdownPassword) {
       console.log("5. ERROR: Password mismatch", {
         providedLength: password.length,
         expectedLength: shutdownPassword.length,
-        match: password === shutdownPassword
+        match: password === shutdownPassword,
       })
-      return NextResponse.json(
-        { error: "Invalid password" },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: "Invalid password" }, { status: 401 })
     }
 
     console.log("6. Password validated successfully")
@@ -72,7 +66,7 @@ export async function POST(request: NextRequest) {
       {
         error: "An error occurred",
         details: error instanceof Error ? error.message : String(error),
-        type: error?.constructor?.name
+        type: error?.constructor?.name,
       },
       { status: 500 }
     )

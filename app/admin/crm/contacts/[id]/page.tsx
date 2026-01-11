@@ -204,11 +204,9 @@ export default function ContactDetailPage() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem asChild>
-                <Link href={`/admin/crm/contacts/${contactId}/edit`}>
-                  <Pencil className="mr-2 h-4 w-4" />
-                  Edit Contact
-                </Link>
+              <DropdownMenuItem onClick={() => router.push(`/admin/crm/contacts/${contactId}/edit`)}>
+                <Pencil className="mr-2 h-4 w-4" />
+                Edit Contact
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem className="text-destructive" onClick={handleDelete}>
@@ -314,12 +312,13 @@ export default function ContactDetailPage() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle className="text-lg">Opportunities</CardTitle>
-                  <Button size="sm" asChild>
-                    <Link href={`/admin/crm/opportunities/new?contact_id=${contactId}`}>
-                      <Plus className="mr-2 h-4 w-4" />
-                      New Opportunity
-                    </Link>
-                  </Button>
+                  <Link
+                    href={`/admin/crm/opportunities/new?contact_id=${contactId}`}
+                    className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex h-9 items-center justify-center rounded-md px-3 text-sm font-medium"
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    New Opportunity
+                  </Link>
                 </CardHeader>
                 <CardContent>
                   {contact.opportunities && contact.opportunities.length > 0 ? (
@@ -353,11 +352,12 @@ export default function ContactDetailPage() {
                     <div className="text-muted-foreground py-8 text-center">
                       <Target className="mx-auto mb-2 h-12 w-12 opacity-50" />
                       <p>No opportunities yet</p>
-                      <Button className="mt-4" size="sm" asChild>
-                        <Link href={`/admin/crm/opportunities/new?contact_id=${contactId}`}>
-                          Create First Opportunity
-                        </Link>
-                      </Button>
+                      <Link
+                        href={`/admin/crm/opportunities/new?contact_id=${contactId}`}
+                        className="bg-primary text-primary-foreground hover:bg-primary/90 mt-4 inline-flex h-9 items-center justify-center rounded-md px-3 text-sm font-medium"
+                      >
+                        Create First Opportunity
+                      </Link>
                     </div>
                   )}
                 </CardContent>
@@ -368,12 +368,13 @@ export default function ContactDetailPage() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle className="text-lg">Activities</CardTitle>
-                  <Button size="sm" asChild>
-                    <Link href={`/admin/crm/activities/new?contact_id=${contactId}`}>
-                      <Plus className="mr-2 h-4 w-4" />
-                      Log Activity
-                    </Link>
-                  </Button>
+                  <Link
+                    href={`/admin/crm/activities/new?contact_id=${contactId}`}
+                    className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex h-9 items-center justify-center rounded-md px-3 text-sm font-medium"
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Log Activity
+                  </Link>
                 </CardHeader>
                 <CardContent>
                   {contact.activities && contact.activities.length > 0 ? (

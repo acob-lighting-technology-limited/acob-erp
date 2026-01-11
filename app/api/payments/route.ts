@@ -129,31 +129,32 @@ export async function POST(request: Request) {
       notes,
     } = body
 
-    // Validate required fields
-    if (!department_id || !payment_type || !category || !title || !amount || !issuer_name || !issuer_phone_number) {
+    // Validate required fields - category must be "one-time" or "recurring"
+    if (!department_id || !category || !title || !amount || !issuer_name || !issuer_phone_number) {
       return NextResponse.json({ error: "Missing required fields (including Issuer Name & Phone)" }, { status: 400 })
     }
 
+    // Validate category is one of the allowed values
+    if (category !== "one-time" && category !== "recurring") {
+      return NextResponse.json({ error: "Category must be 'one-time' or 'recurring'" }, { status: 400 })
+    }
+
+    // Derive payment_type from category (they are now the same)
+    const derivedPaymentType = payment_type || category
+
     // Validate payment type specific fields
-    if (payment_type === "recurring" && (!recurrence_period || !next_payment_due)) {
+    if (derivedPaymentType === "recurring" && (!recurrence_period || !next_payment_due)) {
       return NextResponse.json(
         { error: "Recurring payments require recurrence_period and next_payment_due" },
         { status: 400 }
       )
     }
 
-    if (payment_type === "one-time" && !payment_date) {
+    if (derivedPaymentType === "one-time" && !payment_date) {
       return NextResponse.json({ error: "One-time payments require payment_date" }, { status: 400 })
     }
 
-    // Auto-create category if it doesn't exist
-    if (category) {
-      try {
-        await supabase.from("payment_categories").insert({ name: category }).select().single()
-      } catch (error) {
-        // Ignore error - category might already exist due to unique constraint
-      }
-    }
+    // Note: Categories are now fixed ("one-time" or "recurring"), no need to auto-create
 
     // Check if user can create payment in this department
     const { data: profile } = await supabase.from("profiles").select("is_admin, department").eq("id", user.id).single()
@@ -176,16 +177,16 @@ export async function POST(request: Request) {
       .from("department_payments")
       .insert({
         department_id,
-        payment_type,
+        payment_type: derivedPaymentType,
         category,
         title,
         description,
         amount,
         currency,
-        status: payment_type === "one-time" ? "paid" : "due", // One-time payments are already paid
-        recurrence_period: payment_type === "recurring" ? recurrence_period : null,
-        next_payment_due: payment_type === "recurring" ? next_payment_due : null,
-        payment_date: payment_type === "one-time" ? payment_date : null,
+        status: derivedPaymentType === "one-time" ? "paid" : "due", // One-time payments are already paid
+        recurrence_period: derivedPaymentType === "recurring" ? recurrence_period : null,
+        next_payment_due: derivedPaymentType === "recurring" ? next_payment_due : null,
+        payment_date: derivedPaymentType === "one-time" ? payment_date : null,
         issuer_name,
         issuer_phone_number,
         issuer_address,

@@ -117,18 +117,20 @@ export default function CRMDashboardPage() {
           <p className="text-muted-foreground">Manage your leads, customers, and sales pipeline</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" asChild>
-            <Link href="/admin/crm/activities">
-              <Calendar className="mr-2 h-4 w-4" />
-              Activities
-            </Link>
-          </Button>
-          <Button asChild>
-            <Link href="/admin/crm/contacts/new">
-              <Plus className="mr-2 h-4 w-4" />
-              New Contact
-            </Link>
-          </Button>
+          <Link
+            href="/admin/crm/activities"
+            className="border-input bg-background ring-offset-background hover:bg-accent hover:text-accent-foreground focus-visible:ring-ring inline-flex h-10 items-center justify-center rounded-md border px-4 py-2 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+          >
+            <Calendar className="mr-2 h-4 w-4" />
+            Activities
+          </Link>
+          <Link
+            href="/admin/crm/contacts/new"
+            className="bg-primary text-primary-foreground ring-offset-background hover:bg-primary/90 focus-visible:ring-ring inline-flex h-10 items-center justify-center rounded-md px-4 py-2 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            New Contact
+          </Link>
         </div>
       </div>
 
@@ -309,12 +311,13 @@ export default function CRMDashboardPage() {
                     </Badge>
                   </div>
                 ))}
-                <Button variant="ghost" className="w-full" asChild>
-                  <Link href="/admin/crm/activities">
-                    View all activities
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Link>
-                </Button>
+                <Link
+                  href="/admin/crm/activities"
+                  className="hover:bg-accent hover:text-accent-foreground inline-flex w-full items-center justify-center rounded-md px-4 py-2 text-sm font-medium transition-colors"
+                >
+                  View all activities
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
               </div>
             ) : (
               <div className="text-muted-foreground py-8 text-center">
@@ -350,12 +353,13 @@ export default function CRMDashboardPage() {
                     </div>
                   </Link>
                 ))}
-                <Button variant="ghost" className="w-full" asChild>
-                  <Link href="/admin/crm/contacts?filter=follow-up">
-                    View all follow-ups
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Link>
-                </Button>
+                <Link
+                  href="/admin/crm/contacts?filter=follow-up"
+                  className="hover:bg-accent hover:text-accent-foreground inline-flex w-full items-center justify-center rounded-md px-4 py-2 text-sm font-medium transition-colors"
+                >
+                  View all follow-ups
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
               </div>
             ) : (
               <div className="text-muted-foreground py-8 text-center">

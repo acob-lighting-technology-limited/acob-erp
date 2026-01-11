@@ -100,7 +100,7 @@ interface Category {
 
 interface FormData {
   department_id: string
-  category: string // Storing the name/text directly for now
+  category: "one-time" | "recurring" | "" // Now serves as the payment type
   title: string
   description: string
   amount: string
@@ -113,7 +113,6 @@ interface FormData {
   issuer_address: string
   payment_reference: string
   notes: string
-  payment_type: "one-time" | "recurring"
 }
 
 export default function PaymentsPage() {
@@ -181,7 +180,6 @@ export default function PaymentsPage() {
     issuer_address: "",
     payment_reference: "",
     notes: "",
-    payment_type: "one-time",
   })
 
   useEffect(() => {
@@ -239,19 +237,19 @@ export default function PaymentsPage() {
         return
       }
 
-      if (formData.payment_type === "recurring" && (!formData.recurrence_period || !formData.next_payment_due)) {
+      if (formData.category === "recurring" && (!formData.recurrence_period || !formData.next_payment_due)) {
         toast.error("Recurring payments require a period and start date")
         setSubmitting(false)
         return
       }
 
-      if (formData.payment_type === "one-time" && !formData.payment_date) {
+      if (formData.category === "one-time" && !formData.payment_date) {
         toast.error("One-time payments require a payment date")
         setSubmitting(false)
         return
       }
 
-      if (formData.payment_type === "one-time" && !receiptFile) {
+      if (formData.category === "one-time" && !receiptFile) {
         toast.error("One-time payments require a receipt to be uploaded")
         setSubmitting(false)
         return
@@ -271,7 +269,7 @@ export default function PaymentsPage() {
         const paymentId = data.data.id
 
         // If one-time payment and receipt file exists, upload it
-        if (formData.payment_type === "one-time" && receiptFile) {
+        if (formData.category === "one-time" && receiptFile) {
           const formDataUpload = new FormData()
           formDataUpload.append("file", receiptFile)
           formDataUpload.append("payment_id", paymentId)
@@ -307,7 +305,6 @@ export default function PaymentsPage() {
           issuer_address: "",
           payment_reference: "",
           notes: "",
-          payment_type: "one-time",
         })
         fetchData()
       } else {
@@ -450,9 +447,12 @@ export default function PaymentsPage() {
     let valA: any = a
     let valB: any = b
 
-    if (sortConfig.key === "date") {
-      const dateStrA = a.payment_type === "recurring" ? a.next_payment_due : a.payment_date
-      const dateStrB = b.payment_type === "recurring" ? b.next_payment_due : b.payment_date
+    if (sortConfig.key === "category") {
+      valA = a.category.toLowerCase()
+      valB = b.category.toLowerCase()
+    } else if (sortConfig.key === "date") {
+      const dateStrA = a.category === "recurring" ? a.next_payment_due : a.payment_date
+      const dateStrB = b.category === "recurring" ? b.next_payment_due : b.payment_date
 
       // Handle null/undefined dates - push them to the end
       if (!dateStrA && !dateStrB) return 0
@@ -1160,7 +1160,12 @@ export default function PaymentsPage() {
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[50px]">S/N</TableHead>
-                <TableHead>Category</TableHead>
+                <TableHead className="hover:bg-muted/50 cursor-pointer" onClick={() => handleSort("category")}>
+                  <div className="flex items-center gap-1">
+                    Category
+                    <ArrowUpDown className="h-4 w-4" />
+                  </div>
+                </TableHead>
                 <TableHead>Title</TableHead>
                 <TableHead>Issuer</TableHead>
                 <TableHead>Department</TableHead>
@@ -1231,7 +1236,7 @@ export default function PaymentsPage() {
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="mr-2" onClick={(e) => e.stopPropagation()}>
+                        <Button variant="ghost" size="icon" onClick={(e) => e.stopPropagation()}>
                           <Printer className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
@@ -1300,18 +1305,18 @@ export default function PaymentsPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="category">Category</Label>
-                <Input
-                  id="category"
-                  list="categories"
+                <Select
                   value={formData.category}
-                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                  placeholder="Select or type category"
-                />
-                <datalist id="categories">
-                  {categories.map((cat) => (
-                    <option key={cat.id} value={cat.name} />
-                  ))}
-                </datalist>
+                  onValueChange={(value: "one-time" | "recurring") => setFormData({ ...formData, category: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select Category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="one-time">One-time</SelectItem>
+                    <SelectItem value="recurring">Recurring</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
@@ -1404,24 +1409,8 @@ export default function PaymentsPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="type">Payment Type</Label>
-                <Select
-                  value={formData.payment_type}
-                  onValueChange={(value: any) => setFormData({ ...formData, payment_type: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="one-time">One-time</SelectItem>
-                    <SelectItem value="recurring">Recurring</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {formData.payment_type === "recurring" ? (
+            {formData.category === "recurring" ? (
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="period">Recurrence Period</Label>
                   <Select
@@ -1438,25 +1427,38 @@ export default function PaymentsPage() {
                     </SelectContent>
                   </Select>
                 </div>
-              ) : (
                 <div className="space-y-2">
-                  <Label htmlFor="payment_date">Payment Date</Label>
+                  <Label htmlFor="start_date">Next Payment Due</Label>
                   <div className="relative">
                     <Calendar className="text-muted-foreground absolute top-2.5 left-3 h-4 w-4" />
                     <Input
-                      id="payment_date"
+                      id="start_date"
                       type="date"
                       className="pl-9"
-                      value={formData.payment_date}
-                      onChange={(e) => setFormData({ ...formData, payment_date: e.target.value })}
+                      value={formData.next_payment_due}
+                      onChange={(e) => setFormData({ ...formData, next_payment_due: e.target.value })}
                     />
                   </div>
                 </div>
-              )}
-            </div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label htmlFor="payment_date">Payment Date</Label>
+                <div className="relative">
+                  <Calendar className="text-muted-foreground absolute top-2.5 left-3 h-4 w-4" />
+                  <Input
+                    id="payment_date"
+                    type="date"
+                    className="pl-9"
+                    value={formData.payment_date}
+                    onChange={(e) => setFormData({ ...formData, payment_date: e.target.value })}
+                  />
+                </div>
+              </div>
+            )}
 
             {/* Receipt Upload for One-Time Payments */}
-            {formData.payment_type === "one-time" && (
+            {formData.category === "one-time" && (
               <div className="rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-800 dark:bg-green-900/20">
                 <div className="space-y-2">
                   <Label htmlFor="receipt" className="flex items-center gap-2">
@@ -1476,22 +1478,6 @@ export default function PaymentsPage() {
                   {receiptFile && (
                     <p className="text-sm text-green-600 dark:text-green-400">✓ Selected: {receiptFile.name}</p>
                   )}
-                </div>
-              </div>
-            )}
-
-            {formData.payment_type === "recurring" && (
-              <div className="space-y-2">
-                <Label htmlFor="start_date">Next Payment Due</Label>
-                <div className="relative">
-                  <Calendar className="text-muted-foreground absolute top-2.5 left-3 h-4 w-4" />
-                  <Input
-                    id="start_date"
-                    type="date"
-                    className="pl-9"
-                    value={formData.next_payment_due}
-                    onChange={(e) => setFormData({ ...formData, next_payment_due: e.target.value })}
-                  />
                 </div>
               </div>
             )}

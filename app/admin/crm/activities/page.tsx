@@ -190,11 +190,9 @@ export default function ActivitiesPage() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem asChild>
-                  <Link href={`/admin/crm/activities/${activity.id}`}>
-                    <Eye className="mr-2 h-4 w-4" />
-                    View Details
-                  </Link>
+                <DropdownMenuItem onClick={() => router.push(`/admin/crm/activities/${activity.id}`)}>
+                  <Eye className="mr-2 h-4 w-4" />
+                  View Details
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(activity.id)}>
@@ -235,12 +233,13 @@ export default function ActivitiesPage() {
           <h1 className="text-3xl font-bold">Activities</h1>
           <p className="text-muted-foreground">Track calls, emails, meetings, and tasks</p>
         </div>
-        <Button asChild>
-          <Link href="/admin/crm/activities/new">
-            <Plus className="mr-2 h-4 w-4" />
-            Log Activity
-          </Link>
-        </Button>
+        <Link
+          href="/admin/crm/activities/new"
+          className="bg-primary text-primary-foreground ring-offset-background hover:bg-primary/90 inline-flex h-10 items-center justify-center rounded-md px-4 py-2 text-sm font-medium transition-colors"
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          Log Activity
+        </Link>
       </div>
 
       {/* Stats */}
@@ -408,12 +407,13 @@ export default function ActivitiesPage() {
             <Activity className="text-muted-foreground mx-auto mb-4 h-12 w-12 opacity-50" />
             <h3 className="mb-1 font-medium">No activities found</h3>
             <p className="text-muted-foreground mb-4 text-sm">Start tracking your customer interactions</p>
-            <Button asChild>
-              <Link href="/admin/crm/activities/new">
-                <Plus className="mr-2 h-4 w-4" />
-                Log First Activity
-              </Link>
-            </Button>
+            <Link
+              href="/admin/crm/activities/new"
+              className="bg-primary text-primary-foreground ring-offset-background hover:bg-primary/90 inline-flex h-10 items-center justify-center rounded-md px-4 py-2 text-sm font-medium transition-colors"
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Log First Activity
+            </Link>
           </div>
         )}
       </div>

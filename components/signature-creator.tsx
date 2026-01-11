@@ -97,7 +97,7 @@ export function SignatureCreator({ profile }: SignatureCreatorProps) {
     const formattedFirstName = formatNameProperly(formData.firstName)
     const formattedMiddleName = formData.middleName ? formatNameProperly(formData.middleName) : ""
     const formattedLastName = formatNameProperly(formData.lastName)
-    
+
     const fullName = `${formattedFirstName}${
       formattedMiddleName ? " " + formattedMiddleName : ""
     } ${formattedLastName}`.trim()
@@ -113,9 +113,7 @@ export function SignatureCreator({ profile }: SignatureCreatorProps) {
   <!-- Name & Role -->
   <div style="border-bottom: 1.5px solid #e5e7eb; padding-bottom: 6px; margin-bottom: 6px;">
     <p style="margin: 0 0 0 0; line-height: 1; font-size: 20px; font-weight: bold; color: #1f2937; letter-spacing: -0.025em;">${fullName}</p>
-    <p style="margin: 0 0 10px 0; font-size: 14px; font-weight: 500; color: #1f2937;">${
-      formData.companyRole
-    }</p>
+    <p style="margin: 0 0 10px 0; font-size: 14px; font-weight: 500; color: #1f2937;">${formData.companyRole}</p>
     
     <!-- Contact details -->
     <div style="font-size: 14px; color: #374151; line-height: 1.3;">

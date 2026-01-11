@@ -279,7 +279,6 @@ export function ProfileForm({ user, profile }: ProfileFormProps) {
                   </SelectContent>
                 </Select>
               </div>
-
             </div>
 
             {/* Device Information - Multiple Devices */}

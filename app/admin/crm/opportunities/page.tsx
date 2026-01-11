@@ -186,12 +186,13 @@ export default function OpportunitiesPage() {
           <h1 className="text-3xl font-bold">Opportunities</h1>
           <p className="text-muted-foreground">Track and manage your sales pipeline</p>
         </div>
-        <Button asChild>
-          <Link href="/admin/crm/opportunities/new">
-            <Plus className="mr-2 h-4 w-4" />
-            New Opportunity
-          </Link>
-        </Button>
+        <Link
+          href="/admin/crm/opportunities/new"
+          className="bg-primary text-primary-foreground ring-offset-background hover:bg-primary/90 inline-flex h-10 items-center justify-center rounded-md px-4 py-2 text-sm font-medium transition-colors"
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          New Opportunity
+        </Link>
       </div>
 
       {/* Filters */}
@@ -276,14 +277,14 @@ export default function OpportunitiesPage() {
 
             return (
               <div key={stage.name} className="min-w-[280px]">
-                <div className="mb-3 flex items-center justify-between">
-                  <div>
+                <div className="mb-3">
+                  <div className="flex items-center gap-2">
                     <h3 className="font-semibold">{stage.name}</h3>
-                    <p className="text-muted-foreground text-xs">
-                      {stageOpps.length} deals • {formatCurrency(stageTotal)}
-                    </p>
+                    <Badge variant="secondary">{stage.probability}%</Badge>
                   </div>
-                  <Badge variant="secondary">{stage.probability}%</Badge>
+                  <p className="text-muted-foreground text-xs">
+                    {stageOpps.length} deals • {formatCurrency(stageTotal)}
+                  </p>
                 </div>
 
                 <div className="space-y-3">
@@ -304,11 +305,9 @@ export default function OpportunitiesPage() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem asChild>
-                                <Link href={`/admin/crm/opportunities/${opp.id}`}>
-                                  <Eye className="mr-2 h-4 w-4" />
-                                  View
-                                </Link>
+                              <DropdownMenuItem onClick={() => router.push(`/admin/crm/opportunities/${opp.id}`)}>
+                                <Eye className="mr-2 h-4 w-4" />
+                                View
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem onClick={() => handleStatusChange(opp.id, "won")}>
