@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import { PaymentsContent } from "./payments-content"
+import { PaymentsTable } from "@/components/payments/payments-table"
 
-export interface Payment {
+interface Payment {
   id: string
   department_id: string
   title: string
@@ -15,25 +15,30 @@ export interface Payment {
   payment_date?: string
   category: string
   description?: string
-  notes?: string
   issuer_name?: string
   issuer_phone_number?: string
   issuer_address?: string
   payment_reference?: string
   amount_paid?: number
   created_at: string
-  created_by?: string
   department?: {
     name: string
   }
+  documents?: {
+    id: string
+    document_type: string
+    file_path: string
+    file_name?: string
+    applicable_date?: string
+  }[]
 }
 
-export interface Department {
+interface Department {
   id: string
   name: string
 }
 
-export interface Category {
+interface Category {
   id: string
   name: string
 }
@@ -57,9 +62,7 @@ async function getPaymentsData() {
   let isAdmin = false
 
   if (profile) {
-    isAdmin = profile.is_admin
-
-    // Fetch department ID
+    // Fetch department ID (we don't care about is_admin for user-facing page)
     const { data: dept } = await supabase.from("departments").select("id, name").eq("name", profile.department).single()
 
     if (dept) {
@@ -67,20 +70,20 @@ async function getPaymentsData() {
     }
   }
 
-  // Fetch payments via API route (to use existing logic)
-  // For server component, we need to fetch directly
+  // Build payments query - ALWAYS filter by user's department for user-facing page
   let paymentsQuery = supabase
     .from("department_payments")
     .select(
       `
       *,
-      department:departments(name)
+      department:departments(name),
+      documents:payment_documents(id, document_type, file_path, file_name, applicable_date)
     `
     )
     .order("created_at", { ascending: false })
 
-  // Filter by department if not admin
-  if (!isAdmin && currentUserDepartmentId) {
+  // Always filter by user's department on the user-facing page
+  if (currentUserDepartmentId) {
     paymentsQuery = paymentsQuery.eq("department_id", currentUserDepartmentId)
   }
 
@@ -90,8 +93,11 @@ async function getPaymentsData() {
     console.error("Error loading payments:", paymentsError)
   }
 
-  // Fetch departments
-  const { data: departments } = await supabase.from("departments").select("id, name").order("name")
+  // Fetch departments (just user's department for the dropdown in create form)
+  const { data: departments } = await supabase
+    .from("departments")
+    .select("id, name")
+    .eq("id", currentUserDepartmentId || "")
 
   // Fetch categories
   const { data: categories } = await supabase.from("payment_categories").select("id, name").order("name")
@@ -103,7 +109,7 @@ async function getPaymentsData() {
     currentUser: {
       id: user.id,
       department_id: currentUserDepartmentId,
-      is_admin: isAdmin,
+      is_admin: false, // Always false for user-facing page - hides admin controls
     },
   }
 }
@@ -123,11 +129,12 @@ export default async function DepartmentPaymentsPage() {
   }
 
   return (
-    <PaymentsContent
+    <PaymentsTable
       initialPayments={paymentsData.payments}
       initialDepartments={paymentsData.departments}
       initialCategories={paymentsData.categories}
       currentUser={paymentsData.currentUser}
+      basePath="/payments"
     />
   )
 }
