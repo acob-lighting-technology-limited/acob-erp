@@ -46,6 +46,7 @@ import {
   LayoutGrid,
   List,
   User,
+  Users,
   Building2,
   Eye,
   History,
@@ -192,8 +193,13 @@ export function AdminAssetsContent({
     "Assigned To": true,
     Department: true,
     "Office Location": true,
-    Notes: true,
+    Issues: true,
   })
+
+  // Staff Assets Report dialog state
+  const [staffReportDialogOpen, setStaffReportDialogOpen] = useState(false)
+  const [staffReportExportType, setStaffReportExportType] = useState<"excel" | "pdf" | "word" | null>(null)
+  const [staffReportSelectedTypes, setStaffReportSelectedTypes] = useState<Record<string, boolean>>({})
 
   // Dialog states
   const [isAssetDialogOpen, setIsAssetDialogOpen] = useState(false)
@@ -1253,7 +1259,10 @@ export function AdminAssetsContent({
         // Priority: assignment office_location > asset office_location > user's office_location (for individual assignments)
         row["Office Location"] = asset.current_assignment?.office_location || asset.office_location || "-"
       }
-      if (selectedColumns["Notes"]) row["Notes"] = asset.notes || "-"
+      if (selectedColumns["Issues"])
+        row["Issues"] = asset.unresolved_issues_count
+          ? `${asset.unresolved_issues_count} issue${asset.unresolved_issues_count > 1 ? "s" : ""}`
+          : "-"
       return row
     })
     return baseData
@@ -1382,9 +1391,13 @@ export function AdminAssetsContent({
           row.push(asset.current_assignment?.office_location || asset.office_location || "-")
           headers.push("Office Location")
         }
-        if (selectedColumns["Notes"]) {
-          row.push(asset.notes || "-")
-          headers.push("Notes")
+        if (selectedColumns["Issues"]) {
+          row.push(
+            asset.unresolved_issues_count
+              ? `${asset.unresolved_issues_count} issue${asset.unresolved_issues_count > 1 ? "s" : ""}`
+              : "-"
+          )
+          headers.push("Issues")
         }
 
         return { row, headers }
@@ -1398,7 +1411,7 @@ export function AdminAssetsContent({
         body: body,
         startY: 35,
         styles: { fontSize: 8, cellPadding: 2 },
-        headStyles: { fillColor: [59, 130, 246], textColor: 255 },
+        headStyles: { fillColor: [34, 139, 34], textColor: 255 },
         alternateRowStyles: { fillColor: [245, 247, 250] },
       })
 
@@ -1485,9 +1498,9 @@ export function AdminAssetsContent({
           })
         )
       }
-      if (selectedColumns["Notes"]) {
+      if (selectedColumns["Issues"]) {
         headerCells.push(
-          new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Notes", bold: true })] })] })
+          new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Issues", bold: true })] })] })
         )
       }
 
@@ -1563,8 +1576,18 @@ export function AdminAssetsContent({
               })
             )
           }
-          if (selectedColumns["Notes"]) {
-            rowCells.push(new TableCell({ children: [new Paragraph(asset.notes || "-")] }))
+          if (selectedColumns["Issues"]) {
+            rowCells.push(
+              new TableCell({
+                children: [
+                  new Paragraph(
+                    asset.unresolved_issues_count
+                      ? `${asset.unresolved_issues_count} issue${asset.unresolved_issues_count > 1 ? "s" : ""}`
+                      : "-"
+                  ),
+                ],
+              })
+            )
           }
           return new TableRow({ children: rowCells })
         }),
@@ -1614,6 +1637,256 @@ export function AdminAssetsContent({
       await exportToPDF()
     } else if (exportType === "word") {
       await exportToWord()
+    }
+  }
+
+  // Staff Assets Report Export Functions
+  // This creates a staff-centric view: rows = staff, columns = filtered asset types
+  const getStaffReportData = () => {
+    // Get asset types that are selected in the dialog
+    const assetTypesInReport = Object.keys(staffReportSelectedTypes).filter((type) => staffReportSelectedTypes[type])
+
+    // Create staff-to-assets mapping
+    const staffAssetMap: Record<string, Record<string, string[]>> = {}
+
+    // Initialize all staff
+    staff.forEach((member) => {
+      staffAssetMap[member.id] = {}
+      assetTypesInReport.forEach((type) => {
+        staffAssetMap[member.id][type] = []
+      })
+    })
+
+    // Map assets to staff (use all assets, not just filtered)
+    assets.forEach((asset) => {
+      const assigneeId = asset.current_assignment?.assigned_to
+      if (assigneeId && staffAssetMap[assigneeId] && assetTypesInReport.includes(asset.asset_type)) {
+        staffAssetMap[assigneeId][asset.asset_type].push(asset.unique_code)
+      }
+    })
+
+    return { staffAssetMap, assetTypesInReport }
+  }
+
+  const handleStaffReportClick = (type: "excel" | "pdf" | "word") => {
+    // Initialize selected types with all available asset types from the system
+    const availableTypes: Record<string, boolean> = {}
+    assetTypes.forEach((t) => {
+      availableTypes[t.code] = true
+    })
+    setStaffReportSelectedTypes(availableTypes)
+    setStaffReportExportType(type)
+    setStaffReportDialogOpen(true)
+  }
+
+  const exportStaffReportToExcel = async () => {
+    try {
+      const XLSX = await import("xlsx")
+      const { default: saveAs } = await import("file-saver")
+
+      const { staffAssetMap, assetTypesInReport } = getStaffReportData()
+
+      const dataToExport = staff.map((member, index) => {
+        const row: Record<string, any> = {
+          "#": index + 1,
+          "Staff Name": `${formatName(member.last_name)}, ${formatName(member.first_name)}`,
+          Department: member.department || "-",
+        }
+
+        assetTypesInReport.forEach((typeCode) => {
+          const typeName = ASSET_TYPE_MAP[typeCode]?.label || typeCode
+          const assets = staffAssetMap[member.id]?.[typeCode] || []
+          row[typeName] = assets.length > 0 ? assets.join(", ") : "-"
+        })
+
+        return row
+      })
+
+      const ws = XLSX.utils.json_to_sheet(dataToExport)
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, "Staff Assets Report")
+
+      // Auto-size columns
+      const maxWidth = 50
+      const cols = Object.keys(dataToExport[0] || {}).map((key) => ({
+        wch: Math.min(
+          Math.max(key.length, ...dataToExport.map((row) => String(row[key as keyof typeof row]).length)),
+          maxWidth
+        ),
+      }))
+      ws["!cols"] = cols
+
+      const excelBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" })
+      const data = new Blob([excelBuffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      })
+      saveAs(data, `staff-assets-report-${new Date().toISOString().split("T")[0]}.xlsx`)
+      toast.success("Staff Assets Report exported to Excel successfully")
+      setStaffReportDialogOpen(false)
+    } catch (error: any) {
+      console.error("Error exporting Staff Report to Excel:", error)
+      toast.error("Failed to export Staff Report to Excel")
+    }
+  }
+
+  const exportStaffReportToPDF = async () => {
+    try {
+      const jsPDF = (await import("jspdf")).default
+      const autoTable = (await import("jspdf-autotable")).default
+
+      const { staffAssetMap, assetTypesInReport } = getStaffReportData()
+
+      const doc = new jsPDF({ orientation: "landscape" })
+
+      // Add title
+      doc.setFontSize(16)
+      doc.text("Staff Assets Report", 14, 15)
+      doc.setFontSize(10)
+      doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 22)
+      const assetTypesLabel = assetTypesInReport.map((t) => ASSET_TYPE_MAP[t]?.label || t).join(", ")
+      doc.text(`Asset Types: ${assetTypesLabel}`, 14, 28)
+      doc.text(`Total Staff: ${staff.length}`, 14, 34)
+
+      // Prepare headers
+      const headers = ["#", "Staff Name", "Department", ...assetTypesInReport.map((t) => ASSET_TYPE_MAP[t]?.label || t)]
+
+      // Prepare data
+      const body = staff.map((member, index) => {
+        const row: any[] = [
+          index + 1,
+          `${formatName(member.last_name)}, ${formatName(member.first_name)}`,
+          member.department || "-",
+        ]
+
+        assetTypesInReport.forEach((typeCode) => {
+          const assets = staffAssetMap[member.id]?.[typeCode] || []
+          row.push(assets.length > 0 ? assets.join(", ") : "-")
+        })
+
+        return row
+      })
+
+      autoTable(doc, {
+        head: [headers],
+        body: body,
+        startY: 40,
+        styles: { fontSize: 8, cellPadding: 2 },
+        headStyles: { fillColor: [34, 139, 34] },
+      })
+
+      doc.save(`staff-assets-report-${new Date().toISOString().split("T")[0]}.pdf`)
+      toast.success("Staff Assets Report exported to PDF successfully")
+      setStaffReportDialogOpen(false)
+    } catch (error: any) {
+      console.error("Error exporting Staff Report to PDF:", error)
+      toast.error("Failed to export Staff Report to PDF")
+    }
+  }
+
+  const exportStaffReportToWord = async () => {
+    try {
+      const {
+        Document,
+        Packer,
+        Paragraph,
+        Table,
+        TableRow,
+        TableCell,
+        TextRun,
+        HeadingLevel,
+        AlignmentType,
+        WidthType,
+      } = await import("docx")
+      const { default: saveAs } = await import("file-saver")
+
+      const { staffAssetMap, assetTypesInReport } = getStaffReportData()
+
+      // Create header cells
+      const headerCells = [
+        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "#", bold: true })] })] }),
+        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Staff Name", bold: true })] })] }),
+        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Department", bold: true })] })] }),
+        ...assetTypesInReport.map(
+          (typeCode) =>
+            new TableCell({
+              children: [
+                new Paragraph({
+                  children: [new TextRun({ text: ASSET_TYPE_MAP[typeCode]?.label || typeCode, bold: true })],
+                }),
+              ],
+            })
+        ),
+      ]
+
+      // Create data rows
+      const tableRows = [
+        new TableRow({ children: headerCells }),
+        ...staff.map((member, index) => {
+          const rowCells = [
+            new TableCell({ children: [new Paragraph((index + 1).toString())] }),
+            new TableCell({
+              children: [new Paragraph(`${formatName(member.last_name)}, ${formatName(member.first_name)}`)],
+            }),
+            new TableCell({ children: [new Paragraph(member.department || "-")] }),
+            ...assetTypesInReport.map((typeCode) => {
+              const assets = staffAssetMap[member.id]?.[typeCode] || []
+              return new TableCell({ children: [new Paragraph(assets.length > 0 ? assets.join(", ") : "-")] })
+            }),
+          ]
+          return new TableRow({ children: rowCells })
+        }),
+      ]
+
+      const assetTypesLabel = assetTypesInReport.map((t) => ASSET_TYPE_MAP[t]?.label || t).join(", ")
+
+      const doc = new Document({
+        sections: [
+          {
+            children: [
+              new Paragraph({
+                text: "Staff Assets Report",
+                heading: HeadingLevel.HEADING_1,
+                alignment: AlignmentType.CENTER,
+              }),
+              new Paragraph({
+                text: `Generated on: ${new Date().toLocaleDateString()}`,
+                alignment: AlignmentType.CENTER,
+              }),
+              new Paragraph({
+                text: `Asset Types: ${assetTypesLabel}`,
+                alignment: AlignmentType.CENTER,
+              }),
+              new Paragraph({
+                text: `Total Staff: ${staff.length}`,
+                alignment: AlignmentType.CENTER,
+              }),
+              new Paragraph({ text: "" }),
+              new Table({
+                width: { size: 100, type: WidthType.PERCENTAGE },
+                rows: tableRows,
+              }),
+            ],
+          },
+        ],
+      })
+
+      const blob = await Packer.toBlob(doc)
+      saveAs(blob, `staff-assets-report-${new Date().toISOString().split("T")[0]}.docx`)
+      toast.success("Staff Assets Report exported to Word successfully")
+      setStaffReportDialogOpen(false)
+    } catch (error: any) {
+      console.error("Error exporting Staff Report to Word:", error)
+      toast.error("Failed to export Staff Report to Word")
+    }
+  }
+
+  const handleStaffReportConfirm = async () => {
+    if (staffReportExportType === "excel") {
+      await exportStaffReportToExcel()
+    } else if (staffReportExportType === "pdf") {
+      await exportStaffReportToPDF()
+    } else if (staffReportExportType === "word") {
+      await exportStaffReportToWord()
     }
   }
 
@@ -1871,42 +2144,88 @@ export function AdminAssetsContent({
         {/* Export Buttons */}
         <Card className="border-2">
           <CardContent className="p-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <Download className="text-muted-foreground h-4 w-4" />
-                <span className="text-foreground text-sm font-medium">Export Filtered Data:</span>
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              {/* Assets Export */}
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <Download className="text-muted-foreground h-4 w-4" />
+                  <span className="text-foreground text-sm font-medium">Export Assets:</span>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleExportClick("excel")}
+                    className="gap-2"
+                    disabled={getSortedAssets(filteredAssets).length === 0}
+                  >
+                    <FileText className="h-4 w-4" />
+                    Excel
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleExportClick("pdf")}
+                    className="gap-2"
+                    disabled={getSortedAssets(filteredAssets).length === 0}
+                  >
+                    <FileText className="h-4 w-4" />
+                    PDF
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleExportClick("word")}
+                    className="gap-2"
+                    disabled={getSortedAssets(filteredAssets).length === 0}
+                  >
+                    <FileText className="h-4 w-4" />
+                    Word
+                  </Button>
+                </div>
               </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleExportClick("excel")}
-                  className="gap-2"
-                  disabled={getSortedAssets(filteredAssets).length === 0}
-                >
-                  <FileText className="h-4 w-4" />
-                  Excel (.xlsx)
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleExportClick("pdf")}
-                  className="gap-2"
-                  disabled={getSortedAssets(filteredAssets).length === 0}
-                >
-                  <FileText className="h-4 w-4" />
-                  PDF
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleExportClick("word")}
-                  className="gap-2"
-                  disabled={getSortedAssets(filteredAssets).length === 0}
-                >
-                  <FileText className="h-4 w-4" />
-                  Word (.docx)
-                </Button>
+
+              {/* Divider */}
+              <div className="bg-border hidden h-8 w-px md:block" />
+
+              {/* Staff Assets Report */}
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <Users className="text-muted-foreground h-4 w-4" />
+                  <span className="text-foreground text-sm font-medium">Staff Assets Report:</span>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleStaffReportClick("excel")}
+                    className="gap-2"
+                    disabled={staff.length === 0}
+                  >
+                    <FileText className="h-4 w-4" />
+                    Excel
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleStaffReportClick("pdf")}
+                    className="gap-2"
+                    disabled={staff.length === 0}
+                  >
+                    <FileText className="h-4 w-4" />
+                    PDF
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleStaffReportClick("word")}
+                    className="gap-2"
+                    disabled={staff.length === 0}
+                  >
+                    <FileText className="h-4 w-4" />
+                    Word
+                  </Button>
+                </div>
               </div>
             </div>
           </CardContent>
@@ -1920,7 +2239,7 @@ export function AdminAssetsContent({
               <div className="relative flex-1">
                 <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform" />
                 <Input
-                  placeholder="Search assets by code, type, model, serial, year, status, notes, location, or assigned user..."
+                  placeholder="Search assets by code, type, model, serial, year, status, location, or assigned user..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10"
@@ -2612,17 +2931,6 @@ export function AdminAssetsContent({
               />
             </div>
 
-            <div>
-              <Label htmlFor="notes">Notes</Label>
-              <Textarea
-                id="notes"
-                value={assetForm.notes}
-                onChange={(e) => setAssetForm({ ...assetForm, notes: e.target.value })}
-                placeholder="Additional information about the asset..."
-                rows={3}
-              />
-            </div>
-
             {/* Assignment section - only show when creating new asset and status is 'assigned' */}
             {!selectedAsset && assetForm.status === "assigned" && (
               <div className="space-y-4 border-t pt-4">
@@ -2737,8 +3045,7 @@ export function AdminAssetsContent({
                   assetForm.acquisition_year === originalAssetForm.acquisition_year &&
                   assetForm.asset_model === originalAssetForm.asset_model &&
                   assetForm.serial_number === originalAssetForm.serial_number &&
-                  assetForm.status === originalAssetForm.status &&
-                  assetForm.notes === originalAssetForm.notes) ||
+                  assetForm.status === originalAssetForm.status) ||
                 // For create with "assigned" status: validate assignment fields (only when creating, not editing)
                 (!selectedAsset &&
                   assetForm.status === "assigned" &&
@@ -3349,6 +3656,105 @@ export function AdminAssetsContent({
             >
               <Download className="h-4 w-4" />
               Export to {exportType?.toUpperCase()}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Staff Assets Report Confirmation Dialog */}
+      <Dialog open={staffReportDialogOpen} onOpenChange={setStaffReportDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader className="space-y-3 border-b pb-4">
+            <div className="flex items-center gap-3">
+              <div className="bg-primary/10 flex h-10 w-10 items-center justify-center rounded-lg">
+                <Users className="text-primary h-5 w-5" />
+              </div>
+              <div>
+                <DialogTitle className="text-xl">Staff Assets Report</DialogTitle>
+                <DialogDescription className="mt-1">
+                  Export to <span className="text-primary font-semibold">{staffReportExportType?.toUpperCase()}</span>
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="bg-muted/50 rounded-lg p-3">
+              <p className="text-muted-foreground text-sm">
+                This report lists <span className="text-foreground font-semibold">{staff.length} staff members</span> as
+                rows. Staff without selected assets show{" "}
+                <span className="bg-muted rounded px-1 font-mono text-xs">-</span>.
+              </p>
+            </div>
+
+            {/* Asset Type Selection */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Select Asset Types as Columns:</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    const allSelected = Object.values(staffReportSelectedTypes).every((v) => v)
+                    const newSelection: Record<string, boolean> = {}
+                    assetTypes.forEach((t) => {
+                      newSelection[t.code] = !allSelected
+                    })
+                    setStaffReportSelectedTypes(newSelection)
+                  }}
+                  className="h-7 text-xs"
+                >
+                  {Object.values(staffReportSelectedTypes).every((v) => v) ? "Deselect All" : "Select All"}
+                </Button>
+              </div>
+              <div className="bg-background/50 max-h-64 space-y-1.5 overflow-y-auto rounded-lg border p-2">
+                {assetTypes.map((type) => (
+                  <div
+                    key={type.code}
+                    className={`group hover:bg-muted/80 flex items-center space-x-3 rounded-md px-3 py-2 transition-colors ${
+                      staffReportSelectedTypes[type.code] ? "bg-primary/5 hover:bg-primary/10" : ""
+                    }`}
+                  >
+                    <Checkbox
+                      id={`staff-report-${type.code}`}
+                      checked={staffReportSelectedTypes[type.code] || false}
+                      onCheckedChange={(checked) => {
+                        setStaffReportSelectedTypes((prev) => ({
+                          ...prev,
+                          [type.code]: checked === true,
+                        }))
+                      }}
+                      className="data-[state=checked]:border-primary data-[state=checked]:bg-primary"
+                    />
+                    <Label
+                      htmlFor={`staff-report-${type.code}`}
+                      className={`flex-1 cursor-pointer text-sm font-medium transition-colors ${
+                        staffReportSelectedTypes[type.code]
+                          ? "text-foreground"
+                          : "text-muted-foreground group-hover:text-foreground"
+                      }`}
+                    >
+                      {type.label}
+                    </Label>
+                    {staffReportSelectedTypes[type.code] && <CheckCircle2 className="text-primary h-4 w-4" />}
+                  </div>
+                ))}
+              </div>
+              <p className="text-muted-foreground text-xs">
+                {Object.values(staffReportSelectedTypes).filter((v) => v).length} of {assetTypes.length} types selected
+              </p>
+            </div>
+          </div>
+          <DialogFooter className="border-t pt-4">
+            <Button variant="outline" onClick={() => setStaffReportDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleStaffReportConfirm}
+              className="gap-2"
+              disabled={!Object.values(staffReportSelectedTypes).some((v) => v)}
+            >
+              <Download className="h-4 w-4" />
+              Export to {staffReportExportType?.toUpperCase()}
             </Button>
           </DialogFooter>
         </DialogContent>
