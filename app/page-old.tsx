@@ -14,4 +14,3 @@ export default async function HomePage() {
   // If not logged in, redirect to login
   redirect("/auth/login")
 }
-

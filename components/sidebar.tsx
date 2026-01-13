@@ -217,7 +217,6 @@ export function Sidebar({ user, profile, isAdmin }: SidebarProps) {
                       ? "bg-primary text-primary-foreground shadow-sm"
                       : "text-muted-foreground hover:bg-accent hover:text-foreground"
                   )}
-                  title={isCollapsed ? item.name : undefined}
                 >
                   <item.icon className="h-4 w-4 flex-shrink-0" />
                   <AnimatePresence mode="wait">

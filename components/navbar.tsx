@@ -33,6 +33,7 @@ import { UniversalSearch } from "@/components/universal-search"
 import Image from "next/image"
 import { useSidebarSafe } from "@/components/sidebar-context"
 import { useTheme } from "next-themes"
+import { ThemeToggle } from "@/components/ui/theme-toggle"
 
 interface NavbarProps {
   user?: {
@@ -102,8 +103,8 @@ export function Navbar({ user, isAdmin = false }: NavbarProps) {
   }
 
   return (
-    <nav className="border-border bg-background fixed top-0 right-0 left-0 z-50 w-full overflow-x-hidden border-b">
-      <div className="flex h-16 w-full max-w-full items-center">
+    <nav className="border-border bg-background fixed top-0 right-0 left-0 z-50 w-full overflow-visible border-b">
+      <div className="flex h-16 w-full max-w-full items-center overflow-visible">
         {/* Left side - Collapse Button and Logo (aligned with sidebar edge) */}
         {sidebarContext && (
           <div className="hidden h-full items-center lg:flex">
@@ -146,10 +147,11 @@ export function Navbar({ user, isAdmin = false }: NavbarProps) {
         </div>
 
         {/* Right side - search, notifications and user menu */}
-        <div className="flex flex-1 items-center justify-end gap-2 px-2 sm:gap-4 sm:px-4 lg:px-8">
+        <div className="flex flex-1 items-center justify-end gap-2 overflow-visible px-2 sm:gap-4 sm:px-4 lg:px-8">
           <div className="hidden max-w-md flex-1 items-center gap-4 md:flex">{isAdmin && <UniversalSearch />}</div>
-          <div className="hidden items-center gap-4 md:flex">
+          <div className="hidden items-center gap-4 overflow-visible md:flex">
             <NotificationBell isAdmin={isAdmin} />
+            <ThemeToggle />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-10 w-10 rounded-full p-0 lg:h-11 lg:w-11">
@@ -202,7 +204,7 @@ export function Navbar({ user, isAdmin = false }: NavbarProps) {
                   <>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem asChild>
-                      <Link href="/admin" className="cursor-pointer">
+                      <Link href="/admin" className="flex cursor-pointer items-center">
                         <ShieldCheck className="mr-2 h-4 w-4" />
                         Admin
                       </Link>

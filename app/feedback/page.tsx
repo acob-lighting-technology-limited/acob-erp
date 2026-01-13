@@ -1,68 +1,49 @@
-"use client"
+import { redirect } from "next/navigation"
+import { createClient } from "@/lib/supabase/server"
+import { FeedbackContent } from "./feedback-content"
 
-import { useRouter } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
-import { FeedbackForm } from "@/components/feedback-form"
-import { UserFeedbackList } from "@/components/user-feedback-list"
-import { useState, useEffect } from "react"
+export interface Feedback {
+  id: string
+  feedback_type: string
+  title: string
+  description: string | null
+  status: string
+  priority?: string
+  created_at: string
+}
 
-export default function FeedbackPage() {
-  const router = useRouter()
-  const [userFeedback, setUserFeedback] = useState<any[]>([])
-  const [userId, setUserId] = useState<string | null>(null)
+async function getFeedbackData() {
+  const supabase = await createClient()
 
-  useEffect(() => {
-    const fetchData = async () => {
-      const supabase = createClient()
-      const { data, error } = await supabase.auth.getUser()
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser()
 
-      if (error || !data?.user) {
-        router.push("/auth/login")
-        return
-      }
-
-      setUserId(data.user.id)
-
-      // Fetch user's feedback
-      const { data: feedback } = await supabase
-        .from("feedback")
-        .select("*")
-        .eq("user_id", data.user.id)
-        .order("created_at", { ascending: false })
-
-      setUserFeedback(feedback || [])
-    }
-
-    fetchData()
-  }, [])
-
-  const handleFeedbackSubmitted = (newFeedback: any) => {
-    setUserFeedback([newFeedback, ...userFeedback])
+  if (userError || !user) {
+    return { redirect: "/auth/login" as const }
   }
 
-  if (!userId) {
-    return <div className="bg-background min-h-screen" />
+  const { data: feedback } = await supabase
+    .from("feedback")
+    .select("*")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false })
+
+  return {
+    userFeedback: feedback || [],
+    userId: user.id,
+  }
+}
+
+export default async function FeedbackPage() {
+  const data = await getFeedbackData()
+
+  if ("redirect" in data && data.redirect) {
+    redirect(data.redirect)
   }
 
-  return (
-    <div className="bg-background min-h-screen">
-      <div className="mx-auto max-w-4xl p-6">
-        <div className="mb-8">
-          <h1 className="text-foreground text-3xl font-bold">Feedback & Suggestions</h1>
-          <p className="text-muted-foreground">
-            Share your concerns, complaints, suggestions, or required items with management
-          </p>
-        </div>
+  const feedbackData = data as { userFeedback: Feedback[]; userId: string }
 
-        <div className="grid gap-8 lg:grid-cols-3">
-          <div className="lg:col-span-1">
-            <FeedbackForm userId={userId} onFeedbackSubmitted={handleFeedbackSubmitted} />
-          </div>
-          <div className="lg:col-span-2">
-            <UserFeedbackList feedback={userFeedback} />
-          </div>
-        </div>
-      </div>
-    </div>
-  )
+  return <FeedbackContent initialFeedback={feedbackData.userFeedback} userId={feedbackData.userId} />
 }

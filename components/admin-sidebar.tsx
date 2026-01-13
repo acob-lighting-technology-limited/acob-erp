@@ -256,7 +256,7 @@ export function AdminSidebar({ user, profile }: AdminSidebarProps) {
 
       {/* Back to Dashboard & Logout */}
       <div className="space-y-1.5 border-t px-2.5 py-2.5">
-        <Link href="/dashboard">
+        <Link href="/dashboard" className="block">
           <Button
             variant="outline"
             className={cn(

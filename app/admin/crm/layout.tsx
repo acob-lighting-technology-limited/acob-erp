@@ -1,4 +1,4 @@
-import { AdminSidebar } from "@/components/admin-sidebar"
+import { CRMSidebar } from "@/components/crm-sidebar"
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 
@@ -22,7 +22,7 @@ export default async function CRMLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex min-h-screen">
-      <AdminSidebar user={user} profile={profile} />
+      <CRMSidebar user={user} profile={profile} />
       <main className="bg-background flex-1 overflow-auto">{children}</main>
     </div>
   )

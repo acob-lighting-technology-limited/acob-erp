@@ -109,6 +109,15 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       }
     }
 
+    // Validate and sync category with payment_type if category is being updated
+    if (body.category) {
+      if (body.category !== "one-time" && body.category !== "recurring") {
+        return NextResponse.json({ error: "Category must be 'one-time' or 'recurring'" }, { status: 400 })
+      }
+      // Sync payment_type with category
+      body.payment_type = body.category
+    }
+
     const { data: updatedPayment, error } = await supabase
       .from("department_payments")
       .update(body)

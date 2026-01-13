@@ -81,19 +81,22 @@ export async function POST(request: NextRequest) {
     }
 
     // Update profile with all details
-    const { error: profileError } = await serviceSupabase.from("profiles").update({
-      first_name: firstName,
-      last_name: lastName,
-      other_names: otherNames || null,
-      company_email: email,
-      department: department,
-      company_role: companyRole || null,
-      phone_number: phoneNumber || null,
-      role: role || "staff",
-      is_admin: ["super_admin", "admin"].includes(role || "staff"),
-      is_department_lead: role === "lead",
-      lead_departments: role === "lead" ? [department] : [],
-    }).eq("id", authData.user.id)
+    const { error: profileError } = await serviceSupabase
+      .from("profiles")
+      .update({
+        first_name: firstName,
+        last_name: lastName,
+        other_names: otherNames || null,
+        company_email: email,
+        department: department,
+        company_role: companyRole || null,
+        phone_number: phoneNumber || null,
+        role: role || "staff",
+        is_admin: ["super_admin", "admin"].includes(role || "staff"),
+        is_department_lead: role === "lead",
+        lead_departments: role === "lead" ? [department] : [],
+      })
+      .eq("id", authData.user.id)
 
     if (profileError) {
       // If profile update fails, try to delete the auth user
@@ -127,4 +130,3 @@ export async function POST(request: NextRequest) {
     )
   }
 }
-

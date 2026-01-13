@@ -82,6 +82,9 @@ interface PaymentDocument {
   file_path: string
   applicable_date: string | null
   created_at: string
+  is_archived?: boolean
+  replaced_by?: string
+  archived_at?: string
 }
 
 interface Payment {
@@ -120,8 +123,7 @@ interface ScheduleItem {
 
 interface FormData {
   department_id: string
-  payment_type: "one-time" | "recurring"
-  category: string
+  category: "one-time" | "recurring" | "" // Now serves as the payment type
   title: string
   description: string
   amount: string
@@ -141,11 +143,13 @@ const ScheduleList = ({
   onUpload,
   onView,
   onMarkPaid,
+  onReplace,
 }: {
   items: ScheduleItem[]
   onUpload: (d: Date, t: "invoice" | "receipt") => void
   onView: (e: React.MouseEvent, doc: PaymentDocument) => void
   onMarkPaid?: (d: Date) => void
+  onReplace?: (d: Date, t: "invoice" | "receipt", docId: string) => void
 }) => {
   if (items.length === 0) return <p className="text-muted-foreground text-sm">No items found.</p>
 
@@ -222,18 +226,30 @@ const ScheduleList = ({
                 </Button>
               )}
 
-              {(item.status === "paid" || item.status === "overdue") &&
+              {(item.status === "paid" || item.status === "overdue" || item.status === "due") &&
                 (receiptDoc ? (
-                  <a
-                    href="#"
-                    className={cn(
-                      buttonVariants({ variant: "ghost", size: "sm" }),
-                      "flex h-7 items-center gap-1 text-xs text-green-600"
+                  <div className="flex items-center gap-1">
+                    <a
+                      href="#"
+                      className={cn(
+                        buttonVariants({ variant: "ghost", size: "sm" }),
+                        "flex h-7 items-center gap-1 text-xs text-green-600"
+                      )}
+                      onClick={(e) => onView(e, receiptDoc)}
+                    >
+                      <CheckCircle className="h-3 w-3" /> Receipt
+                    </a>
+                    {onReplace && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-muted-foreground hover:text-foreground h-7 text-xs"
+                        onClick={() => onReplace(item.date, "receipt", receiptDoc.id)}
+                      >
+                        Replace
+                      </Button>
                     )}
-                    onClick={(e) => onView(e, receiptDoc)}
-                  >
-                    <CheckCircle className="h-3 w-3" /> Receipt
-                  </a>
+                  </div>
                 ) : (
                   <Button
                     variant="outline"
@@ -248,8 +264,8 @@ const ScheduleList = ({
                   </Button>
                 ))}
 
-              {/* Mark Paid Button Action */}
-              {item.status === "overdue" && onMarkPaid && (
+              {/* Mark Paid Button Action - only show when receipt exists */}
+              {(item.status === "overdue" || item.status === "due") && onMarkPaid && receiptDoc && (
                 <Button size="sm" className="h-7 text-xs" onClick={() => onMarkPaid(item.date)}>
                   Mark Paid
                 </Button>
@@ -280,6 +296,7 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
   const [uploadDate, setUploadDate] = useState<Date | null>(null)
   const [uploadType, setUploadType] = useState<"invoice" | "receipt">("invoice")
   const [uploading, setUploading] = useState(false)
+  const [replaceDocumentId, setReplaceDocumentId] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Edit State
@@ -288,7 +305,6 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
   const [updating, setUpdating] = useState(false)
   const [editFormData, setEditFormData] = useState<FormData>({
     department_id: "",
-    payment_type: "one-time",
     category: "",
     title: "",
     description: "",
@@ -528,8 +544,7 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
     if (!payment) return
     setEditFormData({
       department_id: payment.department_id,
-      payment_type: payment.payment_type,
-      category: payment.category,
+      category: payment.category as "one-time" | "recurring",
       title: payment.title,
       description: payment.description || "",
       amount: payment.amount.toString(),
@@ -695,6 +710,14 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
   const handleUploadClick = (date: Date, type: "invoice" | "receipt") => {
     setUploadDate(date)
     setUploadType(type)
+    setReplaceDocumentId(null)
+    setUploadDialogOpen(true)
+  }
+
+  const handleReplaceClick = (date: Date, type: "invoice" | "receipt", docId: string) => {
+    setUploadDate(date)
+    setUploadType(type)
+    setReplaceDocumentId(docId)
     setUploadDialogOpen(true)
   }
 
@@ -708,6 +731,11 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
     formData.append("document_type", uploadType)
     formData.append("applicable_date", format(uploadDate, "yyyy-MM-dd"))
 
+    // Include replace_document_id if replacing
+    if (replaceDocumentId) {
+      formData.append("replace_document_id", replaceDocumentId)
+    }
+
     setUploading(true)
     try {
       const response = await fetch(`/api/payments/${params.id}/documents`, {
@@ -716,8 +744,9 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
       })
 
       if (response.ok) {
-        toast.success(`${uploadType} uploaded successfully`)
+        toast.success(replaceDocumentId ? `${uploadType} replaced successfully` : `${uploadType} uploaded successfully`)
         setUploadDialogOpen(false)
+        setReplaceDocumentId(null)
         fetchPayment() // Refresh to show new doc
       } else {
         const data = await response.json()
@@ -836,12 +865,27 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
             </p>
           </div>
           <div className="flex gap-2">
-            {(getRealStatus(payment) === "due" || getRealStatus(payment) === "overdue") && (
-              <Button onClick={(e) => markAsPaid(e)}>
-                <CheckCircle className="mr-2 h-4 w-4" />
-                {payment.payment_type === "recurring" ? "Mark Current Due as Paid" : "Mark as Paid"}
-              </Button>
-            )}
+            {/* Show Mark as Paid only when receipt exists for the current due date */}
+            {(getRealStatus(payment) === "due" || getRealStatus(payment) === "overdue") &&
+              (() => {
+                // Check if receipt exists for one-time or recurring payment
+                if (payment.payment_type === "one-time") {
+                  const hasReceipt = payment.documents?.some((d) => d.document_type === "receipt")
+                  if (!hasReceipt) return null
+                } else if (payment.next_payment_due) {
+                  const dateStr = format(parseISO(payment.next_payment_due), "yyyy-MM-dd")
+                  const hasReceipt = payment.documents?.some(
+                    (d) => d.applicable_date === dateStr && d.document_type === "receipt"
+                  )
+                  if (!hasReceipt) return null
+                }
+                return (
+                  <Button onClick={(e) => markAsPaid(e)}>
+                    <CheckCircle className="mr-2 h-4 w-4" />
+                    {payment.payment_type === "recurring" ? "Mark Current Due as Paid" : "Mark as Paid"}
+                  </Button>
+                )
+              })()}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="icon">
@@ -884,6 +928,7 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
                       onUpload={handleUploadClick}
                       onView={handleViewDocument}
                       onMarkPaid={markAsPaid}
+                      onReplace={handleReplaceClick}
                     />
                   </CardContent>
                 </Card>
@@ -901,6 +946,7 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
                         items={schedule.filter((i) => i.status === "paid")}
                         onUpload={handleUploadClick}
                         onView={handleViewDocument}
+                        onReplace={handleReplaceClick}
                       />
                     </CardContent>
                   </Card>
@@ -1025,19 +1071,19 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="payment_type">Payment Type</Label>
+                <Label htmlFor="category">Category</Label>
                 <Select
-                  value={editFormData.payment_type}
+                  value={editFormData.category}
                   onValueChange={(value: "one-time" | "recurring") =>
-                    setEditFormData({ ...editFormData, payment_type: value })
+                    setEditFormData({ ...editFormData, category: value })
                   }
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select type" />
+                    <SelectValue placeholder="Select Category" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="one-time">One-time Payment</SelectItem>
-                    <SelectItem value="recurring">Recurring Payment</SelectItem>
+                    <SelectItem value="one-time">One-time</SelectItem>
+                    <SelectItem value="recurring">Recurring</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1051,21 +1097,6 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
                   value={editFormData.title}
                   onChange={(e) => setEditFormData({ ...editFormData, title: e.target.value })}
                 />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="category">Category</Label>
-                <Input
-                  id="category"
-                  list="categories"
-                  value={editFormData.category}
-                  onChange={(e) => setEditFormData({ ...editFormData, category: e.target.value })}
-                  placeholder="Select or type category"
-                />
-                <datalist id="categories">
-                  {categories.map((cat) => (
-                    <option key={cat.id} value={cat.name} />
-                  ))}
-                </datalist>
               </div>
             </div>
 
@@ -1144,7 +1175,7 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
               </div>
             </div>
 
-            {editFormData.payment_type === "recurring" ? (
+            {editFormData.category === "recurring" ? (
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="recurrence">Recurrence Period</Label>
@@ -1225,12 +1256,22 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
       </AlertDialog>
 
       {/* Upload Dialog */}
-      <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+      <Dialog
+        open={uploadDialogOpen}
+        onOpenChange={(open) => {
+          setUploadDialogOpen(open)
+          if (!open) setReplaceDocumentId(null)
+        }}
+      >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Upload {uploadType === "invoice" ? "Invoice" : "Receipt"}</DialogTitle>
+            <DialogTitle>
+              {replaceDocumentId ? "Replace" : "Upload"} {uploadType === "invoice" ? "Invoice" : "Receipt"}
+            </DialogTitle>
             <DialogDescription>
-              Upload a document for the payment period of {uploadDate ? format(uploadDate, "PPP") : ""}.
+              {replaceDocumentId
+                ? `Replace the existing ${uploadType} for the payment period of ${uploadDate ? format(uploadDate, "PPP") : ""}. The old document will be archived.`
+                : `Upload a document for the payment period of ${uploadDate ? format(uploadDate, "PPP") : ""}.`}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleFileUpload}>
@@ -1245,7 +1286,13 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
                 Cancel
               </Button>
               <Button type="submit" disabled={uploading}>
-                {uploading ? "Uploading..." : "Upload"}
+                {uploading
+                  ? replaceDocumentId
+                    ? "Replacing..."
+                    : "Uploading..."
+                  : replaceDocumentId
+                    ? "Replace"
+                    : "Upload"}
               </Button>
             </DialogFooter>
           </form>

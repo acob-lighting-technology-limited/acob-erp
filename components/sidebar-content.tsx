@@ -12,7 +12,7 @@ export function SidebarContent({ children }: { children: React.ReactNode }) {
     <motion.main
       initial={false}
       animate={{
-        paddingLeft: isMobile ? 0 : (isCollapsed ? 80 : 256),
+        paddingLeft: isMobile ? 0 : isCollapsed ? 80 : 256,
       }}
       transition={{
         type: "spring",

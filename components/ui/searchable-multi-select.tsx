@@ -68,9 +68,7 @@ export function SearchableMultiSelect({
             {icon && <span className="flex-shrink-0">{icon}</span>}
             <span className="min-w-0 flex-1 truncate text-left">
               {selectedOptions.length > 0 ? (
-                <span className="text-muted-foreground text-xs">
-                  {selectedOptions.length} selected
-                </span>
+                <span className="text-muted-foreground text-xs">{selectedOptions.length} selected</span>
               ) : (
                 <span className="text-muted-foreground">{placeholder}</span>
               )}
@@ -81,7 +79,7 @@ export function SearchableMultiSelect({
       </PopoverPrimitive.Trigger>
       <PopoverPrimitive.Portal>
         <PopoverPrimitive.Content
-          className="bg-popover text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 relative z-50 w-[var(--radix-popover-trigger-width)] max-h-[300px] overflow-hidden rounded-md border shadow-md"
+          className="bg-popover text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 relative z-50 max-h-[300px] w-[var(--radix-popover-trigger-width)] overflow-hidden rounded-md border shadow-md"
           align="start"
         >
           <div className="border-b p-2">
@@ -125,7 +123,7 @@ export function SearchableMultiSelect({
                     key={option.value}
                     onClick={() => toggleValue(option.value)}
                     className={cn(
-                      "group relative flex w-full cursor-pointer items-center rounded-sm py-1.5 pr-8 pl-8 text-sm outline-none transition-colors",
+                      "group relative flex w-full cursor-pointer items-center rounded-sm py-1.5 pr-8 pl-8 text-sm transition-colors outline-none",
                       "hover:bg-accent hover:text-accent-foreground",
                       "dark:hover:bg-accent dark:hover:text-foreground",
                       isSelected && "bg-accent/50"
@@ -133,9 +131,9 @@ export function SearchableMultiSelect({
                   >
                     <span className="absolute left-2 flex h-4 w-4 items-center justify-center">
                       {isSelected ? (
-                        <Check className="h-4 w-4 text-primary" />
+                        <Check className="text-primary h-4 w-4" />
                       ) : (
-                        <div className="h-4 w-4 rounded border border-input" />
+                        <div className="border-input h-4 w-4 rounded border" />
                       )}
                     </span>
                     <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
@@ -154,23 +152,3 @@ export function SearchableMultiSelect({
     </PopoverPrimitive.Root>
   )
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
