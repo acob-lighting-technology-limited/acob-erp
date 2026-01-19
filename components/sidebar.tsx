@@ -4,6 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn, formatName } from "@/lib/utils"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   LayoutDashboard,
@@ -34,6 +35,8 @@ import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { useSidebar } from "./sidebar-context"
 import { motion, AnimatePresence } from "framer-motion"
+import type { UserRole } from "@/types/database"
+import { getRoleDisplayName, getRoleBadgeColor } from "@/lib/permissions"
 
 interface SidebarProps {
   user?: {
@@ -48,7 +51,8 @@ interface SidebarProps {
     last_name?: string
     department?: string
     is_admin?: boolean
-    role?: string
+    role?: UserRole
+    lead_departments?: string[]
   }
   isAdmin?: boolean
 }
@@ -134,42 +138,21 @@ export function Sidebar({ user, profile, isAdmin }: SidebarProps) {
         {/* Logo space maintained but empty */}
       </div>
 
-      {/* Admin Dashboard Indicator */}
-      {pathname?.startsWith("/admin") && (
-        <div
-          className={cn(
-            "bg-primary/10 border-primary/20 mx-2 mb-2 rounded-lg border p-1.5 transition-[padding] duration-300 ease-in-out",
-            isCollapsed ? "px-1.5" : "px-2"
-          )}
-        >
-          <div className="flex items-center gap-1.5">
-            <ShieldCheck className="text-primary h-3.5 w-3.5 flex-shrink-0" />
-            <AnimatePresence mode="wait">
-              {!isCollapsed && (
-                <motion.span
-                  initial={{ width: 0, opacity: 0 }}
-                  animate={{ width: "auto", opacity: 1 }}
-                  exit={{ width: 0, opacity: 0 }}
-                  transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                  className="text-primary overflow-hidden text-xs font-semibold whitespace-nowrap"
-                >
-                  Admin Mode
-                </motion.span>
-              )}
-            </AnimatePresence>
-          </div>
-        </div>
-      )}
-
       {/* User Profile Section */}
       <div
         className={cn(
-          "border-b py-2.5 transition-[padding,margin] duration-300 ease-in-out",
-          isCollapsed ? "mx-auto" : "px-3"
+          "flex min-h-[80px] flex-col border-b py-2.5 transition-[padding,margin] duration-300 ease-in-out",
+          isCollapsed ? "mx-0 items-center px-0" : "px-3"
         )}
       >
-        <div className="flex items-center gap-2.5">
-          <Avatar className={cn("ring-primary/10 h-9 w-9 flex-shrink-0 ring-2")}>
+        {/* User Profile */}
+        <div
+          className={cn(
+            "flex shrink-0 items-center transition-[gap] duration-300 ease-in-out",
+            isCollapsed ? "justify-center" : "gap-2.5"
+          )}
+        >
+          <Avatar className={cn("ring-primary/10 h-9 w-9 shrink-0 ring-2")}>
             <AvatarFallback className="bg-primary text-primary-foreground text-sm font-semibold">
               {getInitials(user?.email, profile?.first_name, profile?.last_name)}
             </AvatarFallback>
@@ -191,60 +174,46 @@ export function Sidebar({ user, profile, isAdmin }: SidebarProps) {
                 <p className="text-muted-foreground truncate text-xs whitespace-nowrap">
                   {profile?.department || "Staff Member"}
                 </p>
+                {profile?.role && (
+                  <Badge
+                    variant="outline"
+                    className={cn("mt-0.5 text-xs whitespace-nowrap", getRoleBadgeColor(profile.role))}
+                  >
+                    {getRoleDisplayName(profile.role)}
+                  </Badge>
+                )}
               </motion.div>
             )}
           </AnimatePresence>
         </div>
+
+        {/* Leading Departments */}
+        <AnimatePresence mode="wait">
+          {!isCollapsed && profile?.lead_departments && profile.lead_departments.length > 0 && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 300, damping: 30 }}
+              className="shrink-0 overflow-hidden"
+            >
+              <div className="pt-2 text-xs">
+                <p className="text-muted-foreground mb-1">Leading:</p>
+                <div className="flex flex-wrap gap-1">
+                  {profile?.lead_departments?.map((dept) => (
+                    <Badge key={dept} variant="outline" className="text-xs">
+                      {dept}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Navigation */}
       <nav className="scrollbar-custom flex-1 space-y-0.5 overflow-y-auto px-2.5 py-3">
-        {/* Admin Dashboard - Show at top if user has admin access */}
-        {(isAdmin || profile?.role === "lead" || profile?.role === "admin" || profile?.role === "super_admin") && (
-          <>
-            {adminNavigation.map((item) => {
-              const isActive = pathname?.startsWith(item.href)
-              return (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className={cn(
-                    "flex items-center rounded-md transition-[padding,gap,background-color,color] duration-300 ease-in-out",
-                    isCollapsed ? "justify-center px-2.5 py-2" : "gap-2.5 px-3 py-2",
-                    "min-h-[36px] text-sm font-medium",
-                    isActive
-                      ? "bg-primary text-primary-foreground shadow-sm"
-                      : "text-muted-foreground hover:bg-accent hover:text-foreground"
-                  )}
-                >
-                  <item.icon className="h-4 w-4 flex-shrink-0" />
-                  <AnimatePresence mode="wait">
-                    {!isCollapsed && (
-                      <motion.span
-                        initial={{ width: 0, opacity: 0 }}
-                        animate={{ width: "auto", opacity: 1 }}
-                        exit={{ width: 0, opacity: 0 }}
-                        transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                        className="overflow-hidden whitespace-nowrap"
-                      >
-                        {item.name}
-                      </motion.span>
-                    )}
-                  </AnimatePresence>
-                </Link>
-              )
-            })}
-            {/* Divider after admin section */}
-            <div
-              className={cn(
-                "my-1.5 border-t transition-[margin] duration-300 ease-in-out",
-                isCollapsed ? "mx-1.5" : "mx-0"
-              )}
-            />
-          </>
-        )}
-
         {/* Regular Navigation */}
         {navigation.map((item) => {
           const isActive = pathname === item.href
@@ -263,7 +232,7 @@ export function Sidebar({ user, profile, isAdmin }: SidebarProps) {
               )}
               title={isCollapsed ? item.name : undefined}
             >
-              <item.icon className="h-4 w-4 flex-shrink-0" />
+              <item.icon className="h-4 w-4 shrink-0" />
               <AnimatePresence mode="wait">
                 {!isCollapsed && (
                   <motion.span
@@ -307,7 +276,7 @@ export function Sidebar({ user, profile, isAdmin }: SidebarProps) {
               )}
               title={isCollapsed ? item.name : undefined}
             >
-              <item.icon className="h-4 w-4 flex-shrink-0" />
+              <item.icon className="h-4 w-4 shrink-0" />
               <AnimatePresence mode="wait">
                 {!isCollapsed && (
                   <motion.span
@@ -326,8 +295,36 @@ export function Sidebar({ user, profile, isAdmin }: SidebarProps) {
         })}
       </nav>
 
-      {/* Logout Button */}
-      <div className="border-t px-2.5 py-2.5">
+      {/* Footer - Admin & Logout */}
+      <div className="space-y-1.5 border-t px-2.5 py-2.5">
+        {/* Go to Admin - Only for admins/leads */}
+        {(isAdmin || profile?.role === "lead" || profile?.role === "admin" || profile?.role === "super_admin") && (
+          <Link href="/admin" className="block">
+            <Button
+              variant="outline"
+              className={cn(
+                "text-muted-foreground hover:text-foreground min-h-[36px] w-full text-sm transition-[padding,gap] duration-300 ease-in-out",
+                isCollapsed ? "justify-center px-2.5" : "justify-start gap-2.5"
+              )}
+              title={isCollapsed ? "Go to Admin" : undefined}
+            >
+              <ShieldCheck className="h-4 w-4 shrink-0" />
+              <AnimatePresence mode="wait">
+                {!isCollapsed && (
+                  <motion.span
+                    initial={{ width: 0, opacity: 0 }}
+                    animate={{ width: "auto", opacity: 1 }}
+                    exit={{ width: 0, opacity: 0 }}
+                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                    className="overflow-hidden whitespace-nowrap"
+                  >
+                    Go to Admin
+                  </motion.span>
+                )}
+              </AnimatePresence>
+            </Button>
+          </Link>
+        )}
         <Button
           variant="outline"
           className={cn(
@@ -337,7 +334,7 @@ export function Sidebar({ user, profile, isAdmin }: SidebarProps) {
           onClick={handleLogout}
           title={isCollapsed ? "Logout" : undefined}
         >
-          <LogOut className="h-4 w-4 flex-shrink-0" />
+          <LogOut className="h-4 w-4 shrink-0" />
           <AnimatePresence mode="wait">
             {!isCollapsed && (
               <motion.span

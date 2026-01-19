@@ -11,7 +11,6 @@ import {
   Briefcase,
   ArrowRight,
   Shield,
-  Settings,
   CreditCard,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -270,14 +269,6 @@ export default async function AdminDashboardPage() {
       icon: Users,
       color: "bg-teal-500",
       roles: ["super_admin", "admin", "lead"],
-    },
-    {
-      title: "System Settings",
-      description: "Configure shutdown and maintenance modes",
-      href: "/admin/settings",
-      icon: Settings,
-      color: "bg-gray-500",
-      roles: ["super_admin"],
     },
   ]
 

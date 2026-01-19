@@ -18,6 +18,7 @@ export interface UserProfile {
   is_admin: boolean
   is_department_lead: boolean
   lead_departments: string[]
+  employment_date: string | null
   created_at: string
   updated_at: string
 }

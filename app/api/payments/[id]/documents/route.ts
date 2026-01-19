@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
+import { getOneDriveService } from "@/lib/onedrive"
 
 function createClient() {
   const cookieStore = cookies()
@@ -133,9 +134,42 @@ export async function POST(request: Request, { params }: { params: { id: string 
       }
     }
 
+    // Sync to OneDrive if enabled
+    try {
+      const onedrive = getOneDriveService()
+      if (onedrive.isEnabled()) {
+        // Get payment details for folder structure
+        const { data: payment } = await supabase
+          .from("department_payments")
+          .select("id, title, department:departments(name)")
+          .eq("id", paymentId)
+          .single()
+
+        if (payment?.department) {
+          const departmentName =
+            typeof payment.department === "object" && "name" in payment.department
+              ? (payment.department as { name: string }).name
+              : "General"
+
+          // Create folder and upload file
+          const onedrivePath = onedrive.getPaymentsPath(departmentName, paymentId, file.name)
+
+          // Convert file to Uint8Array
+          const arrayBuffer = await file.arrayBuffer()
+
+          await onedrive.uploadFile(onedrivePath, arrayBuffer, file.type)
+          console.log(`Synced document to OneDrive: ${onedrivePath}`)
+        }
+      }
+    } catch (onedriveError) {
+      // Log but don't fail the request - OneDrive sync is best effort
+      console.error("OneDrive sync error (non-fatal):", onedriveError)
+    }
+
     return NextResponse.json({ data: newDocument }, { status: 201 })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Upload handler error:", error)
-    return NextResponse.json({ error: error?.message || "Internal Server Error" }, { status: 500 })
+    const message = error instanceof Error ? error.message : "Internal Server Error"
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
