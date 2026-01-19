@@ -152,11 +152,11 @@ export function AdminSidebar({ user, profile }: AdminSidebarProps) {
         {/* User Profile - Fixed height container */}
         <div
           className={cn(
-            "flex flex-shrink-0 items-center transition-[gap] duration-300 ease-in-out",
+            "flex shrink-0 items-center transition-[gap] duration-300 ease-in-out",
             isCollapsed ? "justify-center" : "gap-2.5"
           )}
         >
-          <Avatar className={cn("ring-primary/10 flex-shrink-0 ring-2", "h-9 w-9")}>
+          <Avatar className={cn("ring-primary/10 shrink-0 ring-2", "h-9 w-9")}>
             <AvatarFallback className="bg-primary text-primary-foreground text-sm font-semibold">
               {getInitials(user?.email, profile?.first_name, profile?.last_name)}
             </AvatarFallback>
@@ -174,6 +174,9 @@ export function AdminSidebar({ user, profile }: AdminSidebarProps) {
                   {profile?.first_name && profile?.last_name
                     ? `${formatName(profile.first_name)} ${formatName(profile.last_name)}`
                     : user?.email?.split("@")[0]}
+                </p>
+                <p className="text-muted-foreground truncate text-xs whitespace-nowrap">
+                  {profile?.department || "Staff Member"}
                 </p>
                 {profile?.role && (
                   <Badge
@@ -196,7 +199,7 @@ export function AdminSidebar({ user, profile }: AdminSidebarProps) {
               animate={{ height: "auto", opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              className="flex-shrink-0 overflow-hidden"
+              className="shrink-0 overflow-hidden"
             >
               <div className="pt-2 text-xs">
                 <p className="text-muted-foreground mb-1">Leading:</p>
@@ -235,7 +238,7 @@ export function AdminSidebar({ user, profile }: AdminSidebarProps) {
               )}
               title={isCollapsed ? item.name : undefined}
             >
-              <item.icon className="h-4 w-4 flex-shrink-0" />
+              <item.icon className="h-4 w-4 shrink-0" />
               <AnimatePresence mode="wait">
                 {!isCollapsed && (
                   <motion.span
@@ -265,7 +268,7 @@ export function AdminSidebar({ user, profile }: AdminSidebarProps) {
             )}
             title={isCollapsed ? "Back to Dashboard" : undefined}
           >
-            <LayoutDashboard className="h-4 w-4 flex-shrink-0" />
+            <LayoutDashboard className="h-4 w-4 shrink-0" />
             <AnimatePresence mode="wait">
               {!isCollapsed && (
                 <motion.span
@@ -290,7 +293,7 @@ export function AdminSidebar({ user, profile }: AdminSidebarProps) {
           onClick={handleLogout}
           title={isCollapsed ? "Logout" : undefined}
         >
-          <LogOut className="h-4 w-4 flex-shrink-0" />
+          <LogOut className="h-4 w-4 shrink-0" />
           <AnimatePresence mode="wait">
             {!isCollapsed && (
               <motion.span

@@ -11,7 +11,6 @@ import { SidebarProvider } from "@/components/sidebar-context"
 import { createClient } from "@/lib/supabase/server"
 import { NProgressProvider } from "@/components/nprogress-provider"
 import { NProgressHandler } from "@/components/nprogress-handler"
-import { cookies } from "next/headers"
 import "./globals.css"
 
 export const metadata: Metadata = {
@@ -27,32 +26,24 @@ export const viewport: Viewport = {
 }
 
 async function HeaderWrapperWithData() {
-  const cookieStore = await cookies()
-  const bypassCookie = cookieStore.get("shutdown_bypass")
-
-  // Don't show header if no bypass cookie (shutdown mode)
-  if (!bypassCookie || bypassCookie.value !== "true") {
-    return null
-  }
-
   const supabase = await createClient()
   const { data } = await supabase.auth.getUser()
 
-  // Fetch admin status from profile
-  let isAdmin = false
-  if (data?.user) {
-    const { data: profile } = await supabase.from("profiles").select("is_admin").eq("id", data.user.id).single()
-
-    isAdmin = profile?.is_admin === true
+  // Only show header for authenticated users
+  if (!data?.user) {
+    return null
   }
 
+  // Fetch admin status from profile
+  let isAdmin = false
+  const { data: profile } = await supabase.from("profiles").select("is_admin").eq("id", data.user.id).single()
+  isAdmin = profile?.is_admin === true
+
   // Serialize only the necessary user data to avoid hydration issues
-  const userData = data?.user
-    ? {
-        email: data.user.email,
-        user_metadata: data.user.user_metadata,
-      }
-    : undefined
+  const userData = {
+    email: data.user.email,
+    user_metadata: data.user.user_metadata,
+  }
 
   return <HeaderWrapper user={userData} isAdmin={isAdmin} />
 }

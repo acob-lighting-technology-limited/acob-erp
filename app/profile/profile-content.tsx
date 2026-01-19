@@ -1,7 +1,7 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -13,7 +13,6 @@ import {
   Phone,
   Building2,
   MapPin,
-  Shield,
   Calendar,
   FileText,
   Package,
@@ -24,6 +23,8 @@ import {
   Droplet,
   FileSignature,
   CreditCard,
+  Briefcase,
+  Clock,
 } from "lucide-react"
 import { getRoleDisplayName, getRoleBadgeColor } from "@/lib/permissions"
 import type { UserRole } from "@/types/database"
@@ -76,6 +77,10 @@ export function ProfileContent({ profile, tasks, assets, documentation, feedback
     return `${firstName?.[0] || ""}${lastName?.[0] || ""}`.toUpperCase()
   }
 
+  // Calculate time at ACOB using employment_date if available
+  const employmentDate = profile?.employment_date ? new Date(profile.employment_date) : null
+  const daysAtAcob = employmentDate ? Math.floor((Date.now() - employmentDate.getTime()) / (1000 * 60 * 60 * 24)) : null
+
   if (!profile) {
     return (
       <div className="container mx-auto p-6">
@@ -89,233 +94,252 @@ export function ProfileContent({ profile, tasks, assets, documentation, feedback
   }
 
   const quickActions = [
-    {
-      name: "Email Signature",
-      href: "/signature",
-      icon: FileSignature,
-      description: "Create professional signature",
-      color: "bg-blue-500",
-    },
-    {
-      name: "Submit Feedback",
-      href: "/feedback",
-      icon: MessageSquare,
-      description: "Share your thoughts",
-      color: "bg-green-500",
-    },
-    {
-      name: "Watermark Tool",
-      href: "/watermark",
-      icon: Droplet,
-      description: "Add watermarks",
-      color: "bg-purple-500",
-    },
-    {
-      name: "Payments",
-      href: "/payments",
-      icon: CreditCard,
-      description: "Manage department payments",
-      color: "bg-orange-500",
-    },
+    { name: "Email Signature", href: "/signature", icon: FileSignature, description: "Create professional signature" },
+    { name: "Submit Feedback", href: "/feedback", icon: MessageSquare, description: "Share your thoughts" },
+    { name: "Watermark Tool", href: "/watermark", icon: Droplet, description: "Add watermarks to images" },
+    { name: "Payments", href: "/payments", icon: CreditCard, description: "Manage department payments" },
   ]
 
   return (
-    <div className="from-background via-background to-muted/20 min-h-screen bg-gradient-to-br">
-      <div className="mx-auto max-w-7xl space-y-8 p-4 md:p-8">
-        {/* Header */}
-        <div>
-          <h1 className="text-foreground text-3xl font-bold md:text-4xl">
-            Welcome back, {profile?.first_name || "Staff Member"}!
-          </h1>
-          <p className="text-muted-foreground mt-2">Here's what's happening with your account today.</p>
-        </div>
+    <div className="container mx-auto max-w-full space-y-6 p-4 md:p-6 lg:p-8">
+      {/* Profile Hero Card */}
+      <Card className="relative overflow-hidden">
+        {/* Edit Button - Absolute positioned */}
+        <Button
+          onClick={() => router.push("/profile/edit")}
+          variant="outline"
+          className="bg-background/80 absolute top-4 right-4 z-10 gap-2 backdrop-blur-sm"
+        >
+          <Edit className="h-4 w-4" />
+          Edit Profile
+        </Button>
 
-        {/* Profile Card */}
-        <Card className="overflow-hidden border-2 shadow-lg">
-          <div className="from-primary/10 via-primary/5 to-background bg-gradient-to-r p-6 md:p-8">
-            <div className="flex flex-col gap-8">
-              {/* Top Section: Avatar, Name & Edit Button */}
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-4">
-                  <Avatar className="ring-background h-20 w-20 shadow-xl ring-4">
-                    <AvatarFallback className="bg-primary text-primary-foreground text-2xl font-bold">
-                      {getInitials(profile?.first_name, profile?.last_name)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <h2 className="text-foreground text-2xl font-bold">
-                      {formatName(profile?.first_name)}
-                      {profile?.other_names && ` ${formatName(profile.other_names)}`}
-                      {` ${formatName(profile?.last_name)}`}
-                    </h2>
-                    <p className="text-muted-foreground">{profile?.company_role || "Staff Member"}</p>
-                  </div>
-                </div>
-                <Button onClick={() => router.push("/profile/edit")} variant="outline" className="gap-2">
-                  <Edit className="h-4 w-4" />
-                  Edit Profile
-                </Button>
-              </div>
+        {/* Banner */}
+        <div className="bg-primary/10 h-28 md:h-36 lg:h-44" />
 
-              {/* Info Grid */}
-              <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-                <div className="flex items-center gap-3">
-                  <User className="text-muted-foreground h-5 w-5" />
-                  <div>
-                    <p className="text-muted-foreground text-sm">Full Name</p>
-                    <p className="font-medium">
-                      {formatName(profile?.first_name)}
-                      {profile?.other_names && ` ${formatName(profile.other_names)}`}
-                      {` ${formatName(profile?.last_name)}`}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <Mail className="text-muted-foreground h-5 w-5" />
-                  <div>
-                    <p className="text-muted-foreground text-sm">Email</p>
-                    <p className="font-medium">{profile?.company_email}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <Building2 className="text-muted-foreground h-5 w-5" />
-                  <div>
-                    <p className="text-muted-foreground text-sm">Department</p>
-                    <p className="font-medium">{profile?.department || "N/A"}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <Shield className="text-muted-foreground h-5 w-5" />
-                  <div>
-                    <p className="text-muted-foreground text-sm">Role</p>
-                    <div className="mt-1">
-                      <Badge className={getRoleBadgeColor(profile.role as UserRole)}>
-                        {getRoleDisplayName(profile.role as UserRole)}
-                      </Badge>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <User className="text-muted-foreground h-5 w-5" />
-                  <div>
-                    <p className="text-muted-foreground text-sm">Position</p>
-                    <p className="font-medium">{profile?.company_role || "N/A"}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <Phone className="text-muted-foreground h-5 w-5" />
-                  <div>
-                    <p className="text-muted-foreground text-sm">Phone</p>
-                    <p className="font-medium">{profile?.phone_number || "N/A"}</p>
-                    {profile?.additional_phone && (
-                      <p className="text-muted-foreground text-xs">{profile.additional_phone}</p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <MapPin className="text-muted-foreground h-5 w-5" />
-                  <div>
-                    <p className="text-muted-foreground text-sm">Address</p>
-                    <p className="font-medium">{profile?.residential_address || "N/A"}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <MapPin className="text-muted-foreground h-5 w-5" />
-                  <div>
-                    <p className="text-muted-foreground text-sm">Work Location</p>
-                    <p className="font-medium">{profile?.current_work_location || "N/A"}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <Calendar className="text-muted-foreground h-5 w-5" />
-                  <div>
-                    <p className="text-muted-foreground text-sm">Member Since</p>
-                    <p className="font-medium">{new Date(profile.created_at).toLocaleDateString()}</p>
-                  </div>
-                </div>
+        <CardContent className="relative px-6 pb-6">
+          {/* Avatar and Name */}
+          <div className="-mt-14 flex items-end gap-4 md:-mt-16 lg:-mt-20 lg:gap-6">
+            <Avatar className="border-background h-28 w-28 border-4 shadow-lg md:h-32 md:w-32 lg:h-40 lg:w-40">
+              <AvatarFallback className="bg-primary text-primary-foreground text-3xl font-bold md:text-4xl lg:text-5xl">
+                {getInitials(profile?.first_name, profile?.last_name)}
+              </AvatarFallback>
+            </Avatar>
+            <div className="pb-2 lg:pb-4">
+              <h1 className="text-xl font-bold md:text-2xl lg:text-3xl">
+                {formatName(profile?.first_name)}
+                {profile?.other_names && ` ${formatName(profile.other_names)}`}
+                {` ${formatName(profile?.last_name)}`}
+              </h1>
+              <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-0.5">
+                <p className="text-muted-foreground flex items-center gap-1.5 text-sm md:text-base lg:text-lg">
+                  <Briefcase className="h-4 w-4 lg:h-5 lg:w-5" />
+                  {profile?.company_role || "Staff Member"}
+                </p>
+                <p className="text-muted-foreground flex items-center gap-1.5 text-sm md:text-base lg:text-lg">
+                  <Building2 className="h-4 w-4 lg:h-5 lg:w-5" />
+                  {profile?.department || "Unassigned Department"}
+                </p>
               </div>
             </div>
           </div>
-        </Card>
 
-        {/* Quick Actions */}
-        <div>
-          <h3 className="mb-4 text-xl font-semibold">Quick Actions</h3>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {/* Role & Status Badges */}
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            {/* Primary Role Badge - Role-specific colors */}
+            {(() => {
+              // Define role-specific colors
+              const roleColors: Record<string, { bg: string; border: string; dot: string; text: string }> = {
+                super_admin: {
+                  bg: "bg-red-500/10",
+                  border: "border-red-500/20",
+                  dot: "bg-red-500",
+                  text: "text-red-600 dark:text-red-400",
+                },
+                admin: {
+                  bg: "bg-purple-500/10",
+                  border: "border-purple-500/20",
+                  dot: "bg-purple-500",
+                  text: "text-purple-600 dark:text-purple-400",
+                },
+                lead: {
+                  bg: "bg-blue-500/10",
+                  border: "border-blue-500/20",
+                  dot: "bg-blue-500",
+                  text: "text-blue-600 dark:text-blue-400",
+                },
+                staff: {
+                  bg: "bg-gray-500/10",
+                  border: "border-gray-500/20",
+                  dot: "bg-gray-500",
+                  text: "text-gray-600 dark:text-gray-400",
+                },
+                visitor: {
+                  bg: "bg-slate-500/10",
+                  border: "border-slate-500/20",
+                  dot: "bg-slate-500",
+                  text: "text-slate-600 dark:text-slate-400",
+                },
+              }
+              const colors = roleColors[profile.role] || roleColors.staff
+
+              return (
+                <div
+                  className={`flex items-center gap-2 rounded-full px-3 py-1.5 ${colors.bg} border ${colors.border}`}
+                >
+                  <div className={`h-2 w-2 rounded-full ${colors.dot} animate-pulse`} />
+                  <span className={`text-sm font-semibold ${colors.text}`}>
+                    {getRoleDisplayName(profile.role as UserRole)}
+                  </span>
+                </div>
+              )
+            })()}
+
+            {profile?.is_department_lead && (
+              <div className="flex items-center gap-2 rounded-full border border-amber-500/20 bg-amber-500/10 px-3 py-1.5">
+                <div className="h-2 w-2 rounded-full bg-amber-500" />
+                <span className="text-sm font-medium text-amber-600 dark:text-amber-400">Department Lead</span>
+              </div>
+            )}
+
+            <Badge variant="outline" className="text-muted-foreground">
+              <Clock className="mr-1 h-3 w-3" />
+              {daysAtAcob !== null ? `${daysAtAcob} days at ACOB` : "Set join date"}
+            </Badge>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Contact Information */}
+      <Card>
+        <CardHeader className="pb-4">
+          <CardTitle className="text-base">Contact Information</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="bg-muted/50 flex items-center gap-3 rounded-lg p-3">
+              <Mail className="text-muted-foreground h-5 w-5 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-muted-foreground text-xs">Email</p>
+                <p className="truncate text-sm font-medium">{profile?.company_email}</p>
+              </div>
+            </div>
+
+            <div className="bg-muted/50 flex items-center gap-3 rounded-lg p-3">
+              <Phone className="text-muted-foreground h-5 w-5 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-muted-foreground text-xs">Phone</p>
+                <p className="text-sm font-medium">{profile?.phone_number || "Not set"}</p>
+              </div>
+            </div>
+
+            <div className="bg-muted/50 flex items-center gap-3 rounded-lg p-3">
+              <MapPin className="text-muted-foreground h-5 w-5 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-muted-foreground text-xs">Work Location</p>
+                <p className="truncate text-sm font-medium">{profile?.current_work_location || "Not set"}</p>
+              </div>
+            </div>
+
+            <div className="bg-muted/50 flex items-center gap-3 rounded-lg p-3">
+              <MapPin className="text-muted-foreground h-5 w-5 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-muted-foreground text-xs">Residential Address</p>
+                <p className="truncate text-sm font-medium">{profile?.residential_address || "Not set"}</p>
+              </div>
+            </div>
+
+            <div className="bg-muted/50 flex items-center gap-3 rounded-lg p-3">
+              <Calendar className="text-muted-foreground h-5 w-5 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-muted-foreground text-xs">Joined ACOB</p>
+                <p className="text-sm font-medium">
+                  {employmentDate
+                    ? employmentDate.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+                    : "Not set - Edit profile to add"}
+                </p>
+              </div>
+            </div>
+
+            {profile?.additional_phone && (
+              <div className="bg-muted/50 flex items-center gap-3 rounded-lg p-3">
+                <Phone className="text-muted-foreground h-5 w-5 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-muted-foreground text-xs">Additional Phone</p>
+                  <p className="text-sm font-medium">{profile.additional_phone}</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Quick Actions */}
+      <Card>
+        <CardHeader className="pb-4">
+          <CardTitle className="text-base">Quick Actions</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             {quickActions.map((action) => (
-              <Link key={action.name} href={action.href} className="h-full">
-                <Card className="group hover:border-primary flex h-full cursor-pointer flex-col border-2 transition-all duration-200 hover:-translate-y-1 hover:shadow-lg">
-                  <CardContent className="flex-1 p-4">
-                    <div className="flex h-full items-start gap-4">
-                      <div className={`${action.color} shrink-0 rounded-lg p-2 text-white`}>
-                        <action.icon className="h-6 w-6" />
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="text-foreground group-hover:text-primary font-semibold transition-colors">
-                          {action.name}
-                        </h4>
-                        <p className="text-muted-foreground mt-1 text-sm">{action.description}</p>
-                      </div>
-                      <ArrowRight className="text-muted-foreground group-hover:text-primary h-5 w-5 shrink-0 transition-all group-hover:translate-x-1" />
-                    </div>
-                  </CardContent>
-                </Card>
+              <Link key={action.name} href={action.href}>
+                <div className="hover:border-primary/50 hover:bg-muted/50 flex cursor-pointer flex-col items-center gap-2 rounded-lg border p-4 text-center transition-colors">
+                  <div className="bg-primary/10 rounded-full p-3">
+                    <action.icon className="text-primary h-5 w-5" />
+                  </div>
+                  <span className="text-sm font-medium">{action.name}</span>
+                </div>
               </Link>
             ))}
           </div>
-        </div>
+        </CardContent>
+      </Card>
 
-        {/* Tabs for Related Data */}
-        <Tabs defaultValue="assets" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="assets">
-              <Package className="mr-2 h-4 w-4" />
-              Assets ({assets.length})
-            </TabsTrigger>
-            <TabsTrigger value="tasks">
-              <CheckSquare className="mr-2 h-4 w-4" />
-              Tasks ({tasks.length})
-            </TabsTrigger>
-            <TabsTrigger value="documentation">
-              <FileText className="mr-2 h-4 w-4" />
-              Documentation ({documentation.length})
-            </TabsTrigger>
-            <TabsTrigger value="feedback">
-              <MessageSquare className="mr-2 h-4 w-4" />
-              Feedback ({feedback.length})
-            </TabsTrigger>
-          </TabsList>
+      {/* Activity Section */}
+      <Card>
+        <CardHeader className="pb-4">
+          <CardTitle className="text-base">Your Activity</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Tabs defaultValue="assets">
+            <TabsList className="mb-4">
+              <TabsTrigger value="assets" className="gap-1.5">
+                <Package className="h-4 w-4" />
+                Assets ({assets.length})
+              </TabsTrigger>
+              <TabsTrigger value="tasks" className="gap-1.5">
+                <CheckSquare className="h-4 w-4" />
+                Tasks ({tasks.length})
+              </TabsTrigger>
+              <TabsTrigger value="documentation" className="gap-1.5">
+                <FileText className="h-4 w-4" />
+                Docs ({documentation.length})
+              </TabsTrigger>
+              <TabsTrigger value="feedback" className="gap-1.5">
+                <MessageSquare className="h-4 w-4" />
+                Feedback ({feedback.length})
+              </TabsTrigger>
+            </TabsList>
 
-          {/* Tasks Tab */}
-          <TabsContent value="tasks">
-            <Card>
-              <CardHeader>
-                <CardTitle>Assigned Tasks</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {tasks.length > 0 ? (
+            {/* Tasks Tab */}
+            <TabsContent value="tasks">
+              {tasks.length > 0 ? (
+                <div className="overflow-x-auto rounded-lg border">
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead className="w-[50px]">S/N</TableHead>
                         <TableHead>Title</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Priority</TableHead>
-                        <TableHead>Department</TableHead>
                         <TableHead>Due Date</TableHead>
-                        <TableHead>Actions</TableHead>
+                        <TableHead className="text-right">Action</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {tasks.map((task) => (
+                      {tasks.slice(0, 5).map((task, index) => (
                         <TableRow key={task.id}>
+                          <TableCell className="text-muted-foreground">{index + 1}</TableCell>
                           <TableCell className="font-medium">{task.title}</TableCell>
                           <TableCell>
                             <Badge className={getStatusColor(task.status)}>{task.status}</Badge>
@@ -323,9 +347,8 @@ export function ProfileContent({ profile, tasks, assets, documentation, feedback
                           <TableCell>
                             <Badge className={getPriorityColor(task.priority)}>{task.priority}</Badge>
                           </TableCell>
-                          <TableCell>{task.department || "N/A"}</TableCell>
-                          <TableCell>{task.due_date ? new Date(task.due_date).toLocaleDateString() : "N/A"}</TableCell>
-                          <TableCell>
+                          <TableCell>{task.due_date ? new Date(task.due_date).toLocaleDateString() : "-"}</TableCell>
+                          <TableCell className="text-right">
                             <Link
                               href={`/tasks?taskId=${task.id}`}
                               className={buttonVariants({ variant: "ghost", size: "sm" })}
@@ -337,73 +360,54 @@ export function ProfileContent({ profile, tasks, assets, documentation, feedback
                       ))}
                     </TableBody>
                   </Table>
-                ) : (
-                  <p className="text-muted-foreground py-8 text-center">No tasks assigned</p>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
+                </div>
+              ) : (
+                <div className="bg-muted/30 rounded-lg border py-12 text-center">
+                  <CheckSquare className="text-muted-foreground/50 mx-auto mb-3 h-10 w-10" />
+                  <p className="text-muted-foreground">No tasks assigned</p>
+                </div>
+              )}
+            </TabsContent>
 
-          {/* Assets Tab */}
-          <TabsContent value="assets">
-            <Card>
-              <CardHeader>
-                <CardTitle>Assigned Assets</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {assets.length > 0 ? (
+            {/* Assets Tab */}
+            <TabsContent value="assets">
+              {assets.length > 0 ? (
+                <div className="overflow-x-auto rounded-lg border">
                   <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead className="w-[50px]">S/N</TableHead>
                         <TableHead>Asset Type</TableHead>
-                        <TableHead>Unique Code</TableHead>
+                        <TableHead>Code</TableHead>
                         <TableHead>Model</TableHead>
-                        <TableHead>Serial Number</TableHead>
                         <TableHead>Assignment</TableHead>
                         <TableHead>Status</TableHead>
-                        <TableHead>Assigned Date</TableHead>
-                        <TableHead>Actions</TableHead>
+                        <TableHead className="text-right">Action</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {assets.map((asset, index) => (
+                      {assets.slice(0, 5).map((asset, index) => (
                         <TableRow key={asset.id}>
-                          <TableCell className="font-medium">{index + 1}</TableCell>
+                          <TableCell className="text-muted-foreground">{index + 1}</TableCell>
                           <TableCell className="font-medium">{asset.asset_type}</TableCell>
                           <TableCell>
-                            <Badge variant="outline" className="font-mono">
+                            <Badge variant="outline" className="font-mono text-xs">
                               {asset.unique_code || "-"}
                             </Badge>
                           </TableCell>
                           <TableCell>{asset.asset_model || "-"}</TableCell>
-                          <TableCell>{asset.serial_number || "-"}</TableCell>
                           <TableCell>
-                            {asset.assignment_type === "department" && (
-                              <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400">
-                                <Building2 className="mr-1 h-3 w-3" />
-                                Department
-                              </Badge>
-                            )}
-                            {asset.assignment_type === "office" && (
-                              <Badge className="bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400">
-                                <MapPin className="mr-1 h-3 w-3" />
-                                Office
-                              </Badge>
-                            )}
-                            {asset.assignment_type === "individual" && (
-                              <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
-                                <User className="mr-1 h-3 w-3" />
-                                Personal
-                              </Badge>
-                            )}
+                            <Badge variant="secondary" className="text-xs">
+                              {asset.assignment_type === "department" && "Dept"}
+                              {asset.assignment_type === "office" && "Office"}
+                              {asset.assignment_type === "individual" && "Personal"}
+                            </Badge>
                           </TableCell>
                           <TableCell>
                             <Badge className={getStatusColor(asset.status)}>{asset.status}</Badge>
                           </TableCell>
-                          <TableCell>{new Date(asset.assigned_at).toLocaleDateString()}</TableCell>
-                          <TableCell>
-                            <Link href={`/assets`} className={buttonVariants({ variant: "ghost", size: "sm" })}>
+                          <TableCell className="text-right">
+                            <Link href="/assets" className={buttonVariants({ variant: "ghost", size: "sm" })}>
                               View
                             </Link>
                           </TableCell>
@@ -411,39 +415,39 @@ export function ProfileContent({ profile, tasks, assets, documentation, feedback
                       ))}
                     </TableBody>
                   </Table>
-                ) : (
-                  <p className="text-muted-foreground py-8 text-center">No assets assigned</p>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
+                </div>
+              ) : (
+                <div className="bg-muted/30 rounded-lg border py-12 text-center">
+                  <Package className="text-muted-foreground/50 mx-auto mb-3 h-10 w-10" />
+                  <p className="text-muted-foreground">No assets assigned</p>
+                </div>
+              )}
+            </TabsContent>
 
-          {/* Documentation Tab */}
-          <TabsContent value="documentation">
-            <Card>
-              <CardHeader>
-                <CardTitle>Documentation Created</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {documentation.length > 0 ? (
+            {/* Documentation Tab */}
+            <TabsContent value="documentation">
+              {documentation.length > 0 ? (
+                <div className="overflow-x-auto rounded-lg border">
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead className="w-[50px]">S/N</TableHead>
                         <TableHead>Title</TableHead>
                         <TableHead>Category</TableHead>
-                        <TableHead>Created Date</TableHead>
-                        <TableHead>Actions</TableHead>
+                        <TableHead>Created</TableHead>
+                        <TableHead className="text-right">Action</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {documentation.map((doc) => (
+                      {documentation.slice(0, 5).map((doc, index) => (
                         <TableRow key={doc.id}>
+                          <TableCell className="text-muted-foreground">{index + 1}</TableCell>
                           <TableCell className="font-medium">{doc.title}</TableCell>
                           <TableCell>
                             <Badge variant="outline">{doc.category || "N/A"}</Badge>
                           </TableCell>
                           <TableCell>{new Date(doc.created_at).toLocaleDateString()}</TableCell>
-                          <TableCell>
+                          <TableCell className="text-right">
                             <Link
                               href={`/documentation?docId=${doc.id}`}
                               className={buttonVariants({ variant: "ghost", size: "sm" })}
@@ -455,34 +459,34 @@ export function ProfileContent({ profile, tasks, assets, documentation, feedback
                       ))}
                     </TableBody>
                   </Table>
-                ) : (
-                  <p className="text-muted-foreground py-8 text-center">No documentation created</p>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
+                </div>
+              ) : (
+                <div className="bg-muted/30 rounded-lg border py-12 text-center">
+                  <FileText className="text-muted-foreground/50 mx-auto mb-3 h-10 w-10" />
+                  <p className="text-muted-foreground">No documentation created</p>
+                </div>
+              )}
+            </TabsContent>
 
-          {/* Feedback Tab */}
-          <TabsContent value="feedback">
-            <Card>
-              <CardHeader>
-                <CardTitle>Feedback Submitted</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {feedback.length > 0 ? (
+            {/* Feedback Tab */}
+            <TabsContent value="feedback">
+              {feedback.length > 0 ? (
+                <div className="overflow-x-auto rounded-lg border">
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead className="w-[50px]">S/N</TableHead>
                         <TableHead>Title</TableHead>
                         <TableHead>Type</TableHead>
                         <TableHead>Status</TableHead>
-                        <TableHead>Created Date</TableHead>
-                        <TableHead>Actions</TableHead>
+                        <TableHead>Created</TableHead>
+                        <TableHead className="text-right">Action</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {feedback.map((item) => (
+                      {feedback.slice(0, 5).map((item, index) => (
                         <TableRow key={item.id}>
+                          <TableCell className="text-muted-foreground">{index + 1}</TableCell>
                           <TableCell className="font-medium">{item.title}</TableCell>
                           <TableCell>
                             <Badge variant="outline">{item.feedback_type}</Badge>
@@ -491,7 +495,7 @@ export function ProfileContent({ profile, tasks, assets, documentation, feedback
                             <Badge className={getStatusColor(item.status)}>{item.status}</Badge>
                           </TableCell>
                           <TableCell>{new Date(item.created_at).toLocaleDateString()}</TableCell>
-                          <TableCell>
+                          <TableCell className="text-right">
                             <Link
                               href={`/feedback?feedbackId=${item.id}`}
                               className={buttonVariants({ variant: "ghost", size: "sm" })}
@@ -503,14 +507,17 @@ export function ProfileContent({ profile, tasks, assets, documentation, feedback
                       ))}
                     </TableBody>
                   </Table>
-                ) : (
-                  <p className="text-muted-foreground py-8 text-center">No feedback submitted</p>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-      </div>
+                </div>
+              ) : (
+                <div className="bg-muted/30 rounded-lg border py-12 text-center">
+                  <MessageSquare className="text-muted-foreground/50 mx-auto mb-3 h-10 w-10" />
+                  <p className="text-muted-foreground">No feedback submitted</p>
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
     </div>
   )
 }
