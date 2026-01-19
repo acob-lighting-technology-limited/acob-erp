@@ -121,6 +121,38 @@ export default function HRAdminDashboard() {
 
       {/* Admin Actions */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {/* Employees Management */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Employees
+            </CardTitle>
+            <CardDescription>Manage employee profiles and information</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link href="/admin/hr/employees">
+              <Button className="w-full">Manage Employees ({stats.totalStaff})</Button>
+            </Link>
+          </CardContent>
+        </Card>
+
+        {/* Departments */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Departments
+            </CardTitle>
+            <CardDescription>Manage company departments</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link href="/admin/hr/departments">
+              <Button className="w-full" variant="outline">Manage Departments</Button>
+            </Link>
+          </CardContent>
+        </Card>
+
         {/* Leave Approvals */}
         <Card>
           <CardHeader>

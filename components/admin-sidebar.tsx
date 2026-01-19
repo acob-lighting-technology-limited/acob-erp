@@ -53,17 +53,17 @@ interface AdminSidebarProps {
 
 const adminNavigation = [
   { name: "Admin Dashboard", href: "/admin", icon: LayoutDashboard, roles: ["super_admin", "admin", "lead"] },
-  { name: "Staff Management", href: "/admin/staff", icon: Users, roles: ["super_admin", "admin", "lead"] },
-  { name: "Asset Management", href: "/admin/assets", icon: Package, roles: ["super_admin", "admin", "lead"] },
+  { name: "HR Administration", href: "/admin/hr", icon: Calendar, roles: ["super_admin", "admin", "lead"] },
+  { name: "Finance", href: "/admin/finance", icon: CreditCard, roles: ["super_admin", "admin"] },
+  { name: "Inventory", href: "/admin/inventory", icon: Package, roles: ["super_admin", "admin"] },
+  { name: "Purchasing", href: "/admin/purchasing", icon: Briefcase, roles: ["super_admin", "admin"] },
   { name: "Project Management", href: "/admin/projects", icon: FolderKanban, roles: ["super_admin", "admin", "lead"] },
   { name: "Task Management", href: "/admin/tasks", icon: ClipboardList, roles: ["super_admin", "admin", "lead"] },
-  { name: "Payment Management", href: "/admin/payments", icon: CreditCard, roles: ["super_admin", "admin", "lead"] },
-  { name: "CRM", href: "/admin/crm", icon: Target, roles: ["super_admin", "admin", "lead"] },
-  { name: "HR Administration", href: "/admin/hr", icon: Calendar, roles: ["super_admin", "admin", "lead"] },
+  { name: "Asset Management", href: "/admin/assets", icon: Package, roles: ["super_admin", "admin", "lead"] },
   { name: "Documentation", href: "/admin/documentation", icon: FileText, roles: ["super_admin", "admin", "lead"] },
-  { name: "Job Descriptions", href: "/admin/job-descriptions", icon: Briefcase, roles: ["super_admin", "admin"] },
   { name: "Feedback", href: "/admin/feedback", icon: MessageSquare, roles: ["super_admin", "admin", "lead"] },
   { name: "Audit Logs", href: "/admin/audit-logs", icon: ScrollText, roles: ["super_admin", "admin", "lead"] },
+  { name: "Settings", href: "/admin/settings", icon: Target, roles: ["super_admin"] },
 ]
 
 export function AdminSidebar({ user, profile }: AdminSidebarProps) {
