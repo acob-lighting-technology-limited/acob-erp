@@ -51,16 +51,18 @@ import {
   Trash2,
   AlertTriangle,
 } from "lucide-react"
-import type { UserRole } from "@/types/database"
+import type { UserRole, EmploymentStatus } from "@/types/database"
 import { getRoleDisplayName, getRoleBadgeColor, canAssignRoles, DEPARTMENTS, OFFICE_LOCATIONS } from "@/lib/permissions"
 import { SignatureCreator } from "@/components/signature-creator"
 import { ASSET_TYPE_MAP } from "@/lib/asset-types"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Calendar, User as UserIcon } from "lucide-react"
+import { Calendar, User as UserIcon, UserCircle } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Textarea } from "@/components/ui/textarea"
+import { EmployeeStatusBadge } from "@/components/hr/employee-status-badge"
+import { ChangeStatusDialog } from "@/components/hr/change-status-dialog"
 
 export interface Staff {
   id: string
@@ -84,6 +86,7 @@ export interface Staff {
   is_admin: boolean
   is_department_lead: boolean
   lead_departments: string[]
+  employment_status: EmploymentStatus
   created_at: string
 }
 
@@ -104,6 +107,7 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
   const [departmentFilter, setDepartmentFilter] = useState<string[]>([])
   const [staffFilter, setStaffFilter] = useState<string[]>([])
   const [roleFilter, setRoleFilter] = useState<string[]>([])
+  const [statusFilter, setStatusFilter] = useState<string[]>([])
   const [nameSortOrder, setNameSortOrder] = useState<"asc" | "desc">("asc")
   const [viewMode, setViewMode] = useState<"list" | "card">("list")
   const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null)
@@ -112,6 +116,7 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
   const [isSignatureDialogOpen, setIsSignatureDialogOpen] = useState(false)
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [assignedItems, setAssignedItems] = useState<{
     tasks: any[]
@@ -136,8 +141,8 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
   const [exportType, setExportType] = useState<"excel" | "pdf" | "word" | null>(null)
   const [selectedColumns, setSelectedColumns] = useState<Record<string, boolean>>({
     "#": true,
-    "First Name": true,
     "Last Name": true,
+    "First Name": true,
     "Other Names": true,
     Email: true,
     Department: true,
@@ -575,7 +580,7 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
         }
       }
 
-      toast.success("Staff member deleted successfully")
+      toast.success("Employee deleted successfully")
       setIsDeleteDialogOpen(false)
       setSelectedStaff(null)
       loadData()
@@ -644,7 +649,7 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
 
       if (error) throw error
 
-      toast.success("Staff member updated successfully")
+      toast.success("Employee updated successfully")
       setIsEditDialogOpen(false)
       loadData()
     } catch (error: any) {
@@ -660,14 +665,9 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
     setIsCreatingUser(true)
 
     try {
-      // Validate required fields
-      if (
-        !createUserForm.firstName.trim() ||
-        !createUserForm.lastName.trim() ||
-        !createUserForm.email.trim() ||
-        !createUserForm.department
-      ) {
-        toast.error("First name, last name, email, and department are required")
+      // Validate required fields (department is optional for executives like MD)
+      if (!createUserForm.firstName.trim() || !createUserForm.lastName.trim() || !createUserForm.email.trim()) {
+        toast.error("First name, last name, and email are required")
         setIsCreatingUser(false)
         return
       }
@@ -728,7 +728,9 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
 
       const matchesRole = roleFilter.length === 0 || roleFilter.includes(member.role)
 
-      return matchesSearch && matchesDepartment && matchesStaff && matchesRole
+      const matchesStatus = statusFilter.length === 0 || statusFilter.includes(member.employment_status || "active")
+
+      return matchesSearch && matchesDepartment && matchesStaff && matchesRole && matchesStatus
     })
     .sort((a, b) => {
       const lastNameA = formatName(a.last_name).toLowerCase()
@@ -757,8 +759,8 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
     return staffMembers.map((member, index) => {
       const row: Record<string, any> = {}
       if (selectedColumns["#"]) row["#"] = index + 1
-      if (selectedColumns["First Name"]) row["First Name"] = formatName(member.first_name) || "-"
       if (selectedColumns["Last Name"]) row["Last Name"] = formatName(member.last_name) || "-"
+      if (selectedColumns["First Name"]) row["First Name"] = formatName(member.first_name) || "-"
       if (selectedColumns["Other Names"]) row["Other Names"] = member.other_names || "-"
       if (selectedColumns["Email"]) row["Email"] = member.company_email || "-"
       if (selectedColumns["Department"]) row["Department"] = member.department || "-"
@@ -803,7 +805,7 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
 
       const ws = XLSX.utils.json_to_sheet(dataToExport)
       const wb = XLSX.utils.book_new()
-      XLSX.utils.book_append_sheet(wb, ws, "Staff")
+      XLSX.utils.book_append_sheet(wb, ws, "Employees")
 
       const maxWidth = 60
       const cols = Object.keys(dataToExport[0] || {}).map((key) => ({
@@ -819,7 +821,7 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
         type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       })
       saveAs(data, `staff-export-${new Date().toISOString().split("T")[0]}.xlsx`)
-      toast.success("Staff exported to Excel successfully")
+      toast.success("Employees exported to Excel successfully")
       setExportDialogOpen(false)
     } catch (error: any) {
       console.error("Error exporting staff to Excel:", error)
@@ -839,10 +841,10 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
 
       const doc = new jsPDF({ orientation: "landscape" })
       doc.setFontSize(16)
-      doc.text("Staff Report", 14, 15)
+      doc.text("ACOB Employee Report", 14, 15)
       doc.setFontSize(10)
       doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 22)
-      doc.text(`Total Staff: ${filteredStaff.length}`, 14, 28)
+      doc.text(`Total Employees: ${filteredStaff.length}`, 14, 28)
 
       // Prepare data with selected columns
       const dataToExport = filteredStaff.map((member, index) => {
@@ -853,13 +855,13 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
           row.push(index + 1)
           headers.push("#")
         }
-        if (selectedColumns["First Name"]) {
-          row.push(formatName(member.first_name) || "-")
-          headers.push("First Name")
-        }
         if (selectedColumns["Last Name"]) {
           row.push(formatName(member.last_name) || "-")
           headers.push("Last Name")
+        }
+        if (selectedColumns["First Name"]) {
+          row.push(formatName(member.first_name) || "-")
+          headers.push("First Name")
         }
         if (selectedColumns["Other Names"]) {
           row.push(member.other_names || "-")
@@ -945,12 +947,12 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
         body: body,
         startY: 35,
         styles: { fontSize: 8, cellPadding: 2 },
-        headStyles: { fillColor: [59, 130, 246], textColor: 255 },
+        headStyles: { fillColor: [34, 197, 94], textColor: 255 },
         alternateRowStyles: { fillColor: [245, 247, 250] },
       })
 
-      doc.save(`staff-export-${new Date().toISOString().split("T")[0]}.pdf`)
-      toast.success("Staff exported to PDF successfully")
+      doc.save(`acob-employee-report-${new Date().toISOString().split("T")[0]}.pdf`)
+      toast.success("Employees exported to PDF successfully")
       setExportDialogOpen(false)
     } catch (error: any) {
       console.error("Error exporting staff to PDF:", error)
@@ -1012,7 +1014,7 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
           {
             children: [
               new Paragraph({
-                text: "Staff Report",
+                text: "ACOB Employee Report",
                 heading: HeadingLevel.HEADING_1,
                 alignment: AlignmentType.CENTER,
               }),
@@ -1021,7 +1023,7 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
                 alignment: AlignmentType.CENTER,
               }),
               new Paragraph({
-                text: `Total Staff: ${filteredStaff.length}`,
+                text: `Total Employees: ${filteredStaff.length}`,
                 alignment: AlignmentType.CENTER,
               }),
               new Paragraph({ text: "" }),
@@ -1265,6 +1267,19 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
                   onChange={setRoleFilter}
                   placeholder="Role"
                 />
+                <SearchableMultiSelect
+                  label="Status"
+                  icon={<UserCircle className="h-4 w-4" />}
+                  values={statusFilter}
+                  options={[
+                    { value: "active", label: "Active" },
+                    { value: "suspended", label: "Suspended" },
+                    { value: "terminated", label: "Terminated" },
+                    { value: "on_leave", label: "On Leave" },
+                  ]}
+                  onChange={setStatusFilter}
+                  placeholder="Status"
+                />
               </div>
             </div>
           </CardContent>
@@ -1370,6 +1385,20 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
                             >
                               <Edit className="h-3 w-3" />
                             </Button>
+                            {["admin", "super_admin"].includes(userProfile?.role) && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 w-8 p-0 sm:h-auto sm:w-auto sm:p-2"
+                                onClick={() => {
+                                  setSelectedStaff(member)
+                                  setIsStatusDialogOpen(true)
+                                }}
+                                title="Change Status"
+                              >
+                                <UserCircle className="h-3 w-3" />
+                              </Button>
+                            )}
                             {userProfile?.role === "super_admin" && (
                               <Button
                                 variant="outline"
@@ -2694,6 +2723,24 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Status Change Dialog */}
+      {selectedStaff && (
+        <ChangeStatusDialog
+          open={isStatusDialogOpen}
+          onOpenChange={setIsStatusDialogOpen}
+          employee={{
+            id: selectedStaff.id,
+            first_name: selectedStaff.first_name,
+            last_name: selectedStaff.last_name,
+            employment_status: selectedStaff.employment_status || "active",
+          }}
+          onSuccess={() => {
+            loadData()
+            setSelectedStaff(null)
+          }}
+        />
+      )}
     </div>
   )
 }

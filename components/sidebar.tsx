@@ -10,8 +10,6 @@ import {
   LayoutDashboard,
   User,
   MessageSquare,
-  FileSignature,
-  Droplet,
   ShieldCheck,
   LogOut,
   Menu,
@@ -27,6 +25,7 @@ import {
   Calendar,
   Clock,
   Target,
+  Wrench,
 } from "lucide-react"
 import Image from "next/image"
 import { useState, useEffect } from "react"
@@ -58,23 +57,21 @@ interface SidebarProps {
 }
 
 const navigation = [
-  { name: "Home", href: "/profile", icon: LayoutDashboard }, // Renamed Profile to Home, changed icon to Dashboard icon, points to /profile
-  // Removed original Dashboard entry
+  { name: "Home", href: "/profile", icon: LayoutDashboard },
   { name: "Job Description", href: "/job-description", icon: Briefcase },
-  { name: "My Projects", href: "/projects", icon: FolderKanban },
-  { name: "My Tasks", href: "/tasks", icon: ClipboardList },
-  { name: "My Assets", href: "/assets", icon: Package },
+  { name: "Projects", href: "/projects", icon: FolderKanban },
+  { name: "Tasks", href: "/tasks", icon: ClipboardList },
+  { name: "Assets", href: "/assets", icon: Package },
   { name: "Payments", href: "/payments", icon: CreditCard },
   { name: "Documentation", href: "/documentation", icon: FileText },
   { name: "Feedback", href: "/feedback", icon: MessageSquare },
-  { name: "Signature", href: "/signature", icon: FileSignature },
-  { name: "Watermark", href: "/watermark", icon: Droplet },
+  { name: "Tools", href: "/tools", icon: Wrench },
 ]
 
 const hrNavigation = [
-  { name: "My Leave", href: "/dashboard/leave", icon: Calendar },
-  { name: "My Attendance", href: "/dashboard/attendance", icon: Clock },
-  { name: "My Goals", href: "/dashboard/goals", icon: Target },
+  { name: "Leave", href: "/dashboard/leave", icon: Calendar },
+  { name: "Attendance", href: "/dashboard/attendance", icon: Clock },
+  { name: "Goals", href: "/dashboard/goals", icon: Target },
 ]
 
 const adminNavigation = [{ name: "Admin Dashboard", href: "/admin", icon: ShieldCheck }]
