@@ -27,6 +27,12 @@ export type Database = {
           job_description_updated_at: string | null
           created_at: string
           updated_at: string
+          // Employment status fields
+          employment_status: Database["public"]["Enums"]["employment_status"]
+          status_changed_at: string | null
+          status_changed_by: string | null
+          termination_date: string | null
+          termination_reason: string | null
           // DEPRECATED fields (use assets table instead)
           device_allocated: boolean | null
           device_type: string | null
@@ -53,6 +59,11 @@ export type Database = {
           lead_departments?: string[]
           job_description?: string | null
           job_description_updated_at?: string | null
+          employment_status?: Database["public"]["Enums"]["employment_status"]
+          status_changed_at?: string | null
+          status_changed_by?: string | null
+          termination_date?: string | null
+          termination_reason?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -75,6 +86,11 @@ export type Database = {
           lead_departments?: string[]
           job_description?: string | null
           job_description_updated_at?: string | null
+          employment_status?: Database["public"]["Enums"]["employment_status"]
+          status_changed_at?: string | null
+          status_changed_by?: string | null
+          termination_date?: string | null
+          termination_reason?: string | null
           updated_at?: string
         }
       }
@@ -225,12 +241,14 @@ export type Database = {
     }
     Enums: {
       user_role: "visitor" | "staff" | "lead" | "admin" | "super_admin"
+      employment_status: "active" | "suspended" | "terminated" | "on_leave"
     }
   }
 }
 
 // Legacy type exports for backward compatibility
 export type UserRole = Database["public"]["Enums"]["user_role"]
+export type EmploymentStatus = Database["public"]["Enums"]["employment_status"]
 
 export type DeviceStatus = "available" | "assigned" | "maintenance" | "retired"
 export type AssetStatus = "available" | "assigned" | "maintenance" | "retired"
@@ -262,6 +280,11 @@ export interface Profile {
   lead_departments: string[]
   job_description?: string
   job_description_updated_at?: string
+  employment_status: EmploymentStatus
+  status_changed_at?: string
+  status_changed_by?: string
+  termination_date?: string
+  termination_reason?: string
   created_at: string
   updated_at: string
 }

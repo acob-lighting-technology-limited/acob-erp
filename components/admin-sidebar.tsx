@@ -52,14 +52,14 @@ interface AdminSidebarProps {
 }
 
 const adminNavigation = [
-  { name: "Admin Dashboard", href: "/admin", icon: LayoutDashboard, roles: ["super_admin", "admin", "lead"] },
-  { name: "HR Administration", href: "/admin/hr", icon: Calendar, roles: ["super_admin", "admin", "lead"] },
+  { name: "Dashboard", href: "/admin", icon: LayoutDashboard, roles: ["super_admin", "admin", "lead"] },
+  { name: "HR", href: "/admin/hr", icon: Calendar, roles: ["super_admin", "admin", "lead"] },
   { name: "Finance", href: "/admin/finance", icon: CreditCard, roles: ["super_admin", "admin"] },
   { name: "Inventory", href: "/admin/inventory", icon: Package, roles: ["super_admin", "admin"] },
   { name: "Purchasing", href: "/admin/purchasing", icon: Briefcase, roles: ["super_admin", "admin"] },
-  { name: "Project Management", href: "/admin/projects", icon: FolderKanban, roles: ["super_admin", "admin", "lead"] },
-  { name: "Task Management", href: "/admin/tasks", icon: ClipboardList, roles: ["super_admin", "admin", "lead"] },
-  { name: "Asset Management", href: "/admin/assets", icon: Package, roles: ["super_admin", "admin", "lead"] },
+  { name: "Projects", href: "/admin/projects", icon: FolderKanban, roles: ["super_admin", "admin", "lead"] },
+  { name: "Tasks", href: "/admin/tasks", icon: ClipboardList, roles: ["super_admin", "admin", "lead"] },
+  { name: "Assets", href: "/admin/assets", icon: Package, roles: ["super_admin", "admin", "lead"] },
   { name: "Documentation", href: "/admin/documentation", icon: FileText, roles: ["super_admin", "admin", "lead"] },
   { name: "Feedback", href: "/admin/feedback", icon: MessageSquare, roles: ["super_admin", "admin", "lead"] },
   { name: "Audit Logs", href: "/admin/audit-logs", icon: ScrollText, roles: ["super_admin", "admin", "lead"] },

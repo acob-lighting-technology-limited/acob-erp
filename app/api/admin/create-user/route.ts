@@ -20,12 +20,12 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { firstName, lastName, otherNames, email, department, companyRole, phoneNumber, role } = body
 
-    // Validate required fields
-    if (!firstName || !lastName || !email || !department) {
+    // Validate required fields (department is optional for executives like MD)
+    if (!firstName || !lastName || !email) {
       return NextResponse.json(
         {
           success: false,
-          error: "First name, last name, email, and department are required",
+          error: "First name, last name, and email are required",
         },
         { status: 400 }
       )
@@ -95,16 +95,18 @@ export async function POST(request: NextRequest) {
         is_admin: ["super_admin", "admin"].includes(role || "staff"),
         is_department_lead: role === "lead",
         lead_departments: role === "lead" ? [department] : [],
+        employment_status: "active", // Explicitly set employment status
       })
       .eq("id", authData.user.id)
 
     if (profileError) {
+      console.error("[Create User] Profile update error:", profileError)
       // If profile update fails, try to delete the auth user
       await serviceSupabase.auth.admin.deleteUser(authData.user.id)
       return NextResponse.json(
         {
           success: false,
-          error: profileError.message,
+          error: `Database error: ${profileError.message}`,
         },
         { status: 400 }
       )
