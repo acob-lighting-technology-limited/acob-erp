@@ -679,6 +679,21 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
         return
       }
 
+      // Validate employee number (required and format check)
+      if (!createUserForm.employeeNumber.trim()) {
+        toast.error("Employee number is required")
+        setIsCreatingUser(false)
+        return
+      }
+
+      // Validate employee number format: ACOB/YEAR/NUMBER (e.g., ACOB/2026/058)
+      const empNumPattern = /^ACOB\/[0-9]{4}\/[0-9]{3}$/
+      if (!empNumPattern.test(createUserForm.employeeNumber.trim())) {
+        toast.error("Employee number must be in format: ACOB/YEAR/NUMBER (e.g., ACOB/2026/058)")
+        setIsCreatingUser(false)
+        return
+      }
+
       // Check if user can assign this role
       if (userProfile && !canAssignRoles(userProfile.role, createUserForm.role)) {
         toast.error("You don't have permission to assign this role")
@@ -1633,15 +1648,18 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
             </div>
 
             <div>
-              <Label htmlFor="create_employee_number">Employee Number</Label>
+              <Label htmlFor="create_employee_number">
+                Employee Number <span className="text-destructive">*</span>
+              </Label>
               <Input
                 id="create_employee_number"
                 value={createUserForm.employeeNumber}
-                onChange={(e) => setCreateUserForm({ ...createUserForm, employeeNumber: e.target.value })}
+                onChange={(e) => setCreateUserForm({ ...createUserForm, employeeNumber: e.target.value.toUpperCase() })}
                 placeholder="e.g., ACOB/2026/058"
                 className="mt-1.5 font-mono"
+                required
               />
-              <p className="text-muted-foreground mt-1 text-xs">Format: ACOB/YEAR/NUMBER</p>
+              <p className="text-muted-foreground mt-1 text-xs">Format: ACOB/YEAR/NUMBER (e.g., ACOB/2026/058)</p>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">

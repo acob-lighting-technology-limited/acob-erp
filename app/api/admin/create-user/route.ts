@@ -21,11 +21,23 @@ export async function POST(request: NextRequest) {
     const { firstName, lastName, otherNames, email, department, companyRole, phoneNumber, role, employeeNumber } = body
 
     // Validate required fields (department is optional for executives like MD)
-    if (!firstName || !lastName || !email) {
+    if (!firstName || !lastName || !email || !employeeNumber) {
       return NextResponse.json(
         {
           success: false,
-          error: "First name, last name, and email are required",
+          error: "First name, last name, email, and employee number are required",
+        },
+        { status: 400 }
+      )
+    }
+
+    // Validate employee number format: ACOB/YEAR/NUMBER (e.g., ACOB/2026/058)
+    const empNumPattern = /^ACOB\/[0-9]{4}\/[0-9]{3}$/
+    if (!empNumPattern.test(employeeNumber)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Employee number must be in format: ACOB/YEAR/NUMBER (e.g., ACOB/2026/058)",
         },
         { status: 400 }
       )
