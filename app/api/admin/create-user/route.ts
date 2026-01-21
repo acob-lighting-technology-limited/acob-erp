@@ -18,7 +18,7 @@ const serviceSupabase = createClient(supabaseUrl, supabaseServiceKey, {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { firstName, lastName, otherNames, email, department, companyRole, phoneNumber, role } = body
+    const { firstName, lastName, otherNames, email, department, companyRole, phoneNumber, role, employeeNumber } = body
 
     // Validate required fields (department is optional for executives like MD)
     if (!firstName || !lastName || !email) {
@@ -96,6 +96,7 @@ export async function POST(request: NextRequest) {
         is_department_lead: role === "lead",
         lead_departments: role === "lead" ? [department] : [],
         employment_status: "active", // Explicitly set employment status
+        employee_number: employeeNumber || null, // Employee number (ACOB/YEAR/NUMBER)
       })
       .eq("id", authData.user.id)
 

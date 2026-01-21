@@ -6,6 +6,7 @@ export type Database = {
       profiles: {
         Row: {
           id: string
+          employee_number: string | null // Unique employee identifier: ACOB/YEAR/NUMBER
           company_email: string
           first_name: string
           last_name: string
@@ -41,6 +42,7 @@ export type Database = {
         }
         Insert: {
           id: string
+          employee_number?: string | null
           company_email: string
           first_name: string
           last_name: string
@@ -68,6 +70,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          employee_number?: string | null
           company_email?: string
           first_name?: string
           last_name?: string
@@ -261,6 +264,7 @@ export type ProjectItemStatus = "pending" | "ordered" | "received" | "installed"
 // Updated Profile interface with new fields
 export interface Profile {
   id: string
+  employee_number?: string | null // Unique employee identifier: ACOB/YEAR/NUMBER
   company_email: string
   first_name: string
   last_name: string
