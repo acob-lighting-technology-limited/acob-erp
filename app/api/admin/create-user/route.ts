@@ -18,14 +18,26 @@ const serviceSupabase = createClient(supabaseUrl, supabaseServiceKey, {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { firstName, lastName, otherNames, email, department, companyRole, phoneNumber, role } = body
+    const { firstName, lastName, otherNames, email, department, companyRole, phoneNumber, role, employeeNumber } = body
 
     // Validate required fields (department is optional for executives like MD)
-    if (!firstName || !lastName || !email) {
+    if (!firstName || !lastName || !email || !employeeNumber) {
       return NextResponse.json(
         {
           success: false,
-          error: "First name, last name, and email are required",
+          error: "First name, last name, email, and employee number are required",
+        },
+        { status: 400 }
+      )
+    }
+
+    // Validate employee number format: ACOB/YEAR/NUMBER (e.g., ACOB/2026/058)
+    const empNumPattern = /^ACOB\/[0-9]{4}\/[0-9]{3}$/
+    if (!empNumPattern.test(employeeNumber)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Employee number must be in format: ACOB/YEAR/NUMBER (e.g., ACOB/2026/058)",
         },
         { status: 400 }
       )
@@ -96,6 +108,7 @@ export async function POST(request: NextRequest) {
         is_department_lead: role === "lead",
         lead_departments: role === "lead" ? [department] : [],
         employment_status: "active", // Explicitly set employment status
+        employee_number: employeeNumber || null, // Employee number (ACOB/YEAR/NUMBER)
       })
       .eq("id", authData.user.id)
 

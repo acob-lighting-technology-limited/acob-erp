@@ -66,6 +66,7 @@ import { ChangeStatusDialog } from "@/components/hr/change-status-dialog"
 
 export interface Staff {
   id: string
+  employee_number: string | null
   first_name: string
   last_name: string
   other_names: string | null
@@ -141,6 +142,7 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
   const [exportType, setExportType] = useState<"excel" | "pdf" | "word" | null>(null)
   const [selectedColumns, setSelectedColumns] = useState<Record<string, boolean>>({
     "#": true,
+    "Employee No.": true,
     "Last Name": true,
     "First Name": true,
     "Other Names": true,
@@ -179,6 +181,7 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
     companyRole: "",
     phoneNumber: "",
     role: "staff" as UserRole,
+    employeeNumber: "",
   })
 
   // Form states
@@ -189,6 +192,7 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
     company_role: "",
     lead_departments: [] as string[],
     // Expanded fields
+    employee_number: "",
     first_name: "",
     last_name: "",
     other_names: "",
@@ -257,6 +261,7 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
           company_role: fullProfile.company_role || "",
           lead_departments: fullProfile.lead_departments || [],
           // Expanded fields
+          employee_number: fullProfile.employee_number || "",
           first_name: fullProfile.first_name || "",
           last_name: fullProfile.last_name || "",
           other_names: fullProfile.other_names || "",
@@ -280,6 +285,7 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
           office_location: staffMember.office_location || "",
           company_role: staffMember.company_role || "",
           lead_departments: staffMember.lead_departments || [],
+          employee_number: staffMember.employee_number || "",
           first_name: staffMember.first_name || "",
           last_name: staffMember.last_name || "",
           other_names: staffMember.other_names || "",
@@ -629,6 +635,7 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
         is_admin: ["super_admin", "admin"].includes(editForm.role),
         updated_at: new Date().toISOString(),
         // Always include expanded fields if they exist in form state
+        employee_number: editForm.employee_number || null,
         first_name: editForm.first_name || null,
         last_name: editForm.last_name || null,
         other_names: editForm.other_names || null,
@@ -672,6 +679,21 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
         return
       }
 
+      // Validate employee number (required and format check)
+      if (!createUserForm.employeeNumber.trim()) {
+        toast.error("Employee number is required")
+        setIsCreatingUser(false)
+        return
+      }
+
+      // Validate employee number format: ACOB/YEAR/NUMBER (e.g., ACOB/2026/058)
+      const empNumPattern = /^ACOB\/[0-9]{4}\/[0-9]{3}$/
+      if (!empNumPattern.test(createUserForm.employeeNumber.trim())) {
+        toast.error("Employee number must be in format: ACOB/YEAR/NUMBER (e.g., ACOB/2026/058)")
+        setIsCreatingUser(false)
+        return
+      }
+
       // Check if user can assign this role
       if (userProfile && !canAssignRoles(userProfile.role, createUserForm.role)) {
         toast.error("You don't have permission to assign this role")
@@ -704,6 +726,7 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
         companyRole: "",
         phoneNumber: "",
         role: "staff",
+        employeeNumber: "",
       })
       loadData()
     } catch (error: any) {
@@ -759,6 +782,7 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
     return staffMembers.map((member, index) => {
       const row: Record<string, any> = {}
       if (selectedColumns["#"]) row["#"] = index + 1
+      if (selectedColumns["Employee No."]) row["Employee No."] = member.employee_number || "-"
       if (selectedColumns["Last Name"]) row["Last Name"] = formatName(member.last_name) || "-"
       if (selectedColumns["First Name"]) row["First Name"] = formatName(member.first_name) || "-"
       if (selectedColumns["Other Names"]) row["Other Names"] = member.other_names || "-"
@@ -1294,6 +1318,7 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-12">#</TableHead>
+                      <TableHead>Emp. No.</TableHead>
                       <TableHead>
                         <div className="flex items-center gap-2">
                           <span>Name</span>
@@ -1322,6 +1347,11 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
                     {filteredStaff.map((member, index) => (
                       <TableRow key={member.id}>
                         <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
+                        <TableCell>
+                          <span className="text-muted-foreground font-mono text-sm">
+                            {member.employee_number || "-"}
+                          </span>
+                        </TableCell>
                         <TableCell>
                           <Link
                             href={`/admin/staff/${member.id}`}
@@ -1617,6 +1647,21 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
               />
             </div>
 
+            <div>
+              <Label htmlFor="create_employee_number">
+                Employee Number <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="create_employee_number"
+                value={createUserForm.employeeNumber}
+                onChange={(e) => setCreateUserForm({ ...createUserForm, employeeNumber: e.target.value.toUpperCase() })}
+                placeholder="e.g., ACOB/2026/058"
+                className="mt-1.5 font-mono"
+                required
+              />
+              <p className="text-muted-foreground mt-1 text-xs">Format: ACOB/YEAR/NUMBER (e.g., ACOB/2026/058)</p>
+            </div>
+
             <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <Label htmlFor="create_email">
@@ -1890,6 +1935,17 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
                     {/* Personal Information */}
                     <div className="space-y-4">
                       <h4 className="text-foreground text-sm font-semibold">Personal Information</h4>
+                      <div>
+                        <Label htmlFor="edit_employee_number">Employee Number</Label>
+                        <Input
+                          id="edit_employee_number"
+                          value={editForm.employee_number}
+                          onChange={(e) => setEditForm({ ...editForm, employee_number: e.target.value })}
+                          placeholder="e.g., ACOB/2026/058"
+                          className="font-mono"
+                        />
+                        <p className="text-muted-foreground mt-1 text-xs">Format: ACOB/YEAR/NUMBER</p>
+                      </div>
                       <div className="grid gap-4 md:grid-cols-2">
                         <div>
                           <Label htmlFor="edit_first_name">First Name</Label>
