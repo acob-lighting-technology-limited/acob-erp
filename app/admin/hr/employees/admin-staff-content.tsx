@@ -740,10 +740,10 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
   const filteredStaff = staff
     .filter((member) => {
       const matchesSearch =
-        member.first_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        member.last_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        member.company_email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        member.company_role?.toLowerCase().includes(searchQuery.toLowerCase())
+        (member.first_name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (member.last_name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (member.company_email || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (member.company_role || "").toLowerCase().includes(searchQuery.toLowerCase())
 
       const matchesDepartment = departmentFilter.length === 0 || departmentFilter.includes(member.department)
 
