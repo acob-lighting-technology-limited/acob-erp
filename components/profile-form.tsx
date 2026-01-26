@@ -15,14 +15,13 @@ import { X } from "lucide-react"
 
 const DEPARTMENTS = [
   "Accounts",
-  "Legal, Regulatory and Compliance",
+  "Admin & HR",
+  "Business, Growth and Innovation",
   "IT and Communications",
-  "Operations",
+  "Legal, Regulatory and Compliance",
   "Logistics",
+  "Operations",
   "Technical",
-  "Administrative",
-  "Business Growth and Innovation",
-  "Others",
 ]
 
 const DEVICE_TYPES = ["Laptop", "Desktop"]

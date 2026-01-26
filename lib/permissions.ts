@@ -143,7 +143,7 @@ export function getRoleBadgeColor(role: UserRole): string {
 export const DEPARTMENTS = [
   "Accounts",
   "Admin & HR",
-  "Business Growth and Innovation",
+  "Business, Growth and Innovation",
   "IT and Communications",
   "Legal, Regulatory and Compliance",
   "Logistics",

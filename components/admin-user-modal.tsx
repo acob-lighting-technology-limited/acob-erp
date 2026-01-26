@@ -11,14 +11,13 @@ import { toast } from "sonner"
 
 const DEPARTMENTS = [
   "Accounts",
-  "Legal, Regulatory and Compliance",
+  "Admin & HR",
+  "Business, Growth and Innovation",
   "IT and Communications",
-  "Operations",
+  "Legal, Regulatory and Compliance",
   "Logistics",
+  "Operations",
   "Technical",
-  "Administrative",
-  "Business Growth and Innovation",
-  "Others",
 ]
 
 interface AdminUserModalProps {
