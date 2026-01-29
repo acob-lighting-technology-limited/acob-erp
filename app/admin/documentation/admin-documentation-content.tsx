@@ -11,7 +11,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { SearchableSelect } from "@/components/ui/searchable-select"
 import { Building2 } from "lucide-react"
 import { formatName } from "@/lib/utils"
-import { FileText, Search, Filter, Eye, User, Calendar, Tag, FolderOpen, LayoutGrid, List } from "lucide-react"
+import {
+  FileText,
+  Search,
+  Filter,
+  Eye,
+  User,
+  Calendar,
+  Tag,
+  FolderOpen,
+  LayoutGrid,
+  List,
+  ArrowLeft,
+} from "lucide-react"
+import Link from "next/link"
 import type { UserRole } from "@/types/database"
 
 export interface Documentation {
@@ -134,10 +147,15 @@ export function AdminDocumentationContent({
         {/* Header */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-foreground flex items-center gap-2 text-2xl font-bold sm:gap-3 sm:text-3xl">
-              <FileText className="text-primary h-6 w-6 sm:h-8 sm:w-8" />
-              Staff Documentation
-            </h1>
+            <div className="mb-2 flex items-center gap-2">
+              <Link href="/admin" className="text-muted-foreground hover:text-foreground transition-colors">
+                <ArrowLeft className="h-5 w-5" />
+              </Link>
+              <h1 className="text-foreground flex items-center gap-2 text-2xl font-bold sm:gap-3 sm:text-3xl">
+                <FileText className="text-primary h-6 w-6 sm:h-8 sm:w-8" />
+                Staff Documentation
+              </h1>
+            </div>
             <p className="text-muted-foreground mt-2 text-sm sm:text-base">
               View all staff documentation and knowledge base articles
             </p>

@@ -38,6 +38,29 @@
   --sidebar-accent-foreground: oklch(0.45 0.2 142);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.45 0.2 142);
+
+  /* ===== DESIGN SYSTEM TOKENS ===== */
+
+  /* Standard spacing */
+  --page-padding-mobile: 1rem; /* 16px */
+  --page-padding-desktop: 1.5rem; /* 24px */
+  --section-gap: 1.5rem; /* 24px */
+  --card-gap: 1rem; /* 16px */
+  --component-gap: 0.5rem; /* 8px */
+
+  /* Typography scale */
+  --text-page-title: 1.875rem; /* 30px - Page titles */
+  --text-section-title: 1.125rem; /* 18px - Section headers */
+  --text-card-title: 1rem; /* 16px - Card headers */
+  --text-body: 0.875rem; /* 14px - Body text */
+  --text-label: 0.75rem; /* 12px - Labels, muted text */
+  --text-small: 0.625rem; /* 10px - Small text */
+
+  /* Max widths */
+  --max-width-page: 80rem; /* 1280px - Full pages */
+  --max-width-content: 56rem; /* 896px - Content pages */
+  --max-width-form: 42rem; /* 672px - Forms, profiles */
+  --max-width-narrow: 32rem; /* 512px - Narrow forms, modals */
 }
 
 .dark {

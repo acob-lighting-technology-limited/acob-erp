@@ -1111,58 +1111,58 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
           <Card className="border-2">
-            <CardContent className="p-2.5">
+            <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div className="min-w-0 flex-1">
-                  <p className="text-muted-foreground truncate text-[10px] font-medium">Total Staff</p>
-                  <p className="text-foreground mt-0.5 text-base font-bold md:text-2xl">{stats.total}</p>
+                  <p className="text-muted-foreground text-sm font-medium">Total Staff</p>
+                  <p className="text-foreground mt-1 text-2xl font-bold">{stats.total}</p>
                 </div>
-                <div className="ml-1 shrink-0 rounded-lg bg-blue-100 p-1.5 dark:bg-blue-900/30">
-                  <Users className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                <div className="ml-2 shrink-0 rounded-lg bg-blue-100 p-2.5 dark:bg-blue-900/30">
+                  <Users className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
           <Card className="border-2">
-            <CardContent className="p-2.5">
+            <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div className="min-w-0 flex-1">
-                  <p className="text-muted-foreground truncate text-[10px] font-medium">Admins</p>
-                  <p className="text-foreground mt-0.5 text-base font-bold md:text-2xl">{stats.admins}</p>
+                  <p className="text-muted-foreground text-sm font-medium">Admins</p>
+                  <p className="text-foreground mt-1 text-2xl font-bold">{stats.admins}</p>
                 </div>
-                <div className="ml-1 flex-shrink-0 rounded-lg bg-red-100 p-1.5 dark:bg-red-900/30">
-                  <Shield className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
+                <div className="ml-2 flex-shrink-0 rounded-lg bg-red-100 p-2.5 dark:bg-red-900/30">
+                  <Shield className="h-5 w-5 text-red-600 dark:text-red-400" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
           <Card className="border-2">
-            <CardContent className="p-2.5">
+            <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div className="min-w-0 flex-1">
-                  <p className="text-muted-foreground truncate text-[10px] font-medium">Leads</p>
-                  <p className="text-foreground mt-0.5 text-base font-bold md:text-2xl">{stats.leads}</p>
+                  <p className="text-muted-foreground text-sm font-medium">Leads</p>
+                  <p className="text-foreground mt-1 text-2xl font-bold">{stats.leads}</p>
                 </div>
-                <div className="ml-1 flex-shrink-0 rounded-lg bg-purple-100 p-1.5 dark:bg-purple-900/30">
-                  <UserCog className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
+                <div className="ml-2 flex-shrink-0 rounded-lg bg-purple-100 p-2.5 dark:bg-purple-900/30">
+                  <UserCog className="h-5 w-5 text-purple-600 dark:text-purple-400" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
           <Card className="border-2">
-            <CardContent className="p-2.5">
+            <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div className="min-w-0 flex-1">
-                  <p className="text-muted-foreground truncate text-[10px] font-medium">Staff Members</p>
-                  <p className="text-foreground mt-0.5 text-base font-bold md:text-2xl">{stats.staff}</p>
+                  <p className="text-muted-foreground text-sm font-medium">Staff Members</p>
+                  <p className="text-foreground mt-1 text-2xl font-bold">{stats.staff}</p>
                 </div>
-                <div className="ml-1 flex-shrink-0 rounded-lg bg-green-100 p-1.5 dark:bg-green-900/30">
-                  <Users className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
+                <div className="ml-2 flex-shrink-0 rounded-lg bg-green-100 p-2.5 dark:bg-green-900/30">
+                  <Users className="h-5 w-5 text-green-600 dark:text-green-400" />
                 </div>
               </div>
             </CardContent>
