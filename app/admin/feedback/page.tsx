@@ -73,7 +73,11 @@ export default async function AdminFeedbackPage() {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="mb-2 flex items-center gap-2">
-              <Link href="/admin" className="text-muted-foreground hover:text-foreground transition-colors">
+              <Link
+                href="/admin"
+                aria-label="Back to admin"
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
                 <ArrowLeft className="h-5 w-5" />
               </Link>
               <h1 className="text-foreground flex items-center gap-2 text-2xl font-bold sm:gap-3 sm:text-3xl">

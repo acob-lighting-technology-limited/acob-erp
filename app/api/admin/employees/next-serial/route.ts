@@ -1,12 +1,11 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/client"
-import { cookies } from "next/headers"
+import { createClient } from "@/lib/supabase/server"
 
 export const dynamic = "force-dynamic"
 
 export async function GET() {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     // Check authentication
     const {
@@ -15,6 +14,13 @@ export async function GET() {
 
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    // Check authorization - restrict to admins
+    const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
+
+    if (!profile || !["super_admin", "admin"].includes(profile.role)) {
+      return NextResponse.json({ error: "Forbidden: Admin access required" }, { status: 403 })
     }
 
     // Call the database function to get the next serial

@@ -63,10 +63,10 @@ export class ProductService extends BaseService {
   async getLowStockProducts() {
     const supabase = await this.getClient()
 
-    const { data, error } = await supabase.from(this.tableName).select("*").lte("quantity_on_hand", "reorder_level")
+    const { data, error } = await supabase.from(this.tableName).select("*")
 
     if (error) throw error
-    return data || []
+    return (data || []).filter((p: any) => p.quantity_on_hand <= p.reorder_level)
   }
 
   /**

@@ -64,11 +64,19 @@ async function getPageData() {
   }
 
   // 3. Fetch data
-  const [{ data: items }, { count: total }, { count: active }] = await Promise.all([
+  const [
+    { data: items, error: itemsError },
+    { count: total, error: totalError },
+    { count: active, error: activeError },
+  ] = await Promise.all([
     supabase.from("items").select("*").order("created_at", { ascending: false }),
     supabase.from("items").select("*", { count: "exact", head: true }),
     supabase.from("items").select("*", { count: "exact", head: true }).eq("status", "active"),
   ])
+
+  if (itemsError || totalError || activeError) {
+    throw itemsError ?? totalError ?? activeError
+  }
 
   return {
     items: (items || []) as Item[],

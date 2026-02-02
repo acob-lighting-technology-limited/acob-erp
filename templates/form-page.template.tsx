@@ -117,7 +117,7 @@ export default async function FormPage({ params }: FormPageProps) {
               <CardTitle>Basic Information</CardTitle>
             </CardHeader>
             <CardContent>
-              <form className="space-y-4">
+              <form id="item-form" className="space-y-4">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="name">Name *</Label>
@@ -176,7 +176,7 @@ export default async function FormPage({ params }: FormPageProps) {
           </Card>
 
           {/* Submit Button */}
-          <Button type="submit" className="w-full">
+          <Button type="submit" form="item-form" className="w-full">
             <Package className="mr-2 h-4 w-4" />
             {pageData.isEditing ? "Update Item" : "Create Item"}
           </Button>

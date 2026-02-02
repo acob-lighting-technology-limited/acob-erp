@@ -44,40 +44,62 @@ export class TaskService extends BaseService {
     const { data, error } = await query
     if (error) throw error
 
-    // Fetch user details for assigned tasks
-    const tasksWithUsers = await Promise.all(
-      (data || []).map(async (task: any) => {
-        const taskData: any = { ...task }
+    const tasks = data || []
+    if (tasks.length === 0) return []
 
-        if (task.assignment_type === "individual" && task.assigned_to) {
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("first_name, last_name, department")
-            .eq("id", task.assigned_to)
-            .single()
-
-          taskData.assigned_to_user = profile
-        }
-
-        if (task.assignment_type === "multiple") {
-          const { data: assignments } = await supabase.from("task_assignments").select("user_id").eq("task_id", task.id)
-
-          if (assignments && assignments.length > 0) {
-            const userIds = assignments.map((a: any) => a.user_id)
-            const { data: profiles } = await supabase
-              .from("profiles")
-              .select("id, first_name, last_name")
-              .in("id", userIds)
-
-            taskData.assigned_users = profiles || []
-          }
-        }
-
-        return taskData
-      })
+    // Collect IDs for batch fetching
+    const individualUserIds = Array.from(
+      new Set(
+        tasks.filter((t: any) => t.assignment_type === "individual" && t.assigned_to).map((t: any) => t.assigned_to)
+      )
     )
+    const multipleTaskIds = tasks.filter((t: any) => t.assignment_type === "multiple").map((t: any) => t.id)
 
-    return tasksWithUsers
+    // Batch fetch data
+    const [profilesResult, assignmentsResult] = await Promise.all([
+      individualUserIds.length > 0
+        ? supabase.from("profiles").select("id, first_name, last_name, department").in("id", individualUserIds)
+        : { data: [] },
+      multipleTaskIds.length > 0
+        ? supabase.from("task_assignments").select("task_id, user_id").in("task_id", multipleTaskIds)
+        : { data: [] },
+    ])
+
+    // Fetch details for multiple assignments if needed
+    let multipleProfiles: any[] = []
+    if (assignmentsResult.data && assignmentsResult.data.length > 0) {
+      const multipleUserIds = Array.from(new Set(assignmentsResult.data.map((a: any) => a.user_id)))
+      const { data: mProfiles } = await supabase
+        .from("profiles")
+        .select("id, first_name, last_name")
+        .in("id", multipleUserIds)
+      multipleProfiles = mProfiles || []
+    }
+
+    // Build lookup maps
+    const profileMap = new Map((profilesResult.data || []).map((p: any) => [p.id, p]))
+    const multipleProfileMap = new Map(multipleProfiles.map((p: any) => [p.id, p]))
+    const assignmentsMap = new Map<string, string[]>()
+    ;(assignmentsResult.data || []).forEach((a: any) => {
+      const existing = assignmentsMap.get(a.task_id) || []
+      assignmentsMap.set(a.task_id, [...existing, a.user_id])
+    })
+
+    // Enrich tasks
+    return tasks.map((task: any) => {
+      const taskData = { ...task }
+
+      if (task.assignment_type === "individual" && task.assigned_to) {
+        taskData.assigned_to_user = profileMap.get(task.assigned_to)
+      }
+
+      if (task.assignment_type === "multiple") {
+        const userIds = assignmentsMap.get(task.id) || []
+        taskData.assigned_users = userIds.map((id) => multipleProfileMap.get(id)).filter(Boolean)
+      }
+
+      return taskData
+    })
   }
 
   /**

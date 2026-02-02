@@ -380,15 +380,15 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
 
     // Check documents for earlier dates
     if (payment.documents?.length) {
-      payment.documents.forEach((doc) => {
-        if (!doc.applicable_date) return
+      for (const doc of payment.documents) {
+        if (!doc.applicable_date) continue
         // applicable_date is string YYYY-MM-DD
         // parseISO handles YYYY-MM-DD correctly (local time)
         const docDate = parseISO(doc.applicable_date)
         if (isBefore(docDate, startDate)) {
           startDate = docDate
         }
-      })
+      }
     }
 
     const today = startOfDay(new Date())
@@ -544,7 +544,7 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
     if (!payment) return
     setEditFormData({
       department_id: payment.department_id,
-      category: payment.category as "one-time" | "recurring",
+      category: payment.payment_type,
       title: payment.title,
       description: payment.description || "",
       amount: payment.amount.toString(),
@@ -573,6 +573,7 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
       setUpdating(true)
       const payload = {
         ...editFormData,
+        payment_type: editFormData.category,
         amount: parseFloat(editFormData.amount),
         next_payment_due: editFormData.next_payment_due || null,
         payment_date: editFormData.payment_date || null,
@@ -624,9 +625,8 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
   const markAsPaid = async (targetDate?: Date | any) => {
     if (!payment) return
 
-    const dateToPay = targetDate instanceof Date ? targetDate : parseISO(payment.next_payment_due!)
-
     if (payment.payment_type === "recurring" && payment.next_payment_due && payment.recurrence_period) {
+      const dateToPay = targetDate instanceof Date ? targetDate : parseISO(payment.next_payment_due)
       const dateStr = format(dateToPay, "yyyy-MM-dd")
       const hasReceipt = payment.documents?.some((d) => d.applicable_date === dateStr && d.document_type === "receipt")
 
