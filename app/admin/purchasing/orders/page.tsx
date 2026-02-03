@@ -8,9 +8,13 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ArrowLeft, Plus, ShoppingCart, Search, Filter, Eye } from "lucide-react"
+import { Plus, ShoppingCart, Search, Filter, Eye } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
+import { PageWrapper, PageHeader } from "@/components/layout"
+import { StatCard } from "@/components/ui/stat-card"
+import { EmptyState } from "@/components/ui/empty-state"
+import { Skeleton } from "@/components/ui/skeleton"
 
 interface PurchaseOrder {
   id: string
@@ -91,91 +95,72 @@ export default function PurchaseOrdersPage() {
   }
 
   return (
-    <div className="container mx-auto space-y-6 p-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="mb-1 flex items-center gap-2">
-            <Link href="/admin/purchasing" className="text-muted-foreground hover:text-foreground">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-            <h1 className="text-3xl font-bold">Purchase Orders</h1>
-          </div>
-          <p className="text-muted-foreground">Manage purchase orders</p>
-        </div>
-        <Link href="/admin/purchasing/orders/new">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Create PO
-          </Button>
-        </Link>
-      </div>
+    <PageWrapper maxWidth="full" background="gradient">
+      <PageHeader
+        title="Purchase Orders"
+        description="Manage purchase orders"
+        icon={ShoppingCart}
+        backLink={{ href: "/admin/purchasing", label: "Back to Purchasing" }}
+        actions={
+          <Link href="/admin/purchasing/orders/new">
+            <Button>
+              <Plus className="mr-2 h-4 w-4" />
+              Create PO
+            </Button>
+          </Link>
+        }
+      />
 
       {/* Stats */}
       <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Orders</CardTitle>
-            <ShoppingCart className="text-muted-foreground h-4 w-4" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.total}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending</CardTitle>
-            <ShoppingCart className="h-4 w-4 text-orange-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-orange-600">{stats.pending}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Approved</CardTitle>
-            <ShoppingCart className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{stats.approved}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Value</CardTitle>
-            <ShoppingCart className="text-muted-foreground h-4 w-4" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(stats.totalValue)}</div>
-          </CardContent>
-        </Card>
+        <StatCard title="Total Orders" value={stats.total} icon={ShoppingCart} />
+        <StatCard
+          title="Pending"
+          value={stats.pending}
+          icon={ShoppingCart}
+          iconBgColor="bg-orange-100 dark:bg-orange-900/30"
+          iconColor="text-orange-600 dark:text-orange-400"
+        />
+        <StatCard
+          title="Approved"
+          value={stats.approved}
+          icon={ShoppingCart}
+          iconBgColor="bg-green-100 dark:bg-green-900/30"
+          iconColor="text-green-600 dark:text-green-400"
+        />
+        <StatCard title="Total Value" value={formatCurrency(stats.totalValue)} icon={ShoppingCart} />
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-        <div className="relative flex-1">
-          <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-          <Input
-            placeholder="Search by PO# or supplier..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
-          />
-        </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[180px]">
-            <Filter className="mr-2 h-4 w-4" />
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="draft">Draft</SelectItem>
-            <SelectItem value="pending">Pending</SelectItem>
-            <SelectItem value="approved">Approved</SelectItem>
-            <SelectItem value="received">Received</SelectItem>
-            <SelectItem value="cancelled">Cancelled</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+            <div className="relative flex-1">
+              <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+              <Input
+                placeholder="Search by PO# or supplier..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[180px]">
+                <Filter className="mr-2 h-4 w-4" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="draft">Draft</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="approved">Approved</SelectItem>
+                <SelectItem value="received">Received</SelectItem>
+                <SelectItem value="cancelled">Cancelled</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
@@ -184,20 +169,25 @@ export default function PurchaseOrdersPage() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="border-primary h-8 w-8 animate-spin rounded-full border-4 border-t-transparent"></div>
+            <div className="space-y-3">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="flex items-center gap-4">
+                  <Skeleton className="h-4 w-20" />
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-4 w-20" />
+                  <Skeleton className="h-5 w-16" />
+                </div>
+              ))}
             </div>
           ) : filtered.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <ShoppingCart className="text-muted-foreground mb-4 h-12 w-12" />
-              <h3 className="font-semibold">No purchase orders yet</h3>
-              <Link href="/admin/purchasing/orders/new">
-                <Button className="mt-4">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Create PO
-                </Button>
-              </Link>
-            </div>
+            <EmptyState
+              icon={ShoppingCart}
+              title="No purchase orders yet"
+              description="Create your first purchase order."
+              action={{ label: "Create PO", href: "/admin/purchasing/orders/new", icon: Plus }}
+            />
           ) : (
             <Table>
               <TableHeader>
@@ -238,6 +228,6 @@ export default function PurchaseOrdersPage() {
           )}
         </CardContent>
       </Card>
-    </div>
+    </PageWrapper>
   )
 }

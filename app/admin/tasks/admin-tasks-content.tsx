@@ -42,7 +42,9 @@ import {
   List,
   Users,
   Building2,
+  ArrowLeft,
 } from "lucide-react"
+import Link from "next/link"
 import { Checkbox } from "@/components/ui/checkbox"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { dateValidation } from "@/lib/validation"
@@ -504,10 +506,19 @@ export function AdminTasksContent({
         {/* Header */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-foreground flex items-center gap-2 text-2xl font-bold sm:gap-3 sm:text-3xl">
-              <ClipboardList className="text-primary h-6 w-6 sm:h-8 sm:w-8" />
-              Task Management
-            </h1>
+            <div className="mb-2 flex items-center gap-2">
+              <Link
+                href="/admin"
+                aria-label="Back to admin"
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </Link>
+              <h1 className="text-foreground flex items-center gap-2 text-2xl font-bold sm:gap-3 sm:text-3xl">
+                <ClipboardList className="text-primary h-6 w-6 sm:h-8 sm:w-8" />
+                Task Management
+              </h1>
+            </div>
             <p className="text-muted-foreground mt-2 text-sm sm:text-base">Create and manage tasks for your team</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">

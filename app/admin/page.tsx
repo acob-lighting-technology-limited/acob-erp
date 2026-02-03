@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import Link from "next/link"
 import {
   Users,
@@ -15,6 +15,8 @@ import {
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { formatName } from "@/lib/utils"
+import { PageWrapper, PageHeader, Section } from "@/components/layout"
+import { StatCard } from "@/components/ui/stat-card"
 
 export default async function AdminDashboardPage() {
   const supabase = await createClient()
@@ -302,220 +304,178 @@ export default async function AdminDashboardPage() {
   }
 
   return (
-    <div className="from-background via-background to-muted/20 min-h-screen bg-gradient-to-br p-4 md:p-6">
-      <div className="mx-auto max-w-7xl space-y-5">
-        {/* Header */}
-        <div>
-          <div className="mb-1 flex items-center gap-2">
-            <Shield className="text-primary h-6 w-6" />
-            <h1 className="text-foreground text-2xl font-bold md:text-3xl">Admin Dashboard</h1>
-          </div>
-          <p className="text-muted-foreground text-sm">
-            Welcome back, {formatName(profile?.first_name) || "Admin"}! Manage your organization from here.
-          </p>
-        </div>
+    <PageWrapper maxWidth="full" background="gradient">
+      <PageHeader
+        title="Admin Dashboard"
+        description={`Welcome back, ${formatName(profile?.first_name) || "Admin"}! Manage your organization from here.`}
+        icon={Shield}
+      />
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-2 gap-2 lg:grid-cols-5">
-          <Card className="border">
-            <CardContent className="p-2.5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-muted-foreground text-[10px] font-medium">Total Staff</p>
-                  <p className="text-foreground mt-0.5 text-lg font-bold">{staffCount || 0}</p>
-                </div>
-                <div className="rounded-lg bg-blue-100 p-1.5 dark:bg-blue-900/30">
-                  <Users className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border">
-            <CardContent className="p-2.5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-muted-foreground text-[10px] font-medium">Assets</p>
-                  <p className="text-foreground mt-0.5 text-lg font-bold">{assetCount || 0}</p>
-                </div>
-                <div className="rounded-lg bg-purple-100 p-1.5 dark:bg-purple-900/30">
-                  <Package className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border">
-            <CardContent className="p-2.5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-muted-foreground text-[10px] font-medium">Active Tasks</p>
-                  <p className="text-foreground mt-0.5 text-lg font-bold">{taskCount || 0}</p>
-                </div>
-                <div className="rounded-lg bg-green-100 p-1.5 dark:bg-green-900/30">
-                  <ClipboardList className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border">
-            <CardContent className="p-2.5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-muted-foreground text-[10px] font-medium">Documents</p>
-                  <p className="text-foreground mt-0.5 text-lg font-bold">{docCount || 0}</p>
-                </div>
-                <div className="rounded-lg bg-orange-100 p-1.5 dark:bg-orange-900/30">
-                  <FileText className="h-3.5 w-3.5 text-orange-600 dark:text-orange-400" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border">
-            <CardContent className="p-2.5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-muted-foreground text-[10px] font-medium">Feedback</p>
-                  <p className="text-foreground mt-0.5 text-lg font-bold">{feedbackCount || 0}</p>
-                </div>
-                <div className="rounded-lg bg-cyan-100 p-1.5 dark:bg-cyan-900/30">
-                  <MessageSquare className="h-3.5 w-3.5 text-cyan-600 dark:text-cyan-400" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Quick Actions */}
-        <div>
-          <h2 className="mb-2 text-base font-bold md:text-lg">Quick Actions</h2>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {filteredActions.map((action) => (
-              <Link key={action.href} href={action.href} className="h-full">
-                <Card className="flex h-full cursor-pointer flex-col border transition-all hover:-translate-y-0.5 hover:shadow-md">
-                  <CardContent className="flex flex-1 flex-col p-2.5">
-                    <div className="flex items-center gap-2">
-                      <div className={`${action.color} shrink-0 rounded-lg p-1.5 text-white`}>
-                        <action.icon className="h-3.5 w-3.5" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <h3 className="text-foreground mb-0.5 truncate text-xs font-semibold">{action.title}</h3>
-                        <p className="text-muted-foreground line-clamp-2 text-[10px]">{action.description}</p>
-                      </div>
-                      <ArrowRight className="text-muted-foreground group-hover:text-primary hidden h-3.5 w-3.5 flex-shrink-0 transition-colors sm:block" />
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            ))}
-          </div>
-        </div>
-
-        {/* Recent Activity */}
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          {/* Recent Tasks */}
-          <Card className="border">
-            <CardHeader className="bg-muted/30 border-b px-4 py-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2 text-sm md:text-base">
-                  <ClipboardList className="h-4 w-4" />
-                  Recent Tasks
-                </CardTitle>
-                <Link href="/admin/tasks">
-                  <Badge variant="outline" className="hover:bg-accent cursor-pointer text-xs">
-                    View All
-                  </Badge>
-                </Link>
-              </div>
-            </CardHeader>
-            <CardContent className="p-3">
-              {tasksWithUsers && tasksWithUsers.length > 0 ? (
-                <div className="space-y-2">
-                  {tasksWithUsers.map((task: any) => (
-                    <div
-                      key={task.id}
-                      className="flex flex-col gap-2 border-b py-2 last:border-0 sm:flex-row sm:items-center"
-                    >
-                      <p className="text-foreground min-w-0 flex-1 truncate text-sm font-medium">{task.title}</p>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Badge className={`${getStatusColor(task.status)} shrink-0 text-xs`} variant="outline">
-                          {task.status}
-                        </Badge>
-                        {task.priority && (
-                          <Badge variant="outline" className="shrink-0 text-xs">
-                            {task.priority}
-                          </Badge>
-                        )}
-                        {task.assigned_to_user && (
-                          <span className="text-muted-foreground shrink-0 text-xs whitespace-nowrap">
-                            {formatName(task.assigned_to_user.first_name)} {formatName(task.assigned_to_user.last_name)}
-                          </span>
-                        )}
-                        <span className="text-muted-foreground shrink-0 text-xs whitespace-nowrap">
-                          {formatDate(task.created_at)}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-muted-foreground py-8 text-center text-sm">No recent tasks</p>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Recent Feedback */}
-          <Card className="border">
-            <CardHeader className="bg-muted/30 border-b px-4 py-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2 text-sm md:text-base">
-                  <MessageSquare className="h-4 w-4" />
-                  Recent Feedback
-                </CardTitle>
-                <Link href="/admin/feedback">
-                  <Badge variant="outline" className="hover:bg-accent cursor-pointer text-xs">
-                    View All
-                  </Badge>
-                </Link>
-              </div>
-            </CardHeader>
-            <CardContent className="p-3">
-              {feedbackWithUsers && feedbackWithUsers.length > 0 ? (
-                <div className="space-y-2">
-                  {feedbackWithUsers.map((feedback: any) => (
-                    <div
-                      key={feedback.id}
-                      className="flex flex-col gap-2 border-b py-2 last:border-0 sm:flex-row sm:items-center"
-                    >
-                      <p className="text-foreground min-w-0 flex-1 truncate text-sm font-medium">{feedback.title}</p>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Badge variant="outline" className="shrink-0 text-xs">
-                          {feedback.feedback_type || "N/A"}
-                        </Badge>
-                        <Badge className={`${getStatusColor(feedback.status)} shrink-0 text-xs`} variant="outline">
-                          {feedback.status}
-                        </Badge>
-                        {feedback.user && (
-                          <span className="text-muted-foreground shrink-0 text-xs whitespace-nowrap">
-                            {formatName(feedback.user.first_name)} {formatName(feedback.user.last_name)}
-                          </span>
-                        )}
-                        <span className="text-muted-foreground shrink-0 text-xs whitespace-nowrap">
-                          {formatDate(feedback.created_at)}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-muted-foreground py-8 text-center text-sm">No recent feedback</p>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+      {/* Stats Grid */}
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+        <StatCard
+          title="Total Staff"
+          value={staffCount || 0}
+          icon={Users}
+          iconBgColor="bg-blue-100 dark:bg-blue-900/30"
+          iconColor="text-blue-600 dark:text-blue-400"
+        />
+        <StatCard
+          title="Assets"
+          value={assetCount || 0}
+          icon={Package}
+          iconBgColor="bg-purple-100 dark:bg-purple-900/30"
+          iconColor="text-purple-600 dark:text-purple-400"
+        />
+        <StatCard
+          title="Active Tasks"
+          value={taskCount || 0}
+          icon={ClipboardList}
+          iconBgColor="bg-green-100 dark:bg-green-900/30"
+          iconColor="text-green-600 dark:text-green-400"
+        />
+        <StatCard
+          title="Documents"
+          value={docCount || 0}
+          icon={FileText}
+          iconBgColor="bg-orange-100 dark:bg-orange-900/30"
+          iconColor="text-orange-600 dark:text-orange-400"
+        />
+        <StatCard
+          title="Feedback"
+          value={feedbackCount || 0}
+          icon={MessageSquare}
+          iconBgColor="bg-cyan-100 dark:bg-cyan-900/30"
+          iconColor="text-cyan-600 dark:text-cyan-400"
+        />
       </div>
-    </div>
+
+      {/* Quick Actions */}
+      <Section title="Quick Actions">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {filteredActions.map((action) => (
+            <Link key={action.href} href={action.href} className="h-full">
+              <Card className="group flex h-full cursor-pointer flex-col border transition-all hover:-translate-y-1 hover:shadow-lg">
+                <CardContent className="flex flex-1 flex-col p-4">
+                  <div className="flex items-start gap-3">
+                    <div className={`${action.color} shrink-0 rounded-lg p-2.5 text-white`}>
+                      <action.icon className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-foreground mb-1 text-sm font-semibold">{action.title}</h3>
+                      <p className="text-muted-foreground line-clamp-2 text-xs">{action.description}</p>
+                    </div>
+                    <ArrowRight className="text-muted-foreground group-hover:text-primary h-4 w-4 flex-shrink-0 transition-colors" />
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+          ))}
+        </div>
+      </Section>
+
+      {/* Recent Activity */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {/* Recent Tasks */}
+        <Card className="border">
+          <CardHeader className="bg-muted/30 border-b px-4 py-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-sm md:text-base">
+                <ClipboardList className="h-4 w-4" />
+                Recent Tasks
+              </CardTitle>
+              <Link href="/admin/tasks">
+                <Badge variant="outline" className="hover:bg-accent cursor-pointer text-xs">
+                  View All
+                </Badge>
+              </Link>
+            </div>
+          </CardHeader>
+          <CardContent className="p-3">
+            {tasksWithUsers && tasksWithUsers.length > 0 ? (
+              <div className="space-y-2">
+                {tasksWithUsers.map((task: any) => (
+                  <div
+                    key={task.id}
+                    className="flex flex-col gap-2 border-b py-2 last:border-0 sm:flex-row sm:items-center"
+                  >
+                    <p className="text-foreground min-w-0 flex-1 truncate text-sm font-medium">{task.title}</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge className={`${getStatusColor(task.status)} shrink-0 text-xs`} variant="outline">
+                        {task.status}
+                      </Badge>
+                      {task.priority && (
+                        <Badge variant="outline" className="shrink-0 text-xs">
+                          {task.priority}
+                        </Badge>
+                      )}
+                      {task.assigned_to_user && (
+                        <span className="text-muted-foreground shrink-0 text-xs whitespace-nowrap">
+                          {formatName(task.assigned_to_user.first_name)} {formatName(task.assigned_to_user.last_name)}
+                        </span>
+                      )}
+                      <span className="text-muted-foreground shrink-0 text-xs whitespace-nowrap">
+                        {formatDate(task.created_at)}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-muted-foreground py-8 text-center text-sm">No recent tasks</p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Recent Feedback */}
+        <Card className="border">
+          <CardHeader className="bg-muted/30 border-b px-4 py-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-sm md:text-base">
+                <MessageSquare className="h-4 w-4" />
+                Recent Feedback
+              </CardTitle>
+              <Link href="/admin/feedback">
+                <Badge variant="outline" className="hover:bg-accent cursor-pointer text-xs">
+                  View All
+                </Badge>
+              </Link>
+            </div>
+          </CardHeader>
+          <CardContent className="p-3">
+            {feedbackWithUsers && feedbackWithUsers.length > 0 ? (
+              <div className="space-y-2">
+                {feedbackWithUsers.map((feedback: any) => (
+                  <div
+                    key={feedback.id}
+                    className="flex flex-col gap-2 border-b py-2 last:border-0 sm:flex-row sm:items-center"
+                  >
+                    <p className="text-foreground min-w-0 flex-1 truncate text-sm font-medium">{feedback.title}</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="outline" className="shrink-0 text-xs">
+                        {feedback.feedback_type || "N/A"}
+                      </Badge>
+                      <Badge className={`${getStatusColor(feedback.status)} shrink-0 text-xs`} variant="outline">
+                        {feedback.status}
+                      </Badge>
+                      {feedback.user && (
+                        <span className="text-muted-foreground shrink-0 text-xs whitespace-nowrap">
+                          {formatName(feedback.user.first_name)} {formatName(feedback.user.last_name)}
+                        </span>
+                      )}
+                      <span className="text-muted-foreground shrink-0 text-xs whitespace-nowrap">
+                        {formatDate(feedback.created_at)}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-muted-foreground py-8 text-center text-sm">No recent feedback</p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </PageWrapper>
   )
 }

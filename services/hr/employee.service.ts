@@ -51,10 +51,20 @@ export class EmployeeService extends BaseService {
     data: {
       first_name?: string
       last_name?: string
+      other_names?: string
       department?: string
       role?: string
-      phone?: string
+      phone_number?: string
+      additional_phone?: string
       office_location?: string
+      residential_address?: string
+      current_work_location?: string
+      bank_name?: string
+      bank_account_number?: string
+      bank_account_name?: string
+      date_of_birth?: string
+      employment_date?: string
+      job_description?: string
     }
   ) {
     const supabase = await this.getClient()

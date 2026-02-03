@@ -8,9 +8,13 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ArrowLeft, Plus, Receipt, Search, Filter, Eye, CheckCircle } from "lucide-react"
+import { Plus, Receipt, Search, Filter, Eye, CheckCircle } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
+import { PageWrapper, PageHeader } from "@/components/layout"
+import { StatCard } from "@/components/ui/stat-card"
+import { EmptyState } from "@/components/ui/empty-state"
+import { Skeleton } from "@/components/ui/skeleton"
 
 interface Bill {
   id: string
@@ -104,98 +108,79 @@ export default function BillsPage() {
   }
 
   return (
-    <div className="container mx-auto space-y-6 p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="mb-1 flex items-center gap-2">
-            <Link href="/admin/finance" className="text-muted-foreground hover:text-foreground">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-            <h1 className="text-3xl font-bold">Bills</h1>
-          </div>
-          <p className="text-muted-foreground">Track vendor bills and expenses</p>
-        </div>
-        <Link href="/admin/finance/bills/new">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Bill
-          </Button>
-        </Link>
-      </div>
+    <PageWrapper maxWidth="full" background="gradient">
+      <PageHeader
+        title="Bills"
+        description="Track vendor bills and expenses"
+        icon={Receipt}
+        backLink={{ href: "/admin/finance", label: "Back to Finance" }}
+        actions={
+          <Link href="/admin/finance/bills/new">
+            <Button>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Bill
+            </Button>
+          </Link>
+        }
+      />
 
       {/* Stats */}
       <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Bills</CardTitle>
-            <Receipt className="text-muted-foreground h-4 w-4" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.total}</div>
-            <p className="text-muted-foreground text-xs">{stats.pending} pending approval</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Owed</CardTitle>
-            <Receipt className="text-muted-foreground h-4 w-4" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(stats.totalAmount)}</div>
-            <p className="text-muted-foreground text-xs">All bills</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Paid</CardTitle>
-            <Receipt className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{formatCurrency(stats.totalPaid)}</div>
-            <p className="text-muted-foreground text-xs">{stats.paid} bills paid</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Outstanding</CardTitle>
-            <Receipt className="h-4 w-4 text-orange-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-orange-600">
-              {formatCurrency(stats.totalAmount - stats.totalPaid)}
-            </div>
-            <p className="text-muted-foreground text-xs">{stats.overdue} overdue</p>
-          </CardContent>
-        </Card>
+        <StatCard
+          title="Total Bills"
+          value={stats.total}
+          icon={Receipt}
+          description={`${stats.pending} pending approval`}
+        />
+        <StatCard title="Total Owed" value={formatCurrency(stats.totalAmount)} icon={Receipt} description="All bills" />
+        <StatCard
+          title="Paid"
+          value={formatCurrency(stats.totalPaid)}
+          icon={Receipt}
+          iconBgColor="bg-green-100 dark:bg-green-900/30"
+          iconColor="text-green-600 dark:text-green-400"
+          description={`${stats.paid} bills paid`}
+        />
+        <StatCard
+          title="Outstanding"
+          value={formatCurrency(stats.totalAmount - stats.totalPaid)}
+          icon={Receipt}
+          iconBgColor="bg-orange-100 dark:bg-orange-900/30"
+          iconColor="text-orange-600 dark:text-orange-400"
+          description={`${stats.overdue} overdue`}
+        />
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-        <div className="relative flex-1">
-          <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-          <Input
-            placeholder="Search by bill number or supplier..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
-          />
-        </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[180px]">
-            <Filter className="mr-2 h-4 w-4" />
-            <SelectValue placeholder="Filter by status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="pending">Pending</SelectItem>
-            <SelectItem value="approved">Approved</SelectItem>
-            <SelectItem value="paid">Paid</SelectItem>
-            <SelectItem value="overdue">Overdue</SelectItem>
-            <SelectItem value="cancelled">Cancelled</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+            <div className="relative flex-1">
+              <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+              <Input
+                placeholder="Search by bill number or supplier..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[180px]">
+                <Filter className="mr-2 h-4 w-4" />
+                <SelectValue placeholder="Filter by status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="approved">Approved</SelectItem>
+                <SelectItem value="paid">Paid</SelectItem>
+                <SelectItem value="overdue">Overdue</SelectItem>
+                <SelectItem value="cancelled">Cancelled</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Bills Table */}
       <Card>
@@ -207,21 +192,25 @@ export default function BillsPage() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="border-primary h-8 w-8 animate-spin rounded-full border-4 border-t-transparent"></div>
+            <div className="space-y-3">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="flex items-center gap-4">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-4 w-20" />
+                  <Skeleton className="h-5 w-16" />
+                </div>
+              ))}
             </div>
           ) : filteredBills.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <Receipt className="text-muted-foreground mb-4 h-12 w-12" />
-              <h3 className="text-lg font-semibold">No bills yet</h3>
-              <p className="text-muted-foreground mb-4 text-sm">Add your first bill to start tracking expenses.</p>
-              <Link href="/admin/finance/bills/new">
-                <Button>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Bill
-                </Button>
-              </Link>
-            </div>
+            <EmptyState
+              icon={Receipt}
+              title="No bills yet"
+              description="Add your first bill to start tracking expenses."
+              action={{ label: "Add Bill", href: "/admin/finance/bills/new", icon: Plus }}
+            />
           ) : (
             <Table>
               <TableHeader>
@@ -278,6 +267,6 @@ export default function BillsPage() {
           )}
         </CardContent>
       </Card>
-    </div>
+    </PageWrapper>
   )
 }

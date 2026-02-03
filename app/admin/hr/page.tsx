@@ -4,8 +4,10 @@ import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Calendar, Clock, TrendingUp, Users, CheckCircle, AlertCircle, FileText, ArrowLeft } from "lucide-react"
+import { Calendar, Clock, TrendingUp, Users, CheckCircle, AlertCircle, FileText, Building } from "lucide-react"
 import Link from "next/link"
+import { PageWrapper, PageHeader, Section } from "@/components/layout"
+import { StatCard } from "@/components/ui/stat-card"
 
 interface DashboardStats {
   pendingLeaveRequests: number
@@ -58,203 +60,175 @@ export default function HRAdminDashboard() {
   }
 
   return (
-    <div className="container mx-auto space-y-6 p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="mb-1 flex items-center gap-2">
-            <Link href="/admin" className="text-muted-foreground hover:text-foreground">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-            <h1 className="text-3xl font-bold">HR Administration</h1>
-          </div>
-          <p className="text-muted-foreground">Manage leave approvals, attendance reports, and performance reviews</p>
-        </div>
-      </div>
+    <PageWrapper maxWidth="full" background="gradient">
+      <PageHeader
+        title="HR Administration"
+        description="Manage leave approvals, attendance reports, and performance reviews"
+        icon={Users}
+        backLink={{ href: "/admin", label: "Back to Admin" }}
+      />
 
       {/* Stats Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending Leave</CardTitle>
-            <Calendar className="text-muted-foreground h-4 w-4" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.pendingLeaveRequests}</div>
-            <p className="text-muted-foreground text-xs">Requests awaiting approval</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Today's Attendance</CardTitle>
-            <Clock className="text-muted-foreground h-4 w-4" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.todayAttendance}</div>
-            <p className="text-muted-foreground text-xs">Staff clocked in today</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending Reviews</CardTitle>
-            <FileText className="text-muted-foreground h-4 w-4" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.upcomingReviews}</div>
-            <p className="text-muted-foreground text-xs">Reviews to complete</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Staff</CardTitle>
-            <Users className="text-muted-foreground h-4 w-4" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalStaff}</div>
-            <p className="text-muted-foreground text-xs">Registered employees</p>
-          </CardContent>
-        </Card>
+        <StatCard
+          title="Pending Leave"
+          value={stats.pendingLeaveRequests}
+          icon={Calendar}
+          description="Requests awaiting approval"
+        />
+        <StatCard
+          title="Today's Attendance"
+          value={stats.todayAttendance}
+          icon={Clock}
+          description="Staff clocked in today"
+        />
+        <StatCard
+          title="Pending Reviews"
+          value={stats.upcomingReviews}
+          icon={FileText}
+          description="Reviews to complete"
+        />
+        <StatCard title="Total Staff" value={stats.totalStaff} icon={Users} description="Registered employees" />
       </div>
 
       {/* Admin Actions */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {/* Employees Management */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Employees
-            </CardTitle>
-            <CardDescription>Manage employee profiles and information</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Link href="/admin/hr/employees">
-              <Button className="w-full">Manage Employees ({stats.totalStaff})</Button>
-            </Link>
-          </CardContent>
-        </Card>
+      <Section title="HR Management">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {/* Employees Management */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Employees
+              </CardTitle>
+              <CardDescription>Manage employee profiles and information</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Link href="/admin/hr/employees">
+                <Button className="w-full">Manage Employees ({stats.totalStaff})</Button>
+              </Link>
+            </CardContent>
+          </Card>
 
-        {/* Departments */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Departments
-            </CardTitle>
-            <CardDescription>Manage company departments</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Link href="/admin/hr/departments">
-              <Button className="w-full" variant="outline">Manage Departments</Button>
-            </Link>
-          </CardContent>
-        </Card>
+          {/* Departments */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Building className="h-5 w-5" />
+                Departments
+              </CardTitle>
+              <CardDescription>Manage company departments</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Link href="/admin/hr/departments">
+                <Button className="w-full" variant="outline">
+                  Manage Departments
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
 
-        {/* Leave Approvals */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
-              Leave Approvals
-            </CardTitle>
-            <CardDescription>Review and approve leave requests</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Link href="/admin/hr/leave/approve">
-              <Button className="w-full">Approve Requests ({stats.pendingLeaveRequests})</Button>
-            </Link>
-          </CardContent>
-        </Card>
+          {/* Leave Approvals */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5" />
+                Leave Approvals
+              </CardTitle>
+              <CardDescription>Review and approve leave requests</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Link href="/admin/hr/leave/approve">
+                <Button className="w-full">Approve Requests ({stats.pendingLeaveRequests})</Button>
+              </Link>
+            </CardContent>
+          </Card>
 
-        {/* Attendance Reports */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="h-5 w-5" />
-              Attendance Reports
-            </CardTitle>
-            <CardDescription>View and export attendance data</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Link href="/admin/hr/attendance/reports">
-              <Button className="w-full">View Reports</Button>
-            </Link>
-          </CardContent>
-        </Card>
+          {/* Attendance Reports */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Clock className="h-5 w-5" />
+                Attendance Reports
+              </CardTitle>
+              <CardDescription>View and export attendance data</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Link href="/admin/hr/attendance/reports">
+                <Button className="w-full">View Reports</Button>
+              </Link>
+            </CardContent>
+          </Card>
 
-        {/* Performance Reviews */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5" />
-              Performance Reviews
-            </CardTitle>
-            <CardDescription>Create and manage staff reviews</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Link href="/admin/hr/performance/create">
-              <Button className="w-full">Create Review</Button>
-            </Link>
-          </CardContent>
-        </Card>
-      </div>
+          {/* Performance Reviews */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <TrendingUp className="h-5 w-5" />
+                Performance Reviews
+              </CardTitle>
+              <CardDescription>Create and manage staff reviews</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Link href="/admin/hr/performance/create">
+                <Button className="w-full">Create Review</Button>
+              </Link>
+            </CardContent>
+          </Card>
+        </div>
+      </Section>
 
-      {/* Recent Activity */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Pending Actions</CardTitle>
-          <CardDescription>Items requiring your attention</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {stats.pendingLeaveRequests > 0 && (
-              <div className="flex items-center gap-4">
-                <AlertCircle className="h-5 w-5 text-orange-500" />
-                <div className="flex-1">
-                  <p className="font-medium">{stats.pendingLeaveRequests} pending leave requests</p>
-                  <p className="text-muted-foreground text-sm">Require your approval</p>
+      {/* Pending Actions */}
+      <Section title="Pending Actions">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="space-y-4">
+              {stats.pendingLeaveRequests > 0 && (
+                <div className="flex items-center gap-4">
+                  <AlertCircle className="h-5 w-5 text-orange-500" />
+                  <div className="flex-1">
+                    <p className="font-medium">{stats.pendingLeaveRequests} pending leave requests</p>
+                    <p className="text-muted-foreground text-sm">Require your approval</p>
+                  </div>
+                  <Link href="/admin/hr/leave/approve">
+                    <Button size="sm">Review</Button>
+                  </Link>
                 </div>
-                <Link href="/admin/hr/leave/approve">
-                  <Button size="sm">Review</Button>
-                </Link>
-              </div>
-            )}
+              )}
 
-            {stats.todayAttendance > 0 && (
-              <div className="flex items-center gap-4">
-                <CheckCircle className="h-5 w-5 text-green-500" />
-                <div className="flex-1">
-                  <p className="font-medium">{stats.todayAttendance} staff clocked in</p>
-                  <p className="text-muted-foreground text-sm">Today's attendance</p>
+              {stats.todayAttendance > 0 && (
+                <div className="flex items-center gap-4">
+                  <CheckCircle className="h-5 w-5 text-green-500" />
+                  <div className="flex-1">
+                    <p className="font-medium">{stats.todayAttendance} staff clocked in</p>
+                    <p className="text-muted-foreground text-sm">Today's attendance</p>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {stats.upcomingReviews > 0 && (
-              <div className="flex items-center gap-4">
-                <FileText className="h-5 w-5 text-blue-500" />
-                <div className="flex-1">
-                  <p className="font-medium">{stats.upcomingReviews} reviews pending</p>
-                  <p className="text-muted-foreground text-sm">Performance reviews to complete</p>
+              {stats.upcomingReviews > 0 && (
+                <div className="flex items-center gap-4">
+                  <FileText className="h-5 w-5 text-blue-500" />
+                  <div className="flex-1">
+                    <p className="font-medium">{stats.upcomingReviews} reviews pending</p>
+                    <p className="text-muted-foreground text-sm">Performance reviews to complete</p>
+                  </div>
+                  <Link href="/admin/hr/performance/create">
+                    <Button size="sm">Create</Button>
+                  </Link>
                 </div>
-                <Link href="/admin/hr/performance/create">
-                  <Button size="sm">Create</Button>
-                </Link>
-              </div>
-            )}
+              )}
 
-            {stats.pendingLeaveRequests === 0 && stats.upcomingReviews === 0 && (
-              <div className="text-muted-foreground flex items-center gap-4">
-                <CheckCircle className="h-5 w-5 text-green-500" />
-                <p>All caught up! No pending actions.</p>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+              {stats.pendingLeaveRequests === 0 && stats.upcomingReviews === 0 && (
+                <div className="text-muted-foreground flex items-center gap-4">
+                  <CheckCircle className="h-5 w-5 text-green-500" />
+                  <p>All caught up! No pending actions.</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </Section>
+    </PageWrapper>
   )
 }

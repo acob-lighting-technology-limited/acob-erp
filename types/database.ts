@@ -20,6 +20,11 @@ export type Database = {
           residential_address: string | null
           current_work_location: string | null
           office_location: string | null
+          bank_name: string | null
+          bank_account_number: string | null
+          bank_account_name: string | null
+          date_of_birth: string | null
+          employment_date: string | null
           is_admin: boolean
           role: Database["public"]["Enums"]["user_role"]
           is_department_lead: boolean
@@ -55,6 +60,11 @@ export type Database = {
           residential_address?: string | null
           current_work_location?: string | null
           office_location?: string | null
+          bank_name?: string | null
+          bank_account_number?: string | null
+          bank_account_name?: string | null
+          date_of_birth?: string | null
+          employment_date?: string | null
           is_admin?: boolean
           role?: Database["public"]["Enums"]["user_role"]
           is_department_lead?: boolean
@@ -83,6 +93,11 @@ export type Database = {
           residential_address?: string | null
           current_work_location?: string | null
           office_location?: string | null
+          bank_name?: string | null
+          bank_account_number?: string | null
+          bank_account_name?: string | null
+          date_of_birth?: string | null
+          employment_date?: string | null
           is_admin?: boolean
           role?: Database["public"]["Enums"]["user_role"]
           is_department_lead?: boolean
@@ -278,6 +293,11 @@ export interface Profile {
   residential_address?: string
   current_work_location?: string
   office_location?: string
+  bank_name?: string
+  bank_account_number?: string
+  bank_account_name?: string
+  date_of_birth?: string
+  employment_date?: string
   is_admin: boolean
   role: UserRole
   is_department_lead: boolean

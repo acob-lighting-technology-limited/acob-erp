@@ -41,6 +41,7 @@ import {
   CheckCircle2,
   Clock,
   Package,
+  ArrowLeft,
 } from "lucide-react"
 import Link from "next/link"
 import { dateValidation } from "@/lib/validation"
@@ -285,314 +286,94 @@ export function AdminProjectsContent({ initialProjects, initialStaff }: AdminPro
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Project Management</h1>
-          <p className="text-muted-foreground mt-1">Create and manage projects</p>
-        </div>
-        <Button onClick={() => handleOpenProjectDialog()}>
-          <Plus className="mr-2 h-4 w-4" />
-          Create Project
-        </Button>
-      </div>
-
-      {/* Statistics Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Projects</CardTitle>
-            <FolderKanban className="text-muted-foreground h-4 w-4" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.total}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Planning</CardTitle>
-            <Clock className="h-4 w-4 text-gray-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.planning}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active</CardTitle>
-            <CheckCircle2 className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.active}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Completed</CardTitle>
-            <CheckCircle2 className="h-4 w-4 text-blue-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.completed}</div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Search and Filter */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex flex-col gap-4 md:flex-row">
-            <div className="relative flex-1">
-              <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform" />
-              <Input
-                placeholder="Search projects..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full md:w-[200px]">
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="planning">Planning</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="on_hold">On Hold</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-                <SelectItem value="cancelled">Cancelled</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Projects List */}
-      {filteredProjects.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <FolderKanban className="text-muted-foreground mb-4 h-12 w-12" />
-            <h3 className="mb-2 text-lg font-semibold">No projects found</h3>
-            <p className="text-muted-foreground mb-4 text-sm">
-              {searchQuery || statusFilter !== "all"
-                ? "Try adjusting your search or filters"
-                : "Get started by creating your first project"}
-            </p>
-            {!searchQuery && statusFilter === "all" && (
-              <Button onClick={() => handleOpenProjectDialog()}>
-                <Plus className="mr-2 h-4 w-4" />
-                Create Project
-              </Button>
-            )}
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-4">
-          {filteredProjects.map((project) => (
-            <Card key={project.id} className="transition-shadow hover:shadow-md">
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="flex-1 space-y-1">
-                    <div className="flex items-center gap-2">
-                      <CardTitle className="text-xl">{project.project_name}</CardTitle>
-                      <Badge className={getStatusColor(project.status)}>{project.status.replace("_", " ")}</Badge>
-                    </div>
-                    {project.description && (
-                      <CardDescription className="line-clamp-2">{project.description}</CardDescription>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Link href={`/admin/projects/${project.id}`}>
-                      <Button variant="outline" size="sm">
-                        Manage
-                        <ArrowRight className="ml-2 h-4 w-4" />
-                      </Button>
-                    </Link>
-                    <Button variant="outline" size="icon" onClick={() => handleOpenProjectDialog(project)}>
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => {
-                        setProjectToDelete(project)
-                        setIsDeleteDialogOpen(true)
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-4">
-                  <div className="flex items-center gap-2">
-                    <MapPin className="text-muted-foreground h-4 w-4" />
-                    <div>
-                      <p className="text-muted-foreground text-xs">Location</p>
-                      <p className="font-medium">{project.location}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <Calendar className="text-muted-foreground h-4 w-4" />
-                    <div>
-                      <p className="text-muted-foreground text-xs">Duration</p>
-                      <p className="font-medium">
-                        {formatDate(project.deployment_start_date)} - {formatDate(project.deployment_end_date)}
-                      </p>
-                    </div>
-                  </div>
-
-                  {project.project_manager && (
-                    <div className="flex items-center gap-2">
-                      <User className="text-muted-foreground h-4 w-4" />
-                      <div>
-                        <p className="text-muted-foreground text-xs">Project Manager</p>
-                        <p className="font-medium">
-                          {project.project_manager.first_name} {project.project_manager.last_name}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {project.capacity_w && (
-                    <div className="flex items-center gap-2">
-                      <Package className="text-muted-foreground h-4 w-4" />
-                      <div>
-                        <p className="text-muted-foreground text-xs">Capacity</p>
-                        <p className="font-medium">{project.capacity_w.toLocaleString()} W</p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
-
-      {/* Create/Edit Project Dialog */}
-      <Dialog open={isProjectDialogOpen} onOpenChange={setIsProjectDialogOpen}>
-        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{selectedProject ? "Edit Project" : "Create New Project"}</DialogTitle>
-            <DialogDescription>
-              {selectedProject
-                ? "Update project details below"
-                : "Fill in the project information. Fields marked with * are required."}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="project_name">
-                Project Name <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="project_name"
-                value={projectForm.project_name}
-                onChange={(e) => setProjectForm({ ...projectForm, project_name: e.target.value })}
-                placeholder="Enter project name"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="location">
-                Location <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="location"
-                value={projectForm.location}
-                onChange={(e) => setProjectForm({ ...projectForm, location: e.target.value })}
-                placeholder="Enter project location"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="deployment_start_date">
-                  Deployment Start Date <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="deployment_start_date"
-                  type="date"
-                  value={projectForm.deployment_start_date}
-                  onChange={(e) => setProjectForm({ ...projectForm, deployment_start_date: e.target.value })}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="deployment_end_date">
-                  Deployment End Date <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="deployment_end_date"
-                  type="date"
-                  min={projectForm.deployment_start_date}
-                  value={projectForm.deployment_end_date}
-                  onChange={(e) => setProjectForm({ ...projectForm, deployment_end_date: e.target.value })}
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="capacity_w">Capacity (W)</Label>
-                <Input
-                  id="capacity_w"
-                  type="number"
-                  value={projectForm.capacity_w}
-                  onChange={(e) => setProjectForm({ ...projectForm, capacity_w: e.target.value })}
-                  placeholder="Enter capacity in watts"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="technology_type">Technology Type</Label>
-                <Input
-                  id="technology_type"
-                  value={projectForm.technology_type}
-                  onChange={(e) => setProjectForm({ ...projectForm, technology_type: e.target.value })}
-                  placeholder="e.g., Solar, Wind, Hybrid"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="project_manager_id">Project Manager</Label>
-              <SearchableSelect
-                value={projectForm.project_manager_id || "none"}
-                onValueChange={(value) =>
-                  setProjectForm({ ...projectForm, project_manager_id: value === "none" ? "" : value })
-                }
-                placeholder="Select project manager"
-                searchPlaceholder="Search staff..."
-                icon={<User className="h-4 w-4" />}
-                options={[
-                  { value: "none", label: "None" },
-                  ...staff.map((member) => ({
-                    value: member.id,
-                    label: `${member.first_name} ${member.last_name} - ${member.department}`,
-                  })),
-                ]}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="status">Status</Label>
-              <Select
-                value={projectForm.status}
-                onValueChange={(value) => setProjectForm({ ...projectForm, status: value })}
+    <div className="from-background via-background to-muted/20 min-h-screen w-full overflow-x-hidden bg-gradient-to-br">
+      <div className="mx-auto max-w-7xl space-y-6 p-4 md:p-8">
+        {/* Header */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="mb-2 flex items-center gap-2">
+              <Link
+                href="/admin"
+                aria-label="Back to admin"
+                className="text-muted-foreground hover:text-foreground transition-colors"
               >
-                <SelectTrigger>
-                  <SelectValue />
+                <ArrowLeft className="h-5 w-5" />
+              </Link>
+              <h1 className="text-foreground flex items-center gap-2 text-2xl font-bold sm:gap-3 sm:text-3xl">
+                <FolderKanban className="text-primary h-6 w-6 sm:h-8 sm:w-8" />
+                Project Management
+              </h1>
+            </div>
+            <p className="text-muted-foreground mt-2 text-sm sm:text-base">Create and manage projects</p>
+          </div>
+          <Button onClick={() => handleOpenProjectDialog()} className="gap-2">
+            <Plus className="h-4 w-4" />
+            Create Project
+          </Button>
+        </div>
+
+        {/* Statistics Cards */}
+        <div className="grid gap-4 md:grid-cols-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Projects</CardTitle>
+              <FolderKanban className="text-muted-foreground h-4 w-4" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.total}</div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Planning</CardTitle>
+              <Clock className="h-4 w-4 text-gray-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.planning}</div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Active</CardTitle>
+              <CheckCircle2 className="h-4 w-4 text-green-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.active}</div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Completed</CardTitle>
+              <CheckCircle2 className="h-4 w-4 text-blue-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.completed}</div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Search and Filter */}
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex flex-col gap-4 md:flex-row">
+              <div className="relative flex-1">
+                <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform" />
+                <Input
+                  placeholder="Search projects..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-full md:w-[200px]">
+                  <SelectValue placeholder="Filter by status" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
                   <SelectItem value="planning">Planning</SelectItem>
                   <SelectItem value="active">Active</SelectItem>
                   <SelectItem value="on_hold">On Hold</SelectItem>
@@ -601,54 +382,294 @@ export function AdminProjectsContent({ initialProjects, initialStaff }: AdminPro
                 </SelectContent>
               </Select>
             </div>
+          </CardContent>
+        </Card>
 
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                value={projectForm.description}
-                onChange={(e) => setProjectForm({ ...projectForm, description: e.target.value })}
-                placeholder="Enter project description"
-                rows={4}
-              />
-            </div>
+        {/* Projects List */}
+        {filteredProjects.length === 0 ? (
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-12">
+              <FolderKanban className="text-muted-foreground mb-4 h-12 w-12" />
+              <h3 className="mb-2 text-lg font-semibold">No projects found</h3>
+              <p className="text-muted-foreground mb-4 text-sm">
+                {searchQuery || statusFilter !== "all"
+                  ? "Try adjusting your search or filters"
+                  : "Get started by creating your first project"}
+              </p>
+              {!searchQuery && statusFilter === "all" && (
+                <Button onClick={() => handleOpenProjectDialog()}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Create Project
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-4">
+            {filteredProjects.map((project) => (
+              <Card key={project.id} className="transition-shadow hover:shadow-md">
+                <CardHeader>
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 space-y-1">
+                      <div className="flex items-center gap-2">
+                        <CardTitle className="text-xl">{project.project_name}</CardTitle>
+                        <Badge className={getStatusColor(project.status)}>{project.status.replace("_", " ")}</Badge>
+                      </div>
+                      {project.description && (
+                        <CardDescription className="line-clamp-2">{project.description}</CardDescription>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button asChild variant="outline" size="sm">
+                        <Link href={`/admin/projects/${project.id}`}>
+                          Manage
+                          <ArrowRight className="ml-2 h-4 w-4" />
+                        </Link>
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        aria-label="Edit project"
+                        onClick={() => handleOpenProjectDialog(project)}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        aria-label="Delete project"
+                        onClick={() => {
+                          setProjectToDelete(project)
+                          setIsDeleteDialogOpen(true)
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-4">
+                    <div className="flex items-center gap-2">
+                      <MapPin className="text-muted-foreground h-4 w-4" />
+                      <div>
+                        <p className="text-muted-foreground text-xs">Location</p>
+                        <p className="font-medium">{project.location}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <Calendar className="text-muted-foreground h-4 w-4" />
+                      <div>
+                        <p className="text-muted-foreground text-xs">Duration</p>
+                        <p className="font-medium">
+                          {formatDate(project.deployment_start_date)} - {formatDate(project.deployment_end_date)}
+                        </p>
+                      </div>
+                    </div>
+
+                    {project.project_manager && (
+                      <div className="flex items-center gap-2">
+                        <User className="text-muted-foreground h-4 w-4" />
+                        <div>
+                          <p className="text-muted-foreground text-xs">Project Manager</p>
+                          <p className="font-medium">
+                            {project.project_manager.first_name} {project.project_manager.last_name}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {project.capacity_w && (
+                      <div className="flex items-center gap-2">
+                        <Package className="text-muted-foreground h-4 w-4" />
+                        <div>
+                          <p className="text-muted-foreground text-xs">Capacity</p>
+                          <p className="font-medium">{project.capacity_w.toLocaleString()} W</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
+        )}
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsProjectDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSaveProject} disabled={isSaving}>
-              {isSaving ? "Saving..." : selectedProject ? "Update" : "Create"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        {/* Create/Edit Project Dialog */}
+        <Dialog open={isProjectDialogOpen} onOpenChange={setIsProjectDialogOpen}>
+          <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>{selectedProject ? "Edit Project" : "Create New Project"}</DialogTitle>
+              <DialogDescription>
+                {selectedProject
+                  ? "Update project details below"
+                  : "Fill in the project information. Fields marked with * are required."}
+              </DialogDescription>
+            </DialogHeader>
 
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete the project &quot;{projectToDelete?.project_name}&quot;. This action cannot
-              be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setProjectToDelete(null)} disabled={isDeleting}>
-              Cancel
-            </AlertDialogCancel>
-            <Button
-              onClick={handleDeleteProject}
-              disabled={isDeleting}
-              className="bg-red-600 text-white hover:bg-red-700"
-            >
-              {isDeleting ? "Deleting..." : "Delete"}
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="project_name">
+                  Project Name <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="project_name"
+                  value={projectForm.project_name}
+                  onChange={(e) => setProjectForm({ ...projectForm, project_name: e.target.value })}
+                  placeholder="Enter project name"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="location">
+                  Location <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="location"
+                  value={projectForm.location}
+                  onChange={(e) => setProjectForm({ ...projectForm, location: e.target.value })}
+                  placeholder="Enter project location"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="deployment_start_date">
+                    Deployment Start Date <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="deployment_start_date"
+                    type="date"
+                    value={projectForm.deployment_start_date}
+                    onChange={(e) => setProjectForm({ ...projectForm, deployment_start_date: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="deployment_end_date">
+                    Deployment End Date <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="deployment_end_date"
+                    type="date"
+                    min={projectForm.deployment_start_date}
+                    value={projectForm.deployment_end_date}
+                    onChange={(e) => setProjectForm({ ...projectForm, deployment_end_date: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="capacity_w">Capacity (W)</Label>
+                  <Input
+                    id="capacity_w"
+                    type="number"
+                    value={projectForm.capacity_w}
+                    onChange={(e) => setProjectForm({ ...projectForm, capacity_w: e.target.value })}
+                    placeholder="Enter capacity in watts"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="technology_type">Technology Type</Label>
+                  <Input
+                    id="technology_type"
+                    value={projectForm.technology_type}
+                    onChange={(e) => setProjectForm({ ...projectForm, technology_type: e.target.value })}
+                    placeholder="e.g., Solar, Wind, Hybrid"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="project_manager_id">Project Manager</Label>
+                <SearchableSelect
+                  value={projectForm.project_manager_id || "none"}
+                  onValueChange={(value) =>
+                    setProjectForm({ ...projectForm, project_manager_id: value === "none" ? "" : value })
+                  }
+                  placeholder="Select project manager"
+                  searchPlaceholder="Search staff..."
+                  icon={<User className="h-4 w-4" />}
+                  options={[
+                    { value: "none", label: "None" },
+                    ...staff.map((member) => ({
+                      value: member.id,
+                      label: `${member.first_name} ${member.last_name} - ${member.department}`,
+                    })),
+                  ]}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="status">Status</Label>
+                <Select
+                  value={projectForm.status}
+                  onValueChange={(value) => setProjectForm({ ...projectForm, status: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="planning">Planning</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="on_hold">On Hold</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="description">Description</Label>
+                <Textarea
+                  id="description"
+                  value={projectForm.description}
+                  onChange={(e) => setProjectForm({ ...projectForm, description: e.target.value })}
+                  placeholder="Enter project description"
+                  rows={4}
+                />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsProjectDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleSaveProject} disabled={isSaving}>
+                {isSaving ? "Saving..." : selectedProject ? "Update" : "Create"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will permanently delete the project &quot;{projectToDelete?.project_name}&quot;. This action cannot
+                be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setProjectToDelete(null)} disabled={isDeleting}>
+                Cancel
+              </AlertDialogCancel>
+              <Button
+                onClick={handleDeleteProject}
+                disabled={isDeleting}
+                className="bg-red-600 text-white hover:bg-red-700"
+              >
+                {isDeleting ? "Deleting..." : "Delete"}
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
     </div>
   )
 }

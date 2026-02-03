@@ -1,8 +1,6 @@
-// Base service
-export { BaseService } from "./base.service"
-
-// HR services
-export * from "./hr"
-
-// Finance services
+// Service exports
+export * from "./base.service"
 export * from "./finance"
+export * from "./hr"
+export * from "./inventory"
+export * from "./tasks"

@@ -109,7 +109,10 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
   const [staffFilter, setStaffFilter] = useState<string[]>([])
   const [roleFilter, setRoleFilter] = useState<string[]>([])
   const [statusFilter, setStatusFilter] = useState<string[]>([])
-  const [nameSortOrder, setNameSortOrder] = useState<"asc" | "desc">("asc")
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" }>({
+    key: "last_name",
+    direction: "asc",
+  })
   const [viewMode, setViewMode] = useState<"list" | "card">("list")
   const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null)
   const [isSaving, setIsSaving] = useState(false)
@@ -756,10 +759,18 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
       return matchesSearch && matchesDepartment && matchesStaff && matchesRole && matchesStatus
     })
     .sort((a, b) => {
+      const { key, direction } = sortConfig
+
+      if (key === "employee_number") {
+        const empNoA = (a.employee_number || "").toLowerCase()
+        const empNoB = (b.employee_number || "").toLowerCase()
+        return direction === "asc" ? empNoA.localeCompare(empNoB) : empNoB.localeCompare(empNoA)
+      }
+
       const lastNameA = formatName(a.last_name).toLowerCase()
       const lastNameB = formatName(b.last_name).toLowerCase()
 
-      if (nameSortOrder === "asc") {
+      if (direction === "asc") {
         return lastNameA.localeCompare(lastNameB)
       } else {
         return lastNameB.localeCompare(lastNameA)
@@ -1100,7 +1111,7 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
           <div>
             <h1 className="text-foreground flex items-center gap-2 text-2xl font-bold sm:gap-3 sm:text-3xl">
               <Users className="text-primary h-6 w-6 sm:h-8 sm:w-8" />
-              Staff Management
+              Employee Management
             </h1>
             <p className="text-muted-foreground mt-2 text-sm sm:text-base">
               View and manage staff members, roles, and permissions
@@ -1318,20 +1329,55 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-12">#</TableHead>
-                      <TableHead>Emp. No.</TableHead>
+                      <TableHead>
+                        <div className="flex items-center gap-2">
+                          <span>Emp. No.</span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              setSortConfig((current) => ({
+                                key: "employee_number",
+                                direction:
+                                  current.key === "employee_number" && current.direction === "asc" ? "desc" : "asc",
+                              }))
+                            }
+                            className="h-6 w-6 p-0"
+                          >
+                            {sortConfig.key === "employee_number" ? (
+                              sortConfig.direction === "asc" ? (
+                                <ArrowUp className="h-3 w-3" />
+                              ) : (
+                                <ArrowDown className="h-3 w-3" />
+                              )
+                            ) : (
+                              <ArrowUpDown className="text-muted-foreground/30 h-3 w-3" />
+                            )}
+                          </Button>
+                        </div>
+                      </TableHead>
                       <TableHead>
                         <div className="flex items-center gap-2">
                           <span>Name</span>
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => setNameSortOrder(nameSortOrder === "asc" ? "desc" : "asc")}
+                            onClick={() =>
+                              setSortConfig((current) => ({
+                                key: "last_name",
+                                direction: current.key === "last_name" && current.direction === "asc" ? "desc" : "asc",
+                              }))
+                            }
                             className="h-6 w-6 p-0"
                           >
-                            {nameSortOrder === "asc" ? (
-                              <ArrowUp className="h-3 w-3" />
+                            {sortConfig.key === "last_name" ? (
+                              sortConfig.direction === "asc" ? (
+                                <ArrowUp className="h-3 w-3" />
+                              ) : (
+                                <ArrowDown className="h-3 w-3" />
+                              )
                             ) : (
-                              <ArrowDown className="h-3 w-3" />
+                              <ArrowUpDown className="text-muted-foreground/30 h-3 w-3" />
                             )}
                           </Button>
                         </div>
