@@ -123,7 +123,8 @@ interface ScheduleItem {
 
 interface FormData {
   department_id: string
-  category: "one-time" | "recurring" | "" // Now serves as the payment type
+  payment_type: "one-time" | "recurring" | ""
+  category: string
   title: string
   description: string
   amount: string
@@ -305,6 +306,7 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
   const [updating, setUpdating] = useState(false)
   const [editFormData, setEditFormData] = useState<FormData>({
     department_id: "",
+    payment_type: "",
     category: "",
     title: "",
     description: "",
@@ -544,7 +546,8 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
     if (!payment) return
     setEditFormData({
       department_id: payment.department_id,
-      category: payment.payment_type,
+      payment_type: payment.payment_type,
+      category: payment.category,
       title: payment.title,
       description: payment.description || "",
       amount: payment.amount.toString(),
@@ -573,7 +576,8 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
       setUpdating(true)
       const payload = {
         ...editFormData,
-        payment_type: editFormData.category,
+        payment_type: editFormData.payment_type,
+        category: editFormData.category,
         amount: parseFloat(editFormData.amount),
         next_payment_due: editFormData.next_payment_due || null,
         payment_date: editFormData.payment_date || null,
@@ -1071,19 +1075,37 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
                 </Select>
               </div>
               <div className="space-y-2">
+                <Label htmlFor="payment_type">Payment Type</Label>
+                <Select
+                  value={editFormData.payment_type}
+                  onValueChange={(value: "one-time" | "recurring") =>
+                    setEditFormData({ ...editFormData, payment_type: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select Type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="one-time">One-time</SelectItem>
+                    <SelectItem value="recurring">Recurring</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="category">Category</Label>
                 <Select
                   value={editFormData.category}
-                  onValueChange={(value: "one-time" | "recurring") =>
-                    setEditFormData({ ...editFormData, category: value })
-                  }
+                  onValueChange={(value) => setEditFormData({ ...editFormData, category: value })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select Category" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="one-time">One-time</SelectItem>
-                    <SelectItem value="recurring">Recurring</SelectItem>
+                    {categories.map((cat) => (
+                      <SelectItem key={cat.id} value={cat.name}>
+                        {cat.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -1175,7 +1197,7 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
               </div>
             </div>
 
-            {editFormData.category === "recurring" ? (
+            {editFormData.payment_type === "recurring" ? (
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="recurrence">Recurrence Period</Label>

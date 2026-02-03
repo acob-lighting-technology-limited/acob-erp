@@ -40,6 +40,18 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { firstName, lastName, otherNames, email, department, companyRole, phoneNumber, role, employeeNumber } = body
 
+    // Validate role if provided
+    const allowedRoles = ["staff", "lead", "admin", "super_admin"]
+    if (role && !allowedRoles.includes(role)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Invalid role. Allowed values: ${allowedRoles.join(", ")}`,
+        },
+        { status: 400 }
+      )
+    }
+
     // Validate required fields (department is optional for executives like MD)
     if (!firstName || !lastName || !email || !employeeNumber) {
       return NextResponse.json(
