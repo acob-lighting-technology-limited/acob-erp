@@ -13,6 +13,23 @@ DO $$
 BEGIN
     IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'customers') THEN
         ALTER TABLE customers ENABLE ROW LEVEL SECURITY;
+        
+        -- Create initial policies if they don't exist to prevent blocking access
+        -- SELECT: Authenticated users can view customers
+        DROP POLICY IF EXISTS "Customers select policy" ON customers;
+        CREATE POLICY "Customers select policy" ON customers FOR SELECT TO authenticated USING (true);
+        
+        -- INSERT: Admins and Staff can create customers
+        DROP POLICY IF EXISTS "Customers insert policy" ON customers;
+        CREATE POLICY "Customers insert policy" ON customers FOR INSERT TO authenticated WITH CHECK (has_role('admin') OR has_role('staff'));
+        
+        -- UPDATE: Admins and Staff can update customers
+        DROP POLICY IF EXISTS "Customers update policy" ON customers;
+        CREATE POLICY "Customers update policy" ON customers FOR UPDATE TO authenticated USING (has_role('admin') OR has_role('staff'));
+        
+        -- DELETE: Only Admins can delete customers
+        DROP POLICY IF EXISTS "Customers delete policy" ON customers;
+        CREATE POLICY "Customers delete policy" ON customers FOR DELETE TO authenticated USING (has_role('admin'));
     END IF;
 END $$;
 

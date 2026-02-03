@@ -40,7 +40,12 @@ USING (
         SELECT 1 FROM profiles 
         WHERE profiles.id = leave_approvals.approver_id 
         AND profiles.department_id = (SELECT department_id FROM profiles WHERE id = (SELECT auth.uid()))
-    ))
+    )) OR
+    EXISTS (
+        SELECT 1 FROM leave_requests
+        WHERE id = leave_approvals.leave_request_id
+        AND user_id = (SELECT auth.uid())
+    )
 );
 
 -- Table: leave_balances

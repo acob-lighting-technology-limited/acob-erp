@@ -33,9 +33,15 @@ WITH CHECK (has_role('admin') OR has_role('staff'));
 -- user_roles
 DROP POLICY IF EXISTS "Admins can manage all user roles" ON user_roles;
 DROP POLICY IF EXISTS "Users can view their own roles" ON user_roles;
-CREATE POLICY "User roles management" ON user_roles 
-FOR ALL TO authenticated 
-USING (has_role('admin') OR has_role('super_admin') OR user_id = auth.uid())
+DROP POLICY IF EXISTS "User roles management" ON user_roles;
+
+CREATE POLICY "User roles select (self or admin)" ON user_roles 
+FOR SELECT TO authenticated 
+USING (user_id = auth.uid() OR has_role('admin') OR has_role('super_admin'));
+
+CREATE POLICY "User roles admin write" ON user_roles 
+FOR INSERT, UPDATE, DELETE TO authenticated 
+USING (has_role('admin') OR has_role('super_admin'))
 WITH CHECK (has_role('admin') OR has_role('super_admin'));
 
 -- Refresh PostgREST schema cache

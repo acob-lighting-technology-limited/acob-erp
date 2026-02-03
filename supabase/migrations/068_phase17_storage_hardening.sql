@@ -76,8 +76,13 @@ CREATE POLICY "Payment documents insert policy" ON public.payment_documents
 FOR INSERT TO authenticated 
 WITH CHECK (has_role('admin') OR has_role('lead'));
 
-CREATE POLICY "Payment documents manage policy" ON public.payment_documents 
-FOR ALL TO authenticated 
+CREATE POLICY "Payment documents update policy" ON public.payment_documents 
+FOR UPDATE TO authenticated 
+USING (has_role('admin') OR uploaded_by = (SELECT auth.uid()))
+WITH CHECK (has_role('admin') OR uploaded_by = (SELECT auth.uid()));
+
+CREATE POLICY "Payment documents delete policy" ON public.payment_documents 
+FOR DELETE TO authenticated 
 USING (has_role('admin') OR uploaded_by = (SELECT auth.uid()));
 
 -- Refresh PostgREST schema cache

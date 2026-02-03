@@ -21,7 +21,7 @@ USING (
     (has_role('lead') AND EXISTS (
         SELECT 1 FROM profiles p1
         WHERE p1.id = auth.uid() 
-        AND p1.department = department_payments.department_id -- Assuming department_id is the link
+        AND p1.department_id = department_payments.department_id -- Fixed type mismatch: TEXT vs UUID
     ))
 );
 
@@ -80,8 +80,9 @@ USING (
 
 -- Table: timesheets
 DROP POLICY IF EXISTS "Users can manage own timesheets" ON timesheets;
--- "Timesheets view policy" already exists from previous migration, but let's ensure it's the only one
--- DROP POLICY IF EXISTS "Timesheets view policy" ON timesheets; -- Already consolidated
+CREATE POLICY "Users can manage own timesheets" ON timesheets 
+FOR INSERT, UPDATE, DELETE TO authenticated 
+WITH CHECK (user_id = auth.uid());
 
 -- =====================================================
 -- 2. SECURITY: HARDEN PERMISSIVE POLICIES
