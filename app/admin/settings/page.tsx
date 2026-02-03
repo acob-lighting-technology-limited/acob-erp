@@ -58,14 +58,12 @@ export default async function AdminSettingsPage() {
               <CardDescription>Manage user accounts and permissions</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
-              <Link href="/admin/settings/users">
-                <Button className="w-full">Manage Users</Button>
-              </Link>
-              <Link href="/admin/settings/users/invite">
-                <Button className="w-full" variant="outline">
-                  Invite User
-                </Button>
-              </Link>
+              <Button asChild className="w-full">
+                <Link href="/admin/settings/users">Manage Users</Link>
+              </Button>
+              <Button asChild className="w-full" variant="outline">
+                <Link href="/admin/settings/users/invite">Invite User</Link>
+              </Button>
             </CardContent>
           </Card>
 
@@ -78,9 +76,9 @@ export default async function AdminSettingsPage() {
               <CardDescription>Configure user roles and access levels</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
-              <Link href="/admin/settings/roles">
-                <Button className="w-full">Manage Roles</Button>
-              </Link>
+              <Button asChild className="w-full">
+                <Link href="/admin/settings/roles">Manage Roles</Link>
+              </Button>
             </CardContent>
           </Card>
 
@@ -93,9 +91,9 @@ export default async function AdminSettingsPage() {
               <CardDescription>Configure company information</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
-              <Link href="/admin/settings/company">
-                <Button className="w-full">Company Profile</Button>
-              </Link>
+              <Button asChild className="w-full">
+                <Link href="/admin/settings/company">Company Profile</Link>
+              </Button>
             </CardContent>
           </Card>
         </div>

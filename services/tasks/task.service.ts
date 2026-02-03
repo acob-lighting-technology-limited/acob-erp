@@ -59,20 +59,24 @@ export class TaskService extends BaseService {
     const [profilesResult, assignmentsResult] = await Promise.all([
       individualUserIds.length > 0
         ? supabase.from("profiles").select("id, first_name, last_name, department").in("id", individualUserIds)
-        : { data: [] },
+        : { data: [], error: null },
       multipleTaskIds.length > 0
         ? supabase.from("task_assignments").select("task_id, user_id").in("task_id", multipleTaskIds)
-        : { data: [] },
+        : { data: [], error: null },
     ])
+
+    if (profilesResult.error) throw profilesResult.error
+    if (assignmentsResult.error) throw assignmentsResult.error
 
     // Fetch details for multiple assignments if needed
     let multipleProfiles: any[] = []
     if (assignmentsResult.data && assignmentsResult.data.length > 0) {
       const multipleUserIds = Array.from(new Set(assignmentsResult.data.map((a: any) => a.user_id)))
-      const { data: mProfiles } = await supabase
+      const { data: mProfiles, error: mProfilesError } = await supabase
         .from("profiles")
         .select("id, first_name, last_name")
         .in("id", multipleUserIds)
+      if (mProfilesError) throw mProfilesError
       multipleProfiles = mProfiles || []
     }
 
@@ -109,20 +113,26 @@ export class TaskService extends BaseService {
     const supabase = await this.getClient()
 
     // Individual tasks
-    const { data: individual } = await supabase
+    const { data: individual, error: individualError } = await supabase
       .from(this.tableName)
       .select("*")
       .eq("assigned_to", userId)
       .eq("assignment_type", "individual")
+    if (individualError) throw individualError
 
     // Multiple-user tasks through assignments
-    const { data: assignments } = await supabase.from("task_assignments").select("task_id").eq("user_id", userId)
+    const { data: assignments, error: assignmentsError } = await supabase
+      .from("task_assignments")
+      .select("task_id")
+      .eq("user_id", userId)
+    if (assignmentsError) throw assignmentsError
 
     const multipleTaskIds = assignments?.map((a: any) => a.task_id) || []
-    const { data: multiple } =
+    const { data: multiple, error: multipleError } =
       multipleTaskIds.length > 0
         ? await supabase.from(this.tableName).select("*").in("id", multipleTaskIds).eq("assignment_type", "multiple")
-        : { data: [] }
+        : { data: [], error: null }
+    if (multipleError) throw multipleError
 
     // Combine and deduplicate
     const allTasks = [...(individual || []), ...(multiple || [])]
@@ -135,21 +145,24 @@ export class TaskService extends BaseService {
   async getStats() {
     const supabase = await this.getClient()
 
-    const [{ count: total }, { count: pending }, { count: inProgress }, { count: completed }, { count: urgent }] =
-      await Promise.all([
-        supabase.from(this.tableName).select("*", { count: "exact", head: true }),
-        supabase.from(this.tableName).select("*", { count: "exact", head: true }).eq("status", "pending"),
-        supabase.from(this.tableName).select("*", { count: "exact", head: true }).eq("status", "in_progress"),
-        supabase.from(this.tableName).select("*", { count: "exact", head: true }).eq("status", "completed"),
-        supabase.from(this.tableName).select("*", { count: "exact", head: true }).eq("priority", "urgent"),
-      ])
+    const results = await Promise.all([
+      supabase.from(this.tableName).select("*", { count: "exact", head: true }),
+      supabase.from(this.tableName).select("*", { count: "exact", head: true }).eq("status", "pending"),
+      supabase.from(this.tableName).select("*", { count: "exact", head: true }).eq("status", "in_progress"),
+      supabase.from(this.tableName).select("*", { count: "exact", head: true }).eq("status", "completed"),
+      supabase.from(this.tableName).select("*", { count: "exact", head: true }).eq("priority", "urgent"),
+    ])
+
+    const firstError = results.find((r) => r.error)?.error
+    if (firstError) throw firstError
+    const [totalRes, pendingRes, inProgressRes, completedRes, urgentRes] = results
 
     return {
-      total: total || 0,
-      pending: pending || 0,
-      inProgress: inProgress || 0,
-      completed: completed || 0,
-      urgent: urgent || 0,
+      total: totalRes.count ?? 0,
+      pending: pendingRes.count ?? 0,
+      inProgress: inProgressRes.count ?? 0,
+      completed: completedRes.count ?? 0,
+      urgent: urgentRes.count ?? 0,
     }
   }
 }

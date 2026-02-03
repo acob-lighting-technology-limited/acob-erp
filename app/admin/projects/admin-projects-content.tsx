@@ -420,18 +420,24 @@ export function AdminProjectsContent({ initialProjects, initialStaff }: AdminPro
                       )}
                     </div>
                     <div className="flex items-center gap-2">
-                      <Link href={`/admin/projects/${project.id}`}>
-                        <Button variant="outline" size="sm">
+                      <Button asChild variant="outline" size="sm">
+                        <Link href={`/admin/projects/${project.id}`}>
                           Manage
                           <ArrowRight className="ml-2 h-4 w-4" />
-                        </Button>
-                      </Link>
-                      <Button variant="outline" size="icon" onClick={() => handleOpenProjectDialog(project)}>
+                        </Link>
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        aria-label="Edit project"
+                        onClick={() => handleOpenProjectDialog(project)}
+                      >
                         <Edit className="h-4 w-4" />
                       </Button>
                       <Button
                         variant="outline"
                         size="icon"
+                        aria-label="Delete project"
                         onClick={() => {
                           setProjectToDelete(project)
                           setIsDeleteDialogOpen(true)

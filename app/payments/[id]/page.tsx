@@ -880,7 +880,7 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
                   if (!hasReceipt) return null
                 }
                 return (
-                  <Button onClick={(e) => markAsPaid(e)}>
+                  <Button onClick={() => markAsPaid()}>
                     <CheckCircle className="mr-2 h-4 w-4" />
                     {payment.payment_type === "recurring" ? "Mark Current Due as Paid" : "Mark as Paid"}
                   </Button>

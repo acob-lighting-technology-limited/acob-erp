@@ -75,18 +75,23 @@ export class ProductService extends BaseService {
   async getStats() {
     const supabase = await this.getClient()
 
-    const [{ count: total }, { count: active }, { data: products }] = await Promise.all([
+    const [totalResult, activeResult, productsResult] = await Promise.all([
       supabase.from(this.tableName).select("*", { count: "exact", head: true }),
       supabase.from(this.tableName).select("*", { count: "exact", head: true }).eq("status", "active"),
       supabase.from(this.tableName).select("unit_cost, quantity_on_hand, reorder_level"),
     ])
 
-    const lowStock = products?.filter((p: any) => p.quantity_on_hand <= p.reorder_level).length || 0
-    const totalValue = products?.reduce((sum: number, p: any) => sum + p.unit_cost * p.quantity_on_hand, 0) || 0
+    if (totalResult.error) throw totalResult.error
+    if (activeResult.error) throw activeResult.error
+    if (productsResult.error) throw productsResult.error
+
+    const products = productsResult.data || []
+    const lowStock = products.filter((p: any) => p.quantity_on_hand <= p.reorder_level).length
+    const totalValue = products.reduce((sum: number, p: any) => sum + p.unit_cost * p.quantity_on_hand, 0)
 
     return {
-      total: total || 0,
-      active: active || 0,
+      total: totalResult.count || 0,
+      active: activeResult.count || 0,
       lowStock,
       totalValue,
     }

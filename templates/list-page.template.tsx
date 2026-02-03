@@ -57,7 +57,15 @@ async function getPageData() {
   }
 
   // 2. Check authorization (optional)
-  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single()
+
+  if (profileError) {
+    throw profileError
+  }
 
   if (!profile || !["super_admin", "admin", "lead"].includes(profile.role)) {
     return { redirect: "/dashboard" as const }
@@ -114,12 +122,12 @@ export default async function ListPage() {
         description="Manage your items"
         icon={Package}
         actions={
-          <Link href="/admin/items/new">
-            <Button>
+          <Button asChild>
+            <Link href="/admin/items/new">
               <Plus className="mr-2 h-4 w-4" />
               Add Item
-            </Button>
-          </Link>
+            </Link>
+          </Button>
         }
       />
 
@@ -184,13 +192,18 @@ export default async function ListPage() {
                     <TableCell>
                       <Badge variant="outline">{item.status}</Badge>
                     </TableCell>
-                    <TableCell>{new Date(item.created_at).toLocaleDateString()}</TableCell>
+                    <TableCell>
+                      {new Intl.DateTimeFormat("en-US", {
+                        timeZone: "UTC",
+                        year: "numeric",
+                        month: "short",
+                        day: "2-digit",
+                      }).format(new Date(item.created_at))}
+                    </TableCell>
                     <TableCell className="text-right">
-                      <Link href={`/admin/items/${item.id}`}>
-                        <Button variant="ghost" size="sm">
-                          View
-                        </Button>
-                      </Link>
+                      <Button asChild variant="ghost" size="sm">
+                        <Link href={`/admin/items/${item.id}`}>View</Link>
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
