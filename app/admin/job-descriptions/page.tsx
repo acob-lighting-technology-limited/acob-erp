@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { SearchableSelect } from "@/components/ui/searchable-select"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
+import { AdminTablePage } from "@/components/admin/admin-table-page"
 import {
   Briefcase,
   Search,
@@ -177,40 +178,33 @@ export default function AdminJobDescriptionsPage() {
   }
 
   return (
-    <div className="from-background via-background to-muted/20 min-h-screen w-full overflow-x-hidden bg-gradient-to-br">
-      <div className="mx-auto max-w-7xl space-y-6 p-4 md:p-8">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-foreground flex items-center gap-3 text-3xl font-bold">
-              <Briefcase className="text-primary h-8 w-8" />
-              Job Descriptions
-            </h1>
-            <p className="text-muted-foreground mt-2">View and manage staff job descriptions</p>
-          </div>
-          <div className="flex items-center rounded-lg border p-1">
-            <Button
-              variant={viewMode === "list" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setViewMode("list")}
-              className="gap-2"
-            >
-              <List className="h-4 w-4" />
-              List
-            </Button>
-            <Button
-              variant={viewMode === "card" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setViewMode("card")}
-              className="gap-2"
-            >
-              <LayoutGrid className="h-4 w-4" />
-              Card
-            </Button>
-          </div>
+    <AdminTablePage
+      title="Job Descriptions"
+      description="View and manage staff job descriptions"
+      icon={Briefcase}
+      actions={
+        <div className="flex items-center rounded-lg border p-1">
+          <Button
+            variant={viewMode === "list" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setViewMode("list")}
+            className="gap-2"
+          >
+            <List className="h-4 w-4" />
+            List
+          </Button>
+          <Button
+            variant={viewMode === "card" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setViewMode("card")}
+            className="gap-2"
+          >
+            <LayoutGrid className="h-4 w-4" />
+            Card
+          </Button>
         </div>
-
-        {/* Stats */}
+      }
+      stats={
         <div className="grid gap-4 md:grid-cols-4">
           <Card className="border-2">
             <CardContent className="p-6">
@@ -268,8 +262,8 @@ export default function AdminJobDescriptionsPage() {
             </CardContent>
           </Card>
         </div>
-
-        {/* Filters */}
+      }
+      filters={
         <Card className="border-2">
           <CardContent className="p-6">
             <div className="flex flex-col gap-4 md:flex-row">
@@ -327,153 +321,151 @@ export default function AdminJobDescriptionsPage() {
             </div>
           </CardContent>
         </Card>
-
-        {/* Staff List */}
-        {filteredProfiles.length > 0 ? (
-          viewMode === "list" ? (
-            <Card className="border-2">
-              <CardContent className="p-6">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-12">#</TableHead>
-                      <TableHead>
-                        <div className="flex items-center gap-2">
-                          <span>Name</span>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setNameSortOrder(nameSortOrder === "asc" ? "desc" : "asc")}
-                            className="h-6 w-6 p-0"
-                          >
-                            {nameSortOrder === "asc" ? (
-                              <ArrowUp className="h-3 w-3" />
-                            ) : (
-                              <ArrowDown className="h-3 w-3" />
-                            )}
-                          </Button>
-                        </div>
-                      </TableHead>
-                      <TableHead>Department</TableHead>
-                      <TableHead>Company Role</TableHead>
-                      <TableHead>Role</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Last Updated</TableHead>
-                      <TableHead>Actions</TableHead>
+      }
+      filtersInCard={false}
+    >
+      {/* Staff List */}
+      {filteredProfiles.length > 0 ? (
+        viewMode === "list" ? (
+          <Card className="border-2">
+            <CardContent className="p-6">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-12">#</TableHead>
+                    <TableHead>
+                      <div className="flex items-center gap-2">
+                        <span>Name</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setNameSortOrder(nameSortOrder === "asc" ? "desc" : "asc")}
+                          className="h-6 w-6 p-0"
+                        >
+                          {nameSortOrder === "asc" ? (
+                            <ArrowUp className="h-3 w-3" />
+                          ) : (
+                            <ArrowDown className="h-3 w-3" />
+                          )}
+                        </Button>
+                      </div>
+                    </TableHead>
+                    <TableHead>Department</TableHead>
+                    <TableHead>Company Role</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Last Updated</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredProfiles.map((profile, index) => (
+                    <TableRow key={profile.id}>
+                      <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
+                      <TableCell className="font-medium">
+                        {formatName(profile.last_name)}, {formatName(profile.first_name)}
+                      </TableCell>
+                      <TableCell>{profile.department}</TableCell>
+                      <TableCell>{profile.company_role || "-"}</TableCell>
+                      <TableCell>
+                        <Badge className={getRoleBadgeColor(profile.role)}>{getRoleDisplayName(profile.role)}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={getCompletionColor(!!profile.job_description)}>
+                          {profile.job_description ? "Completed" : "Pending"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-sm">
+                        {formatDate(profile.job_description_updated_at)}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleViewJobDescription(profile)}
+                          className="gap-2"
+                          disabled={!profile.job_description}
+                        >
+                          <Eye className="h-4 w-4" />
+                          View
+                        </Button>
+                      </TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredProfiles.map((profile, index) => (
-                      <TableRow key={profile.id}>
-                        <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
-                        <TableCell className="font-medium">
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {filteredProfiles.map((profile) => (
+              <Card key={profile.id} className="border-2 transition-shadow hover:shadow-lg">
+                <CardHeader className="from-primary/5 to-background border-b bg-gradient-to-r">
+                  <div className="flex items-start justify-between">
+                    <div className="flex flex-1 items-start gap-3">
+                      <div className="bg-primary/10 rounded-lg p-2">
+                        <User className="text-primary h-5 w-5" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <CardTitle className="text-lg">
                           {formatName(profile.last_name)}, {formatName(profile.first_name)}
-                        </TableCell>
-                        <TableCell>{profile.department}</TableCell>
-                        <TableCell>{profile.company_role || "-"}</TableCell>
-                        <TableCell>
-                          <Badge className={getRoleBadgeColor(profile.role)}>{getRoleDisplayName(profile.role)}</Badge>
-                        </TableCell>
-                        <TableCell>
+                        </CardTitle>
+                        <div className="mt-2 flex items-center gap-2">
                           <Badge className={getCompletionColor(!!profile.job_description)}>
                             {profile.job_description ? "Completed" : "Pending"}
                           </Badge>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground text-sm">
-                          {formatDate(profile.job_description_updated_at)}
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleViewJobDescription(profile)}
-                            className="gap-2"
-                            disabled={!profile.job_description}
-                          >
-                            <Eye className="h-4 w-4" />
-                            View
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {filteredProfiles.map((profile) => (
-                <Card key={profile.id} className="border-2 transition-shadow hover:shadow-lg">
-                  <CardHeader className="from-primary/5 to-background border-b bg-gradient-to-r">
-                    <div className="flex items-start justify-between">
-                      <div className="flex flex-1 items-start gap-3">
-                        <div className="bg-primary/10 rounded-lg p-2">
-                          <User className="text-primary h-5 w-5" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <CardTitle className="text-lg">
-                            {formatName(profile.last_name)}, {formatName(profile.first_name)}
-                          </CardTitle>
-                          <div className="mt-2 flex items-center gap-2">
-                            <Badge className={getCompletionColor(!!profile.job_description)}>
-                              {profile.job_description ? "Completed" : "Pending"}
-                            </Badge>
-                            <Badge className={getRoleBadgeColor(profile.role)}>
-                              {getRoleDisplayName(profile.role)}
-                            </Badge>
-                          </div>
+                          <Badge className={getRoleBadgeColor(profile.role)}>{getRoleDisplayName(profile.role)}</Badge>
                         </div>
                       </div>
                     </div>
-                  </CardHeader>
-                  <CardContent className="space-y-3 p-4">
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3 p-4">
+                  <div className="text-muted-foreground flex items-center gap-2 text-sm">
+                    <Building2 className="h-4 w-4" />
+                    <span>{profile.department}</span>
+                  </div>
+
+                  {profile.company_role && (
                     <div className="text-muted-foreground flex items-center gap-2 text-sm">
-                      <Building2 className="h-4 w-4" />
-                      <span>{profile.department}</span>
+                      <Briefcase className="h-4 w-4" />
+                      <span>{profile.company_role}</span>
                     </div>
+                  )}
 
-                    {profile.company_role && (
-                      <div className="text-muted-foreground flex items-center gap-2 text-sm">
-                        <Briefcase className="h-4 w-4" />
-                        <span>{profile.company_role}</span>
-                      </div>
-                    )}
+                  <div className="text-muted-foreground flex items-center gap-2 text-sm">
+                    <Calendar className="h-4 w-4" />
+                    <span>Updated: {formatDate(profile.job_description_updated_at)}</span>
+                  </div>
 
-                    <div className="text-muted-foreground flex items-center gap-2 text-sm">
-                      <Calendar className="h-4 w-4" />
-                      <span>Updated: {formatDate(profile.job_description_updated_at)}</span>
-                    </div>
-
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleViewJobDescription(profile)}
-                      className="w-full gap-2"
-                      disabled={!profile.job_description}
-                    >
-                      <Eye className="h-4 w-4" />
-                      {profile.job_description ? "View Description" : "No Description"}
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )
-        ) : (
-          <Card className="border-2">
-            <CardContent className="p-12 text-center">
-              <Briefcase className="text-muted-foreground mx-auto mb-4 h-16 w-16" />
-              <h3 className="text-foreground mb-2 text-xl font-semibold">No Staff Found</h3>
-              <p className="text-muted-foreground">
-                {searchQuery || departmentFilter !== "all" || staffFilter !== "all" || statusFilter !== "all"
-                  ? "No staff matches your filters"
-                  : "No staff members found"}
-              </p>
-            </CardContent>
-          </Card>
-        )}
-      </div>
-
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleViewJobDescription(profile)}
+                    className="w-full gap-2"
+                    disabled={!profile.job_description}
+                  >
+                    <Eye className="h-4 w-4" />
+                    {profile.job_description ? "View Description" : "No Description"}
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )
+      ) : (
+        <Card className="border-2">
+          <CardContent className="p-12 text-center">
+            <Briefcase className="text-muted-foreground mx-auto mb-4 h-16 w-16" />
+            <h3 className="text-foreground mb-2 text-xl font-semibold">No Staff Found</h3>
+            <p className="text-muted-foreground">
+              {searchQuery || departmentFilter !== "all" || staffFilter !== "all" || statusFilter !== "all"
+                ? "No staff matches your filters"
+                : "No staff members found"}
+            </p>
+          </CardContent>
+        </Card>
+      )}
       {/* View Job Description Dialog */}
       <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
         <DialogContent className="max-h-[80vh] max-w-3xl overflow-y-auto">
@@ -556,6 +548,6 @@ export default function AdminJobDescriptionsPage() {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </AdminTablePage>
   )
 }

@@ -61,6 +61,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Calendar, User as UserIcon } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Textarea } from "@/components/ui/textarea"
+import { AdminTablePage } from "@/components/admin/admin-table-page"
 
 export interface Staff {
   id: string
@@ -1067,50 +1068,41 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
   }
 
   return (
-    <div className="from-background via-background to-muted/20 min-h-screen w-full overflow-x-hidden bg-gradient-to-br">
-      <div className="mx-auto max-w-7xl space-y-6 p-4 md:p-8">
-        {/* Header */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-foreground flex items-center gap-2 text-2xl font-bold sm:gap-3 sm:text-3xl">
-              <Users className="text-primary h-6 w-6 sm:h-8 sm:w-8" />
-              Staff Management
-            </h1>
-            <p className="text-muted-foreground mt-2 text-sm sm:text-base">
-              View and manage staff members, roles, and permissions
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            {(userProfile?.role === "admin" || userProfile?.role === "super_admin") && (
-              <Button onClick={() => setIsCreateUserDialogOpen(true)} className="gap-2" size="sm">
-                <Plus className="h-4 w-4" />
-                <span className="hidden sm:inline">Create User</span>
-              </Button>
-            )}
-            <div className="flex items-center rounded-lg border p-1">
-              <Button
-                variant={viewMode === "list" ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setViewMode("list")}
-                className="gap-1 sm:gap-2"
-              >
-                <List className="h-4 w-4" />
-                <span className="hidden sm:inline">List</span>
-              </Button>
-              <Button
-                variant={viewMode === "card" ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setViewMode("card")}
-                className="gap-1 sm:gap-2"
-              >
-                <LayoutGrid className="h-4 w-4" />
-                <span className="hidden sm:inline">Card</span>
-              </Button>
-            </div>
+    <AdminTablePage
+      title="Staff Management"
+      description="View and manage staff members, roles, and permissions"
+      icon={Users}
+      actions={
+        <div className="flex items-center gap-2">
+          {(userProfile?.role === "admin" || userProfile?.role === "super_admin") && (
+            <Button onClick={() => setIsCreateUserDialogOpen(true)} className="gap-2" size="sm">
+              <Plus className="h-4 w-4" />
+              <span className="hidden sm:inline">Create User</span>
+            </Button>
+          )}
+          <div className="flex items-center rounded-lg border p-1">
+            <Button
+              variant={viewMode === "list" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setViewMode("list")}
+              className="gap-1 sm:gap-2"
+            >
+              <List className="h-4 w-4" />
+              <span className="hidden sm:inline">List</span>
+            </Button>
+            <Button
+              variant={viewMode === "card" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setViewMode("card")}
+              className="gap-1 sm:gap-2"
+            >
+              <LayoutGrid className="h-4 w-4" />
+              <span className="hidden sm:inline">Card</span>
+            </Button>
           </div>
         </div>
-
-        {/* Stats */}
+      }
+      stats={
         <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
           <Card className="border-2">
             <CardContent className="p-4">
@@ -1168,371 +1160,370 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
             </CardContent>
           </Card>
         </div>
-
-        {/* Export Buttons */}
-        <Card className="border-2">
-          <CardContent className="p-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-center gap-2">
-                <Download className="text-muted-foreground h-4 w-4" />
-                <span className="text-foreground text-sm font-medium">Export Filtered Staff:</span>
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleExportClick("excel")}
-                  className="flex-1 gap-2 sm:flex-none"
-                  disabled={filteredStaff.length === 0}
-                >
-                  <FileText className="h-4 w-4" />
-                  <span className="text-xs sm:text-sm">Excel (.xlsx)</span>
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleExportClick("pdf")}
-                  className="flex-1 gap-2 sm:flex-none"
-                  disabled={filteredStaff.length === 0}
-                >
-                  <FileText className="h-4 w-4" />
-                  <span className="text-xs sm:text-sm">PDF</span>
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleExportClick("word")}
-                  className="flex-1 gap-2 sm:flex-none"
-                  disabled={filteredStaff.length === 0}
-                >
-                  <FileText className="h-4 w-4" />
-                  <span className="text-xs sm:text-sm">Word (.docx)</span>
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Filters */}
-        <Card className="border-2">
-          <CardContent className="p-6">
-            <div className="space-y-4">
-              {/* Search Bar */}
-              <div className="relative w-full">
-                <Search className="text-muted-foreground absolute top-1/2 left-3 h-5 w-5 -translate-y-1/2 transform" />
-                <Input
-                  placeholder="Search staff by name, email, or position..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="h-12 pl-11 text-base"
-                />
-              </div>
-
-              {/* Filter Buttons */}
-              <div className="flex gap-3 overflow-hidden">
-                <SearchableMultiSelect
-                  label="Departments"
-                  icon={<Building2 className="h-4 w-4" />}
-                  values={departmentFilter}
-                  options={DEPARTMENTS.map((dept) => ({
-                    value: dept,
-                    label: dept,
-                    icon: <Building2 className="h-3 w-3" />,
-                  }))}
-                  onChange={setDepartmentFilter}
-                  placeholder="Department"
-                />
-                <SearchableMultiSelect
-                  label="Staff Members"
-                  icon={<User className="h-4 w-4" />}
-                  values={staffFilter}
-                  options={staff.map((member) => ({
-                    value: member.id,
-                    label: `${formatName(member.first_name)} ${formatName(member.last_name)} - ${member.department || "No Dept"}`,
-                    icon: <User className="h-3 w-3" />,
-                  }))}
-                  onChange={setStaffFilter}
-                  placeholder="Staff"
-                />
-                <SearchableMultiSelect
-                  label="Roles"
-                  icon={<Shield className="h-4 w-4" />}
-                  values={roleFilter}
-                  options={roles.map((role) => ({
-                    value: role,
-                    label: getRoleDisplayName(role),
-                  }))}
-                  onChange={setRoleFilter}
-                  placeholder="Role"
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Staff List */}
-        {filteredStaff.length > 0 ? (
-          viewMode === "list" ? (
-            <Card className="border-2">
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-12">#</TableHead>
-                      <TableHead>
-                        <div className="flex items-center gap-2">
-                          <span>Name</span>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setNameSortOrder(nameSortOrder === "asc" ? "desc" : "asc")}
-                            className="h-6 w-6 p-0"
-                          >
-                            {nameSortOrder === "asc" ? (
-                              <ArrowUp className="h-3 w-3" />
-                            ) : (
-                              <ArrowDown className="h-3 w-3" />
-                            )}
-                          </Button>
-                        </div>
-                      </TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Department</TableHead>
-                      <TableHead>Role</TableHead>
-                      <TableHead>Position</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredStaff.map((member, index) => (
-                      <TableRow key={member.id}>
-                        <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
-                        <TableCell>
-                          <Link
-                            href={`/admin/staff/${member.id}`}
-                            className="hover:text-primary whitespace-nowrap transition-colors"
-                          >
-                            <span className="text-foreground font-medium">
-                              {formatName(member.last_name)}, {formatName(member.first_name)}
-                            </span>
-                          </Link>
-                        </TableCell>
-                        <TableCell>
-                          <div className="text-muted-foreground flex items-center gap-2 text-sm">
-                            <Mail className="h-3 w-3" />
-                            <span className="max-w-[200px] truncate">{member.company_email}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="text-foreground text-sm">{member.department || "-"}</div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-wrap gap-1">
-                            <Badge className={getRoleBadgeColor(member.role)}>{getRoleDisplayName(member.role)}</Badge>
-                            {member.role === "lead" &&
-                              member.lead_departments &&
-                              member.lead_departments.length > 0 && (
-                                <Badge variant="outline" className="text-xs">
-                                  {member.lead_departments.length} Dept
-                                  {member.lead_departments.length > 1 ? "s" : ""}
-                                </Badge>
-                              )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-muted-foreground text-sm">{member.company_role || "-"}</span>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-1 sm:gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-8 w-8 p-0 sm:h-auto sm:w-auto sm:p-2"
-                              title="View Signature"
-                              onClick={() => handleViewSignature(member)}
-                            >
-                              <FileSignature className="h-3 w-3" />
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-8 text-xs sm:h-auto sm:text-sm"
-                              onClick={() => handleViewDetails(member)}
-                            >
-                              <span className="hidden sm:inline">View</span>
-                              <span className="sm:hidden">👁</span>
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-8 w-8 p-0 sm:h-auto sm:w-auto sm:p-2"
-                              onClick={() => handleEditStaff(member)}
-                            >
-                              <Edit className="h-3 w-3" />
-                            </Button>
-                            {userProfile?.role === "super_admin" && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 w-8 p-0 sm:h-auto sm:w-auto sm:p-2"
-                                onClick={() => handleDeleteStaff(member)}
-                                title="Delete Staff Member"
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </Card>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {filteredStaff.map((member) => (
-                <Card key={member.id} className="border-2 transition-shadow hover:shadow-lg">
-                  <CardHeader className="from-primary/5 to-background border-b bg-linear-to-r">
-                    <div className="flex items-start justify-between">
-                      <Link
-                        href={`/admin/staff/${member.id}`}
-                        className="hover:text-primary flex flex-1 items-start gap-3 transition-colors"
-                      >
-                        <div className="bg-primary/10 rounded-lg p-2">
-                          <Users className="text-primary h-5 w-5" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <CardTitle className="text-lg">
-                            {member.first_name} {member.last_name}
-                          </CardTitle>
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            <Badge className={getRoleBadgeColor(member.role)}>{getRoleDisplayName(member.role)}</Badge>
-                            {member.role === "lead" &&
-                              member.lead_departments &&
-                              member.lead_departments.length > 0 && (
-                                <Badge variant="outline" className="text-xs">
-                                  {member.lead_departments.length} Dept
-                                  {member.lead_departments.length > 1 ? "s" : ""}
-                                </Badge>
-                              )}
-                          </div>
-                        </div>
-                      </Link>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleEditStaff(member)
-                        }}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-3 p-4">
-                    <div className="text-muted-foreground flex items-center gap-2 text-sm">
-                      <Mail className="h-4 w-4" />
-                      <span className="truncate">{member.company_email}</span>
-                    </div>
-
-                    <div className="text-muted-foreground flex items-center gap-2 text-sm">
-                      <Building2 className="h-4 w-4" />
-                      <span>{member.department || "-"}</span>
-                    </div>
-
-                    {member.company_role && (
-                      <div className="text-muted-foreground flex items-center gap-2 text-sm">
-                        <UserCog className="h-4 w-4" />
-                        <span>{member.company_role}</span>
-                      </div>
-                    )}
-
-                    {member.phone_number && (
-                      <div className="text-muted-foreground flex items-center gap-2 text-sm">
-                        <Phone className="h-4 w-4" />
-                        <span>{member.phone_number}</span>
-                      </div>
-                    )}
-
-                    {member.current_work_location && (
-                      <div className="text-muted-foreground flex items-center gap-2 text-sm">
-                        <MapPin className="h-4 w-4" />
-                        <span>{member.current_work_location}</span>
-                      </div>
-                    )}
-
-                    {member.is_department_lead && member.lead_departments.length > 0 && (
-                      <div className="border-t pt-2">
-                        <p className="text-muted-foreground mb-1 text-xs">Leading:</p>
-                        <div className="flex flex-wrap gap-1">
-                          {member.lead_departments.map((dept, idx) => (
-                            <span
-                              key={idx}
-                              className="rounded bg-blue-100 px-2 py-1 text-xs text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
-                            >
-                              {dept}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="mt-2 flex gap-2">
-                      <Button variant="outline" size="sm" onClick={() => handleViewDetails(member)} className="flex-1">
-                        View Details
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleViewSignature(member)}
-                        className="flex-1"
-                        title="View Signature"
-                      >
-                        <FileSignature className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleEditStaff(member)}
-                        className="flex-1 gap-2"
-                      >
-                        <Edit className="h-4 w-4" />
-                        Edit
-                      </Button>
-                      {userProfile?.role === "super_admin" && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDeleteStaff(member)}
-                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                          title="Delete Staff Member"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )
-        ) : (
+      }
+      filters={
+        <>
+          {/* Export Buttons */}
           <Card className="border-2">
-            <CardContent className="p-12 text-center">
-              <Users className="text-muted-foreground mx-auto mb-4 h-16 w-16" />
-              <h3 className="text-foreground mb-2 text-xl font-semibold">No Staff Found</h3>
-              <p className="text-muted-foreground">
-                {searchQuery || departmentFilter.length > 0 || roleFilter.length > 0 || staffFilter.length > 0
-                  ? "No staff matches your filters"
-                  : "No staff members found"}
-              </p>
+            <CardContent className="p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-2">
+                  <Download className="text-muted-foreground h-4 w-4" />
+                  <span className="text-foreground text-sm font-medium">Export Filtered Staff:</span>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleExportClick("excel")}
+                    className="flex-1 gap-2 sm:flex-none"
+                    disabled={filteredStaff.length === 0}
+                  >
+                    <FileText className="h-4 w-4" />
+                    <span className="text-xs sm:text-sm">Excel (.xlsx)</span>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleExportClick("pdf")}
+                    className="flex-1 gap-2 sm:flex-none"
+                    disabled={filteredStaff.length === 0}
+                  >
+                    <FileText className="h-4 w-4" />
+                    <span className="text-xs sm:text-sm">PDF</span>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleExportClick("word")}
+                    className="flex-1 gap-2 sm:flex-none"
+                    disabled={filteredStaff.length === 0}
+                  >
+                    <FileText className="h-4 w-4" />
+                    <span className="text-xs sm:text-sm">Word (.docx)</span>
+                  </Button>
+                </div>
+              </div>
             </CardContent>
           </Card>
-        )}
-      </div>
+        </>
+      }
+      filtersInCard={false}
+    >
+      {/* Filters */}
+      <Card className="border-2">
+        <CardContent className="p-6">
+          <div className="space-y-4">
+            {/* Search Bar */}
+            <div className="relative w-full">
+              <Search className="text-muted-foreground absolute top-1/2 left-3 h-5 w-5 -translate-y-1/2 transform" />
+              <Input
+                placeholder="Search staff by name, email, or position..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="h-12 pl-11 text-base"
+              />
+            </div>
 
+            {/* Filter Buttons */}
+            <div className="flex gap-3 overflow-hidden">
+              <SearchableMultiSelect
+                label="Departments"
+                icon={<Building2 className="h-4 w-4" />}
+                values={departmentFilter}
+                options={DEPARTMENTS.map((dept) => ({
+                  value: dept,
+                  label: dept,
+                  icon: <Building2 className="h-3 w-3" />,
+                }))}
+                onChange={setDepartmentFilter}
+                placeholder="Department"
+              />
+              <SearchableMultiSelect
+                label="Staff Members"
+                icon={<User className="h-4 w-4" />}
+                values={staffFilter}
+                options={staff.map((member) => ({
+                  value: member.id,
+                  label: `${formatName(member.first_name)} ${formatName(member.last_name)} - ${member.department || "No Dept"}`,
+                  icon: <User className="h-3 w-3" />,
+                }))}
+                onChange={setStaffFilter}
+                placeholder="Staff"
+              />
+              <SearchableMultiSelect
+                label="Roles"
+                icon={<Shield className="h-4 w-4" />}
+                values={roleFilter}
+                options={roles.map((role) => ({
+                  value: role,
+                  label: getRoleDisplayName(role),
+                }))}
+                onChange={setRoleFilter}
+                placeholder="Role"
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Staff List */}
+      {filteredStaff.length > 0 ? (
+        viewMode === "list" ? (
+          <Card className="border-2">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-12">#</TableHead>
+                    <TableHead>
+                      <div className="flex items-center gap-2">
+                        <span>Name</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setNameSortOrder(nameSortOrder === "asc" ? "desc" : "asc")}
+                          className="h-6 w-6 p-0"
+                        >
+                          {nameSortOrder === "asc" ? (
+                            <ArrowUp className="h-3 w-3" />
+                          ) : (
+                            <ArrowDown className="h-3 w-3" />
+                          )}
+                        </Button>
+                      </div>
+                    </TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Department</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Position</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredStaff.map((member, index) => (
+                    <TableRow key={member.id}>
+                      <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
+                      <TableCell>
+                        <Link
+                          href={`/admin/staff/${member.id}`}
+                          className="hover:text-primary whitespace-nowrap transition-colors"
+                        >
+                          <span className="text-foreground font-medium">
+                            {formatName(member.last_name)}, {formatName(member.first_name)}
+                          </span>
+                        </Link>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-muted-foreground flex items-center gap-2 text-sm">
+                          <Mail className="h-3 w-3" />
+                          <span className="max-w-[200px] truncate">{member.company_email}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-foreground text-sm">{member.department || "-"}</div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          <Badge className={getRoleBadgeColor(member.role)}>{getRoleDisplayName(member.role)}</Badge>
+                          {member.role === "lead" && member.lead_departments && member.lead_departments.length > 0 && (
+                            <Badge variant="outline" className="text-xs">
+                              {member.lead_departments.length} Dept
+                              {member.lead_departments.length > 1 ? "s" : ""}
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-muted-foreground text-sm">{member.company_role || "-"}</span>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1 sm:gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 w-8 p-0 sm:h-auto sm:w-auto sm:p-2"
+                            title="View Signature"
+                            onClick={() => handleViewSignature(member)}
+                          >
+                            <FileSignature className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 text-xs sm:h-auto sm:text-sm"
+                            onClick={() => handleViewDetails(member)}
+                          >
+                            <span className="hidden sm:inline">View</span>
+                            <span className="sm:hidden">👁</span>
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 w-8 p-0 sm:h-auto sm:w-auto sm:p-2"
+                            onClick={() => handleEditStaff(member)}
+                          >
+                            <Edit className="h-3 w-3" />
+                          </Button>
+                          {userProfile?.role === "super_admin" && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 w-8 p-0 sm:h-auto sm:w-auto sm:p-2"
+                              onClick={() => handleDeleteStaff(member)}
+                              title="Delete Staff Member"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </Card>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {filteredStaff.map((member) => (
+              <Card key={member.id} className="border-2 transition-shadow hover:shadow-lg">
+                <CardHeader className="from-primary/5 to-background border-b bg-linear-to-r">
+                  <div className="flex items-start justify-between">
+                    <Link
+                      href={`/admin/staff/${member.id}`}
+                      className="hover:text-primary flex flex-1 items-start gap-3 transition-colors"
+                    >
+                      <div className="bg-primary/10 rounded-lg p-2">
+                        <Users className="text-primary h-5 w-5" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <CardTitle className="text-lg">
+                          {member.first_name} {member.last_name}
+                        </CardTitle>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <Badge className={getRoleBadgeColor(member.role)}>{getRoleDisplayName(member.role)}</Badge>
+                          {member.role === "lead" && member.lead_departments && member.lead_departments.length > 0 && (
+                            <Badge variant="outline" className="text-xs">
+                              {member.lead_departments.length} Dept
+                              {member.lead_departments.length > 1 ? "s" : ""}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    </Link>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleEditStaff(member)
+                      }}
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3 p-4">
+                  <div className="text-muted-foreground flex items-center gap-2 text-sm">
+                    <Mail className="h-4 w-4" />
+                    <span className="truncate">{member.company_email}</span>
+                  </div>
+
+                  <div className="text-muted-foreground flex items-center gap-2 text-sm">
+                    <Building2 className="h-4 w-4" />
+                    <span>{member.department || "-"}</span>
+                  </div>
+
+                  {member.company_role && (
+                    <div className="text-muted-foreground flex items-center gap-2 text-sm">
+                      <UserCog className="h-4 w-4" />
+                      <span>{member.company_role}</span>
+                    </div>
+                  )}
+
+                  {member.phone_number && (
+                    <div className="text-muted-foreground flex items-center gap-2 text-sm">
+                      <Phone className="h-4 w-4" />
+                      <span>{member.phone_number}</span>
+                    </div>
+                  )}
+
+                  {member.current_work_location && (
+                    <div className="text-muted-foreground flex items-center gap-2 text-sm">
+                      <MapPin className="h-4 w-4" />
+                      <span>{member.current_work_location}</span>
+                    </div>
+                  )}
+
+                  {member.is_department_lead && member.lead_departments.length > 0 && (
+                    <div className="border-t pt-2">
+                      <p className="text-muted-foreground mb-1 text-xs">Leading:</p>
+                      <div className="flex flex-wrap gap-1">
+                        {member.lead_departments.map((dept, idx) => (
+                          <span
+                            key={idx}
+                            className="rounded bg-blue-100 px-2 py-1 text-xs text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
+                          >
+                            {dept}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="mt-2 flex gap-2">
+                    <Button variant="outline" size="sm" onClick={() => handleViewDetails(member)} className="flex-1">
+                      View Details
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleViewSignature(member)}
+                      className="flex-1"
+                      title="View Signature"
+                    >
+                      <FileSignature className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleEditStaff(member)}
+                      className="flex-1 gap-2"
+                    >
+                      <Edit className="h-4 w-4" />
+                      Edit
+                    </Button>
+                    {userProfile?.role === "super_admin" && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDeleteStaff(member)}
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        title="Delete Staff Member"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )
+      ) : (
+        <Card className="border-2">
+          <CardContent className="p-12 text-center">
+            <Users className="text-muted-foreground mx-auto mb-4 h-16 w-16" />
+            <h3 className="text-foreground mb-2 text-xl font-semibold">No Staff Found</h3>
+            <p className="text-muted-foreground">
+              {searchQuery || departmentFilter.length > 0 || roleFilter.length > 0 || staffFilter.length > 0
+                ? "No staff matches your filters"
+                : "No staff members found"}
+            </p>
+          </CardContent>
+        </Card>
+      )}
       {/* Create User Dialog */}
       <Dialog open={isCreateUserDialogOpen} onOpenChange={setIsCreateUserDialogOpen}>
         <DialogContent className="max-w-2xl">
@@ -2694,6 +2685,6 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </AdminTablePage>
   )
 }

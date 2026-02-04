@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
+import { PageHeader, PageWrapper } from "@/components/layout"
 import {
   Bell,
   AlertCircle,
@@ -18,7 +19,6 @@ import {
   Info,
   Search,
   CheckCheck,
-  ArrowLeft,
   User,
   Package,
   AlertTriangle,
@@ -30,7 +30,6 @@ import {
   CalendarClock,
   RefreshCw,
 } from "lucide-react"
-import Link from "next/link"
 
 export interface DynamicNotification {
   id: string
@@ -385,28 +384,13 @@ export function AdminNotificationContent({ initialNotifications }: AdminNotifica
   }
 
   return (
-    <div className="bg-background flex min-h-screen flex-col">
-      <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col p-4 sm:p-6 lg:p-8">
-        {/* Header */}
-        <div className="mb-6 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link href="/admin">
-              <Button variant="ghost" size="icon">
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
-            </Link>
-            <div>
-              <h1 className="text-foreground flex items-center gap-2 text-2xl font-bold sm:text-3xl">
-                <Bell className="h-7 w-7" />
-                Admin Notifications
-              </h1>
-              <p className="text-muted-foreground mt-1 flex items-center gap-1 text-sm">
-                <ShieldCheck className="h-4 w-4" />
-                System-wide notifications and alerts
-              </p>
-            </div>
-          </div>
-
+    <PageWrapper maxWidth="full" background="gradient">
+      <PageHeader
+        title="Admin Notifications"
+        description="System-wide notifications and alerts"
+        icon={Bell}
+        backLink={{ href: "/admin", label: "Back to Admin" }}
+        actions={
           <div className="flex items-center gap-2">
             <Button onClick={loadNotifications} variant="outline" size="icon" title="Refresh" disabled={isLoading}>
               <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
@@ -418,276 +402,276 @@ export function AdminNotificationContent({ initialNotifications }: AdminNotifica
               </Button>
             )}
           </div>
-        </div>
+        }
+      />
 
-        {/* Stats */}
-        <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-8">
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold">{categoryCounts.all}</div>
-              <div className="text-muted-foreground text-xs">Total</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold text-blue-600">{categoryCounts.unread}</div>
-              <div className="text-muted-foreground text-xs">Unread</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold text-orange-600">{categoryCounts.users}</div>
-              <div className="text-muted-foreground text-xs">Users</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold text-green-600">{categoryCounts.tasks}</div>
-              <div className="text-muted-foreground text-xs">Tasks</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold text-red-600">{categoryCounts.payments}</div>
-              <div className="text-muted-foreground text-xs">Payments</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold text-purple-600">{categoryCounts.leave}</div>
-              <div className="text-muted-foreground text-xs">Leave</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold text-indigo-600">{categoryCounts.assets}</div>
-              <div className="text-muted-foreground text-xs">Assets</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold text-teal-600">{categoryCounts.feedback}</div>
-              <div className="text-muted-foreground text-xs">Feedback</div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Main Content */}
+      {/* Stats */}
+      <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-8">
         <Card>
-          <div className="border-b p-4">
-            <div className="flex flex-col gap-4 sm:flex-row">
-              <div className="relative flex-1">
-                <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-                <Input
-                  placeholder="Search notifications..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9"
-                />
-              </div>
-
-              <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                <SelectTrigger className="w-full sm:w-[180px]">
-                  <Filter className="mr-2 h-4 w-4" />
-                  <SelectValue placeholder="Priority" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Priorities</SelectItem>
-                  <SelectItem value="urgent">Urgent</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
-                  <SelectItem value="normal">Normal</SelectItem>
-                  <SelectItem value="low">Low</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <div className="border-b">
-              <TabsList className="h-auto w-full justify-start overflow-x-auto rounded-none border-b-0 bg-transparent p-0">
-                <TabsTrigger
-                  value="all"
-                  className="data-[state=active]:border-primary rounded-none border-b-2 border-transparent px-6 py-3 whitespace-nowrap data-[state=active]:bg-transparent"
-                >
-                  All
-                  {categoryCounts.all > 0 && (
-                    <Badge variant="secondary" className="ml-2">
-                      {categoryCounts.all}
-                    </Badge>
-                  )}
-                </TabsTrigger>
-
-                <TabsTrigger
-                  value="unread"
-                  className="data-[state=active]:border-primary rounded-none border-b-2 border-transparent px-6 py-3 whitespace-nowrap data-[state=active]:bg-transparent"
-                >
-                  Unread
-                  {categoryCounts.unread > 0 && (
-                    <Badge variant="destructive" className="ml-2">
-                      {categoryCounts.unread}
-                    </Badge>
-                  )}
-                </TabsTrigger>
-
-                <TabsTrigger
-                  value="payments"
-                  className="data-[state=active]:border-primary rounded-none border-b-2 border-transparent px-6 py-3 whitespace-nowrap data-[state=active]:bg-transparent"
-                >
-                  <CreditCard className="mr-1 h-4 w-4" />
-                  Payments
-                  {categoryCounts.payments > 0 && (
-                    <Badge variant="secondary" className="ml-2">
-                      {categoryCounts.payments}
-                    </Badge>
-                  )}
-                </TabsTrigger>
-
-                <TabsTrigger
-                  value="leave"
-                  className="data-[state=active]:border-primary rounded-none border-b-2 border-transparent px-6 py-3 whitespace-nowrap data-[state=active]:bg-transparent"
-                >
-                  <CalendarClock className="mr-1 h-4 w-4" />
-                  Leave
-                  {categoryCounts.leave > 0 && (
-                    <Badge variant="secondary" className="ml-2">
-                      {categoryCounts.leave}
-                    </Badge>
-                  )}
-                </TabsTrigger>
-
-                <TabsTrigger
-                  value="tasks"
-                  className="data-[state=active]:border-primary rounded-none border-b-2 border-transparent px-6 py-3 whitespace-nowrap data-[state=active]:bg-transparent"
-                >
-                  <Clock className="mr-1 h-4 w-4" />
-                  Tasks
-                  {categoryCounts.tasks > 0 && (
-                    <Badge variant="secondary" className="ml-2">
-                      {categoryCounts.tasks}
-                    </Badge>
-                  )}
-                </TabsTrigger>
-
-                <TabsTrigger
-                  value="assets"
-                  className="data-[state=active]:border-primary rounded-none border-b-2 border-transparent px-6 py-3 whitespace-nowrap data-[state=active]:bg-transparent"
-                >
-                  <Package className="mr-1 h-4 w-4" />
-                  Assets
-                  {categoryCounts.assets > 0 && (
-                    <Badge variant="secondary" className="ml-2">
-                      {categoryCounts.assets}
-                    </Badge>
-                  )}
-                </TabsTrigger>
-
-                <TabsTrigger
-                  value="users"
-                  className="data-[state=active]:border-primary rounded-none border-b-2 border-transparent px-6 py-3 whitespace-nowrap data-[state=active]:bg-transparent"
-                >
-                  <User className="mr-1 h-4 w-4" />
-                  Users
-                  {categoryCounts.users > 0 && (
-                    <Badge variant="secondary" className="ml-2">
-                      {categoryCounts.users}
-                    </Badge>
-                  )}
-                </TabsTrigger>
-              </TabsList>
-            </div>
-
-            <TabsContent value={activeTab} className="mt-0">
-              <div className="min-h-[400px]" style={{ maxHeight: "calc(100vh - 420px)", overflowY: "auto" }}>
-                {filteredNotifications.length > 0 ? (
-                  <div className="divide-y">
-                    {filteredNotifications.map((notification) => {
-                      const Icon = typeIcons[notification.type]
-                      const isRead = readIds.has(notification.id)
-
-                      return (
-                        <div
-                          key={notification.id}
-                          className={cn(
-                            "group hover:bg-muted/30 relative flex cursor-pointer items-center gap-3 border-l-2 px-4 py-3 transition-all",
-                            typeColors[notification.type],
-                            isRead && "opacity-60"
-                          )}
-                          onClick={() => handleNotificationClick(notification)}
-                        >
-                          {/* Icon */}
-                          <div
-                            className={cn(
-                              "flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
-                              notification.type === "error"
-                                ? "bg-red-100 text-red-600 dark:bg-red-950 dark:text-red-400"
-                                : notification.type === "warning"
-                                  ? "bg-yellow-100 text-yellow-600 dark:bg-yellow-950 dark:text-yellow-400"
-                                  : notification.type === "success"
-                                    ? "bg-green-100 text-green-600 dark:bg-green-950 dark:text-green-400"
-                                    : "bg-blue-100 text-blue-600 dark:bg-blue-950 dark:text-blue-400"
-                            )}
-                          >
-                            <Icon className="h-4 w-4" />
-                          </div>
-
-                          {/* Content */}
-                          <div className="flex min-w-0 flex-1 items-center gap-3">
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-2">
-                                <span className={cn("truncate text-sm", !isRead && "font-semibold")}>
-                                  {notification.title}
-                                </span>
-                                <span className="text-muted-foreground hidden truncate text-xs sm:inline">
-                                  — {notification.message}
-                                </span>
-                              </div>
-                            </div>
-
-                            {/* Badges and meta */}
-                            <div className="hidden shrink-0 items-center gap-2 sm:flex">
-                              {notification.priority !== "normal" && (
-                                <Badge
-                                  variant={notification.priority === "urgent" ? "destructive" : "secondary"}
-                                  className="px-1.5 py-0 text-[10px]"
-                                >
-                                  {notification.priority}
-                                </Badge>
-                              )}
-                              <Badge variant="outline" className="px-1.5 py-0 text-[10px]">
-                                {notification.category}
-                              </Badge>
-                              <span className="text-muted-foreground text-xs whitespace-nowrap">
-                                {notification.timestamp}
-                              </span>
-                            </div>
-
-                            {/* Arrow */}
-                            {notification.link && <ChevronRight className="text-muted-foreground h-4 w-4 shrink-0" />}
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center px-4 py-16">
-                    <div className="bg-muted mb-4 rounded-full p-6">
-                      <Bell className="text-muted-foreground h-16 w-16 opacity-50" />
-                    </div>
-                    <h3 className="mb-2 text-lg font-semibold">
-                      {searchQuery ? "No matching notifications" : "No notifications"}
-                    </h3>
-                    <p className="text-muted-foreground max-w-md text-center text-sm">
-                      {searchQuery
-                        ? "Try adjusting your search terms or filters"
-                        : "You're all caught up! Everything is running smoothly."}
-                    </p>
-                  </div>
-                )}
-              </div>
-            </TabsContent>
-          </Tabs>
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold">{categoryCounts.all}</div>
+            <div className="text-muted-foreground text-xs">Total</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold text-blue-600">{categoryCounts.unread}</div>
+            <div className="text-muted-foreground text-xs">Unread</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold text-orange-600">{categoryCounts.users}</div>
+            <div className="text-muted-foreground text-xs">Users</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold text-green-600">{categoryCounts.tasks}</div>
+            <div className="text-muted-foreground text-xs">Tasks</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold text-red-600">{categoryCounts.payments}</div>
+            <div className="text-muted-foreground text-xs">Payments</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold text-purple-600">{categoryCounts.leave}</div>
+            <div className="text-muted-foreground text-xs">Leave</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold text-indigo-600">{categoryCounts.assets}</div>
+            <div className="text-muted-foreground text-xs">Assets</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold text-teal-600">{categoryCounts.feedback}</div>
+            <div className="text-muted-foreground text-xs">Feedback</div>
+          </CardContent>
         </Card>
       </div>
-    </div>
+
+      {/* Main Content */}
+      <Card>
+        <div className="border-b p-4">
+          <div className="flex flex-col gap-4 sm:flex-row">
+            <div className="relative flex-1">
+              <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+              <Input
+                placeholder="Search notifications..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+
+            <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+              <SelectTrigger className="w-full sm:w-[180px]">
+                <Filter className="mr-2 h-4 w-4" />
+                <SelectValue placeholder="Priority" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Priorities</SelectItem>
+                <SelectItem value="urgent">Urgent</SelectItem>
+                <SelectItem value="high">High</SelectItem>
+                <SelectItem value="normal">Normal</SelectItem>
+                <SelectItem value="low">Low</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <div className="border-b">
+            <TabsList className="h-auto w-full justify-start overflow-x-auto rounded-none border-b-0 bg-transparent p-0">
+              <TabsTrigger
+                value="all"
+                className="data-[state=active]:border-primary rounded-none border-b-2 border-transparent px-6 py-3 whitespace-nowrap data-[state=active]:bg-transparent"
+              >
+                All
+                {categoryCounts.all > 0 && (
+                  <Badge variant="secondary" className="ml-2">
+                    {categoryCounts.all}
+                  </Badge>
+                )}
+              </TabsTrigger>
+
+              <TabsTrigger
+                value="unread"
+                className="data-[state=active]:border-primary rounded-none border-b-2 border-transparent px-6 py-3 whitespace-nowrap data-[state=active]:bg-transparent"
+              >
+                Unread
+                {categoryCounts.unread > 0 && (
+                  <Badge variant="destructive" className="ml-2">
+                    {categoryCounts.unread}
+                  </Badge>
+                )}
+              </TabsTrigger>
+
+              <TabsTrigger
+                value="payments"
+                className="data-[state=active]:border-primary rounded-none border-b-2 border-transparent px-6 py-3 whitespace-nowrap data-[state=active]:bg-transparent"
+              >
+                <CreditCard className="mr-1 h-4 w-4" />
+                Payments
+                {categoryCounts.payments > 0 && (
+                  <Badge variant="secondary" className="ml-2">
+                    {categoryCounts.payments}
+                  </Badge>
+                )}
+              </TabsTrigger>
+
+              <TabsTrigger
+                value="leave"
+                className="data-[state=active]:border-primary rounded-none border-b-2 border-transparent px-6 py-3 whitespace-nowrap data-[state=active]:bg-transparent"
+              >
+                <CalendarClock className="mr-1 h-4 w-4" />
+                Leave
+                {categoryCounts.leave > 0 && (
+                  <Badge variant="secondary" className="ml-2">
+                    {categoryCounts.leave}
+                  </Badge>
+                )}
+              </TabsTrigger>
+
+              <TabsTrigger
+                value="tasks"
+                className="data-[state=active]:border-primary rounded-none border-b-2 border-transparent px-6 py-3 whitespace-nowrap data-[state=active]:bg-transparent"
+              >
+                <Clock className="mr-1 h-4 w-4" />
+                Tasks
+                {categoryCounts.tasks > 0 && (
+                  <Badge variant="secondary" className="ml-2">
+                    {categoryCounts.tasks}
+                  </Badge>
+                )}
+              </TabsTrigger>
+
+              <TabsTrigger
+                value="assets"
+                className="data-[state=active]:border-primary rounded-none border-b-2 border-transparent px-6 py-3 whitespace-nowrap data-[state=active]:bg-transparent"
+              >
+                <Package className="mr-1 h-4 w-4" />
+                Assets
+                {categoryCounts.assets > 0 && (
+                  <Badge variant="secondary" className="ml-2">
+                    {categoryCounts.assets}
+                  </Badge>
+                )}
+              </TabsTrigger>
+
+              <TabsTrigger
+                value="users"
+                className="data-[state=active]:border-primary rounded-none border-b-2 border-transparent px-6 py-3 whitespace-nowrap data-[state=active]:bg-transparent"
+              >
+                <User className="mr-1 h-4 w-4" />
+                Users
+                {categoryCounts.users > 0 && (
+                  <Badge variant="secondary" className="ml-2">
+                    {categoryCounts.users}
+                  </Badge>
+                )}
+              </TabsTrigger>
+            </TabsList>
+          </div>
+
+          <TabsContent value={activeTab} className="mt-0">
+            <div className="min-h-[400px]" style={{ maxHeight: "calc(100vh - 420px)", overflowY: "auto" }}>
+              {filteredNotifications.length > 0 ? (
+                <div className="divide-y">
+                  {filteredNotifications.map((notification) => {
+                    const Icon = typeIcons[notification.type]
+                    const isRead = readIds.has(notification.id)
+
+                    return (
+                      <div
+                        key={notification.id}
+                        className={cn(
+                          "group hover:bg-muted/30 relative flex cursor-pointer items-center gap-3 border-l-2 px-4 py-3 transition-all",
+                          typeColors[notification.type],
+                          isRead && "opacity-60"
+                        )}
+                        onClick={() => handleNotificationClick(notification)}
+                      >
+                        {/* Icon */}
+                        <div
+                          className={cn(
+                            "flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
+                            notification.type === "error"
+                              ? "bg-red-100 text-red-600 dark:bg-red-950 dark:text-red-400"
+                              : notification.type === "warning"
+                                ? "bg-yellow-100 text-yellow-600 dark:bg-yellow-950 dark:text-yellow-400"
+                                : notification.type === "success"
+                                  ? "bg-green-100 text-green-600 dark:bg-green-950 dark:text-green-400"
+                                  : "bg-blue-100 text-blue-600 dark:bg-blue-950 dark:text-blue-400"
+                          )}
+                        >
+                          <Icon className="h-4 w-4" />
+                        </div>
+
+                        {/* Content */}
+                        <div className="flex min-w-0 flex-1 items-center gap-3">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className={cn("truncate text-sm", !isRead && "font-semibold")}>
+                                {notification.title}
+                              </span>
+                              <span className="text-muted-foreground hidden truncate text-xs sm:inline">
+                                — {notification.message}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Badges and meta */}
+                          <div className="hidden shrink-0 items-center gap-2 sm:flex">
+                            {notification.priority !== "normal" && (
+                              <Badge
+                                variant={notification.priority === "urgent" ? "destructive" : "secondary"}
+                                className="px-1.5 py-0 text-[10px]"
+                              >
+                                {notification.priority}
+                              </Badge>
+                            )}
+                            <Badge variant="outline" className="px-1.5 py-0 text-[10px]">
+                              {notification.category}
+                            </Badge>
+                            <span className="text-muted-foreground text-xs whitespace-nowrap">
+                              {notification.timestamp}
+                            </span>
+                          </div>
+
+                          {/* Arrow */}
+                          {notification.link && <ChevronRight className="text-muted-foreground h-4 w-4 shrink-0" />}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center px-4 py-16">
+                  <div className="bg-muted mb-4 rounded-full p-6">
+                    <Bell className="text-muted-foreground h-16 w-16 opacity-50" />
+                  </div>
+                  <h3 className="mb-2 text-lg font-semibold">
+                    {searchQuery ? "No matching notifications" : "No notifications"}
+                  </h3>
+                  <p className="text-muted-foreground max-w-md text-center text-sm">
+                    {searchQuery
+                      ? "Try adjusting your search terms or filters"
+                      : "You're all caught up! Everything is running smoothly."}
+                  </p>
+                </div>
+              )}
+            </div>
+          </TabsContent>
+        </Tabs>
+      </Card>
+    </PageWrapper>
   )
 }

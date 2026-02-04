@@ -4,12 +4,12 @@ import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
-import { formatName } from "@/lib/utils"
+import { cn, formatName } from "@/lib/utils"
 import {
   ArrowLeft,
   User,
@@ -487,9 +487,12 @@ export default function UserDetailPage() {
                         <TableCell>{task.department || "N/A"}</TableCell>
                         <TableCell>{task.due_date ? new Date(task.due_date).toLocaleDateString() : "N/A"}</TableCell>
                         <TableCell>
-                          <Button variant="ghost" size="sm" asChild>
-                            <Link href={`/admin/tasks?taskId=${task.id}`}>View</Link>
-                          </Button>
+                          <Link
+                            href={`/admin/tasks?taskId=${task.id}`}
+                            className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
+                          >
+                            View
+                          </Link>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -534,9 +537,12 @@ export default function UserDetailPage() {
                         </TableCell>
                         <TableCell>{new Date(device.assigned_at).toLocaleDateString()}</TableCell>
                         <TableCell>
-                          <Button variant="ghost" size="sm" asChild>
-                            <Link href={`/admin/devices?deviceId=${device.id}`}>View</Link>
-                          </Button>
+                          <Link
+                            href={`/admin/devices?deviceId=${device.id}`}
+                            className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
+                          >
+                            View
+                          </Link>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -581,9 +587,12 @@ export default function UserDetailPage() {
                         </TableCell>
                         <TableCell>{new Date(asset.assigned_at).toLocaleDateString()}</TableCell>
                         <TableCell>
-                          <Button variant="ghost" size="sm" asChild>
-                            <Link href={`/admin/assets?assetId=${asset.id}`}>View</Link>
-                          </Button>
+                          <Link
+                            href={`/admin/assets?assetId=${asset.id}`}
+                            className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
+                          >
+                            View
+                          </Link>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -622,9 +631,12 @@ export default function UserDetailPage() {
                         </TableCell>
                         <TableCell>{new Date(doc.created_at).toLocaleDateString()}</TableCell>
                         <TableCell>
-                          <Button variant="ghost" size="sm" asChild>
-                            <Link href={`/admin/documentation?docId=${doc.id}`}>View</Link>
-                          </Button>
+                          <Link
+                            href={`/admin/documentation?docId=${doc.id}`}
+                            className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
+                          >
+                            View
+                          </Link>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -667,9 +679,12 @@ export default function UserDetailPage() {
                         </TableCell>
                         <TableCell>{new Date(item.created_at).toLocaleDateString()}</TableCell>
                         <TableCell>
-                          <Button variant="ghost" size="sm" asChild>
-                            <Link href={`/admin/feedback?feedbackId=${item.id}`}>View</Link>
-                          </Button>
+                          <Link
+                            href={`/admin/feedback?feedbackId=${item.id}`}
+                            className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
+                          >
+                            View
+                          </Link>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -710,9 +725,12 @@ export default function UserDetailPage() {
                         <TableCell className="font-mono text-xs">{log.entity_id?.substring(0, 8) || "N/A"}</TableCell>
                         <TableCell>{new Date(log.created_at).toLocaleString()}</TableCell>
                         <TableCell>
-                          <Button variant="ghost" size="sm" asChild>
-                            <Link href={`/admin/audit-logs?logId=${log.id}`}>View</Link>
-                          </Button>
+                          <Link
+                            href={`/admin/audit-logs?logId=${log.id}`}
+                            className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
+                          >
+                            View
+                          </Link>
                         </TableCell>
                       </TableRow>
                     ))}

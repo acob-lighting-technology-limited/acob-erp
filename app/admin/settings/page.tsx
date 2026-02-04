@@ -1,9 +1,11 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Settings, Users, Building2, Shield, ArrowLeft } from "lucide-react"
+import { buttonVariants } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
+import { Settings, Users, Building2, Shield } from "lucide-react"
 import Link from "next/link"
+import { PageHeader, PageWrapper } from "@/components/layout"
 
 export default async function AdminSettingsPage() {
   const supabase = await createClient()
@@ -25,79 +27,64 @@ export default async function AdminSettingsPage() {
   }
 
   return (
-    <div className="from-background via-background to-muted/20 min-h-screen w-full overflow-x-hidden bg-gradient-to-br">
-      <div className="mx-auto max-w-7xl space-y-6 p-4 md:p-8">
-        {/* Header */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <div className="mb-2 flex items-center gap-2">
-              <Link
-                href="/admin"
-                aria-label="Back to admin"
-                className="text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <ArrowLeft className="h-5 w-5" />
-              </Link>
-              <h1 className="text-foreground flex items-center gap-2 text-2xl font-bold sm:gap-3 sm:text-3xl">
-                <Settings className="text-primary h-6 w-6 sm:h-8 sm:w-8" />
-                Settings
-              </h1>
-            </div>
-            <p className="text-muted-foreground mt-2 text-sm sm:text-base">Manage users, roles, and company settings</p>
-          </div>
-        </div>
+    <PageWrapper maxWidth="full" background="gradient">
+      <PageHeader
+        title="Settings"
+        description="Manage users, roles, and company settings"
+        icon={Settings}
+        backLink={{ href: "/admin", label: "Back to Admin" }}
+      />
 
-        {/* Settings Cards */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5" />
-                User Management
-              </CardTitle>
-              <CardDescription>Manage user accounts and permissions</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <Button asChild className="w-full">
-                <Link href="/admin/settings/users">Manage Users</Link>
-              </Button>
-              <Button asChild className="w-full" variant="outline">
-                <Link href="/admin/settings/users/invite">Invite User</Link>
-              </Button>
-            </CardContent>
-          </Card>
+      {/* Settings Cards */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              User Management
+            </CardTitle>
+            <CardDescription>Manage user accounts and permissions</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <Link href="/admin/settings/users" className={cn(buttonVariants({ variant: "default" }), "w-full")}>
+              Manage Users
+            </Link>
+            <Link href="/admin/settings/users/invite" className={cn(buttonVariants({ variant: "outline" }), "w-full")}>
+              Invite User
+            </Link>
+          </CardContent>
+        </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Shield className="h-5 w-5" />
-                Roles & Permissions
-              </CardTitle>
-              <CardDescription>Configure user roles and access levels</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <Button asChild className="w-full">
-                <Link href="/admin/settings/roles">Manage Roles</Link>
-              </Button>
-            </CardContent>
-          </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5" />
+              Roles & Permissions
+            </CardTitle>
+            <CardDescription>Configure user roles and access levels</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <Link href="/admin/settings/roles" className={cn(buttonVariants({ variant: "default" }), "w-full")}>
+              Manage Roles
+            </Link>
+          </CardContent>
+        </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Building2 className="h-5 w-5" />
-                Company Settings
-              </CardTitle>
-              <CardDescription>Configure company information</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <Button asChild className="w-full">
-                <Link href="/admin/settings/company">Company Profile</Link>
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Building2 className="h-5 w-5" />
+              Company Settings
+            </CardTitle>
+            <CardDescription>Configure company information</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <Link href="/admin/settings/company" className={cn(buttonVariants({ variant: "default" }), "w-full")}>
+              Company Profile
+            </Link>
+          </CardContent>
+        </Card>
       </div>
-    </div>
+    </PageWrapper>
   )
 }

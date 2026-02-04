@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { SignatureCreator } from "@/components/signature-creator"
-import { Button } from "@/components/ui/button"
+import { buttonVariants } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 import { ArrowLeft } from "lucide-react"
 import Link from "next/link"
 
@@ -30,12 +31,10 @@ export default async function AdminStaffSignaturePage({ params }: { params: { us
     <div className="bg-background min-h-screen">
       <div className="mx-auto max-w-6xl p-6">
         <div className="mb-8">
-          <Button variant="ghost" asChild className="mb-4">
-            <Link href="/admin/staff">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Staff
-            </Link>
-          </Button>
+          <Link href="/admin/staff" className={cn(buttonVariants({ variant: "ghost" }), "mb-4")}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Staff
+          </Link>
           <h1 className="text-foreground text-3xl font-bold">
             Email Signature - {profile.first_name} {profile.last_name}
           </h1>

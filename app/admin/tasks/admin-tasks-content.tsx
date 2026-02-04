@@ -42,9 +42,8 @@ import {
   List,
   Users,
   Building2,
-  ArrowLeft,
 } from "lucide-react"
-import Link from "next/link"
+import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { Checkbox } from "@/components/ui/checkbox"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { dateValidation } from "@/lib/validation"
@@ -501,56 +500,40 @@ export function AdminTasksContent({
   }
 
   return (
-    <div className="from-background via-background to-muted/20 min-h-screen w-full overflow-x-hidden bg-gradient-to-br">
-      <div className="mx-auto max-w-7xl space-y-6 p-4 md:p-8">
-        {/* Header */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <div className="mb-2 flex items-center gap-2">
-              <Link
-                href="/admin"
-                aria-label="Back to admin"
-                className="text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <ArrowLeft className="h-5 w-5" />
-              </Link>
-              <h1 className="text-foreground flex items-center gap-2 text-2xl font-bold sm:gap-3 sm:text-3xl">
-                <ClipboardList className="text-primary h-6 w-6 sm:h-8 sm:w-8" />
-                Task Management
-              </h1>
-            </div>
-            <p className="text-muted-foreground mt-2 text-sm sm:text-base">Create and manage tasks for your team</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center rounded-lg border p-1">
-              <Button
-                variant={viewMode === "list" ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setViewMode("list")}
-                className="gap-1 sm:gap-2"
-              >
-                <List className="h-4 w-4" />
-                <span className="hidden sm:inline">List</span>
-              </Button>
-              <Button
-                variant={viewMode === "card" ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setViewMode("card")}
-                className="gap-1 sm:gap-2"
-              >
-                <LayoutGrid className="h-4 w-4" />
-                <span className="hidden sm:inline">Card</span>
-              </Button>
-            </div>
-            <Button onClick={() => handleOpenTaskDialog()} className="gap-2" size="sm">
-              <Plus className="h-4 w-4" />
-              <span className="hidden sm:inline">Create Task</span>
-              <span className="sm:hidden">Create</span>
+    <AdminTablePage
+      title="Task Management"
+      description="Create and manage tasks for your team"
+      icon={ClipboardList}
+      actions={
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center rounded-lg border p-1">
+            <Button
+              variant={viewMode === "list" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setViewMode("list")}
+              className="gap-1 sm:gap-2"
+            >
+              <List className="h-4 w-4" />
+              <span className="hidden sm:inline">List</span>
+            </Button>
+            <Button
+              variant={viewMode === "card" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setViewMode("card")}
+              className="gap-1 sm:gap-2"
+            >
+              <LayoutGrid className="h-4 w-4" />
+              <span className="hidden sm:inline">Card</span>
             </Button>
           </div>
+          <Button onClick={() => handleOpenTaskDialog()} className="gap-2" size="sm">
+            <Plus className="h-4 w-4" />
+            <span className="hidden sm:inline">Create Task</span>
+            <span className="sm:hidden">Create</span>
+          </Button>
         </div>
-
-        {/* Stats */}
+      }
+      stats={
         <div className="grid gap-4 md:grid-cols-4">
           <Card className="border-2">
             <CardContent className="p-6">
@@ -608,8 +591,8 @@ export function AdminTasksContent({
             </CardContent>
           </Card>
         </div>
-
-        {/* Filters */}
+      }
+      filters={
         <Card className="border-2">
           <CardContent className="p-6">
             <div className="flex flex-col gap-4 md:flex-row">
@@ -692,212 +675,208 @@ export function AdminTasksContent({
             </div>
           </CardContent>
         </Card>
-
-        {/* Tasks List */}
-        {filteredTasks.length > 0 ? (
-          viewMode === "list" ? (
-            <Card className="border-2">
-              <div className="table-responsive">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-12">#</TableHead>
-                      <TableHead>Task</TableHead>
-                      <TableHead>Assigned To</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Priority</TableHead>
-                      <TableHead>Due Date</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredTasks.map((task, index) => (
-                      <TableRow key={task.id}>
-                        <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
-                        <TableCell>
-                          <div>
-                            <div className="text-foreground font-medium">{task.title}</div>
-                            {task.description && (
-                              <div className="text-muted-foreground mt-1 line-clamp-1 text-sm">{task.description}</div>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {task.assignment_type === "multiple" && task.assigned_users ? (
-                            <div className="text-sm">
-                              <div className="text-foreground flex items-center gap-1">
-                                <Users className="h-3 w-3" />
-                                <span>{task.assigned_users.length} people</span>
-                              </div>
-                              <div className="text-muted-foreground mt-1 text-xs">
-                                {task.assigned_users
-                                  .slice(0, 2)
-                                  .map((u: any) => `${formatName(u.first_name)} ${formatName(u.last_name)}`)
-                                  .join(", ")}
-                                {task.assigned_users.length > 2 && ` +${task.assigned_users.length - 2} more`}
-                              </div>
-                            </div>
-                          ) : task.assignment_type === "department" && task.department ? (
-                            <div className="text-sm">
-                              <div className="text-foreground flex items-center gap-1">
-                                <Building2 className="h-3 w-3" />
-                                <span>{task.department}</span>
-                              </div>
-                              <div className="text-muted-foreground text-xs">Department</div>
-                            </div>
-                          ) : task.assigned_to_user ? (
-                            <div className="text-sm">
-                              <div className="text-foreground">
-                                {formatName((task.assigned_to_user as any)?.first_name)}{" "}
-                                {formatName((task.assigned_to_user as any)?.last_name)}
-                              </div>
-                              {task.department && (
-                                <div className="text-muted-foreground text-xs">{task.department}</div>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-muted-foreground text-sm">Unassigned</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={getStatusColor(task.status)}>{task.status.replace("_", " ")}</Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={getPriorityColor(task.priority)}>{task.priority}</Badge>
-                        </TableCell>
-                        <TableCell>
-                          {task.due_date ? (
-                            <span className="text-foreground text-sm">{formatDate(task.due_date)}</span>
-                          ) : (
-                            <span className="text-muted-foreground text-sm">No due date</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-1 sm:gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleOpenTaskDialog(task)}
-                              className="h-8 w-8 p-0"
-                              title="Edit task"
-                            >
-                              <Edit className="h-3 w-3" />
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                setTaskToDelete(task)
-                                setIsDeleteDialogOpen(true)
-                              }}
-                              className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
-                              title="Delete task"
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </Card>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2">
-              {filteredTasks.map((task) => (
-                <Card key={task.id} className="border-2 transition-shadow hover:shadow-lg">
-                  <CardHeader className="from-primary/5 to-background border-b bg-gradient-to-r">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <CardTitle className="text-lg">{task.title}</CardTitle>
-                        <div className="mt-2 flex items-center gap-2">
-                          <Badge className={getStatusColor(task.status)}>{task.status.replace("_", " ")}</Badge>
-                          <Badge className={getPriorityColor(task.priority)}>{task.priority}</Badge>
-                        </div>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-3 p-4">
-                    {task.description && (
-                      <p className="text-muted-foreground line-clamp-2 text-sm">{task.description}</p>
-                    )}
-
-                    {task.assignment_type === "multiple" && task.assigned_users ? (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Users className="text-muted-foreground h-4 w-4" />
-                        <span className="text-muted-foreground">Assigned to:</span>
-                        <span className="text-foreground font-medium">{task.assigned_users.length} people</span>
-                      </div>
-                    ) : task.assignment_type === "department" && task.department ? (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Building2 className="text-muted-foreground h-4 w-4" />
-                        <span className="text-muted-foreground">Department:</span>
-                        <span className="text-foreground font-medium">{task.department}</span>
-                      </div>
-                    ) : (
-                      task.assigned_to_user && (
-                        <div className="flex items-center gap-2 text-sm">
-                          <User className="text-muted-foreground h-4 w-4" />
-                          <span className="text-muted-foreground">Assigned to:</span>
-                          <span className="text-foreground font-medium">
-                            {formatName((task.assigned_to_user as any)?.first_name)}{" "}
-                            {formatName((task.assigned_to_user as any)?.last_name)}
-                          </span>
-                        </div>
-                      )
-                    )}
-
-                    {task.due_date && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Calendar className="text-muted-foreground h-4 w-4" />
-                        <span className="text-muted-foreground">Due:</span>
-                        <span className="text-foreground">{formatDate(task.due_date)}</span>
-                      </div>
-                    )}
-
-                    <div className="flex gap-2 pt-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleOpenTaskDialog(task)}
-                        className="flex-1 gap-2"
-                      >
-                        <Edit className="h-3 w-3" />
-                        Edit
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setTaskToDelete(task)
-                          setIsDeleteDialogOpen(true)
-                        }}
-                        className="text-red-600 hover:text-red-700"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )
-        ) : (
+      }
+      filtersInCard={false}
+    >
+      {/* Tasks List */}
+      {filteredTasks.length > 0 ? (
+        viewMode === "list" ? (
           <Card className="border-2">
-            <CardContent className="p-12 text-center">
-              <ClipboardList className="text-muted-foreground mx-auto mb-4 h-16 w-16" />
-              <h3 className="text-foreground mb-2 text-xl font-semibold">No Tasks Found</h3>
-              <p className="text-muted-foreground">
-                {searchQuery || statusFilter !== "all" || priorityFilter !== "all"
-                  ? "No tasks match your filters"
-                  : "Get started by creating your first task"}
-              </p>
-            </CardContent>
+            <div className="table-responsive">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-12">#</TableHead>
+                    <TableHead>Task</TableHead>
+                    <TableHead>Assigned To</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Priority</TableHead>
+                    <TableHead>Due Date</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredTasks.map((task, index) => (
+                    <TableRow key={task.id}>
+                      <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
+                      <TableCell>
+                        <div>
+                          <div className="text-foreground font-medium">{task.title}</div>
+                          {task.description && (
+                            <div className="text-muted-foreground mt-1 line-clamp-1 text-sm">{task.description}</div>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {task.assignment_type === "multiple" && task.assigned_users ? (
+                          <div className="text-sm">
+                            <div className="text-foreground flex items-center gap-1">
+                              <Users className="h-3 w-3" />
+                              <span>{task.assigned_users.length} people</span>
+                            </div>
+                            <div className="text-muted-foreground mt-1 text-xs">
+                              {task.assigned_users
+                                .slice(0, 2)
+                                .map((u: any) => `${formatName(u.first_name)} ${formatName(u.last_name)}`)
+                                .join(", ")}
+                              {task.assigned_users.length > 2 && ` +${task.assigned_users.length - 2} more`}
+                            </div>
+                          </div>
+                        ) : task.assignment_type === "department" && task.department ? (
+                          <div className="text-sm">
+                            <div className="text-foreground flex items-center gap-1">
+                              <Building2 className="h-3 w-3" />
+                              <span>{task.department}</span>
+                            </div>
+                            <div className="text-muted-foreground text-xs">Department</div>
+                          </div>
+                        ) : task.assigned_to_user ? (
+                          <div className="text-sm">
+                            <div className="text-foreground">
+                              {formatName((task.assigned_to_user as any)?.first_name)}{" "}
+                              {formatName((task.assigned_to_user as any)?.last_name)}
+                            </div>
+                            {task.department && <div className="text-muted-foreground text-xs">{task.department}</div>}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">Unassigned</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={getStatusColor(task.status)}>{task.status.replace("_", " ")}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={getPriorityColor(task.priority)}>{task.priority}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        {task.due_date ? (
+                          <span className="text-foreground text-sm">{formatDate(task.due_date)}</span>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">No due date</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1 sm:gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleOpenTaskDialog(task)}
+                            className="h-8 w-8 p-0"
+                            title="Edit task"
+                          >
+                            <Edit className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setTaskToDelete(task)
+                              setIsDeleteDialogOpen(true)
+                            }}
+                            className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                            title="Delete task"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </Card>
-        )}
-      </div>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2">
+            {filteredTasks.map((task) => (
+              <Card key={task.id} className="border-2 transition-shadow hover:shadow-lg">
+                <CardHeader className="from-primary/5 to-background border-b bg-gradient-to-r">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <CardTitle className="text-lg">{task.title}</CardTitle>
+                      <div className="mt-2 flex items-center gap-2">
+                        <Badge className={getStatusColor(task.status)}>{task.status.replace("_", " ")}</Badge>
+                        <Badge className={getPriorityColor(task.priority)}>{task.priority}</Badge>
+                      </div>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3 p-4">
+                  {task.description && <p className="text-muted-foreground line-clamp-2 text-sm">{task.description}</p>}
 
+                  {task.assignment_type === "multiple" && task.assigned_users ? (
+                    <div className="flex items-center gap-2 text-sm">
+                      <Users className="text-muted-foreground h-4 w-4" />
+                      <span className="text-muted-foreground">Assigned to:</span>
+                      <span className="text-foreground font-medium">{task.assigned_users.length} people</span>
+                    </div>
+                  ) : task.assignment_type === "department" && task.department ? (
+                    <div className="flex items-center gap-2 text-sm">
+                      <Building2 className="text-muted-foreground h-4 w-4" />
+                      <span className="text-muted-foreground">Department:</span>
+                      <span className="text-foreground font-medium">{task.department}</span>
+                    </div>
+                  ) : (
+                    task.assigned_to_user && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <User className="text-muted-foreground h-4 w-4" />
+                        <span className="text-muted-foreground">Assigned to:</span>
+                        <span className="text-foreground font-medium">
+                          {formatName((task.assigned_to_user as any)?.first_name)}{" "}
+                          {formatName((task.assigned_to_user as any)?.last_name)}
+                        </span>
+                      </div>
+                    )
+                  )}
+
+                  {task.due_date && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <Calendar className="text-muted-foreground h-4 w-4" />
+                      <span className="text-muted-foreground">Due:</span>
+                      <span className="text-foreground">{formatDate(task.due_date)}</span>
+                    </div>
+                  )}
+
+                  <div className="flex gap-2 pt-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleOpenTaskDialog(task)}
+                      className="flex-1 gap-2"
+                    >
+                      <Edit className="h-3 w-3" />
+                      Edit
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setTaskToDelete(task)
+                        setIsDeleteDialogOpen(true)
+                      }}
+                      className="text-red-600 hover:text-red-700"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )
+      ) : (
+        <Card className="border-2">
+          <CardContent className="p-12 text-center">
+            <ClipboardList className="text-muted-foreground mx-auto mb-4 h-16 w-16" />
+            <h3 className="text-foreground mb-2 text-xl font-semibold">No Tasks Found</h3>
+            <p className="text-muted-foreground">
+              {searchQuery || statusFilter !== "all" || priorityFilter !== "all"
+                ? "No tasks match your filters"
+                : "Get started by creating your first task"}
+            </p>
+          </CardContent>
+        </Card>
+      )}
       {/* Task Dialog */}
       <Dialog open={isTaskDialogOpen} onOpenChange={setIsTaskDialogOpen}>
         <DialogContent className="max-w-2xl">
@@ -1203,6 +1182,6 @@ export function AdminTasksContent({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </AdminTablePage>
   )
 }
