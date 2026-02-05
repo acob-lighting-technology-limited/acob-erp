@@ -94,8 +94,3 @@ export type {
 
 // Re-export DocumentType from payments (unique to that module)
 export type { DocumentType } from "./payments"
-
-// ============================================
-// Starlink types
-// ============================================
-export * from "./starlink"
