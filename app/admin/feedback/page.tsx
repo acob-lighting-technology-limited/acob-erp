@@ -1,9 +1,9 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { FeedbackViewerClient } from "@/components/feedback-viewer-client"
-import { MessageSquare, AlertCircle, Clock, CheckCircle, XCircle, ArrowLeft } from "lucide-react"
+import { MessageSquare, AlertCircle, Clock, CheckCircle, XCircle } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
-import Link from "next/link"
+import { PageHeader, PageWrapper } from "@/components/layout"
 
 export default async function AdminFeedbackPage() {
   const supabase = await createClient()
@@ -67,106 +67,89 @@ export default async function AdminFeedbackPage() {
   }
 
   return (
-    <div className="from-background via-background to-muted/20 min-h-screen w-full overflow-x-hidden bg-gradient-to-br">
-      <div className="mx-auto max-w-7xl space-y-6 p-4 md:p-8">
-        {/* Header */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <div className="mb-2 flex items-center gap-2">
-              <Link
-                href="/admin"
-                aria-label="Back to admin"
-                className="text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <ArrowLeft className="h-5 w-5" />
-              </Link>
-              <h1 className="text-foreground flex items-center gap-2 text-2xl font-bold sm:gap-3 sm:text-3xl">
-                <MessageSquare className="text-primary h-6 w-6 sm:h-8 sm:w-8" />
-                User Feedback
-              </h1>
+    <PageWrapper maxWidth="full" background="gradient">
+      <PageHeader
+        title="User Feedback"
+        description="View and manage user concerns, complaints, and suggestions"
+        icon={MessageSquare}
+        backLink={{ href: "/admin", label: "Back to Admin" }}
+      />
+
+      {/* Stats Grid */}
+      <div className="grid gap-4 md:grid-cols-5">
+        <Card className="border-2">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="min-w-0 flex-1">
+                <p className="text-muted-foreground text-sm font-medium">Total</p>
+                <p className="text-foreground mt-1 text-2xl font-bold">{stats.total}</p>
+              </div>
+              <div className="ml-2 shrink-0 rounded-lg bg-blue-100 p-2.5 dark:bg-blue-900/30">
+                <MessageSquare className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              </div>
             </div>
-            <p className="text-muted-foreground mt-2 text-sm sm:text-base">
-              View and manage user concerns, complaints, and suggestions
-            </p>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
-        {/* Stats Grid */}
-        <div className="grid gap-4 md:grid-cols-5">
-          <Card className="border-2">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="min-w-0 flex-1">
-                  <p className="text-muted-foreground text-sm font-medium">Total</p>
-                  <p className="text-foreground mt-1 text-2xl font-bold">{stats.total}</p>
-                </div>
-                <div className="ml-2 shrink-0 rounded-lg bg-blue-100 p-2.5 dark:bg-blue-900/30">
-                  <MessageSquare className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                </div>
+        <Card className="border-2">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="min-w-0 flex-1">
+                <p className="text-muted-foreground text-sm font-medium">Open</p>
+                <p className="text-foreground mt-1 text-2xl font-bold">{stats.open}</p>
               </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-2">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="min-w-0 flex-1">
-                  <p className="text-muted-foreground text-sm font-medium">Open</p>
-                  <p className="text-foreground mt-1 text-2xl font-bold">{stats.open}</p>
-                </div>
-                <div className="ml-2 flex-shrink-0 rounded-lg bg-green-100 p-2.5 dark:bg-green-900/30">
-                  <AlertCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
-                </div>
+              <div className="ml-2 flex-shrink-0 rounded-lg bg-green-100 p-2.5 dark:bg-green-900/30">
+                <AlertCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </CardContent>
+        </Card>
 
-          <Card className="border-2">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="min-w-0 flex-1">
-                  <p className="text-muted-foreground text-sm font-medium">In Progress</p>
-                  <p className="text-foreground mt-1 text-2xl font-bold">{stats.inProgress}</p>
-                </div>
-                <div className="ml-2 flex-shrink-0 rounded-lg bg-blue-100 p-2.5 dark:bg-blue-900/30">
-                  <Clock className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                </div>
+        <Card className="border-2">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="min-w-0 flex-1">
+                <p className="text-muted-foreground text-sm font-medium">In Progress</p>
+                <p className="text-foreground mt-1 text-2xl font-bold">{stats.inProgress}</p>
               </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-2">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="min-w-0 flex-1">
-                  <p className="text-muted-foreground text-sm font-medium">Resolved</p>
-                  <p className="text-foreground mt-1 text-2xl font-bold">{stats.resolved}</p>
-                </div>
-                <div className="ml-2 flex-shrink-0 rounded-lg bg-purple-100 p-2.5 dark:bg-purple-900/30">
-                  <CheckCircle className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                </div>
+              <div className="ml-2 flex-shrink-0 rounded-lg bg-blue-100 p-2.5 dark:bg-blue-900/30">
+                <Clock className="h-5 w-5 text-blue-600 dark:text-blue-400" />
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </CardContent>
+        </Card>
 
-          <Card className="border-2">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="min-w-0 flex-1">
-                  <p className="text-muted-foreground text-sm font-medium">Closed</p>
-                  <p className="text-foreground mt-1 text-2xl font-bold">{stats.closed}</p>
-                </div>
-                <div className="ml-2 flex-shrink-0 rounded-lg bg-gray-100 p-2.5 dark:bg-gray-900/30">
-                  <XCircle className="h-5 w-5 text-gray-600 dark:text-gray-400" />
-                </div>
+        <Card className="border-2">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="min-w-0 flex-1">
+                <p className="text-muted-foreground text-sm font-medium">Resolved</p>
+                <p className="text-foreground mt-1 text-2xl font-bold">{stats.resolved}</p>
               </div>
-            </CardContent>
-          </Card>
-        </div>
+              <div className="ml-2 flex-shrink-0 rounded-lg bg-purple-100 p-2.5 dark:bg-purple-900/30">
+                <CheckCircle className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-        {/* Feedback List */}
-        <FeedbackViewerClient feedback={feedbackWithProfiles || []} />
+        <Card className="border-2">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="min-w-0 flex-1">
+                <p className="text-muted-foreground text-sm font-medium">Closed</p>
+                <p className="text-foreground mt-1 text-2xl font-bold">{stats.closed}</p>
+              </div>
+              <div className="ml-2 flex-shrink-0 rounded-lg bg-gray-100 p-2.5 dark:bg-gray-900/30">
+                <XCircle className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
-    </div>
+
+      {/* Feedback List */}
+      <FeedbackViewerClient feedback={feedbackWithProfiles || []} />
+    </PageWrapper>
   )
 }

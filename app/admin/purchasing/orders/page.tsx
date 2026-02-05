@@ -100,7 +100,7 @@ export default function PurchaseOrdersPage() {
         title="Purchase Orders"
         description="Manage purchase orders"
         icon={ShoppingCart}
-        backLink={{ href: "/admin/purchasing", label: "Back to Purchasing" }}
+        backLink={{ href: "/admin", label: "Back to Admin" }}
         actions={
           <Link href="/admin/purchasing/orders/new">
             <Button>

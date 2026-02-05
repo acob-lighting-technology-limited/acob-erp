@@ -113,7 +113,7 @@ export default function BillsPage() {
         title="Bills"
         description="Track vendor bills and expenses"
         icon={Receipt}
-        backLink={{ href: "/admin/finance", label: "Back to Finance" }}
+        backLink={{ href: "/admin", label: "Back to Admin" }}
         actions={
           <Link href="/admin/finance/bills/new">
             <Button>

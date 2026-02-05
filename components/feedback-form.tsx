@@ -16,9 +16,10 @@ import { EyeOff } from "lucide-react"
 interface FeedbackFormProps {
   userId: string
   onFeedbackSubmitted?: (feedback: any) => void
+  variant?: "card" | "modal"
 }
 
-export function FeedbackForm({ userId, onFeedbackSubmitted }: FeedbackFormProps) {
+export function FeedbackForm({ userId, onFeedbackSubmitted, variant = "card" }: FeedbackFormProps) {
   const [formData, setFormData] = useState({
     feedbackType: "",
     title: "",
@@ -92,70 +93,76 @@ export function FeedbackForm({ userId, onFeedbackSubmitted }: FeedbackFormProps)
     }
   }
 
+  const form = (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      {/* Anonymous Toggle */}
+      <div className="flex items-center justify-between rounded-lg border p-3">
+        <div className="flex items-center gap-2">
+          <EyeOff className={`h-4 w-4 ${isAnonymous ? "text-primary" : "text-muted-foreground"}`} />
+          <Label htmlFor="anonymous" className="cursor-pointer">
+            Submit anonymously
+          </Label>
+        </div>
+        <Switch id="anonymous" checked={isAnonymous} onCheckedChange={setIsAnonymous} />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="feedbackType">Feedback Type *</Label>
+        <Select
+          value={formData.feedbackType}
+          onValueChange={(value) => setFormData({ ...formData, feedbackType: value })}
+        >
+          <SelectTrigger id="feedbackType">
+            <SelectValue placeholder="Select type" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="concern">Concern</SelectItem>
+            <SelectItem value="complaint">Complaint</SelectItem>
+            <SelectItem value="suggestion">Suggestion</SelectItem>
+            <SelectItem value="required_item">Required Item</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="title">Title *</Label>
+        <Input
+          id="title"
+          value={formData.title}
+          onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+          placeholder="Brief title of your feedback"
+          required
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="description">Description</Label>
+        <Textarea
+          id="description"
+          value={formData.description}
+          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+          placeholder="Provide more details about your feedback..."
+          rows={4}
+        />
+      </div>
+
+      <Button type="submit" loading={isLoading} className={variant === "modal" ? "w-full" : "w-full"}>
+        {isAnonymous ? "Submit Anonymously" : "Submit Feedback"}
+      </Button>
+    </form>
+  )
+
+  if (variant === "modal") {
+    return form
+  }
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>Submit Feedback</CardTitle>
         <CardDescription>Share your thoughts with us</CardDescription>
       </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Anonymous Toggle */}
-          <div className="flex items-center justify-between rounded-lg border p-3">
-            <div className="flex items-center gap-2">
-              <EyeOff className={`h-4 w-4 ${isAnonymous ? "text-primary" : "text-muted-foreground"}`} />
-              <Label htmlFor="anonymous" className="cursor-pointer">
-                Submit anonymously
-              </Label>
-            </div>
-            <Switch id="anonymous" checked={isAnonymous} onCheckedChange={setIsAnonymous} />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="feedbackType">Feedback Type *</Label>
-            <Select
-              value={formData.feedbackType}
-              onValueChange={(value) => setFormData({ ...formData, feedbackType: value })}
-            >
-              <SelectTrigger id="feedbackType">
-                <SelectValue placeholder="Select type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="concern">Concern</SelectItem>
-                <SelectItem value="complaint">Complaint</SelectItem>
-                <SelectItem value="suggestion">Suggestion</SelectItem>
-                <SelectItem value="required_item">Required Item</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="title">Title *</Label>
-            <Input
-              id="title"
-              value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              placeholder="Brief title of your feedback"
-              required
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
-            <Textarea
-              id="description"
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder="Provide more details about your feedback..."
-              rows={4}
-            />
-          </div>
-
-          <Button type="submit" loading={isLoading} className="w-full">
-            {isAnonymous ? "Submit Anonymously" : "Submit Feedback"}
-          </Button>
-        </form>
-      </CardContent>
+      <CardContent>{form}</CardContent>
     </Card>
   )
 }

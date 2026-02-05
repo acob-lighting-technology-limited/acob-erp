@@ -262,9 +262,6 @@ export function SignatureCreator({ profile }: SignatureCreatorProps) {
               onChange={(e) => handleInputChange("phoneNumber", e.target.value)}
               placeholder="07012345678"
             />
-            <p className="text-muted-foreground text-sm">
-              Enter numbers only, minimum 11 digits (e.g., 07012345678) - will be formatted as +234 701 234 5678
-            </p>
             {phoneError && <p className="text-destructive text-sm">{phoneError}</p>}
           </div>
 
@@ -277,22 +274,14 @@ export function SignatureCreator({ profile }: SignatureCreatorProps) {
               onChange={(e) => handleInputChange("companyEmail", e.target.value)}
               placeholder="a.john@org.acoblighting.com"
             />
-            <p className="text-muted-foreground text-sm">
-              Auto-generated from your name. You can edit if needed (e.g., a.john@acoblighting.com)
-            </p>
             {emailError && <p className="text-destructive text-sm">{emailError}</p>}
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex">
             <Button onClick={copyToClipboard} disabled={!isFormValid} className="flex-1">
               <Copy className="mr-2 h-4 w-4" />
               Copy Signature
             </Button>
-            <Link href="/dashboard" className="flex-1">
-              <Button variant="outline" className="w-full bg-transparent">
-                Back
-              </Button>
-            </Link>
           </div>
         </CardContent>
       </Card>

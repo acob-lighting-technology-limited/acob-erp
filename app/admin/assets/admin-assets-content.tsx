@@ -61,10 +61,10 @@ import {
   CheckCircle2,
   X,
   Loader2,
-  ArrowLeft,
 } from "lucide-react"
 import Link from "next/link"
 import { Checkbox } from "@/components/ui/checkbox"
+import { AdminTablePage } from "@/components/admin/admin-table-page"
 
 export interface Asset {
   id: string
@@ -2017,54 +2017,42 @@ export function AdminAssetsContent({
   }
 
   return (
-    <div className="from-background via-background to-muted/20 min-h-screen w-full overflow-x-hidden bg-gradient-to-br">
-      <div className="mx-auto max-w-7xl space-y-6 p-4 md:p-8">
-        {/* Header */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <div className="mb-2 flex items-center gap-2">
-              <Link href="/admin" className="text-muted-foreground hover:text-foreground transition-colors">
-                <ArrowLeft className="h-5 w-5" />
-              </Link>
-              <h1 className="text-foreground flex items-center gap-2 text-2xl font-bold sm:gap-3 sm:text-3xl">
-                <Package className="text-primary h-6 w-6 sm:h-8 sm:w-8" />
-                Asset Management
-              </h1>
-            </div>
-            <p className="text-muted-foreground mt-2 text-sm sm:text-base">Manage asset inventory and assignments</p>
+    <AdminTablePage
+      title="Asset Management"
+      description="Manage asset inventory and assignments"
+      icon={Package}
+      actions={
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center rounded-lg border p-1">
+            <Button
+              variant={viewMode === "list" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setViewMode("list")}
+              className="gap-1 sm:gap-2"
+            >
+              <List className="h-4 w-4" />
+              <span className="hidden sm:inline">List</span>
+            </Button>
+            <Button
+              variant={viewMode === "card" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setViewMode("card")}
+              className="gap-1 sm:gap-2"
+            >
+              <LayoutGrid className="h-4 w-4" />
+              <span className="hidden sm:inline">Card</span>
+            </Button>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center rounded-lg border p-1">
-              <Button
-                variant={viewMode === "list" ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setViewMode("list")}
-                className="gap-1 sm:gap-2"
-              >
-                <List className="h-4 w-4" />
-                <span className="hidden sm:inline">List</span>
-              </Button>
-              <Button
-                variant={viewMode === "card" ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setViewMode("card")}
-                className="gap-1 sm:gap-2"
-              >
-                <LayoutGrid className="h-4 w-4" />
-                <span className="hidden sm:inline">Card</span>
-              </Button>
-            </div>
-            {userProfile?.role !== "lead" && (
-              <Button onClick={() => handleOpenAssetDialog()} className="gap-2" size="sm">
-                <Plus className="h-4 w-4" />
-                <span className="hidden sm:inline">Add Asset</span>
-                <span className="sm:hidden">Add</span>
-              </Button>
-            )}
-          </div>
+          {userProfile?.role !== "lead" && (
+            <Button onClick={() => handleOpenAssetDialog()} className="gap-2" size="sm">
+              <Plus className="h-4 w-4" />
+              <span className="hidden sm:inline">Add Asset</span>
+              <span className="sm:hidden">Add</span>
+            </Button>
+          )}
         </div>
-
-        {/* Stats */}
+      }
+      stats={
         <div className="grid grid-cols-3 gap-2 sm:gap-3 md:grid-cols-5 md:gap-4">
           <Card className="border-2">
             <CardContent className="p-3 sm:p-4 md:p-6">
@@ -2147,550 +2135,567 @@ export function AdminAssetsContent({
             </CardContent>
           </Card>
         </div>
-
-        {/* Export Buttons */}
-        <Card className="border-2">
-          <CardContent className="p-4">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              {/* Assets Export */}
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="flex items-center gap-2">
-                  <Download className="text-muted-foreground h-4 w-4" />
-                  <span className="text-foreground text-sm font-medium">Export Assets:</span>
+      }
+      filters={
+        <>
+          {/* Export Buttons */}
+          <Card className="border-2">
+            <CardContent className="p-4">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                {/* Assets Export */}
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <Download className="text-muted-foreground h-4 w-4" />
+                    <span className="text-foreground text-sm font-medium">Export Assets:</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleExportClick("excel")}
+                      className="gap-2"
+                      disabled={getSortedAssets(filteredAssets).length === 0}
+                    >
+                      <FileText className="h-4 w-4" />
+                      Excel
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleExportClick("pdf")}
+                      className="gap-2"
+                      disabled={getSortedAssets(filteredAssets).length === 0}
+                    >
+                      <FileText className="h-4 w-4" />
+                      PDF
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleExportClick("word")}
+                      className="gap-2"
+                      disabled={getSortedAssets(filteredAssets).length === 0}
+                    >
+                      <FileText className="h-4 w-4" />
+                      Word
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleExportClick("excel")}
-                    className="gap-2"
-                    disabled={getSortedAssets(filteredAssets).length === 0}
-                  >
-                    <FileText className="h-4 w-4" />
-                    Excel
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleExportClick("pdf")}
-                    className="gap-2"
-                    disabled={getSortedAssets(filteredAssets).length === 0}
-                  >
-                    <FileText className="h-4 w-4" />
-                    PDF
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleExportClick("word")}
-                    className="gap-2"
-                    disabled={getSortedAssets(filteredAssets).length === 0}
-                  >
-                    <FileText className="h-4 w-4" />
-                    Word
-                  </Button>
+
+                {/* Divider */}
+                <div className="bg-border hidden h-8 w-px md:block" />
+
+                {/* Staff Assets Report */}
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <Users className="text-muted-foreground h-4 w-4" />
+                    <span className="text-foreground text-sm font-medium">Staff Assets Report:</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleStaffReportClick("excel")}
+                      className="gap-2"
+                      disabled={staff.length === 0}
+                    >
+                      <FileText className="h-4 w-4" />
+                      Excel
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleStaffReportClick("pdf")}
+                      className="gap-2"
+                      disabled={staff.length === 0}
+                    >
+                      <FileText className="h-4 w-4" />
+                      PDF
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleStaffReportClick("word")}
+                      className="gap-2"
+                      disabled={staff.length === 0}
+                    >
+                      <FileText className="h-4 w-4" />
+                      Word
+                    </Button>
+                  </div>
                 </div>
               </div>
+            </CardContent>
+          </Card>
 
-              {/* Divider */}
-              <div className="bg-border hidden h-8 w-px md:block" />
-
-              {/* Staff Assets Report */}
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="flex items-center gap-2">
-                  <Users className="text-muted-foreground h-4 w-4" />
-                  <span className="text-foreground text-sm font-medium">Staff Assets Report:</span>
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleStaffReportClick("excel")}
-                    className="gap-2"
-                    disabled={staff.length === 0}
-                  >
-                    <FileText className="h-4 w-4" />
-                    Excel
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleStaffReportClick("pdf")}
-                    className="gap-2"
-                    disabled={staff.length === 0}
-                  >
-                    <FileText className="h-4 w-4" />
-                    PDF
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleStaffReportClick("word")}
-                    className="gap-2"
-                    disabled={staff.length === 0}
-                  >
-                    <FileText className="h-4 w-4" />
-                    Word
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Filters */}
-        <Card className="border-2">
-          <CardContent className="p-6">
-            <div className="space-y-4">
-              {/* First row - Search */}
-              <div className="relative flex-1">
-                <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform" />
-                <Input
-                  placeholder="Search assets by code, type, model, serial, year, status, location, or assigned user..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-
-              {/* Second row - Filters */}
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
-                <SearchableMultiSelect
-                  label="Asset Types"
-                  icon={<Package className="h-4 w-4" />}
-                  values={assetTypeFilter}
-                  options={ASSET_TYPES.map((type) => ({
-                    value: type.code,
-                    label: type.label,
-                  }))}
-                  onChange={setAssetTypeFilter}
-                  placeholder="All Types"
-                />
-                <SearchableMultiSelect
-                  label="Status"
-                  icon={<Filter className="h-4 w-4" />}
-                  values={statusFilter}
-                  options={[
-                    { value: "available", label: "Available" },
-                    { value: "assigned", label: "Assigned" },
-                    { value: "maintenance", label: "Maintenance" },
-                    { value: "retired", label: "Retired" },
-                  ]}
-                  onChange={setStatusFilter}
-                  placeholder="All Status"
-                />
-                <SearchableMultiSelect
-                  label="Years"
-                  icon={<Calendar className="h-4 w-4" />}
-                  values={yearFilter}
-                  options={Array.from(new Set(assets.map((a) => a.acquisition_year)))
-                    .filter(Boolean)
-                    .sort((a, b) => (b || 0) - (a || 0))
-                    .map((year) => ({
-                      value: year?.toString() || "",
-                      label: year?.toString() || "",
-                    }))}
-                  onChange={setYearFilter}
-                  placeholder="All Years"
-                />
-                <SearchableMultiSelect
-                  label="Office Locations"
-                  icon={<Building className="h-4 w-4" />}
-                  values={officeLocationFilter}
-                  options={OFFICE_LOCATIONS.map((location) => ({
-                    value: location,
-                    label: location,
-                    icon: <Building className="h-3 w-3" />,
-                  }))}
-                  onChange={setOfficeLocationFilter}
-                  placeholder="All Locations"
-                />
-                <SearchableMultiSelect
-                  label="Issue Status"
-                  icon={<AlertCircle className="h-4 w-4" />}
-                  values={issueStatusFilter}
-                  options={[
-                    {
-                      value: "has_issues",
-                      label: "Has Issues",
-                      icon: <AlertCircle className="h-3 w-3 text-orange-500" />,
-                    },
-                    {
-                      value: "no_issues",
-                      label: "No Issues",
-                      icon: <CheckCircle2 className="h-3 w-3 text-green-500" />,
-                    },
-                  ]}
-                  onChange={setIssueStatusFilter}
-                  placeholder="All Assets"
-                />
-                {/* Department filter - hidden for leads */}
-                {userProfile?.role !== "lead" && (
-                  <SearchableMultiSelect
-                    label="Departments"
-                    icon={<Building2 className="h-4 w-4" />}
-                    values={departmentFilter}
-                    options={departments.map((dept) => ({
-                      value: dept,
-                      label: dept,
-                      icon: <Building2 className="h-3 w-3" />,
-                    }))}
-                    onChange={setDepartmentFilter}
-                    placeholder="All Departments"
+          {/* Filters */}
+          <Card className="border-2">
+            <CardContent className="p-6">
+              <div className="space-y-4">
+                {/* First row - Search */}
+                <div className="relative flex-1">
+                  <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform" />
+                  <Input
+                    placeholder="Search assets by code, type, model, serial, year, status, location, or assigned user..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10"
                   />
-                )}
-                <SearchableMultiSelect
-                  label="Users"
-                  icon={<User className="h-4 w-4" />}
-                  values={userFilter}
-                  options={staff.map((member) => ({
-                    value: member.id,
-                    label: `${formatName(member.first_name)} ${formatName(member.last_name)} - ${member.department}`,
-                    icon: <User className="h-3 w-3" />,
-                  }))}
-                  onChange={setUserFilter}
-                  placeholder={
-                    userProfile?.role === "lead" && departments.length > 0
-                      ? `All ${departments.length === 1 ? departments[0] : "Department"} Users`
-                      : "All Users"
-                  }
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+                </div>
 
-        {/* assets List */}
-        {getSortedAssets(filteredAssets).length > 0 ? (
-          viewMode === "list" ? (
-            <Card className="border-2">
-              <div className="table-responsive">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-12">#</TableHead>
-                      <TableHead
-                        className="hover:bg-muted/50 cursor-pointer select-none"
-                        onClick={() => handleSort("unique_code")}
-                      >
-                        <div className="flex items-center gap-2">
-                          Unique Code
-                          {sortConfig?.key === "unique_code" ? (
-                            sortConfig.direction === "asc" ? (
-                              <ArrowUp className="h-3 w-3" />
-                            ) : (
-                              <ArrowDown className="h-3 w-3" />
-                            )
+                {/* Second row - Filters */}
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+                  <SearchableMultiSelect
+                    label="Asset Types"
+                    icon={<Package className="h-4 w-4" />}
+                    values={assetTypeFilter}
+                    options={ASSET_TYPES.map((type) => ({
+                      value: type.code,
+                      label: type.label,
+                    }))}
+                    onChange={setAssetTypeFilter}
+                    placeholder="All Types"
+                  />
+                  <SearchableMultiSelect
+                    label="Status"
+                    icon={<Filter className="h-4 w-4" />}
+                    values={statusFilter}
+                    options={[
+                      { value: "available", label: "Available" },
+                      { value: "assigned", label: "Assigned" },
+                      { value: "maintenance", label: "Maintenance" },
+                      { value: "retired", label: "Retired" },
+                    ]}
+                    onChange={setStatusFilter}
+                    placeholder="All Status"
+                  />
+                  <SearchableMultiSelect
+                    label="Years"
+                    icon={<Calendar className="h-4 w-4" />}
+                    values={yearFilter}
+                    options={Array.from(new Set(assets.map((a) => a.acquisition_year)))
+                      .filter(Boolean)
+                      .sort((a, b) => (b || 0) - (a || 0))
+                      .map((year) => ({
+                        value: year?.toString() || "",
+                        label: year?.toString() || "",
+                      }))}
+                    onChange={setYearFilter}
+                    placeholder="All Years"
+                  />
+                  <SearchableMultiSelect
+                    label="Office Locations"
+                    icon={<Building className="h-4 w-4" />}
+                    values={officeLocationFilter}
+                    options={OFFICE_LOCATIONS.map((location) => ({
+                      value: location,
+                      label: location,
+                      icon: <Building className="h-3 w-3" />,
+                    }))}
+                    onChange={setOfficeLocationFilter}
+                    placeholder="All Locations"
+                  />
+                  <SearchableMultiSelect
+                    label="Issue Status"
+                    icon={<AlertCircle className="h-4 w-4" />}
+                    values={issueStatusFilter}
+                    options={[
+                      {
+                        value: "has_issues",
+                        label: "Has Issues",
+                        icon: <AlertCircle className="h-3 w-3 text-orange-500" />,
+                      },
+                      {
+                        value: "no_issues",
+                        label: "No Issues",
+                        icon: <CheckCircle2 className="h-3 w-3 text-green-500" />,
+                      },
+                    ]}
+                    onChange={setIssueStatusFilter}
+                    placeholder="All Assets"
+                  />
+                  {/* Department filter - hidden for leads */}
+                  {userProfile?.role !== "lead" && (
+                    <SearchableMultiSelect
+                      label="Departments"
+                      icon={<Building2 className="h-4 w-4" />}
+                      values={departmentFilter}
+                      options={departments.map((dept) => ({
+                        value: dept,
+                        label: dept,
+                        icon: <Building2 className="h-3 w-3" />,
+                      }))}
+                      onChange={setDepartmentFilter}
+                      placeholder="All Departments"
+                    />
+                  )}
+                  <SearchableMultiSelect
+                    label="Users"
+                    icon={<User className="h-4 w-4" />}
+                    values={userFilter}
+                    options={staff.map((member) => ({
+                      value: member.id,
+                      label: `${formatName(member.first_name)} ${formatName(member.last_name)} - ${member.department}`,
+                      icon: <User className="h-3 w-3" />,
+                    }))}
+                    onChange={setUserFilter}
+                    placeholder={
+                      userProfile?.role === "lead" && departments.length > 0
+                        ? `All ${departments.length === 1 ? departments[0] : "Department"} Users`
+                        : "All Users"
+                    }
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </>
+      }
+      filtersInCard={false}
+    >
+      {/* assets List */}
+      {getSortedAssets(filteredAssets).length > 0 ? (
+        viewMode === "list" ? (
+          <Card className="border-2">
+            <div className="table-responsive">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-12">#</TableHead>
+                    <TableHead
+                      className="hover:bg-muted/50 cursor-pointer select-none"
+                      onClick={() => handleSort("unique_code")}
+                    >
+                      <div className="flex items-center gap-2">
+                        Unique Code
+                        {sortConfig?.key === "unique_code" ? (
+                          sortConfig.direction === "asc" ? (
+                            <ArrowUp className="h-3 w-3" />
                           ) : (
-                            <ArrowUpDown className="text-muted-foreground h-3 w-3" />
+                            <ArrowDown className="h-3 w-3" />
+                          )
+                        ) : (
+                          <ArrowUpDown className="text-muted-foreground h-3 w-3" />
+                        )}
+                      </div>
+                    </TableHead>
+                    <TableHead
+                      className="hover:bg-muted/50 cursor-pointer select-none"
+                      onClick={() => handleSort("asset_type")}
+                    >
+                      <div className="flex items-center gap-2">
+                        Asset Type
+                        {sortConfig?.key === "asset_type" ? (
+                          sortConfig.direction === "asc" ? (
+                            <ArrowUp className="h-3 w-3" />
+                          ) : (
+                            <ArrowDown className="h-3 w-3" />
+                          )
+                        ) : (
+                          <ArrowUpDown className="text-muted-foreground h-3 w-3" />
+                        )}
+                      </div>
+                    </TableHead>
+                    <TableHead
+                      className="hover:bg-muted/50 cursor-pointer select-none"
+                      onClick={() => handleSort("model")}
+                    >
+                      <div className="flex items-center gap-2">
+                        Model / Serial
+                        {sortConfig?.key === "model" ? (
+                          sortConfig.direction === "asc" ? (
+                            <ArrowUp className="h-3 w-3" />
+                          ) : (
+                            <ArrowDown className="h-3 w-3" />
+                          )
+                        ) : (
+                          <ArrowUpDown className="text-muted-foreground h-3 w-3" />
+                        )}
+                      </div>
+                    </TableHead>
+                    <TableHead
+                      className="hover:bg-muted/50 cursor-pointer select-none"
+                      onClick={() => handleSort("year")}
+                    >
+                      <div className="flex items-center gap-2">
+                        Year
+                        {sortConfig?.key === "year" ? (
+                          sortConfig.direction === "asc" ? (
+                            <ArrowUp className="h-3 w-3" />
+                          ) : (
+                            <ArrowDown className="h-3 w-3" />
+                          )
+                        ) : (
+                          <ArrowUpDown className="text-muted-foreground h-3 w-3" />
+                        )}
+                      </div>
+                    </TableHead>
+                    <TableHead
+                      className="hover:bg-muted/50 cursor-pointer select-none"
+                      onClick={() => handleSort("status")}
+                    >
+                      <div className="flex items-center gap-2">
+                        Status
+                        {sortConfig?.key === "status" ? (
+                          sortConfig.direction === "asc" ? (
+                            <ArrowUp className="h-3 w-3" />
+                          ) : (
+                            <ArrowDown className="h-3 w-3" />
+                          )
+                        ) : (
+                          <ArrowUpDown className="text-muted-foreground h-3 w-3" />
+                        )}
+                      </div>
+                    </TableHead>
+                    <TableHead
+                      className="hover:bg-muted/50 cursor-pointer select-none"
+                      onClick={() => handleSort("assigned_to")}
+                    >
+                      <div className="flex items-center gap-2">
+                        Assigned To
+                        {sortConfig?.key === "assigned_to" ? (
+                          sortConfig.direction === "asc" ? (
+                            <ArrowUp className="h-3 w-3" />
+                          ) : (
+                            <ArrowDown className="h-3 w-3" />
+                          )
+                        ) : (
+                          <ArrowUpDown className="text-muted-foreground h-3 w-3" />
+                        )}
+                      </div>
+                    </TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {getSortedAssets(filteredAssets).map((asset, index) => (
+                    <TableRow key={asset.id}>
+                      <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-foreground font-mono text-xs font-medium">{asset.unique_code}</span>
+                          {asset.unresolved_issues_count! > 0 && (
+                            <div className="flex items-center gap-0.5 rounded-full bg-orange-100 px-1.5 py-0.5 dark:bg-orange-900/30">
+                              <AlertCircle className="h-3 w-3 text-orange-600 dark:text-orange-400" />
+                              <span className="text-[10px] font-medium text-orange-700 dark:text-orange-300">
+                                {asset.unresolved_issues_count}
+                              </span>
+                            </div>
                           )}
                         </div>
-                      </TableHead>
-                      <TableHead
-                        className="hover:bg-muted/50 cursor-pointer select-none"
-                        onClick={() => handleSort("asset_type")}
-                      >
-                        <div className="flex items-center gap-2">
-                          Asset Type
-                          {sortConfig?.key === "asset_type" ? (
-                            sortConfig.direction === "asc" ? (
-                              <ArrowUp className="h-3 w-3" />
-                            ) : (
-                              <ArrowDown className="h-3 w-3" />
-                            )
-                          ) : (
-                            <ArrowUpDown className="text-muted-foreground h-3 w-3" />
-                          )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-foreground text-sm font-medium">
+                          {ASSET_TYPE_MAP[asset.asset_type]?.label || asset.asset_type}
                         </div>
-                      </TableHead>
-                      <TableHead
-                        className="hover:bg-muted/50 cursor-pointer select-none"
-                        onClick={() => handleSort("model")}
-                      >
-                        <div className="flex items-center gap-2">
-                          Model / Serial
-                          {sortConfig?.key === "model" ? (
-                            sortConfig.direction === "asc" ? (
-                              <ArrowUp className="h-3 w-3" />
-                            ) : (
-                              <ArrowDown className="h-3 w-3" />
-                            )
-                          ) : (
-                            <ArrowUpDown className="text-muted-foreground h-3 w-3" />
-                          )}
-                        </div>
-                      </TableHead>
-                      <TableHead
-                        className="hover:bg-muted/50 cursor-pointer select-none"
-                        onClick={() => handleSort("year")}
-                      >
-                        <div className="flex items-center gap-2">
-                          Year
-                          {sortConfig?.key === "year" ? (
-                            sortConfig.direction === "asc" ? (
-                              <ArrowUp className="h-3 w-3" />
-                            ) : (
-                              <ArrowDown className="h-3 w-3" />
-                            )
-                          ) : (
-                            <ArrowUpDown className="text-muted-foreground h-3 w-3" />
-                          )}
-                        </div>
-                      </TableHead>
-                      <TableHead
-                        className="hover:bg-muted/50 cursor-pointer select-none"
-                        onClick={() => handleSort("status")}
-                      >
-                        <div className="flex items-center gap-2">
-                          Status
-                          {sortConfig?.key === "status" ? (
-                            sortConfig.direction === "asc" ? (
-                              <ArrowUp className="h-3 w-3" />
-                            ) : (
-                              <ArrowDown className="h-3 w-3" />
-                            )
-                          ) : (
-                            <ArrowUpDown className="text-muted-foreground h-3 w-3" />
-                          )}
-                        </div>
-                      </TableHead>
-                      <TableHead
-                        className="hover:bg-muted/50 cursor-pointer select-none"
-                        onClick={() => handleSort("assigned_to")}
-                      >
-                        <div className="flex items-center gap-2">
-                          Assigned To
-                          {sortConfig?.key === "assigned_to" ? (
-                            sortConfig.direction === "asc" ? (
-                              <ArrowUp className="h-3 w-3" />
-                            ) : (
-                              <ArrowDown className="h-3 w-3" />
-                            )
-                          ) : (
-                            <ArrowUpDown className="text-muted-foreground h-3 w-3" />
-                          )}
-                        </div>
-                      </TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {getSortedAssets(filteredAssets).map((asset, index) => (
-                      <TableRow key={asset.id}>
-                        <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-foreground font-mono text-xs font-medium">{asset.unique_code}</span>
-                            {asset.unresolved_issues_count! > 0 && (
-                              <div className="flex items-center gap-0.5 rounded-full bg-orange-100 px-1.5 py-0.5 dark:bg-orange-900/30">
-                                <AlertCircle className="h-3 w-3 text-orange-600 dark:text-orange-400" />
-                                <span className="text-[10px] font-medium text-orange-700 dark:text-orange-300">
-                                  {asset.unresolved_issues_count}
-                                </span>
-                              </div>
+                      </TableCell>
+                      <TableCell>
+                        {asset.asset_model || asset.serial_number ? (
+                          <div className="text-sm">
+                            {asset.asset_model && <div className="text-foreground">{asset.asset_model}</div>}
+                            {asset.serial_number && (
+                              <div className="text-muted-foreground font-mono text-xs">{asset.serial_number}</div>
                             )}
                           </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="text-foreground text-sm font-medium">
-                            {ASSET_TYPE_MAP[asset.asset_type]?.label || asset.asset_type}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {asset.asset_model || asset.serial_number ? (
-                            <div className="text-sm">
-                              {asset.asset_model && <div className="text-foreground">{asset.asset_model}</div>}
-                              {asset.serial_number && (
-                                <div className="text-muted-foreground font-mono text-xs">{asset.serial_number}</div>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-foreground text-sm">{asset.acquisition_year}</span>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={getStatusColor(asset.status)}>{asset.status}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        {asset.status === "assigned" || asset.status === "retired" || asset.status === "maintenance" ? (
+                          asset.assignment_type === "office" ? (
+                            <div className="flex items-center gap-2 text-sm">
+                              <Building className="text-muted-foreground h-3 w-3" />
+                              <span className="text-foreground">{asset.office_location || "Office"}</span>
+                              {(asset.status === "retired" || asset.status === "maintenance") && (
+                                <span className="text-muted-foreground text-xs">({asset.status})</span>
                               )}
                             </div>
-                          ) : (
-                            <span className="text-muted-foreground text-sm">-</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-foreground text-sm">{asset.acquisition_year}</span>
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={getStatusColor(asset.status)}>{asset.status}</Badge>
-                        </TableCell>
-                        <TableCell>
-                          {asset.status === "assigned" ||
-                          asset.status === "retired" ||
-                          asset.status === "maintenance" ? (
-                            asset.assignment_type === "office" ? (
+                          ) : asset.current_assignment ? (
+                            asset.assignment_type === "individual" && asset.current_assignment.user ? (
                               <div className="flex items-center gap-2 text-sm">
-                                <Building className="text-muted-foreground h-3 w-3" />
-                                <span className="text-foreground">{asset.office_location || "Office"}</span>
+                                <User className="text-muted-foreground h-3 w-3" />
+                                <span className="text-foreground">
+                                  {formatName(asset.current_assignment.user.first_name)}{" "}
+                                  {formatName(asset.current_assignment.user.last_name)}
+                                </span>
                                 {(asset.status === "retired" || asset.status === "maintenance") && (
                                   <span className="text-muted-foreground text-xs">({asset.status})</span>
                                 )}
                               </div>
-                            ) : asset.current_assignment ? (
-                              asset.assignment_type === "individual" && asset.current_assignment.user ? (
-                                <div className="flex items-center gap-2 text-sm">
-                                  <User className="text-muted-foreground h-3 w-3" />
-                                  <span className="text-foreground">
-                                    {formatName(asset.current_assignment.user.first_name)}{" "}
-                                    {formatName(asset.current_assignment.user.last_name)}
-                                  </span>
-                                  {(asset.status === "retired" || asset.status === "maintenance") && (
-                                    <span className="text-muted-foreground text-xs">({asset.status})</span>
-                                  )}
-                                </div>
-                              ) : asset.assignment_type === "department" && asset.current_assignment.department ? (
-                                <div className="flex items-center gap-2 text-sm">
-                                  <Building2 className="text-muted-foreground h-3 w-3" />
-                                  <span className="text-foreground">{asset.current_assignment.department}</span>
-                                  {(asset.status === "retired" || asset.status === "maintenance") && (
-                                    <span className="text-muted-foreground text-xs">({asset.status})</span>
-                                  )}
-                                </div>
-                              ) : (
-                                <span className="text-muted-foreground text-sm">Unassigned</span>
-                              )
+                            ) : asset.assignment_type === "department" && asset.current_assignment.department ? (
+                              <div className="flex items-center gap-2 text-sm">
+                                <Building2 className="text-muted-foreground h-3 w-3" />
+                                <span className="text-foreground">{asset.current_assignment.department}</span>
+                                {(asset.status === "retired" || asset.status === "maintenance") && (
+                                  <span className="text-muted-foreground text-xs">({asset.status})</span>
+                                )}
+                              </div>
                             ) : (
                               <span className="text-muted-foreground text-sm">Unassigned</span>
                             )
                           ) : (
                             <span className="text-muted-foreground text-sm">Unassigned</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex flex-nowrap items-center justify-end gap-1 sm:gap-2">
+                          )
+                        ) : (
+                          <span className="text-muted-foreground text-sm">Unassigned</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex flex-nowrap items-center justify-end gap-1 sm:gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleOpenAssignDialog(asset)}
+                            title={
+                              asset.status === "retired"
+                                ? "Cannot reassign retired asset"
+                                : asset.status === "assigned" && asset.current_assignment
+                                  ? "Reassign Asset"
+                                  : "Assign Asset"
+                            }
+                            disabled={asset.status === "retired"}
+                            className="h-8 w-8 p-0 sm:h-auto sm:w-auto sm:p-2"
+                          >
+                            <UserPlus className="h-3 w-3 sm:mr-1" />
+                            <span className="hidden sm:inline">
+                              {asset.status === "assigned" && asset.current_assignment ? "Reassign" : "Assign"}
+                            </span>
+                          </Button>
+                          {userProfile?.role !== "lead" && (
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleOpenAssignDialog(asset)}
-                              title={
-                                asset.status === "retired"
-                                  ? "Cannot reassign retired asset"
-                                  : asset.status === "assigned" && asset.current_assignment
-                                    ? "Reassign Asset"
-                                    : "Assign Asset"
-                              }
-                              disabled={asset.status === "retired"}
-                              className="h-8 w-8 p-0 sm:h-auto sm:w-auto sm:p-2"
-                            >
-                              <UserPlus className="h-3 w-3 sm:mr-1" />
-                              <span className="hidden sm:inline">
-                                {asset.status === "assigned" && asset.current_assignment ? "Reassign" : "Assign"}
-                              </span>
-                            </Button>
-                            {userProfile?.role !== "lead" && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleOpenAssetDialog(asset)}
-                                title="Edit Asset"
-                                className="h-8 w-8 p-0"
-                              >
-                                <Edit className="h-3 w-3" />
-                              </Button>
-                            )}
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleOpenIssuesDialog(asset)}
-                              title={`Asset Issues (${asset.unresolved_issues_count || 0} unresolved)`}
-                              className={`h-8 w-8 p-0 ${(asset.unresolved_issues_count || 0) > 0 ? "border-orange-500 text-orange-600" : ""}`}
-                            >
-                              <AlertCircle className="h-3 w-3" />
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => loadAssetHistory(asset)}
-                              title="View assignment history"
+                              onClick={() => handleOpenAssetDialog(asset)}
+                              title="Edit Asset"
                               className="h-8 w-8 p-0"
                             >
-                              <Eye className="h-3 w-3" />
+                              <Edit className="h-3 w-3" />
                             </Button>
-                            {userProfile?.role !== "lead" && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  setAssetToDelete(asset)
-                                  setIsDeleteDialogOpen(true)
-                                }}
-                                title="Delete asset"
-                                className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </Card>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {getSortedAssets(filteredAssets).map((asset) => (
-                <Card key={asset.id} className="border-2 transition-shadow hover:shadow-lg">
-                  <CardHeader className="from-primary/5 to-background border-b bg-linear-to-r">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-start gap-3">
-                        <div className="bg-primary/10 rounded-lg p-2">
-                          <Package className="text-primary h-5 w-5" />
+                          )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleOpenIssuesDialog(asset)}
+                            title={`Asset Issues (${asset.unresolved_issues_count || 0} unresolved)`}
+                            className={`h-8 w-8 p-0 ${(asset.unresolved_issues_count || 0) > 0 ? "border-orange-500 text-orange-600" : ""}`}
+                          >
+                            <AlertCircle className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => loadAssetHistory(asset)}
+                            title="View assignment history"
+                            className="h-8 w-8 p-0"
+                          >
+                            <Eye className="h-3 w-3" />
+                          </Button>
+                          {userProfile?.role !== "lead" && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setAssetToDelete(asset)
+                                setIsDeleteDialogOpen(true)
+                              }}
+                              title="Delete asset"
+                              className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          )}
                         </div>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <CardTitle className="font-mono text-sm">{asset.unique_code}</CardTitle>
-                            {asset.unresolved_issues_count! > 0 && (
-                              <div className="flex items-center gap-1 rounded-full bg-orange-100 px-2 py-0.5 dark:bg-orange-900/30">
-                                <AlertCircle className="h-3 w-3 text-orange-600 dark:text-orange-400" />
-                                <span className="text-xs font-medium text-orange-700 dark:text-orange-300">
-                                  {asset.unresolved_issues_count || 0} issue
-                                  {(asset.unresolved_issues_count || 0) > 1 ? "s" : ""}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                          <p className="text-muted-foreground mt-1 text-sm">
-                            {ASSET_TYPE_MAP[asset.asset_type]?.label || asset.asset_type}
-                          </p>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </Card>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {getSortedAssets(filteredAssets).map((asset) => (
+              <Card key={asset.id} className="border-2 transition-shadow hover:shadow-lg">
+                <CardHeader className="from-primary/5 to-background border-b bg-linear-to-r">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start gap-3">
+                      <div className="bg-primary/10 rounded-lg p-2">
+                        <Package className="text-primary h-5 w-5" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <CardTitle className="font-mono text-sm">{asset.unique_code}</CardTitle>
+                          {asset.unresolved_issues_count! > 0 && (
+                            <div className="flex items-center gap-1 rounded-full bg-orange-100 px-2 py-0.5 dark:bg-orange-900/30">
+                              <AlertCircle className="h-3 w-3 text-orange-600 dark:text-orange-400" />
+                              <span className="text-xs font-medium text-orange-700 dark:text-orange-300">
+                                {asset.unresolved_issues_count || 0} issue
+                                {(asset.unresolved_issues_count || 0) > 1 ? "s" : ""}
+                              </span>
+                            </div>
+                          )}
                         </div>
+                        <p className="text-muted-foreground mt-1 text-sm">
+                          {ASSET_TYPE_MAP[asset.asset_type]?.label || asset.asset_type}
+                        </p>
                       </div>
                     </div>
-                  </CardHeader>
-                  <CardContent className="space-y-3 p-4">
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3 p-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground text-sm">Status:</span>
+                    <Badge className={getStatusColor(asset.status)}>{asset.status}</Badge>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground text-sm">Year:</span>
+                    <span className="text-foreground text-sm font-medium">{asset.acquisition_year}</span>
+                  </div>
+
+                  {asset.asset_model && (
                     <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground text-sm">Status:</span>
-                      <Badge className={getStatusColor(asset.status)}>{asset.status}</Badge>
+                      <span className="text-muted-foreground text-sm">Model:</span>
+                      <span className="text-foreground text-sm">{asset.asset_model}</span>
                     </div>
+                  )}
 
+                  {asset.serial_number && (
                     <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground text-sm">Year:</span>
-                      <span className="text-foreground text-sm font-medium">{asset.acquisition_year}</span>
+                      <span className="text-muted-foreground text-sm">Serial:</span>
+                      <span className="text-foreground font-mono text-sm">{asset.serial_number}</span>
                     </div>
+                  )}
 
-                    {asset.asset_model && (
-                      <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground text-sm">Model:</span>
-                        <span className="text-foreground text-sm">{asset.asset_model}</span>
-                      </div>
-                    )}
-
-                    {asset.serial_number && (
-                      <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground text-sm">Serial:</span>
-                        <span className="text-foreground font-mono text-sm">{asset.serial_number}</span>
-                      </div>
-                    )}
-
-                    <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground text-sm">Assigned To:</span>
-                      {asset.status === "assigned" || asset.status === "retired" || asset.status === "maintenance" ? (
-                        asset.assignment_type === "office" ? (
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground text-sm">Assigned To:</span>
+                    {asset.status === "assigned" || asset.status === "retired" || asset.status === "maintenance" ? (
+                      asset.assignment_type === "office" ? (
+                        <div className="flex items-center gap-2">
+                          <Building className="text-muted-foreground h-3 w-3" />
+                          <span className="text-foreground text-sm font-medium">
+                            {asset.office_location || "Office"}
+                          </span>
+                          {asset.status === "retired" && (
+                            <span className="text-muted-foreground text-xs">(retired)</span>
+                          )}
+                          {asset.status === "maintenance" && (
+                            <span className="text-muted-foreground text-xs">(maintenance)</span>
+                          )}
+                        </div>
+                      ) : asset.current_assignment ? (
+                        asset.current_assignment.department ? (
                           <div className="flex items-center gap-2">
-                            <Building className="text-muted-foreground h-3 w-3" />
+                            <Building2 className="text-muted-foreground h-3 w-3" />
                             <span className="text-foreground text-sm font-medium">
-                              {asset.office_location || "Office"}
+                              {asset.current_assignment.department}
                             </span>
                             {asset.status === "retired" && (
                               <span className="text-muted-foreground text-xs">(retired)</span>
@@ -2699,126 +2704,110 @@ export function AdminAssetsContent({
                               <span className="text-muted-foreground text-xs">(maintenance)</span>
                             )}
                           </div>
-                        ) : asset.current_assignment ? (
-                          asset.current_assignment.department ? (
-                            <div className="flex items-center gap-2">
-                              <Building2 className="text-muted-foreground h-3 w-3" />
-                              <span className="text-foreground text-sm font-medium">
-                                {asset.current_assignment.department}
-                              </span>
-                              {asset.status === "retired" && (
-                                <span className="text-muted-foreground text-xs">(retired)</span>
-                              )}
-                              {asset.status === "maintenance" && (
-                                <span className="text-muted-foreground text-xs">(maintenance)</span>
-                              )}
-                            </div>
-                          ) : asset.current_assignment.user ? (
-                            <div className="flex items-center gap-2">
-                              <User className="text-muted-foreground h-3 w-3" />
-                              <span className="text-foreground text-sm font-medium">
-                                {formatName(asset.current_assignment.user.first_name)}{" "}
-                                {formatName(asset.current_assignment.user.last_name)}
-                              </span>
-                              {asset.status === "retired" && (
-                                <span className="text-muted-foreground text-xs">(retired)</span>
-                              )}
-                              {asset.status === "maintenance" && (
-                                <span className="text-muted-foreground text-xs">(maintenance)</span>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-muted-foreground text-sm">Unassigned</span>
-                          )
+                        ) : asset.current_assignment.user ? (
+                          <div className="flex items-center gap-2">
+                            <User className="text-muted-foreground h-3 w-3" />
+                            <span className="text-foreground text-sm font-medium">
+                              {formatName(asset.current_assignment.user.first_name)}{" "}
+                              {formatName(asset.current_assignment.user.last_name)}
+                            </span>
+                            {asset.status === "retired" && (
+                              <span className="text-muted-foreground text-xs">(retired)</span>
+                            )}
+                            {asset.status === "maintenance" && (
+                              <span className="text-muted-foreground text-xs">(maintenance)</span>
+                            )}
+                          </div>
                         ) : (
                           <span className="text-muted-foreground text-sm">Unassigned</span>
                         )
                       ) : (
                         <span className="text-muted-foreground text-sm">Unassigned</span>
-                      )}
-                    </div>
+                      )
+                    ) : (
+                      <span className="text-muted-foreground text-sm">Unassigned</span>
+                    )}
+                  </div>
 
-                    <div className="flex gap-2 pt-2">
+                  <div className="flex gap-2 pt-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleOpenAssignDialog(asset)}
+                      className="flex-1 gap-2"
+                      disabled={asset.status === "retired"}
+                      title={asset.status === "retired" ? "Cannot reassign retired asset" : ""}
+                    >
+                      <UserPlus className="h-3 w-3" />
+                      {asset.status === "assigned" && asset.current_assignment ? "Reassign" : "Assign"}
+                    </Button>
+                    {userProfile?.role !== "lead" && (
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleOpenAssignDialog(asset)}
-                        className="flex-1 gap-2"
-                        disabled={asset.status === "retired"}
-                        title={asset.status === "retired" ? "Cannot reassign retired asset" : ""}
+                        onClick={() => handleOpenAssetDialog(asset)}
+                        title="Edit Asset"
                       >
-                        <UserPlus className="h-3 w-3" />
-                        {asset.status === "assigned" && asset.current_assignment ? "Reassign" : "Assign"}
+                        <Edit className="h-3 w-3" />
                       </Button>
-                      {userProfile?.role !== "lead" && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleOpenAssetDialog(asset)}
-                          title="Edit Asset"
-                        >
-                          <Edit className="h-3 w-3" />
-                        </Button>
-                      )}
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleOpenIssuesDialog(asset)}
+                      title={`Asset Issues (${asset.unresolved_issues_count || 0} unresolved)`}
+                      className={`${(asset.unresolved_issues_count || 0) > 0 ? "border-orange-500 text-orange-600" : ""}`}
+                    >
+                      <AlertCircle className="h-3 w-3" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => loadAssetHistory(asset)}
+                      title="View assignment history"
+                    >
+                      <Eye className="h-3 w-3" />
+                    </Button>
+                    {userProfile?.role !== "lead" && (
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleOpenIssuesDialog(asset)}
-                        title={`Asset Issues (${asset.unresolved_issues_count || 0} unresolved)`}
-                        className={`${(asset.unresolved_issues_count || 0) > 0 ? "border-orange-500 text-orange-600" : ""}`}
+                        onClick={() => {
+                          setAssetToDelete(asset)
+                          setIsDeleteDialogOpen(true)
+                        }}
+                        title="Delete Asset"
+                        className="text-red-600 hover:text-red-700"
                       >
-                        <AlertCircle className="h-3 w-3" />
+                        <Trash2 className="h-3 w-3" />
                       </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => loadAssetHistory(asset)}
-                        title="View assignment history"
-                      >
-                        <Eye className="h-3 w-3" />
-                      </Button>
-                      {userProfile?.role !== "lead" && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setAssetToDelete(asset)
-                            setIsDeleteDialogOpen(true)
-                          }}
-                          title="Delete Asset"
-                          className="text-red-600 hover:text-red-700"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )
-        ) : (
-          <Card className="border-2">
-            <CardContent className="p-12 text-center">
-              <Package className="text-muted-foreground mx-auto mb-4 h-16 w-16" />
-              <h3 className="text-foreground mb-2 text-xl font-semibold">No Assets Found</h3>
-              <p className="text-muted-foreground">
-                {searchQuery ||
-                statusFilter.length > 0 ||
-                departmentFilter.length > 0 ||
-                userFilter.length > 0 ||
-                assetTypeFilter.length > 0 ||
-                yearFilter.length > 0 ||
-                officeLocationFilter.length > 0 ||
-                issueStatusFilter.length > 0
-                  ? "No assets match your filters"
-                  : "Get started by adding your first asset"}
-              </p>
-            </CardContent>
-          </Card>
-        )}
-      </div>
-
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )
+      ) : (
+        <Card className="border-2">
+          <CardContent className="p-12 text-center">
+            <Package className="text-muted-foreground mx-auto mb-4 h-16 w-16" />
+            <h3 className="text-foreground mb-2 text-xl font-semibold">No Assets Found</h3>
+            <p className="text-muted-foreground">
+              {searchQuery ||
+              statusFilter.length > 0 ||
+              departmentFilter.length > 0 ||
+              userFilter.length > 0 ||
+              assetTypeFilter.length > 0 ||
+              yearFilter.length > 0 ||
+              officeLocationFilter.length > 0 ||
+              issueStatusFilter.length > 0
+                ? "No assets match your filters"
+                : "Get started by adding your first asset"}
+            </p>
+          </CardContent>
+        </Card>
+      )}
       {/* asset Dialog */}
       <Dialog open={isAssetDialogOpen} onOpenChange={setIsAssetDialogOpen}>
         <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
@@ -3766,6 +3755,6 @@ export function AdminAssetsContent({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </AdminTablePage>
   )
 }

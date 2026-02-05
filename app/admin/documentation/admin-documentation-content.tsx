@@ -11,21 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { SearchableSelect } from "@/components/ui/searchable-select"
 import { Building2 } from "lucide-react"
 import { formatName } from "@/lib/utils"
-import {
-  FileText,
-  Search,
-  Filter,
-  Eye,
-  User,
-  Calendar,
-  Tag,
-  FolderOpen,
-  LayoutGrid,
-  List,
-  ArrowLeft,
-} from "lucide-react"
-import Link from "next/link"
+import { FileText, Search, Filter, Eye, User, Calendar, Tag, FolderOpen, LayoutGrid, List } from "lucide-react"
 import type { UserRole } from "@/types/database"
+import { AdminTablePage } from "@/components/admin/admin-table-page"
 
 export interface Documentation {
   id: string
@@ -142,47 +130,33 @@ export function AdminDocumentationContent({
   }
 
   return (
-    <div className="from-background via-background to-muted/20 min-h-screen w-full overflow-x-hidden bg-gradient-to-br">
-      <div className="mx-auto max-w-7xl space-y-6 p-4 md:p-8">
-        {/* Header */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <div className="mb-2 flex items-center gap-2">
-              <Link href="/admin" className="text-muted-foreground hover:text-foreground transition-colors">
-                <ArrowLeft className="h-5 w-5" />
-              </Link>
-              <h1 className="text-foreground flex items-center gap-2 text-2xl font-bold sm:gap-3 sm:text-3xl">
-                <FileText className="text-primary h-6 w-6 sm:h-8 sm:w-8" />
-                Staff Documentation
-              </h1>
-            </div>
-            <p className="text-muted-foreground mt-2 text-sm sm:text-base">
-              View all staff documentation and knowledge base articles
-            </p>
-          </div>
-          <div className="flex items-center rounded-lg border p-1">
-            <Button
-              variant={viewMode === "list" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setViewMode("list")}
-              className="gap-1 sm:gap-2"
-            >
-              <List className="h-4 w-4" />
-              <span className="hidden sm:inline">List</span>
-            </Button>
-            <Button
-              variant={viewMode === "card" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setViewMode("card")}
-              className="gap-1 sm:gap-2"
-            >
-              <LayoutGrid className="h-4 w-4" />
-              <span className="hidden sm:inline">Card</span>
-            </Button>
-          </div>
+    <AdminTablePage
+      title="Staff Documentation"
+      description="View all staff documentation and knowledge base articles"
+      icon={FileText}
+      actions={
+        <div className="flex items-center rounded-lg border p-1">
+          <Button
+            variant={viewMode === "list" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setViewMode("list")}
+            className="gap-1 sm:gap-2"
+          >
+            <List className="h-4 w-4" />
+            <span className="hidden sm:inline">List</span>
+          </Button>
+          <Button
+            variant={viewMode === "card" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setViewMode("card")}
+            className="gap-1 sm:gap-2"
+          >
+            <LayoutGrid className="h-4 w-4" />
+            <span className="hidden sm:inline">Card</span>
+          </Button>
         </div>
-
-        {/* Stats */}
+      }
+      stats={
         <div className="grid gap-4 md:grid-cols-4">
           <Card className="border-2">
             <CardContent className="p-6">
@@ -240,8 +214,8 @@ export function AdminDocumentationContent({
             </CardContent>
           </Card>
         </div>
-
-        {/* Filters */}
+      }
+      filters={
         <Card className="border-2">
           <CardContent className="p-6">
             <div className="flex flex-col gap-4 md:flex-row">
@@ -329,166 +303,157 @@ export function AdminDocumentationContent({
             </div>
           </CardContent>
         </Card>
-
-        {/* Documentation List */}
-        {filteredDocumentation.length > 0 ? (
-          viewMode === "list" ? (
-            <Card className="border-2">
-              <CardContent className="p-6">
-                <div className="table-responsive">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-12">#</TableHead>
-                        <TableHead>Author</TableHead>
-                        <TableHead>Department</TableHead>
-                        <TableHead>Title</TableHead>
-                        <TableHead>Category</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Created</TableHead>
-                        <TableHead>Actions</TableHead>
+      }
+      filtersInCard={false}
+    >
+      {/* Documentation List */}
+      {filteredDocumentation.length > 0 ? (
+        viewMode === "list" ? (
+          <Card className="border-2">
+            <CardContent className="p-6">
+              <div className="table-responsive">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12">#</TableHead>
+                      <TableHead>Author</TableHead>
+                      <TableHead>Department</TableHead>
+                      <TableHead>Title</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Created</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredDocumentation.map((doc, index) => (
+                      <TableRow key={doc.id}>
+                        <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
+                        <TableCell>
+                          {doc.user?.first_name && doc.user?.last_name
+                            ? `${formatName(doc.user.last_name)}, ${formatName(doc.user.first_name)}`
+                            : doc.user?.first_name || doc.user?.last_name
+                              ? formatName(doc.user.first_name || doc.user.last_name)
+                              : "-"}
+                        </TableCell>
+                        <TableCell>{doc.user?.department || "No Department"}</TableCell>
+                        <TableCell className="font-medium">{doc.title}</TableCell>
+                        <TableCell>
+                          {doc.category ? (
+                            <Badge variant="outline" className="text-xs">
+                              {doc.category}
+                            </Badge>
+                          ) : (
+                            "-"
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={getStatusColor(doc.is_draft)}>{doc.is_draft ? "Draft" : "Published"}</Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm">{formatDate(doc.created_at)}</TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleViewDocument(doc)}
+                            className="h-8 w-8 gap-1 p-0 sm:h-auto sm:w-auto sm:gap-2 sm:p-2"
+                            title="View document"
+                          >
+                            <Eye className="h-3 w-3 sm:h-4 sm:w-4" />
+                            <span className="hidden sm:inline">View</span>
+                          </Button>
+                        </TableCell>
                       </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredDocumentation.map((doc, index) => (
-                        <TableRow key={doc.id}>
-                          <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
-                          <TableCell>
-                            {doc.user?.first_name && doc.user?.last_name
-                              ? `${formatName(doc.user.last_name)}, ${formatName(doc.user.first_name)}`
-                              : doc.user?.first_name || doc.user?.last_name
-                                ? formatName(doc.user.first_name || doc.user.last_name)
-                                : "-"}
-                          </TableCell>
-                          <TableCell>{doc.user?.department || "No Department"}</TableCell>
-                          <TableCell className="font-medium">{doc.title}</TableCell>
-                          <TableCell>
-                            {doc.category ? (
-                              <Badge variant="outline" className="text-xs">
-                                {doc.category}
-                              </Badge>
-                            ) : (
-                              "-"
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <Badge className={getStatusColor(doc.is_draft)}>
-                              {doc.is_draft ? "Draft" : "Published"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-muted-foreground text-sm">{formatDate(doc.created_at)}</TableCell>
-                          <TableCell>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleViewDocument(doc)}
-                              className="h-8 w-8 gap-1 p-0 sm:h-auto sm:w-auto sm:gap-2 sm:p-2"
-                              title="View document"
-                            >
-                              <Eye className="h-3 w-3 sm:h-4 sm:w-4" />
-                              <span className="hidden sm:inline">View</span>
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {filteredDocumentation.map((doc) => (
-                <Card key={doc.id} className="border-2 transition-shadow hover:shadow-lg">
-                  <CardHeader className="from-primary/5 to-background border-b bg-gradient-to-r">
-                    <div className="flex items-start justify-between">
-                      <div className="flex flex-1 items-start gap-3">
-                        <div className="bg-primary/10 rounded-lg p-2">
-                          <FileText className="text-primary h-5 w-5" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <CardTitle className="line-clamp-2 text-lg">{doc.title}</CardTitle>
-                          <div className="mt-2 flex items-center gap-2">
-                            <Badge className={getStatusColor(doc.is_draft)}>
-                              {doc.is_draft ? "Draft" : "Published"}
-                            </Badge>
-                            {doc.category && (
-                              <Badge variant="outline" className="text-xs">
-                                {doc.category}
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {filteredDocumentation.map((doc) => (
+              <Card key={doc.id} className="border-2 transition-shadow hover:shadow-lg">
+                <CardHeader className="from-primary/5 to-background border-b bg-gradient-to-r">
+                  <div className="flex items-start justify-between">
+                    <div className="flex flex-1 items-start gap-3">
+                      <div className="bg-primary/10 rounded-lg p-2">
+                        <FileText className="text-primary h-5 w-5" />
                       </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-3 p-4">
-                    <div className="text-muted-foreground flex items-center gap-2 text-sm">
-                      <User className="h-4 w-4" />
-                      <span>
-                        {doc.user?.first_name} {doc.user?.last_name}
-                      </span>
-                    </div>
-
-                    <div className="text-muted-foreground flex items-center gap-2 text-sm">
-                      <FolderOpen className="h-4 w-4" />
-                      <span>{doc.user?.department || "No Department"}</span>
-                    </div>
-
-                    <div className="text-muted-foreground flex items-center gap-2 text-sm">
-                      <Calendar className="h-4 w-4" />
-                      <span>{formatDate(doc.created_at)}</span>
-                    </div>
-
-                    {doc.tags && doc.tags.length > 0 && (
-                      <div className="flex items-start gap-2">
-                        <Tag className="text-muted-foreground mt-1 h-4 w-4" />
-                        <div className="flex flex-wrap gap-1">
-                          {doc.tags.slice(0, 3).map((tag, index) => (
-                            <span key={index} className="bg-muted rounded px-2 py-1 text-xs">
-                              {tag}
-                            </span>
-                          ))}
-                          {doc.tags.length > 3 && (
-                            <span className="text-muted-foreground px-2 py-1 text-xs">+{doc.tags.length - 3} more</span>
+                      <div className="min-w-0 flex-1">
+                        <CardTitle className="line-clamp-2 text-lg">{doc.title}</CardTitle>
+                        <div className="mt-2 flex items-center gap-2">
+                          <Badge className={getStatusColor(doc.is_draft)}>{doc.is_draft ? "Draft" : "Published"}</Badge>
+                          {doc.category && (
+                            <Badge variant="outline" className="text-xs">
+                              {doc.category}
+                            </Badge>
                           )}
                         </div>
                       </div>
-                    )}
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3 p-4">
+                  <div className="text-muted-foreground flex items-center gap-2 text-sm">
+                    <User className="h-4 w-4" />
+                    <span>
+                      {doc.user?.first_name} {doc.user?.last_name}
+                    </span>
+                  </div>
 
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleViewDocument(doc)}
-                      className="w-full gap-2"
-                    >
-                      <Eye className="h-4 w-4" />
-                      View Document
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )
-        ) : (
-          <Card className="border-2">
-            <CardContent className="p-12 text-center">
-              <FileText className="text-muted-foreground mx-auto mb-4 h-16 w-16" />
-              <h3 className="text-foreground mb-2 text-xl font-semibold">No Documentation Found</h3>
-              <p className="text-muted-foreground">
-                {searchQuery ||
-                categoryFilter !== "all" ||
-                statusFilter !== "all" ||
-                departmentFilter !== "all" ||
-                staffFilter !== "all"
-                  ? "No documentation matches your filters"
-                  : "No documentation has been created yet"}
-              </p>
-            </CardContent>
-          </Card>
-        )}
-      </div>
+                  <div className="text-muted-foreground flex items-center gap-2 text-sm">
+                    <FolderOpen className="h-4 w-4" />
+                    <span>{doc.user?.department || "No Department"}</span>
+                  </div>
 
+                  <div className="text-muted-foreground flex items-center gap-2 text-sm">
+                    <Calendar className="h-4 w-4" />
+                    <span>{formatDate(doc.created_at)}</span>
+                  </div>
+
+                  {doc.tags && doc.tags.length > 0 && (
+                    <div className="flex items-start gap-2">
+                      <Tag className="text-muted-foreground mt-1 h-4 w-4" />
+                      <div className="flex flex-wrap gap-1">
+                        {doc.tags.slice(0, 3).map((tag, index) => (
+                          <span key={index} className="bg-muted rounded px-2 py-1 text-xs">
+                            {tag}
+                          </span>
+                        ))}
+                        {doc.tags.length > 3 && (
+                          <span className="text-muted-foreground px-2 py-1 text-xs">+{doc.tags.length - 3} more</span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  <Button variant="outline" size="sm" onClick={() => handleViewDocument(doc)} className="w-full gap-2">
+                    <Eye className="h-4 w-4" />
+                    View Document
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )
+      ) : (
+        <Card className="border-2">
+          <CardContent className="p-12 text-center">
+            <FileText className="text-muted-foreground mx-auto mb-4 h-16 w-16" />
+            <h3 className="text-foreground mb-2 text-xl font-semibold">No Documentation Found</h3>
+            <p className="text-muted-foreground">
+              {searchQuery ||
+              categoryFilter !== "all" ||
+              statusFilter !== "all" ||
+              departmentFilter !== "all" ||
+              staffFilter !== "all"
+                ? "No documentation matches your filters"
+                : "No documentation has been created yet"}
+            </p>
+          </CardContent>
+        </Card>
+      )}
       {/* View Document Dialog */}
       <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
         <DialogContent className="max-h-[80vh] max-w-3xl overflow-y-auto">
@@ -523,6 +488,6 @@ export function AdminDocumentationContent({
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </AdminTablePage>
   )
 }

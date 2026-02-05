@@ -9,6 +9,8 @@ import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 import { OneDriveBrowser } from "./onedrive-browser"
 import { Skeleton } from "@/components/ui/skeleton"
+import { PageHeader, PageWrapper } from "@/components/layout"
+import { FolderOpen } from "lucide-react"
 
 export const dynamic = "force-dynamic"
 
@@ -72,10 +74,16 @@ export default async function OneDrivePage() {
   const projectsFolder = process.env.ONEDRIVE_PROJECTS_FOLDER || "/Projects"
 
   return (
-    <div className="container mx-auto max-w-7xl px-4 py-6">
+    <PageWrapper maxWidth="full" background="gradient">
+      <PageHeader
+        title="OneDrive Browser"
+        description="Browse and manage project files"
+        icon={FolderOpen}
+        backLink={{ href: "/admin", label: "Back to Admin" }}
+      />
       <Suspense fallback={<LoadingSkeleton />}>
         <OneDriveBrowser initialPath={projectsFolder} rootLabel="Projects" showProjectsOnly={true} />
       </Suspense>
-    </div>
+    </PageWrapper>
   )
 }

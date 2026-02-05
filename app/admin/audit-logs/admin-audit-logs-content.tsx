@@ -15,6 +15,7 @@ import { ScrollText, Search, Filter, Calendar, User, FileText, LayoutGrid, List,
 import { formatName } from "@/lib/utils"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
+import { AdminTablePage } from "@/components/admin/admin-table-page"
 
 export interface AuditLog {
   id: string
@@ -576,11 +577,12 @@ export function AdminAuditLogsContent({
   }
 
   const filteredLogs = logs.filter((log) => {
+    const normalizedQuery = searchQuery.toLowerCase()
     const matchesSearch =
-      log.entity_type.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      log.action.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (log.user as any)?.first_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (log.user as any)?.last_name?.toLowerCase().includes(searchQuery.toLowerCase())
+      (log.entity_type || "").toLowerCase().includes(normalizedQuery) ||
+      (log.action || "").toLowerCase().includes(normalizedQuery) ||
+      (log.user as any)?.first_name?.toLowerCase().includes(normalizedQuery) ||
+      (log.user as any)?.last_name?.toLowerCase().includes(normalizedQuery)
 
     const matchesAction = actionFilter === "all" || log.action === actionFilter
     const matchesEntity = entityFilter === "all" || log.entity_type === entityFilter
@@ -1060,42 +1062,33 @@ export function AdminAuditLogsContent({
   }
 
   return (
-    <div className="from-background via-background to-muted/20 min-h-screen w-full overflow-x-hidden bg-gradient-to-br">
-      <div className="mx-auto max-w-7xl space-y-6 p-4 md:p-8">
-        {/* Header */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-foreground flex items-center gap-2 text-2xl font-bold sm:gap-3 sm:text-3xl">
-              <ScrollText className="text-primary h-6 w-6 sm:h-8 sm:w-8" />
-              Audit Logs
-            </h1>
-            <p className="text-muted-foreground mt-2 text-sm sm:text-base">
-              Complete audit trail of all system activities
-            </p>
-          </div>
-          <div className="flex items-center rounded-lg border p-1">
-            <Button
-              variant={viewMode === "list" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setViewMode("list")}
-              className="gap-1 sm:gap-2"
-            >
-              <List className="h-4 w-4" />
-              <span className="hidden sm:inline">List</span>
-            </Button>
-            <Button
-              variant={viewMode === "card" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setViewMode("card")}
-              className="gap-1 sm:gap-2"
-            >
-              <LayoutGrid className="h-4 w-4" />
-              <span className="hidden sm:inline">Card</span>
-            </Button>
-          </div>
+    <AdminTablePage
+      title="Audit Logs"
+      description="Complete audit trail of all system activities"
+      icon={ScrollText}
+      actions={
+        <div className="flex items-center rounded-lg border p-1">
+          <Button
+            variant={viewMode === "list" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setViewMode("list")}
+            className="gap-1 sm:gap-2"
+          >
+            <List className="h-4 w-4" />
+            <span className="hidden sm:inline">List</span>
+          </Button>
+          <Button
+            variant={viewMode === "card" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setViewMode("card")}
+            className="gap-1 sm:gap-2"
+          >
+            <LayoutGrid className="h-4 w-4" />
+            <span className="hidden sm:inline">Card</span>
+          </Button>
         </div>
-
-        {/* Stats */}
+      }
+      stats={
         <div className="grid gap-4 md:grid-cols-4">
           <Card className="border-2">
             <CardContent className="p-6">
@@ -1153,8 +1146,8 @@ export function AdminAuditLogsContent({
             </CardContent>
           </Card>
         </div>
-
-        {/* Filters */}
+      }
+      filters={
         <Card className="border-2">
           <CardContent className="p-6">
             <div className="grid gap-4 md:grid-cols-4">
@@ -1308,196 +1301,196 @@ export function AdminAuditLogsContent({
             )}
           </CardContent>
         </Card>
-
-        {/* Export Filtered Data */}
-        <Card className="border-2">
-          <CardContent className="p-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <Download className="text-muted-foreground h-4 w-4" />
-                <span className="text-foreground text-sm font-medium">Export Filtered Data:</span>
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={exportToExcel}
-                  className="gap-2"
-                  disabled={filteredLogs.length === 0}
-                >
-                  <FileText className="h-4 w-4" />
-                  Excel (.xlsx)
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={exportToPDF}
-                  className="gap-2"
-                  disabled={filteredLogs.length === 0}
-                >
-                  <FileText className="h-4 w-4" />
-                  PDF
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={exportToWord}
-                  className="gap-2"
-                  disabled={filteredLogs.length === 0}
-                >
-                  <FileText className="h-4 w-4" />
-                  Word (.docx)
-                </Button>
-              </div>
+      }
+      filtersInCard={false}
+    >
+      {/* Export Filtered Data */}
+      <Card className="border-2">
+        <CardContent className="p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Download className="text-muted-foreground h-4 w-4" />
+              <span className="text-foreground text-sm font-medium">Export Filtered Data:</span>
             </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={exportToExcel}
+                className="gap-2"
+                disabled={filteredLogs.length === 0}
+              >
+                <FileText className="h-4 w-4" />
+                Excel (.xlsx)
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={exportToPDF}
+                className="gap-2"
+                disabled={filteredLogs.length === 0}
+              >
+                <FileText className="h-4 w-4" />
+                PDF
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={exportToWord}
+                className="gap-2"
+                disabled={filteredLogs.length === 0}
+              >
+                <FileText className="h-4 w-4" />
+                Word (.docx)
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Audit Logs List */}
+      {filteredLogs.length > 0 ? (
+        viewMode === "list" ? (
+          <Card className="border-2">
+            <div className="table-responsive">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-12">#</TableHead>
+                    <TableHead>Action</TableHead>
+                    <TableHead>Entity</TableHead>
+                    <TableHead>Target/Affected</TableHead>
+                    <TableHead>Performed By</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead className="w-20">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredLogs.map((log, index) => (
+                    <TableRow key={log.id}>
+                      <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
+                      <TableCell>
+                        <Badge className={getActionColor(log.action)}>{log.action.toUpperCase()}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-foreground text-sm font-medium">
+                          {log.entity_type.replace("_", " ").toUpperCase()}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-foreground text-sm">{getTargetDescription(log)}</span>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2 text-sm">
+                          <User className="text-muted-foreground h-3 w-3" />
+                          <span
+                            className={`${log.entity_type === "feedback" && log.new_values?.is_anonymous ? "text-muted-foreground italic" : "text-foreground"}`}
+                          >
+                            {getPerformedBy(log)}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2 text-sm">
+                          <Calendar className="text-muted-foreground h-3 w-3" />
+                          <span className="text-muted-foreground">{formatDate(log.created_at)}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Button variant="ghost" size="sm" onClick={() => handleViewDetails(log)} className="gap-2">
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </Card>
+        ) : (
+          <div className="space-y-3">
+            {filteredLogs.map((log) => (
+              <Card key={log.id} className="border-2 transition-shadow hover:shadow-md">
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 space-y-2">
+                      <div className="flex flex-wrap items-center gap-3">
+                        <Badge className={getActionColor(log.action)}>{log.action.toUpperCase()}</Badge>
+                        <span className="text-foreground text-sm font-medium">
+                          {log.entity_type.replace("_", " ").toUpperCase()}
+                        </span>
+                        <span className="text-muted-foreground text-sm">{getTargetDescription(log)}</span>
+                      </div>
+
+                      <div className="flex items-center gap-4 text-sm">
+                        <div className="flex items-center gap-2">
+                          <User className="text-muted-foreground h-4 w-4" />
+                          <span className="text-muted-foreground">By:</span>
+                          <span
+                            className={`${log.entity_type === "feedback" && log.new_values?.is_anonymous ? "text-muted-foreground italic" : "text-foreground"}`}
+                          >
+                            {getPerformedBy(log)}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Calendar className="text-muted-foreground h-4 w-4" />
+                          <span className="text-muted-foreground">{formatDate(log.created_at)}</span>
+                        </div>
+                      </div>
+
+                      {log.old_values && (
+                        <details className="mt-2">
+                          <summary className="text-foreground hover:text-primary cursor-pointer text-sm font-medium">
+                            Old Values
+                          </summary>
+                          {formatValues(log.old_values)}
+                        </details>
+                      )}
+
+                      {log.new_values && (
+                        <details className="mt-2">
+                          <summary className="text-foreground hover:text-primary cursor-pointer text-sm font-medium">
+                            New Values
+                          </summary>
+                          {formatValues(log.new_values)}
+                        </details>
+                      )}
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={() => handleViewDetails(log)} className="gap-2">
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )
+      ) : (
+        <Card className="border-2">
+          <CardContent className="p-12 text-center">
+            <ScrollText className="text-muted-foreground mx-auto mb-4 h-16 w-16" />
+            <h3 className="text-foreground mb-2 text-xl font-semibold">No Audit Logs Found</h3>
+            <p className="text-muted-foreground">
+              {searchQuery ||
+              actionFilter !== "all" ||
+              entityFilter !== "all" ||
+              dateFilter !== "all" ||
+              departmentFilter !== "all" ||
+              staffFilter !== "all"
+                ? "No logs match your filters"
+                : "No audit logs available yet"}
+            </p>
           </CardContent>
         </Card>
+      )}
 
-        {/* Audit Logs List */}
-        {filteredLogs.length > 0 ? (
-          viewMode === "list" ? (
-            <Card className="border-2">
-              <div className="table-responsive">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-12">#</TableHead>
-                      <TableHead>Action</TableHead>
-                      <TableHead>Entity</TableHead>
-                      <TableHead>Target/Affected</TableHead>
-                      <TableHead>Performed By</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead className="w-20">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredLogs.map((log, index) => (
-                      <TableRow key={log.id}>
-                        <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
-                        <TableCell>
-                          <Badge className={getActionColor(log.action)}>{log.action.toUpperCase()}</Badge>
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-foreground text-sm font-medium">
-                            {log.entity_type.replace("_", " ").toUpperCase()}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-foreground text-sm">{getTargetDescription(log)}</span>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2 text-sm">
-                            <User className="text-muted-foreground h-3 w-3" />
-                            <span
-                              className={`${log.entity_type === "feedback" && log.new_values?.is_anonymous ? "text-muted-foreground italic" : "text-foreground"}`}
-                            >
-                              {getPerformedBy(log)}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2 text-sm">
-                            <Calendar className="text-muted-foreground h-3 w-3" />
-                            <span className="text-muted-foreground">{formatDate(log.created_at)}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Button variant="ghost" size="sm" onClick={() => handleViewDetails(log)} className="gap-2">
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </Card>
-          ) : (
-            <div className="space-y-3">
-              {filteredLogs.map((log) => (
-                <Card key={log.id} className="border-2 transition-shadow hover:shadow-md">
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1 space-y-2">
-                        <div className="flex flex-wrap items-center gap-3">
-                          <Badge className={getActionColor(log.action)}>{log.action.toUpperCase()}</Badge>
-                          <span className="text-foreground text-sm font-medium">
-                            {log.entity_type.replace("_", " ").toUpperCase()}
-                          </span>
-                          <span className="text-muted-foreground text-sm">{getTargetDescription(log)}</span>
-                        </div>
-
-                        <div className="flex items-center gap-4 text-sm">
-                          <div className="flex items-center gap-2">
-                            <User className="text-muted-foreground h-4 w-4" />
-                            <span className="text-muted-foreground">By:</span>
-                            <span
-                              className={`${log.entity_type === "feedback" && log.new_values?.is_anonymous ? "text-muted-foreground italic" : "text-foreground"}`}
-                            >
-                              {getPerformedBy(log)}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Calendar className="text-muted-foreground h-4 w-4" />
-                            <span className="text-muted-foreground">{formatDate(log.created_at)}</span>
-                          </div>
-                        </div>
-
-                        {log.old_values && (
-                          <details className="mt-2">
-                            <summary className="text-foreground hover:text-primary cursor-pointer text-sm font-medium">
-                              Old Values
-                            </summary>
-                            {formatValues(log.old_values)}
-                          </details>
-                        )}
-
-                        {log.new_values && (
-                          <details className="mt-2">
-                            <summary className="text-foreground hover:text-primary cursor-pointer text-sm font-medium">
-                              New Values
-                            </summary>
-                            {formatValues(log.new_values)}
-                          </details>
-                        )}
-                      </div>
-                      <Button variant="ghost" size="sm" onClick={() => handleViewDetails(log)} className="gap-2">
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )
-        ) : (
-          <Card className="border-2">
-            <CardContent className="p-12 text-center">
-              <ScrollText className="text-muted-foreground mx-auto mb-4 h-16 w-16" />
-              <h3 className="text-foreground mb-2 text-xl font-semibold">No Audit Logs Found</h3>
-              <p className="text-muted-foreground">
-                {searchQuery ||
-                actionFilter !== "all" ||
-                entityFilter !== "all" ||
-                dateFilter !== "all" ||
-                departmentFilter !== "all" ||
-                staffFilter !== "all"
-                  ? "No logs match your filters"
-                  : "No audit logs available yet"}
-              </p>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Pagination info */}
-        {filteredLogs.length > 0 && (
-          <div className="text-muted-foreground text-center text-sm">
-            Showing {filteredLogs.length} of {logs.length} total logs
-            {logs.length >= 500 && " (limited to last 500 entries)"}
-          </div>
-        )}
-      </div>
-
+      {/* Pagination info */}
+      {filteredLogs.length > 0 && (
+        <div className="text-muted-foreground text-center text-sm">
+          Showing {filteredLogs.length} of {logs.length} total logs
+          {logs.length >= 500 && " (limited to last 500 entries)"}
+        </div>
+      )}
       {/* Details Dialog */}
       <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
         <DialogContent className="max-h-[80vh] max-w-3xl overflow-y-auto">
@@ -1628,6 +1621,6 @@ export function AdminAuditLogsContent({
           )}
         </DialogContent>
       </Dialog>
-    </div>
+    </AdminTablePage>
   )
 }
