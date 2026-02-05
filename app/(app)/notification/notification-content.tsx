@@ -94,7 +94,7 @@ interface NotificationContentProps {
 
 export function NotificationContent({ initialNotifications, userId }: NotificationContentProps) {
   const router = useRouter()
-  const supabase = createClient()
+  const [supabase] = useState(() => createClient())
 
   const [notifications, setNotifications] = useState<Notification[]>(initialNotifications)
   const [activeTab, setActiveTab] = useState("all")
@@ -128,7 +128,7 @@ export function NotificationContent({ initialNotifications, userId }: Notificati
     return () => {
       subscription.unsubscribe()
     }
-  }, [supabase, userId])
+  }, [userId])
 
   const markAsRead = async (notificationId: string) => {
     try {
@@ -199,10 +199,15 @@ export function NotificationContent({ initialNotifications, userId }: Notificati
       await markAsRead(notification.id)
     }
 
-    await supabase
+    const { error: clickError } = await supabase
       .from("notifications")
       .update({ clicked: true, clicked_at: new Date().toISOString() })
       .eq("id", notification.id)
+
+    if (clickError) {
+      console.error("Error updating notification click state:", clickError)
+      // We still proceed to the link if it exists, as the click update is non-critical
+    }
 
     if (notification.link_url) {
       router.push(notification.link_url)

@@ -277,16 +277,11 @@ export function SignatureCreator({ profile }: SignatureCreatorProps) {
             {emailError && <p className="text-destructive text-sm">{emailError}</p>}
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex">
             <Button onClick={copyToClipboard} disabled={!isFormValid} className="flex-1">
               <Copy className="mr-2 h-4 w-4" />
               Copy Signature
             </Button>
-            <Link href="/dashboard" className="flex-1">
-              <Button variant="outline" className="w-full bg-transparent">
-                Back
-              </Button>
-            </Link>
           </div>
         </CardContent>
       </Card>

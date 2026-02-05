@@ -298,7 +298,13 @@ export default function DepartmentsPage() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        <Button variant="ghost" size="icon" onClick={() => openEditDialog(dept)}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => openEditDialog(dept)}
+                          aria-label={`Edit department: ${dept.name}`}
+                          title={`Edit department: ${dept.name}`}
+                        >
                           <Pencil className="h-4 w-4" />
                         </Button>
                         <Button
@@ -306,6 +312,12 @@ export default function DepartmentsPage() {
                           size="icon"
                           onClick={() => handleDelete(dept)}
                           disabled={(dept.employee_count ?? 0) > 0}
+                          aria-label={`Delete department: ${dept.name}`}
+                          title={
+                            (dept.employee_count ?? 0) > 0
+                              ? "Cannot delete department with employees"
+                              : `Delete department: ${dept.name}`
+                          }
                         >
                           <Trash2 className="text-destructive h-4 w-4" />
                         </Button>

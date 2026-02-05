@@ -84,17 +84,21 @@ export function FeedbackContent({ initialFeedback, userId }: FeedbackContentProp
       if (error) throw error
 
       if (feedbackToDelete) {
-        await supabase.rpc("log_audit", {
-          p_action: "delete",
-          p_entity_type: "feedback",
-          p_entity_id: id,
-          p_old_values: {
-            feedback_type: feedbackToDelete.feedback_type,
-            title: feedbackToDelete.title,
-            description: feedbackToDelete.description,
-            status: feedbackToDelete.status,
-          },
-        })
+        try {
+          await supabase.rpc("log_audit", {
+            p_action: "delete",
+            p_entity_type: "feedback",
+            p_entity_id: id,
+            p_old_values: {
+              feedback_type: feedbackToDelete.feedback_type,
+              title: feedbackToDelete.title,
+              description: feedbackToDelete.description,
+              status: feedbackToDelete.status,
+            },
+          })
+        } catch (auditError) {
+          console.error("Failed to log audit for feedback deletion:", auditError)
+        }
       }
 
       setUserFeedback((prev) => prev.filter((item) => item.id !== id))
@@ -178,10 +182,12 @@ export function FeedbackContent({ initialFeedback, userId }: FeedbackContentProp
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge className={getTypeColor(item.feedback_type)}>{item.feedback_type.replace("_", " ")}</Badge>
+                      <Badge className={getTypeColor(item.feedback_type)}>
+                        {item.feedback_type.replaceAll("_", " ")}
+                      </Badge>
                     </TableCell>
                     <TableCell>
-                      <Badge className={getStatusColor(item.status)}>{item.status.replace("_", " ")}</Badge>
+                      <Badge className={getStatusColor(item.status)}>{item.status.replaceAll("_", " ")}</Badge>
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm">
                       {new Date(item.created_at).toLocaleDateString()}

@@ -83,12 +83,17 @@ export default function JobDescriptionPage() {
       if (error) throw error
 
       // Log audit
-      await supabase.rpc("log_audit", {
+      const { error: auditError } = await supabase.rpc("log_audit", {
         p_action: "update",
         p_entity_type: "job_description",
         p_entity_id: user.id,
         p_new_values: { job_description: jobDescription },
       })
+
+      if (auditError) {
+        console.error("Error logging job description audit:", auditError)
+        // Optionally handle audit error specifically
+      }
 
       toast.success("Job description saved successfully")
       setIsEditing(false)
@@ -117,9 +122,7 @@ export default function JobDescriptionPage() {
 
   return (
     <>
-      <style
-        dangerouslySetInnerHTML={{
-          __html: `
+      <style>{`
         @media print {
           body {
             background: white !important;
@@ -128,9 +131,7 @@ export default function JobDescriptionPage() {
             display: none !important;
           }
         }
-      `,
-        }}
-      />
+      `}</style>
       <PageWrapper maxWidth="full" background="gradient" className="print:p-4">
         {/* Header */}
         <div className="no-print">

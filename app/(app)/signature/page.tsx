@@ -30,7 +30,7 @@ export default async function SignaturePage({ searchParams }: { searchParams: { 
         title="Email Signature Creator"
         description="Generate your professional email signature"
         icon={FileSignature}
-        backLink={{ href: "/profile", label: "Back to Dashboard" }}
+        backLink={{ href: "/dashboard", label: "Back to Dashboard" }}
       />
       <SignatureCreator profile={profile} />
     </PageWrapper>
