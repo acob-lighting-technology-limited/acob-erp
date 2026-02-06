@@ -749,14 +749,7 @@ export function AdminAssetsContent({
 
         if (error) throw error
 
-        // Log audit
-        await supabase.rpc("log_audit", {
-          p_action: "update",
-          p_entity_type: "asset",
-          p_entity_id: selectedAsset.id,
-          p_old_values: { ...selectedAsset },
-          p_new_values: { ...updateData, unique_code: selectedAsset.unique_code },
-        })
+        // Note: Audit logging is handled by database trigger (audit_log_changes)
 
         toast.success("Asset updated successfully")
       } else {
@@ -808,13 +801,7 @@ export function AdminAssetsContent({
 
         if (error) throw error
 
-        // Log audit
-        await supabase.rpc("log_audit", {
-          p_action: "create",
-          p_entity_type: "asset",
-          p_entity_id: newAsset?.id || null,
-          p_new_values: { ...insertData, unique_code: uniqueCodeData },
-        })
+        // Note: Audit logging is handled by database trigger (audit_log_changes)
 
         // Handle assignment if status is 'assigned'
         if (assetForm.status === "assigned" && newAsset) {
@@ -1006,29 +993,7 @@ export function AdminAssetsContent({
 
       if (assetError) throw assetError
 
-      // Log audit
-      const oldValues = previousAssignedTo
-        ? { assigned_to: previousAssignedTo }
-        : previousDepartment
-          ? { department: previousDepartment }
-          : null
-
-      const newValues: any = { assignment_type: assignForm.assignment_type, notes: assignForm.assignment_notes }
-      if (assignForm.assignment_type === "individual") {
-        newValues.assigned_to = assignForm.assigned_to
-      } else if (assignForm.assignment_type === "department") {
-        newValues.department = assignForm.department
-      } else if (assignForm.assignment_type === "office") {
-        newValues.office_location = assignForm.office_location
-      }
-
-      await supabase.rpc("log_audit", {
-        p_action: currentAssignment ? "reassign" : "assign",
-        p_entity_type: "asset",
-        p_entity_id: selectedAsset.id,
-        p_old_values: { ...oldValues, unique_code: selectedAsset.unique_code },
-        p_new_values: { ...newValues, unique_code: selectedAsset.unique_code },
-      })
+      // Note: Audit logging is handled by database trigger on asset_assignments table
 
       toast.success(`Asset ${currentAssignment ? "reassigned" : "assigned"} successfully`)
       setIsAssignDialogOpen(false)
@@ -1120,13 +1085,7 @@ export function AdminAssetsContent({
 
       if (error) throw error
 
-      // Log audit
-      await supabase.rpc("log_audit", {
-        p_action: "delete",
-        p_entity_type: "asset",
-        p_entity_id: assetToDelete.id,
-        p_old_values: assetToDelete,
-      })
+      // Note: Audit logging is handled by database trigger (audit_log_changes)
 
       toast.success("Asset deleted successfully")
       setIsDeleteDialogOpen(false)

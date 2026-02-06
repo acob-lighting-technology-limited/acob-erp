@@ -32,9 +32,14 @@ const roleColors: Record<string, string> = {
   manager: "default",
   employee: "secondary",
   user: "secondary",
+  staff: "secondary",
+  lead: "default",
 }
 
+import { useSearchParams } from "next/navigation"
+
 export default function UsersPage() {
+  const searchParams = useSearchParams()
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
@@ -42,6 +47,13 @@ export default function UsersPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [formData, setFormData] = useState({ role: "", is_active: true })
+
+  useEffect(() => {
+    const roleParam = searchParams.get("role")
+    if (roleParam) {
+      setRoleFilter(roleParam)
+    }
+  }, [searchParams])
 
   useEffect(() => {
     fetchUsers()
@@ -52,11 +64,19 @@ export default function UsersPage() {
       const supabase = createClient()
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, email, first_name, last_name, role, department, is_active, created_at")
+        .select("id, company_email, first_name, last_name, role, department, employment_status, created_at")
         .order("created_at", { ascending: false })
 
       if (error) throw error
-      setUsers(data || [])
+
+      // Map company_email to email and employment_status to is_active for the UI
+      const mappedUsers = (data || []).map((u: any) => ({
+        ...u,
+        email: u.company_email,
+        is_active: u.employment_status === "active",
+      }))
+
+      setUsers(mappedUsers)
     } catch (error) {
       console.error("Error:", error)
       toast.error("Failed to load users")
@@ -73,7 +93,10 @@ export default function UsersPage() {
       const supabase = createClient()
       const { error } = await supabase
         .from("profiles")
-        .update({ role: formData.role, is_active: formData.is_active })
+        .update({
+          role: formData.role,
+          employment_status: formData.is_active ? "active" : "suspended",
+        })
         .eq("id", editingUser.id)
 
       if (error) throw error
@@ -111,6 +134,91 @@ export default function UsersPage() {
 
   const roles = Array.from(new Set(users.map((u) => u.role)))
 
+  const [isAddUserDialogOpen, setIsAddUserDialogOpen] = useState(false)
+  const [userToAdd, setUserToAdd] = useState<string>("")
+  const [availableUsers, setAvailableUsers] = useState<User[]>([])
+  const [addUserWarning, setAddUserWarning] = useState<string | null>(null)
+
+  // Fetch all users for the "Add User" dialog (to pick from)
+  async function fetchAllUsers() {
+    const supabase = createClient()
+    const { data } = await supabase
+      .from("profiles")
+      .select("id, company_email, first_name, last_name, role, department, employment_status, created_at")
+      .order("first_name")
+
+    if (data) {
+      // Map company_email to email for the UI
+      const mappedUsers = data.map((u: any) => ({
+        ...u,
+        email: u.company_email,
+        is_active: u.employment_status === "active",
+      }))
+      setAvailableUsers(mappedUsers)
+    }
+  }
+
+  function openAddUserDialog() {
+    fetchAllUsers()
+    setAddUserWarning(null)
+    setUserToAdd("")
+    setIsAddUserDialogOpen(true)
+  }
+
+  function handleUserSelect(userId: string) {
+    setUserToAdd(userId)
+    const user = availableUsers.find((u) => u.id === userId)
+    if (!user) return
+
+    if (user.role === roleFilter) {
+      setAddUserWarning(`${user.first_name} is already a ${roleFilter}.`)
+    } else {
+      setAddUserWarning(`User will be removed from "${user.role}" role and assigned to "${roleFilter}".`)
+    }
+  }
+
+  async function handleAddUserToRole() {
+    if (!userToAdd || roleFilter === "all") return
+
+    try {
+      const supabase = createClient()
+
+      // 1. Security Check: Cannot change Super Admin or Self
+      const {
+        data: { user: currentUser },
+      } = await supabase.auth.getUser()
+      const targetUser = availableUsers.find((u) => u.id === userToAdd)
+
+      if (targetUser?.id === currentUser?.id) {
+        toast.error("You cannot change your own role.")
+        return
+      }
+
+      if (targetUser?.role === "super_admin") {
+        toast.error("Cannot modify a Super Admin.")
+        return
+      }
+
+      // 2. Security Check: Admin cannot assign Super Admin role (unless they are super admin?)
+      // Assuming only super_admin can create super_admins.
+      // For now, let's assume standard checks via RLS or backend.
+
+      const { error } = await supabase
+        .from("profiles")
+        .update({ role: roleFilter as any })
+        .eq("id", userToAdd)
+
+      if (error) throw error
+
+      toast.success(`User role updated to ${roleFilter}`)
+      setIsAddUserDialogOpen(false)
+      fetchUsers()
+    } catch (error: any) {
+      console.error("Error adding user to role:", error)
+      toast.error(error.message || "Failed to update role")
+    }
+  }
+
   return (
     <div className="container mx-auto space-y-6 p-6">
       <div className="flex items-center justify-between">
@@ -123,12 +231,20 @@ export default function UsersPage() {
           </div>
           <p className="text-muted-foreground">Manage user accounts and roles</p>
         </div>
-        <Link href="/admin/settings/users/invite">
-          <Button>
-            <UserPlus className="mr-2 h-4 w-4" />
-            Invite User
-          </Button>
-        </Link>
+        <div className="flex gap-2">
+          {roleFilter !== "all" && (
+            <Button onClick={openAddUserDialog} variant="secondary">
+              <UserPlus className="mr-2 h-4 w-4" />
+              Add User to {roleFilter.replace("_", " ")}
+            </Button>
+          )}
+          <Link href="/admin/settings/users/invite">
+            <Button>
+              <UserPlus className="mr-2 h-4 w-4" />
+              Invite User
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Stats */}
@@ -272,7 +388,8 @@ export default function UsersPage() {
                   <SelectContent>
                     <SelectItem value="user">User</SelectItem>
                     <SelectItem value="employee">Employee</SelectItem>
-                    <SelectItem value="manager">Manager</SelectItem>
+                    {/* Manager removed */}
+                    <SelectItem value="lead">Lead</SelectItem>
                     <SelectItem value="admin">Admin</SelectItem>
                     <SelectItem value="super_admin">Super Admin</SelectItem>
                   </SelectContent>
@@ -301,6 +418,46 @@ export default function UsersPage() {
               <Button type="submit">Save Changes</Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add User to Role Dialog */}
+      <Dialog open={isAddUserDialogOpen} onOpenChange={setIsAddUserDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add User to {roleFilter.replace("_", " ")}</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label>Select User</Label>
+              <Select value={userToAdd} onValueChange={handleUserSelect}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Search or select a user..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableUsers.map((u) => (
+                    <SelectItem key={u.id} value={u.id}>
+                      {u.first_name || u.last_name ? `${u.first_name || ""} ${u.last_name || ""}` : u.email} ({u.role})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {addUserWarning && (
+              <div className="rounded-md bg-yellow-100 p-3 text-sm text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200">
+                {addUserWarning}
+              </div>
+            )}
+            <div className="text-muted-foreground text-xs">Note: Users can only have one role at a time.</div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAddUserDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleAddUserToRole} disabled={!userToAdd}>
+              Confirm
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

@@ -34,28 +34,17 @@ export default function InviteUserPage() {
     setSending(true)
 
     try {
-      const supabase = createClient()
-
-      // Check if user already exists
-      const { data: existingUser } = await supabase.from("profiles").select("id").eq("email", formData.email).single()
-
-      if (existingUser) {
-        toast.error("A user with this email already exists")
-        setSending(false)
-        return
-      }
-
-      // Create profile entry (user will need to complete signup)
-      const { error } = await supabase.from("profiles").insert({
-        email: formData.email,
-        first_name: formData.first_name || null,
-        last_name: formData.last_name || null,
-        role: formData.role,
-        department: formData.department || null,
-        is_active: true,
+      const response = await fetch("/api/admin/users/invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
       })
 
-      if (error) throw error
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to invite user")
+      }
 
       toast.success(`Invitation sent to ${formData.email}`)
       router.push("/admin/settings/users")

@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { ArrowLeft, Plus, Pencil, Trash2, Shield, Users } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
+import { DepartmentLeadsManager } from "@/components/admin/department-leads-manager"
 
 interface Role {
   id: string
@@ -112,9 +113,48 @@ export default function RolesPage() {
       }))
 
       setRoles(rolesWithCounts)
-    } catch (error) {
-      console.error("Error:", error)
-      toast.error("Failed to load roles")
+    } catch (error: any) {
+      console.error("Error loading roles:", error)
+      // If table missing, fallback to defaults
+      if (error?.code === "42P01" || error?.message?.includes("relation")) {
+        setRoles([
+          {
+            id: "1",
+            name: "super_admin",
+            description: "Full system access",
+            permissions: defaultPermissions.map((p) => p.key),
+            is_system: true,
+            created_at: new Date().toISOString(),
+          },
+          {
+            id: "2",
+            name: "admin",
+            description: "Administrative access",
+            permissions: ["users.view", "users.manage", "hr.view", "hr.manage", "finance.view", "reports.view"],
+            is_system: true,
+            created_at: new Date().toISOString(),
+          },
+          {
+            id: "3",
+            name: "manager",
+            description: "Department manager access",
+            permissions: ["hr.view", "finance.view", "inventory.view", "reports.view"],
+            is_system: true,
+            created_at: new Date().toISOString(),
+          },
+          {
+            id: "4",
+            name: "employee",
+            description: "Standard employee access",
+            permissions: ["hr.view"],
+            is_system: true,
+            created_at: new Date().toISOString(),
+          },
+        ])
+        toast.warning("Roles table not found, using defaults")
+      } else {
+        toast.error(`Failed to load roles: ${error.message || "Unknown error"}`)
+      }
     } finally {
       setLoading(false)
     }
@@ -133,14 +173,12 @@ export default function RolesPage() {
         if (error) throw error
         toast.success("Role updated")
       } else {
-        const { error } = await supabase
-          .from("roles")
-          .insert({
-            name: formData.name,
-            description: formData.description || null,
-            permissions: formData.permissions,
-            is_system: false,
-          })
+        const { error } = await supabase.from("roles").insert({
+          name: formData.name,
+          description: formData.description || null,
+          permissions: formData.permissions,
+          is_system: false,
+        })
         if (error) throw error
         toast.success("Role created")
       }
@@ -292,46 +330,55 @@ export default function RolesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {roles.map((role) => (
-                  <TableRow key={role.id}>
-                    <TableCell className="font-medium capitalize">{role.name.replace("_", " ")}</TableCell>
-                    <TableCell className="text-muted-foreground max-w-xs truncate">{role.description || "—"}</TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">{role.permissions?.length || 0}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <Users className="text-muted-foreground h-4 w-4" />
-                        {role.user_count || 0}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={role.is_system ? "destructive" : "secondary"}>
-                        {role.is_system ? "System" : "Custom"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button variant="ghost" size="icon" onClick={() => openEdit(role)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDelete(role)}
-                          disabled={role.is_system}
+                {roles
+                  .filter((role) => role.name !== "manager") // Hide manager role as requested
+                  .map((role) => (
+                    <TableRow key={role.id}>
+                      <TableCell className="font-medium capitalize">{role.name.replace("_", " ")}</TableCell>
+                      <TableCell className="text-muted-foreground max-w-xs truncate">
+                        {role.description || "—"}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">{role.permissions?.length || 0}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <a
+                          href={`/admin/settings/users?role=${role.name}`}
+                          className="flex items-center gap-1 hover:underline"
                         >
-                          <Trash2 className="text-destructive h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                          <Users className="text-muted-foreground h-4 w-4" />
+                          {role.user_count || 0}
+                        </a>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={role.is_system ? "destructive" : "secondary"}>
+                          {role.is_system ? "System" : "Custom"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button variant="ghost" size="icon" onClick={() => openEdit(role)}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDelete(role)}
+                            disabled={role.is_system}
+                          >
+                            <Trash2 className="text-destructive h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
               </TableBody>
             </Table>
           )}
         </CardContent>
       </Card>
+
+      <DepartmentLeadsManager />
     </div>
   )
 }

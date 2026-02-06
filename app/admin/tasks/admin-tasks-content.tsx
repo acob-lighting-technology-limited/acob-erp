@@ -351,12 +351,7 @@ export function AdminTasksContent({
           content: "Task details updated by admin",
         })
 
-        await supabase.rpc("log_audit", {
-          p_action: "update",
-          p_entity_type: "task",
-          p_entity_id: selectedTask.id,
-          p_new_values: taskData,
-        })
+        // Audit logging handled by database trigger
 
         toast.success("Task updated successfully")
       } else {
@@ -372,12 +367,7 @@ export function AdminTasksContent({
           if (assignError) throw assignError
         }
 
-        await supabase.rpc("log_audit", {
-          p_action: "create",
-          p_entity_type: "task",
-          p_entity_id: newTask.id,
-          p_new_values: taskData,
-        })
+        // Audit logging handled by database trigger
 
         toast.success("Task created successfully")
       }
@@ -404,12 +394,7 @@ export function AdminTasksContent({
       const { error } = await supabase.from("tasks").delete().eq("id", taskToDelete.id)
       if (error) throw error
 
-      await supabase.rpc("log_audit", {
-        p_action: "delete",
-        p_entity_type: "task",
-        p_entity_id: taskToDelete.id,
-        p_old_values: taskToDelete,
-      })
+      // Audit logging handled by database trigger
 
       toast.success("Task deleted successfully")
       setIsDeleteDialogOpen(false)
