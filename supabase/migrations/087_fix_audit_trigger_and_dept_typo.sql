@@ -1,3 +1,4 @@
+-- Fix the audit_log_changes trigger to use correct column names
 CREATE OR REPLACE FUNCTION public.audit_log_changes()
  RETURNS trigger
  LANGUAGE plpgsql
@@ -10,7 +11,6 @@ DECLARE
     v_action TEXT;
     v_entity_type TEXT;
     v_entity_id TEXT;
-    v_metadata JSONB;
 BEGIN
     -- Determine the action
     IF (TG_OP = 'INSERT') THEN
@@ -30,29 +30,23 @@ BEGIN
 
     -- Determine entity type based on table name
     v_entity_type := TG_TABLE_NAME;
-    
-    -- Construct metadata
-    v_metadata := jsonb_build_object(
-        'old_values', v_old_data,
-        'new_values', v_new_data
-    );
 
-    -- Insert into audit_logs
+    -- Insert into audit_logs using correct column names
     INSERT INTO audit_logs (
         user_id,
-        operation,
-        table_name,
-        record_id,
-        metadata,
-        status
+        action,
+        entity_type,
+        entity_id,
+        old_values,
+        new_values
     )
     VALUES (
         auth.uid(),
         v_action,
         v_entity_type,
         v_entity_id,
-        v_metadata,
-        'success'
+        v_old_data,
+        v_new_data
     );
 
     IF (TG_OP = 'DELETE') THEN

@@ -148,13 +148,20 @@ export function DepartmentLeadsManager() {
       const supabase = createClient()
       const user = users.find((u) => u.id === selectedUserId)
 
-      // 1. If department already has a lead, remove them?
+      // 1. If department already has a lead, remove them first
       // "Remember one lead per dept" -> imply replacement
       if (selectedDept.lead_id) {
-        // Demote old lead? Or just remove is_department_lead flag?
-        // Maybe keeping them as 'lead' role but no department attached?
-        // Let's set is_department_lead = false for the old lead.
-        await supabase.from("profiles").update({ is_department_lead: false }).eq("id", selectedDept.lead_id)
+        // Demote old lead - set is_department_lead = false
+        const { error: demoteError } = await supabase
+          .from("profiles")
+          .update({ is_department_lead: false })
+          .eq("id", selectedDept.lead_id)
+
+        if (demoteError) {
+          console.error("Error demoting previous lead:", demoteError)
+          toast.error("Failed to remove current lead - aborting to prevent duplicate leads")
+          return
+        }
       }
 
       // 2. Update new lead

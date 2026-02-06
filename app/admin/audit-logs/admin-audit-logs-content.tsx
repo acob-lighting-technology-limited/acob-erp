@@ -140,10 +140,8 @@ export function AdminAuditLogsContent({
 
   const supabase = createClient()
 
-  // Trigger enrichment on mount
-  useEffect(() => {
-    loadLogs()
-  }, [])
+  // Initial data is provided via props from server component
+  // loadLogs() is available for explicit refresh only - no auto-refetch on mount
 
   // Initial data is now provided via props from server component
   // loadLogs is still available for client-side refresh if needed

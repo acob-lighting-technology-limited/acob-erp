@@ -142,11 +142,19 @@ BEGIN
     -- Determine entity type (use table name)
     v_entity_type := TG_TABLE_NAME;
     
-    -- Extract department from the record if it exists
-    IF (TG_OP = 'DELETE') THEN
-        v_department := OLD.department;
-    ELSE
-        v_department := NEW.department;
+    -- Extract department from the record if the column exists
+    -- First check if the table has a department column to avoid runtime errors
+    PERFORM 1 FROM information_schema.columns 
+    WHERE table_schema = TG_TABLE_SCHEMA 
+    AND table_name = TG_TABLE_NAME 
+    AND column_name = 'department';
+    
+    IF FOUND THEN
+        IF (TG_OP = 'DELETE') THEN
+            v_department := v_old_data ->> 'department';
+        ELSE
+            v_department := v_new_data ->> 'department';
+        END IF;
     END IF;
     
     -- For certain tables, extract department from related fields
@@ -274,10 +282,25 @@ $$;
 -- STEP 4: Update log_audit RPC function for frontend calls
 -- ============================================================================
 
--- Drop the existing function first to avoid signature conflicts
-DROP FUNCTION IF EXISTS log_audit(text, text, uuid, jsonb, jsonb);
-DROP FUNCTION IF EXISTS log_audit(text, text, text, uuid, jsonb, jsonb, jsonb, text);
-DROP FUNCTION IF EXISTS log_audit(text, text, text, uuid, jsonb, jsonb, jsonb, text, text);
+-- Drop ALL existing overloads of log_audit to avoid signature conflicts
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT p.oid, n.nspname as schema_name, p.proname
+        FROM pg_proc p
+        JOIN pg_namespace n ON p.pronamespace = n.oid
+        WHERE p.proname = 'log_audit'
+        AND n.nspname = 'public'
+    LOOP
+        EXECUTE format('DROP FUNCTION IF EXISTS %I.%I(%s) CASCADE',
+            r.schema_name,
+            r.proname,
+            pg_get_function_identity_arguments(r.oid)
+        );
+    END LOOP;
+END $$;
 
 -- Create the improved log_audit function
 CREATE OR REPLACE FUNCTION log_audit(

@@ -77,7 +77,13 @@ function findTriggerClassName(nodes: React.ReactNode): string | undefined {
   return className
 }
 
-const Select = ({ value, onValueChange, disabled, children }: SelectProps & { children?: React.ReactNode }) => {
+const Select = ({
+  value,
+  defaultValue,
+  onValueChange,
+  disabled,
+  children,
+}: SelectProps & { children?: React.ReactNode }) => {
   const placeholder = findPlaceholder(children)
   const triggerClassName = findTriggerClassName(children)
   const items = findSelectItems(children)
@@ -89,10 +95,16 @@ const Select = ({ value, onValueChange, disabled, children }: SelectProps & { ch
     }
   })
 
+  // Handle controlled vs uncontrolled - use defaultValue if value is undefined
+  const effectiveValue = value !== undefined ? (value as string) : (defaultValue as string | undefined)
+
+  // Properly typed handler that avoids unsafe cast
+  const handleValueChange = onValueChange ? (v: string) => onValueChange(v) : undefined
+
   return (
     <SearchableSelect
-      value={(value as string) ?? ""}
-      onValueChange={(onValueChange as (value: string) => void) || (() => {})}
+      value={effectiveValue ?? ""}
+      onValueChange={handleValueChange || (() => {})}
       placeholder={placeholder}
       options={options}
       className={triggerClassName}

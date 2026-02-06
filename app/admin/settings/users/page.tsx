@@ -14,6 +14,14 @@ import { ArrowLeft, Users, Search, Filter, Shield, Pencil, UserPlus } from "luci
 import Link from "next/link"
 import { toast } from "sonner"
 
+// Allowlist of valid roles for validation
+const ALLOWED_ROLES = ["super_admin", "admin", "manager", "employee", "user", "staff", "lead", "visitor"] as const
+type AllowedRole = (typeof ALLOWED_ROLES)[number]
+
+function isValidRole(role: string): role is AllowedRole {
+  return ALLOWED_ROLES.includes(role as AllowedRole)
+}
+
 interface User {
   id: string
   email: string | null
@@ -22,6 +30,7 @@ interface User {
   role: string
   department: string | null
   is_active: boolean
+  employment_status: string
   created_at: string
   last_sign_in?: string | null
 }
@@ -46,11 +55,12 @@ export default function UsersPage() {
   const [roleFilter, setRoleFilter] = useState<string>("all")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
-  const [formData, setFormData] = useState({ role: "", is_active: true })
+  const [formData, setFormData] = useState({ role: "", employment_status: "active" })
 
   useEffect(() => {
     const roleParam = searchParams.get("role")
-    if (roleParam) {
+    // Validate role param against allowlist before using
+    if (roleParam && (roleParam === "all" || isValidRole(roleParam))) {
       setRoleFilter(roleParam)
     }
   }, [searchParams])
@@ -74,6 +84,7 @@ export default function UsersPage() {
         ...u,
         email: u.company_email,
         is_active: u.employment_status === "active",
+        employment_status: u.employment_status || "active",
       }))
 
       setUsers(mappedUsers)
@@ -91,11 +102,14 @@ export default function UsersPage() {
 
     try {
       const supabase = createClient()
+
+      // Use the explicit employment_status from formData instead of deriving from is_active
+      // This preserves 'terminated' status and only changes when explicitly modified
       const { error } = await supabase
         .from("profiles")
         .update({
           role: formData.role,
-          employment_status: formData.is_active ? "active" : "suspended",
+          employment_status: formData.employment_status,
         })
         .eq("id", editingUser.id)
 
@@ -111,7 +125,11 @@ export default function UsersPage() {
 
   function openEdit(user: User) {
     setEditingUser(user)
-    setFormData({ role: user.role, is_active: user.is_active })
+    // Initialize with the user's actual employment_status, not a derived value
+    setFormData({
+      role: user.role,
+      employment_status: user.employment_status || (user.is_active ? "active" : "suspended"),
+    })
     setIsDialogOpen(true)
   }
 
@@ -153,6 +171,7 @@ export default function UsersPage() {
         ...u,
         email: u.company_email,
         is_active: u.employment_status === "active",
+        employment_status: u.employment_status || "active",
       }))
       setAvailableUsers(mappedUsers)
     }
@@ -350,7 +369,11 @@ export default function UsersPage() {
                     <TableCell className="text-muted-foreground">{user.department || "—"}</TableCell>
                     <TableCell>
                       <Badge variant={user.is_active ? "default" : "secondary"}>
-                        {user.is_active ? "Active" : "Inactive"}
+                        {user.employment_status === "terminated"
+                          ? "Terminated"
+                          : user.is_active
+                            ? "Active"
+                            : "Inactive"}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-sm">{formatDate(user.created_at)}</TableCell>
@@ -396,17 +419,18 @@ export default function UsersPage() {
                 </Select>
               </div>
               <div className="flex items-center justify-between">
-                <Label>Active Status</Label>
+                <Label>Employment Status</Label>
                 <Select
-                  value={formData.is_active ? "active" : "inactive"}
-                  onValueChange={(v) => setFormData({ ...formData, is_active: v === "active" })}
+                  value={formData.employment_status}
+                  onValueChange={(v) => setFormData({ ...formData, employment_status: v })}
                 >
                   <SelectTrigger className="w-32">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="inactive">Inactive</SelectItem>
+                    <SelectItem value="suspended">Suspended</SelectItem>
+                    <SelectItem value="terminated">Terminated</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

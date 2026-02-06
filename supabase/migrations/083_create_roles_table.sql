@@ -40,7 +40,8 @@ VALUES
   ('visitor', 'Read-only guest access', ARRAY[]::TEXT[], true)
 ON CONFLICT (name) DO UPDATE SET 
   permissions = EXCLUDED.permissions,
-  description = EXCLUDED.description;
+  description = EXCLUDED.description,
+  is_system = EXCLUDED.is_system;
 
 -- Function to update timestamp
 CREATE TRIGGER update_roles_updated_at BEFORE UPDATE ON roles

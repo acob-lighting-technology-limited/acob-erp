@@ -65,6 +65,68 @@ export function SearchableSelect({
     setResolvedPortal(!inDialog)
   }, [portal, open])
 
+  // Shared content component to avoid duplication
+  const renderContent = () => (
+    <>
+      <div className="border-b p-2">
+        <div className="relative">
+          <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2 z-10 h-4 w-4 -translate-y-1/2 transform" />
+          <Input
+            ref={inputRef}
+            placeholder={searchPlaceholder}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="h-8 pl-8"
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => {
+              e.stopPropagation()
+              if (e.key === "Escape") {
+                setOpen(false)
+              }
+            }}
+            onMouseDown={(e) => e.stopPropagation()}
+          />
+        </div>
+      </div>
+      <div className="max-h-[250px] overflow-y-auto p-1" onMouseDown={(e) => e.stopPropagation()}>
+        {filteredOptions.length > 0 ? (
+          filteredOptions.map((option) => {
+            const isSelected = option.value === value
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => {
+                  onValueChange(option.value)
+                  setSearchQuery("")
+                  setOpen(false)
+                }}
+                className={cn(
+                  "focus:bg-accent focus:text-accent-foreground relative flex w-full items-center rounded-sm py-1.5 pr-8 pl-2 text-sm outline-none",
+                  "hover:bg-accent hover:text-accent-foreground",
+                  isSelected && "bg-accent/50"
+                )}
+              >
+                <span className="absolute right-2 flex h-3.5 w-3.5 items-center justify-center">
+                  {isSelected && <Check className="h-4 w-4" />}
+                </span>
+                <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
+                  {option.icon && <span className="flex-shrink-0">{option.icon}</span>}
+                  <span className="truncate">{option.label}</span>
+                </div>
+              </button>
+            )
+          })
+        ) : (
+          <div className="text-muted-foreground py-6 text-center text-sm">No results found</div>
+        )}
+      </div>
+    </>
+  )
+
+  const contentClassName =
+    "bg-popover text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 relative z-50 max-h-[300px] w-[var(--radix-popover-trigger-width)] overflow-hidden rounded-md border shadow-md"
+
   return (
     <PopoverPrimitive.Root open={open} onOpenChange={setOpen}>
       <PopoverPrimitive.Trigger asChild>
@@ -87,7 +149,7 @@ export function SearchableSelect({
       {resolvedPortal ? (
         <PopoverPrimitive.Portal>
           <PopoverPrimitive.Content
-            className="bg-popover text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 relative z-50 max-h-[300px] w-[var(--radix-popover-trigger-width)] overflow-hidden rounded-md border shadow-md"
+            className={contentClassName}
             align="start"
             onOpenAutoFocus={(event) => {
               event.preventDefault()
@@ -95,71 +157,15 @@ export function SearchableSelect({
             onCloseAutoFocus={(event) => {
               event.preventDefault()
             }}
-            onPointerDownOutside={(event) => {
-              event.preventDefault()
-            }}
-            onFocusOutside={(event) => {
-              event.preventDefault()
-            }}
+            // Removed onPointerDownOutside and onFocusOutside preventDefault
+            // to restore default outside-click dismissal behavior
           >
-            <div className="border-b p-2">
-              <div className="relative">
-                <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2 z-10 h-4 w-4 -translate-y-1/2 transform" />
-                <Input
-                  ref={inputRef}
-                  placeholder={searchPlaceholder}
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="h-8 pl-8"
-                  onClick={(e) => e.stopPropagation()}
-                  onKeyDown={(e) => {
-                    e.stopPropagation()
-                    if (e.key === "Escape") {
-                      setOpen(false)
-                    }
-                  }}
-                  onMouseDown={(e) => e.stopPropagation()}
-                />
-              </div>
-            </div>
-            <div className="max-h-[250px] overflow-y-auto p-1" onMouseDown={(e) => e.stopPropagation()}>
-              {filteredOptions.length > 0 ? (
-                filteredOptions.map((option) => {
-                  const isSelected = option.value === value
-                  return (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={() => {
-                        onValueChange(option.value)
-                        setSearchQuery("")
-                        setOpen(false)
-                      }}
-                      className={cn(
-                        "focus:bg-accent focus:text-accent-foreground relative flex w-full items-center rounded-sm py-1.5 pr-8 pl-2 text-sm outline-none",
-                        "hover:bg-accent hover:text-accent-foreground",
-                        isSelected && "bg-accent/50"
-                      )}
-                    >
-                      <span className="absolute right-2 flex h-3.5 w-3.5 items-center justify-center">
-                        {isSelected && <Check className="h-4 w-4" />}
-                      </span>
-                      <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
-                        {option.icon && <span className="flex-shrink-0">{option.icon}</span>}
-                        <span className="truncate">{option.label}</span>
-                      </div>
-                    </button>
-                  )
-                })
-              ) : (
-                <div className="text-muted-foreground py-6 text-center text-sm">No results found</div>
-              )}
-            </div>
+            {renderContent()}
           </PopoverPrimitive.Content>
         </PopoverPrimitive.Portal>
       ) : (
         <PopoverPrimitive.Content
-          className="bg-popover text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 relative z-50 max-h-[300px] w-[var(--radix-popover-trigger-width)] overflow-hidden rounded-md border shadow-md"
+          className={contentClassName}
           align="start"
           onOpenAutoFocus={(event) => {
             event.preventDefault()
@@ -167,66 +173,10 @@ export function SearchableSelect({
           onCloseAutoFocus={(event) => {
             event.preventDefault()
           }}
-          onPointerDownOutside={(event) => {
-            event.preventDefault()
-          }}
-          onFocusOutside={(event) => {
-            event.preventDefault()
-          }}
+          // Removed onPointerDownOutside and onFocusOutside preventDefault
+          // to restore default outside-click dismissal behavior
         >
-          <div className="border-b p-2">
-            <div className="relative">
-              <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2 z-10 h-4 w-4 -translate-y-1/2 transform" />
-              <Input
-                ref={inputRef}
-                placeholder={searchPlaceholder}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-8 pl-8"
-                onClick={(e) => e.stopPropagation()}
-                onKeyDown={(e) => {
-                  e.stopPropagation()
-                  if (e.key === "Escape") {
-                    setOpen(false)
-                  }
-                }}
-                onMouseDown={(e) => e.stopPropagation()}
-              />
-            </div>
-          </div>
-          <div className="max-h-[250px] overflow-y-auto p-1" onMouseDown={(e) => e.stopPropagation()}>
-            {filteredOptions.length > 0 ? (
-              filteredOptions.map((option) => {
-                const isSelected = option.value === value
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => {
-                      onValueChange(option.value)
-                      setSearchQuery("")
-                      setOpen(false)
-                    }}
-                    className={cn(
-                      "focus:bg-accent focus:text-accent-foreground relative flex w-full items-center rounded-sm py-1.5 pr-8 pl-2 text-sm outline-none",
-                      "hover:bg-accent hover:text-accent-foreground",
-                      isSelected && "bg-accent/50"
-                    )}
-                  >
-                    <span className="absolute right-2 flex h-3.5 w-3.5 items-center justify-center">
-                      {isSelected && <Check className="h-4 w-4" />}
-                    </span>
-                    <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
-                      {option.icon && <span className="flex-shrink-0">{option.icon}</span>}
-                      <span className="truncate">{option.label}</span>
-                    </div>
-                  </button>
-                )
-              })
-            ) : (
-              <div className="text-muted-foreground py-6 text-center text-sm">No results found</div>
-            )}
-          </div>
+          {renderContent()}
         </PopoverPrimitive.Content>
       )}
     </PopoverPrimitive.Root>

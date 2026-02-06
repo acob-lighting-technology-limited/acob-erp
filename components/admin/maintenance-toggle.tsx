@@ -5,11 +5,11 @@ import { createClient } from "@/lib/supabase/client"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
-import { AlertCircle } from "lucide-react"
 
 export function MaintenanceToggle() {
   const [enabled, setEnabled] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [updating, setUpdating] = useState(false)
 
   useEffect(() => {
     fetchSettings()
@@ -38,25 +38,38 @@ export function MaintenanceToggle() {
   }
 
   async function handleToggle(checked: boolean) {
-    const supabase = createClient()
-    const newValue = {
-      enabled: checked,
-      message: "System is under maintenance. Please check back later.",
-    }
+    // Prevent overlapping requests
+    if (updating) return
 
-    const { error } = await supabase.from("system_settings").upsert({
-      key: "maintenance_mode",
-      value: newValue,
-    })
+    setUpdating(true)
+    try {
+      const supabase = createClient()
+      const newValue = {
+        enabled: checked,
+        message: "System is under maintenance. Please check back later.",
+      }
 
-    if (error) {
+      const { error } = await supabase.from("system_settings").upsert({
+        key: "maintenance_mode",
+        value: newValue,
+      })
+
+      if (error) {
+        toast.error("Failed to update maintenance mode")
+        console.error(error)
+        // Revert state
+        setEnabled(!checked)
+      } else {
+        setEnabled(checked)
+        toast.success(checked ? "Maintenance mode enabled" : "Maintenance mode disabled")
+      }
+    } catch (error) {
+      console.error("Error toggling maintenance mode:", error)
       toast.error("Failed to update maintenance mode")
-      console.error(error)
       // Revert state
       setEnabled(!checked)
-    } else {
-      setEnabled(checked)
-      toast.success(checked ? "Maintenance mode enabled" : "Maintenance mode disabled")
+    } finally {
+      setUpdating(false)
     }
   }
 
@@ -72,7 +85,7 @@ export function MaintenanceToggle() {
             : "System is active and accessible to all users."}
         </p>
       </div>
-      <Switch id="maintenance-mode" checked={enabled} onCheckedChange={handleToggle} disabled={loading} />
+      <Switch id="maintenance-mode" checked={enabled} onCheckedChange={handleToggle} disabled={loading || updating} />
     </div>
   )
 }

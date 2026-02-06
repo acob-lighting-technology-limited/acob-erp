@@ -2,6 +2,16 @@ import { createClient } from "@/lib/supabase/server"
 import { createClient as createAdminClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
 
+// Allowlist of valid roles
+const ALLOWED_ROLES = ["admin", "manager", "employee", "user", "staff", "lead", "visitor"] as const
+const SUPER_ADMIN_ROLE = "super_admin"
+
+type AllowedRole = (typeof ALLOWED_ROLES)[number] | typeof SUPER_ADMIN_ROLE
+
+function isValidRole(role: string): role is AllowedRole {
+  return role === SUPER_ADMIN_ROLE || ALLOWED_ROLES.includes(role as (typeof ALLOWED_ROLES)[number])
+}
+
 export async function POST(request: Request) {
   try {
     const supabase = await createClient()
@@ -15,7 +25,7 @@ export async function POST(request: Request) {
     }
 
     const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
-    if (!["super_admin", "admin"].includes(profile?.role)) {
+    if (![SUPER_ADMIN_ROLE, "admin"].includes(profile?.role)) {
       return NextResponse.json({ error: "Forbidden: Admin access required" }, { status: 403 })
     }
 
@@ -26,7 +36,21 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Email is required" }, { status: 400 })
     }
 
-    // 3. Create admin client
+    // 3. Validate role against allowlist
+    const requestedRole = role || "employee"
+    if (!isValidRole(requestedRole)) {
+      return NextResponse.json({ error: `Invalid role: ${requestedRole}` }, { status: 400 })
+    }
+
+    // 4. Only super_admin can assign super_admin role
+    if (requestedRole === SUPER_ADMIN_ROLE && profile?.role !== SUPER_ADMIN_ROLE) {
+      return NextResponse.json(
+        { error: "Forbidden: Only Super Admins can assign the super_admin role" },
+        { status: 403 }
+      )
+    }
+
+    // 5. Create admin client
     const supabaseAdmin = createAdminClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -38,12 +62,38 @@ export async function POST(request: Request) {
       }
     )
 
-    // 4. Update profile if user exists, else invite
-    // Check if user exists in Auth
-    const { data: existingUsers, error: searchError } = await supabaseAdmin.auth.admin.listUsers()
-    const existingUser = existingUsers?.users.find((u) => u.email?.toLowerCase() === email.toLowerCase())
+    // 6. Check if user exists with pagination
+    let existingUser = null
+    let page = 1
+    const perPage = 1000
 
-    let userId
+    while (true) {
+      const { data: usersPage, error: searchError } = await supabaseAdmin.auth.admin.listUsers({
+        page,
+        perPage,
+      })
+
+      if (searchError) {
+        console.error("Error listing users:", searchError)
+        return NextResponse.json({ error: "Failed to check existing users" }, { status: 500 })
+      }
+
+      // Find matching user (case-insensitive)
+      const matchedUser = usersPage.users.find((u) => u.email?.toLowerCase() === email.toLowerCase())
+      if (matchedUser) {
+        existingUser = matchedUser
+        break
+      }
+
+      // If we got fewer users than perPage, we've reached the end
+      if (usersPage.users.length < perPage) {
+        break
+      }
+
+      page++
+    }
+
+    let userId: string
 
     if (existingUser) {
       // User exists in Auth, just ensure profile is updated
@@ -58,19 +108,13 @@ export async function POST(request: Request) {
       userId = inviteData.user.id
     }
 
-    // 5. Create/Update Profile
-    // We update the profile using the admin client to bypass "update own profile" RLS if needed,
-    // or just to ensure it works even if the user hasn't accepted invite yet.
-    // However, our profiles table might have RLS that admin can write to.
-    // Let's use `supabase` (authed admin) if RLS allows, otherwise `supabaseAdmin`.
-    // We already established admin can write to profiles.
-
+    // 7. Create/Update Profile with validated role
     const { error: profileError } = await supabaseAdmin.from("profiles").upsert({
       id: userId,
       email,
       first_name,
       last_name,
-      role: role || "employee",
+      role: requestedRole,
       department,
       is_active: true,
     })
