@@ -16,6 +16,9 @@ interface SearchableSelectProps {
   className?: string
   disabled?: boolean
   portal?: boolean
+  open?: boolean
+  defaultOpen?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
 export function SearchableSelect({
@@ -28,9 +31,23 @@ export function SearchableSelect({
   className,
   disabled = false,
   portal,
+  open: controlledOpen,
+  defaultOpen,
+  onOpenChange,
 }: SearchableSelectProps) {
   const [searchQuery, setSearchQuery] = React.useState("")
-  const [open, setOpen] = React.useState(false)
+  const [uncontrolledOpen, setUncontrolledOpen] = React.useState(defaultOpen ?? false)
+  const open = controlledOpen !== undefined ? controlledOpen : uncontrolledOpen
+
+  const setOpen = React.useCallback(
+    (newOpen: boolean) => {
+      if (controlledOpen === undefined) {
+        setUncontrolledOpen(newOpen)
+      }
+      onOpenChange?.(newOpen)
+    },
+    [controlledOpen, onOpenChange]
+  )
   const inputRef = React.useRef<HTMLInputElement>(null)
   const triggerRef = React.useRef<HTMLButtonElement>(null)
   const [resolvedPortal, setResolvedPortal] = React.useState<boolean>(portal ?? true)

@@ -104,21 +104,30 @@ export function DepartmentLeadsManager() {
     setSelectedDept(dept)
     setSelectedUserId("")
     setConfirmWarning(null)
-    setIsDialogOpen(true)
 
-    // Fetch potential leads (active users, not admins/super_admins usually?
+    // Fetch potential leads (active users, not admins/super_admins usually?)
     // Or anyone can be lead? Usually staff/leads.
     // User said "Team Lead" is a role.
-    const supabase = createClient()
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("id, first_name, last_name, company_email, role, department, is_department_lead")
-      .eq("employment_status", "active")
-      .neq("role", "visitor") // Exclude visitors
-      .order("first_name")
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, first_name, last_name, company_email, role, department, is_department_lead")
+        .eq("employment_status", "active")
+        .neq("role", "visitor") // Exclude visitors
+        .order("first_name")
 
-    if (data) {
+      if (error) {
+        console.error("Error fetching potential leads:", error)
+        toast.error("Failed to load potential leads. Please try again.")
+        return
+      }
+
       setUsers(data as Profile[])
+      setIsDialogOpen(true)
+    } catch (err) {
+      console.error("Unexpected error in openAssignDialog:", err)
+      toast.error("An unexpected error occurred.")
     }
   }
 

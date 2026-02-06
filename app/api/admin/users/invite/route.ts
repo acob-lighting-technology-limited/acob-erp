@@ -109,15 +109,18 @@ export async function POST(request: Request) {
     }
 
     // 7. Create/Update Profile with validated role
-    const { error: profileError } = await supabaseAdmin.from("profiles").upsert({
+    const profilePayload: any = {
       id: userId,
       email,
-      first_name,
-      last_name,
       role: requestedRole,
-      department,
       is_active: true,
-    })
+    }
+
+    if (first_name !== undefined) profilePayload.first_name = first_name
+    if (last_name !== undefined) profilePayload.last_name = last_name
+    if (department !== undefined) profilePayload.department = department
+
+    const { error: profileError } = await supabaseAdmin.from("profiles").upsert(profilePayload)
 
     if (profileError) {
       throw profileError

@@ -103,6 +103,23 @@ export default function UsersPage() {
     try {
       const supabase = createClient()
 
+      // Security Check: Only super_admin can assign super_admin role
+      if (formData.role === "super_admin") {
+        const {
+          data: { user: currentUser },
+        } = await supabase.auth.getUser()
+        const { data: currentUserProfile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", currentUser?.id)
+          .single()
+
+        if (currentUserProfile?.role !== "super_admin") {
+          toast.error("Only Super Admins can assign the Super Admin role.")
+          return
+        }
+      }
+
       // Use the explicit employment_status from formData instead of deriving from is_active
       // This preserves 'terminated' status and only changes when explicitly modified
       const { error } = await supabase
@@ -218,7 +235,20 @@ export default function UsersPage() {
         return
       }
 
-      // 2. Security Check: Admin cannot assign Super Admin role (unless they are super admin?)
+      // 2. Security Check: Only super_admin can assign super_admin role
+      if (roleFilter === "super_admin") {
+        const { data: currentUserProfile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", currentUser?.id)
+          .single()
+
+        if (currentUserProfile?.role !== "super_admin") {
+          toast.error("Only Super Admins can assign the Super Admin role.")
+          return
+        }
+      }
+
       // Assuming only super_admin can create super_admins.
       // For now, let's assume standard checks via RLS or backend.
 

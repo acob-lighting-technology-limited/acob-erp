@@ -82,6 +82,9 @@ const Select = ({
   defaultValue,
   onValueChange,
   disabled,
+  open,
+  defaultOpen,
+  onOpenChange,
   children,
 }: SelectProps & { children?: React.ReactNode }) => {
   const placeholder = findPlaceholder(children)
@@ -109,6 +112,9 @@ const Select = ({
       options={options}
       className={triggerClassName}
       disabled={disabled}
+      open={open}
+      defaultOpen={defaultOpen}
+      onOpenChange={onOpenChange}
     />
   )
 }

@@ -34,7 +34,33 @@ ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS ip_address INET;
 ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS user_agent TEXT;
 
 -- ============================================================================
--- STEP 2: Create indexes for common query patterns
+-- STEP 2: Ensure audit_logs table has all necessary internal/legacy columns
+-- ============================================================================
+
+DO $$ 
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'audit_logs' AND column_name = 'operation') THEN
+        ALTER TABLE audit_logs ADD COLUMN operation TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'audit_logs' AND column_name = 'table_name') THEN
+        ALTER TABLE audit_logs ADD COLUMN table_name TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'audit_logs' AND column_name = 'record_id') THEN
+        ALTER TABLE audit_logs ADD COLUMN record_id TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'audit_logs' AND column_name = 'metadata') THEN
+        ALTER TABLE audit_logs ADD COLUMN metadata JSONB;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'audit_logs' AND column_name = 'status') THEN
+        ALTER TABLE audit_logs ADD COLUMN status TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'audit_logs' AND column_name = 'error_details') THEN
+        ALTER TABLE audit_logs ADD COLUMN error_details TEXT;
+    END IF;
+END $$;
+
+-- ============================================================================
+-- STEP 3: Create indexes for common query patterns
 -- ============================================================================
 
 -- Index for querying by action type
@@ -57,7 +83,7 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_dashboard
 ON audit_logs(created_at DESC, entity_type, action);
 
 -- ============================================================================
--- STEP 3: Create improved audit_log_changes function
+-- STEP 4: Create improved audit_log_changes function
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION audit_log_changes()
@@ -279,7 +305,7 @@ END;
 $$;
 
 -- ============================================================================
--- STEP 4: Update log_audit RPC function for frontend calls
+-- STEP 5: Update log_audit RPC function for frontend calls
 -- ============================================================================
 
 -- Drop ALL existing overloads of log_audit to avoid signature conflicts
@@ -372,7 +398,7 @@ END;
 $$;
 
 -- ============================================================================
--- STEP 5: Backfill department data for existing audit logs where possible
+-- STEP 6: Backfill department data for existing audit logs where possible
 -- ============================================================================
 
 -- Update department from metadata for asset-related logs
@@ -426,14 +452,14 @@ END
 WHERE action IS NULL AND operation IS NOT NULL;
 
 -- ============================================================================
--- STEP 6: Grant permissions
+-- STEP 7: Grant permissions
 -- ============================================================================
 
 GRANT EXECUTE ON FUNCTION log_audit TO authenticated;
 GRANT EXECUTE ON FUNCTION audit_log_changes TO authenticated;
 
 -- ============================================================================
--- STEP 7: Add comment for documentation
+-- STEP 8: Add comment for documentation
 -- ============================================================================
 
 COMMENT ON FUNCTION audit_log_changes IS 
