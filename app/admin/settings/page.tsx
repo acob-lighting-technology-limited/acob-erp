@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils"
 import { Settings, Users, Building2, Shield } from "lucide-react"
 import Link from "next/link"
 import { PageHeader, PageWrapper } from "@/components/layout"
+import { MaintenanceToggle } from "@/components/admin/maintenance-toggle"
 
 export default async function AdminSettingsPage() {
   const supabase = await createClient()
@@ -82,6 +83,20 @@ export default async function AdminSettingsPage() {
             <Link href="/admin/settings/company" className={cn(buttonVariants({ variant: "default" }), "w-full")}>
               Company Profile
             </Link>
+          </CardContent>
+        </Card>
+
+        {/* System Settings */}
+        <Card className="md:col-span-2 lg:col-span-3">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Settings className="h-5 w-5" />
+              System Settings
+            </CardTitle>
+            <CardDescription>Global system configuration</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <MaintenanceToggle />
           </CardContent>
         </Card>
       </div>

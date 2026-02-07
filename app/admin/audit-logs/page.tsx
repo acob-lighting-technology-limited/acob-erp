@@ -54,11 +54,73 @@ async function getAuditLogsData() {
 
     const usersMap = new Map(usersData?.map((u) => [u.id, u]))
 
-    // Add user info to logs (simplified for SSR - detailed info loaded client-side)
-    logs = logsData.map((log) => ({
-      ...log,
-      user: log.user_id ? usersMap.get(log.user_id) : null,
-    })) as AuditLog[]
+    // Add user info to logs and map database columns to UI interface
+    logs = logsData.map((log: any) => {
+      // Prefer new dedicated columns, fall back to metadata for backward compatibility
+      // Handle potential JSON string values and empty objects
+      let new_values = log.new_values
+      let old_values = log.old_values
+
+      // Parse if string (in case of serialization issues)
+      if (typeof new_values === "string") {
+        try {
+          new_values = JSON.parse(new_values)
+        } catch {
+          new_values = null
+        }
+      }
+      if (typeof old_values === "string") {
+        try {
+          old_values = JSON.parse(old_values)
+        } catch {
+          old_values = null
+        }
+      }
+
+      // Fall back to metadata if new_values is null/undefined/empty
+      const hasNewValues = new_values && Object.keys(new_values).length > 0
+      const hasOldValues = old_values && Object.keys(old_values).length > 0
+
+      if (!hasNewValues && log.metadata?.new_values) {
+        new_values = log.metadata.new_values
+      }
+      if (!hasOldValues && log.metadata?.old_values) {
+        old_values = log.metadata.old_values
+      }
+
+      // Ensure we have objects
+      new_values = new_values || {}
+      old_values = old_values || {}
+
+      const entity_type = (log.entity_type || log.table_name || "unknown").toLowerCase()
+      const entity_id = log.entity_id || log.record_id
+      const action = log.action || log.operation || "unknown"
+      const department = log.department || new_values.department || old_values.department || null
+      const changed_fields = log.changed_fields || []
+
+      return {
+        id: log.id,
+        user_id: log.user_id,
+        action,
+        entity_type,
+        entity_id,
+        old_values,
+        new_values,
+        created_at: log.created_at,
+        department,
+        changed_fields,
+        user: log.user_id ? usersMap.get(log.user_id) : null,
+        // Pre-extract unique_code if available in metadata to avoid flash
+        asset_info:
+          new_values.unique_code || old_values.unique_code
+            ? {
+                unique_code: new_values.unique_code || old_values.unique_code,
+                serial_number: new_values.serial_number || old_values.serial_number,
+                asset_name: new_values.asset_name || old_values.asset_name,
+              }
+            : null,
+      }
+    }) as AuditLog[]
   }
 
   // Load staff for filter
@@ -74,11 +136,13 @@ async function getAuditLogsData() {
   const { data: staffData } = await staffQuery
   staff = staffData || []
 
-  // Get unique departments
+  // Get unique departments from audit logs department column and staff profiles
+  const logDepartments = logsData?.map((log: any) => log.department).filter(Boolean) || []
   if (profile.role === "lead" && profile.lead_departments && profile.lead_departments.length > 0) {
     departments = profile.lead_departments.sort()
   } else {
-    departments = Array.from(new Set(staffData?.map((s: any) => s.department).filter(Boolean))) as string[]
+    const staffDepartments = staffData?.map((s: any) => s.department).filter(Boolean) || []
+    departments = Array.from(new Set([...staffDepartments, ...logDepartments])) as string[]
     departments.sort()
   }
 

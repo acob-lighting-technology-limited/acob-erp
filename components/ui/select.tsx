@@ -3,10 +3,121 @@
 import * as React from "react"
 import * as SelectPrimitive from "@radix-ui/react-select"
 import { Check, ChevronDown, ChevronUp } from "lucide-react"
+import { SearchableSelect } from "@/components/ui/searchable-select"
 
 import { cn } from "@/lib/utils"
 
-const Select = SelectPrimitive.Root
+type SelectProps = React.ComponentPropsWithoutRef<typeof SelectPrimitive.Root>
+
+function getNodeText(node: React.ReactNode): string {
+  if (node === null || node === undefined || typeof node === "boolean") return ""
+  if (typeof node === "string" || typeof node === "number") return String(node)
+  if (Array.isArray(node)) return node.map(getNodeText).join("")
+  if (React.isValidElement(node)) return getNodeText(node.props.children)
+  return ""
+}
+
+function findSelectItems(nodes: React.ReactNode): React.ReactElement[] {
+  const items: React.ReactElement[] = []
+  React.Children.forEach(nodes, (child) => {
+    if (!React.isValidElement(child)) return
+    const typeAny = child.type as any
+    const isItem =
+      typeAny === SelectItem ||
+      typeAny?.displayName === SelectItem.displayName ||
+      String(typeAny?.displayName || "").includes("SelectItem")
+    if (isItem) {
+      items.push(child)
+      return
+    }
+    if (child.props?.children) {
+      items.push(...findSelectItems(child.props.children))
+    }
+  })
+  return items
+}
+
+function findPlaceholder(nodes: React.ReactNode): string | undefined {
+  let placeholder: string | undefined
+  React.Children.forEach(nodes, (child) => {
+    if (!React.isValidElement(child)) return
+    const typeAny = child.type as any
+    const isValue =
+      typeAny === SelectValue ||
+      typeAny?.displayName === SelectValue.displayName ||
+      String(typeAny?.displayName || "").includes("SelectValue")
+    if (isValue && typeof child.props?.placeholder === "string") {
+      placeholder = child.props.placeholder
+      return
+    }
+    if (child.props?.children && placeholder === undefined) {
+      placeholder = findPlaceholder(child.props.children)
+    }
+  })
+  return placeholder
+}
+
+function findTriggerClassName(nodes: React.ReactNode): string | undefined {
+  let className: string | undefined
+  React.Children.forEach(nodes, (child) => {
+    if (!React.isValidElement(child)) return
+    const typeAny = child.type as any
+    const isTrigger =
+      typeAny === SelectTrigger ||
+      typeAny?.displayName === SelectTrigger.displayName ||
+      String(typeAny?.displayName || "").includes("SelectTrigger")
+    if (isTrigger && typeof child.props?.className === "string") {
+      className = child.props.className
+      return
+    }
+    if (child.props?.children && className === undefined) {
+      className = findTriggerClassName(child.props.children)
+    }
+  })
+  return className
+}
+
+const Select = ({
+  value,
+  defaultValue,
+  onValueChange,
+  disabled,
+  open,
+  defaultOpen,
+  onOpenChange,
+  children,
+}: SelectProps & { children?: React.ReactNode }) => {
+  const placeholder = findPlaceholder(children)
+  const triggerClassName = findTriggerClassName(children)
+  const items = findSelectItems(children)
+  const options = items.map((item) => {
+    const labelText = getNodeText(item.props.children)
+    return {
+      value: item.props.value as string,
+      label: labelText || String(item.props.value),
+    }
+  })
+
+  // Handle controlled vs uncontrolled - use defaultValue if value is undefined
+  const effectiveValue = value !== undefined ? (value as string) : (defaultValue as string | undefined)
+
+  // Properly typed handler that avoids unsafe cast
+  const handleValueChange = onValueChange ? (v: string) => onValueChange(v) : undefined
+
+  return (
+    <SearchableSelect
+      value={effectiveValue ?? ""}
+      onValueChange={handleValueChange || (() => {})}
+      placeholder={placeholder}
+      options={options}
+      className={triggerClassName}
+      disabled={disabled}
+      open={open}
+      defaultOpen={defaultOpen}
+      onOpenChange={onOpenChange}
+    />
+  )
+}
 
 const SelectGroup = SelectPrimitive.Group
 

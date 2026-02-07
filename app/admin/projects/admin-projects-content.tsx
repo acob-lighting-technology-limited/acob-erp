@@ -185,12 +185,7 @@ export function AdminProjectsContent({ initialProjects, initialStaff }: AdminPro
         const { error } = await supabase.from("projects").update(projectData).eq("id", selectedProject.id)
         if (error) throw error
 
-        await supabase.rpc("log_audit", {
-          p_action: "update",
-          p_entity_type: "project",
-          p_entity_id: selectedProject.id,
-          p_new_values: projectData,
-        })
+        // Audit logging handled by database trigger
 
         toast.success("Project updated successfully")
       } else {
@@ -200,12 +195,7 @@ export function AdminProjectsContent({ initialProjects, initialStaff }: AdminPro
         })
         if (error) throw error
 
-        await supabase.rpc("log_audit", {
-          p_action: "create",
-          p_entity_type: "project",
-          p_entity_id: null,
-          p_new_values: projectData,
-        })
+        // Audit logging handled by database trigger
 
         toast.success("Project created successfully")
       }
@@ -228,12 +218,7 @@ export function AdminProjectsContent({ initialProjects, initialStaff }: AdminPro
       const { error } = await supabase.from("projects").delete().eq("id", projectToDelete.id)
       if (error) throw error
 
-      await supabase.rpc("log_audit", {
-        p_action: "delete",
-        p_entity_type: "project",
-        p_entity_id: projectToDelete.id,
-        p_old_values: projectToDelete,
-      })
+      // Audit logging handled by database trigger
 
       toast.success("Project deleted successfully")
       setIsDeleteDialogOpen(false)
