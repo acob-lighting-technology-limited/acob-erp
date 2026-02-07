@@ -47,6 +47,7 @@ export function DepartmentLeadsManager() {
   const [users, setUsers] = useState<Profile[]>([])
   const [selectedUserId, setSelectedUserId] = useState<string>("")
   const [confirmWarning, setConfirmWarning] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
     fetchData()
@@ -152,6 +153,7 @@ export function DepartmentLeadsManager() {
 
   async function handleAssign() {
     if (!selectedDept || !selectedUserId) return
+    setIsSubmitting(true)
 
     try {
       const supabase = createClient()
@@ -198,6 +200,8 @@ export function DepartmentLeadsManager() {
     } catch (error: any) {
       console.error("Error assigning lead:", error)
       toast.error(error.message || "Failed to assign lead")
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -294,8 +298,8 @@ export function DepartmentLeadsManager() {
               <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleAssign} disabled={!selectedUserId}>
-                Confirm Assignment
+              <Button onClick={handleAssign} disabled={!selectedUserId || isSubmitting}>
+                {isSubmitting ? "Assigning..." : "Confirm Assignment"}
               </Button>
             </DialogFooter>
           </DialogContent>

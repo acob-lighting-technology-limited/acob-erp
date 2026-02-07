@@ -30,11 +30,16 @@ export async function POST(request: Request) {
     }
 
     // 2. Parse body
-    const { email, first_name, last_name, role, department } = await request.json()
+    const { email: rawEmail, first_name, last_name, role, department } = await request.json()
 
+    if (typeof rawEmail !== "string") {
+      return NextResponse.json({ error: "Email is required" }, { status: 400 })
+    }
+    const email = rawEmail.trim()
     if (!email) {
       return NextResponse.json({ error: "Email is required" }, { status: 400 })
     }
+    const emailNormalized = email.toLowerCase()
 
     // 3. Validate role against allowlist
     const requestedRole = role || "employee"
@@ -79,7 +84,7 @@ export async function POST(request: Request) {
       }
 
       // Find matching user (case-insensitive)
-      const matchedUser = usersPage.users.find((u) => u.email?.toLowerCase() === email.toLowerCase())
+      const matchedUser = usersPage.users.find((u) => u.email?.toLowerCase() === emailNormalized)
       if (matchedUser) {
         existingUser = matchedUser
         break
@@ -100,7 +105,7 @@ export async function POST(request: Request) {
       userId = existingUser.id
     } else {
       // Invite user
-      const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email)
+      const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(emailNormalized)
 
       if (inviteError) {
         throw inviteError
@@ -111,7 +116,7 @@ export async function POST(request: Request) {
     // 7. Create/Update Profile with validated role
     const profilePayload: any = {
       id: userId,
-      email,
+      email: emailNormalized,
       role: requestedRole,
       is_active: true,
     }
@@ -129,6 +134,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, userId })
   } catch (error: any) {
     console.error("Invite error:", error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
