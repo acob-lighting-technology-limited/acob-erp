@@ -159,38 +159,12 @@ export function DepartmentLeadsManager() {
       const supabase = createClient()
       const user = users.find((u) => u.id === selectedUserId)
 
-      // 1. If department already has a lead, remove them first
-      // "Remember one lead per dept" -> imply replacement
-      if (selectedDept.lead_id) {
-        // Demote old lead - set is_department_lead = false
-        const { error: demoteError } = await supabase
-          .from("profiles")
-          .update({ is_department_lead: false })
-          .eq("id", selectedDept.lead_id)
-
-        if (demoteError) {
-          console.error("Error demoting previous lead:", demoteError)
-          toast.error("Failed to remove current lead - aborting to prevent duplicate leads")
-          return
-        }
-      }
-
-      // 2. Update new lead
-      // Set role = 'lead'
-      // Set department = selectedDept.name (since schema uses name currently)
-      // Set is_department_lead = true
-      // Set department_id = selectedDept.id (for future proofing)
-
-      const { error } = await supabase
-        .from("profiles")
-        .update({
-          role: "lead",
-          department: selectedDept.name,
-          // department_id: selectedDept.id, // Uncomment if column exists and is writable
-          is_department_lead: true,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", selectedUserId)
+      // Use RPC for atomic demote/promote/assign operation
+      // This ensures data consistency (atomic transaction)
+      const { error } = await supabase.rpc("assign_department_lead", {
+        p_department_id: selectedDept.id,
+        p_new_lead_id: selectedUserId,
+      })
 
       if (error) throw error
 

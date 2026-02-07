@@ -24,7 +24,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
+    const { data: profile, error: profileFetchError } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single()
+
+    if (profileFetchError) {
+      console.error("Error fetching requester profile:", profileFetchError)
+      return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    }
+
     if (![SUPER_ADMIN_ROLE, "admin"].includes(profile?.role)) {
       return NextResponse.json({ error: "Forbidden: Admin access required" }, { status: 403 })
     }
