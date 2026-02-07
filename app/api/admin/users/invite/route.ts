@@ -52,13 +52,13 @@ export async function POST(request: Request) {
     const emailNormalized = email.toLowerCase()
 
     // 3. Validate role against allowlist
-    const requestedRole = role || "employee"
-    if (!isValidRole(requestedRole)) {
-      return NextResponse.json({ error: `Invalid role: ${requestedRole}` }, { status: 400 })
+    const roleProvided = role !== undefined
+    if (roleProvided && !isValidRole(role)) {
+      return NextResponse.json({ error: `Invalid role: ${role}` }, { status: 400 })
     }
 
     // 4. Only super_admin can assign super_admin role
-    if (requestedRole === SUPER_ADMIN_ROLE && profile?.role !== SUPER_ADMIN_ROLE) {
+    if (roleProvided && role === SUPER_ADMIN_ROLE && profile?.role !== SUPER_ADMIN_ROLE) {
       return NextResponse.json(
         { error: "Forbidden: Only Super Admins can assign the super_admin role" },
         { status: 403 }
@@ -123,14 +123,16 @@ export async function POST(request: Request) {
       userId = inviteData.user.id
     }
 
-    // 7. Create/Update Profile with validated role
+    // 7. Create/Update Profile
+    const roleToApply = roleProvided ? role : existingUser ? undefined : "employee"
+
     const profilePayload: any = {
       id: userId,
       email: emailNormalized,
-      role: requestedRole,
       is_active: true,
     }
 
+    if (roleToApply) profilePayload.role = roleToApply
     if (first_name !== undefined) profilePayload.first_name = first_name
     if (last_name !== undefined) profilePayload.last_name = last_name
     if (department !== undefined) profilePayload.department = department
