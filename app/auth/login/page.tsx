@@ -9,18 +9,70 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useState } from "react"
+import { useState, useRef, useEffect } from "react"
 import { toast } from "sonner"
+import { KeyRound, Mail, ArrowLeft, Shield } from "lucide-react"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [otp, setOtp] = useState("")
+  const [otpDigits, setOtpDigits] = useState<string[]>(["", "", "", "", "", ""])
   const [loginMethod, setLoginMethod] = useState<"password" | "otp">("password")
   const [step, setStep] = useState<"credentials" | "otp">("credentials")
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
+  const otpRefs = useRef<(HTMLInputElement | null)[]>([])
+
+  // Auto-focus first OTP box when entering OTP step
+  useEffect(() => {
+    if (step === "otp") {
+      otpRefs.current[0]?.focus()
+    }
+  }, [step])
+
+  const handleOtpChange = (index: number, value: string) => {
+    // Only allow digits
+    const digit = value.replace(/\D/g, "").slice(-1)
+    const newDigits = [...otpDigits]
+    newDigits[index] = digit
+    setOtpDigits(newDigits)
+
+    // Auto-advance to next input
+    if (digit && index < 5) {
+      otpRefs.current[index + 1]?.focus()
+    }
+
+    // Auto-submit when all 6 digits are filled
+    if (digit && index === 5 && newDigits.every((d) => d !== "")) {
+      handleVerifyOTP(undefined, newDigits.join(""))
+    }
+  }
+
+  const handleOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Backspace" && !otpDigits[index] && index > 0) {
+      otpRefs.current[index - 1]?.focus()
+    }
+  }
+
+  const handleOtpPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault()
+    const paste = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6)
+    if (paste.length === 0) return
+    const newDigits = [...otpDigits]
+    for (let i = 0; i < paste.length && i < 6; i++) {
+      newDigits[i] = paste[i]
+    }
+    setOtpDigits(newDigits)
+    // Focus the next empty box or the last one
+    const nextEmpty = newDigits.findIndex((d) => d === "")
+    otpRefs.current[nextEmpty === -1 ? 5 : nextEmpty]?.focus()
+
+    // Auto-submit if all filled
+    if (newDigits.every((d) => d !== "")) {
+      handleVerifyOTP(undefined, newDigits.join(""))
+    }
+  }
 
   const handleRequestOTP = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -32,16 +84,20 @@ export default function LoginPage() {
       const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
-          shouldCreateUser: true,
-          emailRedirectTo: undefined, // ✅ no redirect → OTP only
+          shouldCreateUser: false, // Only allow existing users
+          emailRedirectTo: undefined, // No redirect → OTP code only
         },
       })
       if (error) throw error
-      toast.success("OTP sent to your email!")
+      toast.success("A 6-digit code has been sent to your email")
       setStep("otp")
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "An error occurred"
-      setError(message)
+      if (message.includes("Signups not allowed")) {
+        setError("This email is not registered. Please contact your administrator.")
+      } else {
+        setError(message)
+      }
       toast.error(message)
     } finally {
       setIsLoading(false)
@@ -71,16 +127,23 @@ export default function LoginPage() {
     }
   }
 
-  const handleVerifyOTP = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleVerifyOTP = async (e?: React.FormEvent, code?: string) => {
+    if (e) e.preventDefault()
     const supabase = createClient()
     setIsLoading(true)
     setError(null)
 
+    const otpCode = code || otpDigits.join("")
+    if (otpCode.length !== 6) {
+      setError("Please enter all 6 digits")
+      setIsLoading(false)
+      return
+    }
+
     try {
       const { error } = await supabase.auth.verifyOtp({
         email,
-        token: otp,
+        token: otpCode,
         type: "email",
       })
       if (error) throw error
@@ -101,6 +164,9 @@ export default function LoginPage() {
         <div className="flex flex-col gap-8">
           {/* Header Section */}
           <div className="space-y-2 text-center">
+            <div className="bg-primary/10 mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl">
+              <Shield className="text-primary h-8 w-8" />
+            </div>
             <h1 className="text-4xl font-bold tracking-tight">Welcome Back</h1>
             <p className="text-muted-foreground text-lg">Login to access your ACOB staff portal</p>
           </div>
@@ -108,10 +174,12 @@ export default function LoginPage() {
           <Card className="border-2 shadow-xl">
             <CardHeader className="space-y-3 pb-6">
               <CardTitle className="text-2xl font-semibold">
-                {step === "credentials" ? "Sign In" : "Verify OTP"}
+                {step === "credentials" ? "Sign In" : "Verify Your Code"}
               </CardTitle>
               <CardDescription className="text-base">
-                {step === "credentials" ? "Choose your preferred login method" : "Enter the OTP sent to your email"}
+                {step === "credentials"
+                  ? "Choose your preferred login method"
+                  : `Enter the 6-digit code sent to ${email}`}
               </CardDescription>
             </CardHeader>
             <CardContent className="pb-8">
@@ -121,25 +189,33 @@ export default function LoginPage() {
                   <div className="bg-muted flex gap-2 rounded-lg p-1.5">
                     <button
                       type="button"
-                      onClick={() => setLoginMethod("password")}
-                      className={`flex-1 rounded-md px-6 py-3 text-sm font-semibold transition-all ${
+                      onClick={() => {
+                        setLoginMethod("password")
+                        setError(null)
+                      }}
+                      className={`flex flex-1 items-center justify-center gap-2 rounded-md px-6 py-3 text-sm font-semibold transition-all ${
                         loginMethod === "password"
                           ? "bg-background ring-primary/20 shadow-md ring-2"
                           : "text-muted-foreground hover:text-foreground hover:bg-background/50"
                       }`}
                     >
+                      <KeyRound className="h-4 w-4" />
                       Password
                     </button>
                     <button
                       type="button"
-                      onClick={() => setLoginMethod("otp")}
-                      className={`flex-1 rounded-md px-6 py-3 text-sm font-semibold transition-all ${
+                      onClick={() => {
+                        setLoginMethod("otp")
+                        setError(null)
+                      }}
+                      className={`flex flex-1 items-center justify-center gap-2 rounded-md px-6 py-3 text-sm font-semibold transition-all ${
                         loginMethod === "otp"
                           ? "bg-background ring-primary/20 shadow-md ring-2"
                           : "text-muted-foreground hover:text-foreground hover:bg-background/50"
                       }`}
                     >
-                      OTP
+                      <Mail className="h-4 w-4" />
+                      One-Time Code
                     </button>
                   </div>
 
@@ -213,59 +289,76 @@ export default function LoginPage() {
                           <p className="rounded-md bg-red-50 p-3 text-sm text-red-500 dark:bg-red-950/30">{error}</p>
                         )}
                         <Button type="submit" className="h-11 w-full text-base font-semibold" loading={isLoading}>
-                          Request OTP
+                          Send One-Time Code
                         </Button>
                       </div>
                     </form>
                   )}
 
-                  <div className="mt-6 text-center">
-                    <p className="text-muted-foreground text-sm">
-                      Don&apos;t have an account?{" "}
+                  {/* First Time Setup Link */}
+                  <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-4 text-center dark:border-blue-900 dark:bg-blue-950/30">
+                    <p className="text-sm text-blue-800 dark:text-blue-200">
+                      <span className="font-semibold">First time logging in?</span>{" "}
                       <Link
-                        href="/auth/sign-up"
-                        className="text-primary font-semibold underline-offset-4 hover:underline"
+                        href="/auth/forgot-password"
+                        className="font-bold text-blue-600 underline underline-offset-4 hover:text-blue-700 dark:text-blue-400"
                       >
-                        Sign up
+                        Set your password here →
                       </Link>
+                    </p>
+                    <p className="text-muted-foreground mt-1 text-xs">
+                      Enter your company email to receive a link to set up your password
                     </p>
                   </div>
                 </div>
               ) : (
                 /* OTP Verification Form */
-                <form onSubmit={handleVerifyOTP}>
+                <form onSubmit={(e) => handleVerifyOTP(e)}>
                   <div className="flex flex-col gap-6">
-                    <div className="grid gap-3">
-                      <Label htmlFor="otp" className="text-sm font-medium">
-                        One-Time Password
-                      </Label>
-                      <Input
-                        id="otp"
-                        type="text"
-                        placeholder="Enter 6-digit OTP"
-                        required
-                        value={otp}
-                        onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                        maxLength={6}
-                        className="h-11 text-center font-mono text-2xl text-base tracking-widest"
-                      />
+                    {/* 6 Individual OTP Boxes */}
+                    <div>
+                      <Label className="mb-3 block text-sm font-medium">One-Time Password</Label>
+                      <div className="flex justify-center gap-3">
+                        {otpDigits.map((digit, index) => (
+                          <input
+                            key={index}
+                            ref={(el) => {
+                              otpRefs.current[index] = el
+                            }}
+                            type="text"
+                            inputMode="numeric"
+                            autoComplete="one-time-code"
+                            maxLength={1}
+                            value={digit}
+                            onChange={(e) => handleOtpChange(index, e.target.value)}
+                            onKeyDown={(e) => handleOtpKeyDown(index, e)}
+                            onPaste={index === 0 ? handleOtpPaste : undefined}
+                            className="border-input bg-background ring-offset-background focus-visible:ring-ring h-14 w-12 rounded-lg border-2 text-center font-mono text-2xl font-bold transition-all focus-visible:border-transparent focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+                          />
+                        ))}
+                      </div>
+                      <p className="text-muted-foreground mt-3 text-center text-xs">
+                        Check your email inbox for the 6-digit code
+                      </p>
                     </div>
+
                     {error && (
                       <p className="rounded-md bg-red-50 p-3 text-sm text-red-500 dark:bg-red-950/30">{error}</p>
                     )}
-                    <Button type="submit" className="h-11 w-full text-base font-semibold" disabled={isLoading}>
-                      {isLoading ? "Verifying..." : "Verify OTP"}
+                    <Button type="submit" className="h-11 w-full text-base font-semibold" loading={isLoading}>
+                      Verify &amp; Sign In
                     </Button>
                     <Button
                       type="button"
                       variant="outline"
                       onClick={() => {
                         setStep("credentials")
-                        setOtp("")
+                        setOtpDigits(["", "", "", "", "", ""])
                         setError(null)
                       }}
                       className="h-11 w-full text-base"
                     >
+                      <ArrowLeft className="mr-2 h-4 w-4" />
                       Back to Login
                     </Button>
                   </div>
