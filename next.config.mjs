@@ -24,6 +24,17 @@ const nextConfig = {
         net: false,
         tls: false,
       }
+
+      // Handle node: scheme for modern Node modules
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        "node:fs": false,
+        "node:net": false,
+        "node:tls": false,
+        "node:path": false,
+        "node:stream": false,
+        "node:crypto": false,
+      }
     }
 
     return config

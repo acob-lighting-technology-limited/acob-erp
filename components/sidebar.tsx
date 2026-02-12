@@ -60,7 +60,7 @@ const navigation = [
   { name: "Home", href: "/profile", icon: LayoutDashboard },
   { name: "Job Description", href: "/job-description", icon: Briefcase },
   { name: "Projects", href: "/projects", icon: FolderKanban },
-  { name: "Tasks", href: "/tasks", icon: ClipboardList },
+  { name: "Tasks", href: "/portal/tasks", icon: ClipboardList },
   { name: "Assets", href: "/assets", icon: Package },
   { name: "Payments", href: "/payments", icon: CreditCard },
   { name: "Documentation", href: "/documentation", icon: FileText },
