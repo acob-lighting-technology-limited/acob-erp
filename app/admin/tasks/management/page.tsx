@@ -29,11 +29,6 @@ async function getAdminTasksData() {
   // Build query based on role
   let tasksQuery = supabase.from("tasks").select("*").order("created_at", { ascending: false })
 
-  // Filter by department for leads
-  if (profile.role === "lead" && profile.lead_departments && profile.lead_departments.length > 0) {
-    tasksQuery = tasksQuery.in("department", profile.lead_departments)
-  }
-
   // Fetch staff - leads can only see staff in their departments
   let staffQuery = supabase
     .from("profiles")
@@ -55,51 +50,78 @@ async function getAdminTasksData() {
     return { tasks: [], staff: [], projects: [], departments: [], userProfile }
   }
 
-  // Fetch task assignments and user details (simplified for SSR)
-  const tasksWithUsers = await Promise.all(
-    (tasksResult.data || []).map(async (task: any) => {
-      const taskData: any = { ...task }
+  // 1. Collect all IDs for batch queries
+  const allTaskIds = tasksResult.data?.map((t: any) => t.id) || []
+  const allIndivUserIds = Array.from(
+    new Set(
+      tasksResult.data
+        ?.filter((t: any) => t.assignment_type === "individual" && t.assigned_to)
+        .map((t: any) => t.assigned_to) || []
+    )
+  ) as string[]
 
-      // For individual tasks, fetch assigned user
-      if (task.assignment_type === "individual" && task.assigned_to) {
-        const { data: userProfileData } = await supabase
-          .from("profiles")
-          .select("first_name, last_name, department")
-          .eq("id", task.assigned_to)
-          .single()
+  // 2. Fetch profiles for individual assignments
+  const { data: indivProfiles } =
+    allIndivUserIds.length > 0
+      ? await supabase.from("profiles").select("id, first_name, last_name, department").in("id", allIndivUserIds)
+      : { data: [] }
+  const indivProfileMap = new Map(indivProfiles?.map((p: any) => [p.id, p]))
 
-        taskData.assigned_to_user = userProfileData
-      }
+  // 3. Fetch task assignments for multiple tasks
+  const multTaskIds = tasksResult.data?.filter((t: any) => t.assignment_type === "multiple").map((t: any) => t.id) || []
+  const { data: allTaskAssignments } =
+    multTaskIds.length > 0
+      ? await supabase.from("task_assignments").select("task_id, user_id").in("task_id", multTaskIds)
+      : { data: [] }
 
-      // For multiple-user tasks, fetch all assignments
-      if (task.assignment_type === "multiple") {
-        const { data: assignments } = await supabase.from("task_assignments").select("user_id").eq("task_id", task.id)
+  // 4. Fetch profiles for multiple assigned users
+  const multUserIds = Array.from(new Set(allTaskAssignments?.map((a: any) => a.user_id) || []))
+  const { data: multProfiles } =
+    multUserIds.length > 0
+      ? await supabase.from("profiles").select("id, first_name, last_name, department").in("id", multUserIds)
+      : { data: [] }
+  const multProfileMap = new Map(multProfiles?.map((p: any) => [p.id, p]))
 
-        if (assignments && assignments.length > 0) {
-          const userIds = assignments.map((a: any) => a.user_id)
-          const { data: userProfiles } = await supabase
-            .from("profiles")
-            .select("id, first_name, last_name, department")
-            .in("id", userIds)
+  // 5. Fetch all completions
+  const { data: allCompletions } =
+    allTaskIds.length > 0
+      ? await supabase.from("task_user_completion").select("task_id, user_id").in("task_id", allTaskIds)
+      : { data: [] }
 
-          const { data: completions } = await supabase
-            .from("task_user_completion")
-            .select("user_id")
-            .eq("task_id", task.id)
+  // Grouping logic
+  const assignmentsByTask = new Map()
+  allTaskAssignments?.forEach((a: any) => {
+    if (!assignmentsByTask.has(a.task_id)) assignmentsByTask.set(a.task_id, [])
+    assignmentsByTask.get(a.task_id).push(a.user_id)
+  })
 
-          const completedUserIds = new Set(completions?.map((c: any) => c.user_id) || [])
+  const completionsByTask = new Map()
+  allCompletions?.forEach((c: any) => {
+    if (!completionsByTask.has(c.task_id)) completionsByTask.set(c.task_id, new Set())
+    completionsByTask.get(c.task_id).add(c.user_id)
+  })
 
-          taskData.assigned_users =
-            userProfiles?.map((p: any) => ({
-              ...p,
-              completed: completedUserIds.has(p.id),
-            })) || []
+  // 6. Reconstruct tasksWithUsers
+  const tasksWithUsers = (tasksResult.data || []).map((task: any) => {
+    const taskData: any = { ...task }
+
+    if (task.assignment_type === "individual" && task.assigned_to) {
+      taskData.assigned_to_user = indivProfileMap.get(task.assigned_to)
+    }
+
+    if (task.assignment_type === "multiple") {
+      const userIds = assignmentsByTask.get(task.id) || []
+      const taskComps = completionsByTask.get(task.id) || new Set()
+      taskData.assigned_users = userIds.map((uid: string) => {
+        const prof = multProfileMap.get(uid)
+        return {
+          ...prof,
+          completed: taskComps.has(uid),
         }
-      }
-
-      return taskData
-    })
-  )
+      })
+    }
+    return taskData
+  })
 
   // For leads, filter tasks strictly by their departments
   let filteredTasks = tasksWithUsers || []

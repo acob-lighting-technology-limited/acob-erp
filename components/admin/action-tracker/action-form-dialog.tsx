@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner"
 import { Loader2, Plus, Save, Trash2, X } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { getCurrentISOWeek } from "@/lib/utils"
 
 interface ActionFormDialogProps {
   isOpen: boolean
@@ -41,7 +42,7 @@ export function ActionFormDialog({
 }: ActionFormDialogProps) {
   const [isSaving, setIsSaving] = useState(false)
   const [dept, setDept] = useState("")
-  const [week, setWeek] = useState(new Date().getMonth() * 4 + Math.ceil(new Date().getDate() / 7))
+  const [week, setWeek] = useState(getCurrentISOWeek())
   const [year, setYear] = useState(new Date().getFullYear())
 
   // For Bulk Entry
@@ -73,7 +74,7 @@ export function ActionFormDialog({
       setDept(defaultDept || departments[0] || "")
       setActionItems([])
       setNewItem("")
-      setWeek(defaultWeek || new Date().getMonth() * 4 + Math.ceil(new Date().getDate() / 7))
+      setWeek(defaultWeek || getCurrentISOWeek())
       setYear(defaultYear || new Date().getFullYear())
     }
   }, [editingAction, isOpen, defaultDept, departments, defaultWeek, defaultYear])

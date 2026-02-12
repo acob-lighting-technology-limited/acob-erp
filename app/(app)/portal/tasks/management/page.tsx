@@ -77,57 +77,76 @@ async function getTasksData() {
   const allTasks = [...(individualTasks || []), ...(multipleTasks || []), ...(departmentTasks || [])]
   const uniqueTasks = Array.from(new Map(allTasks.map((t: any) => [t.id, t])).values())
 
-  // Fetch assigned_by user details and additional info
+  // 1. Collect all IDs for batch queries
+  const allTaskIds = uniqueTasks.map((t: any) => t.id)
+  const assignedByIds = Array.from(new Set(uniqueTasks.map((t: any) => t.assigned_by).filter(Boolean))) as string[]
+
+  // 2. Fetch assigned_by profiles
+  const { data: assignedByProfiles } =
+    assignedByIds.length > 0
+      ? await supabase.from("profiles").select("id, first_name, last_name").in("id", assignedByIds)
+      : { data: [] }
+  const assignedByMap = new Map(assignedByProfiles?.map((p: any) => [p.id, p]))
+
+  // 3. Fetch task assignments for multiple tasks
+  const multipleTasksOnly = uniqueTasks.filter((t: any) => t.assignment_type === "multiple")
+  const taskIdsForMultipleType = multipleTasksOnly.map((t: any) => t.id)
+
+  const { data: allAssignments } =
+    taskIdsForMultipleType.length > 0
+      ? await supabase.from("task_assignments").select("task_id, user_id").in("task_id", taskIdsForMultipleType)
+      : { data: [] }
+
+  // 4. Fetch profiles for assigned users
+  const assignedUserIds = Array.from(new Set(allAssignments?.map((a: any) => a.user_id) || []))
+  const { data: assignedUserProfiles } =
+    assignedUserIds.length > 0
+      ? await supabase.from("profiles").select("id, first_name, last_name").in("id", assignedUserIds)
+      : { data: [] }
+  const userProfileMap = new Map(assignedUserProfiles?.map((p: any) => [p.id, p]))
+
+  // 5. Fetch all completions for these tasks
+  const { data: allCompletions } =
+    allTaskIds.length > 0
+      ? await supabase.from("task_user_completion").select("task_id, user_id").in("task_id", allTaskIds)
+      : { data: [] }
+
+  // Grouping logic
+  const assignmentsByTask = new Map()
+  allAssignments?.forEach((a: any) => {
+    if (!assignmentsByTask.has(a.task_id)) assignmentsByTask.set(a.task_id, [])
+    assignmentsByTask.get(a.task_id).push(a.user_id)
+  })
+
+  const completionsByTask = new Map()
+  allCompletions?.forEach((c: any) => {
+    if (!completionsByTask.has(c.task_id)) completionsByTask.set(c.task_id, new Set())
+    completionsByTask.get(c.task_id).add(c.user_id)
+  })
+
+  // 6. Assemble tasksWithUsers
   const tasksWithUsers = await Promise.all(
     (uniqueTasks || []).map(async (task: any) => {
       const taskData: any = { ...task }
 
-      // Fetch assigned_by user
+      // Attach assigned_by
       if (task.assigned_by) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("first_name, last_name")
-          .eq("id", task.assigned_by)
-          .single()
-
-        taskData.assigned_by_user = profile
+        taskData.assigned_by_user = assignedByMap.get(task.assigned_by)
       }
 
       // For multiple-user tasks, fetch all assigned users and completion status
       if (task.assignment_type === "multiple") {
-        const { data: taskAssignments } = await supabase
-          .from("task_assignments")
-          .select("user_id")
-          .eq("task_id", task.id)
+        const userIds = assignmentsByTask.get(task.id) || []
+        const taskCompletions = completionsByTask.get(task.id) || new Set()
 
-        if (taskAssignments && taskAssignments.length > 0) {
-          const userIds = taskAssignments.map((a: any) => a.user_id)
-          const { data: userProfiles } = await supabase
-            .from("profiles")
-            .select("id, first_name, last_name")
-            .in("id", userIds)
-
-          // Check if current user has completed
-          const { data: userCompletion } = await supabase
-            .from("task_user_completion")
-            .select("user_id")
-            .eq("task_id", task.id)
-            .eq("user_id", user.id)
-            .single()
-
-          const completedUserIds = new Set(
-            (await supabase.from("task_user_completion").select("user_id").eq("task_id", task.id)).data?.map(
-              (c: any) => c.user_id
-            ) || []
-          )
-
-          taskData.assigned_users =
-            userProfiles?.map((profile: any) => ({
-              ...profile,
-              completed: completedUserIds.has(profile.id),
-            })) || []
-          taskData.user_completed = !!userCompletion
-        }
+        taskData.assigned_users = userIds.map((uid: string) => {
+          const profile = userProfileMap.get(uid)
+          return {
+            ...profile,
+            completed: taskCompletions.has(uid),
+          }
+        })
+        taskData.user_completed = taskCompletions.has(user.id)
       }
 
       // For department tasks, check if user can change status

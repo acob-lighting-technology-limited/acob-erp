@@ -17,6 +17,7 @@ import { toast } from "sonner"
 import { Download, Loader2 } from "lucide-react"
 import * as XLSX from "xlsx"
 import { createClient } from "@/lib/supabase/client"
+import { getCurrentISOWeek } from "@/lib/utils"
 
 interface ExportDialogProps {
   isOpen: boolean
@@ -29,7 +30,7 @@ export function ActionTrackerExportDialog({ isOpen, onClose, departments }: Expo
   const [period, setPeriod] = useState("week") // week, month, quarter, year
   const [deptFilter, setDeptFilter] = useState("all")
   const [year, setYear] = useState(new Date().getFullYear())
-  const [value, setValue] = useState(new Date().getMonth() * 4 + Math.ceil(new Date().getDate() / 7)) // Current Week or Month
+  const [value, setValue] = useState(getCurrentISOWeek()) // Current Week or Month
 
   const handleExport = async () => {
     setIsExporting(true)
@@ -41,13 +42,16 @@ export function ActionTrackerExportDialog({ isOpen, onClose, departments }: Expo
       if (period === "week") {
         query = query.eq("week_number", value)
       } else if (period === "month") {
-        // Approximate month to weeks (Rough mapping)
-        const startWeek = (value - 1) * 4 + 1
-        const endWeek = value * 4 + 1
+        const start = new Date(year, value - 1, 1)
+        const end = new Date(year, value, 0)
+        const startWeek = getCurrentISOWeek(start)
+        const endWeek = getCurrentISOWeek(end)
         query = query.gte("week_number", startWeek).lte("week_number", endWeek)
       } else if (period === "quarter") {
-        const startWeek = (value - 1) * 13 + 1
-        const endWeek = value * 13
+        const start = new Date(year, (value - 1) * 3, 1)
+        const end = new Date(year, value * 3, 0)
+        const startWeek = getCurrentISOWeek(start)
+        const endWeek = getCurrentISOWeek(end)
         query = query.gte("week_number", startWeek).lte("week_number", endWeek)
       }
 

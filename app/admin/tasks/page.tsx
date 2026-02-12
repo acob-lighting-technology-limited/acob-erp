@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { getCurrentISOWeek } from "@/lib/utils"
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import {
@@ -41,6 +43,9 @@ export default function AdminTasksDashboard() {
     try {
       const supabase = createClient()
 
+      const currentWeek = getCurrentISOWeek()
+      const currentYear = new Date().getFullYear()
+
       // Total general tasks
       const { count: taskCount } = await supabase
         .from("tasks")
@@ -54,8 +59,13 @@ export default function AdminTasksDashboard() {
         .eq("category", "weekly_action")
         .neq("status", "completed")
 
-      // Submitted weekly reports for current week (simplified)
-      const { data: reports } = await supabase.from("weekly_reports").select("id").eq("status", "submitted")
+      // Submitted weekly reports for current week
+      const { data: reports } = await supabase
+        .from("weekly_reports")
+        .select("id")
+        .eq("status", "submitted")
+        .eq("week_number", currentWeek)
+        .eq("year", currentYear)
 
       // Completed actions this week
       const { count: completedCount } = await supabase
@@ -63,6 +73,8 @@ export default function AdminTasksDashboard() {
         .select("*", { count: "exact", head: true })
         .eq("category", "weekly_action")
         .eq("status", "completed")
+        .eq("week_number", currentWeek)
+        .eq("year", currentYear)
 
       setStats({
         totalTasks: taskCount || 0,

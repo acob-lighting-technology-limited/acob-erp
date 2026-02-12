@@ -54,7 +54,7 @@ DROP POLICY IF EXISTS "Tasks delete policy" ON tasks;
 CREATE POLICY "Tasks select policy" ON tasks FOR SELECT TO authenticated USING (true);
 CREATE POLICY "Tasks insert policy" ON tasks FOR INSERT TO authenticated WITH CHECK ((SELECT has_role('admin')) OR (SELECT has_role('lead')));
 CREATE POLICY "Tasks update policy" ON tasks FOR UPDATE TO authenticated USING ((SELECT has_role('admin')) OR (SELECT has_role('lead')));
-CREATE POLICY "Tasks delete policy" ON tasks FOR DELETE TO authenticated USING ((SELECT has_role('admin')));
+CREATE POLICY "Tasks delete policy" ON tasks FOR DELETE TO authenticated USING ((SELECT has_role('admin')) OR (SELECT has_role('lead')) OR (SELECT has_role('super_admin')));
 
 -- Table: task_assignments
 DROP POLICY IF EXISTS "Only super_admin/admin can create task assignments" ON task_assignments;
@@ -80,7 +80,7 @@ USING (
 
 CREATE POLICY "Task assignments insert policy" ON task_assignments FOR INSERT TO authenticated WITH CHECK ((SELECT has_role('admin')) OR (SELECT has_role('lead')));
 CREATE POLICY "Task assignments update policy" ON task_assignments FOR UPDATE TO authenticated USING ((SELECT has_role('admin')) OR (SELECT has_role('lead')));
-CREATE POLICY "Task assignments delete policy" ON task_assignments FOR DELETE TO authenticated USING ((SELECT has_role('admin')));
+CREATE POLICY "Task assignments delete policy" ON task_assignments FOR DELETE TO authenticated USING ((SELECT has_role('admin')) OR (SELECT has_role('lead')) OR (SELECT has_role('super_admin')));
 
 -- Table: task_user_completion
 DROP POLICY IF EXISTS "Users can mark their own tasks as complete" ON task_user_completion;

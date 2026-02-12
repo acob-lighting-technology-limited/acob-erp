@@ -28,3 +28,14 @@ export function formatFullName(
   const parts = [formatName(firstName), formatName(otherNames), formatName(lastName)].filter(Boolean)
   return parts.join(" ")
 }
+/**
+ * Returns the ISO week number for a given date.
+ * ISO weeks start on Monday. Week 1 is the week with the first Thursday of the year.
+ */
+export function getCurrentISOWeek(date: Date = new Date()): number {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+  const dayNum = d.getUTCDay() || 7
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum)
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1))
+  return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7)
+}

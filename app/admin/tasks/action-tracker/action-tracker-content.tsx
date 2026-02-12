@@ -9,6 +9,8 @@ import { Label } from "@/components/ui/label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { createClient } from "@/lib/supabase/client"
+import { getCurrentISOWeek } from "@/lib/utils"
+
 import { toast } from "sonner"
 import {
   FileSpreadsheet,
@@ -50,7 +52,7 @@ interface ActionTrackerContentProps {
 export function ActionTrackerContent({ initialDepartments }: ActionTrackerContentProps) {
   const [tasks, setTasks] = useState<ActionTask[]>([])
   const [loading, setLoading] = useState(true)
-  const [weekFilter, setWeekFilter] = useState(new Date().getMonth() * 4 + Math.ceil(new Date().getDate() / 7))
+  const [weekFilter, setWeekFilter] = useState(getCurrentISOWeek())
   const [yearFilter, setYearFilter] = useState(new Date().getFullYear())
   const [deptFilter, setDeptFilter] = useState("all")
   const [searchQuery, setSearchQuery] = useState("")

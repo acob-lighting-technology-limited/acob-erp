@@ -18,6 +18,8 @@ import { FileSpreadsheet, Loader2, Upload } from "lucide-react"
 import * as XLSX from "xlsx"
 import { createClient } from "@/lib/supabase/client"
 
+import { getCurrentISOWeek } from "@/lib/utils"
+
 interface ExcelImportDialogProps {
   isOpen: boolean
   onClose: () => void
@@ -28,7 +30,7 @@ interface ExcelImportDialogProps {
 export function ExcelImportDialog({ isOpen, onClose, onComplete, departments }: ExcelImportDialogProps) {
   const [file, setFile] = useState<File | null>(null)
   const [isUploading, setIsUploading] = useState(false)
-  const [week, setWeek] = useState(new Date().getMonth() * 4 + Math.ceil(new Date().getDate() / 7)) // Approximate current week
+  const [week, setWeek] = useState(getCurrentISOWeek()) // Approximate current week
   const [year, setYear] = useState(new Date().getFullYear())
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -75,7 +77,8 @@ export function ExcelImportDialog({ isOpen, onClose, onComplete, departments }: 
         const tasksToInsert = jsonData.map((row) => {
           // Helper to find column by multiple name variants
           const getCol = (names: string[]) => {
-            const key = Object.keys(row).find((k) => names.includes(k.trim()))
+            const normalizedNames = names.map((n) => n.toLowerCase())
+            const key = Object.keys(row).find((k) => normalizedNames.includes(k.trim().toLowerCase()))
             return key ? row[key] : null
           }
 

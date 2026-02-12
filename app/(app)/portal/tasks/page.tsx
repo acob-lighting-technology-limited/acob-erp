@@ -1,7 +1,10 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
+import { toast } from "sonner"
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { ClipboardList, LayoutDashboard, FileSpreadsheet, FileBarChart, CheckCircle2, Clock, Plus } from "lucide-react"
@@ -25,6 +28,7 @@ export default function PortalTasksDashboard() {
   const [loading, setLoading] = useState(true)
 
   const supabase = createClient()
+  const router = useRouter()
 
   useEffect(() => {
     fetchDashboardData()
@@ -35,7 +39,11 @@ export default function PortalTasksDashboard() {
       const {
         data: { user },
       } = await supabase.auth.getUser()
-      if (!user) return
+
+      if (!user) {
+        router.push("/auth/login")
+        return
+      }
 
       const { data: profileData } = await supabase
         .from("profiles")
@@ -43,37 +51,56 @@ export default function PortalTasksDashboard() {
         .eq("id", user.id)
         .single()
 
+      if (!profileData) {
+        toast.error("Profile not found. Please log in again.")
+        router.push("/auth/login")
+        return
+      }
+
       setProfile(profileData)
+      const dept = profileData.department
 
       // Assigned general tasks
-      const { count: taskCount } = await supabase
-        .from("tasks")
-        .select("*", { count: "exact", head: true })
-        .eq("category", "general")
-        .or(`assigned_to.eq.${user.id},department.eq.${profileData?.department || ""}`)
+      let taskQuery = supabase.from("tasks").select("*", { count: "exact", head: true }).eq("category", "general")
+
+      if (dept) {
+        taskQuery = taskQuery.or(`assigned_to.eq.${user.id},department.eq.${dept}`)
+      } else {
+        taskQuery = taskQuery.eq("assigned_to", user.id)
+      }
+      const { count: taskCount } = await taskQuery
 
       // Pending weekly actions for department
-      const { count: actionCount } = await supabase
-        .from("tasks")
-        .select("*", { count: "exact", head: true })
-        .eq("category", "weekly_action")
-        .eq("department", profileData?.department || "")
-        .neq("status", "completed")
+      let actionCount = 0
+      if (dept) {
+        const { count } = await supabase
+          .from("tasks")
+          .select("*", { count: "exact", head: true })
+          .eq("category", "weekly_action")
+          .eq("department", dept)
+          .neq("status", "completed")
+        actionCount = count || 0
+      }
 
       // Reports submitted by department
-      const { count: reportCount } = await supabase
-        .from("weekly_reports")
-        .select("*", { count: "exact", head: true })
-        .eq("department", profileData?.department || "")
-        .eq("status", "submitted")
+      let reportCount = 0
+      if (dept) {
+        const { count } = await supabase
+          .from("weekly_reports")
+          .select("*", { count: "exact", head: true })
+          .eq("department", dept)
+          .eq("status", "submitted")
+        reportCount = count || 0
+      }
 
       setStats({
         assignedTasks: taskCount || 0,
-        pendingActions: actionCount || 0,
-        reportsSubmitted: reportCount || 0,
+        pendingActions: actionCount,
+        reportsSubmitted: reportCount,
       })
     } catch (error) {
       console.error("Portal Dashboard Error:", error)
+      toast.error("Failed to load dashboard data")
     } finally {
       setLoading(false)
     }

@@ -3,6 +3,8 @@
 import { useState, useEffect, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
+import { getCurrentISOWeek } from "@/lib/utils"
+
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -73,7 +75,7 @@ function WeeklyReportFormContent() {
       const pYear = searchParams.get("year")
       const pDept = searchParams.get("dept")
 
-      const currentWeek = pWeek ? parseInt(pWeek) : new Date().getMonth() * 4 + Math.ceil(new Date().getDate() / 7)
+      const currentWeek = pWeek ? parseInt(pWeek) : getCurrentISOWeek()
       const currentYear = pYear ? parseInt(pYear) : new Date().getFullYear()
       const currentDept = pDept || p?.department || ""
 
@@ -187,7 +189,10 @@ function WeeklyReportFormContent() {
         }))
 
         const { error: syncError } = await supabase.from("tasks").insert(actionPayloads)
-        if (syncError) console.error("Sync Error:", syncError)
+        if (syncError) {
+          console.error("Sync Error:", syncError)
+          toast.warning(`Next-week tasks failed to sync - please retry or report: ${syncError.message}`)
+        }
       }
 
       toast.success(id ? "Report updated" : "Report submitted successfully")

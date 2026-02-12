@@ -6,7 +6,9 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { createClient } from "@/lib/supabase/client"
+import { getCurrentISOWeek } from "@/lib/utils"
 import { toast } from "sonner"
+
 import {
   FileSearch,
   Calendar,
@@ -54,7 +56,7 @@ export default function WeeklyReportsPortal() {
   const [searchQuery, setSearchQuery] = useState("")
   const [deptFilter, setDeptFilter] = useState("all")
   const [yearFilter, setYearFilter] = useState(new Date().getFullYear())
-  const [weekFilter, setWeekFilter] = useState(new Date().getMonth() * 4 + Math.ceil(new Date().getDate() / 7))
+  const [weekFilter, setWeekFilter] = useState(getCurrentISOWeek())
   const [allDepartments, setAllDepartments] = useState<string[]>([])
 
   const supabase = createClient()
@@ -211,7 +213,7 @@ export default function WeeklyReportsPortal() {
           </Card>
         ) : (
           filteredReports.map((report) => {
-            const isOwner = profile?.department === report.department
+            const isOwner = profile?.id === report.user_id
             const isAdmin = ["admin", "super_admin"].includes(profile?.role)
 
             return (

@@ -7,7 +7,9 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { createClient } from "@/lib/supabase/client"
+import { getCurrentISOWeek } from "@/lib/utils"
 import { toast } from "sonner"
+
 import {
   FileBarChart,
   Presentation,
@@ -50,7 +52,7 @@ interface WeeklyReportsContentProps {
 export function WeeklyReportsContent({ initialDepartments }: WeeklyReportsContentProps) {
   const [reports, setReports] = useState<WeeklyReport[]>([])
   const [loading, setLoading] = useState(true)
-  const [weekFilter, setWeekFilter] = useState(new Date().getMonth() * 4 + Math.ceil(new Date().getDate() / 7))
+  const [weekFilter, setWeekFilter] = useState(getCurrentISOWeek())
   const [yearFilter, setYearFilter] = useState(new Date().getFullYear())
   const [deptFilter, setDeptFilter] = useState("all")
   const [searchQuery, setSearchQuery] = useState("")
@@ -168,7 +170,7 @@ export function WeeklyReportsContent({ initialDepartments }: WeeklyReportsConten
         valign: "top",
       })
 
-      pres.writeFile({ fileName: `${report.department}_W${report.week_number}_Report.pptx` })
+      await pres.writeFile({ fileName: `${report.department}_W${report.week_number}_Report.pptx` })
       toast.success("PowerPoint generated successfully")
     } catch (error) {
       console.error("PPT Error:", error)
@@ -268,6 +270,7 @@ export function WeeklyReportsContent({ initialDepartments }: WeeklyReportsConten
                       <Presentation className="h-4 w-4 text-orange-600" />
                       Export to PPTX
                     </Button> */}
+
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon" className="h-8 w-8">

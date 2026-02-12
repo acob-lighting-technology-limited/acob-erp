@@ -6,7 +6,9 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { createClient } from "@/lib/supabase/client"
+import { getCurrentISOWeek } from "@/lib/utils"
 import { toast } from "sonner"
+
 import {
   FileSpreadsheet,
   CheckCircle2,
@@ -45,7 +47,7 @@ export default function ActionTrackerPortal() {
   const [loading, setLoading] = useState(true)
   const [updatingId, setUpdatingId] = useState<string | null>(null)
   const [profile, setProfile] = useState<any>(null)
-  const [week, setWeek] = useState(new Date().getMonth() * 4 + Math.ceil(new Date().getDate() / 7))
+  const [week, setWeek] = useState(getCurrentISOWeek())
   const [year, setYear] = useState(new Date().getFullYear())
   const [searchQuery, setSearchQuery] = useState("")
   const [deptFilter, setDeptFilter] = useState("all")
