@@ -25,7 +25,7 @@ import {
 import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import Link from "next/link"
-import pptxgen from "pptxgenjs"
+// import pptxgen from "pptxgenjs"
 
 interface WeeklyReport {
   id: string
@@ -99,8 +99,10 @@ export function WeeklyReportsContent({ initialDepartments }: WeeklyReportsConten
     }
   }
 
-  const exportToPPT = (report: WeeklyReport) => {
+  /*
+  const exportToPPT = async (report: WeeklyReport) => {
     try {
+      const pptxgen = (await import("pptxgenjs")).default
       const pres = new pptxgen()
       pres.layout = "LAYOUT_WIDE"
 
@@ -173,6 +175,7 @@ export function WeeklyReportsContent({ initialDepartments }: WeeklyReportsConten
       toast.error("Failed to generate PowerPoint")
     }
   }
+  */
 
   const filteredReports = reports.filter(
     (r) =>
@@ -261,10 +264,10 @@ export function WeeklyReportsContent({ initialDepartments }: WeeklyReportsConten
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={() => exportToPPT(report)} className="gap-2 bg-white">
+                    {/* <Button variant="outline" size="sm" onClick={() => exportToPPT(report)} className="gap-2 bg-white">
                       <Presentation className="h-4 w-4 text-orange-600" />
                       Export to PPTX
-                    </Button>
+                    </Button> */}
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon" className="h-8 w-8">
