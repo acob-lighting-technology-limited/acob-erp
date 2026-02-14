@@ -161,31 +161,35 @@ export function ActionFormDialog({
           .neq("id", user.id) // Don't notify self
 
         if (deptMembers && deptMembers.length > 0) {
-          const { createNotification } = await import("@/lib/notifications")
+          try {
+            const { createNotification } = await import("@/lib/notifications")
 
-          // If bulk, send one summary or multiple?
-          // Sending one summary is better to avoid spam.
-          const title = payloads.length === 1 ? "New Action Item" : `${payloads.length} New Action Items`
-          const message =
-            payloads.length === 1
-              ? `New action added to ${dept}: ${payloads[0].title}`
-              : `${payloads.length} new actions added to ${dept} tracker.`
+            // If bulk, send one summary or multiple?
+            // Sending one summary is better to avoid spam.
+            const title = payloads.length === 1 ? "New Action Item" : `${payloads.length} New Action Items`
+            const message =
+              payloads.length === 1
+                ? `New action added to ${dept}: ${payloads[0].title}`
+                : `${payloads.length} new actions added to ${dept} tracker.`
 
-          await Promise.all(
-            deptMembers.map((member) =>
-              createNotification({
-                userId: member.id,
-                type: "task_assigned", // Using task_assigned generic type
-                category: "tasks",
-                title: title,
-                message: message,
-                priority: "normal",
-                linkUrl: `/portal/reports/action-tracker?dept=${dept}`,
-                actorId: user.id,
-                entityType: "task_batch",
-              })
+            await Promise.all(
+              deptMembers.map((member) =>
+                createNotification({
+                  userId: member.id,
+                  type: "task_assigned", // Using task_assigned generic type
+                  category: "tasks",
+                  title: title,
+                  message: message,
+                  priority: "normal",
+                  linkUrl: `/portal/reports/action-tracker?dept=${dept}`,
+                  actorId: user.id,
+                  entityType: "task_batch",
+                })
+              )
             )
-          )
+          } catch (notifError) {
+            console.error("Failed to send action notifications:", notifError)
+          }
         }
       }
 

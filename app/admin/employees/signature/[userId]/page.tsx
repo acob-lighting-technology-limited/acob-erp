@@ -24,14 +24,14 @@ export default async function AdminemployeeSignaturePage({ params }: { params: {
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", params.userId).single()
 
   if (!profile) {
-    redirect("/admin/employee")
+    redirect("/admin/employees")
   }
 
   return (
     <div className="bg-background min-h-screen">
       <div className="mx-auto max-w-6xl p-6">
         <div className="mb-8">
-          <Link href="/admin/employee" className={cn(buttonVariants({ variant: "ghost" }), "mb-4")}>
+          <Link href="/admin/employees" className={cn(buttonVariants({ variant: "ghost" }), "mb-4")}>
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Employee
           </Link>

@@ -105,8 +105,9 @@ export default function WeeklyReportsPortal() {
         .eq("year", yearFilter)
         .order("department", { ascending: true })
 
-      if (deptFilter !== "all") {
-        query = query.eq("department", deptFilter)
+      const effectiveDept = profile?.role === "lead" ? profile.department || "all" : deptFilter
+      if (effectiveDept !== "all") {
+        query = query.eq("department", effectiveDept)
       }
 
       const { data, error } = await query
@@ -184,7 +185,7 @@ export default function WeeklyReportsPortal() {
               placeholder="Year"
               title="Year"
             />
-            <Select value={deptFilter} onValueChange={setDeptFilter}>
+            <Select value={deptFilter} onValueChange={setDeptFilter} disabled={profile?.role === "lead"}>
               <SelectTrigger className="w-48">
                 <SelectValue placeholder="Department" />
               </SelectTrigger>

@@ -13,10 +13,27 @@ import { NextResponse } from "next/server"
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const tokenHash = searchParams.get("token_hash")
-  const type = searchParams.get("type") as "invite" | "recovery" | "email" | "signup" | null
-  const next = searchParams.get("next") || "/dashboard"
+  const rawType = searchParams.get("type")
+  const rawNext = searchParams.get("next") || "/dashboard"
 
-  if (!tokenHash || !type) {
+  // Validate type parameter
+  const ALLOWED_TYPES = new Set(["invite", "recovery", "email", "signup"])
+  const type = ALLOWED_TYPES.has(rawType || "") ? (rawType as "invite" | "recovery" | "email" | "signup") : "signup"
+
+  // Validate and sanitize 'next' to prevent open redirects
+  let safeNext = "/dashboard"
+  if (
+    rawNext &&
+    rawNext.startsWith("/") &&
+    !rawNext.startsWith("//") &&
+    !rawNext.includes(":") &&
+    !/https?:\/\//i.test(rawNext) &&
+    !/[\r\n]/.test(rawNext) // Extra validation for CRLF
+  ) {
+    safeNext = rawNext
+  }
+
+  if (!tokenHash || !rawType) {
     return NextResponse.redirect(new URL("/auth/error?message=Missing+confirmation+parameters", request.url))
   }
 
@@ -24,7 +41,7 @@ export async function GET(request: Request) {
 
   const { error } = await supabase.auth.verifyOtp({
     token_hash: tokenHash,
-    type: type === "email" ? "email" : type === "invite" ? "invite" : type === "recovery" ? "recovery" : "signup",
+    type: type,
   })
 
   if (error) {
@@ -42,6 +59,6 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL("/auth/reset-password", request.url))
   }
 
-  // For all other types, redirect to the `next` path
-  return NextResponse.redirect(new URL(next, request.url))
+  // For all other types, redirect to the `safeNext` path
+  return NextResponse.redirect(new URL(safeNext, request.url))
 }

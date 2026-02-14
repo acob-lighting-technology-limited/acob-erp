@@ -6,6 +6,19 @@ export async function GET(request: Request) {
   const code = searchParams.get("code")
   const next = searchParams.get("next") || "/dashboard"
 
+  // Validate and sanitize 'next' to prevent open redirects
+  let safeNext = "/dashboard"
+  if (
+    next &&
+    typeof next === "string" &&
+    next.startsWith("/") &&
+    !next.startsWith("//") &&
+    !next.includes(":") && // Prevent scheme/host characters
+    !/https?:\/\//i.test(next) // Extra check for explicit http/https
+  ) {
+    safeNext = next
+  }
+
   if (code) {
     const supabase = await createClient()
     const { error } = await supabase.auth.exchangeCodeForSession(code)
@@ -16,5 +29,5 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.redirect(new URL(next, request.url))
+  return NextResponse.redirect(new URL(safeNext, request.url))
 }

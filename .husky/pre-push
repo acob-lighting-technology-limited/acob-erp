@@ -1,4 +1,5 @@
-
+#!/bin/sh
+. "$(dirname "$0")/husky.sh"
 
 # Prevent direct pushes to main branch
 protected_branch='main'

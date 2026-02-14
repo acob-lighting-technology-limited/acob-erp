@@ -32,13 +32,26 @@ create policy "Users can view action items for their department"
         )
     );
 
-create policy "Users can insert action items"
+create policy "Admins and leads can insert action items"
     on public.action_items for insert
-    with check (true); 
+    with check (
+        exists (
+            select 1 from profiles
+            where profiles.id = auth.uid()
+            and profiles.role in ('admin', 'super_admin', 'lead')
+        )
+    );
 
-create policy "Users can update action items"
+create policy "Users can update their own action items or admins/leads"
     on public.action_items for update
-    using (true);
+    using (
+        auth.uid() = assigned_by
+        or exists (
+            select 1 from profiles
+            where profiles.id = auth.uid()
+            and profiles.role in ('admin', 'super_admin', 'lead')
+        )
+    );
 
 create policy "Users can delete action items"
     on public.action_items for delete

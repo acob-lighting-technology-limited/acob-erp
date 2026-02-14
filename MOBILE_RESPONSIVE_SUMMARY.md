@@ -39,7 +39,7 @@ This is a MASSIVE undertaking. Here's what still needs to be done:
    - Form fields should be full width
    - Action buttons should stack
 
-2. **employee Management** (`/app/admin/employee/page.tsx`)
+2. **Employee Management** (`/app/admin/employees/page.tsx`)
    - Table needs horizontal scroll wrapper
    - Filter controls need mobile optimization
    - Action buttons need better layout

@@ -109,13 +109,12 @@ export default function LoginPage() {
       setStep("otp")
     } catch (error: unknown) {
       console.error("OTP Request Error:", error)
-      const message = error instanceof Error ? error.message : "An error occurred"
-      if (message.includes("Signups not allowed")) {
-        setError("This email is not registered. Please contact your administrator.")
-      } else {
-        setError(message)
+      let displayMessage = error instanceof Error ? error.message : "An error occurred"
+      if (displayMessage.includes("Signups not allowed")) {
+        displayMessage = "This email is not registered. Please contact your administrator."
       }
-      toast.error(message)
+      setError(displayMessage)
+      toast.error(displayMessage)
     } finally {
       setIsLoading(false)
     }

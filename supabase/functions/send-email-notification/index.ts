@@ -44,6 +44,16 @@ serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
     const resend = new Resend(RESEND_API_KEY)
 
+    // Webhook authenticity validation
+    const webhookSecret = Deno.env.get("WEBHOOK_SECRET")
+    const signature = req.headers.get("x-webhook-secret")
+    if (webhookSecret && signature !== webhookSecret) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 401,
+      })
+    }
+
     const payload: WebhookPayload = await req.json()
     const { record } = payload
 
@@ -79,12 +89,12 @@ serve(async (req) => {
       .eq("id", record.user_id)
       .single()
 
-    if (profileError) {
-      console.error("Error fetching profile preferences:", profileError)
-      // Fail open or closed? If error, maybe safe to skip or log.
-      // Let's assume sending is okay if we can't check, OR safer to skip.
-      // Given the request "off for everyone", let's fail safe (skip) if we can't verify.
-      // But actually, if profile doesn't exist, we probably shouldn't send.
+    if (profileError || !profile) {
+      console.error("Error fetching profile preferences or profile not found:", profileError)
+      return new Response(JSON.stringify({ message: "Profile not found or opt-out status unknown" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      })
     }
 
     if (profile && profile.email_notifications === false) {
@@ -98,11 +108,12 @@ serve(async (req) => {
     // 3. Send Email
     console.log(`Sending email to ${user.email} for notification: ${record.title}`)
 
+    const APP_BASE_URL = Deno.env.get("APP_BASE_URL") || "https://acob-erp.vercel.app"
     const emailHtml = `
       <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
         <h2>${record.title}</h2>
         <p>${record.message}</p>
-        ${record.link_url ? `<p><a href="${SUPABASE_URL?.replace(".supabase.co", "")}${record.link_url}" style="background-color: #000; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View Details</a></p>` : ""}
+        ${record.link_url ? `<p><a href="${APP_BASE_URL}${record.link_url}" style="background-color: #000; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View Details</a></p>` : ""}
         <hr />
         <p style="color: #666; font-size: 12px;">You received this email because you have notifications enabled.</p>
       </div>

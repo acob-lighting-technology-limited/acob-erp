@@ -176,8 +176,8 @@ export async function POST(request: NextRequest) {
 
       const requesterName = requester ? `${requester.first_name} ${requester.last_name}` : "Employee"
 
-      // Send notification to each admin
-      await Promise.all(
+      // Send notification to each admin (best-effort)
+      const notificationResults = await Promise.allSettled(
         admins.map((admin) =>
           notifyApprovalRequest({
             adminId: admin.id,
@@ -188,6 +188,12 @@ export async function POST(request: NextRequest) {
           })
         )
       )
+
+      notificationResults.forEach((result, index) => {
+        if (result.status === "rejected") {
+          console.error(`Failed to notify admin ${admins[index].id}:`, result.reason)
+        }
+      })
     }
 
     return NextResponse.json({

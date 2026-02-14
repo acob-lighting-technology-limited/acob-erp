@@ -801,16 +801,20 @@ export function AdminAssetsContent({
 
         if (error) throw error
 
-        // Notify if assigned immediately
+        // Notify if assigned immediately (non-blocking)
         if (assetForm.status === "assigned" && assetForm.assignment_type === "individual" && assetForm.assigned_to) {
-          const { notifyAssetAssigned } = await import("@/lib/notifications")
-          await notifyAssetAssigned({
-            userId: assetForm.assigned_to,
-            assetId: newAsset.id,
-            assetCode: newAsset.unique_code,
-            assetName: ASSET_TYPE_MAP[newAsset.asset_type]?.label || newAsset.asset_type,
-            assignedBy: user.id,
-          })
+          try {
+            const { notifyAssetAssigned } = await import("@/lib/notifications")
+            await notifyAssetAssigned({
+              userId: assetForm.assigned_to,
+              assetId: newAsset.id,
+              assetCode: newAsset.unique_code,
+              assetName: ASSET_TYPE_MAP[newAsset.asset_type]?.label || newAsset.asset_type,
+              assignedBy: user.id,
+            })
+          } catch (notifError) {
+            console.error("Failed to send asset assignment notification:", notifError)
+          }
         }
 
         // Note: Audit logging is handled by database trigger (audit_log_changes)

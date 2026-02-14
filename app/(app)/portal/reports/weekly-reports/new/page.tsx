@@ -103,13 +103,19 @@ function WeeklyReportFormContent() {
       }
 
       // Fetch current week's ACTION ITEMS from new table
-      const { data: actions } = await supabase
+      const { data: actions, error: actionsError } = await supabase
         .from("action_items")
         .select("*")
         .eq("department", currentDept)
         .eq("week_number", currentWeek)
         .eq("year", currentYear)
         .order("created_at", { ascending: true })
+
+      if (actionsError) {
+        console.error("Error fetching action items:", actionsError)
+        toast.error("Failed to load action items. The form remains restricted.")
+        return
+      }
 
       setCurrentActions(actions || [])
     } catch (error) {
@@ -120,8 +126,13 @@ function WeeklyReportFormContent() {
     }
   }
 
+  function weeksInISOYear(year: number) {
+    return getCurrentISOWeek(new Date(year, 11, 28))
+  }
+
   const getNextWeekParams = (w: number, y: number) => {
-    if (w >= 52) return { week: 1, year: y + 1 }
+    const weeksInYear = weeksInISOYear(y)
+    if (w >= weeksInYear) return { week: 1, year: y + 1 }
     return { week: w + 1, year: y }
   }
 

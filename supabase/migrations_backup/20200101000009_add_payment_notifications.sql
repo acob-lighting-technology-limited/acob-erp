@@ -14,6 +14,8 @@ DECLARE
     dept_head_id UUID;
     notification_id UUID;
 BEGIN
+    -- Set restricted search_path for SECURITY DEFINER function
+    SET search_path = public;
     -- 1. Identify and update OVERDUE payments
     -- Find payments that are 'due' but past their next_payment_due date
     FOR payment_record IN 

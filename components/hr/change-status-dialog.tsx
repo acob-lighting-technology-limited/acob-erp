@@ -62,6 +62,13 @@ export function ChangeStatusContent({ employee, onSuccess, onCancel }: ChangeSta
   const router = useRouter()
 
   useEffect(() => {
+    setStatus(employee.employment_status)
+    setReason("")
+    setSuspensionEndDate("")
+    setTerminationDate("")
+  }, [employee.id, employee.employment_status])
+
+  useEffect(() => {
     if (employee.id) {
       const fetchCounts = async () => {
         setIsFetchingCounts(true)

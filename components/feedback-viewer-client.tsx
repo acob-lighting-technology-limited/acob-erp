@@ -26,16 +26,16 @@ export function FeedbackViewerClient({ feedback }: FeedbackViewerClientProps) {
   const [selectedType, setSelectedType] = useState("all")
   const [selectedStatus, setSelectedStatus] = useState("all")
   const [departmentFilter, setDepartmentFilter] = useState("all")
-  const [employeeFilter, setemployeeFilter] = useState("all")
+  const [employeeFilter, setEmployeeFilter] = useState("all")
   const [nameSortOrder, setNameSortOrder] = useState<"asc" | "desc">("asc")
   const [viewMode, setViewMode] = useState<"list" | "card">("list")
   const [selectedFeedback, setSelectedFeedback] = useState<any | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isUpdating, setIsUpdating] = useState(false)
   const [departments, setDepartments] = useState<string[]>([])
-  const [employee, setemployee] = useState<{ id: string; first_name: string; last_name: string; department: string }[]>(
-    []
-  )
+  const [employees, setEmployees] = useState<
+    { id: string; first_name: string; last_name: string; department: string }[]
+  >([])
   const [userRole, setUserRole] = useState<string | null>(null)
   const [leadDepartments, setLeadDepartments] = useState<string[]>([])
 
@@ -76,7 +76,7 @@ export function FeedbackViewerClient({ feedback }: FeedbackViewerClientProps) {
         const { data: employeeData } = await employeeQuery
 
         if (employeeData) {
-          setemployee(employeeData)
+          setEmployees(employeeData)
 
           // Extract unique departments - for leads, only show their lead departments
           let uniqueDepartments: string[] = []
@@ -336,7 +336,7 @@ export function FeedbackViewerClient({ feedback }: FeedbackViewerClientProps) {
               </label>
               <SearchableSelect
                 value={employeeFilter}
-                onValueChange={setemployeeFilter}
+                onValueChange={setEmployeeFilter}
                 placeholder={
                   userRole === "lead" && departments.length > 0
                     ? `All ${departments.length === 1 ? departments[0] : "Department"} employee`
@@ -352,7 +352,7 @@ export function FeedbackViewerClient({ feedback }: FeedbackViewerClientProps) {
                         ? `All ${departments.length === 1 ? departments[0] : "Department"} employee`
                         : "All employee",
                   },
-                  ...employee.map((member) => ({
+                  ...employees.map((member) => ({
                     value: member.id,
                     label: `${formatName(member.first_name)} ${formatName(member.last_name)} - ${member.department}`,
                     icon: <User className="h-3 w-3" />,

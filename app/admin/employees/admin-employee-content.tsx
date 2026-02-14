@@ -1306,7 +1306,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                       <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
                       <TableCell>
                         <Link
-                          href={`/admin/employee/${member.id}`}
+                          href={`/admin/employees/${member.id}`}
                           className="hover:text-primary whitespace-nowrap transition-colors"
                         >
                           <span className="text-foreground font-medium">
@@ -1391,7 +1391,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                 <CardHeader className="from-primary/5 to-background border-b bg-linear-to-r">
                   <div className="flex items-start justify-between">
                     <Link
-                      href={`/admin/employee/${member.id}`}
+                      href={`/admin/employees/${member.id}`}
                       className="hover:text-primary flex flex-1 items-start gap-3 transition-colors"
                     >
                       <div className="bg-primary/10 rounded-lg p-2">

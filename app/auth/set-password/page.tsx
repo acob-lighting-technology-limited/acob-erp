@@ -49,6 +49,7 @@ export default function SetPasswordPage() {
       if (!session) {
         toast.error("Invalid or expired invitation link. Please contact your administrator.")
         router.push("/auth/login")
+        return
       }
       setIsChecking(false)
     }
