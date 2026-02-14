@@ -35,11 +35,12 @@ interface ActionTask {
   title: string
   description?: string
   status: string
-  priority: string
+  priority?: string // Priority removed from new schema, keeping optimal for UI if needed or remove
   department: string
-  due_date?: string
   week_number: number
   year: number
+  original_week?: number
+  original_year?: number
 }
 
 export default function ActionTrackerPortal() {
@@ -94,9 +95,8 @@ export default function ActionTrackerPortal() {
     setLoading(true)
     try {
       let query = supabase
-        .from("tasks")
+        .from("action_items")
         .select("*")
-        .eq("category", "weekly_action")
         .eq("week_number", week)
         .eq("year", year)
         .order("created_at", { ascending: false })
@@ -119,7 +119,7 @@ export default function ActionTrackerPortal() {
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure?")) return
     try {
-      const { error } = await supabase.from("tasks").delete().eq("id", id)
+      const { error } = await supabase.from("action_items").delete().eq("id", id)
       if (error) throw error
       toast.success("Action deleted")
       loadTasks()
@@ -141,13 +141,17 @@ export default function ActionTrackerPortal() {
   const updateStatus = async (taskId: string, newStatus: string) => {
     setUpdatingId(taskId)
     try {
-      const { error } = await supabase.from("tasks").update({ status: newStatus }).eq("id", taskId)
+      const { error } = await supabase
+        .from("action_items")
+        .update({ status: newStatus, updated_at: new Date().toISOString() })
+        .eq("id", taskId)
 
       if (error) throw error
 
       setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t)))
       toast.success(`Status updated to ${newStatus.replace("_", " ")}`)
     } catch (error) {
+      console.log(error)
       toast.error("Failed to update status")
     } finally {
       setUpdatingId(null)
@@ -163,15 +167,7 @@ export default function ActionTrackerPortal() {
   const stats = {
     total: tasks.length,
     completed: tasks.filter((t) => t.status === "completed").length,
-  }
-
-  const getStatusOrder = (status: string) => {
-    const orders: Record<string, string> = {
-      pending: "in_progress",
-      in_progress: "completed",
-      completed: "pending",
-    }
-    return orders[status] || "pending"
+    pending: tasks.filter((t) => t.status === "pending").length,
   }
 
   const isLead = profile?.role === "lead" || profile?.role === "admin" || profile?.role === "super_admin"
@@ -295,7 +291,14 @@ export default function ActionTrackerPortal() {
                   <TableRow key={task.id} className="group">
                     <TableCell className="text-muted-foreground text-center font-medium">{index + 1}</TableCell>
                     <TableCell>
-                      <div className="text-foreground font-semibold">{task.title}</div>
+                      <div className="text-foreground flex items-center gap-2 font-semibold">
+                        {task.title}
+                        {task.original_week && task.original_week !== task.week_number && (
+                          <Badge variant="outline" className="text-muted-foreground h-5 px-1.5 text-[10px]">
+                            From W{task.original_week}
+                          </Badge>
+                        )}
+                      </div>
                       {task.description && <div className="text-muted-foreground mt-1 text-sm">{task.description}</div>}
                     </TableCell>
                     <TableCell>
@@ -310,18 +313,18 @@ export default function ActionTrackerPortal() {
                                 ? "border-green-200 bg-green-50 text-green-700 hover:bg-green-100"
                                 : task.status === "in_progress"
                                   ? "border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100"
-                                  : "border-yellow-200 bg-yellow-50 text-yellow-700 hover:bg-yellow-100"
+                                  : task.status === "not_started"
+                                    ? "border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
+                                    : "border-yellow-200 bg-yellow-50 text-yellow-700 hover:bg-yellow-100"
                             }`}
                           >
                             <span className="flex items-center gap-2 font-medium capitalize">
                               {task.status === "completed" ? (
                                 <CheckCircle2 className="h-4 w-4" />
-                              ) : task.status === "in_progress" ? (
-                                <Clock className="h-4 w-4" />
                               ) : (
                                 <Clock className="h-4 w-4" />
                               )}
-                              {task.status.replace("_", " ")}
+                              {task.status === "in_progress" ? "In Progress" : task.status.replace("_", " ")}
                             </span>
                             <ChevronDown className="h-3 w-3 opacity-60" />
                           </Button>
@@ -332,6 +335,12 @@ export default function ActionTrackerPortal() {
                             className="gap-2 font-medium text-yellow-600 focus:bg-yellow-50 focus:text-yellow-700"
                           >
                             <Clock className="h-4 w-4" /> Pending
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => updateStatus(task.id, "not_started")}
+                            className="gap-2 font-medium text-red-600 focus:bg-red-50 focus:text-red-700"
+                          >
+                            <Clock className="h-4 w-4" /> Not Started
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             onClick={() => updateStatus(task.id, "in_progress")}

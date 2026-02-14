@@ -148,7 +148,7 @@ export default function WeeklyReportsPortal() {
       backLinkLabel="Back to Dashboard"
       actions={
         (profile?.role === "lead" || profile?.role === "admin" || profile?.role === "super_admin") && (
-          <Link href="/portal/tasks/weekly-reports/new">
+          <Link href="/portal/reports/weekly-reports/new">
             <Button className="gap-2 shadow-sm">
               <Plus className="h-4 w-4" />
               Submit New Report
@@ -245,7 +245,7 @@ export default function WeeklyReportsPortal() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <Link
-                              href={`/portal/tasks/weekly-reports/new?week=${report.week_number}&year=${report.year}&dept=${report.department}`}
+                              href={`/portal/reports/weekly-reports/new?week=${report.week_number}&year=${report.year}&dept=${report.department}`}
                             >
                               <DropdownMenuItem className="cursor-pointer gap-2">
                                 <Edit2 className="h-4 w-4" /> Edit Report
