@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS public.admin_logs (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Create pending users table for new staff without company email yet
+-- Create pending users table for new employee without company email yet
 CREATE TABLE IF NOT EXISTS public.pending_users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   email TEXT NOT NULL UNIQUE,

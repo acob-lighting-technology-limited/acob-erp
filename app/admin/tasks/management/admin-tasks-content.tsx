@@ -364,27 +364,21 @@ export function AdminTasksContent({
           const isNewAssignment = selectedTask.assigned_to !== taskForm.assigned_to
 
           if (isNewAssignment && taskForm.assigned_to) {
-            await notifyTaskAssigned(
-              {
-                userId: taskForm.assigned_to,
-                taskId: selectedTask.id,
-                taskTitle: taskForm.title,
-                assignedBy: user.id,
-                priority: taskForm.priority as any,
-              },
-              { supabase }
-            )
+            await notifyTaskAssigned({
+              userId: taskForm.assigned_to,
+              taskId: selectedTask.id,
+              taskTitle: taskForm.title,
+              assignedBy: user.id,
+              priority: taskForm.priority as any,
+            })
           } else if (taskForm.assigned_to) {
-            await notifyTaskUpdated(
-              {
-                userId: taskForm.assigned_to,
-                taskId: selectedTask.id,
-                taskTitle: taskForm.title,
-                updatedBy: user.id,
-                changeDescription: "Task details updated by admin",
-              },
-              { supabase }
-            )
+            await notifyTaskUpdated({
+              userId: taskForm.assigned_to,
+              taskId: selectedTask.id,
+              taskTitle: taskForm.title,
+              updatedBy: user.id,
+              changeDescription: "Task details updated by admin",
+            })
           }
         } else if (taskForm.assignment_type === "multiple") {
           // For multiple, we can check who was added.
@@ -398,16 +392,13 @@ export function AdminTasksContent({
           if (taskForm.assigned_users.length > 0) {
             await Promise.all(
               taskForm.assigned_users.map((userId) =>
-                notifyTaskUpdated(
-                  {
-                    userId,
-                    taskId: selectedTask.id,
-                    taskTitle: taskForm.title,
-                    updatedBy: user.id,
-                    changeDescription: "Task details updated by admin",
-                  },
-                  { supabase }
-                )
+                notifyTaskUpdated({
+                  userId,
+                  taskId: selectedTask.id,
+                  taskTitle: taskForm.title,
+                  updatedBy: user.id,
+                  changeDescription: "Task details updated by admin",
+                })
               )
             )
           }
@@ -431,29 +422,23 @@ export function AdminTasksContent({
         const { notifyTaskAssigned } = await import("@/lib/notifications")
 
         if (taskForm.assignment_type === "individual" && taskForm.assigned_to) {
-          await notifyTaskAssigned(
-            {
-              userId: taskForm.assigned_to,
-              taskId: newTask.id,
-              taskTitle: newTask.title,
-              assignedBy: user.id,
-              priority: newTask.priority as any,
-            },
-            { supabase }
-          )
+          await notifyTaskAssigned({
+            userId: taskForm.assigned_to,
+            taskId: newTask.id,
+            taskTitle: newTask.title,
+            assignedBy: user.id,
+            priority: newTask.priority as any,
+          })
         } else if (taskForm.assignment_type === "multiple" && taskForm.assigned_users.length > 0) {
           await Promise.all(
             taskForm.assigned_users.map((userId) =>
-              notifyTaskAssigned(
-                {
-                  userId,
-                  taskId: newTask.id,
-                  taskTitle: newTask.title,
-                  assignedBy: user.id,
-                  priority: newTask.priority as any,
-                },
-                { supabase }
-              )
+              notifyTaskAssigned({
+                userId,
+                taskId: newTask.id,
+                taskTitle: newTask.title,
+                assignedBy: user.id,
+                priority: newTask.priority as any,
+              })
             )
           )
         }

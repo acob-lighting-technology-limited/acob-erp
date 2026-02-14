@@ -173,20 +173,17 @@ export function ActionFormDialog({
 
           await Promise.all(
             deptMembers.map((member) =>
-              createNotification(
-                {
-                  userId: member.id,
-                  type: "task_assigned", // Using task_assigned generic type
-                  category: "tasks",
-                  title: title,
-                  message: message,
-                  priority: "normal",
-                  linkUrl: `/portal/reports/action-tracker?dept=${dept}`,
-                  actorId: user.id,
-                  entityType: "task_batch",
-                },
-                { supabase }
-              )
+              createNotification({
+                userId: member.id,
+                type: "task_assigned", // Using task_assigned generic type
+                category: "tasks",
+                title: title,
+                message: message,
+                priority: "normal",
+                linkUrl: `/portal/reports/action-tracker?dept=${dept}`,
+                actorId: user.id,
+                entityType: "task_batch",
+              })
             )
           )
         }
