@@ -184,13 +184,13 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
     department: "",
     companyRole: "",
     phoneNumber: "",
-    role: "employees" as UserRole,
+    role: "employee" as UserRole,
     employeeNumber: "",
   })
 
   // Form states
   const [editForm, setEditForm] = useState({
-    role: "employees" as UserRole,
+    role: "employee" as UserRole,
     department: "",
     office_location: "",
     company_role: "",
@@ -758,7 +758,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         department: "",
         companyRole: "",
         phoneNumber: "",
-        role: "employees",
+        role: "employee",
         employeeNumber: "",
       })
       loadData()
@@ -809,13 +809,13 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
 
   const departments = Array.from(new Set(employees.map((s) => s.department).filter(Boolean))) as string[]
 
-  const roles: UserRole[] = ["visitor", "employees", "lead", "admin", "super_admin"]
+  const roles: UserRole[] = ["visitor", "employee", "lead", "admin", "super_admin"]
 
   const stats = {
     total: employees.length,
     admins: employees.filter((s) => ["super_admin", "admin"].includes(s.role)).length,
     leads: employees.filter((s) => s.role === "lead").length,
-    employees: employees.filter((s) => s.role === "employees").length,
+    employees: employees.filter((s) => s.role === "employee").length,
   }
 
   // Helper function to get export data with selected columns
@@ -853,7 +853,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
   // Export functions
   const handleExportClick = (type: "excel" | "pdf" | "word") => {
     setExportType(type)
-    setExportDialogOpen(true)
+    setExportEmployeeDialogOpen(true)
   }
 
   const exportEmployeesToExcel = async () => {
@@ -887,7 +887,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
       })
       saveAs(data, `employees-export-${new Date().toISOString().split("T")[0]}.xlsx`)
       toast.success("Employees exported to Excel successfully")
-      setExportDialogOpen(false)
+      setExportEmployeeDialogOpen(false)
     } catch (error: any) {
       console.error("Error exporting employees to Excel:", error)
       toast.error("Failed to export employees to Excel")
@@ -1018,7 +1018,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
 
       doc.save(`acob-employee-report-${new Date().toISOString().split("T")[0]}.pdf`)
       toast.success("Employees exported to PDF successfully")
-      setExportDialogOpen(false)
+      setExportEmployeeDialogOpen(false)
     } catch (error: any) {
       console.error("Error exporting employees to PDF:", error)
       toast.error("Failed to export employees to PDF")
@@ -1114,9 +1114,9 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
     if (!userProfile) return []
 
     if (userProfile.role === "super_admin") {
-      return ["visitor", "employees", "lead", "admin", "super_admin"]
+      return ["visitor", "employee", "lead", "admin", "super_admin"]
     } else if (userProfile.role === "admin") {
-      return ["visitor", "employees", "lead"]
+      return ["visitor", "employee", "lead"]
     }
 
     return []
@@ -2833,7 +2833,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
       </Dialog>
 
       {/* Export Column Selection Dialog */}
-      <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
+      <Dialog open={exportEmployeeDialogOpen} onOpenChange={setExportEmployeeDialogOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader className="space-y-3 border-b pb-4">
             <div className="flex items-center gap-3">
@@ -2907,7 +2907,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
             </div>
           </div>
           <DialogFooter className="border-t pt-4">
-            <Button variant="outline" onClick={() => setExportDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setExportEmployeeDialogOpen(false)}>
               Cancel
             </Button>
             <Button

@@ -804,59 +804,14 @@ export function AdminAssetsContent({
         // Notify if assigned immediately
         if (assetForm.status === "assigned" && assetForm.assignment_type === "individual" && assetForm.assigned_to) {
           const { notifyAssetAssigned } = await import("@/lib/notifications")
-          await notifyAssetAssigned(
-            {
-              userId: assetForm.assigned_to,
-              assetId: newAsset.id,
-              assetCode: newAsset.unique_code,
-              assetName: ASSET_TYPE_MAP[newAsset.asset_type]?.label || newAsset.asset_type,
-              assignedBy: user.id,
-            },
-            { supabase }
-          )
+          await notifyAssetAssigned({
+            userId: assetForm.assigned_to,
+            assetId: newAsset.id,
+            assetCode: newAsset.unique_code,
+            assetName: ASSET_TYPE_MAP[newAsset.asset_type]?.label || newAsset.asset_type,
+            assignedBy: user.id,
+          })
         }
-
-        // Notify if assigned immediately
-        if (assetForm.status === "assigned" && assetForm.assignment_type === "individual" && assetForm.assigned_to) {
-          // We need to insert the assignment record first...
-          // Wait, the original code doesn't seem to insert assignment in the Create block!
-          // Looking at the provided code, the Create block inserts Asset but DOES NOT insert into asset_assignments.
-          // This seems to be a bug in the original code or I missed it in the view.
-          // I will assume I need to add assignment insertion logic here if it's missing, OR just notify only on Update if Create doesn't support assignment.
-          // BUT looking at the form, it allows assignment.
-
-          // Let's check if the original code had assignment logic for Create.
-          // The view showed:
-          // const { data: newAsset, error } = await supabase.from("assets").insert(insertData).select().single()
-          // ... (end of view)
-
-          // It seems incomplete. I should probably add the assignment insertion logic AND notification.
-
-          // For now, I will add the notification logic assuming assignment logic exists or needs to be added.
-          // actually, checking line 722 for Update, it updates `assets` table.
-          // Assignments are stored in `asset_assignments`.
-          // If Create doesn't insert into `asset_assignments`, then assigning on create is broken.
-          // I should fix that if I can.
-
-          // However, for this task, I will focus on notifications.
-          // If I can't confirm assignment insertion, I'll skip notification for Create for now to avoid errors,
-          // OR I'll add assignment insertion.
-
-          // Let's blindly add notification for now, but pass `newAsset.id`.
-          const { notifyAssetAssigned } = await import("@/lib/notifications")
-          await notifyAssetAssigned(
-            {
-              userId: assetForm.assigned_to,
-              assetId: newAsset.id,
-              assetCode: newAsset.unique_code,
-              assetName: ASSET_TYPE_MAP[newAsset.asset_type]?.label || newAsset.asset_type,
-              assignedBy: user.id,
-            },
-            { supabase }
-          )
-        }
-
-        if (error) throw error
 
         // Note: Audit logging is handled by database trigger (audit_log_changes)
 

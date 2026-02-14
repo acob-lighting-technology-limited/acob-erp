@@ -40,8 +40,6 @@ const roleColors: Record<string, string> = {
   admin: "default",
   manager: "default",
   employee: "secondary",
-  user: "secondary",
-  employee: "secondary",
   lead: "default",
 }
 
