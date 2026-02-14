@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import { AdminAuditLogsContent, type AuditLog, type StaffMember, type UserProfile } from "./admin-audit-logs-content"
+import { AdminAuditLogsContent, type AuditLog, type employeeMember, type UserProfile } from "./admin-audit-logs-content"
 
 async function getAuditLogsData() {
   const supabase = await createClient()
@@ -35,11 +35,11 @@ async function getAuditLogsData() {
 
   if (logsError) {
     console.error("Audit logs error:", logsError)
-    return { logs: [], staff: [], departments: [], userProfile }
+    return { logs: [], employee: [], departments: [], userProfile }
   }
 
   let logs: AuditLog[] = []
-  let staff: StaffMember[] = []
+  let employee: employeeMember[] = []
   let departments: string[] = []
 
   if (logsData && logsData.length > 0) {
@@ -123,30 +123,30 @@ async function getAuditLogsData() {
     }) as AuditLog[]
   }
 
-  // Load staff for filter
-  let staffQuery = supabase
+  // Load employee for filter
+  let employeeQuery = supabase
     .from("profiles")
     .select("id, first_name, last_name, department")
     .order("last_name", { ascending: true })
 
   if (profile.role === "lead" && profile.lead_departments && profile.lead_departments.length > 0) {
-    staffQuery = staffQuery.in("department", profile.lead_departments)
+    employeeQuery = employeeQuery.in("department", profile.lead_departments)
   }
 
-  const { data: staffData } = await staffQuery
-  staff = staffData || []
+  const { data: employeeData } = await employeeQuery
+  employee = employeeData || []
 
-  // Get unique departments from audit logs department column and staff profiles
+  // Get unique departments from audit logs department column and employee profiles
   const logDepartments = logsData?.map((log: any) => log.department).filter(Boolean) || []
   if (profile.role === "lead" && profile.lead_departments && profile.lead_departments.length > 0) {
     departments = profile.lead_departments.sort()
   } else {
-    const staffDepartments = staffData?.map((s: any) => s.department).filter(Boolean) || []
-    departments = Array.from(new Set([...staffDepartments, ...logDepartments])) as string[]
+    const employeeDepartments = employeeData?.map((s: any) => s.department).filter(Boolean) || []
+    departments = Array.from(new Set([...employeeDepartments, ...logDepartments])) as string[]
     departments.sort()
   }
 
-  return { logs, staff, departments, userProfile }
+  return { logs, employee, departments, userProfile }
 }
 
 export default async function AuditLogsPage() {
@@ -158,7 +158,7 @@ export default async function AuditLogsPage() {
 
   const pageData = data as {
     logs: AuditLog[]
-    staff: StaffMember[]
+    employee: employeeMember[]
     departments: string[]
     userProfile: UserProfile
   }
@@ -166,7 +166,7 @@ export default async function AuditLogsPage() {
   return (
     <AdminAuditLogsContent
       initialLogs={pageData.logs}
-      initialStaff={pageData.staff}
+      initialemployee={pageData.employee}
       initialDepartments={pageData.departments}
       userProfile={pageData.userProfile}
     />

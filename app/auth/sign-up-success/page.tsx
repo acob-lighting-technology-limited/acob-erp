@@ -14,7 +14,7 @@ export default function SignUpSuccessPage() {
           <CardContent className="space-y-4">
             <p className="text-muted-foreground text-sm">
               Please check your email inbox and click the confirmation link to verify your account. Once confirmed, you
-              can log in to access the staff portal.
+              can log in to access the employee portal.
             </p>
             <p className="text-muted-foreground text-sm">
               If you don&apos;t see the email, check your spam folder or try signing up again.

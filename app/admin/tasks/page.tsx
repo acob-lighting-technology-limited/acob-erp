@@ -1,217 +1,191 @@
-"use client"
-
-import { useEffect, useState } from "react"
-import { createClient } from "@/lib/supabase/client"
-import { getCurrentISOWeek } from "@/lib/utils"
-
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+import { redirect } from "next/navigation"
+import { createClient } from "@/lib/supabase/server"
 import {
-  ClipboardList,
-  LayoutDashboard,
-  FileSpreadsheet,
-  FileBarChart,
-  CheckCircle2,
-  AlertCircle,
-  Clock,
-} from "lucide-react"
-import Link from "next/link"
-import { PageWrapper, PageHeader, Section } from "@/components/layout"
-import { StatCard } from "@/components/ui/stat-card"
+  AdminTasksContent,
+  type Task,
+  type employee,
+  type Project,
+  type UserProfile,
+} from "./management/admin-tasks-content"
 
-interface TaskStats {
-  totalTasks: number
-  pendingActions: number
-  submittedReports: number
-  completedThisWeek: number
+async function getAdminTasksData() {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser()
+
+  if (userError || !user) {
+    return { redirect: "/auth/login" as const }
+  }
+
+  // Get user profile
+  const { data: profile } = await supabase.from("profiles").select("role, lead_departments").eq("id", user.id).single()
+
+  if (!profile || !["super_admin", "admin", "lead"].includes(profile.role)) {
+    return { redirect: "/dashboard" as const }
+  }
+
+  const userProfile: UserProfile = {
+    role: profile.role,
+    lead_departments: profile.lead_departments,
+  }
+
+  // Build query based on role
+  let tasksQuery = supabase.from("tasks").select("*").order("created_at", { ascending: false })
+
+  // Fetch employee - leads can only see employee in their departments
+  let employeeQuery = supabase
+    .from("profiles")
+    .select("id, first_name, last_name, company_email, department")
+    .order("last_name", { ascending: true })
+
+  if (profile.role === "lead" && profile.lead_departments && profile.lead_departments.length > 0) {
+    employeeQuery = employeeQuery.in("department", profile.lead_departments)
+  }
+
+  const [tasksResult, employeeResult, projectsResult] = await Promise.all([
+    tasksQuery,
+    employeeQuery,
+    supabase.from("projects").select("id, project_name").order("project_name", { ascending: true }),
+  ])
+
+  if (tasksResult.error || employeeResult.error || projectsResult.error) {
+    console.error("Error loading data:", tasksResult.error || employeeResult.error || projectsResult.error)
+    return { tasks: [], employee: [], projects: [], departments: [], userProfile }
+  }
+
+  // 1. Collect all IDs for batch queries
+  const allTaskIds = tasksResult.data?.map((t: any) => t.id) || []
+  const allIndivUserIds = Array.from(
+    new Set(
+      tasksResult.data
+        ?.filter((t: any) => t.assignment_type === "individual" && t.assigned_to)
+        .map((t: any) => t.assigned_to) || []
+    )
+  ) as string[]
+
+  // 2. Fetch profiles for individual assignments
+  const { data: indivProfiles } =
+    allIndivUserIds.length > 0
+      ? await supabase.from("profiles").select("id, first_name, last_name, department").in("id", allIndivUserIds)
+      : { data: [] }
+  const indivProfileMap = new Map(indivProfiles?.map((p: any) => [p.id, p]))
+
+  // 3. Fetch task assignments for multiple tasks
+  const multTaskIds = tasksResult.data?.filter((t: any) => t.assignment_type === "multiple").map((t: any) => t.id) || []
+  const { data: allTaskAssignments } =
+    multTaskIds.length > 0
+      ? await supabase.from("task_assignments").select("task_id, user_id").in("task_id", multTaskIds)
+      : { data: [] }
+
+  // 4. Fetch profiles for multiple assigned users
+  const multUserIds = Array.from(new Set(allTaskAssignments?.map((a: any) => a.user_id) || []))
+  const { data: multProfiles } =
+    multUserIds.length > 0
+      ? await supabase.from("profiles").select("id, first_name, last_name, department").in("id", multUserIds)
+      : { data: [] }
+  const multProfileMap = new Map(multProfiles?.map((p: any) => [p.id, p]))
+
+  // 5. Fetch all completions
+  const { data: allCompletions } =
+    allTaskIds.length > 0
+      ? await supabase.from("task_user_completion").select("task_id, user_id").in("task_id", allTaskIds)
+      : { data: [] }
+
+  // Grouping logic
+  const assignmentsByTask = new Map()
+  allTaskAssignments?.forEach((a: any) => {
+    if (!assignmentsByTask.has(a.task_id)) assignmentsByTask.set(a.task_id, [])
+    assignmentsByTask.get(a.task_id).push(a.user_id)
+  })
+
+  const completionsByTask = new Map()
+  allCompletions?.forEach((c: any) => {
+    if (!completionsByTask.has(c.task_id)) completionsByTask.set(c.task_id, new Set())
+    completionsByTask.get(c.task_id).add(c.user_id)
+  })
+
+  // 6. Reconstruct tasksWithUsers
+  const tasksWithUsers = (tasksResult.data || []).map((task: any) => {
+    const taskData: any = { ...task }
+
+    if (task.assignment_type === "individual" && task.assigned_to) {
+      taskData.assigned_to_user = indivProfileMap.get(task.assigned_to)
+    }
+
+    if (task.assignment_type === "multiple") {
+      const userIds = assignmentsByTask.get(task.id) || []
+      const taskComps = completionsByTask.get(task.id) || new Set()
+      taskData.assigned_users = userIds.map((uid: string) => {
+        const prof = multProfileMap.get(uid)
+        return {
+          ...prof,
+          completed: taskComps.has(uid),
+        }
+      })
+    }
+    return taskData
+  })
+
+  // For leads, filter tasks strictly by their departments
+  let filteredTasks = tasksWithUsers || []
+  if (profile.role === "lead" && profile.lead_departments && profile.lead_departments.length > 0) {
+    filteredTasks = filteredTasks.filter((task: any) => {
+      if (task.department && profile.lead_departments.includes(task.department)) {
+        return true
+      }
+      if (task.assigned_to_user?.department && profile.lead_departments.includes(task.assigned_to_user.department)) {
+        return true
+      }
+      if (task.assigned_users && task.assigned_users.length > 0) {
+        return task.assigned_users.some((u: any) => u.department && profile.lead_departments.includes(u.department))
+      }
+      return false
+    })
+  }
+
+  // Get unique departments
+  let departments: string[] = []
+  if (profile.role === "lead" && profile.lead_departments && profile.lead_departments.length > 0) {
+    departments = profile.lead_departments.sort()
+  } else {
+    departments = Array.from(new Set(employeeResult.data?.map((s: any) => s.department).filter(Boolean))) as string[]
+    departments.sort()
+  }
+
+  return {
+    tasks: filteredTasks as Task[],
+    employee: (employeeResult.data || []) as employee[],
+    projects: (projectsResult.data || []) as Project[],
+    departments,
+    userProfile,
+  }
 }
 
-export default function AdminTasksDashboard() {
-  const [stats, setStats] = useState<TaskStats>({
-    totalTasks: 0,
-    pendingActions: 0,
-    submittedReports: 0,
-    completedThisWeek: 0,
-  })
-  const [loading, setLoading] = useState(true)
+export default async function AdminTasksPage() {
+  const data = await getAdminTasksData()
 
-  useEffect(() => {
-    fetchDashboardData()
-  }, [])
+  if ("redirect" in data && data.redirect) {
+    redirect(data.redirect)
+  }
 
-  async function fetchDashboardData() {
-    try {
-      const supabase = createClient()
-
-      const currentWeek = getCurrentISOWeek()
-      const currentYear = new Date().getFullYear()
-
-      // Total general tasks
-      const { count: taskCount } = await supabase
-        .from("tasks")
-        .select("*", { count: "exact", head: true })
-        .eq("category", "general")
-
-      // Pending weekly actions
-      const { count: pendingCount } = await supabase
-        .from("tasks")
-        .select("*", { count: "exact", head: true })
-        .eq("category", "weekly_action")
-        .neq("status", "completed")
-
-      // Submitted weekly reports for current week
-      const { data: reports } = await supabase
-        .from("weekly_reports")
-        .select("id")
-        .eq("status", "submitted")
-        .eq("week_number", currentWeek)
-        .eq("year", currentYear)
-
-      // Completed actions this week
-      const { count: completedCount } = await supabase
-        .from("tasks")
-        .select("*", { count: "exact", head: true })
-        .eq("category", "weekly_action")
-        .eq("status", "completed")
-        .eq("week_number", currentWeek)
-        .eq("year", currentYear)
-
-      setStats({
-        totalTasks: taskCount || 0,
-        pendingActions: pendingCount || 0,
-        submittedReports: reports?.length || 0,
-        completedThisWeek: completedCount || 0,
-      })
-    } catch (error) {
-      console.error("Error fetching dashboard data:", error)
-    } finally {
-      setLoading(false)
-    }
+  const pageData = data as {
+    tasks: Task[]
+    employee: employee[]
+    projects: Project[]
+    departments: string[]
+    userProfile: UserProfile
   }
 
   return (
-    <PageWrapper maxWidth="full" background="gradient">
-      <PageHeader
-        title="Tasks & Reporting"
-        description="Manage general tasks, departmental actions, and weekly reporting"
-        icon={ClipboardList}
-        backLink={{ href: "/admin", label: "Back to Admin" }}
-      />
-
-      {/* Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          title="General Tasks"
-          value={stats.totalTasks}
-          icon={LayoutDashboard}
-          description="Active standalone tasks"
-        />
-        <StatCard
-          title="Pending Actions"
-          value={stats.pendingActions}
-          icon={Clock}
-          description="Weekly actions in progress"
-        />
-        <StatCard
-          title="Reports Submitted"
-          value={stats.submittedReports}
-          icon={FileBarChart}
-          description="Departmental reports received"
-        />
-        <StatCard
-          title="Completed Actions"
-          value={stats.completedThisWeek}
-          icon={CheckCircle2}
-          description="Successfully closed this week"
-        />
-      </div>
-
-      {/* Admin Actions */}
-      <Section title="Management Modules">
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {/* General Task Management */}
-          <Card className="transition-shadow hover:shadow-md">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <LayoutDashboard className="h-5 w-5 text-blue-500" />
-                Task Management
-              </CardTitle>
-              <CardDescription>Create and assign general standalone tasks</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Link href="/admin/tasks/management">
-                <Button className="w-full">Open Management</Button>
-              </Link>
-            </CardContent>
-          </Card>
-
-          {/* Action Tracker */}
-          <Card className="border-primary/20 bg-primary/5 transition-shadow hover:shadow-md">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileSpreadsheet className="h-5 w-5 text-green-500" />
-                Action Tracker
-              </CardTitle>
-              <CardDescription>Bulk import weekly actions from Excel sheets</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Link href="/admin/tasks/action-tracker">
-                <Button className="w-full" variant="default">
-                  Manage Actions
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-
-          {/* Weekly Reports */}
-          <Card className="transition-shadow hover:shadow-md">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileBarChart className="h-5 w-5 text-purple-500" />
-                Weekly Reports
-              </CardTitle>
-              <CardDescription>Review and export departmental weekly reports</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Link href="/admin/tasks/weekly-reports">
-                <Button className="w-full" variant="outline">
-                  Review Reports
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-        </div>
-      </Section>
-
-      {/* Status Overview */}
-      <Section title="Current Status">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="space-y-4">
-              {stats.pendingActions > 0 && (
-                <div className="flex items-center gap-4">
-                  <AlertCircle className="h-5 w-5 text-orange-500" />
-                  <div className="flex-1">
-                    <p className="font-medium">{stats.pendingActions} actions pending across departments</p>
-                    <p className="text-muted-foreground text-sm">Requires follow-up with leads</p>
-                  </div>
-                  <Link href="/admin/tasks/action-tracker">
-                    <Button size="sm">Follow up</Button>
-                  </Link>
-                </div>
-              )}
-
-              <div className="flex items-center gap-4">
-                <CheckCircle2 className="h-5 w-5 text-green-500" />
-                <div className="flex-1">
-                  <p className="font-medium">{stats.completedThisWeek} actions completed</p>
-                  <p className="text-muted-foreground text-sm">Productivity this week</p>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </Section>
-    </PageWrapper>
+    <AdminTasksContent
+      initialTasks={pageData.tasks}
+      initialemployee={pageData.employee}
+      initialProjects={pageData.projects}
+      initialDepartments={pageData.departments}
+      userProfile={pageData.userProfile}
+    />
   )
 }

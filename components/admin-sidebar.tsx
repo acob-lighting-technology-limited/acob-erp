@@ -23,6 +23,7 @@ import {
   CreditCard,
   Calendar,
   Target,
+  FileBarChart,
 } from "lucide-react"
 import Image from "next/image"
 import { useState, useEffect } from "react"
@@ -59,6 +60,7 @@ const adminNavigation = [
   { name: "Purchasing", href: "/admin/purchasing", icon: Briefcase, roles: ["super_admin", "admin"] },
   { name: "Projects", href: "/admin/projects", icon: FolderKanban, roles: ["super_admin", "admin", "lead"] },
   { name: "Tasks", href: "/admin/tasks", icon: ClipboardList, roles: ["super_admin", "admin", "lead"] },
+  { name: "Reports", href: "/admin/reports", icon: FileBarChart, roles: ["super_admin", "admin", "lead"] },
   { name: "Assets", href: "/admin/assets", icon: Package, roles: ["super_admin", "admin", "lead"] },
   { name: "Documentation", href: "/admin/documentation", icon: FileText, roles: ["super_admin", "admin", "lead"] },
   { name: "Feedback", href: "/admin/feedback", icon: MessageSquare, roles: ["super_admin", "admin", "lead"] },
@@ -176,7 +178,7 @@ export function AdminSidebar({ user, profile }: AdminSidebarProps) {
                     : user?.email?.split("@")[0]}
                 </p>
                 <p className="text-muted-foreground truncate text-xs whitespace-nowrap">
-                  {profile?.department || "Staff Member"}
+                  {profile?.department || "employee Member"}
                 </p>
                 {profile?.role && (
                   <Badge

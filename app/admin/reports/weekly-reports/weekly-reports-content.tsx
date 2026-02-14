@@ -279,7 +279,7 @@ export function WeeklyReportsContent({ initialDepartments }: WeeklyReportsConten
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <Link
-                          href={`/portal/tasks/weekly-reports/new?week=${report.week_number}&year=${report.year}&dept=${report.department}`}
+                          href={`/portal/reports/weekly-reports/new?week=${report.week_number}&year=${report.year}&dept=${report.department}`}
                         >
                           <DropdownMenuItem className="cursor-pointer gap-2">
                             <Edit2 className="h-4 w-4" /> Edit Override

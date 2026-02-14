@@ -15,7 +15,7 @@ import Link from "next/link"
 import { toast } from "sonner"
 
 // Allowlist of valid roles for validation
-const ALLOWED_ROLES = ["super_admin", "admin", "manager", "employee", "user", "staff", "lead", "visitor"] as const
+const ALLOWED_ROLES = ["super_admin", "admin", "manager", "employee", "user", "employee", "lead", "visitor"] as const
 type AllowedRole = (typeof ALLOWED_ROLES)[number]
 
 function isValidRole(role: string): role is AllowedRole {
@@ -41,7 +41,7 @@ const roleColors: Record<string, string> = {
   manager: "default",
   employee: "secondary",
   user: "secondary",
-  staff: "secondary",
+  employee: "secondary",
   lead: "default",
 }
 

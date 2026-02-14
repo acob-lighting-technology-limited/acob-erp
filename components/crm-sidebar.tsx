@@ -137,7 +137,7 @@ export function CRMSidebar({ user, profile }: CRMSidebarProps) {
           {!collapsed && (
             <div className="flex-1 overflow-hidden">
               <p className="truncate text-sm font-medium">{profile?.full_name || "User"}</p>
-              <p className="text-muted-foreground truncate text-xs">{profile?.role || "Staff"}</p>
+              <p className="text-muted-foreground truncate text-xs">{profile?.role || "employee"}</p>
             </div>
           )}
         </div>

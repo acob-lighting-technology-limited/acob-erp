@@ -3,7 +3,7 @@ import { createClient as createAdminClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
 
 // Allowlist of valid roles
-const ALLOWED_ROLES = ["admin", "manager", "employee", "user", "staff", "lead", "visitor"] as const
+const ALLOWED_ROLES = ["admin", "manager", "employee", "user", "employee", "lead", "visitor"] as const
 const SUPER_ADMIN_ROLE = "super_admin"
 
 type AllowedRole = (typeof ALLOWED_ROLES)[number] | typeof SUPER_ADMIN_ROLE

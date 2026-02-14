@@ -41,7 +41,7 @@ const typeIcons = {
 }
 
 const typeLabels = {
-  profile: "Staff",
+  profile: "employee",
   device: "Device",
   asset: "Asset",
   task: "Task",
@@ -136,7 +136,7 @@ export function UniversalSearch() {
             <div className="relative">
               <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
               <Input
-                placeholder="Search staff, devices, assets, tasks, documentation, feedback..."
+                placeholder="Search employee, devices, assets, tasks, documentation, feedback..."
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 className="pl-9"

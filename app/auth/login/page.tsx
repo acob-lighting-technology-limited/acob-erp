@@ -11,7 +11,9 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState, useRef, useEffect } from "react"
 import { toast } from "sonner"
-import { KeyRound, Mail, ArrowLeft, Shield } from "lucide-react"
+import { KeyRound, Mail, ArrowLeft, Eye, EyeOff } from "lucide-react"
+import Image from "next/image"
+import { useTheme } from "next-themes"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -21,8 +23,22 @@ export default function LoginPage() {
   const [step, setStep] = useState<"credentials" | "otp">("credentials")
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+  const [mounted, setMounted] = useState(false)
   const router = useRouter()
+  const { resolvedTheme } = useTheme()
   const otpRefs = useRef<(HTMLInputElement | null)[]>([])
+
+  // Default to light logo for SSR to prevent hydration mismatch
+  const logoSrc = !mounted
+    ? "/images/acob-logo-light.webp"
+    : resolvedTheme === "dark"
+      ? "/images/acob-logo-dark.webp"
+      : "/images/acob-logo-light.webp"
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   // Auto-focus first OTP box when entering OTP step
   useEffect(() => {
@@ -92,6 +108,7 @@ export default function LoginPage() {
       toast.success("A 6-digit code has been sent to your email")
       setStep("otp")
     } catch (error: unknown) {
+      console.error("OTP Request Error:", error)
       const message = error instanceof Error ? error.message : "An error occurred"
       if (message.includes("Signups not allowed")) {
         setError("This email is not registered. Please contact your administrator.")
@@ -117,8 +134,9 @@ export default function LoginPage() {
       })
       if (error) throw error
       toast.success("Login successful!")
-      router.push("/dashboard")
+      window.location.href = "/dashboard"
     } catch (error: unknown) {
+      console.error("Password Login Error:", error)
       const message = error instanceof Error ? error.message : "Invalid email or password"
       setError(message)
       toast.error(message)
@@ -148,8 +166,9 @@ export default function LoginPage() {
       })
       if (error) throw error
       toast.success("Login successful!")
-      router.push("/dashboard")
+      window.location.href = "/dashboard"
     } catch (error: unknown) {
+      console.error("OTP Verification Error:", error)
       const message = error instanceof Error ? error.message : "Invalid OTP"
       setError(message)
       toast.error(message)
@@ -163,12 +182,12 @@ export default function LoginPage() {
       <div className="w-full max-w-lg">
         <div className="flex flex-col gap-8">
           {/* Header Section */}
-          <div className="space-y-2 text-center">
-            <div className="bg-primary/10 mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl">
-              <Shield className="text-primary h-8 w-8" />
+          <div className="space-y-4 text-center">
+            <div className="mx-auto flex h-20 items-center justify-center">
+              <Image src={logoSrc} alt="ACOB Lighting" width={200} height={60} priority className="h-12 w-auto" />
             </div>
             <h1 className="text-4xl font-bold tracking-tight">Welcome Back</h1>
-            <p className="text-muted-foreground text-lg">Login to access your ACOB staff portal</p>
+            <p className="text-muted-foreground text-lg">Login to access your ACOB employee portal</p>
           </div>
 
           <Card className="border-2 shadow-xl">
@@ -229,12 +248,14 @@ export default function LoginPage() {
                           </Label>
                           <Input
                             id="email"
+                            name="email"
                             type="email"
                             placeholder="a.john@org.acoblighting.com"
                             required
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             className="h-11 text-base"
+                            autoComplete="username"
                           />
                         </div>
                         <div className="grid gap-3">
@@ -249,15 +270,26 @@ export default function LoginPage() {
                               Forgot password?
                             </Link>
                           </div>
-                          <Input
-                            id="password"
-                            type="password"
-                            placeholder="Enter your password"
-                            required
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            className="h-11 text-base"
-                          />
+                          <div className="relative">
+                            <Input
+                              id="password"
+                              name="password"
+                              type={showPassword ? "text" : "password"}
+                              placeholder="Enter your password"
+                              required
+                              value={password}
+                              onChange={(e) => setPassword(e.target.value)}
+                              className="h-11 pr-10 text-base"
+                              autoComplete="current-password"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowPassword(!showPassword)}
+                              className="text-muted-foreground hover:text-foreground absolute top-1/2 right-3 -translate-y-1/2"
+                            >
+                              {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                            </button>
+                          </div>
                         </div>
                         {error && (
                           <p className="rounded-md bg-red-50 p-3 text-sm text-red-500 dark:bg-red-950/30">{error}</p>
@@ -300,14 +332,14 @@ export default function LoginPage() {
                     <p className="text-sm text-blue-800 dark:text-blue-200">
                       <span className="font-semibold">First time logging in?</span>{" "}
                       <Link
-                        href="/auth/forgot-password"
+                        href="/auth/setup-account"
                         className="font-bold text-blue-600 underline underline-offset-4 hover:text-blue-700 dark:text-blue-400"
                       >
-                        Set your password here →
+                        Set up your account here →
                       </Link>
                     </p>
                     <p className="text-muted-foreground mt-1 text-xs">
-                      Enter your company email to receive a link to set up your password
+                      Enter your company email to receive a link to create your password
                     </p>
                   </div>
                 </div>

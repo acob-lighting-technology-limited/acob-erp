@@ -10,16 +10,33 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState, useEffect } from "react"
 import { toast } from "sonner"
-import { Lock, CheckCircle, Shield } from "lucide-react"
+import { Lock, CheckCircle, Eye, EyeOff } from "lucide-react"
+import Image from "next/image"
+import { useTheme } from "next-themes"
 
 export default function SetPasswordPage() {
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [isSuccess, setIsSuccess] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isChecking, setIsChecking] = useState(true)
+  const [mounted, setMounted] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
+  const { resolvedTheme } = useTheme()
+
+  // Default to light logo for SSR to prevent hydration mismatch
+  const logoSrc = !mounted
+    ? "/images/acob-logo-light.webp"
+    : resolvedTheme === "dark"
+      ? "/images/acob-logo-dark.webp"
+      : "/images/acob-logo-light.webp"
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   // Check if user has a valid session from the invite link
   useEffect(() => {
@@ -70,7 +87,7 @@ export default function SetPasswordPage() {
 
       // Redirect to dashboard after 2 seconds
       setTimeout(() => {
-        router.push("/dashboard")
+        window.location.href = "/dashboard"
       }, 2000)
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Failed to set password"
@@ -97,9 +114,9 @@ export default function SetPasswordPage() {
       <div className="w-full max-w-lg">
         <div className="flex flex-col gap-8">
           {/* Header Section */}
-          <div className="space-y-2 text-center">
-            <div className="bg-primary/10 mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl">
-              <Shield className="text-primary h-8 w-8" />
+          <div className="space-y-4 text-center">
+            <div className="mx-auto flex h-20 items-center justify-center">
+              <Image src={logoSrc} alt="ACOB Lighting" width={200} height={60} priority className="h-12 w-auto" />
             </div>
             <h1 className="text-4xl font-bold tracking-tight">Welcome to ACOB ERP</h1>
             <p className="text-muted-foreground text-lg">Set up your password to complete your account</p>
@@ -145,17 +162,26 @@ export default function SetPasswordPage() {
                       <Label htmlFor="password" className="text-sm font-medium">
                         Password
                       </Label>
-                      <Input
-                        id="password"
-                        type="password"
-                        placeholder="Create a strong password"
-                        required
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        className="h-11 text-base"
-                        autoFocus
-                        minLength={6}
-                      />
+                      <div className="relative">
+                        <Input
+                          id="password"
+                          type={showPassword ? "text" : "password"}
+                          placeholder="Create a strong password"
+                          required
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          className="h-11 pr-10 text-base"
+                          autoFocus
+                          minLength={6}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="text-muted-foreground hover:text-foreground absolute top-1/2 right-3 -translate-y-1/2"
+                        >
+                          {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                        </button>
+                      </div>
                       <p className="text-muted-foreground text-xs">Must be at least 6 characters long</p>
                     </div>
 
@@ -163,16 +189,25 @@ export default function SetPasswordPage() {
                       <Label htmlFor="confirmPassword" className="text-sm font-medium">
                         Confirm Password
                       </Label>
-                      <Input
-                        id="confirmPassword"
-                        type="password"
-                        placeholder="Confirm your password"
-                        required
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        className="h-11 text-base"
-                        minLength={6}
-                      />
+                      <div className="relative">
+                        <Input
+                          id="confirmPassword"
+                          type={showConfirmPassword ? "text" : "password"}
+                          placeholder="Confirm your password"
+                          required
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          className="h-11 pr-10 text-base"
+                          minLength={6}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          className="text-muted-foreground hover:text-foreground absolute top-1/2 right-3 -translate-y-1/2"
+                        >
+                          {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                        </button>
+                      </div>
                     </div>
 
                     {/* Password strength indicator */}

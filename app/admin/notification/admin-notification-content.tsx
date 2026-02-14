@@ -122,8 +122,8 @@ export function AdminNotificationContent({ initialNotifications }: AdminNotifica
             title: "Pending User Approvals",
             message: `${pendingUsersCount} user${pendingUsersCount > 1 ? "s" : ""} waiting for approval`,
             timestamp,
-            link: "/admin/staff",
-            linkText: "Review Users",
+            link: "/admin/hr/employees",
+            linkText: "Review Employees",
             read: readIds.has("pending-users"),
             priority: "high",
           })

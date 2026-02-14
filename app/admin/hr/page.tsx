@@ -13,7 +13,7 @@ interface DashboardStats {
   pendingLeaveRequests: number
   todayAttendance: number
   upcomingReviews: number
-  totalStaff: number
+  totalEmployees: number
 }
 
 export default function HRAdminDashboard() {
@@ -21,7 +21,7 @@ export default function HRAdminDashboard() {
     pendingLeaveRequests: 0,
     todayAttendance: 0,
     upcomingReviews: 0,
-    totalStaff: 0,
+    totalEmployees: 0,
   })
   const [loading, setLoading] = useState(true)
 
@@ -43,14 +43,14 @@ export default function HRAdminDashboard() {
       // Fetch upcoming reviews
       const { data: reviews } = await supabase.from("performance_reviews").select("id").eq("status", "draft")
 
-      // Fetch total staff
-      const { count: staffCount } = await supabase.from("profiles").select("*", { count: "exact", head: true })
+      // Fetch total employees
+      const { count: employeeCount } = await supabase.from("profiles").select("*", { count: "exact", head: true })
 
       setStats({
         pendingLeaveRequests: leaveRequests?.length || 0,
         todayAttendance: attendance?.length || 0,
         upcomingReviews: reviews?.length || 0,
-        totalStaff: staffCount || 0,
+        totalEmployees: employeeCount || 0,
       })
     } catch (error) {
       console.error("Error fetching dashboard data:", error)
@@ -80,7 +80,7 @@ export default function HRAdminDashboard() {
           title="Today's Attendance"
           value={stats.todayAttendance}
           icon={Clock}
-          description="Staff clocked in today"
+          description="Employees clocked in today"
         />
         <StatCard
           title="Pending Reviews"
@@ -88,7 +88,12 @@ export default function HRAdminDashboard() {
           icon={FileText}
           description="Reviews to complete"
         />
-        <StatCard title="Total Staff" value={stats.totalStaff} icon={Users} description="Registered employees" />
+        <StatCard
+          title="Total Employees"
+          value={stats.totalEmployees}
+          icon={Users}
+          description="Registered employees"
+        />
       </div>
 
       {/* Admin Actions */}
@@ -105,7 +110,7 @@ export default function HRAdminDashboard() {
             </CardHeader>
             <CardContent>
               <Link href="/admin/hr/employees">
-                <Button className="w-full">Manage Employees ({stats.totalStaff})</Button>
+                <Button className="w-full">Manage Employees ({stats.totalEmployees})</Button>
               </Link>
             </CardContent>
           </Card>
@@ -167,7 +172,7 @@ export default function HRAdminDashboard() {
                 <TrendingUp className="h-5 w-5" />
                 Performance Reviews
               </CardTitle>
-              <CardDescription>Create and manage staff reviews</CardDescription>
+              <CardDescription>Create and manage employee reviews</CardDescription>
             </CardHeader>
             <CardContent>
               <Link href="/admin/hr/performance/create">
@@ -200,7 +205,7 @@ export default function HRAdminDashboard() {
                 <div className="flex items-center gap-4">
                   <CheckCircle className="h-5 w-5 text-green-500" />
                   <div className="flex-1">
-                    <p className="font-medium">{stats.todayAttendance} staff clocked in</p>
+                    <p className="font-medium">{stats.todayAttendance} employees clocked in</p>
                     <p className="text-muted-foreground text-sm">Today's attendance</p>
                   </div>
                 </div>

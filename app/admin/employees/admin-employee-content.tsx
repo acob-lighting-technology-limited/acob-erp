@@ -63,7 +63,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Textarea } from "@/components/ui/textarea"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
 
-export interface Staff {
+export interface Employee {
   id: string
   first_name: string
   last_name: string
@@ -92,22 +92,22 @@ export interface UserProfile {
   role: UserRole
 }
 
-interface AdminStaffContentProps {
-  initialStaff: Staff[]
+interface AdminEmployeeContentProps {
+  initialEmployees: Employee[]
   userProfile: UserProfile
 }
 
-export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffContentProps) {
+export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmployeeContentProps) {
   const searchParams = useSearchParams()
-  const [staff, setStaff] = useState<Staff[]>(initialStaff)
+  const [employee, setEmployees] = useState<Employee[]>(initialEmployees)
   const [isLoading, setIsLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [departmentFilter, setDepartmentFilter] = useState<string[]>([])
-  const [staffFilter, setStaffFilter] = useState<string[]>([])
+  const [employeeFilter, setEmployeeFilter] = useState<string[]>([])
   const [roleFilter, setRoleFilter] = useState<string[]>([])
   const [nameSortOrder, setNameSortOrder] = useState<"asc" | "desc">("asc")
   const [viewMode, setViewMode] = useState<"list" | "card">("list")
-  const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null)
+  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isSignatureDialogOpen, setIsSignatureDialogOpen] = useState(false)
@@ -158,8 +158,8 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
     "Lead Departments": true,
     "Created At": true,
   })
-  const [viewStaffProfile, setViewStaffProfile] = useState<any>(null)
-  const [viewStaffData, setViewStaffData] = useState<{
+  const [viewEmployeeProfile, setViewEmployeeProfile] = useState<any>(null)
+  const [viewEmployeeData, setViewEmployeeData] = useState<{
     tasks: any[]
     assets: any[]
     documentation: any[]
@@ -174,12 +174,12 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
     department: "",
     companyRole: "",
     phoneNumber: "",
-    role: "staff" as UserRole,
+    role: "employee" as UserRole,
   })
 
   // Form states
   const [editForm, setEditForm] = useState({
-    role: "staff" as UserRole,
+    role: "employee" as UserRole,
     department: "",
     office_location: "",
     company_role: "",
@@ -207,18 +207,18 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
   // Handle userId from search params (for edit dialog)
   useEffect(() => {
     const userId = searchParams?.get("userId")
-    if (userId && staff.length > 0 && !isEditDialogOpen) {
-      const user = staff.find((s) => s.id === userId)
+    if (userId && employee.length > 0 && !isEditDialogOpen) {
+      const user = employee.find((s) => s.id === userId)
       if (user) {
-        handleEditStaff(user)
+        handleEditEmployee(user)
       }
     }
-  }, [searchParams, staff, isEditDialogOpen])
+  }, [searchParams, employee, isEditDialogOpen])
 
   const loadData = async () => {
     setIsLoading(true)
     try {
-      // Fetch staff - leads can only see staff in their departments
+      // Fetch employee - leads can only see employee in their departments
       let query = supabase.from("profiles").select("*").order("last_name", { ascending: true })
 
       if (userProfile?.role === "lead") {
@@ -229,25 +229,25 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
 
       if (error) throw error
 
-      setStaff(data || [])
+      setEmployees(data || [])
     } catch (error: any) {
-      console.error("Error loading staff:", error)
-      toast.error("Failed to load staff")
+      console.error("Error loading employee:", error)
+      toast.error("Failed to load employee")
     } finally {
       setIsLoading(false)
     }
   }
 
-  const handleEditStaff = async (staffMember: Staff) => {
+  const handleEditEmployee = async (employee: Employee) => {
     try {
-      setSelectedStaff(staffMember)
+      setSelectedEmployee(employee)
 
       // Load full profile data to get all fields
-      const { data: fullProfile } = await supabase.from("profiles").select("*").eq("id", staffMember.id).single()
+      const { data: fullProfile } = await supabase.from("profiles").select("*").eq("id", employee.id).single()
 
       if (fullProfile) {
         setEditForm({
-          role: fullProfile.role || "staff",
+          role: fullProfile.role || "employee",
           department: fullProfile.department || "",
           office_location: fullProfile.office_location || "",
           company_role: fullProfile.company_role || "",
@@ -271,19 +271,19 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
       } else {
         // Fallback to basic fields if full profile not found
         setEditForm({
-          role: staffMember.role,
-          department: staffMember.department,
-          office_location: staffMember.office_location || "",
-          company_role: staffMember.company_role || "",
-          lead_departments: staffMember.lead_departments || [],
-          first_name: staffMember.first_name || "",
-          last_name: staffMember.last_name || "",
-          other_names: staffMember.other_names || "",
-          company_email: staffMember.company_email || "",
-          phone_number: staffMember.phone_number || "",
+          role: employee.role,
+          department: employee.department,
+          office_location: employee.office_location || "",
+          company_role: employee.company_role || "",
+          lead_departments: employee.lead_departments || [],
+          first_name: employee.first_name || "",
+          last_name: employee.last_name || "",
+          other_names: employee.other_names || "",
+          company_email: employee.company_email || "",
+          phone_number: employee.phone_number || "",
           additional_phone: "",
-          residential_address: staffMember.residential_address || "",
-          current_work_location: staffMember.current_work_location || "",
+          residential_address: employee.residential_address || "",
+          current_work_location: employee.current_work_location || "",
           bank_name: "",
           bank_account_number: "",
           bank_account_name: "",
@@ -296,21 +296,21 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
       setShowMoreOptions(false) // Reset expanded state
       setIsEditDialogOpen(true)
     } catch (error: any) {
-      console.error("Error loading staff for edit:", error)
-      toast.error("Failed to load staff details")
+      console.error("Error loading employee for edit:", error)
+      toast.error("Failed to load employee details")
     }
   }
 
-  const handleViewSignature = async (staffMember: Staff) => {
+  const handleViewSignature = async (employee: Employee) => {
     try {
-      setSelectedStaff(staffMember)
+      setSelectedEmployee(employee)
       setIsSignatureDialogOpen(true)
 
       // Load full profile data for signature
-      const { data: profileData } = await supabase.from("profiles").select("*").eq("id", staffMember.id).single()
+      const { data: profileData } = await supabase.from("profiles").select("*").eq("id", employee.id).single()
 
       if (profileData) {
-        setSelectedStaff(profileData as any)
+        setSelectedEmployee(profileData as any)
       }
     } catch (error: any) {
       console.error("Error loading profile for signature:", error)
@@ -318,16 +318,16 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
     }
   }
 
-  const handleViewDetails = async (staffMember: Staff) => {
+  const handleViewDetails = async (employee: Employee) => {
     try {
-      setSelectedStaff(staffMember)
+      setSelectedEmployee(employee)
       setIsViewDialogOpen(true)
 
       // Load full profile data
-      const { data: profileData } = await supabase.from("profiles").select("*").eq("id", staffMember.id).single()
+      const { data: profileData } = await supabase.from("profiles").select("*").eq("id", employee.id).single()
 
       if (profileData) {
-        setViewStaffProfile(profileData)
+        setViewEmployeeProfile(profileData)
 
         // Load related data
         const [tasksResult, assetAssignmentsResult, deptAssetsResult, officeAssetsResult, docsResult] =
@@ -335,14 +335,14 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
             supabase
               .from("tasks")
               .select("*")
-              .eq("assigned_to", staffMember.id)
+              .eq("assigned_to", employee.id)
               .order("created_at", { ascending: false })
               .limit(10),
             // Individual asset assignments
             supabase
               .from("asset_assignments")
               .select("id, asset_id, assigned_at, is_current, assignment_type")
-              .eq("assigned_to", staffMember.id)
+              .eq("assigned_to", employee.id)
               .eq("is_current", true)
               .limit(10),
             // Department assets (if user has department)
@@ -372,7 +372,7 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
             supabase
               .from("user_documentation")
               .select("*")
-              .eq("user_id", staffMember.id)
+              .eq("user_id", employee.id)
               .order("created_at", { ascending: false })
               .limit(10),
           ])
@@ -421,19 +421,19 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
         // Combine all types of assignments
         const allAssets = [...individualAssetsWithDetails, ...deptAssetsWithDetails, ...officeAssetsWithDetails]
 
-        setViewStaffData({
+        setViewEmployeeData({
           tasks: tasksResult.data || [],
           assets: allAssets || [],
           documentation: docsResult.data || [],
         })
       }
     } catch (error: any) {
-      console.error("Error loading staff details:", error)
-      toast.error("Failed to load staff details")
+      console.error("Error loading employee details:", error)
+      toast.error("Failed to load employee details")
     }
   }
 
-  const checkAssignedItems = async (staffMember: Staff) => {
+  const checkAssignedItems = async (employee: Employee) => {
     try {
       const [
         tasksResult,
@@ -445,33 +445,33 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
         docsResult,
       ] = await Promise.all([
         // Tasks assigned to this user
-        supabase.from("tasks").select("id, title, status").eq("assigned_to", staffMember.id),
+        supabase.from("tasks").select("id, title, status").eq("assigned_to", employee.id),
         // Task assignments (multiple user assignments)
         supabase
           .from("task_assignments")
           .select("id, task_id, Task:tasks(id, title, status)")
-          .eq("user_id", staffMember.id),
+          .eq("user_id", employee.id),
         // Current asset assignments
         supabase
           .from("asset_assignments")
           .select("id, Asset:assets(id, asset_name, asset_type)")
-          .eq("assigned_to", staffMember.id)
+          .eq("assigned_to", employee.id)
           .eq("is_current", true),
         // Projects managed or created by this user
         supabase
           .from("projects")
           .select("id, project_name, status")
-          .or(`project_manager_id.eq.${staffMember.id},created_by.eq.${staffMember.id}`),
+          .or(`project_manager_id.eq.${employee.id},created_by.eq.${employee.id}`),
         // Active project memberships
         supabase
           .from("project_members")
           .select("id, Project:projects(id, project_name)")
-          .eq("user_id", staffMember.id)
+          .eq("user_id", employee.id)
           .eq("is_active", true),
         // Feedback submitted by this user
-        supabase.from("feedback").select("id, title, status").eq("user_id", staffMember.id),
+        supabase.from("feedback").select("id, title, status").eq("user_id", employee.id),
         // User documentation
-        supabase.from("user_documentation").select("id, title").eq("user_id", staffMember.id),
+        supabase.from("user_documentation").select("id, title").eq("user_id", employee.id),
       ])
 
       const assigned = {
@@ -493,10 +493,10 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
     }
   }
 
-  const handleDeleteStaff = async (staffMember: Staff) => {
+  const handleDeleteEmployee = async (employee: Employee) => {
     try {
-      setSelectedStaff(staffMember)
-      const assigned = await checkAssignedItems(staffMember)
+      setSelectedEmployee(employee)
+      const assigned = await checkAssignedItems(employee)
 
       if (!assigned) {
         return
@@ -525,8 +525,8 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
     }
   }
 
-  const confirmDeleteStaff = async () => {
-    if (isDeleting || !selectedStaff) return
+  const confirmDeleteEmployee = async () => {
+    if (isDeleting || !selectedEmployee) return
 
     setIsDeleting(true)
     try {
@@ -538,7 +538,7 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
       }
 
       // Double-check for assignments before deleting
-      const assigned = await checkAssignedItems(selectedStaff)
+      const assigned = await checkAssignedItems(selectedEmployee)
       if (!assigned) {
         setIsDeleting(false)
         return
@@ -561,12 +561,12 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
 
       // Try to delete from profiles first (this is safer and will cascade)
       // Note: Deleting from auth.users requires admin API which may not be available
-      const { error: profileError } = await supabase.from("profiles").delete().eq("id", selectedStaff.id)
+      const { error: profileError } = await supabase.from("profiles").delete().eq("id", selectedEmployee.id)
 
       if (profileError) {
         // If that fails, try using admin API (if available)
         try {
-          const { error: authError } = await supabase.auth.admin.deleteUser(selectedStaff.id)
+          const { error: authError } = await supabase.auth.admin.deleteUser(selectedEmployee.id)
           if (authError) {
             throw authError
           }
@@ -576,23 +576,23 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
         }
       }
 
-      toast.success("Staff member deleted successfully")
+      toast.success("Employee updated successfully")
       setIsDeleteDialogOpen(false)
-      setSelectedStaff(null)
+      setSelectedEmployee(null)
       loadData()
     } catch (error: any) {
-      console.error("Error deleting staff:", error)
-      toast.error(error.message || "Failed to delete staff member")
+      console.error("Error deleting employee:", error)
+      toast.error(error.message || "Failed to delete employee")
     } finally {
       setIsDeleting(false)
     }
   }
 
-  const handleSaveStaff = async () => {
+  const handleSaveEmployee = async () => {
     if (isSaving) return // Prevent duplicate submissions
     setIsSaving(true)
     try {
-      if (!selectedStaff) {
+      if (!selectedEmployee) {
         setIsSaving(false)
         return
       }
@@ -641,16 +641,16 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
         job_description: editForm.job_description || null,
       }
 
-      const { error } = await supabase.from("profiles").update(updateData).eq("id", selectedStaff.id)
+      const { error } = await supabase.from("profiles").update(updateData).eq("id", selectedEmployee.id)
 
       if (error) throw error
 
-      toast.success("Staff member updated successfully")
+      toast.success("Employee updated successfully")
       setIsEditDialogOpen(false)
       loadData()
     } catch (error: any) {
-      console.error("Error updating staff:", error)
-      toast.error("Failed to update staff member")
+      console.error("Error updating employee:", error)
+      toast.error("Failed to update employee")
     } finally {
       setIsSaving(false)
     }
@@ -704,7 +704,7 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
         department: "",
         companyRole: "",
         phoneNumber: "",
-        role: "staff",
+        role: "employee",
       })
       loadData()
     } catch (error: any) {
@@ -715,7 +715,7 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
     }
   }
 
-  const filteredStaff = staff
+  const filteredEmployees = employee
     .filter((member) => {
       const matchesSearch =
         member.first_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -725,11 +725,11 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
 
       const matchesDepartment = departmentFilter.length === 0 || departmentFilter.includes(member.department)
 
-      const matchesStaff = staffFilter.length === 0 || staffFilter.includes(member.id)
+      const matchesEmployee = employeeFilter.length === 0 || employeeFilter.includes(member.id)
 
       const matchesRole = roleFilter.length === 0 || roleFilter.includes(member.role)
 
-      return matchesSearch && matchesDepartment && matchesStaff && matchesRole
+      return matchesSearch && matchesDepartment && matchesEmployee && matchesRole
     })
     .sort((a, b) => {
       const lastNameA = formatName(a.last_name).toLowerCase()
@@ -742,20 +742,20 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
       }
     })
 
-  const departments = Array.from(new Set(staff.map((s) => s.department).filter(Boolean))) as string[]
+  const departments = Array.from(new Set(employee.map((s) => s.department).filter(Boolean))) as string[]
 
-  const roles: UserRole[] = ["visitor", "staff", "lead", "admin", "super_admin"]
+  const roles: UserRole[] = ["visitor", "employee", "lead", "admin", "super_admin"]
 
   const stats = {
-    total: staff.length,
-    admins: staff.filter((s) => ["super_admin", "admin"].includes(s.role)).length,
-    leads: staff.filter((s) => s.role === "lead").length,
-    staff: staff.filter((s) => s.role === "staff").length,
+    total: employee.length,
+    admins: employee.filter((s) => ["super_admin", "admin"].includes(s.role)).length,
+    leads: employee.filter((s) => s.role === "lead").length,
+    employee: employee.filter((s) => s.role === "employee").length,
   }
 
   // Helper function to get export data with selected columns
-  const getExportData = (staffMembers: Staff[]) => {
-    return staffMembers.map((member, index) => {
+  const getExportData = (employees: Employee[]) => {
+    return employees.map((member, index) => {
       const row: Record<string, any> = {}
       if (selectedColumns["#"]) row["#"] = index + 1
       if (selectedColumns["First Name"]) row["First Name"] = formatName(member.first_name) || "-"
@@ -790,21 +790,21 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
     setExportDialogOpen(true)
   }
 
-  const exportStaffToExcel = async () => {
+  const exportEmployeeToExcel = async () => {
     try {
-      if (filteredStaff.length === 0) {
-        toast.error("No staff data to export")
+      if (filteredEmployees.length === 0) {
+        toast.error("No employee data to export")
         return
       }
 
       const XLSX = await import("xlsx")
       const { default: saveAs } = await import("file-saver")
 
-      const dataToExport = getExportData(filteredStaff)
+      const dataToExport = getExportData(filteredEmployees)
 
       const ws = XLSX.utils.json_to_sheet(dataToExport)
       const wb = XLSX.utils.book_new()
-      XLSX.utils.book_append_sheet(wb, ws, "Staff")
+      XLSX.utils.book_append_sheet(wb, ws, "Employees")
 
       const maxWidth = 60
       const cols = Object.keys(dataToExport[0] || {}).map((key) => ({
@@ -819,19 +819,19 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
       const data = new Blob([excelBuffer], {
         type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       })
-      saveAs(data, `staff-export-${new Date().toISOString().split("T")[0]}.xlsx`)
-      toast.success("Staff exported to Excel successfully")
+      saveAs(data, `employees-export-${new Date().toISOString().split("T")[0]}.xlsx`)
+      toast.success("Employees exported to Excel successfully")
       setExportDialogOpen(false)
     } catch (error: any) {
-      console.error("Error exporting staff to Excel:", error)
-      toast.error("Failed to export staff to Excel")
+      console.error("Error exporting employees to Excel:", error)
+      toast.error("Failed to export employees to Excel")
     }
   }
 
-  const exportStaffToPDF = async () => {
+  const exportEmployeeToPDF = async () => {
     try {
-      if (filteredStaff.length === 0) {
-        toast.error("No staff data to export")
+      if (filteredEmployees.length === 0) {
+        toast.error("No employee data to export")
         return
       }
 
@@ -840,13 +840,13 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
 
       const doc = new jsPDF({ orientation: "landscape" })
       doc.setFontSize(16)
-      doc.text("Staff Report", 14, 15)
+      doc.text("Employees Report", 14, 15)
       doc.setFontSize(10)
       doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 22)
-      doc.text(`Total Staff: ${filteredStaff.length}`, 14, 28)
+      doc.text(`Total Employees: ${filteredEmployees.length}`, 14, 28)
 
       // Prepare data with selected columns
-      const dataToExport = filteredStaff.map((member, index) => {
+      const dataToExport = filteredEmployees.map((member, index) => {
         const row: any[] = []
         const headers: string[] = []
 
@@ -950,19 +950,19 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
         alternateRowStyles: { fillColor: [245, 247, 250] },
       })
 
-      doc.save(`staff-export-${new Date().toISOString().split("T")[0]}.pdf`)
-      toast.success("Staff exported to PDF successfully")
+      doc.save(`employees-export-${new Date().toISOString().split("T")[0]}.pdf`)
+      toast.success("Employees exported to PDF successfully")
       setExportDialogOpen(false)
     } catch (error: any) {
-      console.error("Error exporting staff to PDF:", error)
-      toast.error("Failed to export staff to PDF")
+      console.error("Error exporting employees to PDF:", error)
+      toast.error("Failed to export employees to PDF")
     }
   }
 
-  const exportStaffToWord = async () => {
+  const exportEmployeeToWord = async () => {
     try {
-      if (filteredStaff.length === 0) {
-        toast.error("No staff data to export")
+      if (filteredEmployees.length === 0) {
+        toast.error("No employee data to export")
         return
       }
 
@@ -980,7 +980,7 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
       } = await import("docx")
       const { default: saveAs } = await import("file-saver")
 
-      const dataToExport = getExportData(filteredStaff)
+      const dataToExport = getExportData(filteredEmployees)
 
       // Build header row based on selected columns
       const headerCells: any[] = []
@@ -1013,7 +1013,7 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
           {
             children: [
               new Paragraph({
-                text: "Staff Report",
+                text: "Employees Report",
                 heading: HeadingLevel.HEADING_1,
                 alignment: AlignmentType.CENTER,
               }),
@@ -1022,7 +1022,7 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
                 alignment: AlignmentType.CENTER,
               }),
               new Paragraph({
-                text: `Total Staff: ${filteredStaff.length}`,
+                text: `Total Employees: ${filteredEmployees.length}`,
                 alignment: AlignmentType.CENTER,
               }),
               new Paragraph({ text: "" }),
@@ -1036,11 +1036,11 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
       })
 
       const blob = await Packer.toBlob(doc)
-      saveAs(blob, `staff-export-${new Date().toISOString().split("T")[0]}.docx`)
-      toast.success("Staff exported to Word successfully")
+      saveAs(blob, `employees-export-${new Date().toISOString().split("T")[0]}.docx`)
+      toast.success("Employees exported to Word successfully")
     } catch (error: any) {
-      console.error("Error exporting staff to Word:", error)
-      toast.error("Failed to export staff to Word")
+      console.error("Error exporting employees to Word:", error)
+      toast.error("Failed to export employees to Word")
     }
   }
 
@@ -1048,9 +1048,9 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
     if (!userProfile) return []
 
     if (userProfile.role === "super_admin") {
-      return ["visitor", "staff", "lead", "admin", "super_admin"]
+      return ["visitor", "employee", "lead", "admin", "super_admin"]
     } else if (userProfile.role === "admin") {
-      return ["visitor", "staff", "lead"]
+      return ["visitor", "employee", "lead"]
     }
 
     return []
@@ -1061,7 +1061,7 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
       <div className="from-background via-background to-muted/20 flex min-h-screen w-full items-center justify-center bg-gradient-to-br">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="text-primary h-8 w-8 animate-spin" />
-          <p className="text-muted-foreground text-sm">Loading staff...</p>
+          <p className="text-muted-foreground text-sm">Loading employee...</p>
         </div>
       </div>
     )
@@ -1069,8 +1069,8 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
 
   return (
     <AdminTablePage
-      title="Staff Management"
-      description="View and manage staff members, roles, and permissions"
+      title="Employee Management"
+      description="View and manage employee members, roles, and permissions"
       icon={Users}
       actions={
         <div className="flex items-center gap-2">
@@ -1108,7 +1108,7 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div className="min-w-0 flex-1">
-                  <p className="text-muted-foreground text-sm font-medium">Total Staff</p>
+                  <p className="text-muted-foreground text-sm font-medium">Total Employee</p>
                   <p className="text-foreground mt-1 text-2xl font-bold">{stats.total}</p>
                 </div>
                 <div className="ml-2 shrink-0 rounded-lg bg-blue-100 p-2.5 dark:bg-blue-900/30">
@@ -1150,8 +1150,8 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div className="min-w-0 flex-1">
-                  <p className="text-muted-foreground text-sm font-medium">Staff Members</p>
-                  <p className="text-foreground mt-1 text-2xl font-bold">{stats.staff}</p>
+                  <p className="text-muted-foreground text-sm font-medium">Employee Members</p>
+                  <p className="text-foreground mt-1 text-2xl font-bold">{stats.employee}</p>
                 </div>
                 <div className="ml-2 flex-shrink-0 rounded-lg bg-green-100 p-2.5 dark:bg-green-900/30">
                   <Users className="h-5 w-5 text-green-600 dark:text-green-400" />
@@ -1169,7 +1169,7 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-2">
                   <Download className="text-muted-foreground h-4 w-4" />
-                  <span className="text-foreground text-sm font-medium">Export Filtered Staff:</span>
+                  <span className="text-foreground text-sm font-medium">Export Filtered Employee:</span>
                 </div>
                 <div className="flex gap-2">
                   <Button
@@ -1177,7 +1177,7 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
                     size="sm"
                     onClick={() => handleExportClick("excel")}
                     className="flex-1 gap-2 sm:flex-none"
-                    disabled={filteredStaff.length === 0}
+                    disabled={filteredEmployees.length === 0}
                   >
                     <FileText className="h-4 w-4" />
                     <span className="text-xs sm:text-sm">Excel (.xlsx)</span>
@@ -1187,7 +1187,7 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
                     size="sm"
                     onClick={() => handleExportClick("pdf")}
                     className="flex-1 gap-2 sm:flex-none"
-                    disabled={filteredStaff.length === 0}
+                    disabled={filteredEmployees.length === 0}
                   >
                     <FileText className="h-4 w-4" />
                     <span className="text-xs sm:text-sm">PDF</span>
@@ -1197,7 +1197,7 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
                     size="sm"
                     onClick={() => handleExportClick("word")}
                     className="flex-1 gap-2 sm:flex-none"
-                    disabled={filteredStaff.length === 0}
+                    disabled={filteredEmployees.length === 0}
                   >
                     <FileText className="h-4 w-4" />
                     <span className="text-xs sm:text-sm">Word (.docx)</span>
@@ -1218,7 +1218,7 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
             <div className="relative w-full">
               <Search className="text-muted-foreground absolute top-1/2 left-3 h-5 w-5 -translate-y-1/2 transform" />
               <Input
-                placeholder="Search staff by name, email, or position..."
+                placeholder="Search employee by name, email, or position..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="h-12 pl-11 text-base"
@@ -1240,16 +1240,16 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
                 placeholder="Department"
               />
               <SearchableMultiSelect
-                label="Staff Members"
+                label="Employees"
                 icon={<User className="h-4 w-4" />}
-                values={staffFilter}
-                options={staff.map((member) => ({
+                values={employeeFilter}
+                options={employee.map((member) => ({
                   value: member.id,
                   label: `${formatName(member.first_name)} ${formatName(member.last_name)} - ${member.department || "No Dept"}`,
                   icon: <User className="h-3 w-3" />,
                 }))}
-                onChange={setStaffFilter}
-                placeholder="Staff"
+                onChange={setEmployeeFilter}
+                placeholder="Employee"
               />
               <SearchableMultiSelect
                 label="Roles"
@@ -1267,8 +1267,8 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
         </CardContent>
       </Card>
 
-      {/* Staff List */}
-      {filteredStaff.length > 0 ? (
+      {/* Employee List */}
+      {filteredEmployees.length > 0 ? (
         viewMode === "list" ? (
           <Card className="border-2">
             <div className="overflow-x-auto">
@@ -1301,12 +1301,12 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredStaff.map((member, index) => (
+                  {filteredEmployees.map((member, index) => (
                     <TableRow key={member.id}>
                       <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
                       <TableCell>
                         <Link
-                          href={`/admin/staff/${member.id}`}
+                          href={`/admin/employee/${member.id}`}
                           className="hover:text-primary whitespace-nowrap transition-colors"
                         >
                           <span className="text-foreground font-medium">
@@ -1361,7 +1361,7 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
                             variant="outline"
                             size="sm"
                             className="h-8 w-8 p-0 sm:h-auto sm:w-auto sm:p-2"
-                            onClick={() => handleEditStaff(member)}
+                            onClick={() => handleEditEmployee(member)}
                           >
                             <Edit className="h-3 w-3" />
                           </Button>
@@ -1370,8 +1370,8 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
                               variant="outline"
                               size="sm"
                               className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 w-8 p-0 sm:h-auto sm:w-auto sm:p-2"
-                              onClick={() => handleDeleteStaff(member)}
-                              title="Delete Staff Member"
+                              onClick={() => handleDeleteEmployee(member)}
+                              title="Delete Employee"
                             >
                               <Trash2 className="h-3 w-3" />
                             </Button>
@@ -1386,12 +1386,12 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
           </Card>
         ) : (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {filteredStaff.map((member) => (
+            {filteredEmployees.map((member) => (
               <Card key={member.id} className="border-2 transition-shadow hover:shadow-lg">
                 <CardHeader className="from-primary/5 to-background border-b bg-linear-to-r">
                   <div className="flex items-start justify-between">
                     <Link
-                      href={`/admin/staff/${member.id}`}
+                      href={`/admin/employee/${member.id}`}
                       className="hover:text-primary flex flex-1 items-start gap-3 transition-colors"
                     >
                       <div className="bg-primary/10 rounded-lg p-2">
@@ -1417,7 +1417,7 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
                       size="sm"
                       onClick={(e) => {
                         e.stopPropagation()
-                        handleEditStaff(member)
+                        handleEditEmployee(member)
                       }}
                     >
                       <Edit className="h-4 w-4" />
@@ -1488,7 +1488,7 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleEditStaff(member)}
+                      onClick={() => handleEditEmployee(member)}
                       className="flex-1 gap-2"
                     >
                       <Edit className="h-4 w-4" />
@@ -1498,9 +1498,9 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleDeleteStaff(member)}
+                        onClick={() => handleDeleteEmployee(member)}
                         className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                        title="Delete Staff Member"
+                        title="Delete Employee"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -1515,11 +1515,11 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
         <Card className="border-2">
           <CardContent className="p-12 text-center">
             <Users className="text-muted-foreground mx-auto mb-4 h-16 w-16" />
-            <h3 className="text-foreground mb-2 text-xl font-semibold">No Staff Found</h3>
+            <h3 className="text-foreground mb-2 text-xl font-semibold">No Employee Found</h3>
             <p className="text-muted-foreground">
-              {searchQuery || departmentFilter.length > 0 || roleFilter.length > 0 || staffFilter.length > 0
-                ? "No staff matches your filters"
-                : "No staff members found"}
+              {searchQuery || departmentFilter.length > 0 || roleFilter.length > 0 || employeeFilter.length > 0
+                ? "No employee matches your filters"
+                : "No employees found"}
             </p>
           </CardContent>
         </Card>
@@ -1535,7 +1535,7 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
               <div>
                 <DialogTitle className="text-xl">Create New User</DialogTitle>
                 <DialogDescription className="mt-1">
-                  Add a new staff member to the system. Name, email, and department are required.
+                  Add a new employee member to the system. Name, email, and department are required.
                 </DialogDescription>
               </div>
             </div>
@@ -1686,7 +1686,7 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
         </DialogContent>
       </Dialog>
 
-      {/* Edit Staff Dialog */}
+      {/* Edit Employee Dialog */}
       <Dialog
         open={isEditDialogOpen}
         onOpenChange={(open) => {
@@ -1699,9 +1699,9 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
         <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              Edit {selectedStaff?.first_name} {selectedStaff?.last_name}
+              Edit {selectedEmployee?.first_name} {selectedEmployee?.last_name}
             </DialogTitle>
-            <DialogDescription>Update staff member's role, department, and permissions</DialogDescription>
+            <DialogDescription>Update employee member's role, department, and permissions</DialogDescription>
           </DialogHeader>
           <ScrollArea className="max-h-[70vh] pr-4">
             <div className="space-y-4 py-4">
@@ -1734,7 +1734,7 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
                 </Select>
                 <p className="text-muted-foreground mt-1 text-xs">
                   {userProfile?.role === "admin"
-                    ? "As Admin, you can assign: Visitor, Staff, and Lead roles"
+                    ? "As Admin, you can assign: Visitor, Employee, and Lead roles"
                     : "As Super Admin, you can assign any role"}
                 </p>
                 {editForm.role === "lead" && (
@@ -2016,7 +2016,7 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)} disabled={isSaving}>
               Cancel
             </Button>
-            <Button onClick={handleSaveStaff} loading={isSaving}>
+            <Button onClick={handleSaveEmployee} loading={isSaving}>
               Save Changes
             </Button>
           </DialogFooter>
@@ -2028,13 +2028,13 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
         <DialogContent className="max-h-[90vh] max-w-6xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              Email Signature - {selectedStaff?.first_name} {selectedStaff?.last_name}
+              Email Signature - {selectedEmployee?.first_name} {selectedEmployee?.last_name}
             </DialogTitle>
-            <DialogDescription>View and manage signature for this staff member</DialogDescription>
+            <DialogDescription>View and manage signature for this employee member</DialogDescription>
           </DialogHeader>
-          {selectedStaff && (
+          {selectedEmployee && (
             <div className="mt-4">
-              <SignatureCreator profile={selectedStaff} />
+              <SignatureCreator profile={selectedEmployee} />
             </div>
           )}
         </DialogContent>
@@ -2045,13 +2045,13 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
         <DialogContent className="max-h-[90vh] max-w-6xl">
           <DialogHeader>
             <DialogTitle>
-              {viewStaffProfile
-                ? `${formatName(viewStaffProfile.first_name)} ${formatName(viewStaffProfile.last_name)}`
-                : "Staff Details"}
+              {viewEmployeeProfile
+                ? `${formatName(viewEmployeeProfile.first_name)} ${formatName(viewEmployeeProfile.last_name)}`
+                : "Employee Details"}
             </DialogTitle>
             <DialogDescription>View complete profile and related information</DialogDescription>
           </DialogHeader>
-          {viewStaffProfile && (
+          {viewEmployeeProfile && (
             <ScrollArea className="max-h-[70vh] pr-4">
               <div className="space-y-4">
                 {/* Profile Information */}
@@ -2067,17 +2067,17 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
                       <div className="flex items-center gap-3">
                         <Avatar className="h-12 w-12">
                           <AvatarFallback className="bg-primary text-primary-foreground">
-                            {formatName(viewStaffProfile.first_name)?.[0]}
-                            {formatName(viewStaffProfile.last_name)?.[0]}
+                            {formatName(viewEmployeeProfile.first_name)?.[0]}
+                            {formatName(viewEmployeeProfile.last_name)?.[0]}
                           </AvatarFallback>
                         </Avatar>
                         <div>
                           <p className="text-muted-foreground text-sm">Full Name</p>
                           <p className="font-medium">
-                            {formatName(viewStaffProfile.first_name)} {formatName(viewStaffProfile.last_name)}
+                            {formatName(viewEmployeeProfile.first_name)} {formatName(viewEmployeeProfile.last_name)}
                           </p>
-                          {viewStaffProfile.other_names && (
-                            <p className="text-muted-foreground text-xs">({viewStaffProfile.other_names})</p>
+                          {viewEmployeeProfile.other_names && (
+                            <p className="text-muted-foreground text-xs">({viewEmployeeProfile.other_names})</p>
                           )}
                         </div>
                       </div>
@@ -2086,7 +2086,7 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
                         <Mail className="text-muted-foreground h-5 w-5" />
                         <div>
                           <p className="text-muted-foreground text-sm">Email</p>
-                          <p className="font-medium">{viewStaffProfile.company_email}</p>
+                          <p className="font-medium">{viewEmployeeProfile.company_email}</p>
                         </div>
                       </div>
 
@@ -2094,7 +2094,7 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
                         <Building2 className="text-muted-foreground h-5 w-5" />
                         <div>
                           <p className="text-muted-foreground text-sm">Department</p>
-                          <p className="font-medium">{viewStaffProfile.department || "N/A"}</p>
+                          <p className="font-medium">{viewEmployeeProfile.department || "N/A"}</p>
                         </div>
                       </div>
 
@@ -2103,15 +2103,15 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
                         <div>
                           <p className="text-muted-foreground text-sm">Role</p>
                           <div className="mt-1 flex gap-2">
-                            <Badge className={getRoleBadgeColor(viewStaffProfile.role as UserRole)}>
-                              {getRoleDisplayName(viewStaffProfile.role as UserRole)}
+                            <Badge className={getRoleBadgeColor(viewEmployeeProfile.role as UserRole)}>
+                              {getRoleDisplayName(viewEmployeeProfile.role as UserRole)}
                             </Badge>
-                            {viewStaffProfile.role === "lead" &&
-                              viewStaffProfile.lead_departments &&
-                              viewStaffProfile.lead_departments.length > 0 && (
+                            {viewEmployeeProfile.role === "lead" &&
+                              viewEmployeeProfile.lead_departments &&
+                              viewEmployeeProfile.lead_departments.length > 0 && (
                                 <Badge variant="outline">
-                                  Leading {viewStaffProfile.lead_departments.length} Dept
-                                  {viewStaffProfile.lead_departments.length > 1 ? "s" : ""}
+                                  Leading {viewEmployeeProfile.lead_departments.length} Dept
+                                  {viewEmployeeProfile.lead_departments.length > 1 ? "s" : ""}
                                 </Badge>
                               )}
                           </div>
@@ -2122,50 +2122,50 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
                         <UserIcon className="text-muted-foreground h-5 w-5" />
                         <div>
                           <p className="text-muted-foreground text-sm">Position</p>
-                          <p className="font-medium">{viewStaffProfile.company_role || "N/A"}</p>
+                          <p className="font-medium">{viewEmployeeProfile.company_role || "N/A"}</p>
                         </div>
                       </div>
 
-                      {viewStaffProfile.phone_number && (
+                      {viewEmployeeProfile.phone_number && (
                         <div className="flex items-center gap-3">
                           <Phone className="text-muted-foreground h-5 w-5" />
                           <div>
                             <p className="text-muted-foreground text-sm">Phone</p>
-                            <p className="font-medium">{viewStaffProfile.phone_number}</p>
-                            {viewStaffProfile.additional_phone && (
-                              <p className="text-muted-foreground text-xs">{viewStaffProfile.additional_phone}</p>
+                            <p className="font-medium">{viewEmployeeProfile.phone_number}</p>
+                            {viewEmployeeProfile.additional_phone && (
+                              <p className="text-muted-foreground text-xs">{viewEmployeeProfile.additional_phone}</p>
                             )}
                           </div>
                         </div>
                       )}
 
-                      {viewStaffProfile.residential_address && (
+                      {viewEmployeeProfile.residential_address && (
                         <div className="flex items-center gap-3">
                           <MapPin className="text-muted-foreground h-5 w-5" />
                           <div>
                             <p className="text-muted-foreground text-sm">Address</p>
-                            <p className="font-medium">{viewStaffProfile.residential_address}</p>
+                            <p className="font-medium">{viewEmployeeProfile.residential_address}</p>
                           </div>
                         </div>
                       )}
 
-                      {viewStaffProfile.current_work_location && (
+                      {viewEmployeeProfile.current_work_location && (
                         <div className="flex items-center gap-3">
                           <MapPin className="text-muted-foreground h-5 w-5" />
                           <div>
                             <p className="text-muted-foreground text-sm">Work Location</p>
-                            <p className="font-medium">{viewStaffProfile.current_work_location}</p>
+                            <p className="font-medium">{viewEmployeeProfile.current_work_location}</p>
                           </div>
                         </div>
                       )}
 
-                      {viewStaffProfile.lead_departments && viewStaffProfile.lead_departments.length > 0 && (
+                      {viewEmployeeProfile.lead_departments && viewEmployeeProfile.lead_departments.length > 0 && (
                         <div className="flex items-center gap-3">
                           <Building2 className="text-muted-foreground h-5 w-5" />
                           <div>
                             <p className="text-muted-foreground text-sm">Leading Departments</p>
                             <div className="mt-1 flex flex-wrap gap-1">
-                              {viewStaffProfile.lead_departments.map((dept: string) => (
+                              {viewEmployeeProfile.lead_departments.map((dept: string) => (
                                 <Badge key={dept} variant="outline">
                                   {dept}
                                 </Badge>
@@ -2179,7 +2179,7 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
                         <Calendar className="text-muted-foreground h-5 w-5" />
                         <div>
                           <p className="text-muted-foreground text-sm">Member Since</p>
-                          <p className="font-medium">{new Date(viewStaffProfile.created_at).toLocaleDateString()}</p>
+                          <p className="font-medium">{new Date(viewEmployeeProfile.created_at).toLocaleDateString()}</p>
                         </div>
                       </div>
                     </div>
@@ -2189,10 +2189,10 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
                 {/* Related Data Tabs */}
                 <Tabs defaultValue="assets" className="space-y-4">
                   <TabsList>
-                    <TabsTrigger value="assets">Assets ({viewStaffData.assets.length})</TabsTrigger>
-                    <TabsTrigger value="tasks">Tasks ({viewStaffData.tasks.length})</TabsTrigger>
+                    <TabsTrigger value="assets">Assets ({viewEmployeeData.assets.length})</TabsTrigger>
+                    <TabsTrigger value="tasks">Tasks ({viewEmployeeData.tasks.length})</TabsTrigger>
                     <TabsTrigger value="documentation">
-                      Documentation ({viewStaffData.documentation.length})
+                      Documentation ({viewEmployeeData.documentation.length})
                     </TabsTrigger>
                   </TabsList>
 
@@ -2202,9 +2202,9 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
                         <CardTitle>Assigned Assets</CardTitle>
                       </CardHeader>
                       <CardContent>
-                        {viewStaffData.assets.length > 0 ? (
+                        {viewEmployeeData.assets.length > 0 ? (
                           <div className="space-y-3">
-                            {viewStaffData.assets.map((assignment: any) => {
+                            {viewEmployeeData.assets.map((assignment: any) => {
                               const asset = assignment.Asset
                               const assetTypeLabel = asset?.asset_type
                                 ? ASSET_TYPE_MAP[asset.asset_type]?.label || asset.asset_type
@@ -2222,7 +2222,9 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
                                           className="bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
                                         >
                                           Office:{" "}
-                                          {assignment.officeLocation || viewStaffProfile?.office_location || "Office"}
+                                          {assignment.officeLocation ||
+                                            viewEmployeeProfile?.office_location ||
+                                            "Office"}
                                         </Badge>
                                       ) : (
                                         <Badge
@@ -2276,9 +2278,9 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
                         <CardTitle>Assigned Tasks</CardTitle>
                       </CardHeader>
                       <CardContent>
-                        {viewStaffData.tasks.length > 0 ? (
+                        {viewEmployeeData.tasks.length > 0 ? (
                           <div className="space-y-2">
-                            {viewStaffData.tasks.map((task: any) => (
+                            {viewEmployeeData.tasks.map((task: any) => (
                               <div key={task.id} className="rounded-lg border p-3">
                                 <p className="font-medium">{task.title}</p>
                                 <p className="text-muted-foreground text-sm">{task.status}</p>
@@ -2298,9 +2300,9 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
                         <CardTitle>Documentation</CardTitle>
                       </CardHeader>
                       <CardContent>
-                        {viewStaffData.documentation.length > 0 ? (
+                        {viewEmployeeData.documentation.length > 0 ? (
                           <div className="space-y-2">
-                            {viewStaffData.documentation.map((doc: any) => (
+                            {viewEmployeeData.documentation.map((doc: any) => (
                               <div key={doc.id} className="rounded-lg border p-3">
                                 <p className="font-medium">{doc.title || "Untitled"}</p>
                                 <p className="text-muted-foreground text-sm">
@@ -2327,18 +2329,18 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
         </DialogContent>
       </Dialog>
 
-      {/* Delete Staff Confirmation Dialog */}
+      {/* Delete Employee Confirmation Dialog */}
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle className="text-destructive flex items-center gap-2">
               <AlertTriangle className="h-5 w-5" />
-              Delete Staff Member
+              Delete Employee Member
             </DialogTitle>
             <DialogDescription>
-              {selectedStaff
-                ? `Are you sure you want to delete ${formatName(selectedStaff.first_name)} ${formatName(selectedStaff.last_name)}?`
-                : "Are you sure you want to delete this staff member?"}
+              {selectedEmployee
+                ? `Are you sure you want to delete ${formatName(selectedEmployee.first_name)} ${formatName(selectedEmployee.last_name)}?`
+                : "Are you sure you want to delete this employee member?"}
             </DialogDescription>
           </DialogHeader>
 
@@ -2360,9 +2362,9 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
                     <div className="flex items-start gap-3">
                       <AlertTriangle className="text-destructive mt-0.5 h-5 w-5 shrink-0" />
                       <div className="flex-1">
-                        <h4 className="text-destructive mb-2 font-semibold">Cannot Delete Staff Member</h4>
+                        <h4 className="text-destructive mb-2 font-semibold">Cannot Delete Employee Member</h4>
                         <p className="text-muted-foreground mb-4 text-sm">
-                          This staff member has items assigned to them. Please reassign or remove all items before
+                          This employee member has items assigned to them. Please reassign or remove all items before
                           deleting.
                         </p>
 
@@ -2538,7 +2540,7 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
                     <div className="flex-1">
                       <h4 className="text-destructive mb-2 font-semibold">Warning: This action cannot be undone</h4>
                       <p className="text-muted-foreground text-sm">
-                        Deleting this staff member will permanently remove their profile and all associated data from
+                        Deleting this employee member will permanently remove their profile and all associated data from
                         the system. This action cannot be reversed.
                       </p>
                     </div>
@@ -2571,7 +2573,7 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
               }
 
               return (
-                <Button variant="destructive" onClick={confirmDeleteStaff} disabled={isDeleting}>
+                <Button variant="destructive" onClick={confirmDeleteEmployee} disabled={isDeleting}>
                   {isDeleting ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -2580,7 +2582,7 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
                   ) : (
                     <>
                       <Trash2 className="mr-2 h-4 w-4" />
-                      Delete Staff Member
+                      Delete Employee Member
                     </>
                   )}
                 </Button>
@@ -2671,11 +2673,11 @@ export function AdminStaffContent({ initialStaff, userProfile }: AdminStaffConte
             <Button
               onClick={() => {
                 if (exportType === "excel") {
-                  exportStaffToExcel()
+                  exportEmployeeToExcel()
                 } else if (exportType === "pdf") {
-                  exportStaffToPDF()
+                  exportEmployeeToPDF()
                 } else if (exportType === "word") {
-                  exportStaffToWord()
+                  exportEmployeeToWord()
                 }
               }}
               disabled={Object.values(selectedColumns).filter((v) => v).length === 0}

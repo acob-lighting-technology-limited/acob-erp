@@ -22,11 +22,10 @@ export function HeaderWrapper({ user, isAdmin = false }: HeaderWrapperProps) {
     return null
   }
 
-  // Show simple header on auth pages
+  // Don't show header on auth pages
   const isAuthPage = pathname?.startsWith("/auth")
-
   if (isAuthPage) {
-    return <AuthHeader />
+    return null
   }
 
   return <Navbar user={user} isAdmin={isAdmin} />

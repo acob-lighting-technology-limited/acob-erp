@@ -207,7 +207,7 @@ export default function AttendanceReportsPage() {
                 Export CSV
               </Button>
             </div>
-            <CardDescription>{reports.length} staff members</CardDescription>
+            <CardDescription>{reports.length} employees</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">

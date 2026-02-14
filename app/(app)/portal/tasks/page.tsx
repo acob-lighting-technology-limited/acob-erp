@@ -1,220 +1,162 @@
-"use client"
+import { redirect } from "next/navigation"
+import { createClient } from "@/lib/supabase/server"
+import { TasksContent, type Task } from "./management/tasks-content"
 
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
-import { toast } from "sonner"
+async function getTasksData() {
+  const supabase = await createClient()
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { ClipboardList, LayoutDashboard, FileSpreadsheet, FileBarChart, CheckCircle2, Clock, Plus } from "lucide-react"
-import Link from "next/link"
-import { PageWrapper, PageHeader, Section } from "@/components/layout"
-import { StatCard } from "@/components/ui/stat-card"
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser()
 
-interface PortalStats {
-  assignedTasks: number
-  pendingActions: number
-  reportsSubmitted: number
-}
-
-export default function PortalTasksDashboard() {
-  const [stats, setStats] = useState<PortalStats>({
-    assignedTasks: 0,
-    pendingActions: 0,
-    reportsSubmitted: 0,
-  })
-  const [profile, setProfile] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
-
-  const supabase = createClient()
-  const router = useRouter()
-
-  useEffect(() => {
-    fetchDashboardData()
-  }, [])
-
-  async function fetchDashboardData() {
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-
-      if (!user) {
-        router.push("/auth/login")
-        return
-      }
-
-      const { data: profileData } = await supabase
-        .from("profiles")
-        .select("id, department, role")
-        .eq("id", user.id)
-        .single()
-
-      if (!profileData) {
-        toast.error("Profile not found. Please log in again.")
-        router.push("/auth/login")
-        return
-      }
-
-      setProfile(profileData)
-      const dept = profileData.department
-
-      // Assigned general tasks
-      let taskQuery = supabase.from("tasks").select("*", { count: "exact", head: true }).eq("category", "general")
-
-      if (dept) {
-        taskQuery = taskQuery.or(`assigned_to.eq.${user.id},department.eq.${dept}`)
-      } else {
-        taskQuery = taskQuery.eq("assigned_to", user.id)
-      }
-      const { count: taskCount } = await taskQuery
-
-      // Pending weekly actions for department
-      let actionCount = 0
-      if (dept) {
-        const { count } = await supabase
-          .from("tasks")
-          .select("*", { count: "exact", head: true })
-          .eq("category", "weekly_action")
-          .eq("department", dept)
-          .neq("status", "completed")
-        actionCount = count || 0
-      }
-
-      // Reports submitted by department
-      let reportCount = 0
-      if (dept) {
-        const { count } = await supabase
-          .from("weekly_reports")
-          .select("*", { count: "exact", head: true })
-          .eq("department", dept)
-          .eq("status", "submitted")
-        reportCount = count || 0
-      }
-
-      setStats({
-        assignedTasks: taskCount || 0,
-        pendingActions: actionCount,
-        reportsSubmitted: reportCount,
-      })
-    } catch (error) {
-      console.error("Portal Dashboard Error:", error)
-      toast.error("Failed to load dashboard data")
-    } finally {
-      setLoading(false)
-    }
+  if (userError || !user) {
+    return { redirect: "/auth/login" as const }
   }
 
-  const isLeadOrAdmin = profile?.role === "lead" || profile?.role === "admin" || profile?.role === "super_admin"
+  // Get user profile to check department and role
+  const { data: userProfile } = await supabase
+    .from("profiles")
+    .select("department, role, lead_departments")
+    .eq("id", user.id)
+    .single()
 
-  return (
-    <PageWrapper maxWidth="full" background="gradient">
-      <PageHeader
-        title="Tasks & Reports Hub"
-        description="Monitor your tasks and contribute to departmental reporting"
-        icon={ClipboardList}
-      />
+  // Load tasks assigned to user individually
+  const { data: individualTasks } = await supabase
+    .from("tasks")
+    .select("*")
+    .eq("assigned_to", user.id)
+    .eq("assignment_type", "individual")
 
-      {/* Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-3">
-        <StatCard
-          title="My Tasks"
-          value={stats.assignedTasks}
-          icon={LayoutDashboard}
-          description="Invidual and group tasks"
-        />
-        <StatCard
-          title="Dept. Actions"
-          value={stats.pendingActions}
-          icon={Clock}
-          description="Pending weekly actions"
-        />
-        <StatCard
-          title="Our Reports"
-          value={stats.reportsSubmitted}
-          icon={FileBarChart}
-          description="Total reports submitted"
-        />
-      </div>
+  // Load tasks where user is in task_assignments (multiple-user tasks)
+  const { data: assignments } = await supabase.from("task_assignments").select("task_id").eq("user_id", user.id)
 
-      {/* Module Navigation */}
-      <Section title="Quick Access">
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {/* My Tasks */}
-          <Card className="transition-shadow hover:shadow-md">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <LayoutDashboard className="h-5 w-5 text-blue-500" />
-                Task Management
-              </CardTitle>
-              <CardDescription>View and update your assigned tasks</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Link href="/portal/tasks/management">
-                <Button className="w-full">Open Tasks</Button>
-              </Link>
-            </CardContent>
-          </Card>
+  const multipleTaskIds = assignments?.map((a: any) => a.task_id) || []
+  const { data: multipleTasks } =
+    multipleTaskIds.length > 0
+      ? await supabase.from("tasks").select("*").in("id", multipleTaskIds).eq("assignment_type", "multiple")
+      : { data: [] }
 
-          {/* Action Tracker */}
-          <Card className="transition-shadow hover:shadow-md">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileSpreadsheet className="h-5 w-5 text-green-500" />
-                Dept. Action Tracker
-              </CardTitle>
-              <CardDescription>Track and update weekly departmental actions</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Link href="/portal/tasks/action-tracker">
-                <Button className="w-full" variant="outline" disabled={!profile?.department}>
-                  {profile?.department ? "View Actions" : "No Department Assigned"}
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
+  // Load department tasks if user has a department
+  const { data: departmentTasks } = userProfile?.department
+    ? await supabase
+        .from("tasks")
+        .select("*")
+        .eq("department", userProfile.department)
+        .eq("assignment_type", "department")
+    : { data: [] }
 
-          {/* Weekly Reports */}
-          <Card className="transition-shadow hover:shadow-md">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileBarChart className="h-5 w-5 text-purple-500" />
-                Weekly Reports
-              </CardTitle>
-              <CardDescription>Browse submitted reports from all departments</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Link href="/portal/tasks/weekly-reports">
-                <Button className="w-full">Browse Reports</Button>
-              </Link>
-            </CardContent>
-          </Card>
-        </div>
-      </Section>
+  // Combine all tasks and remove duplicates
+  const allTasks = [...(individualTasks || []), ...(multipleTasks || []), ...(departmentTasks || [])]
+  const uniqueTasks = Array.from(new Map(allTasks.map((t: any) => [t.id, t])).values())
 
-      {/* Lead Controls */}
-      {isLeadOrAdmin && (
-        <Section title="Department Lead Actions">
-          <Card className="border-primary/20 bg-primary/5">
-            <CardHeader>
-              <CardTitle className="text-primary flex items-center gap-2">
-                <Plus className="h-5 w-5" />
-                New Weekly Submission
-              </CardTitle>
-              <CardDescription>Submit your weekly departmental progress report</CardDescription>
-            </CardHeader>
-            <CardContent className="flex gap-4">
-              <Link href="/portal/tasks/weekly-reports/new" className="flex-1">
-                <Button className="w-full gap-2">
-                  <Plus className="h-4 w-4" />
-                  Create New Report
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-        </Section>
-      )}
-    </PageWrapper>
+  // 1. Collect all IDs for batch queries
+  const allTaskIds = uniqueTasks.map((t: any) => t.id)
+  const assignedByIds = Array.from(new Set(uniqueTasks.map((t: any) => t.assigned_by).filter(Boolean))) as string[]
+
+  // 2. Fetch assigned_by profiles
+  const { data: assignedByProfiles } =
+    assignedByIds.length > 0
+      ? await supabase.from("profiles").select("id, first_name, last_name").in("id", assignedByIds)
+      : { data: [] }
+  const assignedByMap = new Map(assignedByProfiles?.map((p: any) => [p.id, p]))
+
+  // 3. Fetch task assignments for multiple tasks
+  const multipleTasksOnly = uniqueTasks.filter((t: any) => t.assignment_type === "multiple")
+  const taskIdsForMultipleType = multipleTasksOnly.map((t: any) => t.id)
+
+  const { data: allAssignments } =
+    taskIdsForMultipleType.length > 0
+      ? await supabase.from("task_assignments").select("task_id, user_id").in("task_id", taskIdsForMultipleType)
+      : { data: [] }
+
+  // 4. Fetch profiles for assigned users
+  const assignedUserIds = Array.from(new Set(allAssignments?.map((a: any) => a.user_id) || []))
+  const { data: assignedUserProfiles } =
+    assignedUserIds.length > 0
+      ? await supabase.from("profiles").select("id, first_name, last_name").in("id", assignedUserIds)
+      : { data: [] }
+  const userProfileMap = new Map(assignedUserProfiles?.map((p: any) => [p.id, p]))
+
+  // 5. Fetch all completions for these tasks
+  const { data: allCompletions } =
+    allTaskIds.length > 0
+      ? await supabase.from("task_user_completion").select("task_id, user_id").in("task_id", allTaskIds)
+      : { data: [] }
+
+  // Grouping logic
+  const assignmentsByTask = new Map()
+  allAssignments?.forEach((a: any) => {
+    if (!assignmentsByTask.has(a.task_id)) assignmentsByTask.set(a.task_id, [])
+    assignmentsByTask.get(a.task_id).push(a.user_id)
+  })
+
+  const completionsByTask = new Map()
+  allCompletions?.forEach((c: any) => {
+    if (!completionsByTask.has(c.task_id)) completionsByTask.set(c.task_id, new Set())
+    completionsByTask.get(c.task_id).add(c.user_id)
+  })
+
+  // 6. Assemble tasksWithUsers
+  const tasksWithUsers = await Promise.all(
+    (uniqueTasks || []).map(async (task: any) => {
+      const taskData: any = { ...task }
+
+      // Attach assigned_by
+      if (task.assigned_by) {
+        taskData.assigned_by_user = assignedByMap.get(task.assigned_by)
+      }
+
+      // For multiple-user tasks, fetch all assigned users and completion status
+      if (task.assignment_type === "multiple") {
+        const userIds = assignmentsByTask.get(task.id) || []
+        const taskCompletions = completionsByTask.get(task.id) || new Set()
+
+        taskData.assigned_users = userIds.map((uid: string) => {
+          const profile = userProfileMap.get(uid)
+          return {
+            ...profile,
+            completed: taskCompletions.has(uid),
+          }
+        })
+        taskData.user_completed = taskCompletions.has(user.id)
+      }
+
+      // For department tasks, check if user can change status
+      if (task.assignment_type === "department") {
+        const canChangeStatus =
+          userProfile?.role === "admin" ||
+          userProfile?.role === "super_admin" ||
+          (userProfile?.role === "lead" && userProfile?.lead_departments?.includes(task.department))
+        taskData.can_change_status = canChangeStatus
+      }
+
+      return taskData
+    })
   )
+
+  // Sort by created_at
+  tasksWithUsers.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+
+  return {
+    tasks: tasksWithUsers as Task[],
+    userId: user.id,
+    userProfile: userProfile || null,
+  }
+}
+
+export default async function TasksPage() {
+  const data = await getTasksData()
+
+  if ("redirect" in data && data.redirect) {
+    redirect(data.redirect)
+  }
+
+  const tasksData = data as {
+    tasks: Task[]
+    userId: string
+    userProfile: any
+  }
+
+  return <TasksContent initialTasks={tasksData.tasks} userId={tasksData.userId} userProfile={tasksData.userProfile} />
 }

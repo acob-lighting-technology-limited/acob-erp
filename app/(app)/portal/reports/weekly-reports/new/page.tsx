@@ -375,13 +375,42 @@ function WeeklyReportFormContent() {
                   Work Done
                 </CardTitle>
               </CardHeader>
-              <CardContent className="p-6">
+              <CardContent className="p-4">
                 <Textarea
-                  placeholder="Enter summary of work completed this week..."
+                  placeholder={
+                    !isActionTrackerComplete
+                      ? "Complete Action Tracker first..."
+                      : "Enter summary of work completed this week..."
+                  }
                   className="min-h-[250px] resize-none text-base leading-relaxed focus-visible:ring-blue-500"
                   value={workDone}
                   onChange={(e) => setWorkDone(e.target.value)}
                   required
+                  disabled={!isActionTrackerComplete}
+                />
+              </CardContent>
+            </Card>
+
+            {/* Tasks for New Week */}
+            <Card className="border-2 border-green-500/20 shadow-sm">
+              <CardHeader className="border-b bg-green-500/10 p-4 px-6">
+                <CardTitle className="flex items-center gap-2 text-lg text-green-600 dark:text-green-400">
+                  <Target className="h-5 w-5" />
+                  Tasks for New Week
+                </CardTitle>
+                <CardDescription>
+                  Enter each task on a new line. These will appear in next week's Action Tracker.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-4">
+                <Textarea
+                  placeholder={
+                    !isActionTrackerComplete ? "Complete Action Tracker first..." : "Task 1&#10;Task 2&#10;Task 3"
+                  }
+                  className="min-h-[300px] resize-none font-mono text-base leading-relaxed focus-visible:ring-green-500"
+                  value={tasksNewWeek}
+                  onChange={(e) => setTasksNewWeek(e.target.value)}
+                  disabled={!isActionTrackerComplete}
                 />
               </CardContent>
             </Card>
@@ -394,39 +423,23 @@ function WeeklyReportFormContent() {
                   Challenges & Obstacles
                 </CardTitle>
               </CardHeader>
-              <CardContent className="p-6">
+              <CardContent className="p-4">
                 <Textarea
-                  placeholder="Any blockers or challenges encountered?"
+                  placeholder={
+                    !isActionTrackerComplete
+                      ? "Complete Action Tracker first..."
+                      : "Any blockers or challenges encountered?"
+                  }
                   className="min-h-[150px] resize-none text-base leading-relaxed focus-visible:ring-red-500"
                   value={challenges}
                   onChange={(e) => setChallenges(e.target.value)}
+                  disabled={!isActionTrackerComplete}
                 />
               </CardContent>
             </Card>
           </div>
 
           <div className="space-y-8">
-            {/* Next Week Goals */}
-            <Card className="border-2 border-green-500/20 shadow-sm">
-              <CardHeader className="border-b bg-green-500/10 p-4 px-6">
-                <CardTitle className="flex items-center gap-2 text-lg text-green-600 dark:text-green-400">
-                  <Target className="h-5 w-5" />
-                  Tasks for New Week
-                </CardTitle>
-                <CardDescription>
-                  Enter each task on a new line. These will appear in next week's Action Tracker.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-6">
-                <Textarea
-                  placeholder="Task 1&#10;Task 2&#10;Task 3"
-                  className="min-h-[300px] resize-none font-mono text-base leading-relaxed focus-visible:ring-green-500"
-                  value={tasksNewWeek}
-                  onChange={(e) => setTasksNewWeek(e.target.value)}
-                />
-              </CardContent>
-            </Card>
-
             {/* Summary / Submit */}
             <div className="sticky top-6">
               <Card className="border-primary/20 bg-primary/5 border-2 shadow-md">
@@ -449,7 +462,7 @@ function WeeklyReportFormContent() {
                   <Button
                     type="submit"
                     className="h-12 w-full gap-2 text-lg shadow-lg"
-                    disabled={saving || !isActionTrackerComplete}
+                    disabled={saving || !isActionTrackerComplete || !workDone.trim()}
                   >
                     {saving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
                     {id ? "Update Report" : "Submit Report"}

@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import { AdminStaffContent, type Staff, type UserProfile } from "./admin-staff-content"
+import { AdminEmployeeContent, type Employee, type UserProfile } from "./admin-employee-content"
 
-async function getAdminStaffData() {
+async function getAdminemployeeData() {
   const supabase = await createClient()
 
   const {
@@ -25,37 +25,37 @@ async function getAdminStaffData() {
     role: profile.role,
   }
 
-  // Fetch staff - leads can only see staff in their departments
+  // Fetch employee - leads can only see employee in their departments
   let query = supabase.from("profiles").select("*").order("last_name", { ascending: true })
 
   if (profile.role === "lead" && profile.lead_departments && profile.lead_departments.length > 0) {
     query = query.in("department", profile.lead_departments)
   }
 
-  const { data: staffData, error: staffError } = await query
+  const { data: employeeData, error: employeeError } = await query
 
-  if (staffError) {
-    console.error("Error loading staff:", staffError)
-    return { staff: [], userProfile }
+  if (employeeError) {
+    console.error("Error loading employee:", employeeError)
+    return { employee: [], userProfile }
   }
 
   return {
-    staff: (staffData || []) as Staff[],
+    employee: (employeeData || []) as Employee[],
     userProfile,
   }
 }
 
-export default async function AdminStaffPage() {
-  const data = await getAdminStaffData()
+export default async function AdminemployeePage() {
+  const data = await getAdminemployeeData()
 
   if ("redirect" in data && data.redirect) {
     redirect(data.redirect)
   }
 
   const pageData = data as {
-    staff: Staff[]
+    employee: Employee[]
     userProfile: UserProfile
   }
 
-  return <AdminStaffContent initialStaff={pageData.staff} userProfile={pageData.userProfile} />
+  return <AdminEmployeeContent initialEmployees={pageData.employee} userProfile={pageData.userProfile} />
 }

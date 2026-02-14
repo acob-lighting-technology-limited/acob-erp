@@ -35,7 +35,7 @@ interface StatCardProps {
  *
  * @example
  * // Basic usage
- * <StatCard title="Total Staff" value={120} icon={Users} />
+ * <StatCard title="Total employee" value={120} icon={Users} />
  *
  * @example
  * // With custom colors

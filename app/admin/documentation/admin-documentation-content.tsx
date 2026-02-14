@@ -39,7 +39,7 @@ export interface UserProfile {
   lead_departments?: string[]
 }
 
-export interface StaffMember {
+export interface employeeMember {
   id: string
   first_name: string
   last_name: string
@@ -48,22 +48,22 @@ export interface StaffMember {
 
 interface AdminDocumentationContentProps {
   initialDocumentation: Documentation[]
-  initialStaff: StaffMember[]
+  initialemployee: employeeMember[]
   userProfile: UserProfile
 }
 
 export function AdminDocumentationContent({
   initialDocumentation,
-  initialStaff,
+  initialemployee,
   userProfile,
 }: AdminDocumentationContentProps) {
   const [documentation] = useState<Documentation[]>(initialDocumentation)
-  const [staff] = useState<StaffMember[]>(initialStaff)
+  const [employee] = useState<employeeMember[]>(initialemployee)
   const [searchQuery, setSearchQuery] = useState("")
   const [categoryFilter, setCategoryFilter] = useState("all")
   const [statusFilter, setStatusFilter] = useState("all")
   const [departmentFilter, setDepartmentFilter] = useState("all")
-  const [staffFilter, setStaffFilter] = useState("all")
+  const [employeeFilter, setemployeeFilter] = useState("all")
   const [viewMode, setViewMode] = useState<"list" | "card">("list")
   const [selectedDoc, setSelectedDoc] = useState<Documentation | null>(null)
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
@@ -96,9 +96,9 @@ export function AdminDocumentationContent({
       matchesDepartment = departmentFilter === "all" || doc.user?.department === departmentFilter
     }
 
-    const matchesStaff = staffFilter === "all" || doc.user_id === staffFilter
+    const matchesemployee = employeeFilter === "all" || doc.user_id === employeeFilter
 
-    return matchesSearch && matchesCategory && matchesStatus && matchesDepartment && matchesStaff
+    return matchesSearch && matchesCategory && matchesStatus && matchesDepartment && matchesemployee
   })
 
   const categories = Array.from(new Set(documentation.map((d) => d.category).filter(Boolean))) as string[]
@@ -131,8 +131,8 @@ export function AdminDocumentationContent({
 
   return (
     <AdminTablePage
-      title="Staff Documentation"
-      description="View all staff documentation and knowledge base articles"
+      title="employee Documentation"
+      description="View all employee documentation and knowledge base articles"
       icon={FileText}
       actions={
         <div className="flex items-center rounded-lg border p-1">
@@ -261,16 +261,16 @@ export function AdminDocumentationContent({
                 />
               )}
               <SearchableSelect
-                value={staffFilter}
-                onValueChange={setStaffFilter}
+                value={employeeFilter}
+                onValueChange={setemployeeFilter}
                 placeholder={
                   userProfile?.role === "lead" &&
                   userProfile.lead_departments &&
                   userProfile.lead_departments.length > 0
-                    ? `All ${userProfile.lead_departments.length === 1 ? userProfile.lead_departments[0] : "Department"} Staff`
-                    : "All Staff"
+                    ? `All ${userProfile.lead_departments.length === 1 ? userProfile.lead_departments[0] : "Department"} employee`
+                    : "All employee"
                 }
-                searchPlaceholder="Search staff..."
+                searchPlaceholder="Search employee..."
                 icon={<User className="h-4 w-4" />}
                 className="w-full md:w-48"
                 options={[
@@ -280,10 +280,10 @@ export function AdminDocumentationContent({
                       userProfile?.role === "lead" &&
                       userProfile.lead_departments &&
                       userProfile.lead_departments.length > 0
-                        ? `All ${userProfile.lead_departments.length === 1 ? userProfile.lead_departments[0] : "Department"} Staff`
-                        : "All Staff",
+                        ? `All ${userProfile.lead_departments.length === 1 ? userProfile.lead_departments[0] : "Department"} employee`
+                        : "All employee",
                   },
-                  ...staff.map((member) => ({
+                  ...employee.map((member) => ({
                     value: member.id,
                     label: `${formatName(member.first_name)} ${formatName(member.last_name)} - ${member.department}`,
                     icon: <User className="h-3 w-3" />,
@@ -447,7 +447,7 @@ export function AdminDocumentationContent({
               categoryFilter !== "all" ||
               statusFilter !== "all" ||
               departmentFilter !== "all" ||
-              staffFilter !== "all"
+              employeeFilter !== "all"
                 ? "No documentation matches your filters"
                 : "No documentation has been created yet"}
             </p>

@@ -29,7 +29,7 @@ export default async function AdminDashboardPage() {
 
   // Fetch stats
   const [
-    { count: staffCount },
+    { count: employeeCount },
     { count: assetCount },
     { count: taskCount },
     { count: docCount },
@@ -117,8 +117,8 @@ export default async function AdminDashboardPage() {
       title: "Pending User Approvals",
       message: `You have ${pendingUsersCount} user${pendingUsersCount > 1 ? "s" : ""} waiting for approval.`,
       timestamp: "Just now",
-      link: "/admin/staff",
-      linkText: "Review Users",
+      link: "/admin/hr/employees",
+      linkText: "Review Employees",
     })
   }
 
@@ -201,9 +201,9 @@ export default async function AdminDashboardPage() {
 
   const quickActions = [
     {
-      title: "Staff Management",
-      description: "View and manage all staff members",
-      href: "/admin/staff",
+      title: "Employee Management",
+      description: "View and manage all employees",
+      href: "/admin/hr/employees",
       icon: Users,
       color: "bg-blue-500",
       roles: ["super_admin", "admin"],
@@ -218,7 +218,7 @@ export default async function AdminDashboardPage() {
     },
     {
       title: "Task Management",
-      description: "Create and assign tasks to staff",
+      description: "Create and assign tasks to employees",
       href: "/admin/tasks",
       icon: ClipboardList,
       color: "bg-green-500",
@@ -226,7 +226,7 @@ export default async function AdminDashboardPage() {
     },
     {
       title: "Documentation",
-      description: "View all staff documentation",
+      description: "View all employee documentation",
       href: "/admin/documentation",
       icon: FileText,
       color: "bg-orange-500",
@@ -234,7 +234,7 @@ export default async function AdminDashboardPage() {
     },
     {
       title: "Job Descriptions",
-      description: "View staff job descriptions",
+      description: "View employee job descriptions",
       href: "/admin/job-descriptions",
       icon: Briefcase,
       color: "bg-pink-500",
@@ -314,8 +314,8 @@ export default async function AdminDashboardPage() {
       {/* Stats Grid */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
         <StatCard
-          title="Total Staff"
-          value={staffCount || 0}
+          title="Total Employees"
+          value={employeeCount || 0}
           icon={Users}
           iconBgColor="bg-blue-100 dark:bg-blue-900/30"
           iconColor="text-blue-600 dark:text-blue-400"

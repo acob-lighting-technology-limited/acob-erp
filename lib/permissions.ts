@@ -5,25 +5,29 @@ import type { UserRole, Profile } from "@/types/database"
  * 1. super_admin - Full system access, can assign all roles
  * 2. admin - HR functions, cannot assign roles to leads or themselves
  * 3. lead - Department leads with limited management access
- * 4. staff - Regular employees
+ * 4. employee - Regular employees
  * 5. visitor - Read-only guest access
  */
 
 // Helper to check role hierarchy
 export function hasRoleOrHigher(userRole: UserRole, requiredRole: UserRole): boolean {
-  const hierarchy: UserRole[] = ["visitor", "staff", "lead", "admin", "super_admin"]
+  const hierarchy: UserRole[] = ["visitor", "employee", "lead", "admin", "super_admin"]
   const userLevel = hierarchy.indexOf(userRole)
   const requiredLevel = hierarchy.indexOf(requiredRole)
   return userLevel >= requiredLevel
 }
 
-export function canViewAllStaff(role: UserRole): boolean {
+export function canViewAllemployee(role: UserRole): boolean {
   return hasRoleOrHigher(role, "admin") // admin and super_admin
 }
 
-export function canViewDepartmentStaff(role: UserRole, leadDepartments: string[], staffDepartment: string): boolean {
-  if (canViewAllStaff(role)) return true
-  return role === "lead" && leadDepartments.includes(staffDepartment)
+export function canViewDepartmentemployee(
+  role: UserRole,
+  leadDepartments: string[],
+  employeeDepartment: string
+): boolean {
+  if (canViewAllemployee(role)) return true
+  return role === "lead" && leadDepartments.includes(employeeDepartment)
 }
 
 export function canManageDevices(role: UserRole): boolean {
@@ -109,9 +113,9 @@ export function canAssignRoles(assignerRole: UserRole, targetRole: UserRole): bo
   // super_admin can assign any role
   if (assignerRole === "super_admin") return true
 
-  // admin can assign visitor, staff, and lead (but not admin or super_admin)
+  // admin can assign visitor, employee, and lead (but not admin or super_admin)
   if (assignerRole === "admin") {
-    return ["visitor", "staff", "lead"].includes(targetRole)
+    return ["visitor", "employee", "lead"].includes(targetRole)
   }
 
   // Others cannot assign roles
@@ -121,7 +125,7 @@ export function canAssignRoles(assignerRole: UserRole, targetRole: UserRole): bo
 export function getRoleDisplayName(role: UserRole): string {
   const roleNames: Record<UserRole, string> = {
     visitor: "Visitor",
-    staff: "Staff",
+    employee: "employee",
     lead: "Lead",
     admin: "Admin",
     super_admin: "Super Admin",
@@ -132,7 +136,7 @@ export function getRoleDisplayName(role: UserRole): string {
 export function getRoleBadgeColor(role: UserRole): string {
   const colors: Record<UserRole, string> = {
     visitor: "bg-slate-100 text-slate-800 dark:bg-slate-900/30 dark:text-slate-400",
-    staff: "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400",
+    employee: "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400",
     lead: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
     admin: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400",
     super_admin: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",

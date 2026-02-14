@@ -24,7 +24,7 @@ export interface Project {
   }
 }
 
-export interface Staff {
+export interface employee {
   id: string
   first_name: string
   last_name: string
@@ -51,8 +51,8 @@ async function getAdminProjectsData() {
     return { redirect: "/dashboard" as const }
   }
 
-  // Fetch projects and staff in parallel
-  const [projectsResult, staffResult] = await Promise.all([
+  // Fetch projects and employee in parallel
+  const [projectsResult, employeeResult] = await Promise.all([
     supabase
       .from("projects")
       .select(
@@ -77,7 +77,7 @@ async function getAdminProjectsData() {
 
   return {
     projects: (projectsResult.data || []) as Project[],
-    staff: (staffResult.data || []) as Staff[],
+    employee: (employeeResult.data || []) as employee[],
   }
 }
 
@@ -88,7 +88,7 @@ export default async function AdminProjectsPage() {
     redirect(data.redirect)
   }
 
-  const projectsData = data as { projects: Project[]; staff: Staff[] }
+  const projectsData = data as { projects: Project[]; employee: employee[] }
 
-  return <AdminProjectsContent initialProjects={projectsData.projects} initialStaff={projectsData.staff} />
+  return <AdminProjectsContent initialProjects={projectsData.projects} initialemployee={projectsData.employee} />
 }

@@ -26,20 +26,22 @@ export function FeedbackViewerClient({ feedback }: FeedbackViewerClientProps) {
   const [selectedType, setSelectedType] = useState("all")
   const [selectedStatus, setSelectedStatus] = useState("all")
   const [departmentFilter, setDepartmentFilter] = useState("all")
-  const [staffFilter, setStaffFilter] = useState("all")
+  const [employeeFilter, setemployeeFilter] = useState("all")
   const [nameSortOrder, setNameSortOrder] = useState<"asc" | "desc">("asc")
   const [viewMode, setViewMode] = useState<"list" | "card">("list")
   const [selectedFeedback, setSelectedFeedback] = useState<any | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isUpdating, setIsUpdating] = useState(false)
   const [departments, setDepartments] = useState<string[]>([])
-  const [staff, setStaff] = useState<{ id: string; first_name: string; last_name: string; department: string }[]>([])
+  const [employee, setemployee] = useState<{ id: string; first_name: string; last_name: string; department: string }[]>(
+    []
+  )
   const [userRole, setUserRole] = useState<string | null>(null)
   const [leadDepartments, setLeadDepartments] = useState<string[]>([])
 
   const supabase = createClient()
 
-  // Load all departments and staff from database
+  // Load all departments and employee from database
   useEffect(() => {
     const loadFilterData = async () => {
       try {
@@ -60,28 +62,30 @@ export function FeedbackViewerClient({ feedback }: FeedbackViewerClientProps) {
           setLeadDepartments(userProfile.lead_departments || [])
         }
 
-        // Load staff - leads can only see staff in their departments
-        let staffQuery = supabase
+        // Load employee - leads can only see employee in their departments
+        let employeeQuery = supabase
           .from("profiles")
           .select("id, first_name, last_name, department")
           .order("last_name", { ascending: true })
 
         // If user is a lead, filter by their lead departments
         if (userProfile?.role === "lead" && userProfile.lead_departments && userProfile.lead_departments.length > 0) {
-          staffQuery = staffQuery.in("department", userProfile.lead_departments)
+          employeeQuery = employeeQuery.in("department", userProfile.lead_departments)
         }
 
-        const { data: staffData } = await staffQuery
+        const { data: employeeData } = await employeeQuery
 
-        if (staffData) {
-          setStaff(staffData)
+        if (employeeData) {
+          setemployee(employeeData)
 
           // Extract unique departments - for leads, only show their lead departments
           let uniqueDepartments: string[] = []
           if (userProfile?.role === "lead" && userProfile.lead_departments && userProfile.lead_departments.length > 0) {
             uniqueDepartments = userProfile.lead_departments.sort()
           } else {
-            uniqueDepartments = Array.from(new Set(staffData.map((s: any) => s.department).filter(Boolean))) as string[]
+            uniqueDepartments = Array.from(
+              new Set(employeeData.map((s: any) => s.department).filter(Boolean))
+            ) as string[]
             uniqueDepartments.sort()
           }
           setDepartments(uniqueDepartments)
@@ -125,9 +129,9 @@ export function FeedbackViewerClient({ feedback }: FeedbackViewerClientProps) {
       filtered = filtered.filter((item) => item.profiles?.department === departmentFilter)
     }
 
-    // Staff filter
-    if (staffFilter !== "all") {
-      filtered = filtered.filter((item) => item.user_id === staffFilter)
+    // employee filter
+    if (employeeFilter !== "all") {
+      filtered = filtered.filter((item) => item.user_id === employeeFilter)
     }
 
     // Sort by name
@@ -143,7 +147,7 @@ export function FeedbackViewerClient({ feedback }: FeedbackViewerClientProps) {
     })
 
     setFilteredFeedback(filtered)
-  }, [feedback, searchQuery, selectedType, selectedStatus, departmentFilter, staffFilter, nameSortOrder])
+  }, [feedback, searchQuery, selectedType, selectedStatus, departmentFilter, employeeFilter, nameSortOrder])
 
   const getTypeColor = (type: string) => {
     switch (type) {
@@ -328,27 +332,27 @@ export function FeedbackViewerClient({ feedback }: FeedbackViewerClientProps) {
 
             <div className="space-y-2">
               <label className="text-foreground text-sm font-medium">
-                {userRole === "lead" && departments.length > 0 ? `Staff (${departments.join(", ")})` : "Staff"}
+                {userRole === "lead" && departments.length > 0 ? `employee (${departments.join(", ")})` : "employee"}
               </label>
               <SearchableSelect
-                value={staffFilter}
-                onValueChange={setStaffFilter}
+                value={employeeFilter}
+                onValueChange={setemployeeFilter}
                 placeholder={
                   userRole === "lead" && departments.length > 0
-                    ? `All ${departments.length === 1 ? departments[0] : "Department"} Staff`
-                    : "All Staff"
+                    ? `All ${departments.length === 1 ? departments[0] : "Department"} employee`
+                    : "All employee"
                 }
-                searchPlaceholder="Search staff..."
+                searchPlaceholder="Search employee..."
                 icon={<User className="h-4 w-4" />}
                 options={[
                   {
                     value: "all",
                     label:
                       userRole === "lead" && departments.length > 0
-                        ? `All ${departments.length === 1 ? departments[0] : "Department"} Staff`
-                        : "All Staff",
+                        ? `All ${departments.length === 1 ? departments[0] : "Department"} employee`
+                        : "All employee",
                   },
-                  ...staff.map((member) => ({
+                  ...employee.map((member) => ({
                     value: member.id,
                     label: `${formatName(member.first_name)} ${formatName(member.last_name)} - ${member.department}`,
                     icon: <User className="h-3 w-3" />,
@@ -522,7 +526,7 @@ export function FeedbackViewerClient({ feedback }: FeedbackViewerClientProps) {
               selectedType !== "all" ||
               selectedStatus !== "all" ||
               departmentFilter !== "all" ||
-              staffFilter !== "all"
+              employeeFilter !== "all"
                 ? "No feedback matches your filters"
                 : "No feedback has been submitted yet"}
             </p>

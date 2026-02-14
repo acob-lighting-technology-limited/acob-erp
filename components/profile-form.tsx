@@ -13,6 +13,8 @@ import { toast } from "sonner"
 import Link from "next/link"
 import { X } from "lucide-react"
 
+import { Switch } from "@/components/ui/switch"
+
 const DEPARTMENTS = [
   "Accounts",
   "Admin & HR",
@@ -23,15 +25,6 @@ const DEPARTMENTS = [
   "Operations",
   "Technical",
 ]
-
-const DEVICE_TYPES = ["Laptop", "Desktop"]
-
-interface Device {
-  id: string
-  type: string
-  brand: string
-  model: string
-}
 
 interface ProfileFormProps {
   user: any
@@ -54,45 +47,13 @@ export function ProfileForm({ user, profile }: ProfileFormProps) {
     bankAccountName: profile?.bank_account_name || "",
     dateOfBirth: profile?.date_of_birth ? profile.date_of_birth.substring(0, 10) : "",
     employmentDate: profile?.employment_date ? profile.employment_date.substring(0, 10) : "",
+    emailNotifications: profile?.email_notifications ?? true,
   })
-
-  const [devices, setDevices] = useState<Device[]>(
-    profile?.devices || [
-      {
-        id: "1",
-        type: profile?.device_type || "",
-        brand: profile?.device_allocated || "",
-        model: profile?.device_model || "",
-      },
-    ]
-  )
 
   const [isLoading, setIsLoading] = useState(false)
 
   const handleInputChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
-  }
-
-  const handleDeviceChange = (index: number, field: string, value: string) => {
-    const newDevices = [...devices]
-    newDevices[index] = { ...newDevices[index], [field]: value }
-    setDevices(newDevices)
-  }
-
-  const addDevice = () => {
-    setDevices([
-      ...devices,
-      {
-        id: Date.now().toString(),
-        type: "",
-        brand: "",
-        model: "",
-      },
-    ])
-  }
-
-  const removeDevice = (index: number) => {
-    setDevices(devices.filter((_, i) => i !== index))
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -124,15 +85,12 @@ export function ProfileForm({ user, profile }: ProfileFormProps) {
           additional_phone: additionalPhone,
           residential_address: formData.residentialAddress,
           current_work_location: formData.currentWorkLocation,
-          device_type: devices[0]?.type || "",
-          device_allocated: devices[0]?.brand || "",
-          device_model: devices[0]?.model || "",
-          devices: devices,
           bank_name: formData.bankName,
           bank_account_number: formData.bankAccountNumber,
           bank_account_name: formData.bankAccountName,
           date_of_birth: formData.dateOfBirth || null,
           employment_date: formData.employmentDate || null,
+          email_notifications: formData.emailNotifications,
           updated_at: new Date().toISOString(),
         })
         .eq("id", user.id)
@@ -258,6 +216,14 @@ export function ProfileForm({ user, profile }: ProfileFormProps) {
                   rows={3}
                 />
               </div>
+              <div className="flex items-center space-x-2 pt-2">
+                <Switch
+                  id="emailNotifications"
+                  checked={formData.emailNotifications}
+                  onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, emailNotifications: checked }))}
+                />
+                <Label htmlFor="emailNotifications">Receive email notifications for updates and tasks</Label>
+              </div>
             </div>
 
             {/* Work Location */}
@@ -278,69 +244,6 @@ export function ProfileForm({ user, profile }: ProfileFormProps) {
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-
-            {/* Device Information - Multiple Devices */}
-            <div className="space-y-4 border-t pt-6">
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold">Device Information</h3>
-                <Button type="button" variant="outline" size="sm" onClick={addDevice}>
-                  Add Device
-                </Button>
-              </div>
-
-              {devices.map((device, index) => (
-                <div key={device.id} className="space-y-3 rounded-lg border p-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">Device {index + 1}</span>
-                    {devices.length > 1 && (
-                      <Button type="button" variant="ghost" size="sm" onClick={() => removeDevice(index)}>
-                        <X className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-
-                  <div className="grid gap-4 sm:grid-cols-3">
-                    <div className="space-y-2">
-                      <Label htmlFor={`deviceType-${index}`}>Device Type</Label>
-                      <Select value={device.type} onValueChange={(value) => handleDeviceChange(index, "type", value)}>
-                        <SelectTrigger id={`deviceType-${index}`}>
-                          <SelectValue placeholder="Select type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {DEVICE_TYPES.map((type) => (
-                            <SelectItem key={type} value={type}>
-                              {type}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor={`deviceBrand-${index}`}>Device Brand</Label>
-                      <Select value={device.brand} onValueChange={(value) => handleDeviceChange(index, "brand", value)}>
-                        <SelectTrigger id={`deviceBrand-${index}`}>
-                          <SelectValue placeholder="Select brand" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Dell">Dell</SelectItem>
-                          <SelectItem value="HP">HP</SelectItem>
-                          <SelectItem value="Others">Others</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor={`deviceModel-${index}`}>Device Model</Label>
-                      <Input
-                        id={`deviceModel-${index}`}
-                        value={device.model}
-                        onChange={(e) => handleDeviceChange(index, "model", e.target.value)}
-                        placeholder="e.g., Latitude 5520"
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))}
             </div>
 
             {/* Banking Information */}

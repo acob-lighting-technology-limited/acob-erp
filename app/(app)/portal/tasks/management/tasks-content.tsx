@@ -25,7 +25,33 @@ import {
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import type { Task } from "./page"
+
+export interface Task {
+  id: string
+  title: string
+  description?: string
+  priority: string
+  status: string
+  due_date?: string
+  started_at?: string
+  completed_at?: string
+  created_at: string
+  assignment_type?: "individual" | "multiple" | "department"
+  assigned_by?: string
+  assigned_by_user?: {
+    first_name: string
+    last_name: string
+  }
+  department?: string
+  assigned_users?: Array<{
+    id: string
+    first_name: string
+    last_name: string
+    completed?: boolean
+  }>
+  user_completed?: boolean
+  can_change_status?: boolean
+}
 
 interface TaskUpdate {
   id: string

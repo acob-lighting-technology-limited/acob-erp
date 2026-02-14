@@ -16,6 +16,7 @@ interface CreateNotificationParams {
     | "asset_assigned"
     | "approval_request"
     | "approval_granted"
+    | "approval_rejected"
     | "system"
     | "announcement"
   category: "tasks" | "assets" | "feedback" | "approvals" | "system" | "mentions"
@@ -204,6 +205,30 @@ export async function notifyApprovalGranted(params: {
     priority: "normal",
     linkUrl: params.linkUrl,
     actorId: params.approvedBy,
+    entityType: "approval",
+    entityId: undefined,
+  })
+}
+
+/**
+ * Notify user about approval rejected
+ */
+export async function notifyApprovalRejected(params: {
+  userId: string
+  approvalType: string
+  rejectedBy: string
+  reason: string
+  linkUrl?: string
+}) {
+  return createNotification({
+    userId: params.userId,
+    type: "approval_rejected",
+    category: "approvals",
+    title: "Approval rejected",
+    message: `Your ${params.approvalType} has been rejected. Reason: ${params.reason}`,
+    priority: "high",
+    linkUrl: params.linkUrl,
+    actorId: params.rejectedBy,
     entityType: "approval",
     entityId: undefined,
   })

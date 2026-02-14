@@ -161,6 +161,35 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Failed to create leave request" }, { status: 500 })
     }
 
+    // Notify all admins and super_admins
+    const { data: admins } = await supabase.from("profiles").select("id").in("role", ["admin", "super_admin"])
+
+    if (admins && admins.length > 0) {
+      const { notifyApprovalRequest } = await import("@/lib/notifications")
+
+      // Get the requester's name
+      const { data: requester } = await supabase
+        .from("profiles")
+        .select("first_name, last_name")
+        .eq("id", user.id)
+        .single()
+
+      const requesterName = requester ? `${requester.first_name} ${requester.last_name}` : "Employee"
+
+      // Send notification to each admin
+      await Promise.all(
+        admins.map((admin) =>
+          notifyApprovalRequest({
+            adminId: admin.id,
+            requestType: "Leave Request",
+            requestBy: user.id,
+            requestDetails: `${requesterName} requested ${daysCount} days leave`,
+            linkUrl: `/admin/hr/leave?status=pending`,
+          })
+        )
+      )
+    }
+
     return NextResponse.json({
       data: newRequest,
       message: "Leave request created successfully",

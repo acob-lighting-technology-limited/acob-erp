@@ -80,7 +80,7 @@ export interface Task {
   }
 }
 
-export interface Staff {
+export interface employee {
   id: string
   first_name: string
   last_name: string
@@ -100,7 +100,7 @@ export interface Project {
 
 interface AdminTasksContentProps {
   initialTasks: Task[]
-  initialStaff: Staff[]
+  initialemployee: employee[]
   initialProjects: Project[]
   initialDepartments: string[]
   userProfile: UserProfile
@@ -108,20 +108,20 @@ interface AdminTasksContentProps {
 
 export function AdminTasksContent({
   initialTasks,
-  initialStaff,
+  initialemployee,
   initialProjects,
   initialDepartments,
   userProfile,
 }: AdminTasksContentProps) {
   const [tasks, setTasks] = useState<Task[]>(initialTasks)
-  const [staff] = useState<Staff[]>(initialStaff)
+  const [employee] = useState<employee[]>(initialemployee)
   const [departments] = useState<string[]>(initialDepartments)
   const [projects] = useState<Project[]>(initialProjects)
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [priorityFilter, setPriorityFilter] = useState("all")
   const [departmentFilter, setDepartmentFilter] = useState("all")
-  const [staffFilter, setStaffFilter] = useState("all")
+  const [employeeFilter, setemployeeFilter] = useState("all")
   const [viewMode, setViewMode] = useState<"list" | "card">("list")
 
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false)
@@ -285,12 +285,12 @@ export function AdminTasksContent({
       }
 
       if (taskForm.assignment_type === "individual" && !taskForm.assigned_to) {
-        toast.error("Please select a staff member for individual assignment")
+        toast.error("Please select a employee member for individual assignment")
         setIsSaving(false)
         return
       }
       if (taskForm.assignment_type === "multiple" && taskForm.assigned_users.length === 0) {
-        toast.error("Please select at least one staff member for multiple assignment")
+        toast.error("Please select at least one employee member for multiple assignment")
         setIsSaving(false)
         return
       }
@@ -352,6 +352,66 @@ export function AdminTasksContent({
         })
 
         // Audit logging handled by database trigger
+        // Send notification to recipients
+        const { notifyTaskAssigned, notifyTaskUpdated } = await import("@/lib/notifications")
+
+        if (taskForm.assignment_type === "individual") {
+          // If assigned to changed or if it's the same person but we just want to update them
+          // We can check if assignment changed if we had original data, but for now we'll send a "Task Updated" notification
+          // or just notify if it's a new assignment. Since we don't track the *previous* assignment easily here without looking at selectedTask
+          // let's assume if they save, they might have changed something important.
+
+          const isNewAssignment = selectedTask.assigned_to !== taskForm.assigned_to
+
+          if (isNewAssignment && taskForm.assigned_to) {
+            await notifyTaskAssigned(
+              {
+                userId: taskForm.assigned_to,
+                taskId: selectedTask.id,
+                taskTitle: taskForm.title,
+                assignedBy: user.id,
+                priority: taskForm.priority as any,
+              },
+              { supabase }
+            )
+          } else if (taskForm.assigned_to) {
+            await notifyTaskUpdated(
+              {
+                userId: taskForm.assigned_to,
+                taskId: selectedTask.id,
+                taskTitle: taskForm.title,
+                updatedBy: user.id,
+                changeDescription: "Task details updated by admin",
+              },
+              { supabase }
+            )
+          }
+        } else if (taskForm.assignment_type === "multiple") {
+          // For multiple, we can check who was added.
+          // For simplicity, we might just notify everyone "Task Updated"
+          // BUT notifyTaskAssigned is better for new people.
+          // Let's notify everyone "Task Updated" for now to be safe, or check diff.
+          // Checking diff is better.
+          // But here we deleted all and re-inserted.
+
+          // Let's just notify all current assigned users
+          if (taskForm.assigned_users.length > 0) {
+            await Promise.all(
+              taskForm.assigned_users.map((userId) =>
+                notifyTaskUpdated(
+                  {
+                    userId,
+                    taskId: selectedTask.id,
+                    taskTitle: taskForm.title,
+                    updatedBy: user.id,
+                    changeDescription: "Task details updated by admin",
+                  },
+                  { supabase }
+                )
+              )
+            )
+          }
+        }
 
         toast.success("Task updated successfully")
       } else {
@@ -365,6 +425,37 @@ export function AdminTasksContent({
           }))
           const { error: assignError } = await supabase.from("task_assignments").insert(assignments)
           if (assignError) throw assignError
+        }
+
+        // Send notification
+        const { notifyTaskAssigned } = await import("@/lib/notifications")
+
+        if (taskForm.assignment_type === "individual" && taskForm.assigned_to) {
+          await notifyTaskAssigned(
+            {
+              userId: taskForm.assigned_to,
+              taskId: newTask.id,
+              taskTitle: newTask.title,
+              assignedBy: user.id,
+              priority: newTask.priority as any,
+            },
+            { supabase }
+          )
+        } else if (taskForm.assignment_type === "multiple" && taskForm.assigned_users.length > 0) {
+          await Promise.all(
+            taskForm.assigned_users.map((userId) =>
+              notifyTaskAssigned(
+                {
+                  userId,
+                  taskId: newTask.id,
+                  taskTitle: newTask.title,
+                  assignedBy: user.id,
+                  priority: newTask.priority as any,
+                },
+                { supabase }
+              )
+            )
+          )
         }
 
         // Audit logging handled by database trigger
@@ -430,15 +521,17 @@ export function AdminTasksContent({
       matchesDepartment =
         departmentFilter === "all" ||
         task.department === departmentFilter ||
-        (task.assigned_to_user ? staff.find((s) => s.id === task.assigned_to)?.department === departmentFilter : false)
+        (task.assigned_to_user
+          ? employee.find((s) => s.id === task.assigned_to)?.department === departmentFilter
+          : false)
     }
 
-    const matchesStaff =
-      staffFilter === "all" ||
-      task.assigned_to === staffFilter ||
-      task.assigned_users?.some((u: any) => u.id === staffFilter)
+    const matchesemployee =
+      employeeFilter === "all" ||
+      task.assigned_to === employeeFilter ||
+      task.assigned_users?.some((u: any) => u.id === employeeFilter)
 
-    return matchesSearch && matchesStatus && matchesPriority && matchesDepartment && matchesStaff
+    return matchesSearch && matchesStatus && matchesPriority && matchesDepartment && matchesemployee
   })
 
   const stats = {
@@ -632,14 +725,14 @@ export function AdminTasksContent({
                 />
               )}
               <SearchableSelect
-                value={staffFilter}
-                onValueChange={setStaffFilter}
+                value={employeeFilter}
+                onValueChange={setemployeeFilter}
                 placeholder={
                   userProfile?.role === "lead" && departments.length > 0
-                    ? `All ${departments.length === 1 ? departments[0] : "Department"} Staff`
-                    : "All Staff"
+                    ? `All ${departments.length === 1 ? departments[0] : "Department"} employee`
+                    : "All employee"
                 }
-                searchPlaceholder="Search staff..."
+                searchPlaceholder="Search employee..."
                 icon={<User className="h-4 w-4" />}
                 className="w-full md:w-48"
                 options={[
@@ -647,10 +740,10 @@ export function AdminTasksContent({
                     value: "all",
                     label:
                       userProfile?.role === "lead" && departments.length > 0
-                        ? `All ${departments.length === 1 ? departments[0] : "Department"} Staff`
-                        : "All Staff",
+                        ? `All ${departments.length === 1 ? departments[0] : "Department"} employee`
+                        : "All employee",
                   },
-                  ...staff.map((member) => ({
+                  ...employee.map((member) => ({
                     value: member.id,
                     label: `${formatName(member.first_name)} ${formatName(member.last_name)} - ${member.department}`,
                     icon: <User className="h-3 w-3" />,
@@ -974,17 +1067,17 @@ export function AdminTasksContent({
                 <SearchableSelect
                   value={taskForm.assigned_to}
                   onValueChange={(value) => {
-                    const selectedStaff = staff.find((s) => s.id === value)
+                    const selectedemployee = employee.find((s) => s.id === value)
                     setTaskForm({
                       ...taskForm,
                       assigned_to: value,
-                      department: selectedStaff?.department || "",
+                      department: selectedemployee?.department || "",
                     })
                   }}
-                  placeholder="Select staff member"
-                  searchPlaceholder="Search staff..."
+                  placeholder="Select employee member"
+                  searchPlaceholder="Search employee..."
                   icon={<User className="h-4 w-4" />}
-                  options={staff.map((member) => ({
+                  options={employee.map((member) => ({
                     value: member.id,
                     label: `${member.first_name} ${member.last_name} - ${member.department}`,
                   }))}
@@ -998,10 +1091,10 @@ export function AdminTasksContent({
                 <Card className="mt-2 border-2">
                   <ScrollArea className="h-[200px]">
                     <CardContent className="space-y-2 p-4">
-                      {staff.length === 0 ? (
-                        <p className="text-muted-foreground py-4 text-center text-sm">No staff members found</p>
+                      {employee.length === 0 ? (
+                        <p className="text-muted-foreground py-4 text-center text-sm">No employee members found</p>
                       ) : (
-                        staff.map((member) => (
+                        employee.map((member) => (
                           <div key={member.id} className="hover:bg-muted flex items-center space-x-2 rounded-md p-2">
                             <Checkbox
                               id={`member-${member.id}`}
@@ -1033,7 +1126,7 @@ export function AdminTasksContent({
                   </ScrollArea>
                 </Card>
                 <p className="text-muted-foreground mt-1 text-xs">
-                  {taskForm.assigned_users.length} staff member{taskForm.assigned_users.length !== 1 ? "s" : ""}{" "}
+                  {taskForm.assigned_users.length} employee member{taskForm.assigned_users.length !== 1 ? "s" : ""}{" "}
                   selected
                 </p>
               </div>
@@ -1067,8 +1160,8 @@ export function AdminTasksContent({
                   </SelectContent>
                 </Select>
                 <p className="text-muted-foreground mt-1 text-xs">
-                  All staff in this department will see this task. Only department leads, admins, and super admins can
-                  change the status.
+                  All employee in this department will see this task. Only department leads, admins, and super admins
+                  can change the status.
                 </p>
               </div>
             )}

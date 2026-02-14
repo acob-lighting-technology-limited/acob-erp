@@ -71,6 +71,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (status === "terminated") {
       updateData.termination_date = termination_date || new Date().toISOString().split("T")[0]
       updateData.termination_reason = reason
+
+      // CRITICAL: Downgrade permissions and remove roles upon termination
+      updateData.role = "visitor"
+      updateData.company_role = null
+      updateData.is_admin = false
+      updateData.is_department_lead = false
+      updateData.lead_departments = []
     } else {
       // Clear termination fields if not terminated
       updateData.termination_date = null

@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
           title: name,
           subtitle: profile.company_email || undefined,
           description: `${profile.department || ""} ${profile.role || ""}`.trim() || undefined,
-          href: `/admin/staff/${profile.id}`,
+          href: `/admin/employee/${profile.id}`,
           metadata: profile,
         })
 

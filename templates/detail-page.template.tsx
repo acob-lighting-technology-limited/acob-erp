@@ -6,7 +6,7 @@
  * - Main content area with sections
  * - Optional sidebar with meta information
  *
- * Examples: Project detail, Staff profile, Task detail
+ * Examples: Project detail, employee profile, Task detail
  */
 
 import { redirect, notFound } from "next/navigation"

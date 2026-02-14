@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import { WeeklyReportsContent } from "./weekly-reports-content"
+import { ActionTrackerContent } from "./action-tracker-content"
 
-export default async function WeeklyReportsPage() {
+export default async function ActionTrackerPage() {
   const supabase = await createClient()
 
   const {
@@ -14,7 +14,7 @@ export default async function WeeklyReportsPage() {
     redirect("/auth/login")
   }
 
-  // Get user profile to check if staff/admin
+  // Get user profile to check if employee/admin
   const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
 
   if (!profile || !["super_admin", "admin"].includes(profile.role)) {
@@ -22,10 +22,10 @@ export default async function WeeklyReportsPage() {
   }
 
   // Fetch departments for filtering
-  const { data: staffData } = await supabase.from("profiles").select("department").not("department", "is", null)
+  const { data: employeeData } = await supabase.from("profiles").select("department").not("department", "is", null)
 
-  const departments = Array.from(new Set(staffData?.map((s: any) => s.department).filter(Boolean))) as string[]
+  const departments = Array.from(new Set(employeeData?.map((s: any) => s.department).filter(Boolean))) as string[]
   departments.sort()
 
-  return <WeeklyReportsContent initialDepartments={departments} />
+  return <ActionTrackerContent initialDepartments={departments} />
 }

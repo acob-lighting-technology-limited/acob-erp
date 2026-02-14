@@ -152,6 +152,44 @@ export function ActionFormDialog({
         const { error } = await supabase.from("tasks").insert(payloads)
         if (error) throw error
         toast.success(`Created ${payloads.length} actions`)
+
+        // Notify Department Members
+        const { data: deptMembers } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("department", dept)
+          .neq("id", user.id) // Don't notify self
+
+        if (deptMembers && deptMembers.length > 0) {
+          const { createNotification } = await import("@/lib/notifications")
+
+          // If bulk, send one summary or multiple?
+          // Sending one summary is better to avoid spam.
+          const title = payloads.length === 1 ? "New Action Item" : `${payloads.length} New Action Items`
+          const message =
+            payloads.length === 1
+              ? `New action added to ${dept}: ${payloads[0].title}`
+              : `${payloads.length} new actions added to ${dept} tracker.`
+
+          await Promise.all(
+            deptMembers.map((member) =>
+              createNotification(
+                {
+                  userId: member.id,
+                  type: "task_assigned", // Using task_assigned generic type
+                  category: "tasks",
+                  title: title,
+                  message: message,
+                  priority: "normal",
+                  linkUrl: `/portal/reports/action-tracker?dept=${dept}`,
+                  actorId: user.id,
+                  entityType: "task_batch",
+                },
+                { supabase }
+              )
+            )
+          )
+        }
       }
 
       onComplete()

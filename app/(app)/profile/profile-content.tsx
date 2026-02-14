@@ -134,7 +134,7 @@ export function ProfileContent({ profile, tasks, assets, documentation, feedback
               <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-0.5">
                 <p className="text-muted-foreground flex items-center gap-1.5 text-sm md:text-base lg:text-lg">
                   <Briefcase className="h-4 w-4 lg:h-5 lg:w-5" />
-                  {profile?.company_role || "Staff Member"}
+                  {profile?.company_role || "employee Member"}
                 </p>
                 <p className="text-muted-foreground flex items-center gap-1.5 text-sm md:text-base lg:text-lg">
                   <Building2 className="h-4 w-4 lg:h-5 lg:w-5" />
@@ -168,7 +168,7 @@ export function ProfileContent({ profile, tasks, assets, documentation, feedback
                   dot: "bg-blue-500",
                   text: "text-blue-600 dark:text-blue-400",
                 },
-                staff: {
+                employee: {
                   bg: "bg-gray-500/10",
                   border: "border-gray-500/20",
                   dot: "bg-gray-500",
@@ -181,7 +181,7 @@ export function ProfileContent({ profile, tasks, assets, documentation, feedback
                   text: "text-slate-600 dark:text-slate-400",
                 },
               }
-              const colors = roleColors[profile.role] || roleColors.staff
+              const colors = roleColors[profile.role] || roleColors.employee
 
               return (
                 <div

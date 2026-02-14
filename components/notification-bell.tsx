@@ -164,7 +164,7 @@ export function NotificationBell({ isAdmin = false }: NotificationBellProps) {
             message: `${pendingUsersCount} user${pendingUsersCount > 1 ? "s" : ""} waiting for approval`,
             timestamp: formatRelativeTime(now.toISOString()),
             createdAt: now.toISOString(),
-            link: "/admin/staff",
+            link: "/admin/employee",
             linkText: "Review Users",
             read: readIds.has("pending-users"),
           })

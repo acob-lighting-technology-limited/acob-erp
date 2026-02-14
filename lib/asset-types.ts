@@ -41,7 +41,7 @@ export const ASSET_TYPE_MAP = ASSET_TYPES.reduce(
 )
 
 export const ASSIGNMENT_TYPES = [
-  { value: "individual", label: "Individual Staff" },
+  { value: "individual", label: "Individual employee" },
   { value: "department", label: "Department" },
   { value: "office", label: "Office" },
 ] as const
