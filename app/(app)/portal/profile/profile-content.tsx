@@ -125,7 +125,7 @@ export function ProfileContent({ profile, tasks, assets, documentation, feedback
         {/* Header */}
         <div>
           <h1 className="text-foreground text-3xl font-bold md:text-4xl">
-            Welcome back, {profile?.first_name || "Staff Member"}!
+            Welcome back, {profile?.first_name || "employee Member"}!
           </h1>
           <p className="text-muted-foreground mt-2">Here's what's happening with your account today.</p>
         </div>
@@ -148,7 +148,7 @@ export function ProfileContent({ profile, tasks, assets, documentation, feedback
                       {profile?.other_names && ` ${formatName(profile.other_names)}`}
                       {` ${formatName(profile?.last_name)}`}
                     </h2>
-                    <p className="text-muted-foreground">{profile?.company_role || "Staff Member"}</p>
+                    <p className="text-muted-foreground">{profile?.company_role || "employee Member"}</p>
                   </div>
                 </div>
                 <Button onClick={() => router.push("/profile/edit")} variant="outline" className="gap-2">

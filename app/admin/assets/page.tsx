@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import { AdminAssetsContent, type Asset, type Staff, type UserProfile } from "./admin-assets-content"
+import { AdminAssetsContent, type Asset, type Employee, type UserProfile } from "./admin-assets-content"
 
 async function getAdminAssetsData() {
   const supabase = await createClient()
@@ -34,7 +34,7 @@ async function getAdminAssetsData() {
 
   if (assetsError) {
     console.error("Error loading assets:", assetsError)
-    return { assets: [], staff: [], departments: [], userProfile }
+    return { assets: [], employees: [], departments: [], userProfile }
   }
 
   // Fetch current assignments for all assets
@@ -56,18 +56,18 @@ async function getAdminAssetsData() {
     assignmentUsersMap = new Map(usersData?.map((u) => [u.id, u]))
   }
 
-  // Fetch staff - leads can only see staff in their departments
-  let staffQuery = supabase
+  // Fetch employees - leads can only see employees in their departments
+  let employeeQuery = supabase
     .from("profiles")
     .select("id, first_name, last_name, company_email, department")
     .order("last_name", { ascending: true })
 
   if (profile.role === "lead" && profile.lead_departments && profile.lead_departments.length > 0) {
-    staffQuery = staffQuery.in("department", profile.lead_departments)
+    employeeQuery = employeeQuery.in("department", profile.lead_departments)
   }
 
-  const { data: staffData } = await staffQuery
-  const staff = (staffData || []) as Staff[]
+  const { data: employeeData } = await employeeQuery
+  const employees = (employeeData || []) as Employee[]
 
   // Fetch unresolved issue counts
   const { data: issuesData } = await supabase.from("asset_issues").select("asset_id, resolved")
@@ -82,7 +82,7 @@ async function getAdminAssetsData() {
   // Filter assets for leads
   let filteredAssets = assetsData || []
   if (profile.role === "lead" && profile.lead_departments && profile.lead_departments.length > 0) {
-    const deptUserIds = staff.map((s) => s.id)
+    const deptUserIds = employees.map((s) => s.id)
     filteredAssets = filteredAssets.filter((asset) => {
       const assignment = (assignmentsData || []).find((a: any) => a.asset_id === asset.id)
       if (!assignment) return false
@@ -114,9 +114,9 @@ async function getAdminAssetsData() {
   const departments =
     profile.role === "lead" && profile.lead_departments
       ? profile.lead_departments
-      : Array.from(new Set(staff.map((s) => s.department).filter(Boolean)))
+      : Array.from(new Set(employees.map((s) => s.department).filter(Boolean)))
 
-  return { assets, staff, departments, userProfile }
+  return { assets, employees, departments, userProfile }
 }
 
 export default async function AdminAssetsPage() {
@@ -128,7 +128,7 @@ export default async function AdminAssetsPage() {
 
   const pageData = data as {
     assets: Asset[]
-    staff: Staff[]
+    employees: Employee[]
     departments: string[]
     userProfile: UserProfile
   }
@@ -136,7 +136,7 @@ export default async function AdminAssetsPage() {
   return (
     <AdminAssetsContent
       initialAssets={pageData.assets}
-      initialStaff={pageData.staff}
+      initialEmployees={pageData.employees}
       initialDepartments={pageData.departments}
       userProfile={pageData.userProfile}
     />

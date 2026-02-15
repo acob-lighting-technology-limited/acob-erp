@@ -12,7 +12,7 @@ Use for pages that display lists/tables of items with:
 - Table or grid of items
 - Empty states
 
-**Examples**: Staff list, Tasks list, Products list, Projects list
+**Examples**: employee list, Tasks list, Products list, Projects list
 
 ### 2. Form Page Template (`form-page.template.tsx`)
 
@@ -30,7 +30,7 @@ Use for pages that display detailed view of a single item:
 - Main content with sections
 - Sidebar with meta information
 
-**Examples**: Project detail, Staff profile, Task detail
+**Examples**: Project detail, employee profile, Task detail
 
 ## How to Use
 
@@ -97,7 +97,7 @@ Use `StatCard` from `@/components/ui/stat-card`:
 
 ```tsx
 <StatCard
-  title="Total Staff"
+  title="Total employee"
   value={120}
   icon={Users}
   iconBgColor="bg-blue-100 dark:bg-blue-900/30"

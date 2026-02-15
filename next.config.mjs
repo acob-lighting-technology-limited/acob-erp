@@ -23,6 +23,21 @@ const nextConfig = {
         fs: false,
         net: false,
         tls: false,
+        http: false,
+        https: false,
+      }
+
+      // Handle node: scheme for modern Node modules
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        "node:fs": false,
+        "node:net": false,
+        "node:tls": false,
+        "node:path": false,
+        "node:stream": false,
+        "node:crypto": false,
+        "node:http": false,
+        "node:https": false,
       }
     }
 

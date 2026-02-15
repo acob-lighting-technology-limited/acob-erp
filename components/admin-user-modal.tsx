@@ -33,8 +33,6 @@ export function AdminUserModal({ user, onClose, onSave }: AdminUserModalProps) {
     department: user.department || "",
     companyRole: user.company_role || "",
     phoneNumber: user.phone_number || "",
-    deviceType: user.device_type || "",
-    deviceModel: user.device_model || "",
   })
   const [isLoading, setIsLoading] = useState(false)
 
@@ -54,8 +52,6 @@ export function AdminUserModal({ user, onClose, onSave }: AdminUserModalProps) {
           department: formData.department,
           company_role: formData.companyRole,
           phone_number: phoneNumber,
-          device_type: formData.deviceType,
-          device_model: formData.deviceModel,
           updated_at: new Date().toISOString(),
         })
         .eq("id", user.id)
@@ -150,41 +146,15 @@ export function AdminUserModal({ user, onClose, onSave }: AdminUserModalProps) {
               placeholder="e.g., +2348012345678"
             />
           </div>
+        </div>
 
-          <div className="grid gap-2 sm:grid-cols-2">
-            <div>
-              <Label htmlFor="deviceType">Device Type</Label>
-              <Select
-                value={formData.deviceType}
-                onValueChange={(value) => setFormData({ ...formData, deviceType: value })}
-              >
-                <SelectTrigger id="deviceType">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Laptop">Laptop</SelectItem>
-                  <SelectItem value="Desktop">Desktop</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="deviceModel">Device Model</Label>
-              <Input
-                id="deviceModel"
-                value={formData.deviceModel}
-                onChange={(e) => setFormData({ ...formData, deviceModel: e.target.value })}
-              />
-            </div>
-          </div>
-
-          <div className="flex gap-2 pt-4">
-            <Button onClick={handleSave} loading={isLoading} className="flex-1">
-              Save Changes
-            </Button>
-            <Button onClick={onClose} variant="outline" className="flex-1 bg-transparent">
-              Cancel
-            </Button>
-          </div>
+        <div className="flex gap-2 pt-4">
+          <Button onClick={handleSave} loading={isLoading} className="flex-1">
+            Save Changes
+          </Button>
+          <Button onClick={onClose} variant="outline" className="flex-1 bg-transparent">
+            Cancel
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

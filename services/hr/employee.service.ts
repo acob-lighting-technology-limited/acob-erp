@@ -2,7 +2,7 @@ import { BaseService } from "../base.service"
 
 /**
  * Employee Service
- * Handles all employee/staff related operations
+ * Handles all employee/employee related operations
  */
 export class EmployeeService extends BaseService {
   constructor() {

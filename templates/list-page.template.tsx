@@ -6,7 +6,7 @@
  * - Filters section
  * - Table or grid of items
  *
- * Examples: Staff list, Tasks list, Products list, Projects list
+ * Examples: employee list, Tasks list, Products list, Projects list
  */
 
 import { redirect } from "next/navigation"

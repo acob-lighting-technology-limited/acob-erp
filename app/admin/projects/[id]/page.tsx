@@ -45,7 +45,7 @@ interface Project {
   status: string
 }
 
-interface Staff {
+interface employee {
   id: string
   first_name: string
   last_name: string
@@ -58,7 +58,7 @@ interface ProjectMember {
   user_id: string
   role: string
   assigned_at: string
-  user: Staff
+  user: employee
 }
 
 interface ProjectItem {
@@ -77,7 +77,7 @@ export default function AdminProjectDetailPage() {
   const projectId = params.id as string
 
   const [project, setProject] = useState<Project | null>(null)
-  const [staff, setStaff] = useState<Staff[]>([])
+  const [employee, setemployee] = useState<employee[]>([])
   const [members, setMembers] = useState<ProjectMember[]>([])
   const [items, setItems] = useState<ProjectItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -137,7 +137,7 @@ export default function AdminProjectDetailPage() {
         return
       }
 
-      await Promise.all([loadProject(), loadStaff(), loadMembers(), loadItems()])
+      await Promise.all([loadProject(), loademployee(), loadMembers(), loadItems()])
       console.log("✅ All project data loaded successfully")
     } catch (error) {
       console.error("❌ Error loading project data:", error)
@@ -157,16 +157,16 @@ export default function AdminProjectDetailPage() {
     setProject(data)
   }
 
-  const loadStaff = async () => {
-    console.log("👥 Loading staff...")
+  const loademployee = async () => {
+    console.log("👥 Loading employee...")
     const { data, error } = await supabase
       .from("profiles")
       .select("id, first_name, last_name, company_email, department")
       .order("last_name", { ascending: true })
 
-    console.log("Staff result:", { count: data?.length, error })
+    console.log("employee result:", { count: data?.length, error })
     if (error) throw error
-    setStaff(data || [])
+    setemployee(data || [])
   }
 
   const loadMembers = async () => {
@@ -213,7 +213,7 @@ export default function AdminProjectDetailPage() {
   const handleAddMember = async () => {
     if (isAddingMember) return // Prevent duplicate submissions
     if (!memberForm.user_id) {
-      toast.error("Please select a staff member")
+      toast.error("Please select a employee member")
       return
     }
 
@@ -403,7 +403,7 @@ export default function AdminProjectDetailPage() {
     }
   }
 
-  const availableStaff = staff.filter((s) => !members.some((m) => m.user_id === s.id))
+  const availableemployee = employee.filter((s) => !members.some((m) => m.user_id === s.id))
 
   if (isLoading) {
     return null // loading.tsx will handle the loading state
@@ -561,19 +561,19 @@ export default function AdminProjectDetailPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Add Project Member</DialogTitle>
-            <DialogDescription>Assign a staff member to this project</DialogDescription>
+            <DialogDescription>Assign a employee member to this project</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="user_id">Staff Member</Label>
+              <Label htmlFor="user_id">employee Member</Label>
               <SearchableSelect
                 value={memberForm.user_id}
                 onValueChange={(value) => setMemberForm({ ...memberForm, user_id: value })}
-                placeholder="Select staff member"
-                searchPlaceholder="Search staff..."
+                placeholder="Select employee member"
+                searchPlaceholder="Search employee..."
                 icon={<User className="h-4 w-4" />}
-                options={availableStaff.map((member) => ({
+                options={availableemployee.map((member) => ({
                   value: member.id,
                   label: `${member.first_name} ${member.last_name} - ${member.department}`,
                 }))}

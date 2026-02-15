@@ -1,6 +1,6 @@
 import { neon } from "@neondatabase/serverless"
 
-// This script imports staff data from the CSV into the pending_users table
+// This script imports employee data from the CSV into the pending_users table
 // Run this after the database schema is created
 
 const sql = neon(process.env.DATABASE_URL!)

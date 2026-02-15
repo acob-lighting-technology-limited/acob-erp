@@ -94,7 +94,7 @@ export interface AuditLog {
   }
 }
 
-export interface StaffMember {
+export interface employeeMember {
   id: string
   first_name: string
   last_name: string
@@ -108,14 +108,14 @@ export interface UserProfile {
 
 interface AdminAuditLogsContentProps {
   initialLogs: AuditLog[]
-  initialStaff: StaffMember[]
+  initialemployee: employeeMember[]
   initialDepartments: string[]
   userProfile: UserProfile
 }
 
 export function AdminAuditLogsContent({
   initialLogs,
-  initialStaff,
+  initialemployee,
   initialDepartments,
   userProfile,
 }: AdminAuditLogsContentProps) {
@@ -123,7 +123,7 @@ export function AdminAuditLogsContent({
   const HIDDEN_ACTIONS = ["sync", "migrate", "update_schema", "migration"]
 
   const [logs, setLogs] = useState<AuditLog[]>(initialLogs)
-  const [staff] = useState<StaffMember[]>(initialStaff)
+  const [employee] = useState<employeeMember[]>(initialemployee)
   const [departments] = useState<string[]>(initialDepartments)
   const [isLoading, setIsLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
@@ -131,7 +131,7 @@ export function AdminAuditLogsContent({
   const [entityFilter, setEntityFilter] = useState("all")
   const [dateFilter, setDateFilter] = useState("all")
   const [departmentFilter, setDepartmentFilter] = useState("all")
-  const [staffFilter, setStaffFilter] = useState("all")
+  const [employeeFilter, setemployeeFilter] = useState("all")
   const [customStartDate, setCustomStartDate] = useState("")
   const [customEndDate, setCustomEndDate] = useState("")
   const [viewMode, setViewMode] = useState<"list" | "card">("list")
@@ -789,18 +789,18 @@ export function AdminAuditLogsContent({
     if (userProfile?.role === "lead") {
       // Leads: logs are already filtered, but ensure they match lead's departments
       if (userProfile.lead_departments && userProfile.lead_departments.length > 0) {
-        const userDept = staff.find((s) => s.id === log.user_id)?.department
+        const userDept = employee.find((s) => s.id === log.user_id)?.department
         matchesDepartment = userDept ? userProfile.lead_departments.includes(userDept) : false
       }
     } else {
       // Admins: use department filter
       matchesDepartment =
         departmentFilter === "all" ||
-        (log.user ? staff.find((s) => s.id === log.user_id)?.department === departmentFilter : false)
+        (log.user ? employee.find((s) => s.id === log.user_id)?.department === departmentFilter : false)
     }
 
-    // Filter by staff
-    const matchesStaff = staffFilter === "all" || log.user_id === staffFilter
+    // Filter by employee
+    const matchesemployee = employeeFilter === "all" || log.user_id === employeeFilter
 
     let matchesDate = true
     if (dateFilter !== "all") {
@@ -837,7 +837,7 @@ export function AdminAuditLogsContent({
       }
     }
 
-    return matchesSearch && matchesAction && matchesEntity && matchesDate && matchesDepartment && matchesStaff
+    return matchesSearch && matchesAction && matchesEntity && matchesDate && matchesDepartment && matchesemployee
   })
 
   const getActionColor = (action: string) => {
@@ -1660,16 +1660,16 @@ export function AdminAuditLogsContent({
                 />
               )}
               <SearchableSelect
-                value={staffFilter}
-                onValueChange={setStaffFilter}
+                value={employeeFilter}
+                onValueChange={setemployeeFilter}
                 placeholder={
                   userProfile?.role === "lead" &&
                   userProfile.lead_departments &&
                   userProfile.lead_departments.length > 0
-                    ? `All ${userProfile.lead_departments.length === 1 ? userProfile.lead_departments[0] : "Department"} Staff`
-                    : "All Staff"
+                    ? `All ${userProfile.lead_departments.length === 1 ? userProfile.lead_departments[0] : "Department"} employee`
+                    : "All employee"
                 }
-                searchPlaceholder="Search staff..."
+                searchPlaceholder="Search employee..."
                 icon={<User className="h-4 w-4" />}
                 options={[
                   {
@@ -1678,10 +1678,10 @@ export function AdminAuditLogsContent({
                       userProfile?.role === "lead" &&
                       userProfile.lead_departments &&
                       userProfile.lead_departments.length > 0
-                        ? `All ${userProfile.lead_departments.length === 1 ? userProfile.lead_departments[0] : "Department"} Staff`
-                        : "All Staff",
+                        ? `All ${userProfile.lead_departments.length === 1 ? userProfile.lead_departments[0] : "Department"} employee`
+                        : "All employee",
                   },
-                  ...staff.map((member) => ({
+                  ...employee.map((member) => ({
                     value: member.id,
                     label: `${formatName(member.first_name)} ${formatName(member.last_name)} - ${member.department}`,
                     icon: <User className="h-3 w-3" />,
@@ -1908,7 +1908,7 @@ export function AdminAuditLogsContent({
               entityFilter !== "all" ||
               dateFilter !== "all" ||
               departmentFilter !== "all" ||
-              staffFilter !== "all"
+              employeeFilter !== "all"
                 ? "No logs match your filters"
                 : "No audit logs available yet"}
             </p>

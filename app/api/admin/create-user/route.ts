@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
     const { firstName, lastName, otherNames, email, department, companyRole, phoneNumber, role, employeeNumber } = body
 
     // Validate role if provided
-    const allowedRoles = ["staff", "lead", "admin", "super_admin"]
+    const allowedRoles = ["employee", "lead", "admin", "super_admin"]
     if (role && !allowedRoles.includes(role)) {
       return NextResponse.json(
         {
@@ -135,8 +135,8 @@ export async function POST(request: NextRequest) {
         department: department,
         company_role: companyRole || null,
         phone_number: phoneNumber || null,
-        role: role || "staff",
-        is_admin: ["super_admin", "admin"].includes(role || "staff"),
+        role: role || "employee",
+        is_admin: ["super_admin", "admin"].includes(role || "employee"),
         is_department_lead: role === "lead",
         lead_departments: role === "lead" ? [department] : [],
         employment_status: "active", // Explicitly set employment status

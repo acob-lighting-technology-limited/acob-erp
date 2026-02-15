@@ -2,7 +2,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList } from "@/components/ui/tabs"
 
-export default function StaffDetailLoading() {
+export default function employeeDetailLoading() {
   return (
     <div className="mx-auto max-w-7xl space-y-6 p-6">
       {/* Back button */}

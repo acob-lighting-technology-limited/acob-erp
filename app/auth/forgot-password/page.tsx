@@ -7,14 +7,30 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import Link from "next/link"
-import { useState } from "react"
+import { useState, useEffect } from "react"
+
 import { toast } from "sonner"
 import { ArrowLeft, Mail } from "lucide-react"
+import Image from "next/image"
+import { useTheme } from "next-themes"
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [emailSent, setEmailSent] = useState(false)
+  const [mounted, setMounted] = useState(false)
+  const { resolvedTheme } = useTheme()
+
+  // Default to light logo for SSR to prevent hydration mismatch
+  const logoSrc = !mounted
+    ? "/images/acob-logo-light.webp"
+    : resolvedTheme === "dark"
+      ? "/images/acob-logo-dark.webp"
+      : "/images/acob-logo-light.webp"
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -43,7 +59,10 @@ export default function ForgotPasswordPage() {
       <div className="w-full max-w-lg">
         <div className="flex flex-col gap-8">
           {/* Header Section */}
-          <div className="space-y-2 text-center">
+          <div className="space-y-4 text-center">
+            <div className="mx-auto flex h-20 items-center justify-center">
+              <Image src={logoSrc} alt="ACOB Lighting" width={200} height={60} priority className="h-12 w-auto" />
+            </div>
             <h1 className="text-4xl font-bold tracking-tight">Forgot Password</h1>
             <p className="text-muted-foreground text-lg">Enter your email to receive a password reset link</p>
           </div>

@@ -91,8 +91,8 @@ const WATERMARK_PRESETS: WatermarkPreset[] = [
 
 // Default watermark images - Change these paths to use different default watermarks
 const DEFAULT_WATERMARKS = [
-  { id: "default", name: "ACOB Logo (Light)", path: "/acob-logo-watermark.webp" },
-  { id: "dark", name: "ACOB Logo (Dark)", path: "/acob-logo-watermark-dark.webp" },
+  { id: "default", name: "ACOB Logo (Light)", path: "/images/acob-logo-watermark.webp" },
+  { id: "dark", name: "ACOB Logo (Dark)", path: "/images/acob-logo-dark.webp" },
 ]
 
 export function WatermarkStudio() {

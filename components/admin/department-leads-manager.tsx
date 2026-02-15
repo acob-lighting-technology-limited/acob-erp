@@ -107,7 +107,7 @@ export function DepartmentLeadsManager() {
     setConfirmWarning(null)
 
     // Fetch potential leads (active users, not admins/super_admins usually?)
-    // Or anyone can be lead? Usually staff/leads.
+    // Or anyone can be lead? Usually employee/leads.
     // User said "Team Lead" is a role.
     try {
       const supabase = createClient()

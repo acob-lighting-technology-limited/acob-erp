@@ -83,7 +83,7 @@ export default function SignUpPage() {
           {/* Header Section */}
           <div className="space-y-2 text-center">
             <h1 className="text-4xl font-bold tracking-tight">Join ACOB</h1>
-            <p className="text-muted-foreground text-lg">Create your account to access the staff portal</p>
+            <p className="text-muted-foreground text-lg">Create your account to access the employee portal</p>
           </div>
 
           <Card className="border-2 shadow-xl">

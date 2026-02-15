@@ -250,7 +250,7 @@ export function SignatureCreator({ profile }: SignatureCreatorProps) {
               id="companyRole"
               value={formData.companyRole}
               onChange={(e) => handleInputChange("companyRole", e.target.value)}
-              placeholder="IT Support Staff"
+              placeholder="IT Support employee"
             />
           </div>
 

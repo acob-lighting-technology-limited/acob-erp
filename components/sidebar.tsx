@@ -26,6 +26,7 @@ import {
   Clock,
   Target,
   Wrench,
+  FileBarChart,
 } from "lucide-react"
 import Image from "next/image"
 import { useState, useEffect } from "react"
@@ -60,7 +61,8 @@ const navigation = [
   { name: "Home", href: "/profile", icon: LayoutDashboard },
   { name: "Job Description", href: "/job-description", icon: Briefcase },
   { name: "Projects", href: "/projects", icon: FolderKanban },
-  { name: "Tasks", href: "/tasks", icon: ClipboardList },
+  { name: "Tasks", href: "/portal/tasks", icon: ClipboardList },
+  { name: "Reports", href: "/portal/reports", icon: FileBarChart },
   { name: "Assets", href: "/assets", icon: Package },
   { name: "Payments", href: "/payments", icon: CreditCard },
   { name: "Documentation", href: "/documentation", icon: FileText },
@@ -169,7 +171,7 @@ export function Sidebar({ user, profile, isAdmin }: SidebarProps) {
                     : user?.email?.split("@")[0]}
                 </p>
                 <p className="text-muted-foreground truncate text-xs whitespace-nowrap">
-                  {profile?.department || "Staff Member"}
+                  {profile?.department || "employee Member"}
                 </p>
                 {profile?.role && (
                   <Badge

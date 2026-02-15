@@ -26,9 +26,6 @@ const DEPARTMENTS = [
   "Technical",
 ]
 
-const DEVICE_TYPES = ["All Devices", "None", "Laptop", "Desktop"]
-const DEVICE_BRANDS = ["All Brands", "Dell", "HP", "Others"]
-
 interface AdminDashboardProps {
   users: any[]
   currentUserId: string
@@ -38,16 +35,13 @@ interface AdminDashboardProps {
 export function AdminDashboard({ users, currentUserId, feedbackByUserId = {} }: AdminDashboardProps) {
   const [filteredUsers, setFilteredUsers] = useState(users)
   const [selectedDepartment, setSelectedDepartment] = useState("All Departments")
-  const [selectedDeviceType, setSelectedDeviceType] = useState("All Devices")
-  const [selectedDeviceBrand, setSelectedDeviceBrand] = useState("All Brands")
+
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedUser, setSelectedUser] = useState<any>(null)
   const [showModal, setShowModal] = useState(false)
   const [isImporting, setIsImporting] = useState(false)
 
-  const [sortKey, setSortKey] = useState<
-    "last_name" | "first_name" | "company_email" | "department" | "device_type" | "device_allocated" | null
-  >(null)
+  const [sortKey, setSortKey] = useState<"last_name" | "first_name" | "company_email" | "department" | null>(null)
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc")
 
   const properCase = (s: string | null | undefined): string => {
@@ -93,25 +87,6 @@ export function AdminDashboard({ users, currentUserId, feedbackByUserId = {} }: 
       filtered = filtered.filter((user) => user.department === selectedDepartment)
     }
 
-    if (selectedDeviceType !== "All Devices") {
-      if (selectedDeviceType === "None") {
-        filtered = filtered.filter((user) => !user.device_type)
-      } else {
-        filtered = filtered.filter((user) => user.device_type === selectedDeviceType)
-      }
-    }
-
-    if (selectedDeviceBrand !== "All Brands") {
-      if (selectedDeviceBrand === "Others") {
-        filtered = filtered.filter(
-          (user) =>
-            user.device_allocated && !user.device_allocated.includes("Dell") && !user.device_allocated.includes("HP")
-        )
-      } else {
-        filtered = filtered.filter((user) => user.device_allocated?.includes(selectedDeviceBrand))
-      }
-    }
-
     if (searchTerm) {
       filtered = filtered.filter(
         (user) =>
@@ -123,7 +98,7 @@ export function AdminDashboard({ users, currentUserId, feedbackByUserId = {} }: 
 
     filtered = applySort(filtered)
     setFilteredUsers(filtered)
-  }, [users, selectedDepartment, selectedDeviceType, selectedDeviceBrand, searchTerm, sortKey, sortDir])
+  }, [users, selectedDepartment, searchTerm, sortKey, sortDir])
 
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text)
@@ -131,17 +106,7 @@ export function AdminDashboard({ users, currentUserId, feedbackByUserId = {} }: 
   }
 
   const exportToCSV = () => {
-    const headers = [
-      "First Name",
-      "Last Name",
-      "Department",
-      "Company Role",
-      "Email",
-      "Phone",
-      "Device Type",
-      "Device Model",
-      "Work Location",
-    ]
+    const headers = ["First Name", "Last Name", "Department", "Company Role", "Email", "Phone", "Work Location"]
     const rows = filteredUsers.map((user) => [
       user.first_name,
       user.last_name,
@@ -149,8 +114,7 @@ export function AdminDashboard({ users, currentUserId, feedbackByUserId = {} }: 
       user.company_role,
       user.company_email,
       user.phone_number,
-      user.device_type,
-      user.device_allocated,
+
       user.current_work_location,
     ])
 
@@ -160,7 +124,7 @@ export function AdminDashboard({ users, currentUserId, feedbackByUserId = {} }: 
     const url = window.URL.createObjectURL(blob)
     const a = document.createElement("a")
     a.href = url
-    a.download = `staff-data-${new Date().toISOString().split("T")[0]}.csv`
+    a.download = `employee-data-${new Date().toISOString().split("T")[0]}.csv`
     a.click()
     toast.success("CSV exported successfully!")
   }
@@ -171,7 +135,7 @@ export function AdminDashboard({ users, currentUserId, feedbackByUserId = {} }: 
     const url = window.URL.createObjectURL(blob)
     const a = document.createElement("a")
     a.href = url
-    a.download = `staff-data-${new Date().toISOString().split("T")[0]}.json`
+    a.download = `employee-data-${new Date().toISOString().split("T")[0]}.json`
     a.click()
     toast.success("JSON exported successfully!")
   }
@@ -187,14 +151,13 @@ export function AdminDashboard({ users, currentUserId, feedbackByUserId = {} }: 
           "Company Role": user.company_role,
           Email: user.company_email,
           Phone: user.phone_number,
-          "Device Type": user.device_type,
-          "Device Model": user.device_allocated,
+
           "Work Location": user.current_work_location,
         }))
       )
       const workbook = utils.book_new()
-      utils.book_append_sheet(workbook, worksheet, "Staff")
-      writeFile(workbook, `staff-data-${new Date().toISOString().split("T")[0]}.xlsx`)
+      utils.book_append_sheet(workbook, worksheet, "employee")
+      writeFile(workbook, `employee-data-${new Date().toISOString().split("T")[0]}.xlsx`)
       toast.success("XLSX exported successfully!")
     } catch (error) {
       toast.error("Failed to export XLSX")
@@ -214,15 +177,14 @@ export function AdminDashboard({ users, currentUserId, feedbackByUserId = {} }: 
         user.company_role,
         user.company_email,
         user.phone_number,
-        user.device_type,
       ])
 
       autoTable(doc, {
-        head: [["First Name", "Last Name", "Department", "Role", "Email", "Phone", "Device"]],
+        head: [["First Name", "Last Name", "Department", "Role", "Email", "Phone"]],
         body: tableData,
       })
 
-      doc.save(`staff-data-${new Date().toISOString().split("T")[0]}.pdf`)
+      doc.save(`employee-data-${new Date().toISOString().split("T")[0]}.pdf`)
       toast.success("PDF exported successfully!")
     } catch (error) {
       toast.error("Failed to export PDF")
@@ -230,12 +192,12 @@ export function AdminDashboard({ users, currentUserId, feedbackByUserId = {} }: 
   }
 
   const handleImportCSV = async () => {
-    if (!confirm("This will import staff data from CSV. Continue?")) {
+    if (!confirm("This will import employee data from CSV. Continue?")) {
       return
     }
 
     setIsImporting(true)
-    toast.loading("Importing staff data...", { id: "import" })
+    toast.loading("Importing employee data...", { id: "import" })
 
     try {
       const response = await fetch("/api/admin/import-csv", {
@@ -299,7 +261,7 @@ export function AdminDashboard({ users, currentUserId, feedbackByUserId = {} }: 
       <Card>
         <CardHeader>
           <CardTitle>Import & Export Data</CardTitle>
-          <CardDescription>Import staff from CSV or download data in various formats</CardDescription>
+          <CardDescription>Import employee from CSV or download data in various formats</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-2">
@@ -364,36 +326,7 @@ export function AdminDashboard({ users, currentUserId, feedbackByUserId = {} }: 
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="deviceType">Device Type</Label>
-              <Select value={selectedDeviceType} onValueChange={setSelectedDeviceType}>
-                <SelectTrigger id="deviceType">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {DEVICE_TYPES.map((type) => (
-                    <SelectItem key={type} value={type}>
-                      {type}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="deviceBrand">Device Brand</Label>
-              <Select value={selectedDeviceBrand} onValueChange={setSelectedDeviceBrand}>
-                <SelectTrigger id="deviceBrand">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {DEVICE_BRANDS.map((brand) => (
-                    <SelectItem key={brand} value={brand}>
-                      {brand}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+
             <div className="flex items-end gap-2">
               <Button
                 type="button"
@@ -401,8 +334,6 @@ export function AdminDashboard({ users, currentUserId, feedbackByUserId = {} }: 
                 className="w-full"
                 onClick={() => {
                   setSelectedDepartment("All Departments")
-                  setSelectedDeviceType("All Devices")
-                  setSelectedDeviceBrand("All Brands")
                   setSearchTerm("")
                   setSortKey(null)
                   setSortDir("asc")
@@ -420,7 +351,7 @@ export function AdminDashboard({ users, currentUserId, feedbackByUserId = {} }: 
       {/* <Card>
         <CardHeader>
           <CardTitle>Import & Export Data</CardTitle>
-          <CardDescription>Import staff from CSV or download data in various formats</CardDescription>
+          <CardDescription>Import employee from CSV or download data in various formats</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-2">
@@ -462,7 +393,7 @@ export function AdminDashboard({ users, currentUserId, feedbackByUserId = {} }: 
       {/* Users Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Staff Members</CardTitle>
+          <CardTitle>employee Members</CardTitle>
           <CardDescription>Total: {filteredUsers.length} users</CardDescription>
         </CardHeader>
         <CardContent>
@@ -492,16 +423,7 @@ export function AdminDashboard({ users, currentUserId, feedbackByUserId = {} }: 
                     </button>
                   </TableHead>
                   <TableHead>Phone</TableHead>
-                  <TableHead>
-                    <button onClick={() => setSort("device_type")} className="underline-offset-2 hover:underline">
-                      Device Type {sortKey === "device_type" ? (sortDir === "asc" ? "▲" : "▼") : ""}
-                    </button>
-                  </TableHead>
-                  <TableHead>
-                    <button onClick={() => setSort("device_allocated")} className="underline-offset-2 hover:underline">
-                      Device Brand {sortKey === "device_allocated" ? (sortDir === "asc" ? "▲" : "▼") : ""}
-                    </button>
-                  </TableHead>
+
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -525,17 +447,7 @@ export function AdminDashboard({ users, currentUserId, feedbackByUserId = {} }: 
                     </TableCell>
                     <TableCell>{user.department ? properCase(user.department) : "-"}</TableCell>
                     <TableCell>{cleanPhoneNumber(user.phone_number)}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <span>{properCase(user.device_type) || "-"}</span>
-                        {getLatestFeedbackType(user.id) && (
-                          <span
-                            className={`inline-block h-2 w-2 rounded-full ${getTypeColor(getLatestFeedbackType(user.id)!)}`}
-                          />
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>{properCase(user.device_allocated) || "-"}</TableCell>
+
                     <TableCell>
                       <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
                         <Button
@@ -582,7 +494,7 @@ export function AdminDashboard({ users, currentUserId, feedbackByUserId = {} }: 
         <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
           <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <DialogHeader>
-              <DialogTitle>Staff Details</DialogTitle>
+              <DialogTitle>employee Details</DialogTitle>
               <DialogDescription>Full profile and recent feedback</DialogDescription>
             </DialogHeader>
             <div className="space-y-6">
@@ -609,12 +521,7 @@ export function AdminDashboard({ users, currentUserId, feedbackByUserId = {} }: 
                     <Label>Phone</Label>
                     <div className="mt-1">{detailsUser.phone_number}</div>
                   </div>
-                  <div className="sm:col-span-2">
-                    <Label>Device</Label>
-                    <div className="mt-1">
-                      {properCase(detailsUser.device_type)} {properCase(detailsUser.device_model)}
-                    </div>
-                  </div>
+
                   <div className="sm:col-span-2">
                     <Label>Address</Label>
                     <div className="mt-1">{properCase(detailsUser.residential_address)}</div>
@@ -676,7 +583,7 @@ export function AdminDashboard({ users, currentUserId, feedbackByUserId = {} }: 
                       `Email: ${(detailsUser.company_email || "").toLowerCase()}`,
                       `Department: ${properCase(detailsUser.department)}`,
                       `Phone: ${detailsUser.phone_number || ""}`,
-                      `Device: ${properCase(detailsUser.device_type)} ${properCase(detailsUser.device_model)}`,
+
                       `Address: ${properCase(detailsUser.residential_address)}`,
                       `Work Location: ${properCase(detailsUser.current_work_location)}`,
                       `Bank: ${properCase(detailsUser.bank_name)} ${detailsUser.bank_account_number || ""}`,

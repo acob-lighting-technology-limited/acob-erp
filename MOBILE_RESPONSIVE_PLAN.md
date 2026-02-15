@@ -27,7 +27,7 @@ Make all pages in the ERP system fully mobile responsive with optimized layouts 
 - `/app/admin/payments/page.tsx` - Table needs horizontal scroll on mobile
 - `/app/admin/payments/[id]/page.tsx` - Details layout needs mobile optimization
 
-### 4. Staff Management (`/app/admin/staff/page.tsx`)
+### 4. Employee Management (`/app/admin/employees/page.tsx`)
 **Improvements:**
 - Table needs horizontal scroll wrapper
 - Filter controls should stack on mobile
@@ -103,8 +103,8 @@ className="flex flex-col sm:flex-row gap-2"
 - [ ] Profile Edit Page
 - [ ] Payments List
 - [ ] Payment Details
-- [ ] Staff Management
-- [ ] Staff Details
+- [ ] employee Management
+- [ ] employee Details
 - [ ] Assets Page
 - [ ] Asset Details
 - [ ] Tasks Page

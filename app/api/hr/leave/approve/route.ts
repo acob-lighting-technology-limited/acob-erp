@@ -104,6 +104,27 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Send notification to the user
+    const { notifyApprovalGranted, notifyApprovalRejected } = await import("@/lib/notifications")
+
+    if (status === "approved") {
+      await notifyApprovalGranted({
+        userId: leaveRequest.user_id,
+        approvalType: "Leave Request",
+        approvedBy: user.id,
+        details: `${leaveRequest.days_count} days from ${new Date(leaveRequest.start_date).toLocaleDateString()}`,
+        linkUrl: "/portal/leave",
+      })
+    } else if (status === "rejected") {
+      await notifyApprovalRejected({
+        userId: leaveRequest.user_id,
+        approvalType: "Leave Request",
+        rejectedBy: user.id,
+        reason: comments || "No reason provided",
+        linkUrl: "/portal/leave",
+      })
+    }
+
     return NextResponse.json({
       message: `Leave request ${status} successfully`,
     })

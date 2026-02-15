@@ -39,7 +39,7 @@ This is a MASSIVE undertaking. Here's what still needs to be done:
    - Form fields should be full width
    - Action buttons should stack
 
-2. **Staff Management** (`/app/admin/staff/page.tsx`)
+2. **Employee Management** (`/app/admin/employees/page.tsx`)
    - Table needs horizontal scroll wrapper
    - Filter controls need mobile optimization
    - Action buttons need better layout
@@ -101,7 +101,7 @@ This is a MASSIVE undertaking. Here's what still needs to be done:
 
 ### For Immediate Implementation:
 1. **Profile Page** - Most used by all users
-2. **Staff Management** - Critical admin function
+2. **employee Management** - Critical admin function
 3. **Tasks Page** - High usage
 
 ### Testing Strategy:
@@ -131,7 +131,7 @@ This is a MASSIVE undertaking. Here's what still needs to be done:
 ## Next Steps
 
 1. Continue with Profile Page
-2. Then Staff Management
+2. Then employee Management
 3. Then Tasks
 4. Systematic review of all other pages
 5. Comprehensive mobile testing

@@ -57,7 +57,7 @@ export default function AdminJobDescriptionsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [departmentFilter, setDepartmentFilter] = useState("all")
-  const [staffFilter, setStaffFilter] = useState("all")
+  const [employeeFilter, setemployeeFilter] = useState("all")
   const [statusFilter, setStatusFilter] = useState("all")
   const [nameSortOrder, setNameSortOrder] = useState<"asc" | "desc">("asc")
   const [viewMode, setViewMode] = useState<"list" | "card">("list")
@@ -91,7 +91,7 @@ export default function AdminJobDescriptionsPage() {
 
       // Role-based filtering
       if (profile?.role === "lead" && profile.lead_departments) {
-        // Leads can only see their department's staff
+        // Leads can only see their department's employee
         query = query.in("department", profile.lead_departments)
       }
       // super_admin and admin can see all profiles (no filter needed)
@@ -124,14 +124,14 @@ export default function AdminJobDescriptionsPage() {
 
       const matchesDepartment = departmentFilter === "all" || profile.department === departmentFilter
 
-      const matchesStaff = staffFilter === "all" || profile.id === staffFilter
+      const matchesemployee = employeeFilter === "all" || profile.id === employeeFilter
 
       const matchesStatus =
         statusFilter === "all" ||
         (statusFilter === "completed" && profile.job_description) ||
         (statusFilter === "pending" && !profile.job_description)
 
-      return matchesSearch && matchesDepartment && matchesStaff && matchesStatus
+      return matchesSearch && matchesDepartment && matchesemployee && matchesStatus
     })
     .sort((a, b) => {
       const lastNameA = formatName(a.last_name).toLowerCase()
@@ -180,7 +180,7 @@ export default function AdminJobDescriptionsPage() {
   return (
     <AdminTablePage
       title="Job Descriptions"
-      description="View and manage staff job descriptions"
+      description="View and manage employee job descriptions"
       icon={Briefcase}
       actions={
         <div className="flex items-center rounded-lg border p-1">
@@ -210,7 +210,7 @@ export default function AdminJobDescriptionsPage() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-muted-foreground text-sm font-medium">Total Staff</p>
+                  <p className="text-muted-foreground text-sm font-medium">Total employee</p>
                   <p className="text-foreground mt-2 text-3xl font-bold">{stats.total}</p>
                 </div>
                 <div className="rounded-lg bg-blue-100 p-3 dark:bg-blue-900/30">
@@ -270,7 +270,7 @@ export default function AdminJobDescriptionsPage() {
               <div className="relative flex-1">
                 <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform" />
                 <Input
-                  placeholder="Search staff..."
+                  placeholder="Search employee..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10"
@@ -293,14 +293,14 @@ export default function AdminJobDescriptionsPage() {
                 ]}
               />
               <SearchableSelect
-                value={staffFilter}
-                onValueChange={setStaffFilter}
-                placeholder="All Staff"
-                searchPlaceholder="Search staff..."
+                value={employeeFilter}
+                onValueChange={setemployeeFilter}
+                placeholder="All employee"
+                searchPlaceholder="Search employee..."
                 icon={<User className="h-4 w-4" />}
                 className="w-full md:w-48"
                 options={[
-                  { value: "all", label: "All Staff" },
+                  { value: "all", label: "All employee" },
                   ...profiles.map((member) => ({
                     value: member.id,
                     label: `${formatName(member.first_name)} ${formatName(member.last_name)} - ${member.department}`,
@@ -324,7 +324,7 @@ export default function AdminJobDescriptionsPage() {
       }
       filtersInCard={false}
     >
-      {/* Staff List */}
+      {/* employee List */}
       {filteredProfiles.length > 0 ? (
         viewMode === "list" ? (
           <Card className="border-2">
@@ -457,11 +457,11 @@ export default function AdminJobDescriptionsPage() {
         <Card className="border-2">
           <CardContent className="p-12 text-center">
             <Briefcase className="text-muted-foreground mx-auto mb-4 h-16 w-16" />
-            <h3 className="text-foreground mb-2 text-xl font-semibold">No Staff Found</h3>
+            <h3 className="text-foreground mb-2 text-xl font-semibold">No employee Found</h3>
             <p className="text-muted-foreground">
-              {searchQuery || departmentFilter !== "all" || staffFilter !== "all" || statusFilter !== "all"
-                ? "No staff matches your filters"
-                : "No staff members found"}
+              {searchQuery || departmentFilter !== "all" || employeeFilter !== "all" || statusFilter !== "all"
+                ? "No employee matches your filters"
+                : "No employee members found"}
             </p>
           </CardContent>
         </Card>
@@ -499,8 +499,8 @@ export default function AdminJobDescriptionsPage() {
               <div className="mt-2 flex flex-wrap items-center gap-3">
                 <span className="text-sm">{selectedProfile?.department}</span>
                 {selectedProfile?.company_role && <span className="text-sm">" {selectedProfile.company_role}</span>}
-                <Badge className={getRoleBadgeColor(selectedProfile?.role || "staff")}>
-                  {getRoleDisplayName(selectedProfile?.role || "staff")}
+                <Badge className={getRoleBadgeColor(selectedProfile?.role || "employee")}>
+                  {getRoleDisplayName(selectedProfile?.role || "employee")}
                 </Badge>
                 <span className="text-sm">
                   Last updated: {formatDate(selectedProfile?.job_description_updated_at || null)}

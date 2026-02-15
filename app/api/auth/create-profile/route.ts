@@ -32,9 +32,6 @@ export async function POST(request: Request) {
       additional_phone: "",
       residential_address: "",
       current_work_location: "",
-      device_allocated: "",
-      device_type: "",
-      device_model: "",
       is_admin: false,
     })
 

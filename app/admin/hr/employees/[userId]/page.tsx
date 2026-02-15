@@ -144,8 +144,8 @@ export default function UserDetailPage() {
 
       if (profileError) throw profileError
       if (!profileData) {
-        toast.error("User not found")
-        router.push("/admin/staff")
+        toast.error("Employee not found")
+        router.push("/admin/hr/employees")
         return
       }
 
@@ -276,9 +276,9 @@ export default function UserDetailPage() {
       <div className="container mx-auto p-6">
         <Card>
           <CardContent className="pt-6">
-            <p className="text-muted-foreground text-center">User not found</p>
-            <Button onClick={() => router.push("/admin/staff")} className="mt-4">
-              Back to Staff
+            <p className="text-muted-foreground text-center">Employee not found</p>
+            <Button onClick={() => router.push("/admin/hr/employees")} className="mt-4">
+              Back to Employees
             </Button>
           </CardContent>
         </Card>
@@ -294,7 +294,7 @@ export default function UserDetailPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => router.push("/admin/staff")}>
+          <Button variant="ghost" size="icon" onClick={() => router.push("/admin/hr/employees")}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
@@ -302,7 +302,7 @@ export default function UserDetailPage() {
             <p className="text-muted-foreground">{profile.company_email}</p>
           </div>
         </div>
-        <Button onClick={() => router.push(`/admin/staff?userId=${userId}`)}>
+        <Button onClick={() => router.push(`/admin/hr/employees?userId=${userId}`)}>
           <Edit className="mr-2 h-4 w-4" />
           Edit Profile
         </Button>

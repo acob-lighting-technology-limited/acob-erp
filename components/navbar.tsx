@@ -58,10 +58,10 @@ export function Navbar({ user, isAdmin = false }: NavbarProps) {
 
   // Default to light logo for SSR to prevent hydration mismatch
   const logoSrc = !mounted
-    ? "/acob-logo-light.webp"
+    ? "/images/acob-logo-light.webp"
     : resolvedTheme === "dark"
-      ? "/acob-logo-dark.webp"
-      : "/acob-logo-light.webp"
+      ? "/images/acob-logo-dark.webp"
+      : "/images/acob-logo-light.webp"
 
   useEffect(() => {
     setMounted(true)

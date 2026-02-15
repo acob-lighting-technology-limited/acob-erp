@@ -45,18 +45,18 @@ import {
   Package,
 } from "lucide-react"
 import { dateValidation } from "@/lib/validation"
-import type { Project, Staff } from "./page"
+import type { Project, employee } from "./page"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
 
 interface AdminProjectsContentProps {
   initialProjects: Project[]
-  initialStaff: Staff[]
+  initialemployee: employee[]
 }
 
-export function AdminProjectsContent({ initialProjects, initialStaff }: AdminProjectsContentProps) {
+export function AdminProjectsContent({ initialProjects, initialemployee }: AdminProjectsContentProps) {
   const router = useRouter()
   const [projects, setProjects] = useState<Project[]>(initialProjects)
-  const [staff] = useState<Staff[]>(initialStaff)
+  const [employee] = useState<employee[]>(initialemployee)
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
 
@@ -565,11 +565,11 @@ export function AdminProjectsContent({ initialProjects, initialStaff }: AdminPro
                   setProjectForm({ ...projectForm, project_manager_id: value === "none" ? "" : value })
                 }
                 placeholder="Select project manager"
-                searchPlaceholder="Search staff..."
+                searchPlaceholder="Search employee..."
                 icon={<User className="h-4 w-4" />}
                 options={[
                   { value: "none", label: "None" },
-                  ...staff.map((member) => ({
+                  ...employee.map((member) => ({
                     value: member.id,
                     label: `${member.first_name} ${member.last_name} - ${member.department}`,
                   })),

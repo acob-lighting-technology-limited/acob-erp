@@ -4,7 +4,7 @@ import {
   AdminDocumentationContent,
   type Documentation,
   type UserProfile,
-  type StaffMember,
+  type employeeMember,
 } from "./admin-documentation-content"
 
 async function getAdminDocumentationData() {
@@ -33,7 +33,7 @@ async function getAdminDocumentationData() {
 
   // Fetch documentation - leads can only see documentation from their departments
   let documentation: Documentation[] = []
-  let staff: StaffMember[] = []
+  let employee: employeeMember[] = []
 
   let docsQuery = supabase.from("user_documentation").select("*").order("created_at", { ascending: false })
 
@@ -45,7 +45,7 @@ async function getAdminDocumentationData() {
     if (userIds.length > 0) {
       docsQuery = docsQuery.in("user_id", userIds)
     } else {
-      return { documentation: [], staff: [], userProfile }
+      return { documentation: [], employee: [], userProfile }
     }
   }
 
@@ -53,7 +53,7 @@ async function getAdminDocumentationData() {
 
   if (docsError) {
     console.error("Documentation error:", docsError)
-    return { documentation: [], staff: [], userProfile }
+    return { documentation: [], employee: [], userProfile }
   }
 
   // If we have documentation, fetch user details
@@ -74,15 +74,15 @@ async function getAdminDocumentationData() {
     })) as Documentation[]
   }
 
-  // Load staff for filter
-  const { data: staffData } = await supabase
+  // Load employee for filter
+  const { data: employeeData } = await supabase
     .from("profiles")
     .select("id, first_name, last_name, department")
     .order("last_name", { ascending: true })
 
-  staff = staffData || []
+  employee = employeeData || []
 
-  return { documentation, staff, userProfile }
+  return { documentation, employee, userProfile }
 }
 
 export default async function AdminDocumentationPage() {
@@ -92,12 +92,12 @@ export default async function AdminDocumentationPage() {
     redirect(data.redirect)
   }
 
-  const pageData = data as { documentation: Documentation[]; staff: StaffMember[]; userProfile: UserProfile }
+  const pageData = data as { documentation: Documentation[]; employee: employeeMember[]; userProfile: UserProfile }
 
   return (
     <AdminDocumentationContent
       initialDocumentation={pageData.documentation}
-      initialStaff={pageData.staff}
+      initialemployee={pageData.employee}
       userProfile={pageData.userProfile}
     />
   )
