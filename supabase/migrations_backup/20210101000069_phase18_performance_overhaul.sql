@@ -189,12 +189,14 @@ ALTER POLICY "Asset issues select policy" ON asset_issues USING (
 -- Cleanup redundant policies on 'meters' from the list
 DROP POLICY IF EXISTS "Emergency Insert Meters" ON meters;
 DROP POLICY IF EXISTS "employee create meters" ON meters;
+DROP POLICY IF EXISTS "staff create meters" ON meters;
 CREATE POLICY "Meters insert policy" ON meters 
 FOR INSERT TO authenticated 
 WITH CHECK ((SELECT has_role('employee')) OR (SELECT has_role('admin')));
 
 DROP POLICY IF EXISTS "Emergency Update Meters" ON meters;
 DROP POLICY IF EXISTS "employee update meters" ON meters;
+DROP POLICY IF EXISTS "staff update meters" ON meters;
 CREATE POLICY "Meters update policy" ON meters 
 FOR UPDATE TO authenticated 
 USING ((SELECT has_role('employee')) OR (SELECT has_role('admin')));
