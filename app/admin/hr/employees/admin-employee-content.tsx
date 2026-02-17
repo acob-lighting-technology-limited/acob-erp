@@ -63,6 +63,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Textarea } from "@/components/ui/textarea"
 import { EmployeeStatusBadge } from "@/components/hr/employee-status-badge"
 import { ChangeStatusDialog, ChangeStatusContent } from "@/components/hr/change-status-dialog"
+import { PendingApplicationsModal } from "./pending-applications-modal"
 
 export interface Employee {
   id: string
@@ -632,6 +633,15 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         return
       }
 
+      // Validate email domain
+      const allowedDomains = ["acoblighting.com", "org.acoblighting.com"]
+      const emailDomain = editForm.company_email.split("@")[1]?.toLowerCase()
+      if (editForm.company_email && (!emailDomain || !allowedDomains.includes(emailDomain))) {
+        toast.error("Only @acoblighting.com and @org.acoblighting.com emails are allowed")
+        setIsSaving(false)
+        return
+      }
+
       // Validate: If role is lead, at least one department must be selected
       if (editForm.role === "lead" && editForm.lead_departments.length === 0) {
         toast.error("Please select at least one department for this lead")
@@ -705,6 +715,15 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
     setIsCreatingUser(true)
 
     try {
+      // Validate email domain
+      const allowedDomains = ["acoblighting.com", "org.acoblighting.com"]
+      const emailDomain = createUserForm.email.split("@")[1]?.toLowerCase()
+      if (!emailDomain || !allowedDomains.includes(emailDomain)) {
+        toast.error("Only @acoblighting.com and @org.acoblighting.com emails are allowed")
+        setIsCreatingUser(false)
+        return
+      }
+
       // Validate required fields (department is optional for executives like MD)
       if (!createUserForm.firstName.trim() || !createUserForm.lastName.trim() || !createUserForm.email.trim()) {
         toast.error("First name, last name, and email are required")
@@ -1148,6 +1167,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <PendingApplicationsModal onEmployeeCreated={loadData} />
             {(userProfile?.role === "admin" || userProfile?.role === "super_admin") && (
               <Button onClick={() => setIsCreateUserDialogOpen(true)} className="gap-2" size="sm">
                 <Plus className="h-4 w-4" />

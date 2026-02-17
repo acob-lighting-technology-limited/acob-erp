@@ -75,13 +75,25 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validate email format
+    // Validate email format and domain
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
       return NextResponse.json(
         {
           success: false,
           error: "Invalid email format",
+        },
+        { status: 400 }
+      )
+    }
+
+    const allowedDomains = ["acoblighting.com", "org.acoblighting.com"]
+    const domain = email.split("@")[1]?.toLowerCase()
+    if (!domain || !allowedDomains.includes(domain)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Only @acoblighting.com and @org.acoblighting.com emails are allowed.",
         },
         { status: 400 }
       )

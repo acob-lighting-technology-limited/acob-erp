@@ -34,6 +34,15 @@ export default function SetupAccountPage() {
 
   const handleSetupAccount = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    // Domain restriction check
+    const allowedDomains = ["acoblighting.com", "org.acoblighting.com"]
+    const domain = email.split("@")[1]?.toLowerCase()
+    if (!domain || !allowedDomains.includes(domain)) {
+      toast.error("Only @acoblighting.com and @org.acoblighting.com emails are allowed.")
+      return
+    }
+
     const supabase = createClient()
     setIsLoading(true)
 

@@ -51,7 +51,32 @@ export async function createNotification(params: CreateNotificationParams) {
       p_rich_content: params.richContent || null,
     })
 
-    if (error) throw error
+    if (error) {
+      console.error("RPC Error creating notification:", error)
+      // Fallback to direct insertion if RPC fails
+      const { data: insertData, error: insertError } = await supabase
+        .from("notifications")
+        .insert({
+          user_id: params.userId,
+          type: params.type,
+          title: params.title,
+          message: params.message,
+          priority: params.priority || "normal",
+          action_url: params.linkUrl || null,
+          data: {
+            category: params.category,
+            actor_id: params.actorId,
+            entity_type: params.entityType,
+            entity_id: params.entityId,
+            rich_content: params.richContent,
+          },
+        })
+        .select()
+        .single()
+
+      if (insertError) throw insertError
+      return insertData?.id
+    }
 
     return data
   } catch (error) {
@@ -159,6 +184,11 @@ export async function notifyAssetAssigned(params: {
     actorId: params.assignedBy,
     entityType: "asset",
     entityId: params.assetId,
+    richContent: {
+      asset_code: params.assetCode,
+      asset_name: params.assetName,
+      assigned_by: params.assignedBy,
+    },
   })
 }
 

@@ -174,4 +174,13 @@ export const formValidation = {
       return value === null || value === undefined || value === ""
     })
   },
+
+  /**
+   * Validate that email belongs to official company domains
+   */
+  isCompanyEmail: (email: string): boolean => {
+    if (!email) return false
+    const allowedDomains = ["acoblighting.com", "org.acoblighting.com"]
+    return allowedDomains.some((domain) => email.toLowerCase().endsWith(`@${domain}`))
+  },
 }
