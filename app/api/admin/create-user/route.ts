@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { createClient as createServerClient } from "@/lib/supabase/server"
+import { formValidation } from "@/lib/validation"
 
 export const dynamic = "force-dynamic"
 
@@ -21,8 +22,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: "Forbidden: Admin access required" }, { status: 403 })
   }
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
   if (!supabaseUrl || !supabaseServiceKey) {
     console.error("Missing required Supabase configuration")
@@ -87,9 +88,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const allowedDomains = ["acoblighting.com", "org.acoblighting.com"]
-    const domain = email.split("@")[1]?.toLowerCase()
-    if (!domain || !allowedDomains.includes(domain)) {
+    if (!formValidation.isCompanyEmail(email)) {
       return NextResponse.json(
         {
           success: false,
@@ -99,11 +98,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check if user already exists
-    const { data: existingUser } = await serviceSupabase.auth.admin.listUsers()
-    const userExists = existingUser.users.some((u) => u.email === email)
+    // Check if user already exists using the profile table (more direct)
+    const { data: existingProfile } = await serviceSupabase
+      .from("profiles")
+      .select("id")
+      .eq("company_email", email)
+      .single()
 
-    if (userExists) {
+    if (existingProfile) {
       return NextResponse.json(
         {
           success: false,
@@ -165,7 +167,7 @@ export async function POST(request: NextRequest) {
           success: false,
           error: `Database error: ${profileError.message}`,
         },
-        { status: 400 }
+        { status: 500 }
       )
     }
 

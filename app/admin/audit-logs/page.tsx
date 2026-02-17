@@ -137,12 +137,17 @@ async function getAuditLogsData() {
 
     // 4. Fetch all users
     const allUserIds = Array.from(new Set([...Array.from(actorIds), ...Array.from(potentialUserIds)]))
-    const { data: usersData } = await supabase
-      .from("profiles")
-      .select("id, first_name, last_name, company_email, employee_number")
-      .in("id", allUserIds)
+    let usersData: any[] = []
 
-    const usersMap = new Map(usersData?.map((u) => [u.id, u]))
+    if (allUserIds.length > 0) {
+      const { data } = await supabase
+        .from("profiles")
+        .select("id, first_name, last_name, company_email, employee_number")
+        .in("id", allUserIds)
+      usersData = data || []
+    }
+
+    const usersMap = new Map(usersData.map((u) => [u.id, u]))
 
     // 5. Build final logs
     logs = parsedLogs.map((log) => {

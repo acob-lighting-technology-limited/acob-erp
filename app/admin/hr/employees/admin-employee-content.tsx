@@ -64,6 +64,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { EmployeeStatusBadge } from "@/components/hr/employee-status-badge"
 import { ChangeStatusDialog, ChangeStatusContent } from "@/components/hr/change-status-dialog"
 import { PendingApplicationsModal } from "./pending-applications-modal"
+import { formValidation } from "@/lib/validation"
 
 export interface Employee {
   id: string
@@ -634,9 +635,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
       }
 
       // Validate email domain
-      const allowedDomains = ["acoblighting.com", "org.acoblighting.com"]
-      const emailDomain = editForm.company_email.split("@")[1]?.toLowerCase()
-      if (editForm.company_email && (!emailDomain || !allowedDomains.includes(emailDomain))) {
+      if (editForm.company_email && !formValidation.isCompanyEmail(editForm.company_email)) {
         toast.error("Only @acoblighting.com and @org.acoblighting.com emails are allowed")
         setIsSaving(false)
         return
@@ -715,18 +714,16 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
     setIsCreatingUser(true)
 
     try {
-      // Validate email domain
-      const allowedDomains = ["acoblighting.com", "org.acoblighting.com"]
-      const emailDomain = createUserForm.email.split("@")[1]?.toLowerCase()
-      if (!emailDomain || !allowedDomains.includes(emailDomain)) {
-        toast.error("Only @acoblighting.com and @org.acoblighting.com emails are allowed")
+      // Validate required fields
+      if (!createUserForm.firstName.trim() || !createUserForm.lastName.trim() || !createUserForm.email.trim()) {
+        toast.error("First name, last name, and email are required")
         setIsCreatingUser(false)
         return
       }
 
-      // Validate required fields (department is optional for executives like MD)
-      if (!createUserForm.firstName.trim() || !createUserForm.lastName.trim() || !createUserForm.email.trim()) {
-        toast.error("First name, last name, and email are required")
+      // Validate email domain
+      if (!formValidation.isCompanyEmail(createUserForm.email)) {
+        toast.error("Only @acoblighting.com and @org.acoblighting.com emails are allowed")
         setIsCreatingUser(false)
         return
       }

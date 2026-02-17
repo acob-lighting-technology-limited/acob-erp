@@ -1,15 +1,28 @@
 import { createClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
 import { Resend } from "resend"
+import { createClient as createServerClient } from "@/lib/supabase/server"
+import crypto from "crypto"
 
 export async function POST(req: Request) {
+  // 1. Verify Caller is an Admin
+  const supabase = await createServerClient()
+  const {
+    data: { user: caller },
+  } = await supabase.auth.getUser()
+
+  if (!caller) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
+  const { data: callerProfile } = await supabase.from("profiles").select("role").eq("id", caller.id).single()
+  if (!callerProfile || !["super_admin", "admin"].includes(callerProfile.role)) {
+    return NextResponse.json({ error: "Forbidden: Admin access required" }, { status: 403 })
+  }
+
   console.log("--- Starting Approval Process ---")
   try {
     const resendApiKey = process.env.RESEND_API_KEY
-    if (!resendApiKey) {
-      console.warn("WARNING: RESEND_API_KEY is not defined in environment variables. Email will not be sent.")
-    }
-
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
@@ -41,36 +54,50 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Pending user not found" }, { status: 404 })
     }
 
-    // 2. Determine Employee ID
+    // 2. Determine Employee ID with Retry Logic for Race Conditions
     let employeeId = manualEmployeeId
-
     const currentYear = new Date().getFullYear()
 
     if (!employeeId) {
-      // Fallback to Auto-generation Logic
-      const { data: lastProfile } = await supabaseAdmin
-        .from("profiles")
-        .select("employee_number")
-        .not("employee_number", "is", null)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .single()
+      let retryCount = 0
+      const maxRetries = 3
+      while (retryCount < maxRetries) {
+        const { data: lastProfile } = await supabaseAdmin
+          .from("profiles")
+          .select("employee_number")
+          .not("employee_number", "is", null)
+          .order("employee_number", { ascending: false })
+          .limit(1)
+          .single()
 
-      let nextIdNumber = 1
-
-      if (lastProfile && lastProfile.employee_number) {
-        const parts = lastProfile.employee_number.split("/")
-        if (parts.length === 3) {
-          const lastNum = parseInt(parts[2], 10)
-          if (!isNaN(lastNum)) {
-            nextIdNumber = lastNum + 1
+        let nextIdNumber = 1
+        if (lastProfile && lastProfile.employee_number) {
+          const parts = lastProfile.employee_number.split("/")
+          if (parts.length === 3) {
+            const lastNum = parseInt(parts[2], 10)
+            if (!isNaN(lastNum)) nextIdNumber = lastNum + retryCount + 1
           }
         }
+        employeeId = `ACOB/${currentYear}/${nextIdNumber.toString().padStart(3, "0")}`
+
+        // Check if this ID is already taken
+        const { data: exists } = await supabaseAdmin
+          .from("profiles")
+          .select("id")
+          .eq("employee_number", employeeId)
+          .single()
+        if (!exists) break
+        retryCount++
       }
-      employeeId = `ACOB/${currentYear}/${nextIdNumber.toString().padStart(3, "0")}`
     }
-    const tempPassword = `Welcome${currentYear}!`
-    const portalUrl = "https://premium21.web-hosting.com:2096/"
+
+    // Secure Token-based Setup Flow
+    const setupToken = crypto.randomBytes(32).toString("hex")
+    const setupTokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24 hours
+    const publicUrl =
+      process.env.NEXT_PUBLIC_APP_URL ||
+      (typeof window !== "undefined" ? window.location.origin : "https://erp.acoblighting.com")
+    const setupUrl = `${publicUrl}/auth/setup-account?token=${setupToken}`
 
     // 3. Create or Update Auth User
     // First check if user already exists
@@ -83,7 +110,7 @@ export async function POST(req: Request) {
     if (!authUserId) {
       const { data: newAuthUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
         email: pendingUser.company_email,
-        password: tempPassword,
+        password: crypto.randomBytes(16).toString("hex"), // Random secure original password
         email_confirm: true,
         user_metadata: {
           first_name: pendingUser.first_name,
@@ -107,11 +134,11 @@ export async function POST(req: Request) {
         other_names: pendingUser.other_names,
         department: pendingUser.department,
         company_role: pendingUser.company_role,
-        role: "employee", // Default role
+        role: "employee",
         employment_status: "active",
         employee_number: employeeId,
         company_email: pendingUser.company_email,
-        personal_email: pendingUser.personal_email, // IMPORTANT: Saved here
+        personal_email: pendingUser.personal_email,
         phone_number: pendingUser.phone_number,
         additional_phone: pendingUser.additional_phone_number,
         residential_address: pendingUser.residential_address,
@@ -119,6 +146,9 @@ export async function POST(req: Request) {
         office_location: pendingUser.office_location,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
+        setup_token: setupToken,
+        setup_token_expires_at: setupTokenExpiresAt,
+        must_reset_password: true,
       },
       { onConflict: "id" }
     )
@@ -214,25 +244,21 @@ export async function POST(req: Request) {
         </div>
 
         <div class="card" style="margin-top: 20px;">
-            <div class="card-header status-header-neutral" style="background: #f0fdf4; color: #15803d; border-bottom-color: #bbf7d0;">Login Credentials</div>
+            <div class="card-header status-header-neutral" style="background: #f0fdf4; color: #15803d; border-bottom-color: #bbf7d0;">Account Activation</div>
             <table>
                 <tr>
-                    <td class="label">Portal URL</td>
-                    <td class="value"><a href="${portalUrl}" style="color: #16a34a; text-decoration: none;">Webmail Login</a></td>
+                    <td class="label">Setup URL</td>
+                    <td class="value"><a href="${setupUrl}" style="color: #16a34a; text-decoration: none; font-weight: 700;">ACTIVATE MY ACCOUNT</a></td>
                 </tr>
                 <tr>
                     <td class="label">Company Email</td>
                     <td class="value"><span class="credential">${pendingUser.company_email}</span></td>
                 </tr>
-                <tr>
-                    <td class="label">Temporary Password</td>
-                    <td class="value"><span class="credential">${tempPassword}</span></td>
-                </tr>
             </table>
         </div>
 
         <div class="cta">
-            <a href="${portalUrl}" class="button">Login to Portal</a>
+            <a href="${setupUrl}" class="button">Set Up Password</a>
         </div>
         <div class="support">
             Please log in and change your password immediately.<br>

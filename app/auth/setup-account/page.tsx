@@ -9,15 +9,27 @@ import { Label } from "@/components/ui/label"
 import Link from "next/link"
 import { useState, useEffect } from "react"
 
-import { toast } from "sonner"
-import { ArrowLeft, UserPlus, CheckCircle2 } from "lucide-react"
+import { ArrowLeft, UserPlus, CheckCircle2, Lock, Eye, EyeOff, CheckCircle } from "lucide-react"
 import Image from "next/image"
 import { useTheme } from "next-themes"
+import { formValidation } from "@/lib/validation"
+import { useSearchParams, useRouter } from "next/navigation"
+import { toast } from "sonner"
 
 export default function SetupAccountPage() {
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const token = searchParams?.get("token")
+
   const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+
   const [isLoading, setIsLoading] = useState(false)
   const [emailSent, setEmailSent] = useState(false)
+  const [isSuccess, setIsSuccess] = useState(false)
   const [mounted, setMounted] = useState(false)
   const { resolvedTheme } = useTheme()
 
@@ -36,9 +48,7 @@ export default function SetupAccountPage() {
     e.preventDefault()
 
     // Domain restriction check
-    const allowedDomains = ["acoblighting.com", "org.acoblighting.com"]
-    const domain = email.split("@")[1]?.toLowerCase()
-    if (!domain || !allowedDomains.includes(domain)) {
+    if (!formValidation.isCompanyEmail(email)) {
       toast.error("Only @acoblighting.com and @org.acoblighting.com emails are allowed.")
       return
     }
@@ -64,6 +74,43 @@ export default function SetupAccountPage() {
     }
   }
 
+  const handleCreatePassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (password !== confirmPassword) {
+      toast.error("Passwords do not match")
+      return
+    }
+
+    if (password.length < 6) {
+      toast.error("Password must be at least 6 characters")
+      return
+    }
+
+    setIsLoading(true)
+    try {
+      const response = await fetch("/api/auth/setup-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, password }),
+      })
+
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error)
+
+      setIsSuccess(true)
+      toast.success("Account activated successfully!")
+
+      setTimeout(() => {
+        router.push("/auth/login")
+      }, 2000)
+    } catch (error: any) {
+      toast.error(error.message || "Failed to activate account")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   return (
     <div className="from-background via-background to-muted/20 flex min-h-screen w-full items-center justify-center bg-gradient-to-br p-4 md:p-6">
       <div className="w-full max-w-lg">
@@ -80,7 +127,17 @@ export default function SetupAccountPage() {
           <Card className="border-2 shadow-xl">
             <CardHeader className="space-y-3 pb-6">
               <CardTitle className="flex items-center gap-2 text-2xl font-semibold">
-                {emailSent ? (
+                {isSuccess ? (
+                  <>
+                    <CheckCircle className="h-6 w-6 text-green-600" />
+                    Activation Complete
+                  </>
+                ) : token ? (
+                  <>
+                    <Lock className="text-primary h-6 w-6" />
+                    Create Your Password
+                  </>
+                ) : emailSent ? (
                   <>
                     <CheckCircle2 className="h-6 w-6 text-green-600" />
                     Check Your Email
@@ -93,13 +150,79 @@ export default function SetupAccountPage() {
                 )}
               </CardTitle>
               <CardDescription className="text-base">
-                {emailSent
-                  ? "We've sent you a link to set up your password"
-                  : "Enter your company email and we'll send you a link to create your password"}
+                {isSuccess
+                  ? "Your account is now active"
+                  : token
+                    ? "Set a secure password to activate your company account"
+                    : emailSent
+                      ? "We've sent you a link to set up your password"
+                      : "Enter your company email and we'll send you a link to create your password"}
               </CardDescription>
             </CardHeader>
             <CardContent className="pb-8">
-              {emailSent ? (
+              {isSuccess ? (
+                <div className="space-y-6">
+                  <div className="rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-900 dark:bg-green-950/30">
+                    <p className="text-sm text-green-800 dark:text-green-200">
+                      You can now log in with your new password. Redirecting to login page...
+                    </p>
+                  </div>
+                  <Link href="/auth/login" className="block">
+                    <Button className="h-11 w-full">Go to Login</Button>
+                  </Link>
+                </div>
+              ) : token ? (
+                <form onSubmit={handleCreatePassword}>
+                  <div className="flex flex-col gap-5">
+                    <div className="grid gap-3">
+                      <Label htmlFor="password">New Password</Label>
+                      <div className="relative">
+                        <Input
+                          id="password"
+                          type={showPassword ? "text" : "password"}
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          required
+                          className="h-11 pr-10"
+                          autoFocus
+                          minLength={6}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="text-muted-foreground hover:text-foreground absolute top-1/2 right-3 -translate-y-1/2"
+                        >
+                          {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                        </button>
+                      </div>
+                    </div>
+                    <div className="grid gap-3">
+                      <Label htmlFor="confirmPassword">Confirm Password</Label>
+                      <div className="relative">
+                        <Input
+                          id="confirmPassword"
+                          type={showConfirmPassword ? "text" : "password"}
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          required
+                          className="h-11 pr-10"
+                          minLength={6}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          className="text-muted-foreground hover:text-foreground absolute top-1/2 right-3 -translate-y-1/2"
+                        >
+                          {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                        </button>
+                      </div>
+                    </div>
+                    <Button type="submit" className="h-11 w-full text-base font-semibold" loading={isLoading}>
+                      Activate Account
+                    </Button>
+                  </div>
+                </form>
+              ) : emailSent ? (
                 <div className="space-y-6">
                   <div className="rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-900 dark:bg-green-950/30">
                     <div className="flex gap-3">

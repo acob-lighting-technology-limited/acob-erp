@@ -1962,8 +1962,11 @@ export function AdminAssetsContent({
     unresolvedIssues: assets.reduce((sum, asset) => sum + (asset.unresolved_issues_count || 0), 0),
   }
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
+  const formatDate = (dateString?: string | null) => {
+    if (!dateString) return "-"
+    const date = new Date(dateString)
+    if (isNaN(date.getTime())) return "-"
+    return date.toLocaleDateString("en-US", {
       month: "short",
       day: "numeric",
       year: "numeric",

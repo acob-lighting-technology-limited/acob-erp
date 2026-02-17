@@ -15,21 +15,34 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import Link from "next/link"
 
 // Validation Schema
-const formSchema = z.object({
-  first_name: z.string().min(2, "First name must be at least 2 characters"),
-  last_name: z.string().min(2, "Last name must be at least 2 characters"),
-  other_names: z.string().optional(),
-  department: z.string().min(1, "Please select a department"),
-  other_department: z.string().optional(),
-  company_role: z.string().min(2, "Company role is required"),
-  personal_email: z.string().email("Invalid email address"),
-  phone_number: z.string().regex(/^0[789][01]\d{8}$/, "Must be a valid Nigerian phone number (e.g., 08012345678)"),
-  additional_phone_number: z.string().optional(),
-  residential_address: z.string().min(5, "Address is required"),
-  current_work_location: z.enum(["Office", "Site"]),
-  office_location: z.string().optional(),
-  honeypot: z.string().optional(),
-})
+const formSchema = z
+  .object({
+    first_name: z.string().min(2, "First name must be at least 2 characters"),
+    last_name: z.string().min(2, "Last name must be at least 2 characters"),
+    other_names: z.string().optional(),
+    department: z.string().min(1, "Please select a department"),
+    other_department: z.string().optional(),
+    company_role: z.string().min(2, "Company role is required"),
+    personal_email: z.string().email("Invalid email address"),
+    phone_number: z.string().regex(/^0[789][01]\d{8}$/, "Must be a valid Nigerian phone number (e.g., 08012345678)"),
+    additional_phone_number: z.string().optional(),
+    residential_address: z.string().min(5, "Address is required"),
+    current_work_location: z.enum(["Office", "Site"]),
+    office_location: z.string().optional(),
+    honeypot: z.string().optional(),
+  })
+  .refine(
+    (data) => {
+      if (data.current_work_location === "Site" && (!data.office_location || data.office_location.trim() === "")) {
+        return false
+      }
+      return true
+    },
+    {
+      message: "Site location is required for Site Based employees",
+      path: ["office_location"],
+    }
+  )
 
 type FormValues = z.infer<typeof formSchema>
 
@@ -357,6 +370,9 @@ export default function EmployeeOnboardingForm() {
                         placeholder="e.g. Dangote Refinery Site"
                         {...register("office_location")}
                       />
+                      {errors.office_location && (
+                        <p className="text-destructive mt-1 text-sm">{errors.office_location.message}</p>
+                      )}
                     </div>
                   ) : (
                     <div className="bg-muted/50 border-border text-muted-foreground flex items-center gap-2 rounded-lg border p-4 text-sm">
