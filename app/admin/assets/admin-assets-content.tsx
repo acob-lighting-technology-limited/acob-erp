@@ -230,19 +230,25 @@ export function AdminAssetsContent({
   const [assetTypes, setAssetTypes] =
     useState<{ label: string; code: string; requiresSerialModel: boolean }[]>(ASSET_TYPES)
 
-  // Track original form values for change detection
-  const [originalAssetForm, setOriginalAssetForm] = useState({
-    asset_type: "",
-    acquisition_year: currentYear,
-    asset_model: "",
-    serial_number: "",
-    unique_code: "",
-    status: "available",
-    notes: "",
-  })
+  interface AssetFormState {
+    asset_type: string
+    acquisition_year: number
+    asset_model: string
+    serial_number: string
+    unique_code: string
+    status: string
+    notes: string
+    assignment_type: "individual" | "department" | "office"
+    assigned_to: string
+    assignment_department: string
+    office_location: string
+    assignment_notes: string
+    assigned_by: string
+    assigned_at: string
+  }
 
-  // Form states
-  const [assetForm, setAssetForm] = useState({
+  // Track original form values for change detection
+  const [originalAssetForm, setOriginalAssetForm] = useState<AssetFormState>({
     asset_type: "",
     acquisition_year: currentYear,
     asset_model: "",
@@ -250,8 +256,7 @@ export function AdminAssetsContent({
     unique_code: "",
     status: "available",
     notes: "",
-    // Assignment fields
-    assignment_type: "individual" as "individual" | "department" | "office",
+    assignment_type: "individual",
     assigned_to: "",
     assignment_department: "",
     office_location: "",
@@ -260,8 +265,36 @@ export function AdminAssetsContent({
     assigned_at: "",
   })
 
-  const [assignForm, setAssignForm] = useState({
-    assignment_type: "individual" as "individual" | "department" | "office",
+  // Form states
+  const [assetForm, setAssetForm] = useState<AssetFormState>({
+    asset_type: "",
+    acquisition_year: currentYear,
+    asset_model: "",
+    serial_number: "",
+    unique_code: "",
+    status: "available",
+    notes: "",
+    assignment_type: "individual",
+    assigned_to: "",
+    assignment_department: "",
+    office_location: "",
+    assignment_notes: "",
+    assigned_by: "",
+    assigned_at: "",
+  })
+
+  interface AssignFormState {
+    assignment_type: "individual" | "department" | "office"
+    assigned_to: string
+    department: string
+    office_location: string
+    assignment_notes: string
+    assigned_by: string
+    assigned_at: string
+  }
+
+  const [assignForm, setAssignForm] = useState<AssignFormState>({
+    assignment_type: "individual",
     assigned_to: "",
     department: "",
     office_location: "",
@@ -504,29 +537,32 @@ export function AdminAssetsContent({
 
       if (error) throw error
 
-      // Fetch user details separately for each assignment
-      const historyWithUsers = await Promise.all(
-        (data || []).map(async (assignment: any) => {
-          const [assignedFromResult, assignedByResult, assignedToResult] = await Promise.all([
-            assignment.assigned_from
-              ? supabase.from("profiles").select("first_name, last_name").eq("id", assignment.assigned_from).single()
-              : Promise.resolve({ data: null }),
-            assignment.assigned_by
-              ? supabase.from("profiles").select("first_name, last_name").eq("id", assignment.assigned_by).single()
-              : Promise.resolve({ data: null }),
-            assignment.assigned_to
-              ? supabase.from("profiles").select("first_name, last_name").eq("id", assignment.assigned_to).single()
-              : Promise.resolve({ data: null }),
-          ])
-
-          return {
-            ...assignment,
-            assigned_from_user: assignedFromResult.data,
-            assigned_by_user: assignedByResult.data,
-            assigned_to_user: assignedToResult.data,
-          }
-        })
+      // Gather all unique user IDs from data
+      const uniqueUserIds = Array.from(
+        new Set((data || []).flatMap((a: any) => [a.assigned_from, a.assigned_by, a.assigned_to].filter(Boolean)))
       )
+
+      let usersMap = new Map()
+      if (uniqueUserIds.length > 0) {
+        const { data: usersData } = await supabase
+          .from("profiles")
+          .select("id, first_name, last_name")
+          .in("id", uniqueUserIds)
+
+        if (usersData) {
+          usersMap = new Map(usersData.map((u: any) => [u.id, u]))
+        }
+      }
+
+      // Replace per-assignment queries with lookup map
+      const historyWithUsers = (data || []).map((assignment: any) => {
+        return {
+          ...assignment,
+          assigned_from_user: assignment.assigned_from ? usersMap.get(assignment.assigned_from) : null,
+          assigned_by_user: assignment.assigned_by ? usersMap.get(assignment.assigned_by) : null,
+          assigned_to_user: assignment.assigned_to ? usersMap.get(assignment.assigned_to) : null,
+        }
+      })
 
       setAssetHistory((historyWithUsers as any) || [])
       setSelectedAsset(asset)
@@ -689,7 +725,7 @@ export function AdminAssetsContent({
         assignment_notes: formData.assignment_notes,
         assigned_by: formData.assigned_by,
         assigned_at: formData.assigned_at,
-      } as any)
+      })
     } else {
       const {
         data: { user },
@@ -720,6 +756,13 @@ export function AdminAssetsContent({
         unique_code: "",
         status: "available",
         notes: "",
+        assignment_type: "individual",
+        assigned_to: "",
+        assignment_department: "",
+        office_location: "",
+        assignment_notes: "",
+        assigned_by: user?.id || "",
+        assigned_at: new Date().toISOString().slice(0, 16),
       })
     }
     setIsAssetDialogOpen(true)
@@ -803,29 +846,36 @@ export function AdminAssetsContent({
             assetForm.office_location !== (currentAssignment?.office_location || ""))
 
         if (isAssigneeChanged) {
-          // 1. Close current assignment (Fires handle_asset_return)
-          await supabase
-            .from("asset_assignments")
-            .update({
-              is_current: false,
-              handed_over_at: new Date().toISOString(),
-              handover_notes: `Reassigned via Edit`,
-            })
-            .eq("asset_id", selectedAsset.id)
-            .eq("is_current", true)
+          const assignmentResponse = getAssignmentData(selectedAsset.id, user.id)
+          if (!assignmentResponse.success) {
+            toast.error(assignmentResponse.error)
+            return
+          }
 
-          // 2. Create new assignment (Fires handle_new_asset_assignment)
-          const assignmentData = getAssignmentData(selectedAsset.id, user.id)
-          if (!assignmentData) return
+          const assignmentData = assignmentResponse.data
+          const { error: rpcError } = await supabase.rpc("reassign_asset", {
+            p_asset_id: selectedAsset.id,
+            p_new_assignment_type: assetForm.assignment_type,
+            p_assigned_to: (assignmentData as any).assigned_to || null,
+            p_department: (assignmentData as any).department || null,
+            p_office_location: (assignmentData as any).office_location || null,
+            p_assigned_by: (assignmentData as any).assigned_by,
+            p_assigned_at: (assignmentData as any).assigned_at,
+            p_assignment_notes: (assignmentData as any).assignment_notes,
+            p_handover_notes: `Reassigned via Edit`,
+            p_new_status: assetForm.status,
+          })
 
-          const { error: nAssignError } = await supabase.from("asset_assignments").insert(assignmentData)
-          if (nAssignError) throw nAssignError
+          if (rpcError) throw rpcError
         } else if (selectedAsset.status !== "assigned" && assetForm.status === "assigned") {
           // Normal initial assignment
-          const assignmentData = getAssignmentData(selectedAsset.id, user.id)
-          if (!assignmentData) return
+          const assignmentResponse = getAssignmentData(selectedAsset.id, user.id)
+          if (!assignmentResponse.success) {
+            toast.error(assignmentResponse.error)
+            return
+          }
 
-          const { error: assignError } = await supabase.from("asset_assignments").insert(assignmentData)
+          const { error: assignError } = await supabase.from("asset_assignments").insert(assignmentResponse.data)
           if (assignError) throw assignError
         }
 
@@ -873,9 +923,13 @@ export function AdminAssetsContent({
 
         // 4. Handle initial assignment if status is 'assigned'
         if (assetForm.status === "assigned" && newAsset) {
-          const assignmentData = getAssignmentData(newAsset.id, user.id)
-          if (!assignmentData) return
+          const assignmentResponse = getAssignmentData(newAsset.id, user.id)
+          if (!assignmentResponse.success) {
+            toast.error(assignmentResponse.error)
+            return
+          }
 
+          const assignmentData = assignmentResponse.data
           const { error: assignError } = await supabase.from("asset_assignments").insert(assignmentData)
           if (assignError) throw assignError
 
@@ -884,8 +938,8 @@ export function AdminAssetsContent({
             .from("assets")
             .update({
               assignment_type: assetForm.assignment_type,
-              department: assignmentData.department || null,
-              office_location: assignmentData.office_location || null,
+              department: (assignmentData as any).department || null,
+              office_location: (assignmentData as any).office_location || null,
             })
             .eq("id", newAsset.id)
         }
@@ -906,24 +960,18 @@ export function AdminAssetsContent({
   // Helper to construct assignment data from form
   const getAssignmentData = (assetId: string, userId: string) => {
     if (assetForm.assignment_type === "individual" && !assetForm.assigned_to) {
-      toast.error("Please select a user")
-      setIsSaving(false)
-      return null
+      return { success: false, error: "Please select a user" } as const
     }
     if (assetForm.assignment_type === "department" && !assetForm.assignment_department) {
-      toast.error("Please select a department")
-      setIsSaving(false)
-      return null
+      return { success: false, error: "Please select a department" } as const
     }
     if (assetForm.assignment_type === "office" && !assetForm.office_location) {
-      toast.error("Please select an office location")
-      setIsSaving(false)
-      return null
+      return { success: false, error: "Please select an office location" } as const
     }
 
     const data: any = {
       asset_id: assetId,
-      assigned_by: userId,
+      assigned_by: assetForm.assigned_by || userId,
       assigned_at: assetForm.assigned_at ? new Date(assetForm.assigned_at).toISOString() : new Date().toISOString(),
       is_current: true,
       assignment_notes: assetForm.assignment_notes || null,
@@ -940,7 +988,7 @@ export function AdminAssetsContent({
       data.office_location = assetForm.office_location
     }
 
-    return data
+    return { success: true, data } as const
   }
 
   const handleAssignAsset = async () => {
@@ -966,57 +1014,23 @@ export function AdminAssetsContent({
         return
       }
 
-      // 1. Close current assignment (This fires handle_asset_return)
-      // The trigger will see the "Reassigned" note and send a Transfer Outgoing email.
-      const { error: updateError } = await supabase
-        .from("asset_assignments")
-        .update({
-          is_current: false,
-          handed_over_at: new Date().toISOString(),
-          handover_notes: "Reassigned",
-        })
-        .eq("asset_id", selectedAsset.id)
-        .eq("is_current", true)
+      // Use RPC for atomic reassignment
+      const { error: rpcError } = await supabase.rpc("reassign_asset", {
+        p_asset_id: selectedAsset.id,
+        p_new_assignment_type: assignForm.assignment_type,
+        p_assigned_to: assignForm.assigned_to || null,
+        p_department: assignForm.department || null,
+        p_office_location: assignForm.office_location || null,
+        p_assigned_by: assignForm.assigned_by || user.id,
+        p_assigned_at: assignForm.assigned_at
+          ? new Date(assignForm.assigned_at).toISOString()
+          : new Date().toISOString(),
+        p_assignment_notes: assignForm.assignment_notes || null,
+        p_handover_notes: "Reassigned",
+        p_new_status: "assigned",
+      })
 
-      if (updateError) {
-        console.error("Error closing current assignment:", updateError)
-        throw new Error(`Failed to close current assignment: ${updateError.message}`)
-      }
-
-      // 2. Create new assignment (This fires handle_new_asset_assignment)
-      // The trigger will see an assignment was closed <10s ago and send a Transfer Incoming email.
-      const assignmentData: any = {
-        asset_id: selectedAsset.id,
-        assigned_by: user.id,
-        assigned_at: assignForm.assigned_at ? new Date(assignForm.assigned_at).toISOString() : new Date().toISOString(),
-        assignment_notes: assignForm.assignment_notes || null,
-        is_current: true,
-        assignment_type: assignForm.assignment_type,
-      }
-
-      if (assignForm.assignment_type === "individual") {
-        assignmentData.assigned_to = assignForm.assigned_to
-        const profile = employees.find((e) => e.id === assignForm.assigned_to)
-        if (profile) assignmentData.department = profile.department
-      } else if (assignForm.assignment_type === "department") {
-        assignmentData.department = assignForm.department
-      } else if (assignForm.assignment_type === "office") {
-        assignmentData.office_location = assignForm.office_location
-      }
-
-      const { error: assignError } = await supabase.from("asset_assignments").insert(assignmentData)
-      if (assignError) throw assignError
-
-      // 3. Update asset state
-      await supabase
-        .from("assets")
-        .update({
-          assignment_type: assignForm.assignment_type,
-          status: "assigned",
-          department: assignmentData.department || null,
-          office_location: assignmentData.office_location || null,
-        })
-        .eq("id", selectedAsset.id)
+      if (rpcError) throw rpcError
 
       toast.success("Asset reassigned successfully")
       setIsAssignDialogOpen(false)
@@ -2989,8 +3003,8 @@ export function AdminAssetsContent({
                   <div>
                     <Label htmlFor="assigned_by">Assigned By (Optional Override)</Label>
                     <SearchableSelect
-                      value={(assetForm as any).assigned_by}
-                      onValueChange={(value) => setAssetForm({ ...assetForm, ["assigned_by"]: value } as any)}
+                      value={assetForm.assigned_by}
+                      onValueChange={(value) => setAssetForm({ ...assetForm, assigned_by: value })}
                       placeholder="Select assigner (defaults to you)"
                       searchPlaceholder="Search employees..."
                       icon={<User className="h-4 w-4" />}
@@ -3007,8 +3021,8 @@ export function AdminAssetsContent({
                     <Input
                       type="datetime-local"
                       id="assigned_at"
-                      value={(assetForm as any).assigned_at || ""}
-                      onChange={(e) => setAssetForm({ ...assetForm, ["assigned_at"]: e.target.value } as any)}
+                      value={assetForm.assigned_at || ""}
+                      onChange={(e) => setAssetForm({ ...assetForm, assigned_at: e.target.value })}
                     />
                   </div>
                 </div>
@@ -3044,13 +3058,13 @@ export function AdminAssetsContent({
                   assetForm.serial_number === originalAssetForm.serial_number &&
                   assetForm.status === originalAssetForm.status &&
                   // Check assignment details
-                  (assetForm as any).assignment_type === (originalAssetForm as any).assignment_type &&
-                  (assetForm as any).assigned_to === (originalAssetForm as any).assigned_to &&
-                  (assetForm as any).assignment_department === (originalAssetForm as any).assignment_department &&
-                  (assetForm as any).office_location === (originalAssetForm as any).office_location &&
-                  (assetForm as any).assignment_notes === (originalAssetForm as any).assignment_notes &&
-                  (assetForm as any).assigned_by === (originalAssetForm as any).assigned_by &&
-                  (assetForm as any).assigned_at === (originalAssetForm as any).assigned_at) ||
+                  assetForm.assignment_type === originalAssetForm.assignment_type &&
+                  assetForm.assigned_to === originalAssetForm.assigned_to &&
+                  assetForm.assignment_department === originalAssetForm.assignment_department &&
+                  assetForm.office_location === originalAssetForm.office_location &&
+                  assetForm.assignment_notes === originalAssetForm.assignment_notes &&
+                  assetForm.assigned_by === originalAssetForm.assigned_by &&
+                  assetForm.assigned_at === originalAssetForm.assigned_at) ||
                 // For create with "assigned" status: validate assignment fields (only when creating, not editing)
                 (!selectedAsset &&
                   assetForm.status === "assigned" &&
@@ -3201,8 +3215,8 @@ export function AdminAssetsContent({
               <div>
                 <Label htmlFor="assigned_by">Assigned By (Optional Override)</Label>
                 <SearchableSelect
-                  value={(assignForm as any).assigned_by}
-                  onValueChange={(value) => setAssignForm({ ...assignForm, ["assigned_by"]: value } as any)}
+                  value={assignForm.assigned_by}
+                  onValueChange={(value) => setAssignForm({ ...assignForm, assigned_by: value })}
                   placeholder="Select assigner (defaults to you)"
                   searchPlaceholder="Search employees..."
                   icon={<User className="h-4 w-4" />}
@@ -3219,8 +3233,8 @@ export function AdminAssetsContent({
                 <Input
                   type="datetime-local"
                   id="assigned_at"
-                  value={(assignForm as any).assigned_at || ""}
-                  onChange={(e) => setAssignForm({ ...assignForm, ["assigned_at"]: e.target.value } as any)}
+                  value={assignForm.assigned_at || ""}
+                  onChange={(e) => setAssignForm({ ...assignForm, assigned_at: e.target.value })}
                 />
               </div>
             </div>

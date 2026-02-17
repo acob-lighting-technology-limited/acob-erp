@@ -123,16 +123,20 @@ async function getAuditLogsData() {
     // 3. Fetch current asset assignments
     const assetAssignmentsMap = new Map()
     if (assetIds.size > 0) {
-      const { data: assignments } = await supabase
+      const { data: assignments, error: assignmentsError } = await supabase
         .from("asset_assignments")
         .select("asset_id, assigned_to, assignment_type")
         .in("asset_id", Array.from(assetIds))
         .eq("is_current", true)
 
-      assignments?.forEach((a) => {
-        assetAssignmentsMap.set(a.asset_id, a)
-        if (a.assigned_to) potentialUserIds.add(a.assigned_to)
-      })
+      if (assignmentsError) {
+        console.error("Error fetching asset assignments for audit logs:", assignmentsError)
+      } else {
+        assignments?.forEach((a) => {
+          assetAssignmentsMap.set(a.asset_id, a)
+          if (a.assigned_to) potentialUserIds.add(a.assigned_to)
+        })
+      }
     }
 
     // 4. Fetch all users
@@ -140,11 +144,16 @@ async function getAuditLogsData() {
     let usersData: any[] = []
 
     if (allUserIds.length > 0) {
-      const { data } = await supabase
+      const { data, error: usersError } = await supabase
         .from("profiles")
         .select("id, first_name, last_name, company_email, employee_number")
         .in("id", allUserIds)
-      usersData = data || []
+
+      if (usersError) {
+        console.error("Error fetching users for audit logs:", usersError)
+      } else {
+        usersData = data || []
+      }
     }
 
     const usersMap = new Map(usersData.map((u) => [u.id, u]))
@@ -159,10 +168,12 @@ async function getAuditLogsData() {
       let assetId = null
 
       if (log.entity_type.includes("asset")) {
-        assetId =
-          log.entity_type.includes("assignment") || log.new_values.asset_id
-            ? log.new_values.asset_id || log.old_values.asset_id || log.entity_id
-            : log.entity_id
+        // Clearer logic to determine the relevant asset ID
+        if (log.entity_type.includes("assignment")) {
+          assetId = log.new_values.asset_id || log.old_values.asset_id || log.entity_id
+        } else {
+          assetId = log.entity_id
+        }
 
         const assignment = assetId ? assetAssignmentsMap.get(assetId) : null
 
@@ -173,17 +184,17 @@ async function getAuditLogsData() {
           asset_name: log.new_values.asset_name || log.old_values.asset_name,
         }
 
-        // Merge with assignment info if available
+        // Merge with assignment info, PREFERRING historical values from the log
         if (baseInfo.unique_code || assignment) {
+          const historicalAssignedTo = log.new_values.assigned_to || log.old_values.assigned_to
+          const targetAssignedTo = historicalAssignedTo || assignment?.assigned_to
+
           assetInfo = {
             ...baseInfo,
             assignment_type:
-              assignment?.assignment_type || log.new_values.assignment_type || log.old_values.assignment_type,
-            assigned_to: assignment?.assigned_to || log.new_values.assigned_to,
-            assigned_to_user:
-              assignment?.assigned_to || log.new_values.assigned_to
-                ? usersMap.get(assignment?.assigned_to || log.new_values.assigned_to) || null
-                : null,
+              log.new_values.assignment_type || log.old_values.assignment_type || assignment?.assignment_type,
+            assigned_to: targetAssignedTo,
+            assigned_to_user: targetAssignedTo ? usersMap.get(targetAssignedTo) || null : null,
           }
         }
       }

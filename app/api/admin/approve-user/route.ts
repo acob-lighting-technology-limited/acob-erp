@@ -3,6 +3,8 @@ import { NextResponse } from "next/server"
 import { Resend } from "resend"
 import { createClient as createServerClient } from "@/lib/supabase/server"
 import crypto from "crypto"
+import { renderWelcomeEmail } from "@/lib/email-templates/welcome"
+import { renderInternalNotificationEmail } from "@/lib/email-templates/internal-notification"
 
 export async function POST(req: Request) {
   // 1. Verify Caller is an Admin
@@ -31,7 +33,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "System configuration error: Missing database keys" }, { status: 500 })
     }
 
-    const resend = new Resend(resendApiKey || "dummy_key")
+    if (!resendApiKey) {
+      console.error("ERROR: Missing RESEND_API_KEY environment variable")
+      return NextResponse.json({ error: "Email configuration error: Missing API key" }, { status: 500 })
+    }
+
+    const resend = new Resend(resendApiKey)
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     })
@@ -89,23 +96,29 @@ export async function POST(req: Request) {
         if (!exists) break
         retryCount++
       }
+
+      if (retryCount >= maxRetries) {
+        throw new Error(
+          "Failed to generate a unique employee ID after multiple attempts. Please try again or specify an ID manually."
+        )
+      }
     }
 
     // Secure Token-based Setup Flow
     const setupToken = crypto.randomBytes(32).toString("hex")
     const setupTokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24 hours
-    const publicUrl =
-      process.env.NEXT_PUBLIC_APP_URL ||
-      (typeof window !== "undefined" ? window.location.origin : "https://erp.acoblighting.com")
+    const publicUrl = process.env.NEXT_PUBLIC_APP_URL || "https://erp.acoblighting.com"
     const setupUrl = `${publicUrl}/auth/setup-account?token=${setupToken}`
 
     // 3. Create or Update Auth User
     // First check if user already exists
-    const {
-      data: { users },
-      error: listError,
-    } = await supabaseAdmin.auth.admin.listUsers()
-    let authUserId = users?.find((u) => u.email === pendingUser.company_email)?.id
+    const { data: existingProfile } = await supabaseAdmin
+      .from("profiles")
+      .select("id")
+      .eq("company_email", pendingUser.company_email)
+      .maybeSingle()
+
+    let authUserId = existingProfile?.id
 
     if (!authUserId) {
       const { data: newAuthUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
@@ -144,7 +157,6 @@ export async function POST(req: Request) {
         residential_address: pendingUser.residential_address,
         current_work_location: pendingUser.current_work_location,
         office_location: pendingUser.office_location,
-        created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         setup_token: setupToken,
         setup_token_expires_at: setupTokenExpiresAt,
@@ -158,230 +170,35 @@ export async function POST(req: Request) {
     }
 
     // 5. Delete from Pending Users
-    await supabaseAdmin.from("pending_users").delete().eq("id", pendingUserId)
+    const { error: deleteError } = await supabaseAdmin.from("pending_users").delete().eq("id", pendingUserId)
+    if (deleteError) {
+      console.error("CRITICAL ERROR: Failed to delete pending user record after profile creation", deleteError)
+      // We don't throw because the profile is already created, but this is a serious data integrity issue
+    }
 
     // 6. Send Welcome Email
     try {
       await resend.emails.send({
-        from: "ACOB HR <notifications@acoblighting.com>", // Using verified domain
-        to: [pendingUser.personal_email], // Send to PERSONAL email
+        from: "ACOB HR <notifications@acoblighting.com>",
+        to: [pendingUser.personal_email],
         subject: "Welcome to ACOB - Login Credentials",
-        // Simple HTML construction based on the preview file we agreed on
-        html: `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Welcome to ACOB Lighting</title>
-    <style>
-        body { margin: 0; padding: 0; background: #fff; font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif; }
-        .outer-header { background: #000; width: 100%; padding: 20px 0; text-align: center; border-bottom: 3px solid #16a34a; }
-        .wrapper { max-width: 600px; margin: 0 auto; background: #fff; padding: 32px 28px; }
-        .title { font-size: 24px; font-weight: 700; color: #111827; margin-bottom: 14px; }
-        .text { font-size: 15px; color: #374151; line-height: 1.6; margin: 0 0 18px 0; }
-        .card { margin-top: 22px; border: 1px solid #d1d5db; overflow: hidden; background: #f9fafb; }
-        .card-header { padding: 12px 18px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; border-bottom: 1px solid #d1d5db; }
-        .status-header-neutral { background: #eff6ff; color: #1e40af; border-bottom-color: #bfdbfe; }
-        table { width: 100%; border-collapse: collapse; }
-        td { padding: 12px 18px; font-size: 14px; border-bottom: 1px solid #d1d5db; }
-        tr:last-child td { border-bottom: none; }
-        .label { width: 40%; color: #4b5563; font-weight: 500; border-right: 1px solid #d1d5db; }
-        .value { color: #111827; font-weight: 600; }
-        .credential { background: #e5e7eb; padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: 13px; border: 1px solid #d1d5db; }
-        .cta { text-align: center; margin-top: 32px; }
-        .button { display: inline-block; background: #000; color: #fff; text-decoration: none; padding: 14px 32px; border-radius: 6px; font-weight: 600; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; }
-        .support { text-align: center; font-size: 14px; color: #4b5563; margin-top: 24px; line-height: 1.5; }
-        .support a { color: #16a34a; font-weight: 600; text-decoration: none; }
-        .footer { background: #000; padding: 20px; text-align: center; font-size: 11px; color: #9ca3af; border-top: 3px solid #16a34a; }
-        .footer strong { color: #fff; }
-        .footer-system { color: #16a34a; font-weight: 600; }
-        .footer-note { color: #9ca3af; font-style: italic; }
-    </style>
-</head>
-<body>
-    <div class="outer-header">
-        <img src="https://erp.acoblighting.com/images/acob-logo-dark.webp" alt="ACOB Lighting" height="40">
-    </div>
-    <div class="wrapper">
-        <div class="title">Welcome to the Team</div>
-        <p class="text">Dear ${pendingUser.first_name},</p>
-        <p class="text">We are thrilled to welcome you to the team at ACOB Lighting Technology Limited.</p>
-        <p class="text">An official employee account has been created for you. Please find your login credentials and details below.</p>
-        
-        <div class="card">
-            <div class="card-header status-header-neutral">Employee Profile</div>
-            <table>
-                <tr>
-                    <td class="label">Full Name</td>
-                    <td class="value">${pendingUser.first_name} ${pendingUser.last_name}</td>
-                </tr>
-                 <tr>
-                    <td class="label">Employee ID</td>
-                    <td class="value">${employeeId}</td>
-                </tr>
-                <tr>
-                    <td class="label">Department</td>
-                    <td class="value">${pendingUser.department}</td>
-                </tr>
-                <tr>
-                    <td class="label">Role</td>
-                    <td class="value">${pendingUser.company_role}</td>
-                </tr>
-                <tr>
-                    <td class="label">Work Location</td>
-                    <td class="value">
-                        ${pendingUser.current_work_location}
-                        ${
-                          pendingUser.office_location &&
-                          pendingUser.office_location !== pendingUser.current_work_location
-                            ? `(${pendingUser.office_location})`
-                            : ""
-                        }
-                    </td>
-                </tr>
-            </table>
-        </div>
-
-        <div class="card" style="margin-top: 20px;">
-            <div class="card-header status-header-neutral" style="background: #f0fdf4; color: #15803d; border-bottom-color: #bbf7d0;">Account Activation</div>
-            <table>
-                <tr>
-                    <td class="label">Setup URL</td>
-                    <td class="value"><a href="${setupUrl}" style="color: #16a34a; text-decoration: none; font-weight: 700;">ACTIVATE MY ACCOUNT</a></td>
-                </tr>
-                <tr>
-                    <td class="label">Company Email</td>
-                    <td class="value"><span class="credential">${pendingUser.company_email}</span></td>
-                </tr>
-            </table>
-        </div>
-
-        <div class="cta">
-            <a href="${setupUrl}" class="button">Set Up Password</a>
-        </div>
-        <div class="support">
-            Please log in and change your password immediately.<br>
-            If you have any questions, contact <a href="mailto:ict@acoblighting.com">ict@acoblighting.com</a>
-        </div>
-    </div>
-    <div class="footer">
-        <strong>ACOB Lighting Technology Limited</strong><br>
-        ACOB Internal Systems – Admin & HR Department<br>
-        <span class="footer-system">Employee Management System</span>
-        <br><br>
-        <i class="footer-note">This is an automated system notification. Please do not reply directly to this email.</i>
-    </div>
-</body>
-</html>
-            `,
+        html: renderWelcomeEmail({ pendingUser, employeeId, setupUrl }),
       })
 
       // 7. Send Internal Confirmation Email to Stakeholders
-      await resend.emails.send({
-        from: "ACOB Internal Systems <notifications@acoblighting.com>",
-        to: [
-          "ict@acoblighting.com",
-          "a.peter@acoblighting.com",
-          "info@acoblighting.com",
-          "acobacct@gmail.com",
-          "a.lawrence@acoblighting.com",
-          "i.emmanuel@acoblighting.com",
-          "o.mercy@org.acoblighting.com",
-          "infoacob@gmail.com",
-          "e.rafiat@org.acoblighting.com",
-          "u.vanessa@org.acoblighting.com",
-          "a.onyekachukwu@org.acoblighting.com",
-          "i.surajo@org.acoblighting.com",
-        ],
-        subject: "New Employee Onboarded: " + pendingUser.first_name + " " + pendingUser.last_name,
-        html: `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>New Employee Onboarding Notification</title>
-    <style>
-        body { margin: 0; padding: 0; background: #f3f4f6; font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif; }
-        .outer-header { background: #000; width: 100%; padding: 20px 0; text-align: center; border-bottom: 3px solid #16a34a; }
-        .wrapper { max-width: 600px; margin: 20px auto; background: #fff; padding: 32px 28px; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
-        .title { font-size: 20px; font-weight: 700; color: #111827; margin-bottom: 20px; }
-        .text { font-size: 14px; color: #4b5563; line-height: 1.6; margin: 0 0 18px 0; }
-        .card { margin-top: 22px; border: 1px solid #e5e7eb; overflow: hidden; background: #fbfbfb; border-radius: 6px; }
-        .card-header { padding: 12px 18px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; border-bottom: 1px solid #e5e7eb; background: #f8fafc; color: #64748b; }
-        table { width: 100%; border-collapse: collapse; }
-        td { padding: 12px 18px; font-size: 13px; border-bottom: 1px solid #e5e7eb; }
-        tr:last-child td { border-bottom: none; }
-        .label { width: 35%; color: #64748b; font-weight: 500; border-right: 1px solid #e5e7eb; }
-        .value { color: #0f172a; font-weight: 600; }
-        .cta { text-align: center; margin-top: 32px; }
-        .button { display: inline-block; background: #16a34a; color: #fff; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-weight: 600; font-size: 13px; }
-        .footer { background: #000; width: 100%; padding: 40px 0; text-align: center; font-size: 11px; color: #9ca3af; border-top: 3px solid #16a34a; }
-    </style>
-</head>
-<body>
-    <div class="outer-header">
-        <img src="https://erp.acoblighting.com/images/acob-logo-dark.webp" alt="ACOB Lighting" height="35">
-    </div>
-    <div class="wrapper">
-        <div class="title">New Employee Onboarded</div>
-        <p class="text">Hello Team,</p>
-        <p class="text">This is an automated notification that a new employee has been successfully approved and added to the system.</p>
-        
-        <div class="card">
-            <div class="card-header">Onboarding Details</div>
-            <table>
-                <tr>
-                    <td class="label">Employee Name</td>
-                    <td class="value">${pendingUser.first_name} ${pendingUser.last_name}</td>
-                </tr>
-                <tr>
-                    <td class="label">Employee ID</td>
-                    <td class="value">${employeeId}</td>
-                </tr>
-                <tr>
-                    <td class="label">Department</td>
-                    <td class="value">${pendingUser.department}</td>
-                </tr>
-                <tr>
-                    <td class="label">Official Email</td>
-                    <td class="value">${pendingUser.company_email}</td>
-                </tr>
-                <tr>
-                    <td class="label">Work Location</td>
-                    <td class="value">
-                        ${pendingUser.current_work_location}
-                        ${
-                          pendingUser.office_location &&
-                          pendingUser.office_location !== pendingUser.current_work_location
-                            ? `(${pendingUser.office_location})`
-                            : ""
-                        }
-                    </td>
-                </tr>
-                <tr>
-                    <td class="label">Approved Date</td>
-                    <td class="value">${new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</td>
-                </tr>
-            </table>
-        </div>
+      const stakeholderEmails = (process.env.STAKEHOLDER_EMAILS || "")
+        .split(",")
+        .map((e: string) => e.trim())
+        .filter((e: string) => e.includes("@"))
 
-        <div class="cta">
-            <a href="https://erp.acoblighting.com/admin/hr/employees" class="button">View Employee Directory</a>
-        </div>
-    </div>
-    <div class="footer">
-        <strong style="color: #fff;">ACOB Lighting Technology Limited</strong><br>
-        <span style="color: #16a34a; font-weight: 600; font-size: 10px; text-transform: uppercase; letter-spacing: 1px;">ACOB Internal Systems</span>
-        <div style="margin-top: 12px; font-style: italic; font-size: 10px; opacity: 0.7; max-width: 500px; margin-left: auto; margin-right: auto; padding: 0 20px;">
-            This is an automated system notification. Please do not reply directly to this email.
-        </div>
-    </div>
-</body>
-</html>
-`,
-      })
+      if (stakeholderEmails.length > 0) {
+        await resend.emails.send({
+          from: "ACOB Internal Systems <notifications@acoblighting.com>",
+          to: stakeholderEmails,
+          subject: `New Employee Onboarded: ${pendingUser.first_name} ${pendingUser.last_name}`,
+          html: renderInternalNotificationEmail({ pendingUser, employeeId }),
+        })
+      }
     } catch (emailError) {
       console.error("Failed to send notification emails:", emailError)
       // We do NOT rollback here, creation was successful. Just log the error.
