@@ -114,6 +114,8 @@ export async function POST(req: Request) {
 
     // Secure Token-based Setup Flow
     const setupToken = crypto.randomBytes(32).toString("hex")
+    // Store hash in DB, email raw token
+    const setupTokenHash = crypto.createHash("sha256").update(setupToken).digest("hex")
     const setupTokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24 hours
     const publicUrl = process.env.NEXT_PUBLIC_APP_URL || "https://erp.acoblighting.com"
     const setupUrl = `${publicUrl}/auth/setup-account?token=${setupToken}`
@@ -146,32 +148,77 @@ export async function POST(req: Request) {
       authUserId = newAuthUser.user.id
     }
 
-    // 4. Upsert Profile Record (Handles cases where a trigger might have created a skeleton profile)
-    const { error: profileError } = await supabaseAdmin.from("profiles").upsert(
-      {
-        id: authUserId,
-        first_name: pendingUser.first_name,
-        last_name: pendingUser.last_name,
-        other_names: pendingUser.other_names,
-        department: pendingUser.department,
-        company_role: pendingUser.company_role,
-        role: "employee",
-        employment_status: "active",
-        employee_number: employeeId,
-        company_email: pendingUser.company_email,
-        personal_email: pendingUser.personal_email,
-        phone_number: pendingUser.phone_number,
-        additional_phone: pendingUser.additional_phone_number,
-        residential_address: pendingUser.residential_address,
-        current_work_location: pendingUser.current_work_location,
-        office_location: pendingUser.office_location,
-        updated_at: new Date().toISOString(),
-        setup_token: setupToken,
-        setup_token_expires_at: setupTokenExpiresAt,
-        must_reset_password: true,
-      },
-      { onConflict: "id" }
-    )
+    // 4. Upsert Profile Record with Retry for Employee ID
+    let profileError = null
+    let retryUpsert = 0
+    const maxUpsertRetries = 3
+
+    while (retryUpsert < maxUpsertRetries) {
+      // If employeeId is NOT manually set and we are retrying, regenerate it
+      if (!manualEmployeeId && retryUpsert > 0) {
+        const { data: lastProfile } = await supabaseAdmin
+          .from("profiles")
+          .select("employee_number")
+          .not("employee_number", "is", null)
+          .order("employee_number", { ascending: false })
+          .limit(1)
+          .single()
+
+        let nextIdNumber = 1
+        if (lastProfile && lastProfile.employee_number) {
+          const parts = lastProfile.employee_number.split("/")
+          if (parts.length === 3) {
+            const lastNum = parseInt(parts[2], 10)
+            if (!isNaN(lastNum)) nextIdNumber = lastNum + retryUpsert + 1
+          }
+        }
+        employeeId = `ACOB/${currentYear}/${nextIdNumber.toString().padStart(3, "0")}`
+      }
+
+      const { error } = await supabaseAdmin.from("profiles").upsert(
+        {
+          id: authUserId,
+          first_name: pendingUser.first_name,
+          last_name: pendingUser.last_name,
+          other_names: pendingUser.other_names,
+          department: pendingUser.department,
+          company_role: pendingUser.company_role,
+          role: "employee",
+          employment_status: "active",
+          employee_number: employeeId,
+          company_email: pendingUser.company_email,
+          personal_email: pendingUser.personal_email,
+          phone_number: pendingUser.phone_number,
+          additional_phone: pendingUser.additional_phone_number,
+          residential_address: pendingUser.residential_address,
+          current_work_location: pendingUser.current_work_location,
+          office_location: pendingUser.office_location,
+          updated_at: new Date().toISOString(),
+          setup_token: setupTokenHash,
+          setup_token_expires_at: setupTokenExpiresAt,
+          must_reset_password: true,
+        },
+        { onConflict: "id" }
+      )
+
+      if (!error) {
+        profileError = null
+        break
+      }
+
+      // Check for employee_number unique constraint violation
+      // Postgres error code 23505 is unique_violation
+      if (error && error.code === "23505" && error.message.includes("profiles_employee_number_key")) {
+        console.warn(`Employee ID collision for ${employeeId}, retrying...`)
+        retryUpsert++
+        profileError = error
+        continue
+      } else {
+        // Other errors are fatal
+        profileError = error
+        break
+      }
+    }
 
     if (profileError) {
       throw new Error(`Profile creation failed: ${profileError.message}`)
