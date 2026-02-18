@@ -1,7 +1,7 @@
 import path from "path"
 
 const nextConfig = {
-  transpilePackages: ["xlsx", "jspdf", "jspdf-autotable", "docx", "file-saver", "pptxgenjs"],
+  transpilePackages: ["xlsx", "jspdf", "jspdf-autotable", "docx", "file-saver"],
 
   // Ensure build fails on TypeScript errors (matches Vercel behavior)
   typescript: {
@@ -40,7 +40,6 @@ const nextConfig = {
         "node:crypto": false,
         "node:http": false,
         "node:https": false,
-        "pptxgenjs": path.resolve("node_modules/pptxgenjs/dist/pptxgen.bundle.js"),
       }
 
       // Specifically handle 'node:' scheme imports by treating them as externals or ignoring them

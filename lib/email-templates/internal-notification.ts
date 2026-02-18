@@ -88,7 +88,7 @@ export function renderInternalNotificationEmail({ pendingUser, employeeId }: Int
     </div>
     <div class="footer">
         <strong style="color: #fff;">ACOB Lighting Technology Limited</strong><br>
-        <span style="color: #16a34a; font-weight: 600; font-size: 10px; text-transform: uppercase; letter-spacing: 1px;">ACOB Internal Systems</span>
+        <span style="color: #16a34a; font-weight: 600; font-size: 10px; text-transform: uppercase; letter-spacing: 1px;">ACOB Admin & HR</span>
         <div style="margin-top: 12px; font-style: italic; font-size: 10px; opacity: 0.7; max-width: 500px; margin-left: auto; margin-right: auto; padding: 0 20px;">
             This is an automated system notification. Please do not reply directly to this email.
         </div>

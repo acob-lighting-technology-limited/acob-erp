@@ -24,7 +24,8 @@ serve(async (req) => {
     const authHeader = req.headers.get("Authorization")
 
     // Auth Check
-    const isServiceRole = authHeader?.includes(SUPABASE_SERVICE_ROLE_KEY!)
+    const bearerToken = authHeader?.replace("Bearer ", "")
+    const isServiceRole = bearerToken === SUPABASE_SERVICE_ROLE_KEY
     const isSecretValid =
       (webhookSecret && signature === webhookSecret) ||
       signature === DB_TRIGGER_SECRET ||
@@ -41,8 +42,13 @@ serve(async (req) => {
     const record = payload.record
     if (!record?.user_id) return new Response("Missing user_id", { status: 200 })
 
-    const notificationData = typeof record.data === "string" ? JSON.parse(record.data) : record.data || {}
-    const assetCode = notificationData.asset_code || notificationData.unique_code
+    let notificationData = {}
+    try {
+      notificationData = typeof record.data === "string" ? JSON.parse(record.data) : record.data || {}
+    } catch {
+      console.warn("[WARN] Failed to parse record.data, using empty object")
+    }
+    const assetCode = (notificationData as any).asset_code || (notificationData as any).unique_code
 
     // 1. Fetch User (Recipient)
     const { data: recipientUser, error: userError } = await supabase.auth.admin.getUserById(record.user_id)
@@ -88,8 +94,8 @@ serve(async (req) => {
       }
 
       // Try fetch specific assignment if possible
-      if (notificationData.assigned_by || notificationData.actor_id) {
-        const actorId = notificationData.assigned_by || notificationData.actor_id
+      if ((notificationData as any).assigned_by || (notificationData as any).actor_id) {
+        const actorId = (notificationData as any).assigned_by || (notificationData as any).actor_id
 
         // If it's a UUID, fetch the name. If it's already a name, use it.
         const isUuid = typeof actorId === "string" && actorId.length === 36 && actorId.includes("-")
@@ -158,7 +164,7 @@ serve(async (req) => {
       case "asset_status_alert":
         subject = `Asset Status Alert - ${assetCode}`
         title = "Asset Status Alert"
-        introText = `The status of the following asset has been updated to <strong>${(notificationData.status_action || "REPORTED").toUpperCase()}</strong>.`
+        introText = `The status of the following asset has been updated to <strong>${((notificationData as any).status_action || "REPORTED").toUpperCase()}</strong>.`
         headerText = "Status Change: Alert"
         headerColorClass = "status-header-alert"
         break
@@ -184,7 +190,7 @@ serve(async (req) => {
 
     // Base rows for ALL emails
     let tableRows = `
-        ${row("Asset Code", assetCode, true)}
+        ${row("Asset Code", assetCode || "N/A", true)}
         ${row("Asset Type", assetType)}
         ${row("Model", assetModel)}
         ${row("Serial Number", serialNumber, false, true)}
@@ -195,27 +201,27 @@ serve(async (req) => {
 
     // Specific rows appended after base rows
     if (emailType === "asset_transfer_outgoing") {
-      tableRows += row("Authorized By", notificationData.authorized_by || assignedByName)
+      tableRows += row("Authorized By", (notificationData as any).authorized_by || assignedByName)
       tableRows += row("Transfer Date", assignedDate)
     } else if (emailType === "asset_transfer_incoming") {
-      tableRows += row("Condition", notificationData.condition || "Good / Working")
+      tableRows += row("Condition", (notificationData as any).condition || "Good / Working")
       tableRows += row("Assigned By", assignedByName)
       tableRows += row("Assigned Date", assignedDate)
     } else if (emailType === "asset_returned") {
       tableRows += row("Returned By", recipientName)
-      tableRows += row("Authorized By", notificationData.authorized_by || assignedByName)
+      tableRows += row("Authorized By", (notificationData as any).authorized_by || assignedByName)
       tableRows += row("Return Date", assignedDate)
     } else if (emailType === "asset_status_alert") {
       tableRows += row(
         "Status Note",
-        notificationData.status_description || notificationData.status_action || "Updated",
+        (notificationData as any).status_description || (notificationData as any).status_action || "Updated",
         false,
         false
       )
-      tableRows += row("Reported By", notificationData.reported_by || assignedByName)
+      tableRows += row("Reported By", (notificationData as any).reported_by || assignedByName)
       tableRows += row("Date", assignedDate)
     } else if (emailType === "asset_status_fixed") {
-      tableRows += row("Resolution Note", notificationData.resolution_note || "Issue Resolved", false, false)
+      tableRows += row("Resolution Note", (notificationData as any).resolution_note || "Issue Resolved", false, false)
       tableRows += row("Date", assignedDate)
     } else {
       // Default: Initial Assignment
@@ -280,7 +286,7 @@ serve(async (req) => {
     </div>
     <div class="footer">
         <strong>ACOB Lighting Technology Limited</strong><br>
-        ACOB Internal Systems – IT & Communications Department<br>
+        ACOB Admin & HR Department<br>
         <span class="footer-system">Asset Management System</span>
         <br><br>
         <i class="footer-note">This is an automated system notification. Please do not reply directly to this email.</i>
@@ -289,14 +295,14 @@ serve(async (req) => {
 </html>`
 
     const { error } = await resend.emails.send({
-      from: "ACOB Internal Systems <notifications@acoblighting.com>",
+      from: "ACOB Admin & HR <notifications@acoblighting.com>",
       to: email,
       subject: subject,
       html: emailHtml,
     })
 
     if (error) {
-      console.error(`[Resend Error] Failed to send email to ${email}:`, JSON.stringify(error))
+      console.error(`[Resend Error] Failed to send email to user ${record.user_id}:`, JSON.stringify(error))
       return new Response(JSON.stringify(error), { status: 400 })
     }
 

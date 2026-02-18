@@ -126,26 +126,22 @@ interface AssetAssignment {
   }
 }
 
-interface AssignmentHistory {
+interface AssetActivity {
   id: string
-  assigned_at: string
-  handed_over_at?: string
-  assignment_notes?: string
-  handover_notes?: string
-  department?: string
-  office_location?: string
-  assignment_type?: string
-  assigned_from_user?: {
-    first_name: string
-    last_name: string
-  }
-  assigned_by_user?: {
-    first_name: string
-    last_name: string
-  }
-  assigned_to_user?: {
-    first_name: string
-    last_name: string
+  timestamp: string
+  type: "assignment" | "unassignment" | "status_change" | "issue_reported" | "issue_resolved"
+  title: string
+  description?: string
+  user_name?: string
+  performed_by_name?: string
+  details?: {
+    assigned_to?: string
+    department?: string
+    office_location?: string
+    assignment_type?: string
+    notes?: string
+    status?: string
+    old_status?: string
   }
 }
 
@@ -218,7 +214,7 @@ export function AdminAssetsContent({
   const [isAssigning, setIsAssigning] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
-  const [assetHistory, setAssetHistory] = useState<AssignmentHistory[]>([])
+  const [assetHistory, setAssetHistory] = useState<AssetActivity[]>([])
 
   // Issue tracking states
   const [assetIssues, setAssetIssues] = useState<AssetIssue[]>([])
@@ -484,18 +480,16 @@ export function AdminAssetsContent({
         .eq("id", assetId)
         .single()
 
-      // If asset status is not "assigned" or "retired", don't load any assignment
-      if (assetData?.status !== "assigned" && assetData?.status !== "retired") {
-        setCurrentAssignment(null)
-        return
-      }
-
+      // If asset status is not "assigned" or "retired" or "maintenance", we still want to load the PREVIOUS assignment for the details view
       const { data, error } = await supabase
         .from("asset_assignments")
-        .select("id, assigned_to, assigned_at, is_current, department, office_location, assignment_type")
+        .select(
+          "id, assigned_to, assigned_at, handed_over_at, is_current, department, office_location, assignment_type, handover_notes"
+        )
         .eq("asset_id", assetId)
-        .eq("is_current", true)
-        .single()
+        .order("assigned_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
 
       if (error && error.code !== "PGRST116") throw error
 
@@ -529,50 +523,151 @@ export function AdminAssetsContent({
 
   const loadAssetHistory = async (asset: Asset) => {
     try {
-      const { data, error } = await supabase
+      // 1. Fetch Assignments
+      const { data: assignments, error: assignmentsError } = await supabase
         .from("asset_assignments")
         .select(
-          "id, assigned_at, handed_over_at, assignment_notes, handover_notes, assigned_from, assigned_by, assigned_to, department, office_location, assignment_type"
+          "id, assigned_at, handed_over_at, assignment_notes, handover_notes, assigned_by, assigned_to, department, office_location, assignment_type"
         )
         .eq("asset_id", asset.id)
-        .order("assigned_at", { ascending: false })
 
-      if (error) throw error
+      if (assignmentsError) throw assignmentsError
 
-      // Gather all unique user IDs from data
-      const uniqueUserIds = Array.from(
-        new Set((data || []).flatMap((a: any) => [a.assigned_from, a.assigned_by, a.assigned_to].filter(Boolean)))
-      )
+      // 2. Fetch Issues
+      const { data: issues, error: issuesError } = await supabase
+        .from("asset_issues")
+        .select("id, description, resolved, created_at, resolved_at, created_by, resolved_by")
+        .eq("asset_id", asset.id)
+
+      if (issuesError) throw issuesError
+
+      // 3. Fetch Status Changes from Audit Logs
+      const { data: auditLogs, error: auditError } = await supabase
+        .from("audit_logs")
+        .select("id, operation, old_values, new_values, created_at, user_id")
+        .eq("table_name", "assets")
+        .eq("record_id", asset.id)
+        .eq("operation", "UPDATE")
+
+      if (auditError) throw auditError
+
+      // 4. Resolve User Names
+      const userIds = new Set<string>()
+      assignments?.forEach((a) => {
+        if (a.assigned_by) userIds.add(a.assigned_by)
+        if (a.assigned_to) userIds.add(a.assigned_to)
+      })
+      issues?.forEach((i) => {
+        if (i.created_by) userIds.add(i.created_by)
+        if (i.resolved_by) userIds.add(i.resolved_by)
+      })
+      auditLogs?.forEach((l) => {
+        if (l.user_id) userIds.add(l.user_id)
+      })
 
       let usersMap = new Map()
-      if (uniqueUserIds.length > 0) {
+      if (userIds.size > 0) {
         const { data: usersData } = await supabase
           .from("profiles")
           .select("id, first_name, last_name")
-          .in("id", uniqueUserIds)
-
-        if (usersData) {
-          usersMap = new Map(usersData.map((u: any) => [u.id, u]))
-        }
+          .in("id", Array.from(userIds))
+        if (usersData) usersMap = new Map(usersData.map((u: any) => [u.id, u]))
       }
 
-      // Replace per-assignment queries with lookup map
-      const historyWithUsers = (data || []).map((assignment: any) => {
-        return {
-          ...assignment,
-          assigned_from_user: assignment.assigned_from ? usersMap.get(assignment.assigned_from) : null,
-          assigned_by_user: assignment.assigned_by ? usersMap.get(assignment.assigned_by) : null,
-          assigned_to_user: assignment.assigned_to ? usersMap.get(assignment.assigned_to) : null,
+      const getUName = (id: string | null | undefined) => {
+        if (!id) return null
+        const u = usersMap.get(id)
+        return u ? `${formatName(u.first_name)} ${formatName(u.last_name)}` : "System"
+      }
+
+      // 5. Transform into unified Activity list
+      const activities: AssetActivity[] = []
+
+      // Add Assignments & Handovers
+      assignments?.forEach((a) => {
+        // The Assignment itself
+        activities.push({
+          id: `${a.id}-assign`,
+          timestamp: a.assigned_at,
+          type: "assignment",
+          title: "Asset Assigned",
+          user_name: a.assigned_to
+            ? getUName(a.assigned_to) || a.department || a.office_location || "Office"
+            : a.department || a.office_location || "Office",
+          performed_by_name: getUName(a.assigned_by) || "System Admin",
+          details: {
+            notes: a.assignment_notes,
+            assignment_type: a.assignment_type,
+          },
+        })
+
+        // The Handover/Return (if closed)
+        if (a.handed_over_at) {
+          activities.push({
+            id: `${a.id}-return`,
+            timestamp: a.handed_over_at,
+            type: "unassignment",
+            title: "Asset Returned / Unassigned",
+            user_name: a.assigned_to
+              ? getUName(a.assigned_to) || a.department || a.office_location || "Office"
+              : a.department || a.office_location || "Office",
+            details: {
+              notes: a.handover_notes,
+            },
+          })
         }
       })
 
-      setAssetHistory((historyWithUsers as any) || [])
+      // Add Issues
+      issues?.forEach((i) => {
+        activities.push({
+          id: `${i.id}-issue`,
+          timestamp: i.created_at,
+          type: "issue_reported",
+          title: "Issue Reported",
+          description: i.description,
+          performed_by_name: getUName(i.created_by) || "System Admin",
+        })
+
+        if (i.resolved && i.resolved_at) {
+          activities.push({
+            id: `${i.id}-resolved`,
+            timestamp: i.resolved_at,
+            type: "issue_resolved",
+            title: "Issue Resolved",
+            performed_by_name: getUName(i.resolved_by) || "System Admin",
+          })
+        }
+      })
+
+      // Add Status Changes (filter for meaningful changes)
+      auditLogs?.forEach((l) => {
+        const oldStatus = l.old_values?.status
+        const newStatus = l.new_values?.status
+        if (newStatus && oldStatus !== newStatus) {
+          activities.push({
+            id: l.id,
+            timestamp: l.created_at,
+            type: "status_change",
+            title: `Status Changed: ${formatName(newStatus)}`,
+            performed_by_name: getUName(l.user_id) || "System Admin",
+            details: {
+              old_status: oldStatus,
+              status: newStatus,
+            },
+          })
+        }
+      })
+
+      // Sort chronological (descending)
+      activities.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+
+      setAssetHistory(activities)
       setSelectedAsset(asset)
       setIsHistoryOpen(true)
     } catch (error: any) {
       console.error("Error loading asset history:", error)
-      const errorMessage = error?.message || error?.toString() || "Failed to load asset history"
-      toast.error(`Failed to load asset history: ${errorMessage}`)
+      toast.error(`Failed to load history: ${error.message}`)
     }
   }
 
@@ -674,12 +769,16 @@ export function AdminAssetsContent({
       }
 
       if (asset.status === "assigned" || asset.status === "retired" || asset.status === "maintenance") {
-        const { data } = await supabase
+        const { data, error: assignmentFetchError } = await supabase
           .from("asset_assignments")
           .select("assigned_by, assigned_at, assigned_to, department, office_location, assignment_notes")
           .eq("asset_id", asset.id)
           .eq("is_current", true)
           .single()
+
+        if (assignmentFetchError && assignmentFetchError.code !== "PGRST116") {
+          console.error("Error fetching current assignment:", assignmentFetchError)
+        }
 
         if (data) {
           assignmentDetails = {
@@ -2561,6 +2660,18 @@ export function AdminAssetsContent({
                           ) : (
                             <span className="text-muted-foreground text-sm">Unassigned</span>
                           )
+                        ) : asset.status === "available" ? (
+                          asset.current_assignment?.user ? (
+                            <div className="flex items-center gap-2 text-sm opacity-70">
+                              <History className="text-muted-foreground h-3 w-3" />
+                              <span className="text-muted-foreground italic">
+                                Last: {formatName(asset.current_assignment.user.first_name)}{" "}
+                                {formatName(asset.current_assignment.user.last_name)}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground text-sm italic">Available</span>
+                          )
                         ) : (
                           <span className="text-muted-foreground text-sm">Unassigned</span>
                         )}
@@ -3308,107 +3419,84 @@ export function AdminAssetsContent({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <History className="text-primary h-5 w-5" />
-              Asset Assignment History
+              Complete Asset Activity Timeline
             </DialogTitle>
             <DialogDescription>
-              Complete history of assignments for {selectedAsset?.unique_code} (
-              {ASSET_TYPE_MAP[selectedAsset?.asset_type || ""]?.label})
+              Chronological history of assignments, status changes, and issues for {selectedAsset?.unique_code}
             </DialogDescription>
           </DialogHeader>
           <div className="mt-4 space-y-4">
-            {assetHistory.map((history, index) => (
-              <div
-                key={history.id}
-                className={`rounded-lg border-2 p-4 ${
-                  index === 0 ? "bg-primary/5 border-primary/30 shadow-sm" : "bg-muted/30 border-muted"
-                }`}
-              >
-                <div className="mb-3 flex items-center justify-between">
-                  <Badge variant={index === 0 ? "default" : "outline"} className="text-xs">
-                    {index === 0 ? "Current Assignment" : `Assignment ${assetHistory.length - index}`}
-                  </Badge>
-                  <div className="text-muted-foreground flex items-center gap-2 text-sm">
-                    <Calendar className="h-3 w-3" />
-                    {formatDate(history.assigned_at)}
-                  </div>
-                </div>
-
-                {(history.assigned_to_user || history.department || history.office_location) && (
-                  <div className="mb-2">
-                    <p className="text-muted-foreground text-sm">
-                      Assigned to:{" "}
-                      {history.assigned_to_user ? (
-                        <span className="text-foreground font-semibold">
-                          {formatName(history.assigned_to_user.first_name)}{" "}
-                          {formatName(history.assigned_to_user.last_name)}
-                        </span>
-                      ) : history.department ? (
-                        <span className="text-foreground flex items-center gap-1 font-semibold">
-                          <Building2 className="h-3 w-3" />
-                          {history.department} (Department)
-                        </span>
-                      ) : history.office_location ? (
-                        <span className="text-foreground flex items-center gap-1 font-semibold">
-                          <Building2 className="h-3 w-3" />
-                          {history.office_location} (Office)
-                        </span>
-                      ) : (
-                        <span className="text-foreground font-semibold">Office</span>
-                      )}
-                    </p>
-                  </div>
-                )}
-
-                {history.assigned_by_user && (
-                  <p className="text-muted-foreground mb-2 text-sm">
-                    Assigned by:{" "}
-                    <span className="text-foreground font-medium">
-                      {formatName(history.assigned_by_user.first_name)} {formatName(history.assigned_by_user.last_name)}
-                    </span>
-                  </p>
-                )}
-
-                {history.assigned_from_user && (
-                  <p className="text-muted-foreground mb-2 text-sm">
-                    Transferred from:{" "}
-                    <span className="text-foreground font-medium">
-                      {formatName(history.assigned_from_user.first_name)}{" "}
-                      {formatName(history.assigned_from_user.last_name)}
-                    </span>
-                  </p>
-                )}
-
-                {history.assignment_notes && (
-                  <div className="bg-background/50 mt-3 rounded border p-3">
-                    <p className="text-foreground mb-1 flex items-center gap-1 text-xs font-semibold">
-                      <FileText className="h-3 w-3" />
-                      Assignment Notes:
-                    </p>
-                    <p className="text-muted-foreground text-sm">{history.assignment_notes}</p>
-                  </div>
-                )}
-
-                {history.handed_over_at && (
-                  <div className="mt-3 border-t pt-3">
-                    <div className="mb-2 flex items-center gap-2">
-                      <Badge variant="secondary" className="text-xs">
-                        Handed Over
-                      </Badge>
-                      <span className="text-muted-foreground text-xs">{formatDate(history.handed_over_at)}</span>
+            {assetHistory.length === 0 ? (
+              <div className="text-muted-foreground py-12 text-center">No activity history found for this asset.</div>
+            ) : (
+              assetHistory.map((activity, index) => (
+                <div
+                  key={activity.id}
+                  className={`rounded-lg border-2 p-4 transition-all hover:shadow-md ${
+                    index === 0 ? "bg-primary/5 border-primary/30" : "bg-muted/30 border-muted"
+                  }`}
+                >
+                  <div className="mb-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      {activity.type === "assignment" && <UserPlus className="h-4 w-4 text-blue-500" />}
+                      {activity.type === "unassignment" && <History className="h-4 w-4 text-orange-500" />}
+                      {activity.type === "status_change" && <ArrowUpDown className="h-4 w-4 text-purple-500" />}
+                      {activity.type === "issue_reported" && <AlertCircle className="h-4 w-4 text-red-500" />}
+                      {activity.type === "issue_resolved" && <CheckCircle2 className="h-4 w-4 text-green-500" />}
+                      <span className="text-sm font-bold tracking-wide uppercase">{activity.title}</span>
                     </div>
-                    {history.handover_notes && (
-                      <div className="bg-background/50 rounded border p-3">
+                    <div className="text-muted-foreground flex items-center gap-2 text-sm">
+                      <Calendar className="h-3 w-3" />
+                      {formatDate(activity.timestamp)}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    {activity.user_name && (
+                      <p className="text-sm">
+                        <span className="text-muted-foreground">User/Location:</span>{" "}
+                        <span className="text-foreground font-semibold">{activity.user_name}</span>
+                      </p>
+                    )}
+
+                    {activity.performed_by_name && (
+                      <p className="text-sm">
+                        <span className="text-muted-foreground">Performed by:</span>{" "}
+                        <span className="text-foreground font-medium">{activity.performed_by_name}</span>
+                      </p>
+                    )}
+
+                    {activity.description && (
+                      <div className="bg-background/50 mt-2 rounded border p-3">
+                        <p className="text-muted-foreground text-sm italic">"{activity.description}"</p>
+                      </div>
+                    )}
+
+                    {activity.details?.notes && (
+                      <div className="bg-background/50 mt-2 rounded border p-3">
                         <p className="text-foreground mb-1 flex items-center gap-1 text-xs font-semibold">
                           <FileText className="h-3 w-3" />
-                          Handover Notes:
+                          Notes:
                         </p>
-                        <p className="text-muted-foreground text-sm">{history.handover_notes}</p>
+                        <p className="text-muted-foreground text-sm">{activity.details.notes}</p>
+                      </div>
+                    )}
+
+                    {activity.details?.old_status && (
+                      <div className="flex items-center gap-2 text-xs">
+                        <Badge variant="outline" className="opacity-70">
+                          {activity.details.old_status}
+                        </Badge>
+                        <ArrowUpDown className="text-muted-foreground h-3 w-3" />
+                        <Badge className={getStatusColor(activity.details.status || "")}>
+                          {activity.details.status}
+                        </Badge>
                       </div>
                     )}
                   </div>
-                )}
-              </div>
-            ))}
+                </div>
+              ))
+            )}
           </div>
         </DialogContent>
       </Dialog>

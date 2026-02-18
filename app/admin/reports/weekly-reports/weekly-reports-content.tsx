@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { createClient } from "@/lib/supabase/client"
-import { getCurrentISOWeek } from "@/lib/utils"
+import { getCurrentISOWeek, getNextWeekParams } from "@/lib/utils"
 import { toast } from "sonner"
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -29,6 +29,7 @@ import {
   FileBarChart,
   Loader2,
   Search,
+  Mail,
 } from "lucide-react"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
 import {
@@ -47,6 +48,12 @@ import {
   exportAllToPDF,
   exportAllToDocx,
   exportAllToPPTX,
+  exportAllToPDFBase64,
+  exportActionTrackerToPDFBase64,
+  autoNumberLines,
+  sortReportsByDepartment,
+  type WeeklyReport,
+  type ActionItem,
 } from "@/lib/export-utils"
 import { WeeklyReportAdminDialog } from "@/components/admin/reports/weekly-report-dialog"
 import { cn } from "@/lib/utils"
@@ -54,18 +61,10 @@ import { format } from "date-fns"
 import { Label } from "@/components/ui/label"
 import { Fragment } from "react"
 
-interface WeeklyReport {
+interface TrackerStatus {
   id: string
   department: string
-  week_number: number
-  year: number
-  work_done: string
-  tasks_new_week: string
-  challenges: string
   status: string
-  user_id: string
-  created_at: string
-  profiles: any // Suppress array vs object linting for Supabase joins
 }
 
 interface WeeklyReportsContentProps {
@@ -82,6 +81,8 @@ export function WeeklyReportsContent({ initialDepartments }: WeeklyReportsConten
   const [isAdminDialogOpen, setIsAdminDialogOpen] = useState(false)
   const [editingReport, setEditingReport] = useState<WeeklyReport | null>(null)
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
+  const [trackingData, setTrackingData] = useState<TrackerStatus[]>([])
+  const [isSendingDigest, setIsSendingDigest] = useState(false)
 
   const supabase = createClient()
 
@@ -104,7 +105,21 @@ export function WeeklyReportsContent({ initialDepartments }: WeeklyReportsConten
 
       const { data, error } = await query
       if (error) throw error
-      setReports(data || [])
+
+      const sortedData = sortReportsByDepartment(data || [])
+      setReports(sortedData)
+
+      // ─── Fetch Action Items for Aggregate Status (NEXT WEEK) ─────────────────
+      const { week: nextW, year: nextY } = getNextWeekParams(weekFilter, yearFilter)
+      const { data: actions, error: actionsError } = await supabase
+        .from("action_items")
+        .select("id, department, status")
+        .eq("week_number", nextW)
+        .eq("year", nextY)
+
+      if (!actionsError) {
+        setTrackingData(actions || [])
+      }
     } catch (error) {
       console.error("Error loading reports:", error)
       toast.error("Failed to load reports")
@@ -127,6 +142,70 @@ export function WeeklyReportsContent({ initialDepartments }: WeeklyReportsConten
     setExpandedRows(newExpanded)
   }
 
+  const handleSendDigest = async () => {
+    if (filteredReports.length === 0) {
+      toast.error("No reports to send for this week.")
+      return
+    }
+    if (!confirm(`Send weekly digest for Week ${weekFilter}, ${yearFilter} to i.chibuikem@org.acoblighting.com?`))
+      return
+
+    setIsSendingDigest(true)
+    const toastId = toast.loading("Generating PDFs and sending digest...")
+    try {
+      // The action tracker for week N is derived from "Tasks for New Week" in week N's reports,
+      // which get synced into action_items for week N+1.
+      const { week: nextW, year: nextY } = getNextWeekParams(weekFilter, yearFilter)
+
+      // 1. Fetch action items for NEXT week (week N+1)
+      const { data: actions, error: actionsError } = await supabase
+        .from("action_items")
+        .select("id, title, description, status, department, week_number, year")
+        .eq("week_number", nextW)
+        .eq("year", nextY)
+
+      if (actionsError) throw actionsError
+
+      // 2. Generate both PDFs as base64
+      //    - Weekly Report: week N (the reports being viewed)
+      //    - Action Tracker: week N+1 (the tasks derived from those reports)
+      const [weeklyReportBase64, actionTrackerBase64] = await Promise.all([
+        exportAllToPDFBase64(filteredReports, weekFilter, yearFilter),
+        exportActionTrackerToPDFBase64(actions || [], nextW, nextY),
+      ])
+
+      // 3. Call the Edge Function
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+      const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+      const res = await fetch(`${supabaseUrl}/functions/v1/send-weekly-digest`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${supabaseKey}`,
+        },
+        body: JSON.stringify({
+          weeklyReportBase64,
+          actionTrackerBase64,
+          week: weekFilter,
+          year: yearFilter,
+          actionTrackerWeek: nextW,
+          actionTrackerYear: nextY,
+          testEmail: "i.chibuikem@org.acoblighting.com",
+        }),
+      })
+
+      const result = await res.json()
+      if (!res.ok) throw new Error(result.error || "Failed to send digest")
+
+      toast.success(`Digest sent — Weekly Report W${weekFilter} + Action Tracker W${nextW}`, { id: toastId })
+    } catch (err: any) {
+      console.error("[Send Digest Error]", err)
+      toast.error(err.message || "Failed to send digest", { id: toastId })
+    } finally {
+      setIsSendingDigest(false)
+    }
+  }
+
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure? Admin delete is permanent.")) return
     try {
@@ -137,6 +216,30 @@ export function WeeklyReportsContent({ initialDepartments }: WeeklyReportsConten
     } catch (error) {
       toast.error("Delete failed")
     }
+  }
+
+  /** Calculates the overall status of the action tracker for a department. */
+  const getActionTrackerStatus = (department: string) => {
+    const deptActions = trackingData.filter((a) => a.department === department)
+    if (deptActions.length === 0)
+      return { label: "Pending", color: "bg-slate-100 text-slate-600 dark:bg-slate-900/40 dark:text-slate-400" }
+
+    const allCompleted = deptActions.every((a) => a.status === "completed")
+    if (allCompleted)
+      return { label: "Finished", color: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" }
+
+    const anyInProgress = deptActions.some((a) => a.status === "in_progress")
+    const anyCompleted = deptActions.some((a) => a.status === "completed")
+    if (anyInProgress || anyCompleted)
+      return { label: "Started", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" }
+
+    // Check for not_started specifically
+    const anyNotStarted = deptActions.some((a) => a.status === "not_started")
+    if (anyNotStarted)
+      return { label: "Not Started", color: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400" }
+
+    // Default: all are pending
+    return { label: "Pending", color: "bg-slate-100 text-slate-600 dark:bg-slate-900/40 dark:text-slate-400" }
   }
 
   /*
@@ -228,6 +331,8 @@ export function WeeklyReportsContent({ initialDepartments }: WeeklyReportsConten
       title="Weekly Reports"
       description="Review and export departmental reports"
       icon={FileBarChart}
+      backLinkHref="/admin/reports"
+      backLinkLabel="Back to Reports"
       actions={
         <div className="flex items-center gap-2">
           {filteredReports.length > 0 && (
@@ -253,6 +358,15 @@ export function WeeklyReportsContent({ initialDepartments }: WeeklyReportsConten
               >
                 <Presentation className="h-4 w-4" /> <span className="hidden sm:inline">PPTX</span>
               </Button>
+              <Button
+                variant="outline"
+                onClick={handleSendDigest}
+                disabled={isSendingDigest}
+                className="gap-2 border-green-200 text-green-700 hover:bg-green-50 hover:text-green-800 dark:border-green-900/30 dark:hover:bg-green-950/20"
+              >
+                {isSendingDigest ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+                <span className="hidden sm:inline">{isSendingDigest ? "Sending..." : "Send Digest"}</span>
+              </Button>
             </>
           )}
           <Button
@@ -262,7 +376,7 @@ export function WeeklyReportsContent({ initialDepartments }: WeeklyReportsConten
             }}
             className="gap-2"
           >
-            <Plus className="h-4 w-4" /> Add Override
+            <Plus className="h-4 w-4" /> Add Report
           </Button>
         </div>
       }
@@ -283,11 +397,19 @@ export function WeeklyReportsContent({ initialDepartments }: WeeklyReportsConten
           <div className="flex w-full flex-wrap items-end gap-3 md:w-auto">
             <div className="w-24">
               <Label className="mb-1.5 block text-xs font-semibold">Week</Label>
-              <Input type="number" value={weekFilter} onChange={(e) => setWeekFilter(parseInt(e.target.value))} />
+              <Input
+                type="number"
+                value={weekFilter}
+                onChange={(e) => setWeekFilter(parseInt(e.target.value) || weekFilter)}
+              />
             </div>
             <div className="w-28">
               <Label className="mb-1.5 block text-xs font-semibold">Year</Label>
-              <Input type="number" value={yearFilter} onChange={(e) => setYearFilter(parseInt(e.target.value))} />
+              <Input
+                type="number"
+                value={yearFilter}
+                onChange={(e) => setYearFilter(parseInt(e.target.value) || yearFilter)}
+              />
             </div>
             <div className="min-w-[12rem] flex-1 md:flex-none">
               <Label className="mb-1.5 block text-xs font-semibold">Department</Label>
@@ -321,6 +443,7 @@ export function WeeklyReportsContent({ initialDepartments }: WeeklyReportsConten
               <TableHead className="text-foreground font-bold">Submitted By</TableHead>
               <TableHead className="text-foreground font-bold">Week</TableHead>
               <TableHead className="text-foreground font-bold">Submission Date</TableHead>
+              <TableHead className="text-foreground text-center font-bold">Action Tracker</TableHead>
               <TableHead className="text-foreground text-right font-bold">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -328,7 +451,7 @@ export function WeeklyReportsContent({ initialDepartments }: WeeklyReportsConten
             {loading ? (
               <TableRow>
                 <TableCell colSpan={6} className="h-32 text-center">
-                  <div className="flex items-center justify-center gap-2 text-slate-500">
+                  <div className="text-muted-foreground flex items-center justify-center gap-2">
                     <Loader2 className="h-5 w-5 animate-spin" />
                     Auditing records...
                   </div>
@@ -336,7 +459,7 @@ export function WeeklyReportsContent({ initialDepartments }: WeeklyReportsConten
               </TableRow>
             ) : filteredReports.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="h-32 text-center font-medium text-slate-500">
+                <TableCell colSpan={6} className="text-muted-foreground h-32 text-center font-medium">
                   No records found for the selected criteria.
                 </TableCell>
               </TableRow>
@@ -369,6 +492,32 @@ export function WeeklyReportsContent({ initialDepartments }: WeeklyReportsConten
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm">
                       {format(new Date(report.created_at), "MMM dd, yyyy")}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Link
+                        href={`/admin/reports/action-tracker?week=${getNextWeekParams(report.week_number, report.year).week}&year=${getNextWeekParams(report.week_number, report.year).year}&dept=${report.department}`}
+                        className="group flex flex-col items-center gap-1 transition-all"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {(() => {
+                          const status = getActionTrackerStatus(report.department)
+                          return (
+                            <Badge
+                              variant="secondary"
+                              className={cn(
+                                "px-2.5 py-1 text-[10px] font-bold uppercase transition-all duration-200",
+                                "group-hover:ring-primary/20 cursor-pointer ring-1 ring-transparent group-hover:scale-110 group-hover:shadow-md",
+                                status.color
+                              )}
+                            >
+                              <div className="flex items-center gap-1.5">
+                                {status.label}
+                                <ExternalLink className="h-2.5 w-2.5 opacity-50 transition-opacity group-hover:opacity-100" />
+                              </div>
+                            </Badge>
+                          )
+                        })()}
+                      </Link>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
@@ -436,34 +585,46 @@ export function WeeklyReportsContent({ initialDepartments }: WeeklyReportsConten
                     </TableCell>
                   </TableRow>
                   {expandedRows.has(report.id) && (
-                    <TableRow className="border-t-0 bg-slate-50/30 hover:bg-slate-50/30">
+                    <TableRow className="bg-muted/20 hover:bg-muted/20 border-t-0">
                       <TableCell colSpan={6} className="p-0">
                         <div className="animate-in slide-in-from-top-2 grid grid-cols-1 gap-8 p-6 duration-200 md:grid-cols-3">
                           <div className="space-y-3">
                             <h4 className="flex items-center gap-2 text-[10px] font-black tracking-widest text-blue-600 uppercase">
                               <div className="h-1 w-1 rounded-full bg-blue-600" />
-                              Work Accomplished
+                              Work Done
                             </h4>
-                            <div className="border-l-2 border-blue-100 pl-3 text-sm leading-relaxed font-medium whitespace-pre-wrap text-slate-700">
-                              {report.work_done}
+                            <div className="text-foreground/80 space-y-1.5 border-l-2 border-blue-100 pl-3 text-sm font-medium dark:border-blue-900/30">
+                              {autoNumberLines(report.work_done)
+                                .split("\n")
+                                .map((line, i) => (
+                                  <div key={i}>{line}</div>
+                                ))}
                             </div>
                           </div>
                           <div className="space-y-3">
                             <h4 className="flex items-center gap-2 text-[10px] font-black tracking-widest text-emerald-600 uppercase">
                               <div className="h-1 w-1 rounded-full bg-emerald-600" />
-                              Upcoming Objectives
+                              Tasks for New Week
                             </h4>
-                            <div className="border-l-2 border-emerald-100 pl-3 text-sm leading-relaxed font-medium whitespace-pre-wrap text-slate-700">
-                              {report.tasks_new_week}
+                            <div className="text-foreground/80 space-y-1.5 border-l-2 border-emerald-100 pl-3 text-sm font-medium dark:border-emerald-900/30">
+                              {autoNumberLines(report.tasks_new_week)
+                                .split("\n")
+                                .map((line, i) => (
+                                  <div key={i}>{line}</div>
+                                ))}
                             </div>
                           </div>
                           <div className="space-y-3">
                             <h4 className="flex items-center gap-2 text-[10px] font-black tracking-widest text-rose-600 uppercase">
                               <div className="h-1 w-1 rounded-full bg-rose-600" />
-                              Critical Blockers
+                              Challenges
                             </h4>
-                            <div className="border-l-2 border-rose-100 pl-3 text-sm leading-relaxed font-medium whitespace-pre-wrap text-slate-700">
-                              {report.challenges}
+                            <div className="text-foreground/80 space-y-1.5 border-l-2 border-rose-100 pl-3 text-sm font-medium dark:border-rose-900/30">
+                              {autoNumberLines(report.challenges)
+                                .split("\n")
+                                .map((line, i) => (
+                                  <div key={i}>{line}</div>
+                                ))}
                             </div>
                           </div>
                         </div>

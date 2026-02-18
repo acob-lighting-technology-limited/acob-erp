@@ -1,53 +1,41 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { useState, useEffect, Fragment } from "react"
+import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { createClient } from "@/lib/supabase/client"
-import { getCurrentISOWeek } from "@/lib/utils"
+import { getCurrentISOWeek, cn } from "@/lib/utils"
 import { toast } from "sonner"
-
 import {
-  FileSearch,
-  Calendar,
-  Building2,
-  ExternalLink,
-  Plus,
   FileBarChart,
+  FileSearch,
+  Plus,
   Search,
-  Filter,
+  ChevronDown,
+  ChevronRight,
+  Loader2,
+  RefreshCw,
+  FileText,
+  File as FileIcon,
+  Presentation,
   Edit2,
   Trash2,
   MoreVertical,
-  Loader2,
   CheckCircle2,
   Target,
   AlertTriangle,
-  Building,
+  Building2,
 } from "lucide-react"
-import Link from "next/link"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
-import { PageWrapper, PageHeader } from "@/components/layout"
-import { Input } from "@/components/ui/input"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-
-interface WeeklyReport {
-  id: string
-  department: string
-  week_number: number
-  year: number
-  work_done: string
-  tasks_new_week: string
-  challenges: string
-  status: string
-  created_at: string
-  user_id: string
-  profiles: {
-    full_name: string
-  }
-}
+import { WeeklyReportDialog } from "@/components/portal/reports/weekly-report-dialog"
+import { exportToPDF, exportToDocx, exportToPPTX, autoNumberLines, type WeeklyReport } from "@/lib/export-utils"
+import { format } from "date-fns"
 
 export default function WeeklyReportsPortal() {
   const [reports, setReports] = useState<WeeklyReport[]>([])
@@ -58,6 +46,9 @@ export default function WeeklyReportsPortal() {
   const [yearFilter, setYearFilter] = useState(new Date().getFullYear())
   const [weekFilter, setWeekFilter] = useState(getCurrentISOWeek())
   const [allDepartments, setAllDepartments] = useState<string[]>([])
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [selectedReportParams, setSelectedReportParams] = useState<any>(null)
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
 
   const supabase = createClient()
 
@@ -66,9 +57,7 @@ export default function WeeklyReportsPortal() {
   }, [])
 
   useEffect(() => {
-    if (profile) {
-      loadReports()
-    }
+    if (profile) loadReports()
   }, [profile, weekFilter, yearFilter, deptFilter])
 
   async function fetchInitialData() {
@@ -80,7 +69,6 @@ export default function WeeklyReportsPortal() {
         const { data: p } = await supabase.from("profiles").select("id, department, role").eq("id", user.id).single()
         setProfile(p)
 
-        // Fetch all departments for filtering
         const { data: depts } = await supabase.from("profiles").select("department").not("department", "is", null)
         const uniqueDepts = Array.from(new Set(depts?.map((d) => d.department).filter(Boolean))) as string[]
         setAllDepartments(uniqueDepts.sort())
@@ -99,7 +87,7 @@ export default function WeeklyReportsPortal() {
     try {
       let query = supabase
         .from("weekly_reports")
-        .select("*, profiles:user_id ( full_name )")
+        .select("*, profiles:user_id ( first_name, last_name )")
         .eq("status", "submitted")
         .eq("week_number", weekFilter)
         .eq("year", yearFilter)
@@ -123,7 +111,6 @@ export default function WeeklyReportsPortal() {
 
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure? Delete is permanent.")) return
-
     try {
       const { error } = await supabase.from("weekly_reports").delete().eq("id", id)
       if (error) throw error
@@ -134,172 +121,284 @@ export default function WeeklyReportsPortal() {
     }
   }
 
+  const toggleRow = (id: string) => {
+    const next = new Set(expandedRows)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    setExpandedRows(next)
+  }
+
   const filteredReports = reports.filter(
     (r) =>
       r.department.toLowerCase().includes(searchQuery.toLowerCase()) ||
       r.work_done?.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
+  const isLead = profile?.role === "lead" || profile?.role === "admin" || profile?.role === "super_admin"
+  const isAdmin = profile?.role === "admin" || profile?.role === "super_admin"
+
   return (
     <AdminTablePage
       title="Weekly Departmental Reports"
       description="Browse weekly updates and progress from all departments"
       icon={FileBarChart}
-      backLinkHref="/dashboard"
-      backLinkLabel="Back to Dashboard"
+      backLinkHref="/portal/reports"
+      backLinkLabel="Back to Reports"
       actions={
-        (profile?.role === "lead" || profile?.role === "admin" || profile?.role === "super_admin") && (
-          <Link href="/portal/reports/weekly-reports/new">
-            <Button className="gap-2 shadow-sm">
-              <Plus className="h-4 w-4" />
-              Submit New Report
-            </Button>
-          </Link>
-        )
+        isLead ? (
+          <Button
+            className="gap-2 shadow-sm"
+            onClick={() => {
+              setSelectedReportParams({ week: weekFilter, year: yearFilter, dept: profile?.department })
+              setIsDialogOpen(true)
+            }}
+          >
+            <Plus className="h-4 w-4" />
+            Submit New Report
+          </Button>
+        ) : null
       }
       filters={
-        <div className="flex flex-col gap-4 md:flex-row">
-          <div className="relative flex-1">
-            <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-            <Input
-              placeholder="Search reports..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
+        <div className="mb-6 flex flex-col items-end justify-between gap-4 md:flex-row">
+          <div className="w-full max-w-md flex-1">
+            <Label className="mb-1.5 block text-xs font-semibold">Search Content</Label>
+            <div className="relative">
+              <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+              <Input
+                placeholder="Search..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+              />
+            </div>
           </div>
-          <div className="flex gap-2">
-            <Input
-              type="number"
-              className="w-24"
-              value={weekFilter}
-              onChange={(e) => setWeekFilter(parseInt(e.target.value))}
-              placeholder="Week"
-              title="Week Number"
-            />
-            <Input
-              type="number"
-              className="w-28"
-              value={yearFilter}
-              onChange={(e) => setYearFilter(parseInt(e.target.value))}
-              placeholder="Year"
-              title="Year"
-            />
-            <Select value={deptFilter} onValueChange={setDeptFilter} disabled={profile?.role === "lead"}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Department" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Every Department</SelectItem>
-                {allDepartments.map((d) => (
-                  <SelectItem key={d} value={d}>
-                    {d}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="flex w-full flex-wrap items-end gap-3 md:w-auto">
+            <div className="w-24">
+              <Label className="mb-1.5 block text-xs font-semibold">Week</Label>
+              <Input
+                type="number"
+                value={weekFilter}
+                onChange={(e) => setWeekFilter(parseInt(e.target.value) || weekFilter)}
+              />
+            </div>
+            <div className="w-28">
+              <Label className="mb-1.5 block text-xs font-semibold">Year</Label>
+              <Input
+                type="number"
+                value={yearFilter}
+                onChange={(e) => setYearFilter(parseInt(e.target.value) || yearFilter)}
+              />
+            </div>
+            <div className="min-w-[12rem] flex-1 md:flex-none">
+              <Label className="mb-1.5 block text-xs font-semibold">Department</Label>
+              <Select value={deptFilter} onValueChange={setDeptFilter} disabled={profile?.role === "lead"}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All Departments" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Every Department</SelectItem>
+                  {allDepartments.map((d) => (
+                    <SelectItem key={d} value={d}>
+                      {d}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button variant="outline" size="icon" onClick={loadReports} disabled={loading} className="shrink-0">
+              <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
+            </Button>
           </div>
         </div>
       }
     >
-      <div className="grid gap-6">
-        {loading ? (
-          <div className="flex justify-center py-20">
-            <Loader2 className="text-primary h-8 w-8 animate-spin" />
-          </div>
-        ) : filteredReports.length === 0 ? (
-          <Card className="border-2 border-dashed p-20 text-center">
-            <FileSearch className="text-muted-foreground mx-auto mb-4 h-12 w-12 opacity-20" />
-            <p className="text-muted-foreground">No reports found matching your filters.</p>
-          </Card>
-        ) : (
-          filteredReports.map((report) => {
-            const isOwner = profile?.id === report.user_id
-            const isAdmin = ["admin", "super_admin"].includes(profile?.role)
+      <div className="bg-background dark:bg-card overflow-hidden rounded-lg border shadow-sm">
+        <Table>
+          <TableHeader className="bg-muted/50">
+            <TableRow>
+              <TableHead className="text-muted-foreground w-[40px]"></TableHead>
+              <TableHead className="text-foreground font-bold">Department</TableHead>
+              <TableHead className="text-foreground font-bold">Submitted By</TableHead>
+              <TableHead className="text-foreground font-bold">Week</TableHead>
+              <TableHead className="text-foreground font-bold">Date</TableHead>
+              <TableHead className="text-foreground text-right font-bold">Export</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={6} className="h-32 text-center">
+                  <div className="text-muted-foreground flex items-center justify-center gap-2">
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    Loading reports...
+                  </div>
+                </TableCell>
+              </TableRow>
+            ) : filteredReports.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} className="text-muted-foreground h-32 text-center font-medium">
+                  No reports found for the selected criteria.
+                </TableCell>
+              </TableRow>
+            ) : (
+              filteredReports.map((report) => {
+                const isMyDept = profile?.department && report.department && profile.department === report.department
+                const hasManageRights = isMyDept
+                const p = Array.isArray(report.profiles) ? report.profiles[0] : report.profiles
+                const submittedBy = p ? `${p.first_name} ${p.last_name}` : "Unknown"
 
-            return (
-              <Card key={report.id} className="overflow-hidden border-2 shadow-sm transition-shadow hover:shadow-lg">
-                <CardHeader className="bg-muted/30 border-b p-4 px-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="bg-primary/10 rounded-lg p-2">
-                        <Building2 className="text-primary h-5 w-5" />
-                      </div>
-                      <div>
-                        <CardTitle className="text-xl">{report.department}</CardTitle>
-                        <CardDescription className="mt-1 flex items-center gap-3 text-sm">
-                          <span className="text-primary/80 flex items-center gap-1 font-medium">
-                            Week {report.week_number}, {report.year}
-                          </span>
-                          <span className="text-muted-foreground/50">|</span>
-                          <span className="flex items-center gap-1">By {report.profiles?.full_name}</span>
-                        </CardDescription>
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      {(isOwner || isAdmin) && (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <Link
-                              href={`/portal/reports/weekly-reports/new?week=${report.week_number}&year=${report.year}&dept=${report.department}`}
-                            >
-                              <DropdownMenuItem className="cursor-pointer gap-2">
-                                <Edit2 className="h-4 w-4" /> Edit Report
-                              </DropdownMenuItem>
-                            </Link>
-                            <DropdownMenuItem
-                              className="text-destructive cursor-pointer gap-2"
-                              onClick={() => handleDelete(report.id)}
-                            >
-                              <Trash2 className="h-4 w-4" /> Delete Report
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                return (
+                  <Fragment key={report.id}>
+                    <TableRow
+                      className={cn(
+                        "hover:bg-muted/50 cursor-pointer transition-colors",
+                        expandedRows.has(report.id) && "bg-muted/30"
                       )}
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="grid gap-8 p-6 md:grid-cols-3">
-                  <div className="space-y-3">
-                    <h4 className="flex items-center gap-2 text-xs font-bold tracking-wider text-blue-600 uppercase">
-                      <CheckCircle2 className="h-3 w-3" />
-                      Work Done
-                    </h4>
-                    <div className="text-foreground/90 min-h-[100px] rounded-xl border border-blue-100 bg-blue-50/20 p-4 text-sm leading-relaxed whitespace-pre-wrap">
-                      {report.work_done || "No summary provided."}
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    <h4 className="flex items-center gap-2 text-xs font-bold tracking-wider text-green-600 uppercase">
-                      <Target className="h-3 w-3" />
-                      Next Week Goals
-                    </h4>
-                    <div className="text-foreground/90 min-h-[100px] rounded-xl border border-green-100 bg-green-50/20 p-4 text-sm leading-relaxed whitespace-pre-wrap">
-                      {report.tasks_new_week || "No goals listed."}
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    <h4 className="flex items-center gap-2 text-xs font-bold tracking-wider text-red-600 uppercase">
-                      <AlertTriangle className="h-3 w-3" />
-                      Challenges
-                    </h4>
-                    <div className="text-foreground/90 min-h-[100px] rounded-xl border border-red-100 bg-red-50/20 p-4 text-sm leading-relaxed whitespace-pre-wrap">
-                      {report.challenges || "No challenges reported."}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )
-          })
-        )}
+                      onClick={() => toggleRow(report.id)}
+                    >
+                      <TableCell>
+                        {expandedRows.has(report.id) ? (
+                          <ChevronDown className="h-4 w-4 text-slate-400" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4 text-slate-400" />
+                        )}
+                      </TableCell>
+                      <TableCell className="text-foreground font-bold">{report.department}</TableCell>
+                      <TableCell className="text-muted-foreground">{submittedBy}</TableCell>
+                      <TableCell className="text-foreground font-medium">
+                        W{report.week_number}, {report.year}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-sm">
+                        {report.created_at ? format(new Date(report.created_at), "MMM dd, yyyy") : "—"}
+                      </TableCell>
+                      <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-1">
+                          <div className="bg-background flex items-center gap-1 rounded-md border p-0.5 shadow-sm">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-red-600 hover:text-red-700"
+                              onClick={() => exportToPDF(report)}
+                              title="PDF"
+                            >
+                              <FileText className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-indigo-600 hover:text-indigo-700"
+                              onClick={() => exportToDocx(report)}
+                              title="Word"
+                            >
+                              <FileIcon className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-amber-600 hover:text-amber-700"
+                              onClick={() => exportToPPTX(report)}
+                              title="PPTX"
+                            >
+                              <Presentation className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                          {hasManageRights && (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8">
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  className="cursor-pointer gap-2"
+                                  onClick={() => {
+                                    setSelectedReportParams({
+                                      week: report.week_number,
+                                      year: report.year,
+                                      dept: report.department,
+                                    })
+                                    setIsDialogOpen(true)
+                                  }}
+                                >
+                                  <Edit2 className="h-4 w-4" /> Edit Report
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  className="cursor-pointer gap-2 text-red-600"
+                                  onClick={() => handleDelete(report.id)}
+                                >
+                                  <Trash2 className="h-4 w-4" /> Delete Report
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                    {expandedRows.has(report.id) && (
+                      <TableRow className="bg-muted/20 hover:bg-muted/20 border-t-0">
+                        <TableCell colSpan={6} className="p-0">
+                          <div className="animate-in slide-in-from-top-2 grid grid-cols-1 gap-8 p-6 duration-200 md:grid-cols-3">
+                            <div className="space-y-3">
+                              <h4 className="flex items-center gap-2 text-[10px] font-black tracking-widest text-blue-600 uppercase">
+                                <div className="h-1 w-1 rounded-full bg-blue-600" />
+                                Work Done
+                              </h4>
+                              <div className="text-foreground/80 space-y-1.5 border-l-2 border-blue-100 pl-3 text-sm font-medium dark:border-blue-900/30">
+                                {autoNumberLines(report.work_done)
+                                  .split("\n")
+                                  .map((line, i) => (
+                                    <div key={i}>{line}</div>
+                                  ))}
+                              </div>
+                            </div>
+                            <div className="space-y-3">
+                              <h4 className="flex items-center gap-2 text-[10px] font-black tracking-widest text-emerald-600 uppercase">
+                                <div className="h-1 w-1 rounded-full bg-emerald-600" />
+                                Tasks for New Week
+                              </h4>
+                              <div className="text-foreground/80 space-y-1.5 border-l-2 border-emerald-100 pl-3 text-sm font-medium dark:border-emerald-900/30">
+                                {autoNumberLines(report.tasks_new_week)
+                                  .split("\n")
+                                  .map((line, i) => (
+                                    <div key={i}>{line}</div>
+                                  ))}
+                              </div>
+                            </div>
+                            <div className="space-y-3">
+                              <h4 className="flex items-center gap-2 text-[10px] font-black tracking-widest text-rose-600 uppercase">
+                                <div className="h-1 w-1 rounded-full bg-rose-600" />
+                                Challenges
+                              </h4>
+                              <div className="text-foreground/80 space-y-1.5 border-l-2 border-rose-100 pl-3 text-sm font-medium dark:border-rose-900/30">
+                                {autoNumberLines(report.challenges)
+                                  .split("\n")
+                                  .map((line, i) => (
+                                    <div key={i}>{line}</div>
+                                  ))}
+                              </div>
+                            </div>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </Fragment>
+                )
+              })
+            )}
+          </TableBody>
+        </Table>
       </div>
+
+      <WeeklyReportDialog
+        isOpen={isDialogOpen}
+        onClose={() => {
+          setIsDialogOpen(false)
+          setSelectedReportParams(null)
+        }}
+        onSuccess={() => loadReports()}
+        initialData={selectedReportParams}
+      />
     </AdminTablePage>
   )
 }

@@ -85,6 +85,7 @@ export interface Employee {
   is_admin: boolean
   is_department_lead: boolean
   lead_departments: string[]
+  department_changed_at: string | null
   created_at: string
 }
 
@@ -163,7 +164,8 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
     tasks: any[]
     assets: any[]
     documentation: any[]
-  }>({ tasks: [], assets: [], documentation: [] })
+    deptHistory: any[]
+  }>({ tasks: [], assets: [], documentation: [], deptHistory: [] })
   const [isCreateUserDialogOpen, setIsCreateUserDialogOpen] = useState(false)
   const [isCreatingUser, setIsCreatingUser] = useState(false)
   const [createUserForm, setCreateUserForm] = useState({
@@ -199,6 +201,8 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
     date_of_birth: "",
     employment_date: "",
     job_description: "",
+    department_changed_at: "",
+    department_change_reason: "",
   })
   const [showMoreOptions, setShowMoreOptions] = useState(false)
 
@@ -267,6 +271,8 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
           date_of_birth: fullProfile.date_of_birth || "",
           employment_date: fullProfile.employment_date || "",
           job_description: fullProfile.job_description || "",
+          department_changed_at: fullProfile.department_changed_at || new Date().toISOString().split("T")[0],
+          department_change_reason: "",
         })
       } else {
         // Fallback to basic fields if full profile not found
@@ -290,6 +296,8 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
           date_of_birth: "",
           employment_date: "",
           job_description: "",
+          department_changed_at: new Date().toISOString().split("T")[0],
+          department_change_reason: "",
         })
       }
 
@@ -330,7 +338,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         setViewEmployeeProfile(profileData)
 
         // Load related data
-        const [tasksResult, assetAssignmentsResult, deptAssetsResult, officeAssetsResult, docsResult] =
+        const [tasksResult, assetAssignmentsResult, deptAssetsResult, officeAssetsResult, docsResult, historyResult] =
           await Promise.all([
             supabase
               .from("tasks")
@@ -375,6 +383,11 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
               .eq("user_id", employee.id)
               .order("created_at", { ascending: false })
               .limit(10),
+            supabase
+              .from("employee_department_history")
+              .select("*")
+              .eq("profile_id", employee.id)
+              .order("changed_at", { ascending: false }),
           ])
 
         // Fetch asset details separately for individual assignments
@@ -425,6 +438,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
           tasks: tasksResult.data || [],
           assets: allAssets || [],
           documentation: docsResult.data || [],
+          deptHistory: historyResult.data || [],
         })
       }
     } catch (error: any) {
@@ -639,11 +653,23 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         date_of_birth: editForm.date_of_birth || null,
         employment_date: editForm.employment_date || null,
         job_description: editForm.job_description || null,
+        department_changed_at: editForm.department_changed_at || null,
       }
 
       const { error } = await supabase.from("profiles").update(updateData).eq("id", selectedEmployee.id)
 
       if (error) throw error
+
+      // Log department change to history if department was changed
+      if (selectedEmployee.department !== editForm.department) {
+        await supabase.from("employee_department_history").insert({
+          profile_id: selectedEmployee.id,
+          old_department: selectedEmployee.department,
+          new_department: editForm.department,
+          changed_at: editForm.department_changed_at || new Date().toISOString().split("T")[0],
+          reason: editForm.department_change_reason || "Department changed during profile update",
+        })
+      }
 
       toast.success("Employee updated successfully")
       setIsEditDialogOpen(false)
@@ -1763,6 +1789,40 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                 </Select>
               </div>
 
+              {(selectedEmployee?.department !== editForm.department || editForm.department_changed_at) && (
+                <div className="bg-muted/30 animate-in fade-in slide-in-from-top-2 grid gap-4 rounded-lg border p-4">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="text-primary h-4 w-4" />
+                    <Label className="text-sm font-semibold">Department Change Details</Label>
+                  </div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div>
+                      <Label htmlFor="dept_change_date">Effective Date *</Label>
+                      <Input
+                        id="dept_change_date"
+                        type="date"
+                        value={editForm.department_changed_at || ""}
+                        onChange={(e) => setEditForm({ ...editForm, department_changed_at: e.target.value })}
+                        className="mt-1"
+                      />
+                      <p className="text-muted-foreground mt-1 text-[10px]">
+                        The date the department change becomes/became effective.
+                      </p>
+                    </div>
+                    <div>
+                      <Label htmlFor="dept_change_reason">Reason for Change</Label>
+                      <Input
+                        id="dept_change_reason"
+                        value={editForm.department_change_reason || ""}
+                        onChange={(e) => setEditForm({ ...editForm, department_change_reason: e.target.value })}
+                        placeholder="e.g. Promotion, Restructuring"
+                        className="mt-1"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div>
                 <Label htmlFor="office_location">Office Location</Label>
                 <SearchableSelect
@@ -2095,6 +2155,11 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                         <div>
                           <p className="text-muted-foreground text-sm">Department</p>
                           <p className="font-medium">{viewEmployeeProfile.department || "N/A"}</p>
+                          {viewEmployeeProfile.department_changed_at && (
+                            <p className="text-muted-foreground text-xs italic">
+                              Since {new Date(viewEmployeeProfile.department_changed_at).toLocaleDateString()}
+                            </p>
+                          )}
                         </div>
                       </div>
 
@@ -2194,6 +2259,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                     <TabsTrigger value="documentation">
                       Documentation ({viewEmployeeData.documentation.length})
                     </TabsTrigger>
+                    <TabsTrigger value="history">Dept. History ({viewEmployeeData.deptHistory.length})</TabsTrigger>
                   </TabsList>
 
                   <TabsContent value="assets">
@@ -2313,6 +2379,43 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                           </div>
                         ) : (
                           <p className="text-muted-foreground text-sm">No documentation</p>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+
+                  <TabsContent value="history">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Department History</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {viewEmployeeData.deptHistory.length > 0 ? (
+                          <div className="space-y-6">
+                            {viewEmployeeData.deptHistory.map((item: any) => (
+                              <div key={item.id} className="border-primary/20 relative border-l-2 pb-2 pl-6">
+                                <div className="border-primary bg-background absolute top-0 -left-[9px] h-4 w-4 rounded-full border-2" />
+                                <div className="flex flex-col gap-1">
+                                  <div className="flex items-center justify-between gap-4">
+                                    <p className="text-foreground text-sm font-bold">
+                                      {item.old_department || "New Joiner"} → {item.new_department}
+                                    </p>
+                                    <Badge variant="outline" className="shrink-0 text-[10px]">
+                                      {new Date(item.changed_at).toLocaleDateString()}
+                                    </Badge>
+                                  </div>
+                                  {item.reason && (
+                                    <p className="text-muted-foreground mt-1 text-xs italic">"{item.reason}"</p>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-center justify-center py-8 text-center">
+                            <Calendar className="text-muted-foreground mb-2 h-8 w-8 opacity-20" />
+                            <p className="text-muted-foreground text-sm">No department changes recorded</p>
+                          </div>
                         )}
                       </CardContent>
                     </Card>
