@@ -150,7 +150,11 @@ export function AdminTasksContent({
 
   const loadData = async () => {
     try {
-      let tasksQuery = supabase.from("tasks").select("*").order("created_at", { ascending: false })
+      let tasksQuery = supabase
+        .from("tasks")
+        .select("*")
+        .neq("category", "weekly_action")
+        .order("created_at", { ascending: false })
 
       if (userProfile?.role === "lead" && userProfile?.lead_departments && userProfile.lead_departments.length > 0) {
         tasksQuery = tasksQuery.in("department", userProfile.lead_departments)

@@ -122,14 +122,12 @@ export function ActionFormDialog({
       if (editingAction) {
         // Update single
         const { error } = await supabase
-          .from("tasks")
+          .from("action_items")
           .update({
             title: singleData.title,
             description: singleData.description,
             department: dept,
-            priority: singleData.priority,
             status: singleData.status,
-            due_date: singleData.due_date || null,
             week_number: week,
             year: year,
           })
@@ -141,15 +139,13 @@ export function ActionFormDialog({
         const payloads = finalItems.map((title) => ({
           title,
           department: dept,
-          category: "weekly_action",
-          priority: "medium",
           status: "pending",
           week_number: week,
           year: year,
           assigned_by: user.id,
         }))
 
-        const { error } = await supabase.from("tasks").insert(payloads)
+        const { error } = await supabase.from("action_items").insert(payloads)
         if (error) throw error
         toast.success(`Created ${payloads.length} actions`)
 

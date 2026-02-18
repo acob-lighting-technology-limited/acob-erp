@@ -100,9 +100,6 @@ export function ExcelImportDialog({ isOpen, onClose, onComplete, departments }: 
             title: String(title).substring(0, 255),
             description: String(getCol(["Detailed Description", "Notes", "Details"]) || "").substring(0, 1000) || null,
             department: String(dept).substring(0, 100),
-            priority,
-            due_date: dueDate,
-            category: "weekly_action",
             week_number: week,
             year: year,
             assigned_by: user.id,
@@ -110,7 +107,7 @@ export function ExcelImportDialog({ isOpen, onClose, onComplete, departments }: 
           }
         })
 
-        const { error } = await supabase.from("tasks").insert(tasksToInsert)
+        const { error } = await supabase.from("action_items").insert(tasksToInsert)
 
         if (error) throw error
 

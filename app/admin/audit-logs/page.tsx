@@ -2,7 +2,13 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { AdminAuditLogsContent, type AuditLog, type employeeMember, type UserProfile } from "./admin-audit-logs-content"
 
-async function getAuditLogsData() {
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+type AuditLogsData =
+  | { kind: "redirect"; redirect: string }
+  | { kind: "data"; logs: AuditLog[]; employee: employeeMember[]; departments: string[]; userProfile: UserProfile }
+
+async function getAuditLogsData(): Promise<AuditLogsData> {
   const supabase = await createClient()
 
   const {
@@ -11,14 +17,14 @@ async function getAuditLogsData() {
   } = await supabase.auth.getUser()
 
   if (userError || !user) {
-    return { redirect: "/auth/login" as const }
+    return { kind: "redirect", redirect: "/auth/login" }
   }
 
   // Get user profile
   const { data: profile } = await supabase.from("profiles").select("role, lead_departments").eq("id", user.id).single()
 
   if (!profile || !["super_admin", "admin", "lead"].includes(profile.role)) {
-    return { redirect: "/dashboard" as const }
+    return { kind: "redirect", redirect: "/dashboard" }
   }
 
   const userProfile: UserProfile = {
@@ -26,16 +32,17 @@ async function getAuditLogsData() {
     lead_departments: profile.lead_departments,
   }
 
-  // Fetch audit logs
+  // Fetch audit logs - Filter out internal system logs to prevent them from eclipsing user actions
   const { data: logsData, error: logsError } = await supabase
     .from("audit_logs")
     .select("*")
+    .not("action", "in", '("sync","migrate","update_schema","migration")')
     .order("created_at", { ascending: false })
     .limit(500)
 
   if (logsError) {
     console.error("Audit logs error:", logsError)
-    return { logs: [], employee: [], departments: [], userProfile }
+    return { kind: "data", logs: [], employee: [], departments: [], userProfile }
   }
 
   let logs: AuditLog[] = []
@@ -43,25 +50,11 @@ async function getAuditLogsData() {
   let departments: string[] = []
 
   if (logsData && logsData.length > 0) {
-    // Get unique user IDs from logs
-    const userIds = Array.from(new Set(logsData.map((log) => log.user_id).filter(Boolean)))
-
-    // Fetch user profiles for all unique user IDs
-    const { data: usersData } = await supabase
-      .from("profiles")
-      .select("id, first_name, last_name, company_email")
-      .in("id", userIds)
-
-    const usersMap = new Map(usersData?.map((u) => [u.id, u]))
-
-    // Add user info to logs and map database columns to UI interface
-    logs = logsData.map((log: any) => {
-      // Prefer new dedicated columns, fall back to metadata for backward compatibility
-      // Handle potential JSON string values and empty objects
+    // 1. Pre-process logs to parse JSON columns
+    const parsedLogs = logsData.map((log) => {
       let new_values = log.new_values
       let old_values = log.old_values
 
-      // Parse if string (in case of serialization issues)
       if (typeof new_values === "string") {
         try {
           new_values = JSON.parse(new_values)
@@ -78,13 +71,10 @@ async function getAuditLogsData() {
       }
 
       // Fall back to metadata if new_values is null/undefined/empty
-      const hasNewValues = new_values && Object.keys(new_values).length > 0
-      const hasOldValues = old_values && Object.keys(old_values).length > 0
-
-      if (!hasNewValues && log.metadata?.new_values) {
+      if ((!new_values || Object.keys(new_values || {}).length === 0) && log.metadata?.new_values) {
         new_values = log.metadata.new_values
       }
-      if (!hasOldValues && log.metadata?.old_values) {
+      if ((!old_values || Object.keys(old_values || {}).length === 0) && log.metadata?.old_values) {
         old_values = log.metadata.old_values
       }
 
@@ -92,33 +82,173 @@ async function getAuditLogsData() {
       new_values = new_values || {}
       old_values = old_values || {}
 
-      const entity_type = (log.entity_type || log.table_name || "unknown").toLowerCase()
-      const entity_id = log.entity_id || log.record_id
-      const action = log.action || log.operation || "unknown"
-      const department = log.department || new_values.department || old_values.department || null
+      return {
+        ...log,
+        new_values,
+        old_values,
+        entity_type: (log.entity_type || log.table_name || "unknown").toLowerCase(),
+        action: log.action || log.operation || "unknown",
+        entity_id: log.entity_id || log.record_id,
+      }
+    })
+
+    // 2. Collect all relevant IDs
+    const actorIds = new Set(parsedLogs.map((l) => l.user_id).filter(Boolean))
+    const assetIds = new Set<string>()
+    const potentialUserIds = new Set<string>()
+
+    parsedLogs.forEach((log) => {
+      // Collect IDs from JSON blobs
+      const targets = [
+        log.new_values.assigned_to,
+        log.old_values.assigned_to,
+        log.new_values.user_id,
+        log.old_values.user_id,
+        log.new_values.target_user_id,
+        log.old_values.target_user_id,
+        // For profiles/users table, the record_id itself is a user ID
+        log.entity_type === "profile" || log.entity_type === "profiles" || log.entity_type === "user"
+          ? log.entity_id
+          : null,
+      ]
+
+      targets.forEach((id) => {
+        if (id && typeof id === "string" && UUID_RE.test(id)) potentialUserIds.add(id)
+      })
+
+      // Collect Asset IDs
+      if (log.entity_type.includes("asset")) {
+        // Try to get asset_id from entity_id (if it's an asset) or from values
+        const possibleAssetId = log.entity_id
+        if (possibleAssetId && UUID_RE.test(possibleAssetId)) assetIds.add(possibleAssetId)
+
+        if (log.new_values.asset_id && UUID_RE.test(log.new_values.asset_id)) assetIds.add(log.new_values.asset_id)
+      }
+    })
+
+    // 3. Fetch current asset assignments
+    const assetAssignmentsMap = new Map()
+    if (assetIds.size > 0) {
+      const { data: assignments, error: assignmentsError } = await supabase
+        .from("asset_assignments")
+        .select("asset_id, assigned_to, assignment_type")
+        .in("asset_id", Array.from(assetIds))
+        .eq("is_current", true)
+
+      if (assignmentsError) {
+        console.error("Error fetching asset assignments for audit logs:", assignmentsError)
+      } else {
+        assignments?.forEach((a) => {
+          assetAssignmentsMap.set(a.asset_id, a)
+          if (a.assigned_to) potentialUserIds.add(a.assigned_to)
+        })
+      }
+    }
+
+    // 4. Fetch all users
+    const allUserIds = Array.from(new Set([...Array.from(actorIds), ...Array.from(potentialUserIds)]))
+    let usersData: any[] = []
+
+    if (allUserIds.length > 0) {
+      const { data, error: usersError } = await supabase
+        .from("profiles")
+        .select("id, first_name, last_name, company_email, employee_number")
+        .in("id", allUserIds)
+
+      if (usersError) {
+        console.error("Error fetching users for audit logs:", usersError)
+      } else {
+        usersData = data || []
+      }
+    }
+
+    const usersMap = new Map(usersData.map((u) => [u.id, u]))
+
+    // 5. Build final logs
+    logs = parsedLogs.map((log) => {
+      const department = log.department || log.new_values.department || log.old_values.department || null
       const changed_fields = log.changed_fields || []
+
+      // Determine related asset info
+      let assetInfo = null
+      let assetId = null
+
+      if (log.entity_type.includes("asset")) {
+        // Clearer logic to determine the relevant asset ID
+        if (log.entity_type.includes("assignment")) {
+          assetId = log.new_values.asset_id || log.old_values.asset_id || log.entity_id
+        } else {
+          assetId = log.entity_id
+        }
+
+        const assignment = assetId ? assetAssignmentsMap.get(assetId) : null
+
+        // Base info from logs
+        const baseInfo = {
+          unique_code: log.new_values.unique_code || log.old_values.unique_code,
+          serial_number: log.new_values.serial_number || log.old_values.serial_number,
+          asset_name: log.new_values.asset_name || log.old_values.asset_name,
+        }
+
+        // Merge with assignment info, PREFERRING historical values from the log
+        if (baseInfo.unique_code || assignment) {
+          const historicalAssignedTo = log.new_values.assigned_to || log.old_values.assigned_to
+          const targetAssignedTo = historicalAssignedTo || assignment?.assigned_to
+
+          assetInfo = {
+            ...baseInfo,
+            assignment_type:
+              log.new_values.assignment_type || log.old_values.assignment_type || assignment?.assignment_type,
+            assigned_to: targetAssignedTo,
+            assigned_to_user: targetAssignedTo ? usersMap.get(targetAssignedTo) || null : null,
+          }
+        }
+      }
+
+      // Determine Target User
+      let targetUser = null
+
+      // Priority 1: Explicit target in log (most accurate for historical events)
+      // Check for assigned_to in new_values (common in asset assignment logs)
+      // Check for target_user_id (standard audit log field)
+      const targetId = log.new_values.assigned_to || log.new_values.target_user_id
+
+      if (targetId && usersMap.has(targetId)) {
+        targetUser = usersMap.get(targetId)
+      }
+      // Priority 2: For asset assignments, if we can't find it in new_values, maybe it's in assetInfo
+      // BUT we must be careful not to use *current* assignment for *old* logs.
+      // We only use assetInfo.assigned_to_user if the log action suggests it might be relevant AND it matches?
+      // Actually, relying on current assignment for old logs is what caused the bug.
+      // Better to check if the log provides a hint.
+      // If the log is "ASSIGN" or "REASSIGN" and we have no targetId, it's better to show nothing than the wrong person.
+      // However, for the "Unassigned" bug case, the log *had* no target.
+      // If we fixed the bug, FUTURE logs will have targetId.
+      // Past logs for "Unassigned" actions are just broken.
+      // We will NOT default to current user to avoid "history rewriting".
+
+      // Priority 3: Entity is the user (for profile updates)
+      else if (
+        (log.entity_type === "profile" || log.entity_type === "profiles" || log.entity_type === "user") &&
+        usersMap.has(log.entity_id)
+      ) {
+        targetUser = usersMap.get(log.entity_id)
+      }
 
       return {
         id: log.id,
         user_id: log.user_id,
-        action,
-        entity_type,
-        entity_id,
-        old_values,
-        new_values,
+        action: log.action,
+        entity_type: log.entity_type,
+        entity_id: log.entity_id,
+        old_values: log.old_values,
+        new_values: log.new_values,
         created_at: log.created_at,
         department,
         changed_fields,
-        user: log.user_id ? usersMap.get(log.user_id) : null,
-        // Pre-extract unique_code if available in metadata to avoid flash
-        asset_info:
-          new_values.unique_code || old_values.unique_code
-            ? {
-                unique_code: new_values.unique_code || old_values.unique_code,
-                serial_number: new_values.serial_number || old_values.serial_number,
-                asset_name: new_values.asset_name || old_values.asset_name,
-              }
-            : null,
+        user: log.user_id ? usersMap.get(log.user_id) || null : null,
+        asset_info: assetInfo,
+        target_user: targetUser || null,
       }
     }) as AuditLog[]
   }
@@ -146,29 +276,24 @@ async function getAuditLogsData() {
     departments.sort()
   }
 
-  return { logs, employee, departments, userProfile }
+  return { kind: "data", logs, employee, departments, userProfile }
 }
 
 export default async function AuditLogsPage() {
   const data = await getAuditLogsData()
 
-  if ("redirect" in data && data.redirect) {
+  if (data.kind === "redirect") {
     redirect(data.redirect)
   }
 
-  const pageData = data as {
-    logs: AuditLog[]
-    employee: employeeMember[]
-    departments: string[]
-    userProfile: UserProfile
-  }
+  const { logs, employee, departments, userProfile } = data
 
   return (
     <AdminAuditLogsContent
-      initialLogs={pageData.logs}
-      initialemployee={pageData.employee}
-      initialDepartments={pageData.departments}
-      userProfile={pageData.userProfile}
+      initialLogs={logs}
+      initialemployee={employee}
+      initialDepartments={departments}
+      userProfile={userProfile}
     />
   )
 }

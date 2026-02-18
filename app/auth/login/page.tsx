@@ -92,6 +92,17 @@ export default function LoginPage() {
 
   const handleRequestOTP = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    // Domain restriction check
+    const allowedDomains = ["acoblighting.com", "org.acoblighting.com"]
+    const domain = email.split("@")[1]?.toLowerCase()
+    if (!domain || !allowedDomains.includes(domain)) {
+      const msg = "Only @acoblighting.com and @org.acoblighting.com emails are allowed."
+      setError(msg)
+      toast.error(msg)
+      return
+    }
+
     const supabase = createClient()
     setIsLoading(true)
     setError(null)
@@ -122,6 +133,17 @@ export default function LoginPage() {
 
   const handlePasswordLogin = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    // Domain restriction check
+    const allowedDomains = ["acoblighting.com", "org.acoblighting.com"]
+    const domain = email.split("@")[1]?.toLowerCase()
+    if (!domain || !allowedDomains.includes(domain)) {
+      const msg = "Only @acoblighting.com and @org.acoblighting.com emails are allowed."
+      setError(msg)
+      toast.error(msg)
+      return
+    }
+
     const supabase = createClient()
     setIsLoading(true)
     setError(null)

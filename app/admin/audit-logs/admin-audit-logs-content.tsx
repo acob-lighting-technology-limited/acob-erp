@@ -1083,10 +1083,8 @@ export function AdminAuditLogsContent({
         if (log.target_user?.first_name) {
           return `${formatName(log.target_user.first_name)} ${formatName(log.target_user.last_name)}`
         }
-        // Check asset assignee info
-        if (log.asset_info?.assigned_to_user?.first_name) {
-          return `${formatName(log.asset_info.assigned_to_user.first_name)} ${formatName(log.asset_info.assigned_to_user.last_name)}`
-        }
+        // REMOVED: Fallback to current asset owner. This causes historical logs to show current owner.
+        // If target_user is null, it means the log didn't capture a target. Better to show nothing than wrong info.
         // Check for direct name in metadata
         if (log.new_values?.assigned_to_name) return log.new_values.assigned_to_name
         return null
@@ -1094,6 +1092,17 @@ export function AdminAuditLogsContent({
 
       // If we found a human, ALWAYS return the human name
       if (personName) return personName
+
+      // Check assignment type to prevent misleading "Department" target for individual assignments
+      const assignmentType =
+        log.new_values?.assignment_type ||
+        log.old_values?.assignment_type ||
+        log.asset_info?.assignment_type ||
+        (log.new_values?.assigned_to || log.old_values?.assigned_to ? "individual" : null)
+
+      // If it is explicitly an individual assignment but we couldn't find the name,
+      // return "-" instead of falling back to department, which would confuse it with a department assignment.
+      if (assignmentType === "individual") return "-"
 
       // 2. Fallback: Department or Office
       const dept = log.new_values?.department || log.old_values?.department

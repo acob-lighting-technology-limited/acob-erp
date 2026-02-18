@@ -24,6 +24,7 @@ import { User } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { formatName, cn } from "@/lib/utils"
+import { format, differenceInDays } from "date-fns"
 import {
   Users,
   Search,
@@ -50,6 +51,10 @@ import {
   ChevronUp,
   Trash2,
   AlertTriangle,
+  Calendar,
+  Clock,
+  User as UserIcon,
+  UserCircle,
 } from "lucide-react"
 import type { UserRole, EmploymentStatus } from "@/types/database"
 import { getRoleDisplayName, getRoleBadgeColor, canAssignRoles, DEPARTMENTS, OFFICE_LOCATIONS } from "@/lib/permissions"
@@ -58,11 +63,12 @@ import { ASSET_TYPE_MAP } from "@/lib/asset-types"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Calendar, User as UserIcon, UserCircle } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Textarea } from "@/components/ui/textarea"
 import { EmployeeStatusBadge } from "@/components/hr/employee-status-badge"
 import { ChangeStatusDialog, ChangeStatusContent } from "@/components/hr/change-status-dialog"
+import { PendingApplicationsModal } from "./pending-applications-modal"
+import { formValidation } from "@/lib/validation"
 
 export interface Employee {
   id: string
@@ -632,6 +638,13 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         return
       }
 
+      // Validate email domain
+      if (editForm.company_email && !formValidation.isCompanyEmail(editForm.company_email)) {
+        toast.error("Only @acoblighting.com and @org.acoblighting.com emails are allowed")
+        setIsSaving(false)
+        return
+      }
+
       // Validate: If role is lead, at least one department must be selected
       if (editForm.role === "lead" && editForm.lead_departments.length === 0) {
         toast.error("Please select at least one department for this lead")
@@ -705,9 +718,16 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
     setIsCreatingUser(true)
 
     try {
-      // Validate required fields (department is optional for executives like MD)
+      // Validate required fields
       if (!createUserForm.firstName.trim() || !createUserForm.lastName.trim() || !createUserForm.email.trim()) {
         toast.error("First name, last name, and email are required")
+        setIsCreatingUser(false)
+        return
+      }
+
+      // Validate email domain
+      if (!formValidation.isCompanyEmail(createUserForm.email)) {
+        toast.error("Only @acoblighting.com and @org.acoblighting.com emails are allowed")
         setIsCreatingUser(false)
         return
       }
@@ -1148,6 +1168,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <PendingApplicationsModal onEmployeeCreated={loadData} />
             {(userProfile?.role === "admin" || userProfile?.role === "super_admin") && (
               <Button onClick={() => setIsCreateUserDialogOpen(true)} className="gap-2" size="sm">
                 <Plus className="h-4 w-4" />
@@ -1935,8 +1956,44 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                       <div className="flex items-center gap-3">
                         <Calendar className="text-muted-foreground h-5 w-5" />
                         <div>
-                          <p className="text-muted-foreground text-sm">Member Since</p>
-                          <p className="font-medium">{new Date(viewEmployeeProfile.created_at).toLocaleDateString()}</p>
+                          <p className="text-muted-foreground text-sm">Hire Date</p>
+                          <p className="font-medium">
+                            {viewEmployeeProfile.employment_date
+                              ? format(new Date(viewEmployeeProfile.employment_date), "PPP")
+                              : "Not recorded"}
+                          </p>
+                        </div>
+                      </div>
+
+                      {viewEmployeeProfile.employment_date && (
+                        <>
+                          <div className="flex items-center gap-3">
+                            <CheckCircle2 className="text-muted-foreground h-5 w-5" />
+                            <div>
+                              <p className="text-muted-foreground text-sm">Joined ACOB</p>
+                              <p className="font-medium">
+                                {format(new Date(viewEmployeeProfile.employment_date), "MMM d, yyyy")}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-3">
+                            <Clock className="text-muted-foreground h-5 w-5" />
+                            <div>
+                              <p className="text-muted-foreground text-sm">Days at ACOB</p>
+                              <p className="font-medium text-blue-600 dark:text-blue-400">
+                                {differenceInDays(new Date(), new Date(viewEmployeeProfile.employment_date))} Days
+                              </p>
+                            </div>
+                          </div>
+                        </>
+                      )}
+
+                      <div className="flex items-center gap-3">
+                        <Calendar className="text-muted-foreground h-5 w-5" />
+                        <div>
+                          <p className="text-muted-foreground text-sm">Account Created</p>
+                          <p className="font-medium">{format(new Date(viewEmployeeProfile.created_at), "PPP")}</p>
                         </div>
                       </div>
                     </div>
