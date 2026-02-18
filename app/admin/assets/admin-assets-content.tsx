@@ -532,7 +532,7 @@ export function AdminAssetsContent({
       const { data, error } = await supabase
         .from("asset_assignments")
         .select(
-          "id, assigned_at, handed_over_at, assignment_notes, handover_notes, assigned_from, assigned_by, assigned_to, department, assignment_type"
+          "id, assigned_at, handed_over_at, assignment_notes, handover_notes, assigned_from, assigned_by, assigned_to, department, office_location, assignment_type"
         )
         .eq("asset_id", asset.id)
         .order("assigned_at", { ascending: false })
@@ -777,26 +777,6 @@ export function AdminAssetsContent({
     setIsIssuesDialogOpen(true)
   }
 
-  const handleOpenAssignDialog = async (asset: Asset) => {
-    setSelectedAsset(asset)
-    await loadCurrentAssignment(asset.id)
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    setAssignForm({
-      assignment_type: asset.assignment_type || "individual",
-      assigned_to: asset.current_assignment?.assigned_to || "",
-      department: asset.current_assignment?.department || asset.department || "",
-      office_location: asset.current_assignment?.office_location || asset.office_location || "",
-      assignment_notes: "",
-      assigned_by: user?.id || "",
-      assigned_at: new Date().toISOString().slice(0, 16),
-    })
-    setIsAssignDialogOpen(true)
-  }
-
   const handleSaveAsset = async () => {
     if (isSaving) return
     setIsSaving(true)
@@ -848,9 +828,9 @@ export function AdminAssetsContent({
         const isAssigneeChanged =
           selectedAsset.status === "assigned" &&
           assetForm.status === "assigned" &&
-          (assetForm.assigned_to !== (currentAssignment?.assigned_to || "") ||
-            assetForm.assignment_department !== (currentAssignment?.department || "") ||
-            assetForm.office_location !== (currentAssignment?.office_location || ""))
+          (assetForm.assigned_to !== originalAssetForm.assigned_to ||
+            assetForm.assignment_department !== originalAssetForm.assignment_department ||
+            assetForm.office_location !== originalAssetForm.office_location)
 
         if (isAssigneeChanged) {
           const assignmentResponse = getAssignmentData(selectedAsset.id, user.id)
@@ -886,7 +866,7 @@ export function AdminAssetsContent({
           if (assignError) throw assignError
 
           // Update asset record to reflect assignment fields (crucial for consistency)
-          await supabase
+          const { error: assetFieldsError } = await supabase
             .from("assets")
             .update({
               assignment_type: assetForm.assignment_type,
@@ -894,6 +874,8 @@ export function AdminAssetsContent({
               office_location: (assignmentResponse.data as any).office_location || null,
             })
             .eq("id", selectedAsset.id)
+
+          if (assetFieldsError) throw assetFieldsError
         }
 
         toast.success("Asset updated successfully")
@@ -951,7 +933,7 @@ export function AdminAssetsContent({
           if (assignError) throw assignError
 
           // Update asset state
-          await supabase
+          const { error: assetFieldsError } = await supabase
             .from("assets")
             .update({
               assignment_type: assetForm.assignment_type,
@@ -959,6 +941,8 @@ export function AdminAssetsContent({
               office_location: (assignmentData as any).office_location || null,
             })
             .eq("id", newAsset.id)
+
+          if (assetFieldsError) throw assetFieldsError
         }
 
         toast.success(`Asset created successfully: ${uniqueCodeData}`)
@@ -3338,7 +3322,7 @@ export function AdminAssetsContent({
                   </div>
                 </div>
 
-                {(history.assigned_to_user || history.department) && (
+                {(history.assigned_to_user || history.department || history.office_location) && (
                   <div className="mb-2">
                     <p className="text-muted-foreground text-sm">
                       Assigned to:{" "}
@@ -3351,6 +3335,11 @@ export function AdminAssetsContent({
                         <span className="text-foreground flex items-center gap-1 font-semibold">
                           <Building2 className="h-3 w-3" />
                           {history.department} (Department)
+                        </span>
+                      ) : history.office_location ? (
+                        <span className="text-foreground flex items-center gap-1 font-semibold">
+                          <Building2 className="h-3 w-3" />
+                          {history.office_location} (Office)
                         </span>
                       ) : (
                         <span className="text-foreground font-semibold">Office</span>

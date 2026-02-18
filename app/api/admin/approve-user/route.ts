@@ -207,7 +207,7 @@ export async function POST(req: Request) {
         await resend.emails.send({
           from: "ACOB Internal Systems <notifications@acoblighting.com>",
           to: stakeholderEmails,
-          subject: `New Employee Onboarded: ${pendingUser.first_name} ${pendingUser.last_name}`,
+          subject: `New Employee Onboarded: ${pendingUser.first_name.replace(/[\r\n]/g, "")} ${pendingUser.last_name.replace(/[\r\n]/g, "")}`,
           html: renderInternalNotificationEmail({ pendingUser, employeeId }),
         })
       }
