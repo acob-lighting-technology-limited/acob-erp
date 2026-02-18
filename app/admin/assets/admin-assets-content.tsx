@@ -133,6 +133,8 @@ interface AssignmentHistory {
   assignment_notes?: string
   handover_notes?: string
   department?: string
+  office_location?: string
+  assignment_type?: string
   assigned_from_user?: {
     first_name: string
     last_name: string
@@ -490,7 +492,7 @@ export function AdminAssetsContent({
 
       const { data, error } = await supabase
         .from("asset_assignments")
-        .select("id, assigned_to, assigned_at, is_current, department")
+        .select("id, assigned_to, assigned_at, is_current, department, office_location, assignment_type")
         .eq("asset_id", assetId)
         .eq("is_current", true)
         .single()
@@ -826,7 +828,7 @@ export function AdminAssetsContent({
 
         // If status changed FROM assigned TO something else (returned, maintenance, etc.)
         if (selectedAsset.status === "assigned" && assetForm.status !== "assigned") {
-          await supabase
+          const { error: closeError } = await supabase
             .from("asset_assignments")
             .update({
               is_current: false,
@@ -835,6 +837,11 @@ export function AdminAssetsContent({
             })
             .eq("asset_id", selectedAsset.id)
             .eq("is_current", true)
+
+          if (closeError) {
+            console.error("Error closing assignment:", closeError)
+            throw new Error(`Failed to close current assignment: ${closeError.message}`)
+          }
         }
 
         // Detect Transfer/Reassignment in EDIT mode
@@ -877,6 +884,16 @@ export function AdminAssetsContent({
 
           const { error: assignError } = await supabase.from("asset_assignments").insert(assignmentResponse.data)
           if (assignError) throw assignError
+
+          // Update asset record to reflect assignment fields (crucial for consistency)
+          await supabase
+            .from("assets")
+            .update({
+              assignment_type: assetForm.assignment_type,
+              department: (assignmentResponse.data as any).department || null,
+              office_location: (assignmentResponse.data as any).office_location || null,
+            })
+            .eq("id", selectedAsset.id)
         }
 
         toast.success("Asset updated successfully")
@@ -3321,7 +3338,7 @@ export function AdminAssetsContent({
                   </div>
                 </div>
 
-                {(history.assigned_to_user || (history as any).department) && (
+                {(history.assigned_to_user || history.department) && (
                   <div className="mb-2">
                     <p className="text-muted-foreground text-sm">
                       Assigned to:{" "}
@@ -3330,10 +3347,10 @@ export function AdminAssetsContent({
                           {formatName(history.assigned_to_user.first_name)}{" "}
                           {formatName(history.assigned_to_user.last_name)}
                         </span>
-                      ) : (history as any).department ? (
+                      ) : history.department ? (
                         <span className="text-foreground flex items-center gap-1 font-semibold">
                           <Building2 className="h-3 w-3" />
-                          {(history as any).department} (Department)
+                          {history.department} (Department)
                         </span>
                       ) : (
                         <span className="text-foreground font-semibold">Office</span>

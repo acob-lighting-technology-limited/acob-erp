@@ -61,6 +61,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Pending user not found" }, { status: 404 })
     }
 
+    // 1b. Validate Required Fields
+    const requiredFields = ["company_email", "personal_email", "first_name", "last_name", "department", "company_role"]
+    const missingFields = requiredFields.filter((field) => !pendingUser[field])
+
+    if (missingFields.length > 0) {
+      return NextResponse.json({ error: `Missing required user data: ${missingFields.join(", ")}` }, { status: 422 })
+    }
+
     // 2. Determine Employee ID with Retry Logic for Race Conditions
     let employeeId = manualEmployeeId
     const currentYear = new Date().getFullYear()
@@ -184,8 +192,12 @@ export async function POST(req: Request) {
         subject: "Welcome to ACOB - Login Credentials",
         html: renderWelcomeEmail({ pendingUser, employeeId, setupUrl }),
       })
+    } catch (emailError) {
+      console.error("Failed to send welcome email:", emailError)
+    }
 
-      // 7. Send Internal Confirmation Email to Stakeholders
+    // 7. Send Internal Confirmation Email to Stakeholders
+    try {
       const stakeholderEmails = (process.env.STAKEHOLDER_EMAILS || "")
         .split(",")
         .map((e: string) => e.trim())
@@ -200,13 +212,16 @@ export async function POST(req: Request) {
         })
       }
     } catch (emailError) {
-      console.error("Failed to send notification emails:", emailError)
-      // We do NOT rollback here, creation was successful. Just log the error.
+      console.error("Failed to send stakeholder notification emails:", emailError)
     }
 
     return NextResponse.json({ success: true, employeeId })
   } catch (error: any) {
     console.error("Approval Process Error:", error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    // Redact internal error details from the client
+    const message = error.message?.includes("Auth creation failed")
+      ? error.message
+      : "An unexpected error occurred during the approval process. Please check system logs."
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

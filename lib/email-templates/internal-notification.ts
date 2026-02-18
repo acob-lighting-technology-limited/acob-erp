@@ -1,9 +1,20 @@
+import { escapeHtml } from "./utils"
+import { type PendingUser } from "./welcome"
+
 interface InternalNotificationEmailProps {
-  pendingUser: any
+  pendingUser: PendingUser
   employeeId: string
 }
 
 export function renderInternalNotificationEmail({ pendingUser, employeeId }: InternalNotificationEmailProps) {
+  const firstName = escapeHtml(pendingUser.first_name)
+  const lastName = escapeHtml(pendingUser.last_name)
+  const dept = escapeHtml(pendingUser.department)
+  const email = escapeHtml(pendingUser.company_email)
+  const workLoc = escapeHtml(pendingUser.current_work_location)
+  const officeLoc = pendingUser.office_location ? escapeHtml(pendingUser.office_location) : ""
+  const empId = escapeHtml(employeeId)
+
   return `
 <!DOCTYPE html>
 <html lang="en">
@@ -43,30 +54,25 @@ export function renderInternalNotificationEmail({ pendingUser, employeeId }: Int
             <table>
                 <tr>
                     <td class="label">Employee Name</td>
-                    <td class="value">${pendingUser.first_name} ${pendingUser.last_name}</td>
+                    <td class="value">${firstName} ${lastName}</td>
                 </tr>
                 <tr>
                     <td class="label">Employee ID</td>
-                    <td class="value">${employeeId}</td>
+                    <td class="value">${empId}</td>
                 </tr>
                 <tr>
                     <td class="label">Department</td>
-                    <td class="value">${pendingUser.department}</td>
+                    <td class="value">${dept}</td>
                 </tr>
                 <tr>
                     <td class="label">Official Email</td>
-                    <td class="value">${pendingUser.company_email}</td>
+                    <td class="value">${email}</td>
                 </tr>
                 <tr>
                     <td class="label">Work Location</td>
                     <td class="value">
-                        ${pendingUser.current_work_location}
-                        ${
-                          pendingUser.office_location &&
-                          pendingUser.office_location !== pendingUser.current_work_location
-                            ? `(${pendingUser.office_location})`
-                            : ""
-                        }
+                        ${workLoc}
+                        ${officeLoc && officeLoc !== workLoc ? `(${officeLoc})` : ""}
                     </td>
                 </tr>
                 <tr>

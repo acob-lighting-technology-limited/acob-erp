@@ -2,7 +2,13 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { AdminAuditLogsContent, type AuditLog, type employeeMember, type UserProfile } from "./admin-audit-logs-content"
 
-async function getAuditLogsData() {
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+type AuditLogsData =
+  | { kind: "redirect"; redirect: string }
+  | { kind: "data"; logs: AuditLog[]; employee: employeeMember[]; departments: string[]; userProfile: UserProfile }
+
+async function getAuditLogsData(): Promise<AuditLogsData> {
   const supabase = await createClient()
 
   const {
@@ -11,14 +17,14 @@ async function getAuditLogsData() {
   } = await supabase.auth.getUser()
 
   if (userError || !user) {
-    return { redirect: "/auth/login" as const }
+    return { kind: "redirect", redirect: "/auth/login" }
   }
 
   // Get user profile
   const { data: profile } = await supabase.from("profiles").select("role, lead_departments").eq("id", user.id).single()
 
   if (!profile || !["super_admin", "admin", "lead"].includes(profile.role)) {
-    return { redirect: "/dashboard" as const }
+    return { kind: "redirect", redirect: "/dashboard" }
   }
 
   const userProfile: UserProfile = {
@@ -36,7 +42,7 @@ async function getAuditLogsData() {
 
   if (logsError) {
     console.error("Audit logs error:", logsError)
-    return { logs: [], employee: [], departments: [], userProfile }
+    return { kind: "data", logs: [], employee: [], departments: [], userProfile }
   }
 
   let logs: AuditLog[] = []
@@ -107,16 +113,16 @@ async function getAuditLogsData() {
       ]
 
       targets.forEach((id) => {
-        if (id && typeof id === "string" && id.length === 36) potentialUserIds.add(id)
+        if (id && typeof id === "string" && UUID_RE.test(id)) potentialUserIds.add(id)
       })
 
       // Collect Asset IDs
       if (log.entity_type.includes("asset")) {
         // Try to get asset_id from entity_id (if it's an asset) or from values
         const possibleAssetId = log.entity_id
-        if (possibleAssetId && possibleAssetId.length === 36) assetIds.add(possibleAssetId)
+        if (possibleAssetId && UUID_RE.test(possibleAssetId)) assetIds.add(possibleAssetId)
 
-        if (log.new_values.asset_id && log.new_values.asset_id.length === 36) assetIds.add(log.new_values.asset_id)
+        if (log.new_values.asset_id && UUID_RE.test(log.new_values.asset_id)) assetIds.add(log.new_values.asset_id)
       }
     })
 
@@ -205,8 +211,7 @@ async function getAuditLogsData() {
       // Priority 1: Explicit target in log (most accurate for historical events)
       // Check for assigned_to in new_values (common in asset assignment logs)
       // Check for target_user_id (standard audit log field)
-      // Check for user_id in new_values IF it's different from the actor (though rare)
-      const targetId = log.new_values.assigned_to || log.original_data?.target_user_id || log.new_values.target_user_id
+      const targetId = log.new_values.assigned_to || log.new_values.target_user_id
 
       if (targetId && usersMap.has(targetId)) {
         targetUser = usersMap.get(targetId)
@@ -271,29 +276,24 @@ async function getAuditLogsData() {
     departments.sort()
   }
 
-  return { logs, employee, departments, userProfile }
+  return { kind: "data", logs, employee, departments, userProfile }
 }
 
 export default async function AuditLogsPage() {
   const data = await getAuditLogsData()
 
-  if ("redirect" in data && data.redirect) {
+  if (data.kind === "redirect") {
     redirect(data.redirect)
   }
 
-  const pageData = data as {
-    logs: AuditLog[]
-    employee: employeeMember[]
-    departments: string[]
-    userProfile: UserProfile
-  }
+  const { logs, employee, departments, userProfile } = data
 
   return (
     <AdminAuditLogsContent
-      initialLogs={pageData.logs}
-      initialemployee={pageData.employee}
-      initialDepartments={pageData.departments}
-      userProfile={pageData.userProfile}
+      initialLogs={logs}
+      initialemployee={employee}
+      initialDepartments={departments}
+      userProfile={userProfile}
     />
   )
 }

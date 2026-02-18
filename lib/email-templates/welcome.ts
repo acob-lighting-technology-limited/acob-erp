@@ -1,12 +1,33 @@
-import { formatName } from "@/lib/utils"
+import { escapeHtml } from "./utils"
+
+export interface PendingUser {
+  first_name: string
+  last_name: string
+  department: string
+  company_role: string
+  company_email: string
+  personal_email: string
+  current_work_location: string
+  office_location?: string
+}
 
 interface WelcomeEmailProps {
-  pendingUser: any
+  pendingUser: PendingUser
   employeeId: string
   setupUrl: string
 }
 
 export function renderWelcomeEmail({ pendingUser, employeeId, setupUrl }: WelcomeEmailProps) {
+  const firstName = escapeHtml(pendingUser.first_name)
+  const lastName = escapeHtml(pendingUser.last_name)
+  const dept = escapeHtml(pendingUser.department)
+  const role = escapeHtml(pendingUser.company_role)
+  const email = escapeHtml(pendingUser.company_email)
+  const workLoc = escapeHtml(pendingUser.current_work_location)
+  const officeLoc = pendingUser.office_location ? escapeHtml(pendingUser.office_location) : ""
+  const empId = escapeHtml(employeeId)
+  const safeSetupUrl = escapeHtml(setupUrl)
+
   return `
 <!DOCTYPE html>
 <html lang="en">
@@ -45,7 +66,7 @@ export function renderWelcomeEmail({ pendingUser, employeeId, setupUrl }: Welcom
     </div>
     <div class="wrapper">
         <div class="title">Welcome to the Team</div>
-        <p class="text">Dear ${pendingUser.first_name},</p>
+        <p class="text">Dear ${firstName},</p>
         <p class="text">We are thrilled to welcome you to the team at ACOB Lighting Technology Limited.</p>
         <p class="text">An official employee account has been created for you. Please find your login credentials and details below.</p>
         
@@ -54,30 +75,25 @@ export function renderWelcomeEmail({ pendingUser, employeeId, setupUrl }: Welcom
             <table>
                 <tr>
                     <td class="label">Full Name</td>
-                    <td class="value">${pendingUser.first_name} ${pendingUser.last_name}</td>
+                    <td class="value">${firstName} ${lastName}</td>
                 </tr>
                  <tr>
                     <td class="label">Employee ID</td>
-                    <td class="value">${employeeId}</td>
+                    <td class="value">${empId}</td>
                 </tr>
                 <tr>
                     <td class="label">Department</td>
-                    <td class="value">${pendingUser.department}</td>
+                    <td class="value">${dept}</td>
                 </tr>
                 <tr>
                     <td class="label">Role</td>
-                    <td class="value">${pendingUser.company_role}</td>
+                    <td class="value">${role}</td>
                 </tr>
                 <tr>
                     <td class="label">Work Location</td>
                     <td class="value">
-                        ${pendingUser.current_work_location}
-                        ${
-                          pendingUser.office_location &&
-                          pendingUser.office_location !== pendingUser.current_work_location
-                            ? `(${pendingUser.office_location})`
-                            : ""
-                        }
+                        ${workLoc}
+                        ${officeLoc && officeLoc !== workLoc ? `(${officeLoc})` : ""}
                     </td>
                 </tr>
             </table>
@@ -88,17 +104,17 @@ export function renderWelcomeEmail({ pendingUser, employeeId, setupUrl }: Welcom
             <table>
                 <tr>
                     <td class="label">Setup URL</td>
-                    <td class="value"><a href="${setupUrl}" style="color: #16a34a; text-decoration: none; font-weight: 700;">ACTIVATE MY ACCOUNT</a></td>
+                    <td class="value"><a href="${safeSetupUrl}" style="color: #16a34a; text-decoration: none; font-weight: 700;">ACTIVATE MY ACCOUNT</a></td>
                 </tr>
                 <tr>
                     <td class="label">Company Email</td>
-                    <td class="value"><span class="credential">${pendingUser.company_email}</span></td>
+                    <td class="value"><span class="credential">${email}</span></td>
                 </tr>
             </table>
         </div>
 
         <div class="cta">
-            <a href="${setupUrl}" class="button">Set Up Password</a>
+            <a href="${safeSetupUrl}" class="button">Set Up Password</a>
         </div>
         <div class="support">
             Please log in and change your password immediately.<br>
