@@ -33,7 +33,7 @@ export async function updateSession(request: NextRequest) {
   const pathname = request.nextUrl.pathname
 
   // Allow unauthenticated access to auth pages, public routes, and the form
-  if (pathname !== "/" && !user && !pathname.startsWith("/auth") && !pathname.startsWith("/form")) {
+  if (pathname !== "/" && !user && !pathname.startsWith("/auth") && !pathname.startsWith("/employee/new")) {
     const url = request.nextUrl.clone()
     url.pathname = "/auth/login"
     return NextResponse.redirect(url)

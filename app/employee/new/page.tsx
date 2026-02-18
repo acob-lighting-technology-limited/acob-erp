@@ -54,7 +54,12 @@ export default function EmployeeOnboardingForm() {
 
   useEffect(() => {
     async function fetchDepartments() {
-      const { data } = await supabase.from("departments").select("name").order("name")
+      const { data, error } = await supabase.from("departments").select("name").order("name")
+      if (error) {
+        console.error("Failed to load departments:", error)
+        toast.error("Could not load departments. Please refresh the page.")
+        return
+      }
       if (data) {
         setDepartments(data.map((d) => d.name))
       }
@@ -85,9 +90,14 @@ export default function EmployeeOnboardingForm() {
   const selectedDepartment = watch("department")
   const workLocation = watch("current_work_location")
 
+  const sanitize = (s: string) =>
+    s
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z]/g, "")
   const companyEmail =
     firstName && lastName
-      ? `${lastName.charAt(0).toLowerCase()}.${firstName.toLowerCase()}@org.acoblighting.com`
+      ? `${sanitize(lastName).charAt(0)}.${sanitize(firstName)}@org.acoblighting.com`
       : "Wait for name input..."
 
   async function onSubmit(data: FormValues) {

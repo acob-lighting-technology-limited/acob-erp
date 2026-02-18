@@ -32,8 +32,12 @@ async function getAdminTasksData() {
     lead_departments: profile.lead_departments,
   }
 
-  // Build query based on role
-  let tasksQuery = supabase.from("tasks").select("*").order("created_at", { ascending: false })
+  // Build query based on role - exclude weekly action tracker items
+  let tasksQuery = supabase
+    .from("tasks")
+    .select("*")
+    .neq("category", "weekly_action")
+    .order("created_at", { ascending: false })
 
   // Fetch employee - leads can only see employee in their departments
   let employeeQuery = supabase

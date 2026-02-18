@@ -67,9 +67,8 @@ export function ActionTrackerContent({ initialDepartments }: ActionTrackerConten
     setLoading(true)
     try {
       let query = supabase
-        .from("tasks")
+        .from("action_items")
         .select("*")
-        .eq("category", "weekly_action")
         .eq("week_number", weekFilter)
         .eq("year", yearFilter)
         .order("created_at", { ascending: false })
@@ -97,7 +96,7 @@ export function ActionTrackerContent({ initialDepartments }: ActionTrackerConten
     if (!confirm("Are you sure you want to delete this action?")) return
 
     try {
-      const { error } = await supabase.from("tasks").delete().eq("id", id)
+      const { error } = await supabase.from("action_items").delete().eq("id", id)
       if (error) throw error
       toast.success("Action deleted")
       loadTasks()
@@ -236,7 +235,6 @@ export function ActionTrackerContent({ initialDepartments }: ActionTrackerConten
               <TableHead className="w-12">#</TableHead>
               <TableHead>Department</TableHead>
               <TableHead className="min-w-[300px]">Action Description</TableHead>
-              <TableHead>Priority</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="w-12 text-right"></TableHead>
             </TableRow>
@@ -266,21 +264,6 @@ export function ActionTrackerContent({ initialDepartments }: ActionTrackerConten
                     {task.description && (
                       <div className="text-muted-foreground mt-1 line-clamp-1 text-xs">{task.description}</div>
                     )}
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      className={
-                        task.priority === "urgent"
-                          ? "bg-red-100 text-red-800"
-                          : task.priority === "high"
-                            ? "bg-orange-100 text-orange-800"
-                            : task.priority === "medium"
-                              ? "bg-blue-100 text-blue-800"
-                              : "bg-gray-100 text-gray-800"
-                      }
-                    >
-                      {task.priority}
-                    </Badge>
                   </TableCell>
                   <TableCell>
                     <Badge

@@ -24,6 +24,7 @@ import { User } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { formatName, cn } from "@/lib/utils"
+import { format, differenceInDays } from "date-fns"
 import {
   Users,
   Search,
@@ -50,6 +51,10 @@ import {
   ChevronUp,
   Trash2,
   AlertTriangle,
+  Calendar,
+  Clock,
+  User as UserIcon,
+  UserCircle,
 } from "lucide-react"
 import type { UserRole, EmploymentStatus } from "@/types/database"
 import { getRoleDisplayName, getRoleBadgeColor, canAssignRoles, DEPARTMENTS, OFFICE_LOCATIONS } from "@/lib/permissions"
@@ -58,7 +63,6 @@ import { ASSET_TYPE_MAP } from "@/lib/asset-types"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Calendar, User as UserIcon, UserCircle } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Textarea } from "@/components/ui/textarea"
 import { EmployeeStatusBadge } from "@/components/hr/employee-status-badge"
@@ -1952,8 +1956,44 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                       <div className="flex items-center gap-3">
                         <Calendar className="text-muted-foreground h-5 w-5" />
                         <div>
-                          <p className="text-muted-foreground text-sm">Member Since</p>
-                          <p className="font-medium">{new Date(viewEmployeeProfile.created_at).toLocaleDateString()}</p>
+                          <p className="text-muted-foreground text-sm">Hire Date</p>
+                          <p className="font-medium">
+                            {viewEmployeeProfile.employment_date
+                              ? format(new Date(viewEmployeeProfile.employment_date), "PPP")
+                              : "Not recorded"}
+                          </p>
+                        </div>
+                      </div>
+
+                      {viewEmployeeProfile.employment_date && (
+                        <>
+                          <div className="flex items-center gap-3">
+                            <CheckCircle2 className="text-muted-foreground h-5 w-5" />
+                            <div>
+                              <p className="text-muted-foreground text-sm">Joined ACOB</p>
+                              <p className="font-medium">
+                                {format(new Date(viewEmployeeProfile.employment_date), "MMM d, yyyy")}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-3">
+                            <Clock className="text-muted-foreground h-5 w-5" />
+                            <div>
+                              <p className="text-muted-foreground text-sm">Days at ACOB</p>
+                              <p className="font-medium text-blue-600 dark:text-blue-400">
+                                {differenceInDays(new Date(), new Date(viewEmployeeProfile.employment_date))} Days
+                              </p>
+                            </div>
+                          </div>
+                        </>
+                      )}
+
+                      <div className="flex items-center gap-3">
+                        <Calendar className="text-muted-foreground h-5 w-5" />
+                        <div>
+                          <p className="text-muted-foreground text-sm">Account Created</p>
+                          <p className="font-medium">{format(new Date(viewEmployeeProfile.created_at), "PPP")}</p>
                         </div>
                       </div>
                     </div>

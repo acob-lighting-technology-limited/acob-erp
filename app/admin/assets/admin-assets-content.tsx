@@ -784,10 +784,14 @@ export function AdminAssetsContent({
       const {
         data: { user },
       } = await supabase.auth.getUser()
-      if (!user) return
+      if (!user) {
+        setIsSaving(false)
+        return
+      }
 
       if (!assetForm.asset_type) {
         toast.error("Please select an asset type")
+        setIsSaving(false)
         return
       }
 
@@ -996,12 +1000,18 @@ export function AdminAssetsContent({
     if (isAssigning) return
     setIsAssigning(true)
     try {
-      if (!selectedAsset) return
+      if (!selectedAsset) {
+        setIsAssigning(false)
+        return
+      }
 
       const {
         data: { user },
       } = await supabase.auth.getUser()
-      if (!user) return
+      if (!user) {
+        setIsAssigning(false)
+        return
+      }
 
       // Validate
       const validationError = assignmentValidation.validateAssignment(
@@ -1012,6 +1022,7 @@ export function AdminAssetsContent({
       )
       if (validationError) {
         toast.error(validationError)
+        setIsAssigning(false)
         return
       }
 

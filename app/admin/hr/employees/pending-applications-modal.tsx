@@ -47,6 +47,7 @@ export function PendingApplicationsModal({ onEmployeeCreated }: PendingApplicati
   const [selectedUser, setSelectedUser] = useState<PendingUser | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [employeeId, setEmployeeId] = useState("")
+  const [hireDate, setHireDate] = useState(new Date().toISOString().split("T")[0])
 
   const supabase = createClient()
 
@@ -122,7 +123,8 @@ export function PendingApplicationsModal({ onEmployeeCreated }: PendingApplicati
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           pendingUserId: selectedUser.id,
-          employeeId: employeeId, // Send the edited ID
+          employeeId: employeeId,
+          hireDate: hireDate,
         }),
       })
 
@@ -262,6 +264,15 @@ export function PendingApplicationsModal({ onEmployeeCreated }: PendingApplicati
                     <div className="mb-6 flex items-center justify-between">
                       <h2 className="text-xl font-bold tracking-tight">Applicant Verification Profile</h2>
                       <div className="flex items-center gap-3">
+                        <div className="flex flex-col items-end">
+                          <span className="text-muted-foreground mb-1 text-[10px] font-bold uppercase">Hire Date</span>
+                          <Input
+                            type="date"
+                            value={hireDate}
+                            onChange={(e) => setHireDate(e.target.value)}
+                            className="bg-primary/5 border-primary/20 focus-visible:ring-primary h-9 w-40 font-mono text-xs font-bold"
+                          />
+                        </div>
                         <div className="flex flex-col items-end">
                           <span className="text-muted-foreground mb-1 text-[10px] font-bold uppercase">Assign ID</span>
                           <div className="relative w-44">

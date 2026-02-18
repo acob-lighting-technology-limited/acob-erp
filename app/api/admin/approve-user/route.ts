@@ -44,7 +44,7 @@ export async function POST(req: Request) {
     })
 
     const body = await req.json()
-    const { pendingUserId, employeeId: manualEmployeeId } = body
+    const { pendingUserId, employeeId: manualEmployeeId, hireDate } = body
 
     if (!pendingUserId) {
       return NextResponse.json({ error: "Missing pendingUserId" }, { status: 400 })
@@ -193,6 +193,7 @@ export async function POST(req: Request) {
           residential_address: pendingUser.residential_address,
           current_work_location: pendingUser.current_work_location,
           office_location: pendingUser.office_location,
+          employment_date: hireDate || new Date().toISOString(),
           updated_at: new Date().toISOString(),
           setup_token: setupTokenHash,
           setup_token_expires_at: setupTokenExpiresAt,

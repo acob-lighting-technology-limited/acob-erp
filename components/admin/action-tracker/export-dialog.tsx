@@ -36,7 +36,7 @@ export function ActionTrackerExportDialog({ isOpen, onClose, departments }: Expo
     setIsExporting(true)
     try {
       const supabase = createClient()
-      let query = supabase.from("tasks").select("*").eq("category", "weekly_action").eq("year", year)
+      let query = supabase.from("action_items").select("*").eq("year", year)
 
       // Time range filtering
       if (period === "week") {
@@ -72,11 +72,9 @@ export function ActionTrackerExportDialog({ isOpen, onClose, departments }: Expo
         Department: t.department,
         Action: t.title,
         Description: t.description || "",
-        Priority: t.priority,
         Status: t.status,
         Week: t.week_number,
         Year: t.year,
-        "Due Date": t.due_date ? new Date(t.due_date).toLocaleDateString() : "N/A",
       }))
 
       const worksheet = XLSX.utils.json_to_sheet(exportData)

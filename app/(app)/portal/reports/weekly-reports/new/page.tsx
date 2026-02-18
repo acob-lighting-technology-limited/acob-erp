@@ -23,6 +23,7 @@ import {
   Calendar,
   ChevronRight,
   Trophy,
+  Lightbulb,
 } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
@@ -161,6 +162,31 @@ function WeeklyReportFormContent() {
       toast.error("Failed to update status")
       // Revert
       setCurrentActions(currentActions)
+    }
+  }
+
+  const handleTextareaKeyDown = (
+    e: React.KeyboardEvent<HTMLTextAreaElement>,
+    value: string,
+    setter: (val: string) => void
+  ) => {
+    if (e.key === "Enter") {
+      const lines = value.split("\n")
+      const lastLine = lines[lines.length - 1]
+      const match = lastLine.match(/^(\d+)\.\s/)
+
+      if (match) {
+        e.preventDefault()
+        const nextNumber = parseInt(match[1]) + 1
+        const newValue = value + "\n" + nextNumber + ". "
+        setter(newValue)
+      }
+    }
+  }
+
+  const applyNumbering = (value: string, setter: (val: string) => void) => {
+    if (!value || !value.trim().match(/^1\.\s/)) {
+      setter("1. " + value.trim())
     }
   }
 
@@ -380,11 +406,20 @@ function WeeklyReportFormContent() {
           <div className="space-y-8 md:col-span-2">
             {/* Work Done */}
             <Card className="border-2 shadow-sm">
-              <CardHeader className="border-b bg-blue-500/10 p-4 px-6">
+              <CardHeader className="flex flex-row items-center justify-between border-b bg-blue-500/10 p-4 px-6">
                 <CardTitle className="flex items-center gap-2 text-lg text-blue-600 dark:text-blue-400">
                   <CheckCircle2 className="h-5 w-5" />
-                  Work Done
+                  Work Accomplished
                 </CardTitle>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  type="button"
+                  onClick={() => applyNumbering(workDone, setWorkDone)}
+                  className="h-8 gap-1 text-[10px] text-blue-600 hover:bg-blue-100"
+                >
+                  <Plus className="h-3 w-3" /> Auto-Number
+                </Button>
               </CardHeader>
               <CardContent className="p-4">
                 <Textarea
@@ -396,6 +431,7 @@ function WeeklyReportFormContent() {
                   className="min-h-[250px] resize-none text-base leading-relaxed focus-visible:ring-blue-500"
                   value={workDone}
                   onChange={(e) => setWorkDone(e.target.value)}
+                  onKeyDown={(e) => handleTextareaKeyDown(e, workDone, setWorkDone)}
                   required
                   disabled={!isActionTrackerComplete}
                 />
@@ -405,10 +441,21 @@ function WeeklyReportFormContent() {
             {/* Tasks for New Week */}
             <Card className="border-2 border-green-500/20 shadow-sm">
               <CardHeader className="border-b bg-green-500/10 p-4 px-6">
-                <CardTitle className="flex items-center gap-2 text-lg text-green-600 dark:text-green-400">
-                  <Target className="h-5 w-5" />
-                  Tasks for New Week
-                </CardTitle>
+                <div className="mb-1 flex w-full flex-row items-center justify-between">
+                  <CardTitle className="flex items-center gap-2 text-lg text-green-600 dark:text-green-400">
+                    <Target className="h-5 w-5" />
+                    Upcoming Objectives
+                  </CardTitle>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    type="button"
+                    onClick={() => applyNumbering(tasksNewWeek, setTasksNewWeek)}
+                    className="h-8 gap-1 text-[10px] text-green-600 hover:bg-green-100"
+                  >
+                    <Plus className="h-3 w-3" /> Auto-Number
+                  </Button>
+                </div>
                 <CardDescription>
                   Enter each task on a new line. These will appear in next week's Action Tracker.
                 </CardDescription>
@@ -421,6 +468,7 @@ function WeeklyReportFormContent() {
                   className="min-h-[300px] resize-none font-mono text-base leading-relaxed focus-visible:ring-green-500"
                   value={tasksNewWeek}
                   onChange={(e) => setTasksNewWeek(e.target.value)}
+                  onKeyDown={(e) => handleTextareaKeyDown(e, tasksNewWeek, setTasksNewWeek)}
                   disabled={!isActionTrackerComplete}
                 />
               </CardContent>
@@ -428,11 +476,20 @@ function WeeklyReportFormContent() {
 
             {/* Challenges */}
             <Card className="border-2 shadow-sm">
-              <CardHeader className="border-b bg-red-500/10 p-4 px-6">
+              <CardHeader className="flex flex-row items-center justify-between border-b bg-red-500/10 p-4 px-6">
                 <CardTitle className="flex items-center gap-2 text-lg text-red-600 dark:text-red-400">
                   <AlertTriangle className="h-5 w-5" />
-                  Challenges & Obstacles
+                  Critical Blockers
                 </CardTitle>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  type="button"
+                  onClick={() => applyNumbering(challenges, setChallenges)}
+                  className="h-8 gap-1 text-[10px] text-red-600 hover:bg-red-100"
+                >
+                  <Plus className="h-3 w-3" /> Auto-Number
+                </Button>
               </CardHeader>
               <CardContent className="p-4">
                 <Textarea
@@ -444,6 +501,7 @@ function WeeklyReportFormContent() {
                   className="min-h-[150px] resize-none text-base leading-relaxed focus-visible:ring-red-500"
                   value={challenges}
                   onChange={(e) => setChallenges(e.target.value)}
+                  onKeyDown={(e) => handleTextareaKeyDown(e, challenges, setChallenges)}
                   disabled={!isActionTrackerComplete}
                 />
               </CardContent>

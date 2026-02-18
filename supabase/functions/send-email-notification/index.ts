@@ -5,8 +5,8 @@ import { Resend } from "npm:resend@2.0.0"
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
-const DB_TRIGGER_SECRET = "acob_notification_trigger_secret_2026"
-const LEGACY_TRIGGER_SECRET = "b6393118aded6b24ca849be194414535"
+const DB_TRIGGER_SECRET = Deno.env.get("DB_TRIGGER_SECRET")
+const LEGACY_TRIGGER_SECRET = Deno.env.get("LEGACY_TRIGGER_SECRET")
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -31,7 +31,7 @@ serve(async (req) => {
       signature === LEGACY_TRIGGER_SECRET
 
     if (!isServiceRole && !isSecretValid) {
-      console.error(`[AUTH] Unauthorized. Signature: ${signature?.slice(0, 5)}... Header Secret: ${signature}`)
+      console.error(`[AUTH] Unauthorized webhook signature. Signature prefix: ${signature?.slice(0, 5) ?? "none"}`)
       return new Response("Unauthorized", { status: 401 })
     }
 

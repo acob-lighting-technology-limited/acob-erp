@@ -10,24 +10,49 @@ import { createClient } from "@/lib/supabase/client"
 import { getCurrentISOWeek } from "@/lib/utils"
 import { toast } from "sonner"
 
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
-  FileBarChart,
+  ChevronDown,
+  ChevronRight,
+  MoreVertical,
+  FileText,
+  File as FileIcon,
   Presentation,
-  Search,
+  Plus,
+  RefreshCw,
+  Clock,
+  ExternalLink,
   User,
-  Building,
   CalendarDays,
-  CheckCircle2,
-  Target,
-  AlertTriangle,
   Edit2,
   Trash2,
-  MoreVertical,
+  FileBarChart,
+  Loader2,
+  Search,
 } from "lucide-react"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu"
 import Link from "next/link"
-// import pptxgen from "pptxgenjs"
+import {
+  exportToPDF,
+  exportToDocx,
+  exportToPPTX,
+  exportAllToPDF,
+  exportAllToDocx,
+  exportAllToPPTX,
+} from "@/lib/export-utils"
+import { WeeklyReportAdminDialog } from "@/components/admin/reports/weekly-report-dialog"
+import { cn } from "@/lib/utils"
+import { format } from "date-fns"
+import { Label } from "@/components/ui/label"
+import { Fragment } from "react"
 
 interface WeeklyReport {
   id: string
@@ -38,11 +63,9 @@ interface WeeklyReport {
   tasks_new_week: string
   challenges: string
   status: string
+  user_id: string
   created_at: string
-  profiles: {
-    first_name: string
-    last_name: string
-  }
+  profiles: any // Suppress array vs object linting for Supabase joins
 }
 
 interface WeeklyReportsContentProps {
@@ -56,6 +79,9 @@ export function WeeklyReportsContent({ initialDepartments }: WeeklyReportsConten
   const [yearFilter, setYearFilter] = useState(new Date().getFullYear())
   const [deptFilter, setDeptFilter] = useState("all")
   const [searchQuery, setSearchQuery] = useState("")
+  const [isAdminDialogOpen, setIsAdminDialogOpen] = useState(false)
+  const [editingReport, setEditingReport] = useState<WeeklyReport | null>(null)
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
 
   const supabase = createClient()
 
@@ -64,7 +90,9 @@ export function WeeklyReportsContent({ initialDepartments }: WeeklyReportsConten
     try {
       let query = supabase
         .from("weekly_reports")
-        .select("*, profiles(first_name, last_name)")
+        .select(
+          "id, department, week_number, year, work_done, tasks_new_week, challenges, status, user_id, created_at, profiles(first_name, last_name)"
+        )
         .eq("status", "submitted")
         .eq("week_number", weekFilter)
         .eq("year", yearFilter)
@@ -88,6 +116,16 @@ export function WeeklyReportsContent({ initialDepartments }: WeeklyReportsConten
   useEffect(() => {
     loadReports()
   }, [weekFilter, yearFilter, deptFilter])
+
+  const toggleRow = (id: string) => {
+    const newExpanded = new Set(expandedRows)
+    if (newExpanded.has(id)) {
+      newExpanded.delete(id)
+    } else {
+      newExpanded.add(id)
+    }
+    setExpandedRows(newExpanded)
+  }
 
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure? Admin delete is permanent.")) return
@@ -190,41 +228,75 @@ export function WeeklyReportsContent({ initialDepartments }: WeeklyReportsConten
       title="Weekly Reports"
       description="Review and export departmental reports"
       icon={FileBarChart}
+      actions={
+        <div className="flex items-center gap-2">
+          {filteredReports.length > 0 && (
+            <>
+              <Button
+                variant="outline"
+                onClick={() => exportAllToPDF(filteredReports, weekFilter, yearFilter)}
+                className="gap-2 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-900/30 dark:hover:bg-red-950/20"
+              >
+                <FileText className="h-4 w-4" /> <span className="hidden sm:inline">PDF</span>
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => exportAllToDocx(filteredReports, weekFilter, yearFilter)}
+                className="gap-2 border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700 dark:border-blue-900/30 dark:hover:bg-blue-950/20"
+              >
+                <FileIcon className="h-4 w-4" /> <span className="hidden sm:inline">Word</span>
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => exportAllToPPTX(filteredReports, weekFilter, yearFilter)}
+                className="gap-2 border-orange-200 text-orange-600 hover:bg-orange-50 hover:text-orange-700 dark:border-orange-900/30 dark:hover:bg-orange-950/20"
+              >
+                <Presentation className="h-4 w-4" /> <span className="hidden sm:inline">PPTX</span>
+              </Button>
+            </>
+          )}
+          <Button
+            onClick={() => {
+              setEditingReport(null)
+              setIsAdminDialogOpen(true)
+            }}
+            className="gap-2"
+          >
+            <Plus className="h-4 w-4" /> Add Override
+          </Button>
+        </div>
+      }
       filters={
-        <div className="mb-6 flex flex-col gap-4 md:flex-row">
-          <div className="relative flex-1">
-            <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-            <Input
-              placeholder="Search reports..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-          <div className="flex gap-2">
-            <div className="w-24">
+        <div className="mb-6 flex flex-col items-end justify-between gap-4 md:flex-row">
+          <div className="w-full max-w-md flex-1">
+            <Label className="mb-1.5 block text-xs font-semibold">Search Content</Label>
+            <div className="relative">
+              <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
               <Input
-                type="number"
-                value={weekFilter}
-                onChange={(e) => setWeekFilter(parseInt(e.target.value))}
-                title="Week Number"
+                placeholder="Search..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
               />
+            </div>
+          </div>
+          <div className="flex w-full flex-wrap items-end gap-3 md:w-auto">
+            <div className="w-24">
+              <Label className="mb-1.5 block text-xs font-semibold">Week</Label>
+              <Input type="number" value={weekFilter} onChange={(e) => setWeekFilter(parseInt(e.target.value))} />
             </div>
             <div className="w-28">
-              <Input
-                type="number"
-                value={yearFilter}
-                onChange={(e) => setYearFilter(parseInt(e.target.value))}
-                title="Year"
-              />
+              <Label className="mb-1.5 block text-xs font-semibold">Year</Label>
+              <Input type="number" value={yearFilter} onChange={(e) => setYearFilter(parseInt(e.target.value))} />
             </div>
-            <div className="w-48">
+            <div className="min-w-[12rem] flex-1 md:flex-none">
+              <Label className="mb-1.5 block text-xs font-semibold">Department</Label>
               <Select value={deptFilter} onValueChange={setDeptFilter}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Department" />
+                  <SelectValue placeholder="All Departments" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Departments</SelectItem>
+                  <SelectItem value="all">Every Department</SelectItem>
                   {initialDepartments.map((dept) => (
                     <SelectItem key={dept} value={dept}>
                       {dept}
@@ -233,102 +305,184 @@ export function WeeklyReportsContent({ initialDepartments }: WeeklyReportsConten
                 </SelectContent>
               </Select>
             </div>
+            <Button variant="outline" size="icon" onClick={loadReports} disabled={loading} className="shrink-0">
+              <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
+            </Button>
           </div>
         </div>
       }
     >
-      <div className="grid gap-6">
-        {loading ? (
-          <div className="text-muted-foreground py-20 text-center">Loading reports...</div>
-        ) : filteredReports.length === 0 ? (
-          <div className="text-muted-foreground py-20 text-center">No reports found for this week.</div>
-        ) : (
-          filteredReports.map((report) => (
-            <Card key={report.id} className="overflow-hidden border-2 shadow-sm">
-              <CardHeader className="bg-muted/30 border-b p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="bg-primary/10 rounded-lg p-2">
-                      <Building className="text-primary h-5 w-5" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-xl">{report.department}</CardTitle>
-                      <CardDescription className="mt-1 flex items-center gap-3">
-                        <span className="flex items-center gap-1">
-                          <User className="h-3 w-3" />
-                          {report.profiles?.first_name} {report.profiles?.last_name}
-                        </span>
-                        <span className="text-primary flex items-center gap-1 font-medium">
-                          <CalendarDays className="h-3 w-3" />
-                          Week {report.week_number}, {report.year}
-                        </span>
-                      </CardDescription>
-                    </div>
+      <div className="bg-background dark:bg-card overflow-hidden rounded-lg border shadow-sm">
+        <Table>
+          <TableHeader className="bg-muted/50">
+            <TableRow>
+              <TableHead className="text-muted-foreground w-[40px]"></TableHead>
+              <TableHead className="text-foreground font-bold">Department</TableHead>
+              <TableHead className="text-foreground font-bold">Submitted By</TableHead>
+              <TableHead className="text-foreground font-bold">Week</TableHead>
+              <TableHead className="text-foreground font-bold">Submission Date</TableHead>
+              <TableHead className="text-foreground text-right font-bold">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={6} className="h-32 text-center">
+                  <div className="flex items-center justify-center gap-2 text-slate-500">
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    Auditing records...
                   </div>
-                  <div className="flex gap-2">
-                    {/* <Button variant="outline" size="sm" onClick={() => exportToPPT(report)} className="gap-2 bg-white">
-                      <Presentation className="h-4 w-4 text-orange-600" />
-                      Export to PPTX
-                    </Button> */}
-
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <Link
-                          href={`/portal/reports/weekly-reports/new?week=${report.week_number}&year=${report.year}&dept=${report.department}`}
-                        >
-                          <DropdownMenuItem className="cursor-pointer gap-2">
-                            <Edit2 className="h-4 w-4" /> Edit Override
-                          </DropdownMenuItem>
-                        </Link>
-                        <DropdownMenuItem
-                          className="text-destructive cursor-pointer gap-2"
-                          onClick={() => handleDelete(report.id)}
-                        >
-                          <Trash2 className="h-4 w-4" /> Delete Permanently
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="grid gap-6 pt-6 md:grid-cols-3">
-                <div>
-                  <h4 className="mb-2 flex items-center gap-2 text-xs font-bold text-blue-600 uppercase">
-                    <CheckCircle2 className="h-4 w-4" />
-                    Work Done
-                  </h4>
-                  <div className="text-foreground min-h-[100px] rounded-xl border border-blue-100 bg-blue-50/20 p-4 text-sm whitespace-pre-wrap">
-                    {report.work_done}
-                  </div>
-                </div>
-                <div>
-                  <h4 className="mb-2 flex items-center gap-2 text-xs font-bold text-green-600 uppercase">
-                    <Target className="h-4 w-4" />
-                    Tasks New Week
-                  </h4>
-                  <div className="text-foreground min-h-[100px] rounded-xl border border-green-100 bg-green-50/20 p-4 text-sm whitespace-pre-wrap">
-                    {report.tasks_new_week}
-                  </div>
-                </div>
-                <div>
-                  <h4 className="mb-2 flex items-center gap-2 text-xs font-bold text-red-600 uppercase">
-                    <AlertTriangle className="h-4 w-4" />
-                    Challenges
-                  </h4>
-                  <div className="text-foreground min-h-[100px] rounded-xl border border-red-100 bg-red-50/20 p-4 text-sm whitespace-pre-wrap">
-                    {report.challenges}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))
-        )}
+                </TableCell>
+              </TableRow>
+            ) : filteredReports.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} className="h-32 text-center font-medium text-slate-500">
+                  No records found for the selected criteria.
+                </TableCell>
+              </TableRow>
+            ) : (
+              filteredReports.map((report) => (
+                <Fragment key={report.id}>
+                  <TableRow
+                    className={cn(
+                      "hover:bg-muted/50 cursor-pointer transition-colors",
+                      expandedRows.has(report.id) && "bg-muted/30"
+                    )}
+                    onClick={() => toggleRow(report.id)}
+                  >
+                    <TableCell>
+                      {expandedRows.has(report.id) ? (
+                        <ChevronDown className="h-4 w-4 text-slate-400" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4 text-slate-400" />
+                      )}
+                    </TableCell>
+                    <TableCell className="text-foreground font-bold">{report.department}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {(() => {
+                        const p = Array.isArray(report.profiles) ? report.profiles[0] : report.profiles
+                        return p ? `${p.first_name} ${p.last_name}` : "Unknown"
+                      })()}
+                    </TableCell>
+                    <TableCell className="text-foreground font-medium">
+                      W{report.week_number}, {report.year}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-sm">
+                      {format(new Date(report.created_at), "MMM dd, yyyy")}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                        <div className="bg-background flex items-center gap-1 rounded-md border p-0.5 shadow-sm">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-red-600 hover:text-red-700"
+                            onClick={() => exportToPDF(report)}
+                            title="PDF"
+                          >
+                            <FileIcon className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-indigo-600 hover:text-indigo-700"
+                            onClick={() => exportToDocx(report)}
+                            title="Word"
+                          >
+                            <FileText className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-amber-600 hover:text-amber-700"
+                            onClick={() => exportToPPTX(report)}
+                            title="Deck"
+                          >
+                            <Presentation className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setEditingReport(report)
+                                setIsAdminDialogOpen(true)
+                              }}
+                            >
+                              <Edit2 className="mr-2 h-4 w-4" /> Edit Report
+                            </DropdownMenuItem>
+                            <Link
+                              href={`/portal/reports/weekly-reports/new?week=${report.week_number}&year=${report.year}&dept=${report.department}`}
+                            >
+                              <DropdownMenuItem>
+                                <ExternalLink className="mr-2 h-4 w-4" /> Portal View
+                              </DropdownMenuItem>
+                            </Link>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="text-red-600 focus:bg-red-50 focus:text-red-600"
+                              onClick={() => handleDelete(report.id)}
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" /> Purge Record
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                  {expandedRows.has(report.id) && (
+                    <TableRow className="border-t-0 bg-slate-50/30 hover:bg-slate-50/30">
+                      <TableCell colSpan={6} className="p-0">
+                        <div className="animate-in slide-in-from-top-2 grid grid-cols-1 gap-8 p-6 duration-200 md:grid-cols-3">
+                          <div className="space-y-3">
+                            <h4 className="flex items-center gap-2 text-[10px] font-black tracking-widest text-blue-600 uppercase">
+                              <div className="h-1 w-1 rounded-full bg-blue-600" />
+                              Work Accomplished
+                            </h4>
+                            <div className="border-l-2 border-blue-100 pl-3 text-sm leading-relaxed font-medium whitespace-pre-wrap text-slate-700">
+                              {report.work_done}
+                            </div>
+                          </div>
+                          <div className="space-y-3">
+                            <h4 className="flex items-center gap-2 text-[10px] font-black tracking-widest text-emerald-600 uppercase">
+                              <div className="h-1 w-1 rounded-full bg-emerald-600" />
+                              Upcoming Objectives
+                            </h4>
+                            <div className="border-l-2 border-emerald-100 pl-3 text-sm leading-relaxed font-medium whitespace-pre-wrap text-slate-700">
+                              {report.tasks_new_week}
+                            </div>
+                          </div>
+                          <div className="space-y-3">
+                            <h4 className="flex items-center gap-2 text-[10px] font-black tracking-widest text-rose-600 uppercase">
+                              <div className="h-1 w-1 rounded-full bg-rose-600" />
+                              Critical Blockers
+                            </h4>
+                            <div className="border-l-2 border-rose-100 pl-3 text-sm leading-relaxed font-medium whitespace-pre-wrap text-slate-700">
+                              {report.challenges}
+                            </div>
+                          </div>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </Fragment>
+              ))
+            )}
+          </TableBody>
+        </Table>
       </div>
+
+      <WeeklyReportAdminDialog
+        isOpen={isAdminDialogOpen}
+        onClose={() => setIsAdminDialogOpen(false)}
+        report={editingReport}
+        onSuccess={loadReports}
+      />
     </AdminTablePage>
   )
 }

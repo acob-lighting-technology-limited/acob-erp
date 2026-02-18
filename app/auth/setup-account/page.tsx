@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import Link from "next/link"
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 
 import { ArrowLeft, UserPlus, CheckCircle2, Lock, Eye, EyeOff, CheckCircle } from "lucide-react"
 import Image from "next/image"
@@ -16,7 +16,7 @@ import { formValidation } from "@/lib/validation"
 import { useSearchParams, useRouter } from "next/navigation"
 import { toast } from "sonner"
 
-export default function SetupAccountPage() {
+function SetupAccountContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const token = searchParams?.get("token")
@@ -96,7 +96,7 @@ export default function SetupAccountPage() {
       })
 
       const data = await response.json()
-      if (!response.ok) throw new Error(data.error)
+      if (!response.ok) throw new Error(data.error || data.message || "Failed to activate account")
 
       setIsSuccess(true)
       toast.success("Account activated successfully!")
@@ -191,6 +191,7 @@ export default function SetupAccountPage() {
                           type="button"
                           onClick={() => setShowPassword(!showPassword)}
                           className="text-muted-foreground hover:text-foreground absolute top-1/2 right-3 -translate-y-1/2"
+                          aria-label={showPassword ? "Hide password" : "Show password"}
                         >
                           {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                         </button>
@@ -212,6 +213,7 @@ export default function SetupAccountPage() {
                           type="button"
                           onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                           className="text-muted-foreground hover:text-foreground absolute top-1/2 right-3 -translate-y-1/2"
+                          aria-label={showConfirmPassword ? "Hide password" : "Show password"}
                         >
                           {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                         </button>
@@ -343,5 +345,15 @@ export default function SetupAccountPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function SetupAccountPage() {
+  return (
+    <Suspense
+      fallback={<div className="flex min-h-screen items-center justify-center font-medium">Loading setup page...</div>}
+    >
+      <SetupAccountContent />
+    </Suspense>
   )
 }
