@@ -605,9 +605,13 @@ const pdfActionTrackerPage = (
   doc.setLineWidth(0.5)
   doc.line(14, headerH + 20, W - 14, headerH + 20)
 
-  // Column headers
-  const colX = [14, 90, 155]
-  const colW2 = [74, 63, 41]
+  // Column headers: S/N | ACTION ITEM | STATUS
+  const snX = 14
+  const snW = 12
+  const actionX = snX + snW
+  const statusW = 36
+  const statusX = W - 14 - statusW
+  const actionW = statusX - actionX
   const headerY = headerH + 28
 
   doc.setFillColor(...PDF_GREEN)
@@ -615,9 +619,9 @@ const pdfActionTrackerPage = (
   doc.setFontSize(8)
   doc.setTextColor(...PDF_WHITE)
   doc.setFont("helvetica", "bold")
-  doc.text("ACTION ITEM", colX[0] + 2, headerY)
-  doc.text("DEPARTMENT", colX[1] + 2, headerY)
-  doc.text("STATUS", colX[2] + 2, headerY)
+  doc.text("S/N", snX + 2, headerY)
+  doc.text("ACTION ITEM", actionX + 2, headerY)
+  doc.text("STATUS", statusX + 2, headerY)
 
   // Rows
   let rowY = headerY + 8
@@ -643,24 +647,28 @@ const pdfActionTrackerPage = (
       doc.rect(14, rowY - 5, W - 28, rowH, "F")
     }
 
+    // S/N
+    doc.setFontSize(8)
+    doc.setTextColor(...PDF_SLATE)
+    doc.setFont("helvetica", "bold")
+    doc.text(`${i + 1}`, snX + 4, rowY)
+
+    // Action item — full width, no truncation
     doc.setFontSize(9)
     doc.setTextColor(...PDF_SLATE)
     doc.setFont("helvetica", "normal")
-
-    const titleLines = doc.splitTextToSize(action.title, colW2[0] - 4)
-    doc.text(titleLines[0], colX[0] + 2, rowY) // single line to keep row height consistent
-    const deptLabel = action.department.length > 22 ? action.department.slice(0, 20) + "..." : action.department
-    doc.text(deptLabel, colX[1] + 2, rowY)
+    const titleLines = doc.splitTextToSize(action.title, actionW - 4)
+    doc.text(titleLines[0], actionX + 2, rowY)
 
     // Status badge
     const statusColor = statusColors[action.status] || statusColors.pending
     const statusLabel = statusLabels[action.status] || action.status
     doc.setFillColor(...statusColor)
-    doc.roundedRect(colX[2] + 2, rowY - 4, 34, 6, 1, 1, "F")
+    doc.roundedRect(statusX + 1, rowY - 4, statusW - 2, 6, 1, 1, "F")
     doc.setTextColor(...PDF_WHITE)
     doc.setFont("helvetica", "bold")
     doc.setFontSize(7)
-    doc.text(statusLabel, colX[2] + 19, rowY, { align: "center" })
+    doc.text(statusLabel, statusX + statusW / 2, rowY, { align: "center" })
 
     // Separator
     doc.setDrawColor(226, 232, 240)
@@ -805,11 +813,11 @@ export const exportActionTrackerToPPTX = async (actions: ActionItem[], week: num
       fontFace: "Calibri",
     })
 
-    // Table header
+    // Table header: S/N | ACTION ITEM | STATUS
     const tableY = 1.2
-    const colWidths = [6.5, 3.5, 2.8]
-    const headers = ["ACTION ITEM", "DEPARTMENT", "STATUS"]
-    const colX = [0.25, 6.75, 10.25]
+    const colWidths = [0.8, 9.2, 2.8]
+    const headers = ["S/N", "ACTION ITEM", "STATUS"]
+    const colX = [0.25, 1.05, 10.25]
 
     slide.addShape(pres.ShapeType?.rect ?? "rect", {
       x: 0.25,
@@ -858,19 +866,20 @@ export const exportActionTrackerToPPTX = async (actions: ActionItem[], week: num
         fill: { color: bg },
         line: { color: "E2E8F0", width: 0.5 },
       })
-      const title = action.title.length > 60 ? action.title.slice(0, 57) + "..." : action.title
-      slide.addText(title, {
+      // S/N
+      slide.addText(`${i + 1}`, {
         x: colX[0] + 0.1,
         y: rowY,
         w: colWidths[0] - 0.1,
         h: rowH,
         fontSize: 10,
+        bold: true,
         color: ACOB_SLATE,
         valign: "middle",
         fontFace: "Calibri",
       })
-      const deptTrunc = action.department.length > 28 ? action.department.slice(0, 25) + "..." : action.department
-      slide.addText(deptTrunc, {
+      // Action item — full width, no truncation
+      slide.addText(action.title, {
         x: colX[1] + 0.1,
         y: rowY,
         w: colWidths[1] - 0.1,
