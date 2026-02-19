@@ -29,6 +29,7 @@ import {
   Trash2,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { getNextWeekParams } from "@/lib/utils"
 
 type Employee = {
   id: string
@@ -129,9 +130,9 @@ export function MailDigestContent({ employees }: Props) {
     return emails
   }, [recipientMode, employees, selectedEmployeeIds, manualEmails])
 
-  // Meeting week = weekNumber. Everything uses the same week now.
-  const actionTrackerWeek = weekNumber
-  const actionTrackerYear = yearNumber
+  // Action items derived from week N's "Tasks for New Week" are stored as week N+1.
+  // So for meeting week 8, we need action items from week 9.
+  const { week: actionTrackerWeek, year: actionTrackerYear } = getNextWeekParams(weekNumber, yearNumber)
 
   // ── Handlers ────────────────────────────────────────────────────────────────
   const toggleEmployee = useCallback((id: string) => {
@@ -252,6 +253,8 @@ export function MailDigestContent({ employees }: Props) {
         recipients: resolvedRecipients,
         meetingWeek: weekNumber,
         meetingYear: yearNumber,
+        actionTrackerWeek,
+        actionTrackerYear,
       }
 
       if (contentChoice === "weekly_report") {
