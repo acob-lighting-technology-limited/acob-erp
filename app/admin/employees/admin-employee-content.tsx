@@ -42,6 +42,7 @@ import {
   ArrowDown,
   FileSignature,
   Download,
+  Building,
   FileText,
   Plus,
   CheckCircle2,
@@ -201,8 +202,8 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
     date_of_birth: "",
     employment_date: "",
     job_description: "",
-    department_changed_at: "",
-    department_change_reason: "",
+    department_changed_at: null as string | null,
+    department_change_reason: null as string | null,
   })
   const [showMoreOptions, setShowMoreOptions] = useState(false)
 
@@ -271,7 +272,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
           date_of_birth: fullProfile.date_of_birth || "",
           employment_date: fullProfile.employment_date || "",
           job_description: fullProfile.job_description || "",
-          department_changed_at: fullProfile.department_changed_at || new Date().toISOString().split("T")[0],
+          department_changed_at: fullProfile.department_changed_at || "",
           department_change_reason: "",
         })
       } else {
@@ -296,7 +297,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
           date_of_birth: "",
           employment_date: "",
           job_description: "",
-          department_changed_at: new Date().toISOString().split("T")[0],
+          department_changed_at: "",
           department_change_reason: "",
         })
       }
@@ -590,7 +591,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         }
       }
 
-      toast.success("Employee updated successfully")
+      toast.success("Employee deleted successfully")
       setIsDeleteDialogOpen(false)
       setSelectedEmployee(null)
       loadData()
@@ -653,7 +654,11 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         date_of_birth: editForm.date_of_birth || null,
         employment_date: editForm.employment_date || null,
         job_description: editForm.job_description || null,
-        department_changed_at: editForm.department_changed_at || null,
+      }
+
+      // Only include department_changed_at if it's explicitly set or department changed
+      if (selectedEmployee.department !== editForm.department || editForm.department_changed_at) {
+        updateData.department_changed_at = editForm.department_changed_at || new Date().toISOString().split("T")[0]
       }
 
       const { error } = await supabase.from("profiles").update(updateData).eq("id", selectedEmployee.id)
@@ -662,13 +667,18 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
 
       // Log department change to history if department was changed
       if (selectedEmployee.department !== editForm.department) {
-        await supabase.from("employee_department_history").insert({
+        const { error: historyError } = await supabase.from("employee_department_history").insert({
           profile_id: selectedEmployee.id,
           old_department: selectedEmployee.department,
           new_department: editForm.department,
           changed_at: editForm.department_changed_at || new Date().toISOString().split("T")[0],
           reason: editForm.department_change_reason || "Department changed during profile update",
         })
+
+        if (historyError) {
+          console.error("Failed to log department history:", historyError)
+          toast.error("Department updated but failed to record change history")
+        }
       }
 
       toast.success("Employee updated successfully")
@@ -1477,7 +1487,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
 
                   {member.current_work_location && (
                     <div className="text-muted-foreground flex items-center gap-2 text-sm">
-                      <MapPin className="h-4 w-4" />
+                      <Building className="h-4 w-4" />
                       <span>{member.current_work_location}</span>
                     </div>
                   )}
@@ -1760,7 +1770,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                 </Select>
                 <p className="text-muted-foreground mt-1 text-xs">
                   {userProfile?.role === "admin"
-                    ? "As Admin, you can assign: Visitor, Employee, and Lead roles"
+                    ? "As Admin, you can assign: Visitor and Employee roles"
                     : "As Super Admin, you can assign any role"}
                 </p>
                 {editForm.role === "lead" && (
@@ -1774,7 +1784,17 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                 <Label htmlFor="department">Department *</Label>
                 <Select
                   value={editForm.department}
-                  onValueChange={(value) => setEditForm({ ...editForm, department: value })}
+                  onValueChange={(value) => {
+                    const isOriginal = value === selectedEmployee?.department
+                    setEditForm({
+                      ...editForm,
+                      department: value,
+                      department_changed_at: isOriginal
+                        ? null
+                        : editForm.department_changed_at || new Date().toISOString().split("T")[0],
+                      department_change_reason: isOriginal ? null : editForm.department_change_reason,
+                    })
+                  }}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select department" />
@@ -1789,7 +1809,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                 </Select>
               </div>
 
-              {(selectedEmployee?.department !== editForm.department || editForm.department_changed_at) && (
+              {selectedEmployee?.department !== editForm.department && (
                 <div className="bg-muted/30 animate-in fade-in slide-in-from-top-2 grid gap-4 rounded-lg border p-4">
                   <div className="flex items-center gap-2">
                     <Calendar className="text-primary h-4 w-4" />
@@ -1830,11 +1850,11 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                   onValueChange={(value) => setEditForm({ ...editForm, office_location: value })}
                   placeholder="Select office location"
                   searchPlaceholder="Search office locations..."
-                  icon={<Building2 className="h-4 w-4" />}
+                  icon={<Building className="h-4 w-4" />}
                   options={OFFICE_LOCATIONS.map((location) => ({
                     value: location,
                     label: location,
-                    icon: <Building2 className="h-3 w-3" />,
+                    icon: <Building className="h-3 w-3" />,
                   }))}
                 />
               </div>
@@ -2206,7 +2226,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
 
                       {viewEmployeeProfile.residential_address && (
                         <div className="flex items-center gap-3">
-                          <MapPin className="text-muted-foreground h-5 w-5" />
+                          <Building className="text-muted-foreground h-5 w-5" />
                           <div>
                             <p className="text-muted-foreground text-sm">Address</p>
                             <p className="font-medium">{viewEmployeeProfile.residential_address}</p>
@@ -2214,15 +2234,13 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                         </div>
                       )}
 
-                      {viewEmployeeProfile.current_work_location && (
-                        <div className="flex items-center gap-3">
-                          <MapPin className="text-muted-foreground h-5 w-5" />
-                          <div>
-                            <p className="text-muted-foreground text-sm">Work Location</p>
-                            <p className="font-medium">{viewEmployeeProfile.current_work_location}</p>
-                          </div>
+                      <div className="flex items-center gap-3">
+                        <Building className="text-muted-foreground h-5 w-5" />
+                        <div>
+                          <p className="text-muted-foreground text-sm">Work Location</p>
+                          <p className="font-medium">{viewEmployeeProfile.current_work_location}</p>
                         </div>
-                      )}
+                      </div>
 
                       {viewEmployeeProfile.lead_departments && viewEmployeeProfile.lead_departments.length > 0 && (
                         <div className="flex items-center gap-3">

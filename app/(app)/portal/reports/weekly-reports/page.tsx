@@ -340,11 +340,11 @@ export default function WeeklyReportsPortal() {
                         <TableCell colSpan={6} className="p-0">
                           <div className="animate-in slide-in-from-top-2 grid grid-cols-1 gap-8 p-6 duration-200 md:grid-cols-3">
                             <div className="space-y-3">
-                              <h4 className="flex items-center gap-2 text-[10px] font-black tracking-widest text-blue-600 uppercase">
-                                <div className="h-1 w-1 rounded-full bg-blue-600" />
+                              <h4 className="text-primary flex items-center gap-2 text-[10px] font-black tracking-widest uppercase">
+                                <div className="bg-primary h-1 w-1 rounded-full" />
                                 Work Done
                               </h4>
-                              <div className="text-foreground/80 space-y-1.5 border-l-2 border-blue-100 pl-3 text-sm font-medium dark:border-blue-900/30">
+                              <div className="text-foreground/80 border-primary/20 space-y-1.5 border-l-2 pl-3 text-sm font-medium">
                                 {autoNumberLines(report.work_done)
                                   .split("\n")
                                   .map((line, i) => (
@@ -353,11 +353,11 @@ export default function WeeklyReportsPortal() {
                               </div>
                             </div>
                             <div className="space-y-3">
-                              <h4 className="flex items-center gap-2 text-[10px] font-black tracking-widest text-emerald-600 uppercase">
-                                <div className="h-1 w-1 rounded-full bg-emerald-600" />
+                              <h4 className="flex items-center gap-2 text-[10px] font-black tracking-widest text-indigo-500 uppercase">
+                                <div className="h-1 w-1 rounded-full bg-indigo-500" />
                                 Tasks for New Week
                               </h4>
-                              <div className="text-foreground/80 space-y-1.5 border-l-2 border-emerald-100 pl-3 text-sm font-medium dark:border-emerald-900/30">
+                              <div className="text-foreground/80 space-y-1.5 border-l-2 border-indigo-100 pl-3 text-sm font-medium dark:border-indigo-900/30">
                                 {autoNumberLines(report.tasks_new_week)
                                   .split("\n")
                                   .map((line, i) => (
@@ -366,11 +366,11 @@ export default function WeeklyReportsPortal() {
                               </div>
                             </div>
                             <div className="space-y-3">
-                              <h4 className="flex items-center gap-2 text-[10px] font-black tracking-widest text-rose-600 uppercase">
-                                <div className="h-1 w-1 rounded-full bg-rose-600" />
+                              <h4 className="flex items-center gap-2 text-[10px] font-black tracking-widest text-orange-500 uppercase">
+                                <div className="h-1 w-1 rounded-full bg-orange-500" />
                                 Challenges
                               </h4>
-                              <div className="text-foreground/80 space-y-1.5 border-l-2 border-rose-100 pl-3 text-sm font-medium dark:border-rose-900/30">
+                              <div className="text-foreground/80 space-y-1.5 border-l-2 border-orange-100 pl-3 text-sm font-medium dark:border-orange-900/30">
                                 {autoNumberLines(report.challenges)
                                   .split("\n")
                                   .map((line, i) => (

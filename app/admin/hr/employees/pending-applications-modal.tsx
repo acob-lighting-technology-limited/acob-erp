@@ -115,6 +115,14 @@ export function PendingApplicationsModal({ onEmployeeCreated }: PendingApplicati
 
   const handleApprove = async () => {
     if (!selectedUser) return
+
+    // Validate ID format before sending
+    const empNumPattern = /^ACOB\/[0-9]{4}\/[0-9]{3}$/
+    if (employeeId && !empNumPattern.test(employeeId)) {
+      toast.error("Employee ID MUST be in format: ACOB/YEAR/NUMBER (e.g., ACOB/2026/001)")
+      return
+    }
+
     setIsProcessing(true)
 
     try {
