@@ -94,7 +94,7 @@ export function MeetingRemindersContent({ employees }: Props) {
 
   // Meeting fields
   const [meetingDate, setMeetingDate] = useState(getNextMondayFormatted())
-  const [meetingTime, setMeetingTime] = useState("09:00")
+  const [meetingTime, setMeetingTime] = useState("08:30")
   const [teamsLink, setTeamsLink] = useState(DEFAULT_TEAMS_LINK)
   const [agendaText, setAgendaText] = useState(DEFAULT_AGENDA.join("\n"))
 

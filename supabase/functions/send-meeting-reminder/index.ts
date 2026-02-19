@@ -201,14 +201,15 @@ serve(async (req) => {
       subject = "Reminder for General Weekly Meeting"
       html = buildMeetingReminderHtml(
         meetingDate || "Monday",
-        meetingTime || "9:00 AM",
+        meetingTime || "8:30 AM",
         teamsLink || "",
         agenda || [
           "Opening Prayer",
-          "Departmental updates",
-          "Progress on ongoing projects",
-          "Upcoming Events and Deadline",
-          "Any other business",
+          "Knowledge Sharing Session (30 minutes)",
+          "Departmental Updates",
+          "Progress on Ongoing Projects",
+          "Upcoming Events and Deadlines",
+          "Any Other Business",
           "Adjournment",
         ]
       )
