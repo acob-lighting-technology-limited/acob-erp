@@ -1,21 +1,3 @@
-import { escapeHtml } from "./utils"
-import { type PendingUser } from "./welcome"
-
-interface InternalNotificationEmailProps {
-  pendingUser: PendingUser
-  employeeId: string
-}
-
-export function renderInternalNotificationEmail({ pendingUser, employeeId }: InternalNotificationEmailProps) {
-  const firstName = escapeHtml(pendingUser.first_name)
-  const lastName = escapeHtml(pendingUser.last_name)
-  const dept = escapeHtml(pendingUser.department)
-  const email = escapeHtml(pendingUser.company_email)
-  const workLoc = escapeHtml(pendingUser.current_work_location)
-  const officeLoc = pendingUser.office_location ? escapeHtml(pendingUser.office_location) : ""
-  const empId = escapeHtml(employeeId)
-
-  return `
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -54,30 +36,29 @@ export function renderInternalNotificationEmail({ pendingUser, employeeId }: Int
             <table>
                 <tr>
                     <td class="label">Employee Name</td>
-                    <td class="value">${firstName} ${lastName}</td>
+                    <td class="value">Chibuike I.</td>
                 </tr>
                 <tr>
                     <td class="label">Employee ID</td>
-                    <td class="value">${empId}</td>
+                    <td class="value">ACOB/2026/042</td>
                 </tr>
                 <tr>
                     <td class="label">Department</td>
-                    <td class="value">${dept}</td>
+                    <td class="value">ICT and Communications</td>
                 </tr>
                 <tr>
                     <td class="label">Official Email</td>
-                    <td class="value">${email}</td>
+                    <td class="value">i.chibuikem@acoblighting.com</td>
                 </tr>
                 <tr>
                     <td class="label">Work Location</td>
                     <td class="value">
-                        ${workLoc}
-                        ${officeLoc && officeLoc !== workLoc ? `(${officeLoc})` : ""}
+                        Head Office (Abuja)
                     </td>
                 </tr>
                 <tr>
                     <td class="label">Approved Date</td>
-                    <td class="value">${new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</td>
+                    <td class="value">February 19, 2026</td>
                 </tr>
             </table>
         </div>
@@ -93,5 +74,3 @@ export function renderInternalNotificationEmail({ pendingUser, employeeId }: Int
     </div>
 </body>
 </html>
-  `
-}

@@ -483,7 +483,7 @@ function buildEmailHtml(
   </div>
   <div class="wrapper">
     <span class="week-badge">Week ${meetingWeek} &bull; ${meetingYear}</span>
-    <div class="title">General Meeting Minutes &amp; Action Tracker</div>
+    <div class="title">General Meeting Minutes and Actionable</div>
     <p class="text">Dear All,</p>
     <p class="text">
       Please find attached the <strong>Weekly Report and Actionable Items</strong>
@@ -511,9 +511,7 @@ function buildEmailHtml(
         <span class="attach-badge">PDF</span>
       </div>
     </div>
-    <div class="cta">
-      <a href="https://erp.acoblighting.com/portal/reports/weekly-reports" class="button">View Reports Portal</a>
-    </div>
+
     <div class="support">
       If you have any questions, please contact<br>
       <a href="mailto:ict@acoblighting.com">ict@acoblighting.com</a>
@@ -573,26 +571,26 @@ serve(async (req) => {
     let meetingYear: number
 
     if (bodyMeetingWeek) {
-      // New unified approach: meetingWeek is the meeting week directly
       meetingWeek = bodyMeetingWeek
       meetingYear = bodyMeetingYear || currentYear
     } else if (forceWeek) {
-      // Legacy: forceWeek was the report-data week, meeting week = forceWeek + 1
-      meetingWeek = forceWeek + 1 > 52 ? 1 : forceWeek + 1
-      meetingYear = forceWeek + 1 > 52 ? (forceYear || currentYear) + 1 : forceYear || currentYear
+      // Legacy: use the week as-is (no offset)
+      meetingWeek = forceWeek
+      meetingYear = forceYear || currentYear
     } else if (bodyWeek) {
-      // Legacy: bodyWeek was report-data week
-      meetingWeek = bodyWeek + 1 > 52 ? 1 : bodyWeek + 1
-      meetingYear = bodyWeek + 1 > 52 ? (bodyYear || currentYear) + 1 : bodyYear || currentYear
+      // Legacy: use the week as-is (no offset)
+      meetingWeek = bodyWeek
+      meetingYear = bodyYear || currentYear
     } else {
-      // Auto: current week IS the meeting week
+      // Auto: current week
       meetingWeek = currentWeek
       meetingYear = currentYear
     }
 
     // ── Data weeks ──────────────────────────────────────────────────────
-    // Reports data = previous week (week - 1), action tracker = meeting week
-    const { week: reportDataWeek, year: reportDataYear } = getPreviousWeek(meetingWeek, meetingYear)
+    // Everything uses the same meeting week — no previous-week offset
+    const reportDataWeek = meetingWeek
+    const reportDataYear = meetingYear
     const atWeek = bodyAtWeek ?? meetingWeek
     const atYear = bodyAtYear ?? meetingYear
 
@@ -666,7 +664,7 @@ serve(async (req) => {
           ? [testEmail]
           : ["i.chibuikem@org.acoblighting.com"]
 
-    const subject = `General Meeting Minutes \u2014 Week ${meetingWeek}, ${meetingYear}`
+    const subject = `General Meeting Minutes and Actionable \u2014 Week ${meetingWeek}, ${meetingYear}`
     const html = buildEmailHtml(meetingWeek, meetingYear, reportDataWeek, reportDataYear)
 
     const results = []

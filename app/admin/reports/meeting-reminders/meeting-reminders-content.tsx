@@ -1,7 +1,8 @@
 "use client"
 
-import { useState, useMemo, useCallback, useEffect } from "react"
+import { useState, useMemo, useCallback } from "react"
 import { toast } from "sonner"
+import { createClient } from "@/lib/supabase/client"
 import { PageWrapper, PageHeader } from "@/components/layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -9,26 +10,26 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
+import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
-  Mail,
+  Megaphone,
   Send,
-  Clock,
   Users,
   UserPlus,
-  FileText,
-  ClipboardList,
+  Mail,
   X,
   Plus,
   Loader2,
   CheckCircle2,
   AlertCircle,
   Search,
-  CalendarDays,
+  Calendar,
+  Clock,
+  Video,
+  BookOpen,
   Repeat,
-  Trash2,
 } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
 
 type Employee = {
   id: string
@@ -39,64 +40,80 @@ type Employee = {
 }
 
 type RecipientMode = "all" | "select" | "manual" | "all_plus"
-type ContentChoice = "both" | "weekly_report" | "action_tracker"
+type ReminderType = "meeting" | "knowledge_sharing"
 type SendTiming = "now" | "scheduled" | "recurring"
 
 interface Props {
   employees: Employee[]
 }
 
-export function MailDigestContent({ employees }: Props) {
-  const supabase = createClient()
+const DEFAULT_TEAMS_LINK =
+  "https://teams.microsoft.com/l/meetup-join/19%3ameeting_MWZhNTgwYjEtMzdjMi00ZDZkLWJhM2YtZjFiNjgxNDEzN2Nk%40thread.v2/0?context=%7b%22Tid%22%3a%22b1f048ac-9f61-4cfd-98a3-13454b2682e5%22%2c%22Oid%22%3a%22224317b2-9cfb-425c-bc86-57bb397c73cd%22%7d"
 
+const DEFAULT_AGENDA = [
+  "Opening Prayer",
+  "Departmental updates",
+  "Progress on ongoing projects",
+  "Upcoming Events and Deadline",
+  "Any other business",
+  "Adjournment",
+]
+
+function getNextMondayFormatted(): string {
+  const now = new Date()
+  const day = now.getDay()
+  const daysUntilMonday = day === 0 ? 1 : day === 1 ? 0 : 8 - day
+  const nextMonday = new Date(now)
+  nextMonday.setDate(now.getDate() + daysUntilMonday)
+  return nextMonday.toISOString().split("T")[0]
+}
+
+function formatDateNice(dateStr: string): string {
+  if (!dateStr) return ""
+  const d = new Date(dateStr + "T00:00:00")
+  const day = d.getDate()
+  const suffix = [1, 21, 31].includes(day) ? "st" : [2, 22].includes(day) ? "nd" : [3, 23].includes(day) ? "rd" : "th"
+  const weekday = d.toLocaleDateString("en-GB", { weekday: "long" })
+  const month = d.toLocaleDateString("en-GB", { month: "long" })
+  const year = d.getFullYear()
+  return `${weekday} ${day}${suffix} ${month} ${year}`
+}
+
+function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1)
+}
+
+export function MeetingRemindersContent({ employees }: Props) {
   // ── State ──────────────────────────────────────────────────────────────────
+  const [reminderType, setReminderType] = useState<ReminderType>("meeting")
   const [recipientMode, setRecipientMode] = useState<RecipientMode>("all")
   const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<Set<string>>(new Set())
   const [manualEmails, setManualEmails] = useState<string[]>([])
   const [manualInput, setManualInput] = useState("")
   const [searchQuery, setSearchQuery] = useState("")
 
-  const [contentChoice, setContentChoice] = useState<ContentChoice>("both")
+  // Meeting fields
+  const [meetingDate, setMeetingDate] = useState(getNextMondayFormatted())
+  const [meetingTime, setMeetingTime] = useState("09:00")
+  const [teamsLink, setTeamsLink] = useState(DEFAULT_TEAMS_LINK)
+  const [agendaText, setAgendaText] = useState(DEFAULT_AGENDA.join("\n"))
 
-  const currentYear = new Date().getFullYear()
-  const currentWeekNumber = getISOWeek()
-  // Default = CURRENT week (the meeting week)
-  const [weekNumber, setWeekNumber] = useState(currentWeekNumber)
-  const [yearNumber, setYearNumber] = useState(currentYear)
+  // Knowledge sharing fields
+  const [sessionDate, setSessionDate] = useState(getNextMondayFormatted())
+  const [sessionTime, setSessionTime] = useState("08:30")
+  const [duration, setDuration] = useState("30 minutes")
 
+  // Delivery timing
   const [sendTiming, setSendTiming] = useState<SendTiming>("now")
   const [scheduledDate, setScheduledDate] = useState("")
   const [scheduledTime, setScheduledTime] = useState("09:00")
-  const [recurringDay, setRecurringDay] = useState("monday")
-  const [recurringTime, setRecurringTime] = useState("09:00")
+  const [recurringDay, setRecurringDay] = useState("sunday")
+  const [recurringTime, setRecurringTime] = useState("18:00")
 
   const [isSending, setIsSending] = useState(false)
   const [sendResult, setSendResult] = useState<any>(null)
 
-  // Active schedules from DB
-  const [activeSchedules, setActiveSchedules] = useState<any[]>([])
-  const [loadingSchedules, setLoadingSchedules] = useState(false)
-
-  // ── Fetch active schedules ──────────────────────────────────────────────────
-  const fetchSchedules = useCallback(async () => {
-    setLoadingSchedules(true)
-    try {
-      const { data, error } = await supabase
-        .from("digest_schedules")
-        .select("*")
-        .eq("is_active", true)
-        .order("created_at", { ascending: false })
-      if (!error && data) setActiveSchedules(data)
-    } catch {
-      /* ignore */
-    } finally {
-      setLoadingSchedules(false)
-    }
-  }, [supabase])
-
-  useEffect(() => {
-    fetchSchedules()
-  }, [fetchSchedules])
+  const supabase = createClient()
 
   // ── Computed ────────────────────────────────────────────────────────────────
   const filteredEmployees = useMemo(() => {
@@ -128,10 +145,6 @@ export function MailDigestContent({ employees }: Props) {
     }
     return emails
   }, [recipientMode, employees, selectedEmployeeIds, manualEmails])
-
-  // Meeting week = weekNumber. Everything uses the same week now.
-  const actionTrackerWeek = weekNumber
-  const actionTrackerYear = yearNumber
 
   // ── Handlers ────────────────────────────────────────────────────────────────
   const toggleEmployee = useCallback((id: string) => {
@@ -176,91 +189,102 @@ export function MailDigestContent({ employees }: Props) {
       return
     }
 
-    // ── Scheduled: save to DB ────────────────────────────────────────────
-    if (sendTiming === "scheduled") {
-      if (!scheduledDate) {
-        toast.error("Please set a scheduled date")
-        return
-      }
-      const scheduledDateTime = new Date(`${scheduledDate}T${scheduledTime}`)
-      if (scheduledDateTime <= new Date()) {
-        toast.error("Scheduled time must be in the future")
-        return
-      }
+    // For scheduled/recurring, save the schedule to DB
+    if (sendTiming === "scheduled" || sendTiming === "recurring") {
+      const toastId = toast.loading("Saving schedule...")
+      try {
+        const schedulePayload: any = {
+          schedule_type: sendTiming === "scheduled" ? "one_time" : "recurring",
+          reminder_type: reminderType,
+          recipients: resolvedRecipients,
+          is_active: true,
+          send_day: sendTiming === "recurring" ? recurringDay : null,
+          send_time: sendTiming === "recurring" ? recurringTime : scheduledTime,
+          meeting_config: {
+            type: reminderType,
+            meetingDate: reminderType === "meeting" ? meetingDate : undefined,
+            meetingTime: reminderType === "meeting" ? meetingTime : undefined,
+            teamsLink: reminderType === "meeting" ? teamsLink : undefined,
+            agenda: reminderType === "meeting" ? agendaText : undefined,
+            sessionDate: reminderType === "knowledge_sharing" ? sessionDate : undefined,
+            sessionTime: reminderType === "knowledge_sharing" ? sessionTime : undefined,
+            duration: reminderType === "knowledge_sharing" ? duration : undefined,
+          },
+        }
 
-      const { error } = await supabase.from("digest_schedules").insert({
-        schedule_type: "one_time",
-        meeting_week: weekNumber,
-        meeting_year: yearNumber,
-        recipients: resolvedRecipients,
-        content_choice: contentChoice,
-        next_run_at: scheduledDateTime.toISOString(),
-      })
+        if (sendTiming === "scheduled") {
+          schedulePayload.next_run_at = new Date(`${scheduledDate}T${scheduledTime}`).toISOString()
+        } else {
+          // For recurring, calculate next run
+          const days = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]
+          const targetDay = days.indexOf(recurringDay)
+          const now = new Date()
+          const currentDay = now.getDay()
+          let daysUntil = targetDay - currentDay
+          if (daysUntil <= 0) daysUntil += 7
+          const nextRun = new Date(now)
+          nextRun.setDate(now.getDate() + daysUntil)
+          const [h, m] = recurringTime.split(":")
+          nextRun.setHours(parseInt(h), parseInt(m), 0, 0)
+          schedulePayload.next_run_at = nextRun.toISOString()
+        }
 
-      if (error) {
-        toast.error("Failed to save schedule: " + error.message)
-        return
+        const { error } = await supabase.from("reminder_schedules").insert(schedulePayload)
+        if (error) throw error
+
+        toast.success(
+          sendTiming === "scheduled"
+            ? `✅ Scheduled for ${new Date(`${scheduledDate}T${scheduledTime}`).toLocaleString("en-GB", {
+                weekday: "short",
+                day: "numeric",
+                month: "short",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}`
+            : `✅ Recurring every ${capitalize(recurringDay)} at ${recurringTime}`,
+          { id: toastId }
+        )
+      } catch (err: any) {
+        console.error("[Schedule Error]", err)
+        toast.error(err.message || "Failed to save schedule", { id: toastId })
       }
-
-      toast.success(
-        `Email scheduled for ${scheduledDateTime.toLocaleString("en-GB", {
-          weekday: "short",
-          day: "numeric",
-          month: "short",
-          hour: "2-digit",
-          minute: "2-digit",
-        })}`
-      )
-      fetchSchedules()
       return
     }
 
-    // ── Recurring: save to DB ────────────────────────────────────────────
-    if (sendTiming === "recurring") {
-      const { error } = await supabase.from("digest_schedules").insert({
-        schedule_type: "recurring",
-        recipients: resolvedRecipients,
-        content_choice: "both", // Recurring always sends both reports
-        send_day: recurringDay,
-        send_time: recurringTime,
-      })
-
-      if (error) {
-        toast.error("Failed to save recurring schedule: " + error.message)
-        return
-      }
-
-      toast.success(`Recurring weekly email set for every ${capitalize(recurringDay)} at ${recurringTime}`)
-      fetchSchedules()
-      return
-    }
-
-    // ── Immediate ────────────────────────────────────────────────────────
-    await doSend()
-  }
-
-  const doSend = async () => {
+    // Send immediately
     setIsSending(true)
     setSendResult(null)
-    const toastId = toast.loading(`Sending digest to ${resolvedRecipients.length} recipient(s)...`)
+    const label = reminderType === "meeting" ? "Meeting Reminder" : "Knowledge Sharing Reminder"
+    const toastId = toast.loading(`Sending ${label} to ${resolvedRecipients.length} recipient(s)...`)
 
     try {
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
       const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
       const payload: any = {
+        type: reminderType,
         recipients: resolvedRecipients,
-        meetingWeek: weekNumber,
-        meetingYear: yearNumber,
       }
 
-      if (contentChoice === "weekly_report") {
-        payload.skipActionTracker = true
-      } else if (contentChoice === "action_tracker") {
-        payload.skipWeeklyReport = true
+      if (reminderType === "meeting") {
+        payload.meetingDate = formatDateNice(meetingDate)
+        payload.meetingTime = new Date(`2000-01-01T${meetingTime}`).toLocaleTimeString("en-US", {
+          hour: "numeric",
+          minute: "2-digit",
+          hour12: true,
+        })
+        payload.teamsLink = teamsLink
+        payload.agenda = agendaText
+          .split("\n")
+          .map((l) => l.replace(/^\d+\.\s*/, "").trim())
+          .filter(Boolean)
+      } else {
+        payload.sessionDate = formatDateNice(sessionDate)
+        payload.sessionTime = sessionTime
+        payload.duration = duration
       }
 
-      const res = await fetch(`${supabaseUrl}/functions/v1/send-weekly-digest`, {
+      const res = await fetch(`${supabaseUrl}/functions/v1/send-meeting-reminder`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -269,149 +293,80 @@ export function MailDigestContent({ employees }: Props) {
         body: JSON.stringify(payload),
       })
 
-      const result = await res.json()
-      if (!res.ok) throw new Error(result.error || "Failed to send digest")
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Failed to send")
 
-      setSendResult(result)
-      const successCount = result.results?.filter((r: any) => r.success).length || 0
-      const failCount = result.results?.filter((r: any) => !r.success).length || 0
+      setSendResult(data)
+      const successCount = data.results?.filter((r: any) => r.success).length || 0
+      const failCount = data.results?.filter((r: any) => !r.success).length || 0
 
       if (failCount === 0) {
-        toast.success(`✅ Digest sent to ${successCount} recipient(s)`, { id: toastId })
+        toast.success(`✅ ${label} sent to ${successCount} recipient(s)`, { id: toastId })
       } else {
         toast.warning(`Sent to ${successCount}, failed for ${failCount}`, { id: toastId })
       }
     } catch (err: any) {
-      console.error("[Mail Digest Error]", err)
-      toast.error(err.message || "Failed to send digest", { id: toastId })
+      console.error("[Meeting Reminder Error]", err)
+      toast.error(err.message || "Failed to send", { id: toastId })
     } finally {
       setIsSending(false)
     }
   }
 
-  const deactivateSchedule = async (id: string) => {
-    const { error } = await supabase.from("digest_schedules").update({ is_active: false }).eq("id", id)
-    if (error) {
-      toast.error("Failed to deactivate schedule")
-    } else {
-      toast.success("Schedule deactivated")
-      fetchSchedules()
-    }
-  }
-
   // ── Render ──────────────────────────────────────────────────────────────────
-  const weekOptions = Array.from({ length: 52 }, (_, i) => i + 1)
-  const yearOptions = [currentYear - 1, currentYear, currentYear + 1]
-
-  const departments = useMemo(() => {
-    const depts = new Set(employees.map((e) => e.department).filter(Boolean))
-    return Array.from(depts).sort() as string[]
-  }, [employees])
-
   return (
     <PageWrapper maxWidth="full" background="gradient">
       <PageHeader
-        title="General Meeting Mailing"
-        description="Send weekly report digests and action trackers to selected recipients."
-        icon={Mail}
+        title="Meeting Reminders"
+        description="Send general meeting and knowledge sharing session reminders to all employees."
+        icon={Megaphone}
         backLink={{ href: "/admin/reports", label: "Back to Reports" }}
       />
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* ── LEFT: Settings ────────────────────────────────────────────── */}
         <div className="space-y-6 lg:col-span-2">
-          {/* Week Selection */}
+          {/* Reminder Type */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-lg">
-                <CalendarDays className="h-5 w-5 text-green-600" />
-                Meeting Week
+                <Mail className="h-5 w-5 text-orange-600" />
+                Reminder Type
               </CardTitle>
-              <CardDescription>Choose which general meeting week to send</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-wrap items-end gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="week-select">Meeting Week</Label>
-                  <Select value={String(weekNumber)} onValueChange={(v) => setWeekNumber(Number(v))}>
-                    <SelectTrigger id="week-select" className="w-[140px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {weekOptions.map((w) => (
-                        <SelectItem key={w} value={String(w)}>
-                          Week {w}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="year-select">Year</Label>
-                  <Select value={String(yearNumber)} onValueChange={(v) => setYearNumber(Number(v))}>
-                    <SelectTrigger id="year-select" className="w-[120px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {yearOptions.map((y) => (
-                        <SelectItem key={y} value={String(y)}>
-                          {y}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="text-muted-foreground space-y-1 text-sm">
-                  <p>
-                    All Content: <Badge variant="outline">Week {weekNumber}</Badge>
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Content Choice */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <FileText className="h-5 w-5 text-blue-600" />
-                Content to Send
-              </CardTitle>
-              <CardDescription>Choose which attachments to include</CardDescription>
+              <CardDescription>Choose which reminder to send</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="flex flex-wrap gap-3">
                 {[
-                  { value: "both", label: "Both Reports", icon: FileText, desc: "Weekly Report + Action Tracker" },
                   {
-                    value: "weekly_report",
-                    label: "Weekly Report Only",
-                    icon: FileText,
-                    desc: "Departmental work done, tasks & challenges",
+                    value: "meeting" as ReminderType,
+                    label: "General Meeting Reminder",
+                    icon: Video,
+                    desc: "Weekly meeting with agenda & Teams link",
                   },
                   {
-                    value: "action_tracker",
-                    label: "Action Tracker Only",
-                    icon: ClipboardList,
-                    desc: "Upcoming action items & completion status",
+                    value: "knowledge_sharing" as ReminderType,
+                    label: "Knowledge Sharing Session",
+                    icon: BookOpen,
+                    desc: "Pre-meeting knowledge sharing reminder",
                   },
                 ].map((opt) => (
                   <button
                     key={opt.value}
                     type="button"
-                    onClick={() => setContentChoice(opt.value as ContentChoice)}
-                    className={`flex min-w-[180px] flex-1 items-start gap-3 rounded-lg border-2 p-4 text-left transition-all ${
-                      contentChoice === opt.value
-                        ? "border-green-600 bg-green-50 dark:border-green-500 dark:bg-green-950/30"
+                    onClick={() => setReminderType(opt.value)}
+                    className={`flex min-w-[240px] flex-1 items-start gap-3 rounded-lg border-2 p-4 text-left transition-all ${
+                      reminderType === opt.value
+                        ? "border-orange-600 bg-orange-50 dark:border-orange-500 dark:bg-orange-950/30"
                         : "hover:border-muted-foreground/30 bg-muted/30 border-transparent"
                     }`}
                   >
                     <opt.icon
-                      className={`mt-0.5 h-5 w-5 shrink-0 ${contentChoice === opt.value ? "text-green-600" : "text-muted-foreground"}`}
+                      className={`mt-0.5 h-5 w-5 shrink-0 ${reminderType === opt.value ? "text-orange-600" : "text-muted-foreground"}`}
                     />
                     <div>
                       <div
-                        className={`font-semibold ${contentChoice === opt.value ? "text-green-700 dark:text-green-400" : ""}`}
+                        className={`font-semibold ${reminderType === opt.value ? "text-orange-700 dark:text-orange-400" : ""}`}
                       >
                         {opt.label}
                       </div>
@@ -423,6 +378,106 @@ export function MailDigestContent({ employees }: Props) {
             </CardContent>
           </Card>
 
+          {/* Meeting Details */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Calendar className="h-5 w-5 text-blue-600" />
+                {reminderType === "meeting" ? "Meeting Details" : "Session Details"}
+              </CardTitle>
+              <CardDescription>
+                {reminderType === "meeting"
+                  ? "Configure the meeting date, time, Teams link, and agenda"
+                  : "Configure the session date, time, and duration"}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {reminderType === "meeting" ? (
+                <>
+                  <div className="flex flex-wrap gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="meet-date">Meeting Date</Label>
+                      <Input
+                        id="meet-date"
+                        type="date"
+                        value={meetingDate}
+                        onChange={(e) => setMeetingDate(e.target.value)}
+                        className="w-[180px]"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="meet-time">Meeting Time</Label>
+                      <Input
+                        id="meet-time"
+                        type="time"
+                        value={meetingTime}
+                        onChange={(e) => setMeetingTime(e.target.value)}
+                        className="w-[140px]"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="teams-link">Microsoft Teams Link</Label>
+                    <Input
+                      id="teams-link"
+                      placeholder="Paste Microsoft Teams meeting link..."
+                      value={teamsLink}
+                      onChange={(e) => setTeamsLink(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="agenda">Agenda (one item per line)</Label>
+                    <Textarea
+                      id="agenda"
+                      value={agendaText}
+                      onChange={(e) => setAgendaText(e.target.value)}
+                      rows={8}
+                      placeholder={"1. Opening Prayer\n2. Departmental updates\n..."}
+                    />
+                    <p className="text-muted-foreground text-xs">
+                      Each line becomes one agenda item. Numbering is automatic.
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex flex-wrap gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="session-date">Session Date</Label>
+                      <Input
+                        id="session-date"
+                        type="date"
+                        value={sessionDate}
+                        onChange={(e) => setSessionDate(e.target.value)}
+                        className="w-[180px]"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="session-time">Session Time</Label>
+                      <Input
+                        id="session-time"
+                        type="time"
+                        value={sessionTime}
+                        onChange={(e) => setSessionTime(e.target.value)}
+                        className="w-[140px]"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="session-duration">Duration</Label>
+                      <Input
+                        id="session-duration"
+                        value={duration}
+                        onChange={(e) => setDuration(e.target.value)}
+                        placeholder="e.g. 30 minutes"
+                        className="w-[160px]"
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Recipient Mode */}
           <Card>
             <CardHeader className="pb-3">
@@ -430,7 +485,7 @@ export function MailDigestContent({ employees }: Props) {
                 <Users className="h-5 w-5 text-purple-600" />
                 Recipients
               </CardTitle>
-              <CardDescription>Choose who receives the email</CardDescription>
+              <CardDescription>Choose who receives the reminder</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Mode Pills */}
@@ -447,7 +502,7 @@ export function MailDigestContent({ employees }: Props) {
                     onClick={() => setRecipientMode(mode.value as RecipientMode)}
                     className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all ${
                       recipientMode === mode.value
-                        ? "bg-green-600 text-white shadow-md"
+                        ? "bg-orange-600 text-white shadow-md"
                         : "bg-muted text-muted-foreground hover:bg-muted/80"
                     }`}
                   >
@@ -457,7 +512,7 @@ export function MailDigestContent({ employees }: Props) {
                 ))}
               </div>
 
-              {/* Employee Selection (for "select" mode) */}
+              {/* Employee Selection */}
               {recipientMode === "select" && (
                 <div className="space-y-3">
                   <div className="flex items-center gap-2">
@@ -482,7 +537,7 @@ export function MailDigestContent({ employees }: Props) {
                       <label
                         key={emp.id}
                         className={`flex cursor-pointer items-center gap-3 rounded-md px-3 py-2 transition-colors ${
-                          selectedEmployeeIds.has(emp.id) ? "bg-green-50 dark:bg-green-950/20" : "hover:bg-muted/50"
+                          selectedEmployeeIds.has(emp.id) ? "bg-orange-50 dark:bg-orange-950/20" : "hover:bg-muted/50"
                         }`}
                       >
                         <Checkbox
@@ -510,7 +565,7 @@ export function MailDigestContent({ employees }: Props) {
                 </div>
               )}
 
-              {/* Manual Email Input (for "manual" and "all_plus" modes) */}
+              {/* Manual Email Input */}
               {(recipientMode === "manual" || recipientMode === "all_plus") && (
                 <div className="space-y-3">
                   <div className="flex gap-2">
@@ -557,20 +612,20 @@ export function MailDigestContent({ employees }: Props) {
 
               {recipientMode === "all" && (
                 <p className="text-muted-foreground text-sm">
-                  The digest will be sent to all <strong>{employees.length}</strong> active employees.
+                  The reminder will be sent to all <strong>{employees.length}</strong> active employees.
                 </p>
               )}
             </CardContent>
           </Card>
 
-          {/* Send Timing */}
+          {/* Delivery Timing */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-lg">
                 <Clock className="h-5 w-5 text-orange-600" />
                 Delivery Timing
               </CardTitle>
-              <CardDescription>Send now, schedule once, or set up recurring weekly delivery</CardDescription>
+              <CardDescription>Send now, schedule once, or set up recurring delivery</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex flex-wrap gap-3">
@@ -579,14 +634,14 @@ export function MailDigestContent({ employees }: Props) {
                   onClick={() => setSendTiming("now")}
                   className={`flex min-w-[150px] flex-1 items-center gap-3 rounded-lg border-2 p-4 transition-all ${
                     sendTiming === "now"
-                      ? "border-green-600 bg-green-50 dark:border-green-500 dark:bg-green-950/30"
+                      ? "border-orange-600 bg-orange-50 dark:border-orange-500 dark:bg-orange-950/30"
                       : "hover:border-muted-foreground/30 bg-muted/30 border-transparent"
                   }`}
                 >
-                  <Send className={`h-5 w-5 ${sendTiming === "now" ? "text-green-600" : "text-muted-foreground"}`} />
+                  <Send className={`h-5 w-5 ${sendTiming === "now" ? "text-orange-600" : "text-muted-foreground"}`} />
                   <div className="text-left">
                     <div
-                      className={`font-semibold ${sendTiming === "now" ? "text-green-700 dark:text-green-400" : ""}`}
+                      className={`font-semibold ${sendTiming === "now" ? "text-orange-700 dark:text-orange-400" : ""}`}
                     >
                       Send Immediately
                     </div>
@@ -598,16 +653,16 @@ export function MailDigestContent({ employees }: Props) {
                   onClick={() => setSendTiming("scheduled")}
                   className={`flex min-w-[150px] flex-1 items-center gap-3 rounded-lg border-2 p-4 transition-all ${
                     sendTiming === "scheduled"
-                      ? "border-green-600 bg-green-50 dark:border-green-500 dark:bg-green-950/30"
+                      ? "border-orange-600 bg-orange-50 dark:border-orange-500 dark:bg-orange-950/30"
                       : "hover:border-muted-foreground/30 bg-muted/30 border-transparent"
                   }`}
                 >
                   <Clock
-                    className={`h-5 w-5 ${sendTiming === "scheduled" ? "text-green-600" : "text-muted-foreground"}`}
+                    className={`h-5 w-5 ${sendTiming === "scheduled" ? "text-orange-600" : "text-muted-foreground"}`}
                   />
                   <div className="text-left">
                     <div
-                      className={`font-semibold ${sendTiming === "scheduled" ? "text-green-700 dark:text-green-400" : ""}`}
+                      className={`font-semibold ${sendTiming === "scheduled" ? "text-orange-700 dark:text-orange-400" : ""}`}
                     >
                       Schedule
                     </div>
@@ -619,16 +674,16 @@ export function MailDigestContent({ employees }: Props) {
                   onClick={() => setSendTiming("recurring")}
                   className={`flex min-w-[150px] flex-1 items-center gap-3 rounded-lg border-2 p-4 transition-all ${
                     sendTiming === "recurring"
-                      ? "border-green-600 bg-green-50 dark:border-green-500 dark:bg-green-950/30"
+                      ? "border-orange-600 bg-orange-50 dark:border-orange-500 dark:bg-orange-950/30"
                       : "hover:border-muted-foreground/30 bg-muted/30 border-transparent"
                   }`}
                 >
                   <Repeat
-                    className={`h-5 w-5 ${sendTiming === "recurring" ? "text-green-600" : "text-muted-foreground"}`}
+                    className={`h-5 w-5 ${sendTiming === "recurring" ? "text-orange-600" : "text-muted-foreground"}`}
                   />
                   <div className="text-left">
                     <div
-                      className={`font-semibold ${sendTiming === "recurring" ? "text-green-700 dark:text-green-400" : ""}`}
+                      className={`font-semibold ${sendTiming === "recurring" ? "text-orange-700 dark:text-orange-400" : ""}`}
                     >
                       Recurring
                     </div>
@@ -673,7 +728,7 @@ export function MailDigestContent({ employees }: Props) {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"].map((d) => (
+                          {["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"].map((d) => (
                             <SelectItem key={d} value={d}>
                               {capitalize(d)}
                             </SelectItem>
@@ -694,53 +749,8 @@ export function MailDigestContent({ employees }: Props) {
                   </div>
                   <p className="text-muted-foreground flex items-center gap-1.5 text-xs">
                     <Repeat className="h-3.5 w-3.5" />
-                    Runs server-side — no need to keep your computer on. The meeting week is auto-calculated each time.
+                    Runs server-side — no need to keep your computer on. The reminder is sent automatically each week.
                   </p>
-                </div>
-              )}
-
-              {/* Active Schedules */}
-              {activeSchedules.length > 0 && (
-                <div className="space-y-2 border-t pt-2">
-                  <div className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
-                    Active Schedules
-                  </div>
-                  {activeSchedules.map((s) => (
-                    <div
-                      key={s.id}
-                      className="bg-muted/40 flex items-center justify-between rounded-lg px-3 py-2 text-sm"
-                    >
-                      <div className="flex items-center gap-2">
-                        {s.schedule_type === "recurring" ? (
-                          <Repeat className="h-4 w-4 text-green-600" />
-                        ) : (
-                          <Clock className="h-4 w-4 text-orange-600" />
-                        )}
-                        <span>
-                          {s.schedule_type === "recurring"
-                            ? `Every ${capitalize(s.send_day || "monday")} at ${s.send_time || "09:00"}`
-                            : `One-time: W${s.meeting_week} — ${new Date(s.next_run_at).toLocaleString("en-GB", {
-                                weekday: "short",
-                                day: "numeric",
-                                month: "short",
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })}`}
-                        </span>
-                        <Badge variant="secondary" className="text-xs">
-                          {(s.recipients as string[])?.length || 0} recipients
-                        </Badge>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-destructive hover:text-destructive h-7 w-7 p-0"
-                        onClick={() => deactivateSchedule(s.id)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  ))}
                 </div>
               )}
             </CardContent>
@@ -749,37 +759,42 @@ export function MailDigestContent({ employees }: Props) {
 
         {/* ── RIGHT: Summary & Send ─────────────────────────────────────── */}
         <div className="space-y-6">
-          <Card className="sticky top-6 border-green-200 dark:border-green-900">
+          <Card className="sticky top-6 border-orange-200 dark:border-orange-900">
             <CardHeader className="pb-3">
               <CardTitle className="text-lg">Summary</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Week info */}
+              {/* Type */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Week</span>
-                  <Badge>
-                    W{weekNumber}, {yearNumber}
+                  <span className="text-muted-foreground">Type</span>
+                  <Badge variant="outline" className="gap-1">
+                    {reminderType === "meeting" ? (
+                      <>
+                        <Video className="h-3 w-3" /> Meeting
+                      </>
+                    ) : (
+                      <>
+                        <BookOpen className="h-3 w-3" /> Knowledge Sharing
+                      </>
+                    )}
                   </Badge>
                 </div>
-              </div>
-
-              <div className="border-t" />
-
-              {/* Content */}
-              <div className="space-y-1">
-                <div className="text-muted-foreground text-xs font-medium tracking-wider uppercase">Attachments</div>
-                <div className="flex flex-wrap gap-1.5">
-                  {(contentChoice === "both" || contentChoice === "weekly_report") && (
-                    <Badge variant="secondary" className="gap-1">
-                      <FileText className="h-3 w-3" /> Weekly Report
-                    </Badge>
-                  )}
-                  {(contentChoice === "both" || contentChoice === "action_tracker") && (
-                    <Badge variant="secondary" className="gap-1">
-                      <ClipboardList className="h-3 w-3" /> Action Tracker
-                    </Badge>
-                  )}
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Date</span>
+                  <Badge>
+                    {reminderType === "meeting"
+                      ? meetingDate
+                        ? formatDateNice(meetingDate)
+                        : "Not set"
+                      : sessionDate
+                        ? formatDateNice(sessionDate)
+                        : "Not set"}
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Time</span>
+                  <Badge variant="secondary">{reminderType === "meeting" ? meetingTime : sessionTime}</Badge>
                 </div>
               </div>
 
@@ -789,7 +804,7 @@ export function MailDigestContent({ employees }: Props) {
               <div className="space-y-1">
                 <div className="text-muted-foreground text-xs font-medium tracking-wider uppercase">Recipients</div>
                 <div className="flex items-center gap-2">
-                  <Users className="h-4 w-4 text-green-600" />
+                  <Users className="h-4 w-4 text-orange-600" />
                   <span className="text-2xl font-bold">{resolvedRecipients.length}</span>
                   <span className="text-muted-foreground text-sm">email(s)</span>
                 </div>
@@ -811,18 +826,18 @@ export function MailDigestContent({ employees }: Props) {
 
               <div className="border-t" />
 
-              {/* Timing */}
+              {/* Delivery */}
               <div className="space-y-1">
                 <div className="text-muted-foreground text-xs font-medium tracking-wider uppercase">Delivery</div>
                 <div className="flex items-center gap-2 text-sm">
                   {sendTiming === "now" ? (
                     <>
-                      <Send className="h-4 w-4 text-green-600" />
+                      <Send className="h-4 w-4 text-orange-600" />
                       <span>Immediately</span>
                     </>
                   ) : sendTiming === "recurring" ? (
                     <>
-                      <Repeat className="h-4 w-4 text-green-600" />
+                      <Repeat className="h-4 w-4 text-orange-600" />
                       <span>
                         Every {capitalize(recurringDay)} at {recurringTime}
                       </span>
@@ -847,7 +862,7 @@ export function MailDigestContent({ employees }: Props) {
               </div>
 
               <Button
-                className="mt-4 w-full bg-green-600 text-white hover:bg-green-700"
+                className="mt-4 w-full bg-orange-600 text-white hover:bg-orange-700"
                 size="lg"
                 disabled={isSending || resolvedRecipients.length === 0}
                 onClick={handleSend}
@@ -918,19 +933,4 @@ export function MailDigestContent({ employees }: Props) {
       </div>
     </PageWrapper>
   )
-}
-
-// ── Helpers ────────────────────────────────────────────────────────────────────
-function getISOWeek(): number {
-  const now = new Date()
-  const jan4 = new Date(now.getFullYear(), 0, 4)
-  const dayOfWeek = jan4.getDay() || 7
-  const week1Monday = new Date(jan4)
-  week1Monday.setDate(jan4.getDate() - (dayOfWeek - 1))
-  const diff = now.getTime() - week1Monday.getTime()
-  return Math.floor(diff / (7 * 24 * 60 * 60 * 1000)) + 1
-}
-
-function capitalize(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1)
 }

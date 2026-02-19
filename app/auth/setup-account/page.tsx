@@ -7,9 +7,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import Link from "next/link"
-import { useState, useEffect, Suspense } from "react"
+import { useState, useEffect, useRef, useCallback, Suspense } from "react"
 
-import { ArrowLeft, UserPlus, CheckCircle2, Lock, Eye, EyeOff, CheckCircle } from "lucide-react"
+import { ArrowLeft, UserPlus, CheckCircle2, Lock, Eye, EyeOff, CheckCircle, KeyRound } from "lucide-react"
 import Image from "next/image"
 import { useTheme } from "next-themes"
 import { formValidation } from "@/lib/validation"
@@ -32,6 +32,9 @@ function SetupAccountContent() {
   const [isSuccess, setIsSuccess] = useState(false)
   const [isRecoveryMode, setIsRecoveryMode] = useState(false)
   const [mounted, setMounted] = useState(false)
+  const [otpDigits, setOtpDigits] = useState<string[]>(["", "", "", "", "", ""])
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false)
+  const otpRefs = useRef<(HTMLInputElement | null)[]>([])
   const { resolvedTheme } = useTheme()
 
   // Default to light logo for SSR to prevent hydration mismatch
@@ -45,6 +48,20 @@ function SetupAccountContent() {
     setMounted(true)
 
     const supabase = createClient()
+
+    // Check if we already have a session (came via /auth/callback)
+    const checkExistingSession = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      if (session) {
+        // We have a valid session from the callback code exchange
+        setIsRecoveryMode(true)
+      }
+    }
+    checkExistingSession()
+
+    // Also listen for PASSWORD_RECOVERY event (hash fragment / implicit flow)
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -71,8 +88,9 @@ function SetupAccountContent() {
     setIsLoading(true)
 
     try {
+      // Use the callback route for proper PKCE code exchange, then redirect to setup-account
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/setup-account`,
+        redirectTo: `${window.location.origin}/auth/callback?next=/auth/setup-account`,
       })
 
       if (error) throw error
@@ -85,6 +103,78 @@ function SetupAccountContent() {
       toast.error(message)
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  // OTP digit handlers
+  const handleOtpChange = useCallback(
+    (index: number, value: string) => {
+      if (!/^\d*$/.test(value)) return // only digits
+      const newDigits = [...otpDigits]
+      newDigits[index] = value.slice(-1)
+      setOtpDigits(newDigits)
+      // Auto-focus next input
+      if (value && index < 5) {
+        otpRefs.current[index + 1]?.focus()
+      }
+    },
+    [otpDigits]
+  )
+
+  const handleOtpKeyDown = useCallback(
+    (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === "Backspace" && !otpDigits[index] && index > 0) {
+        otpRefs.current[index - 1]?.focus()
+      }
+    },
+    [otpDigits]
+  )
+
+  const handleOtpPaste = useCallback(
+    (e: React.ClipboardEvent) => {
+      e.preventDefault()
+      const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6)
+      if (pasted.length > 0) {
+        const newDigits = [...otpDigits]
+        for (let i = 0; i < pasted.length; i++) {
+          newDigits[i] = pasted[i]
+        }
+        setOtpDigits(newDigits)
+        const focusIndex = Math.min(pasted.length, 5)
+        otpRefs.current[focusIndex]?.focus()
+      }
+    },
+    [otpDigits]
+  )
+
+  const handleVerifyOtp = async () => {
+    const code = otpDigits.join("")
+    if (code.length !== 6) {
+      toast.error("Please enter all 6 digits")
+      return
+    }
+
+    setIsVerifyingOtp(true)
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.auth.verifyOtp({
+        email,
+        token: code,
+        type: "recovery",
+      })
+
+      if (error) throw error
+
+      // OTP verified — session is now established, show password form
+      setIsRecoveryMode(true)
+      toast.success("Code verified! Now create your password.")
+    } catch (err: any) {
+      console.error("OTP Verification Error:", err)
+      toast.error(err.message || "Invalid or expired code. Please try again.")
+      setOtpDigits(["", "", "", "", "", ""])
+      otpRefs.current[0]?.focus()
+    } finally {
+      setIsVerifyingOtp(false)
     }
   }
 
@@ -255,44 +345,72 @@ function SetupAccountContent() {
                     <div className="flex gap-3">
                       <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-green-600" />
                       <div className="space-y-1 text-sm text-green-800 dark:text-green-200">
-                        <p className="font-medium">Setup link sent to {email}</p>
+                        <p className="font-medium">Setup code sent to {email}</p>
                         <p>
-                          Open the email and click the link to create your password. If you don&apos;t see it, check
-                          your spam folder.
+                          We sent a 6-digit verification code to your email. Enter it below, or click the link in the
+                          email.
                         </p>
                       </div>
                     </div>
                   </div>
 
-                  {/* Steps indicator */}
-                  <div className="space-y-3 rounded-lg border p-4">
-                    <p className="text-sm font-medium">What to do next:</p>
+                  {/* OTP Input */}
+                  <div className="space-y-4">
                     <div className="space-y-2">
-                      <div className="flex items-start gap-3">
-                        <span className="bg-primary/10 text-primary flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold">
-                          1
-                        </span>
-                        <p className="text-muted-foreground text-sm">Open the email we just sent you</p>
+                      <Label className="flex items-center gap-2 text-sm font-medium">
+                        <KeyRound className="h-4 w-4" />
+                        Verification Code
+                      </Label>
+                      <div className="flex justify-center gap-2" onPaste={handleOtpPaste}>
+                        {otpDigits.map((digit, i) => (
+                          <input
+                            key={i}
+                            ref={(el) => {
+                              otpRefs.current[i] = el
+                            }}
+                            type="text"
+                            inputMode="numeric"
+                            maxLength={1}
+                            value={digit}
+                            onChange={(e) => handleOtpChange(i, e.target.value)}
+                            onKeyDown={(e) => handleOtpKeyDown(i, e)}
+                            className="border-input bg-background focus:ring-primary/20 h-14 w-12 rounded-lg border-2 text-center text-2xl font-bold transition-all focus:border-green-500 focus:ring-2 focus:outline-none"
+                            autoFocus={i === 0}
+                          />
+                        ))}
                       </div>
-                      <div className="flex items-start gap-3">
-                        <span className="bg-primary/10 text-primary flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold">
-                          2
-                        </span>
-                        <p className="text-muted-foreground text-sm">
-                          Click the <strong>&quot;Reset Password&quot;</strong> button in the email
-                        </p>
-                      </div>
-                      <div className="flex items-start gap-3">
-                        <span className="bg-primary/10 text-primary flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold">
-                          3
-                        </span>
-                        <p className="text-muted-foreground text-sm">Create your password and start using ACOB ERP</p>
-                      </div>
+                      <p className="text-muted-foreground text-center text-xs">
+                        Check your inbox (and spam folder) for the code
+                      </p>
+                    </div>
+
+                    <Button
+                      onClick={handleVerifyOtp}
+                      className="h-11 w-full text-base font-semibold"
+                      disabled={otpDigits.join("").length !== 6 || isVerifyingOtp}
+                    >
+                      {isVerifyingOtp ? "Verifying..." : "Verify & Continue"}
+                    </Button>
+                  </div>
+
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                      <span className="w-full border-t" />
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                      <span className="bg-background text-muted-foreground px-2">or click the link in the email</span>
                     </div>
                   </div>
 
                   <div className="space-y-3">
-                    <Button onClick={() => setEmailSent(false)} variant="outline" className="h-11 w-full">
+                    <Button
+                      onClick={() => {
+                        setEmailSent(false)
+                        setOtpDigits(["", "", "", "", "", ""])
+                      }}
+                      variant="outline"
+                      className="h-11 w-full"
+                    >
                       Didn&apos;t receive it? Send again
                     </Button>
                     <Link href="/auth/login" className="block">

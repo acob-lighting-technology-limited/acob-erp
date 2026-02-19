@@ -1,7 +1,7 @@
 "use client"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { ShieldCheck, FileBarChart, ClipboardList, FileText, Mail, ChevronRight } from "lucide-react"
+import { ShieldCheck, FileBarChart, ClipboardList, FileText, Mail, ChevronRight, Megaphone } from "lucide-react"
 import Link from "next/link"
 import { PageWrapper, PageHeader } from "@/components/layout"
 import { Button } from "@/components/ui/button"
@@ -32,6 +32,15 @@ export default function AdminReportsPage() {
       icon: Mail,
       color: "text-purple-600 dark:text-purple-400",
       bgColor: "bg-purple-100 dark:bg-purple-900/30",
+    },
+    {
+      title: "Meeting Reminders",
+      description:
+        "Send general meeting and knowledge sharing session reminders with custom dates, times, agenda, and Teams links.",
+      href: "/admin/reports/meeting-reminders",
+      icon: Megaphone,
+      color: "text-orange-600 dark:text-orange-400",
+      bgColor: "bg-orange-100 dark:bg-orange-900/30",
     },
   ]
 

@@ -180,13 +180,16 @@ serve(async (req) => {
     }
 
     // 4. Construct HTML
-    const row = (label: string, value: string, isCode = false, isMono = false) => `
+    const row = (label: string, value: string, isCode = false, isMono = false) => {
+      const displayValue = isCode ? `<span class="asset-code">${value}</span>` : value
+      return `
         <tr>
             <td class="label">${label}</td>
             <td class="value"${isMono ? ' style="font-family:monospace;"' : ""}>
-                ${isCode ? `<span class="asset-code">${value}</span>` : value}
+                ${displayValue}
             </td>
         </tr>`
+    }
 
     // Base rows for ALL emails
     let tableRows = `
@@ -279,9 +282,7 @@ serve(async (req) => {
                 ${tableRows}
             </table>
         </div>
-        <div class="cta">
-            <a href="${ctaUrl}" class="button">${ctaText}</a>
-        </div>
+
         <div class="support">${supportText}</div>
     </div>
     <div class="footer">

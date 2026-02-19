@@ -54,9 +54,10 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL("/auth/set-password", request.url))
   }
 
-  // For recovery, redirect to reset-password page
+  // For recovery, redirect to reset-password page (or custom next if provided)
   if (type === "recovery") {
-    return NextResponse.redirect(new URL("/auth/reset-password", request.url))
+    const recoveryDest = safeNext !== "/dashboard" ? safeNext : "/auth/reset-password"
+    return NextResponse.redirect(new URL(recoveryDest, request.url))
   }
 
   // For all other types, redirect to the `safeNext` path
