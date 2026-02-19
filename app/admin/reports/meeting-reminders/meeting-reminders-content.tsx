@@ -52,10 +52,11 @@ const DEFAULT_TEAMS_LINK =
 
 const DEFAULT_AGENDA = [
   "Opening Prayer",
-  "Departmental updates",
-  "Progress on ongoing projects",
-  "Upcoming Events and Deadline",
-  "Any other business",
+  "Knowledge Sharing Session (30 minutes)",
+  "Departmental Updates",
+  "Progress on Ongoing Projects",
+  "Upcoming Events and Deadlines",
+  "Any Other Business",
   "Adjournment",
 ]
 
