@@ -95,10 +95,11 @@ export default function EmployeeOnboardingForm() {
       .trim()
       .toLowerCase()
       .replace(/[^a-z]/g, "")
+
+  const safeFirst = sanitize(firstName || "")
+  const safeLast = sanitize(lastName || "")
   const companyEmail =
-    firstName && lastName
-      ? `${sanitize(lastName).charAt(0)}.${sanitize(firstName)}@org.acoblighting.com`
-      : "Wait for name input..."
+    safeFirst && safeLast ? `${safeLast.charAt(0)}.${safeFirst}@org.acoblighting.com` : "Wait for name input..."
 
   async function onSubmit(data: FormValues) {
     if (data.honeypot) return
@@ -108,6 +109,7 @@ export default function EmployeeOnboardingForm() {
     try {
       const actualDepartment = data.department === "Other" ? data.other_department : data.department
       if (!actualDepartment) throw new Error("Please specify your department")
+      if (!safeFirst || !safeLast) throw new Error("Please use alphabetic characters for your first and last name")
 
       const record = {
         first_name: data.first_name,

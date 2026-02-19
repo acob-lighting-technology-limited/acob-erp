@@ -115,6 +115,14 @@ export function PendingApplicationsModal({ onEmployeeCreated }: PendingApplicati
 
   const handleApprove = async () => {
     if (!selectedUser) return
+
+    // Validate ID format before sending
+    const empNumPattern = /^ACOB\/[0-9]{4}\/[0-9]{3}$/
+    if (employeeId && !empNumPattern.test(employeeId)) {
+      toast.error("Employee ID MUST be in format: ACOB/YEAR/NUMBER (e.g., ACOB/2026/001)")
+      return
+    }
+
     setIsProcessing(true)
 
     try {
@@ -137,7 +145,12 @@ export function PendingApplicationsModal({ onEmployeeCreated }: PendingApplicati
       toast.success("User approved and account created successfully")
       const remaining = pendingUsers.filter((u) => u.id !== selectedUser.id)
       setPendingUsers(remaining)
-      setSelectedUser(remaining.length > 0 ? remaining[0] : null)
+      if (remaining.length > 0) {
+        handleUserSelect(remaining[0])
+      } else {
+        setSelectedUser(null)
+        setEmployeeId("")
+      }
       onEmployeeCreated()
     } catch (error: any) {
       console.error("Approval error:", error)
@@ -160,7 +173,12 @@ export function PendingApplicationsModal({ onEmployeeCreated }: PendingApplicati
       toast.success("Application rejected")
       const remaining = pendingUsers.filter((u) => u.id !== selectedUser.id)
       setPendingUsers(remaining)
-      setSelectedUser(remaining.length > 0 ? remaining[0] : null)
+      if (remaining.length > 0) {
+        handleUserSelect(remaining[0])
+      } else {
+        setSelectedUser(null)
+        setEmployeeId("")
+      }
     } catch (error: any) {
       console.error("Rejection error:", error)
       toast.error("Failed to reject application")

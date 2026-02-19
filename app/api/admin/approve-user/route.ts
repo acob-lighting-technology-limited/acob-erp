@@ -73,6 +73,16 @@ export async function POST(req: Request) {
     let employeeId = manualEmployeeId
     const currentYear = new Date().getFullYear()
 
+    if (employeeId) {
+      const empNumPattern = /^ACOB\/[0-9]{4}\/[0-9]{3}$/
+      if (!empNumPattern.test(employeeId)) {
+        return NextResponse.json(
+          { error: "Employee number must be in format: ACOB/YEAR/NUMBER (e.g., ACOB/2026/058)" },
+          { status: 400 }
+        )
+      }
+    }
+
     if (!employeeId) {
       let retryCount = 0
       const maxRetries = 3
@@ -222,6 +232,12 @@ export async function POST(req: Request) {
     }
 
     if (profileError) {
+      // Clean up orphaned auth user if we just created one
+      if (!existingProfile && authUserId) {
+        await supabaseAdmin.auth.admin
+          .deleteUser(authUserId)
+          .catch((e) => console.error("Failed to clean up orphaned auth user:", e))
+      }
       throw new Error(`Profile creation failed: ${profileError.message}`)
     }
 
@@ -235,7 +251,7 @@ export async function POST(req: Request) {
     // 6. Send Welcome Email
     try {
       await resend.emails.send({
-        from: "ACOB HR <notifications@acoblighting.com>",
+        from: "ACOB Admin & HR <notifications@acoblighting.com>",
         to: [pendingUser.personal_email],
         subject: "Welcome to ACOB - Login Credentials",
         html: renderWelcomeEmail({ pendingUser, employeeId, setupUrl }),
@@ -253,9 +269,9 @@ export async function POST(req: Request) {
 
       if (stakeholderEmails.length > 0) {
         await resend.emails.send({
-          from: "ACOB Internal Systems <notifications@acoblighting.com>",
+          from: "ACOB Admin & HR <notifications@acoblighting.com>",
           to: stakeholderEmails,
-          subject: `New Employee Onboarded: ${pendingUser.first_name.replace(/[\r\n]/g, "")} ${pendingUser.last_name.replace(/[\r\n]/g, "")}`,
+          subject: `New Employee Onboarded - ${pendingUser.first_name.replace(/[\r\n]/g, "")} ${pendingUser.last_name.replace(/[\r\n]/g, "")}`,
           html: renderInternalNotificationEmail({ pendingUser, employeeId }),
         })
       }

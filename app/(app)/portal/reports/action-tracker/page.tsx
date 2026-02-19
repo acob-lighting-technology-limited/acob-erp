@@ -1,97 +1,95 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { useState, useEffect, Suspense, Fragment } from "react"
+import { useSearchParams } from "next/navigation"
+import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { createClient } from "@/lib/supabase/client"
-import { getCurrentISOWeek } from "@/lib/utils"
+import { getCurrentISOWeek, cn } from "@/lib/utils"
 import { toast } from "sonner"
-
 import {
   FileSpreadsheet,
   CheckCircle2,
   Clock,
-  RefreshCcw,
   Search,
-  ArrowRight,
-  Plus,
-  Edit2,
-  Trash2,
-  MoreVertical,
   ChevronDown,
+  ChevronRight,
+  Loader2,
+  RefreshCw,
+  FileText,
+  File as FileIcon,
+  Presentation,
+  MoreVertical,
 } from "lucide-react"
-import { PageWrapper, PageHeader } from "@/components/layout"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { ActionFormDialog } from "@/components/admin/action-tracker/action-form-dialog"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import {
+  exportActionTrackerToPDF,
+  exportActionTrackerToPPTX,
+  exportActionTrackerToDocx,
+  type ActionItem,
+} from "@/lib/export-utils"
 
 interface ActionTask {
   id: string
   title: string
   description?: string
   status: string
-  priority?: string // Priority removed from new schema, keeping optimal for UI if needed or remove
+  priority: string
   department: string
+  due_date?: string
   week_number: number
   year: number
-  original_week?: number
-  original_year?: number
 }
 
 export default function ActionTrackerPortal() {
   const [tasks, setTasks] = useState<ActionTask[]>([])
   const [loading, setLoading] = useState(true)
-  const [updatingId, setUpdatingId] = useState<string | null>(null)
+  const searchParams = useSearchParams()
+  const [expandedDepts, setExpandedDepts] = useState<Set<string>>(new Set())
   const [profile, setProfile] = useState<any>(null)
-  const [week, setWeek] = useState(getCurrentISOWeek())
-  const [year, setYear] = useState(new Date().getFullYear())
-  const [searchQuery, setSearchQuery] = useState("")
-  const [deptFilter, setDeptFilter] = useState("all")
   const [allDepartments, setAllDepartments] = useState<string[]>([])
-  const [isFormOpen, setIsFormOpen] = useState(false)
-  const [editingTask, setEditingTask] = useState<ActionTask | null>(null)
+
+  const [week, setWeek] = useState(() => {
+    const w = searchParams.get("week")
+    return w ? parseInt(w) : getCurrentISOWeek()
+  })
+  const [year, setYear] = useState(() => {
+    const y = searchParams.get("year")
+    return y ? parseInt(y) : new Date().getFullYear()
+  })
+  const [deptFilter, setDeptFilter] = useState("all")
+  const [searchQuery, setSearchQuery] = useState("")
 
   const supabase = createClient()
 
   useEffect(() => {
-    fetchInitialData()
-  }, [])
-
-  useEffect(() => {
-    if (profile) {
-      loadTasks()
-    }
-  }, [profile, week, year, deptFilter])
-
-  async function fetchInitialData() {
-    try {
+    const fetchMetadata = async () => {
       const {
         data: { user },
       } = await supabase.auth.getUser()
-      if (!user) return
-
-      const { data: p } = await supabase.from("profiles").select("id, department, role").eq("id", user.id).single()
-      setProfile(p)
-
-      // Fetch all departments for filtering
-      const { data: depts } = await supabase.from("profiles").select("department").not("department", "is", null)
-      const uniqueDepts = Array.from(new Set(depts?.map((d) => d.department).filter(Boolean))) as string[]
-      setAllDepartments(uniqueDepts.sort())
-
-      if (p?.department) {
-        setDeptFilter(p.department)
+      if (user) {
+        const { data: p } = await supabase.from("profiles").select("*").eq("id", user.id).single()
+        setProfile(p)
       }
-    } catch (error) {
-      console.error("Error fetching initial data:", error)
+      const { data: depts } = await supabase.from("profiles").select("department").not("department", "is", null)
+      if (depts) {
+        setAllDepartments(
+          Array.from(new Set(depts.map((d) => d.department)))
+            .filter(Boolean)
+            .sort() as string[]
+        )
+      }
     }
-  }
+    fetchMetadata()
+  }, [])
 
-  async function loadTasks() {
+  const loadTasks = async () => {
     setLoading(true)
     try {
       let query = supabase
@@ -99,7 +97,7 @@ export default function ActionTrackerPortal() {
         .select("*")
         .eq("week_number", week)
         .eq("year", year)
-        .order("created_at", { ascending: false })
+        .order("department", { ascending: true })
 
       if (deptFilter !== "all") {
         query = query.eq("department", deptFilter)
@@ -109,37 +107,27 @@ export default function ActionTrackerPortal() {
       if (error) throw error
       setTasks(data || [])
     } catch (error) {
-      console.error("Error loading tasks:", error)
+      console.error(error)
       toast.error("Failed to load actions")
     } finally {
       setLoading(false)
     }
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure?")) return
-    try {
-      const { error } = await supabase.from("action_items").delete().eq("id", id)
-      if (error) throw error
-      toast.success("Action deleted")
-      loadTasks()
-    } catch (error) {
-      toast.error("Failed to delete")
+  useEffect(() => {
+    loadTasks()
+  }, [week, year, deptFilter])
+
+  const handleStatusChange = async (taskId: string, newStatus: string) => {
+    const task = tasks.find((t) => t.id === taskId)
+    if (!task) return
+
+    // Critical security check: Only allow updates for user's own department
+    if (profile?.department !== task.department) {
+      toast.error("Unauthorized: You can only update statuses for your own department")
+      return
     }
-  }
 
-  const handleEdit = (task: ActionTask) => {
-    setEditingTask(task)
-    setIsFormOpen(true)
-  }
-
-  const handleAdd = () => {
-    setEditingTask(null)
-    setIsFormOpen(true)
-  }
-
-  const updateStatus = async (taskId: string, newStatus: string) => {
-    setUpdatingId(taskId)
     try {
       const { error } = await supabase
         .from("action_items")
@@ -147,256 +135,319 @@ export default function ActionTrackerPortal() {
         .eq("id", taskId)
 
       if (error) throw error
-
+      toast.success("Status updated")
       setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t)))
-      toast.success(`Status updated to ${newStatus.replace("_", " ")}`)
     } catch (error) {
-      console.log(error)
+      console.error(error)
       toast.error("Failed to update status")
-    } finally {
-      setUpdatingId(null)
     }
+  }
+
+  const toggleDept = (dept: string) => {
+    const next = new Set(expandedDepts)
+    if (next.has(dept)) next.delete(dept)
+    else next.add(dept)
+    setExpandedDepts(next)
   }
 
   const filteredTasks = tasks.filter(
     (t) =>
       t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.description?.toLowerCase().includes(searchQuery.toLowerCase())
+      t.department.toLowerCase().includes(searchQuery.toLowerCase())
   )
+
+  const deptsPresent = Array.from(new Set(filteredTasks.map((t) => t.department))).sort()
 
   const stats = {
     total: tasks.length,
     completed: tasks.filter((t) => t.status === "completed").length,
-    pending: tasks.filter((t) => t.status === "pending").length,
+    pending: tasks.filter((t) => t.status !== "completed").length,
   }
 
-  const isLead = profile?.role === "lead" || profile?.role === "admin" || profile?.role === "super_admin"
+  const getDeptStatus = (dept: string) => {
+    const deptActions = tasks.filter((t) => t.department === dept)
+    if (deptActions.length === 0)
+      return { label: "Pending", color: "bg-slate-100 text-slate-600 dark:bg-slate-900/40 dark:text-slate-400" }
+    if (deptActions.every((a) => a.status === "completed"))
+      return { label: "Finished", color: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" }
+    if (deptActions.some((a) => a.status === "in_progress" || a.status === "completed"))
+      return { label: "Started", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" }
+    return { label: "Pending", color: "bg-slate-100 text-slate-600 dark:bg-slate-900/40 dark:text-slate-400" }
+  }
+
+  const statusColor = (status: string) => {
+    if (status === "completed") return "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+    if (status === "in_progress") return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+    if (status === "not_started") return "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400"
+    return "bg-slate-100 text-slate-600 dark:bg-slate-900/40 dark:text-slate-400"
+  }
+
+  const actionItemsForExport: ActionItem[] = tasks.map((t) => ({
+    id: t.id,
+    title: t.title,
+    description: t.description,
+    department: t.department,
+    status: t.status,
+    week_number: t.week_number,
+    year: t.year,
+  }))
 
   return (
     <AdminTablePage
-      title="Departmental Action Tracker"
-      description={`Tracking actions for ${deptFilter === "all" ? "Every Department" : deptFilter}`}
+      title="Action Tracker"
+      description="Track departmental items and progress for the current week"
       icon={FileSpreadsheet}
-      backLinkHref="/dashboard"
-      backLinkLabel="Back to Dashboard"
+      backLinkHref="/portal/reports"
+      backLinkLabel="Back to Reports"
       actions={
-        isLead && (
-          <Button onClick={handleAdd} className="gap-2 shadow-sm">
-            <Plus className="h-4 w-4" />
-            Bulk Manual Entry
-          </Button>
-        )
+        tasks.length > 0 ? (
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => exportActionTrackerToPDF(actionItemsForExport, week, year)}
+              className="gap-2 border-red-200 text-red-600"
+            >
+              <FileText className="h-4 w-4" /> PDF
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => exportActionTrackerToPPTX(actionItemsForExport, week, year)}
+              className="gap-2 border-orange-200 text-orange-600"
+            >
+              <Presentation className="h-4 w-4" /> PPTX
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => exportActionTrackerToDocx(actionItemsForExport, week, year)}
+              className="gap-2 border-blue-200 text-blue-600"
+            >
+              <FileIcon className="h-4 w-4" /> Word
+            </Button>
+          </div>
+        ) : null
       }
       stats={
-        <div className="mb-6 grid gap-4 md:grid-cols-2">
-          <Card className="border-2 shadow-sm">
-            <CardHeader className="py-4">
-              <CardTitle className="text-muted-foreground flex items-center gap-2 text-sm font-bold uppercase">
-                <Clock className="h-4 w-4" /> Completion Rate
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-end gap-2">
-                <span className="text-primary text-3xl font-bold">{stats.completed}</span>
-                <span className="text-muted-foreground mb-1 text-lg">/ {stats.total} total actions</span>
+        <div className="grid gap-4 md:grid-cols-3">
+          <Card>
+            <CardContent className="flex items-center justify-between p-4">
+              <div>
+                <p className="text-muted-foreground text-sm font-medium">Total Actions</p>
+                <p className="text-2xl font-bold">{stats.total}</p>
               </div>
+              <FileSpreadsheet className="h-8 w-8 text-blue-500 opacity-20" />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="flex items-center justify-between p-4">
+              <div>
+                <p className="text-muted-foreground text-sm font-medium">Completed</p>
+                <p className="text-2xl font-bold text-green-600">{stats.completed}</p>
+              </div>
+              <CheckCircle2 className="h-8 w-8 text-green-500 opacity-20" />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="flex items-center justify-between p-4">
+              <div>
+                <p className="text-muted-foreground text-sm font-medium">Pending</p>
+                <p className="text-2xl font-bold text-orange-600">{stats.pending}</p>
+              </div>
+              <Clock className="h-8 w-8 text-orange-500 opacity-20" />
             </CardContent>
           </Card>
         </div>
       }
       filters={
-        <div className="flex flex-col gap-4 md:flex-row">
-          <div className="relative flex-1">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="relative min-w-[200px] flex-1">
             <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
             <Input
-              placeholder="Find a specific action..."
+              placeholder="Search..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
             />
           </div>
-          <div className="flex gap-2">
-            <Input
-              type="number"
-              className="w-24"
-              value={week}
-              onChange={(e) => setWeek(parseInt(e.target.value))}
-              placeholder="Week"
-              title="Week Number"
-            />
-            <Input
-              type="number"
-              className="w-28"
-              value={year}
-              onChange={(e) => setYear(parseInt(e.target.value))}
-              placeholder="Year"
-              title="Year"
-            />
-            <Select value={deptFilter} onValueChange={setDeptFilter}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Department" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Every Department</SelectItem>
-                {allDepartments.map((d) => (
-                  <SelectItem key={d} value={d}>
-                    {d}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button variant="outline" size="icon" onClick={() => loadTasks()} className="h-10 w-10">
-              <RefreshCcw className="h-4 w-4" />
+          <div className="flex items-end gap-2">
+            <div className="w-24">
+              <Label className="text-muted-foreground ml-1 text-[10px] font-bold uppercase">Week</Label>
+              <Input type="number" value={week} onChange={(e) => setWeek(parseInt(e.target.value) || week)} />
+            </div>
+            <div className="w-28">
+              <Label className="text-muted-foreground ml-1 text-[10px] font-bold uppercase">Year</Label>
+              <Input type="number" value={year} onChange={(e) => setYear(parseInt(e.target.value) || year)} />
+            </div>
+            <div className="w-52">
+              <Label className="text-muted-foreground ml-1 text-[10px] font-bold uppercase">Department</Label>
+              <Select value={deptFilter} onValueChange={setDeptFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Departments</SelectItem>
+                  {allDepartments.map((d) => (
+                    <SelectItem key={d} value={d}>
+                      {d}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button variant="outline" size="icon" onClick={loadTasks} disabled={loading} className="h-10 w-10 shrink-0">
+              <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
             </Button>
           </div>
         </div>
       }
     >
-      <Card className="overflow-hidden border-2 shadow-sm">
-        <CardHeader className="bg-muted/30 border-b py-4">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <FileSpreadsheet className="text-primary h-5 w-5" />
-            Weekly Action List
-          </CardTitle>
-          <CardDescription>Click status badge to cycle through Progress States</CardDescription>
-        </CardHeader>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
+      <div className="bg-background dark:bg-card overflow-hidden rounded-lg border shadow-sm">
+        <Table>
+          <TableHeader className="bg-muted/50">
+            <TableRow>
+              <TableHead className="w-[40px]"></TableHead>
+              <TableHead className="font-bold">Department</TableHead>
+              <TableHead className="font-bold">Summary</TableHead>
+              <TableHead className="text-center font-bold">Status</TableHead>
+              <TableHead className="w-[100px]"></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
               <TableRow>
-                <TableHead className="w-12 text-center">#</TableHead>
-                <TableHead className="min-w-[400px]">Action Description</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="w-12 text-right"></TableHead>
+                <TableCell colSpan={5} className="text-muted-foreground h-32 text-center">
+                  <Loader2 className="mx-auto mb-2 h-6 w-6 animate-spin" />
+                  Loading departmental actions...
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={4} className="text-muted-foreground py-20 text-center">
-                    <div className="flex items-center justify-center gap-2">
-                      <RefreshCcw className="h-4 w-4 animate-spin" />
-                      Loading actions...
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ) : filteredTasks.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={4} className="text-muted-foreground py-20 text-center italic">
-                    No actions assigned for this week.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredTasks.map((task, index) => (
-                  <TableRow key={task.id} className="group">
-                    <TableCell className="text-muted-foreground text-center font-medium">{index + 1}</TableCell>
-                    <TableCell>
-                      <div className="text-foreground flex items-center gap-2 font-semibold">
-                        {task.title}
-                        {task.original_week && task.original_week !== task.week_number && (
-                          <Badge variant="outline" className="text-muted-foreground h-5 px-1.5 text-[10px]">
-                            From W{task.original_week}
-                          </Badge>
-                        )}
-                      </div>
-                      {task.description && <div className="text-muted-foreground mt-1 text-sm">{task.description}</div>}
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            disabled={updatingId === task.id}
-                            className={`flex h-9 items-center gap-2 rounded-full border-2 px-3 transition-all ${
-                              task.status === "completed"
-                                ? "border-green-200 bg-green-50 text-green-700 hover:bg-green-100"
-                                : task.status === "in_progress"
-                                  ? "border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100"
-                                  : task.status === "not_started"
-                                    ? "border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
-                                    : "border-yellow-200 bg-yellow-50 text-yellow-700 hover:bg-yellow-100"
-                            }`}
-                          >
-                            <span className="flex items-center gap-2 font-medium capitalize">
-                              {task.status === "completed" ? (
-                                <CheckCircle2 className="h-4 w-4" />
-                              ) : (
-                                <Clock className="h-4 w-4" />
-                              )}
-                              {task.status === "in_progress" ? "In Progress" : task.status.replace("_", " ")}
-                            </span>
-                            <ChevronDown className="h-3 w-3 opacity-60" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-48">
-                          <DropdownMenuItem
-                            onClick={() => updateStatus(task.id, "pending")}
-                            className="gap-2 font-medium text-yellow-600 focus:bg-yellow-50 focus:text-yellow-700"
-                          >
-                            <Clock className="h-4 w-4" /> Pending
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => updateStatus(task.id, "not_started")}
-                            className="gap-2 font-medium text-red-600 focus:bg-red-50 focus:text-red-700"
-                          >
-                            <Clock className="h-4 w-4" /> Not Started
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => updateStatus(task.id, "in_progress")}
-                            className="gap-2 font-medium text-blue-600 focus:bg-blue-50 focus:text-blue-700"
-                          >
-                            <Clock className="h-4 w-4" /> In Progress
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => updateStatus(task.id, "completed")}
-                            className="gap-2 font-medium text-green-600 focus:bg-green-50 focus:text-green-700"
-                          >
-                            <CheckCircle2 className="h-4 w-4" /> Completed
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {isLead && (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleEdit(task)} className="cursor-pointer gap-2">
-                              <Edit2 className="h-4 w-4" /> Edit Details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => handleDelete(task.id)}
-                              className="text-destructive cursor-pointer gap-2"
-                            >
-                              <Trash2 className="h-4 w-4" /> Delete Permanently
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+            ) : deptsPresent.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5} className="text-muted-foreground h-32 text-center font-medium">
+                  No actions found.
+                </TableCell>
+              </TableRow>
+            ) : (
+              deptsPresent.map((dept) => {
+                const deptActions = filteredTasks.filter((t) => t.department === dept)
+                const completed = deptActions.filter((a) => a.status === "completed").length
+                const total = deptActions.length
+                const status = getDeptStatus(dept)
+                const isMyDept = profile?.department === dept
 
-      <ActionFormDialog
-        isOpen={isFormOpen}
-        onClose={() => setIsFormOpen(false)}
-        onComplete={loadTasks}
-        departments={profile?.role === "lead" ? [profile.department] : allDepartments}
-        editingAction={editingTask}
-        defaultDept={deptFilter === "all" ? profile?.department || allDepartments[0] : deptFilter}
-        defaultWeek={week}
-        defaultYear={year}
-      />
+                return (
+                  <Fragment key={dept}>
+                    <TableRow
+                      className={cn(
+                        "hover:bg-muted/30 cursor-pointer transition-colors",
+                        expandedDepts.has(dept) && "bg-muted/50"
+                      )}
+                      onClick={() => toggleDept(dept)}
+                    >
+                      <TableCell>
+                        {expandedDepts.has(dept) ? (
+                          <ChevronDown className="text-primary h-4 w-4" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4 text-slate-400" />
+                        )}
+                      </TableCell>
+                      <TableCell className="font-bold">{dept}</TableCell>
+                      <TableCell className="text-muted-foreground text-sm">
+                        {completed} of {total} completed
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Badge className={cn("px-2.5 py-1 text-[10px] font-bold uppercase", status.color)}>
+                          {status.label}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="sm" className="h-8 text-xs font-medium">
+                          {expandedDepts.has(dept) ? "Hide" : "View"}
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                    {expandedDepts.has(dept) && (
+                      <TableRow className="bg-muted/10 hover:bg-muted/10 border-t-0">
+                        <TableCell colSpan={5} className="p-0">
+                          <div className="animate-in slide-in-from-top-2 p-6 pt-2 duration-200">
+                            <div className="bg-background overflow-hidden rounded-lg border shadow-sm">
+                              <Table>
+                                <TableHeader className="bg-muted/30">
+                                  <TableRow>
+                                    <TableHead className="text-[10px] font-black tracking-widest uppercase">
+                                      Action Description
+                                    </TableHead>
+                                    <TableHead className="w-[180px] text-[10px] font-black tracking-widest uppercase">
+                                      Status
+                                    </TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {deptActions.map((task) => (
+                                    <TableRow key={task.id} className="hover:bg-muted/5">
+                                      <TableCell>
+                                        <div className="text-sm font-semibold">{task.title}</div>
+                                        {task.description && (
+                                          <div className="text-muted-foreground mt-0.5 text-xs">{task.description}</div>
+                                        )}
+                                      </TableCell>
+                                      <TableCell>
+                                        {isMyDept ? (
+                                          <Select
+                                            value={task.status}
+                                            onValueChange={(val) => handleStatusChange(task.id, val)}
+                                          >
+                                            <SelectTrigger
+                                              className={cn(
+                                                "h-8 text-[11px] font-bold uppercase",
+                                                statusColor(task.status)
+                                              )}
+                                            >
+                                              <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                              <SelectItem value="pending" className="text-xs">
+                                                Pending
+                                              </SelectItem>
+                                              <SelectItem value="not_started" className="text-xs">
+                                                Not Started
+                                              </SelectItem>
+                                              <SelectItem value="in_progress" className="text-xs">
+                                                In Progress
+                                              </SelectItem>
+                                              <SelectItem value="completed" className="text-xs">
+                                                Completed
+                                              </SelectItem>
+                                            </SelectContent>
+                                          </Select>
+                                        ) : (
+                                          <Badge
+                                            className={cn(
+                                              "px-2.5 py-1 text-[10px] font-bold uppercase",
+                                              statusColor(task.status)
+                                            )}
+                                          >
+                                            {task.status.replace("_", " ")}
+                                          </Badge>
+                                        )}
+                                      </TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </Fragment>
+                )
+              })
+            )}
+          </TableBody>
+        </Table>
+      </div>
     </AdminTablePage>
   )
 }

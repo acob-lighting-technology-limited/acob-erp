@@ -1,3 +1,4 @@
+import { Suspense } from "react"
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { ActionTrackerContent } from "./action-tracker-content"
@@ -27,5 +28,9 @@ export default async function ActionTrackerPage() {
   const departments = Array.from(new Set(employeeData?.map((s: any) => s.department).filter(Boolean))) as string[]
   departments.sort()
 
-  return <ActionTrackerContent initialDepartments={departments} />
+  return (
+    <Suspense fallback={<div className="flex justify-center py-20">Loading Tracker...</div>}>
+      <ActionTrackerContent initialDepartments={departments} />
+    </Suspense>
+  )
 }

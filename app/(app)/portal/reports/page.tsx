@@ -1,7 +1,7 @@
 "use client"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { LayoutDashboard, FileBarChart, ClipboardList, FileText, ChevronRight } from "lucide-react"
+import { LayoutDashboard, FileBarChart, ClipboardList, FileText, ChevronRight, ArrowLeft } from "lucide-react"
 import Link from "next/link"
 import { PageWrapper, PageHeader } from "@/components/layout"
 import { Button } from "@/components/ui/button"
@@ -9,27 +9,36 @@ import { Button } from "@/components/ui/button"
 export default function PortalReportsPage() {
   const reportCards = [
     {
-      title: "Action Tracker",
-      description: "Track project progress, pending actions, and status updates.",
-      href: "/portal/reports/action-tracker",
-      icon: ClipboardList,
-      color: "text-blue-600 dark:text-blue-400",
-      bgColor: "bg-blue-100 dark:bg-blue-900/30",
-    },
-    {
       title: "Weekly Reports",
-      description: "View and submit weekly status updates and performance summaries.",
+      description: "View and submit weekly status updates and performance summaries for your department.",
       href: "/portal/reports/weekly-reports",
       icon: FileText,
       color: "text-green-600 dark:text-green-400",
       bgColor: "bg-green-100 dark:bg-green-900/30",
     },
+    {
+      title: "Action Tracker",
+      description: "Track project progress, pending actions, and update completion status for your team.",
+      href: "/portal/reports/action-tracker",
+      icon: ClipboardList,
+      color: "text-blue-600 dark:text-blue-400",
+      bgColor: "bg-blue-100 dark:bg-blue-900/30",
+    },
   ]
 
   return (
     <PageWrapper maxWidth="full" background="gradient">
+      <div className="mb-4">
+        <Button variant="ghost" size="sm" asChild className="text-muted-foreground hover:text-foreground gap-2">
+          <Link href="/dashboard">
+            <ArrowLeft className="h-4 w-4" />
+            Back to Dashboard
+          </Link>
+        </Button>
+      </div>
+
       <PageHeader
-        title="Reports Dashboard"
+        title="Reports"
         description="Access project status reports, action tracking tools, and weekly performance summaries."
         icon={FileBarChart}
       />

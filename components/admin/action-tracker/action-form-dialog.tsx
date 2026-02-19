@@ -282,8 +282,9 @@ export function ActionFormDialog({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="pending">Pending</SelectItem>
-                      <SelectItem value="in_progress">In Progress</SelectItem>
-                      <SelectItem value="completed">Completed</SelectItem>
+                      <SelectItem value="not_started">Not Started</SelectItem>
+                      <SelectItem value="in_progress">Started</SelectItem>
+                      <SelectItem value="completed">Finished</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

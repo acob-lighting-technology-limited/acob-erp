@@ -39,3 +39,16 @@ export function getCurrentISOWeek(date: Date = new Date()): number {
   const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1))
   return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7)
 }
+
+/**
+ * Returns the next ISO week and year.
+ */
+export function getNextWeekParams(w: number, y: number) {
+  // ISO weeks in a year is either 52 or 53.
+  // A simple way to check is to see the week of Dec 28th.
+  const dec28 = new Date(y, 11, 28)
+  const weeksInYear = getCurrentISOWeek(dec28)
+
+  if (w >= weeksInYear) return { week: 1, year: y + 1 }
+  return { week: w + 1, year: y }
+}

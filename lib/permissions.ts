@@ -30,6 +30,10 @@ export function canViewDepartmentemployee(
   return role === "lead" && leadDepartments.includes(employeeDepartment)
 }
 
+export function canDeleteEmployee(role: UserRole): boolean {
+  return hasRoleOrHigher(role, "admin") // Only admin and super_admin can delete employees
+}
+
 export function canManageDevices(role: UserRole): boolean {
   return hasRoleOrHigher(role, "admin") // admin and super_admin
 }
@@ -115,7 +119,7 @@ export function canAssignRoles(assignerRole: UserRole, targetRole: UserRole): bo
 
   // admin can assign visitor, employee, and lead (but not admin or super_admin)
   if (assignerRole === "admin") {
-    return ["visitor", "employee", "lead"].includes(targetRole)
+    return ["visitor", "employee"].includes(targetRole)
   }
 
   // Others cannot assign roles
@@ -125,7 +129,7 @@ export function canAssignRoles(assignerRole: UserRole, targetRole: UserRole): bo
 export function getRoleDisplayName(role: UserRole): string {
   const roleNames: Record<UserRole, string> = {
     visitor: "Visitor",
-    employee: "employee",
+    employee: "Employee",
     lead: "Lead",
     admin: "Admin",
     super_admin: "Super Admin",

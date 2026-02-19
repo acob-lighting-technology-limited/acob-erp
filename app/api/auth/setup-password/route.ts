@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
+import crypto from "crypto"
 
 export async function POST(req: Request) {
   try {
@@ -22,11 +23,12 @@ export async function POST(req: Request) {
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
 
-    // 1. Find user by token
+    // 1. Find user by hashed token
+    const tokenHash = crypto.createHash("sha256").update(token).digest("hex")
     const { data: profile, error: profileError } = await supabaseAdmin
       .from("profiles")
       .select("id, setup_token_expires_at")
-      .eq("setup_token", token)
+      .eq("setup_token", tokenHash)
       .single()
 
     if (profileError || !profile) {

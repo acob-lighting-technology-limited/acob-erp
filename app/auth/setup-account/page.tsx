@@ -30,6 +30,7 @@ function SetupAccountContent() {
   const [isLoading, setIsLoading] = useState(false)
   const [emailSent, setEmailSent] = useState(false)
   const [isSuccess, setIsSuccess] = useState(false)
+  const [isRecoveryMode, setIsRecoveryMode] = useState(false)
   const [mounted, setMounted] = useState(false)
   const { resolvedTheme } = useTheme()
 
@@ -42,6 +43,19 @@ function SetupAccountContent() {
 
   useEffect(() => {
     setMounted(true)
+
+    const supabase = createClient()
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === "PASSWORD_RECOVERY") {
+        setIsRecoveryMode(true)
+      }
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
   }, [])
 
   const handleSetupAccount = async (e: React.FormEvent) => {
@@ -58,7 +72,7 @@ function SetupAccountContent() {
 
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/reset-password`,
+        redirectTo: `${window.location.origin}/auth/setup-account`,
       })
 
       if (error) throw error
@@ -89,23 +103,32 @@ function SetupAccountContent() {
 
     setIsLoading(true)
     try {
-      const response = await fetch("/api/auth/setup-password", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, password }),
-      })
+      const supabase = createClient()
 
-      const data = await response.json()
-      if (!response.ok) throw new Error(data.error || data.message || "Failed to activate account")
+      if (isRecoveryMode) {
+        // Standard Supabase Recovery Flow
+        const { error } = await supabase.auth.updateUser({ password })
+        if (error) throw error
+      } else {
+        // Custom Initial Setup Flow
+        const response = await fetch("/api/auth/setup-password", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token, password }),
+        })
+
+        const data = await response.json()
+        if (!response.ok) throw new Error(data.error || data.message || "Failed to activate account")
+      }
 
       setIsSuccess(true)
-      toast.success("Account activated successfully!")
+      toast.success(isRecoveryMode ? "Password reset successfully!" : "Account activated successfully!")
 
       setTimeout(() => {
         router.push("/auth/login")
       }, 2000)
     } catch (error: any) {
-      toast.error(error.message || "Failed to activate account")
+      toast.error(error.message || "Failed to process request")
     } finally {
       setIsLoading(false)
     }
@@ -132,10 +155,10 @@ function SetupAccountContent() {
                     <CheckCircle className="h-6 w-6 text-green-600" />
                     Activation Complete
                   </>
-                ) : token ? (
+                ) : token || isRecoveryMode ? (
                   <>
                     <Lock className="text-primary h-6 w-6" />
-                    Create Your Password
+                    {isRecoveryMode ? "Reset Your Password" : "Create Your Password"}
                   </>
                 ) : emailSent ? (
                   <>
@@ -152,8 +175,10 @@ function SetupAccountContent() {
               <CardDescription className="text-base">
                 {isSuccess
                   ? "Your account is now active"
-                  : token
-                    ? "Set a secure password to activate your company account"
+                  : token || isRecoveryMode
+                    ? isRecoveryMode
+                      ? "Enter a new password for your account"
+                      : "Set a secure password to activate your company account"
                     : emailSent
                       ? "We've sent you a link to set up your password"
                       : "Enter your company email and we'll send you a link to create your password"}
@@ -171,7 +196,7 @@ function SetupAccountContent() {
                     <Button className="h-11 w-full">Go to Login</Button>
                   </Link>
                 </div>
-              ) : token ? (
+              ) : token || isRecoveryMode ? (
                 <form onSubmit={handleCreatePassword}>
                   <div className="flex flex-col gap-5">
                     <div className="grid gap-3">
