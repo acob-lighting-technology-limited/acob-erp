@@ -156,6 +156,14 @@ export const assignmentValidation = {
  */
 export const formValidation = {
   /**
+   * Validate general email format.
+   */
+  isEmail: (email: string): boolean => {
+    if (!email) return false
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+  },
+
+  /**
    * Check if all required fields are filled
    */
   hasRequiredFields: (fields: Record<string, any>, requiredKeys: string[]): boolean => {

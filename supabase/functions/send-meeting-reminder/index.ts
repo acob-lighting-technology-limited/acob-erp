@@ -198,20 +198,31 @@ serve(async (req) => {
     let subject: string
 
     if (type === "meeting") {
+      const normalizedAgenda = Array.isArray(agenda)
+        ? agenda
+        : typeof agenda === "string"
+          ? agenda
+              .split(/\r?\n/)
+              .map((line) => line.replace(/^\d+\.\s*/, "").trim())
+              .filter(Boolean)
+          : []
+
       subject = "Reminder for General Weekly Meeting"
       html = buildMeetingReminderHtml(
         meetingDate || "Monday",
         meetingTime || "8:30 AM",
         teamsLink || "",
-        agenda || [
-          "Opening Prayer",
-          "Knowledge Sharing Session (30 minutes)",
-          "Departmental Updates",
-          "Progress on Ongoing Projects",
-          "Upcoming Events and Deadlines",
-          "Any Other Business",
-          "Adjournment",
-        ]
+        normalizedAgenda.length > 0
+          ? normalizedAgenda
+          : [
+              "Opening Prayer",
+              "Knowledge Sharing Session (30 minutes)",
+              "Departmental Updates",
+              "Progress on Ongoing Projects",
+              "Upcoming Events and Deadlines",
+              "Any Other Business",
+              "Adjournment",
+            ]
       )
     } else {
       subject = "Reminder: Knowledge Sharing Session"

@@ -23,8 +23,8 @@ export default async function MeetingRemindersPage() {
   // Fetch all active employees with their emails
   const { data: employees } = await supabase
     .from("profiles")
-    .select("id, full_name, company_email, department, employment_status")
-    .not("company_email", "is", null)
+    .select("id, full_name, company_email, additional_email, department, employment_status")
+    .or("company_email.not.is.null,additional_email.not.is.null")
     .order("full_name")
 
   const activeEmployees = (employees || []).filter((e: any) => e.employment_status === "active" || !e.employment_status)
