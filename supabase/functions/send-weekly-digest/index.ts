@@ -12,7 +12,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 }
 
-// ─── Colours ──────────────────────────────────────────────────────────────────
 const GREEN = rgb(0.102, 0.478, 0.29)
 const DARK = rgb(0.059, 0.176, 0.122)
 const WHITE = rgb(1, 1, 1)
@@ -22,7 +21,6 @@ const BLUE = rgb(0.114, 0.416, 0.588)
 const RED = rgb(0.725, 0.11, 0.11)
 const LIGHT = rgb(0.976, 0.984, 0.992)
 
-// ─── ISO week helpers ─────────────────────────────────────────────────────────
 function getCurrentISOWeek(): { week: number; year: number } {
   const now = new Date()
   const jan4 = new Date(now.getFullYear(), 0, 4)
@@ -85,7 +83,8 @@ function wrapText(text: string, maxChars: number): string[] {
   return lines
 }
 
-// ─── Fetch logo bytes ─────────────────────────────────────────────────────────
+const STORAGE_BASE = "https://itqegqxeqkeogwrvlzlj.supabase.co/storage/v1/object/public/assets/logos"
+
 async function fetchLogoBytes(url: string): Promise<Uint8Array | null> {
   try {
     const res = await fetch(url)
@@ -96,14 +95,20 @@ async function fetchLogoBytes(url: string): Promise<Uint8Array | null> {
   }
 }
 
-// ─── Draw logo in page header (shared helper) ─────────────────────────────────
-async function drawLogoInHeader(doc: PDFDocument, page: any, logoBytes: Uint8Array | null, headerH: number, H: number) {
+async function drawLogoInHeader(
+  doc: PDFDocument,
+  page: any,
+  logoBytes: Uint8Array | null,
+  headerH: number,
+  H: number,
+  W: number
+) {
   if (!logoBytes) return
   try {
     const img = await doc.embedPng(logoBytes)
-    const dims = img.scaleToFit(100, 30)
+    const dims = img.scaleToFit(108, 26)
     page.drawImage(img, {
-      x: 16,
+      x: W - dims.width - 17,
       y: H - headerH + (headerH - dims.height) / 2,
       width: dims.width,
       height: dims.height,
@@ -121,7 +126,7 @@ async function addCoverPage(
   week: number,
   year: number,
   subtitle: string,
-  logoBytes: Uint8Array | null
+  coverLogoBytes: Uint8Array | null
 ) {
   const page = doc.addPage([595, 842])
   const { width: W, height: H } = page.getSize()
@@ -131,23 +136,59 @@ async function addCoverPage(
   page.drawRectangle({ x: 0, y: H - 60, width: W, height: 60, color: DARK })
   page.drawRectangle({ x: 0, y: H - 66, width: W, height: 6, color: GREEN })
 
-  await drawLogoInHeader(doc, page, logoBytes, 60, H)
+  // Large centred LIGHT logo in body area
+  if (coverLogoBytes) {
+    try {
+      const img = await doc.embedPng(coverLogoBytes)
+      const dims = img.scaleToFit(350, 80)
+      page.drawImage(img, {
+        x: W / 2 - dims.width / 2,
+        y: H / 2 + 80,
+        width: dims.width,
+        height: dims.height,
+      })
+    } catch {
+      /* skip */
+    }
+  } else {
+    page.drawText("ACOB LIGHTING TECHNOLOGY LIMITED", {
+      x: W / 2 - 150,
+      y: H / 2 + 90,
+      size: 14,
+      font: bold,
+      color: DARK,
+    })
+  }
+
+  // Green divider below logo
+  page.drawRectangle({ x: 80, y: H / 2 + 60, width: W - 160, height: 2, color: GREEN })
 
   // Centre content
-  page.drawRectangle({ x: 80, y: H / 2 + 20, width: W - 160, height: 2, color: GREEN })
-  page.drawText("General Meeting", { x: W / 2 - 120, y: H / 2 + 40, size: 28, font: bold, color: DARK })
-  page.drawText("Weekly Report", { x: W / 2 - 80, y: H / 2 + 8, size: 20, font: regular, color: GREEN })
+  const gmText = "General Meeting"
+  const gmWidth = bold.widthOfTextAtSize(gmText, 28)
+  page.drawText(gmText, { x: W / 2 - gmWidth / 2, y: H / 2 + 30, size: 28, font: bold, color: DARK })
 
-  const pillW = 100,
-    pillH = 24,
-    pillX = W / 2 - 50,
-    pillY = H / 2 - 30
+  const wrText = "Weekly Report"
+  const wrWidth = regular.widthOfTextAtSize(wrText, 20)
+  page.drawText(wrText, { x: W / 2 - wrWidth / 2, y: H / 2 + 2, size: 20, font: regular, color: GREEN })
+
+  // Week pill
+  const pillLabel = `Week ${week}`
+  const pillLabelW = bold.widthOfTextAtSize(pillLabel, 12)
+  const pillW = pillLabelW + 36,
+    pillH = 24
+  const pillX = W / 2 - pillW / 2,
+    pillY = H / 2 - 36
   page.drawRectangle({ x: pillX, y: pillY, width: pillW, height: pillH, color: GREEN })
-  page.drawText(`Week ${week}`, { x: pillX + 18, y: pillY + 7, size: 12, font: bold, color: WHITE })
-  page.drawText(mondayDate, { x: W / 2 - 90, y: pillY - 22, size: 10, font: regular, color: MUTED })
+  page.drawText(pillLabel, { x: pillX + 18, y: pillY + 7, size: 12, font: bold, color: WHITE })
+
+  // Monday date — properly centred
+  const dateWidth = regular.widthOfTextAtSize(mondayDate, 10)
+  page.drawText(mondayDate, { x: W / 2 - dateWidth / 2, y: pillY - 22, size: 10, font: regular, color: MUTED })
 
   if (subtitle) {
-    page.drawText(subtitle, { x: W / 2 - 60, y: pillY - 42, size: 10, font: regular, color: GREEN })
+    const stWidth = regular.widthOfTextAtSize(subtitle, 10)
+    page.drawText(subtitle, { x: W / 2 - stWidth / 2, y: pillY - 42, size: 10, font: regular, color: GREEN })
   }
 
   // Footer
@@ -161,15 +202,13 @@ async function addCoverPage(
   })
 }
 
-// ─── Weekly Report content page ───────────────────────────────────────────────
-// Layout: 3 rows, 1 column — Work Done / Tasks for New Week / Challenges
 async function addWeeklyReportContentPage(
   doc: PDFDocument,
   bold: any,
   regular: any,
   department: string,
   report: any,
-  logoBytes: Uint8Array | null,
+  headerLogoBytes: Uint8Array | null,
   nextDept?: string
 ) {
   const page = doc.addPage([595, 842])
@@ -177,13 +216,11 @@ async function addWeeklyReportContentPage(
   const footerH = 40
   const headerH = 52
 
-  // Header bar
   page.drawRectangle({ x: 0, y: H - headerH, width: W, height: headerH, color: DARK })
-  await drawLogoInHeader(doc, page, logoBytes, headerH, H)
-  page.drawText(department.toUpperCase(), { x: 120, y: H - 30, size: 9, font: bold, color: WHITE })
   page.drawRectangle({ x: 0, y: H - headerH - 4, width: W, height: 4, color: GREEN })
+  page.drawText(department.toUpperCase(), { x: 22, y: H - 32, size: 9, font: bold, color: WHITE })
+  await drawLogoInHeader(doc, page, headerLogoBytes, headerH, H, W)
 
-  // Body: 3 equal rows
   const bodyTop = H - headerH - 8
   const bodyH = bodyTop - footerH
   const rowH = bodyH / 3
@@ -201,11 +238,9 @@ async function addWeeklyReportContentPage(
     const s = sections[i]
     const sectionTop = bodyTop - i * rowH
 
-    // Label bar
     page.drawRectangle({ x: padX, y: sectionTop - labelH, width: innerW, height: labelH, color: s.color })
     page.drawText(s.label, { x: padX + 6, y: sectionTop - labelH + 7, size: 8, font: bold, color: WHITE })
 
-    // Content lines
     let ty = sectionTop - labelH - 14
     const bottomLimit = sectionTop - rowH + 6
     for (const rawLine of s.text.split("\n")) {
@@ -216,13 +251,11 @@ async function addWeeklyReportContentPage(
       }
     }
 
-    // Row divider (not after last)
     if (i < 2) {
       page.drawRectangle({ x: padX, y: sectionTop - rowH, width: innerW, height: 0.5, color: rgb(0.8, 0.85, 0.9) })
     }
   }
 
-  // Footer
   page.drawRectangle({ x: 0, y: 0, width: W, height: footerH, color: GREEN })
   page.drawText("Confidential \u2014 ACOB Internal Use Only", { x: 20, y: 14, size: 8, font: regular, color: WHITE })
   if (nextDept) {
@@ -232,7 +265,6 @@ async function addWeeklyReportContentPage(
   }
 }
 
-// ─── Action Tracker content page ──────────────────────────────────────────────
 async function addActionTrackerPage(
   doc: PDFDocument,
   bold: any,
@@ -241,7 +273,7 @@ async function addActionTrackerPage(
   actions: any[],
   week: number,
   year: number,
-  logoBytes: Uint8Array | null,
+  headerLogoBytes: Uint8Array | null,
   nextDept?: string
 ) {
   const page = doc.addPage([595, 842])
@@ -249,26 +281,42 @@ async function addActionTrackerPage(
   const footerH = 40
   const headerH = 52
 
-  // Header bar
   page.drawRectangle({ x: 0, y: H - headerH, width: W, height: headerH, color: DARK })
-  await drawLogoInHeader(doc, page, logoBytes, headerH, H)
-  page.drawText(department.toUpperCase(), { x: 120, y: H - 30, size: 9, font: bold, color: WHITE })
-
-  // Week badge in header
-  page.drawRectangle({ x: W - 110, y: H - headerH + 14, width: 90, height: 20, color: GREEN })
-  page.drawText(`Week ${week}, ${year}`, { x: W - 100, y: H - headerH + 21, size: 8, font: bold, color: WHITE })
   page.drawRectangle({ x: 0, y: H - headerH - 4, width: W, height: 4, color: GREEN })
+  page.drawText(department.toUpperCase(), { x: 22, y: H - 32, size: 9, font: bold, color: WHITE })
+  await drawLogoInHeader(doc, page, headerLogoBytes, headerH, H, W)
 
-  // Section title
-  page.drawText("ACTION TRACKER", { x: 20, y: H - headerH - 22, size: 12, font: bold, color: DARK })
-  page.drawRectangle({ x: 20, y: H - headerH - 28, width: W - 40, height: 1.5, color: GREEN })
+  const badgeW = 85,
+    badgeH = 20
+  page.drawRectangle({
+    x: W - 20 - badgeW,
+    y: H - headerH - 4 - badgeH - 8,
+    width: badgeW,
+    height: badgeH,
+    color: GREEN,
+  })
+  page.drawText(`Week ${week}, ${year}`, {
+    x: W - 20 - badgeW / 2 - 22,
+    y: H - headerH - 4 - badgeH - 8 + 6,
+    size: 8,
+    font: bold,
+    color: WHITE,
+  })
 
-  // Column headers
+  page.drawText("ACTION TRACKER", { x: 20, y: H - headerH - 4 - 30, size: 12, font: bold, color: DARK })
+  page.drawRectangle({ x: 20, y: H - headerH - 4 - 36, width: W - 40, height: 1.5, color: GREEN })
+
+  // Column headers: S/N | ACTION ITEM | STATUS
+  const snX = 20
+  const snW = 30
+  const actionX = snX + snW
+  const statusW = 100
+  const statusX = W - 20 - statusW
   const headerY = H - headerH - 50
   page.drawRectangle({ x: 20, y: headerY - 4, width: W - 40, height: 20, color: GREEN })
-  page.drawText("ACTION ITEM", { x: 26, y: headerY + 2, size: 8, font: bold, color: WHITE })
-  page.drawText("DEPARTMENT", { x: 260, y: headerY + 2, size: 8, font: bold, color: WHITE })
-  page.drawText("STATUS", { x: 450, y: headerY + 2, size: 8, font: bold, color: WHITE })
+  page.drawText("S/N", { x: snX + 6, y: headerY + 2, size: 8, font: bold, color: WHITE })
+  page.drawText("ACTION ITEM", { x: actionX + 6, y: headerY + 2, size: 8, font: bold, color: WHITE })
+  page.drawText("STATUS", { x: statusX + 6, y: headerY + 2, size: 8, font: bold, color: WHITE })
 
   const statusColors: Record<string, any> = {
     completed: rgb(0.086, 0.396, 0.204),
@@ -292,19 +340,17 @@ async function addActionTrackerPage(
     if (i % 2 === 0) {
       page.drawRectangle({ x: 20, y: rowY - 12, width: W - 40, height: rowH, color: LIGHT })
     }
-    const title = action.title.length > 45 ? action.title.slice(0, 42) + "..." : action.title
-    page.drawText(title, { x: 26, y: rowY - 4, size: 8, font: regular, color: SLATE })
-    const dept = action.department.length > 22 ? action.department.slice(0, 20) + "..." : action.department
-    page.drawText(dept, { x: 260, y: rowY - 4, size: 8, font: regular, color: SLATE })
+    page.drawText(`${i + 1}`, { x: snX + 10, y: rowY - 4, size: 8, font: bold, color: SLATE })
+    const titleLines = wrapText(action.title, 60)
+    page.drawText(titleLines[0], { x: actionX + 6, y: rowY - 4, size: 8, font: regular, color: SLATE })
     const sc = statusColors[action.status] || statusColors.pending
     const sl = statusLabels[action.status] || action.status
-    page.drawRectangle({ x: 448, y: rowY - 10, width: 80, height: 14, color: sc })
-    page.drawText(sl, { x: 452, y: rowY - 5, size: 7, font: bold, color: WHITE })
+    page.drawRectangle({ x: statusX + 4, y: rowY - 10, width: statusW - 8, height: 14, color: sc })
+    page.drawText(sl, { x: statusX + 8, y: rowY - 5, size: 7, font: bold, color: WHITE })
     page.drawRectangle({ x: 20, y: rowY - 13, width: W - 40, height: 0.5, color: rgb(0.886, 0.906, 0.941) })
     rowY -= rowH
   }
 
-  // Footer
   page.drawRectangle({ x: 0, y: 0, width: W, height: footerH, color: GREEN })
   page.drawText("Confidential \u2014 ACOB Internal Use Only", { x: 20, y: 14, size: 8, font: regular, color: WHITE })
   if (nextDept) {
@@ -314,12 +360,12 @@ async function addActionTrackerPage(
   }
 }
 
-// ─── Build Weekly Report PDF ──────────────────────────────────────────────────
 async function buildWeeklyReportPDF(
   reports: any[],
-  week: number,
-  year: number,
-  logoBytes: Uint8Array | null
+  meetingWeek: number,
+  meetingYear: number,
+  coverLogoBytes: Uint8Array | null,
+  headerLogoBytes: Uint8Array | null
 ): Promise<Uint8Array> {
   const doc = await PDFDocument.create()
   const bold = await doc.embedFont(StandardFonts.HelveticaBold)
@@ -334,7 +380,7 @@ async function buildWeeklyReportPDF(
     return a.department.localeCompare(b.department)
   })
 
-  await addCoverPage(doc, bold, regular, week, year, "", logoBytes)
+  await addCoverPage(doc, bold, regular, meetingWeek, meetingYear, "", coverLogoBytes)
 
   for (let i = 0; i < sorted.length; i++) {
     await addWeeklyReportContentPage(
@@ -343,7 +389,7 @@ async function buildWeeklyReportPDF(
       regular,
       sorted[i].department,
       sorted[i],
-      logoBytes,
+      headerLogoBytes,
       sorted[i + 1]?.department
     )
   }
@@ -351,18 +397,18 @@ async function buildWeeklyReportPDF(
   return doc.save()
 }
 
-// ─── Build Action Tracker PDF ─────────────────────────────────────────────────
 async function buildActionTrackerPDF(
   actions: any[],
-  week: number,
-  year: number,
-  logoBytes: Uint8Array | null
+  meetingWeek: number,
+  meetingYear: number,
+  coverLogoBytes: Uint8Array | null,
+  headerLogoBytes: Uint8Array | null
 ): Promise<Uint8Array> {
   const doc = await PDFDocument.create()
   const bold = await doc.embedFont(StandardFonts.HelveticaBold)
   const regular = await doc.embedFont(StandardFonts.Helvetica)
 
-  await addCoverPage(doc, bold, regular, week, year, "Action Tracker", logoBytes)
+  await addCoverPage(doc, bold, regular, meetingWeek, meetingYear, "Action Tracker", coverLogoBytes)
 
   const grouped: Record<string, any[]> = {}
   for (const a of actions) {
@@ -376,23 +422,29 @@ async function buildActionTrackerPDF(
   }
 
   for (let i = 0; i < depts.length; i++) {
-    await addActionTrackerPage(doc, bold, regular, depts[i], grouped[depts[i]], week, year, logoBytes, depts[i + 1])
+    await addActionTrackerPage(
+      doc,
+      bold,
+      regular,
+      depts[i],
+      grouped[depts[i]],
+      meetingWeek,
+      meetingYear,
+      headerLogoBytes,
+      depts[i + 1]
+    )
   }
 
   return doc.save()
 }
 
-// ─── Email HTML ───────────────────────────────────────────────────────────────
 function buildEmailHtml(
-  reportWeek: number,
-  reportYear: number,
-  atWeek: number,
-  atYear: number,
-  currentWeek: number,
-  currentYear: number
+  meetingWeek: number,
+  meetingYear: number,
+  reportDataWeek: number,
+  reportDataYear: number
 ): string {
-  // Meeting date = Monday of the CURRENT week (when email is sent / meeting happened)
-  const meetingDate = getWeekMonday(currentWeek, currentYear)
+  const meetingDate = getWeekMonday(meetingWeek, meetingYear)
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -430,8 +482,8 @@ function buildEmailHtml(
     <img src="https://erp.acoblighting.com/images/acob-logo-dark.png" height="40" alt="ACOB Lighting">
   </div>
   <div class="wrapper">
-    <span class="week-badge">Week ${currentWeek} &bull; ${currentYear}</span>
-    <div class="title">General Meeting Minutes &amp; Action Tracker</div>
+    <span class="week-badge">Week ${meetingWeek} &bull; ${meetingYear}</span>
+    <div class="title">General Meeting Minutes and Actionable</div>
     <p class="text">Dear All,</p>
     <p class="text">
       Please find attached the <strong>Weekly Report and Actionable Items</strong>
@@ -445,7 +497,7 @@ function buildEmailHtml(
       <div class="attach-card">
         <div class="attach-icon">&#128196;</div>
         <div class="attach-info">
-          <div class="attach-name">Weekly Report &mdash; Week ${reportWeek}, ${reportYear}</div>
+          <div class="attach-name">Weekly Report &mdash; Week ${meetingWeek}, ${meetingYear}</div>
           <div class="attach-desc">Departmental work done, tasks &amp; challenges</div>
         </div>
         <span class="attach-badge">PDF</span>
@@ -453,15 +505,13 @@ function buildEmailHtml(
       <div class="attach-card">
         <div class="attach-icon">&#9989;</div>
         <div class="attach-info">
-          <div class="attach-name">Action Tracker &mdash; Week ${atWeek}, ${atYear}</div>
+          <div class="attach-name">Action Tracker &mdash; Week ${meetingWeek}, ${meetingYear}</div>
           <div class="attach-desc">Upcoming departmental action items &amp; completion status</div>
         </div>
         <span class="attach-badge">PDF</span>
       </div>
     </div>
-    <div class="cta">
-      <a href="https://erp.acoblighting.com/portal/reports/weekly-reports" class="button">View Reports Portal</a>
-    </div>
+
     <div class="support">
       If you have any questions, please contact<br>
       <a href="mailto:ict@acoblighting.com">ict@acoblighting.com</a>
@@ -498,71 +548,85 @@ serve(async (req) => {
 
     const {
       testEmail,
+      recipients: bodyRecipients,
+      weeklyReportBase64,
+      actionTrackerBase64,
+      // NEW: meetingWeek is the week of the meeting (what shows on cover page)
+      meetingWeek: bodyMeetingWeek,
+      meetingYear: bodyMeetingYear,
+      // LEGACY: forceWeek (kept for backwards compat with old callers)
       forceWeek,
       forceYear,
-      weeklyReportBase64, // pre-generated by client (jsPDF)
-      actionTrackerBase64, // pre-generated by client (jsPDF)
       week: bodyWeek,
       year: bodyYear,
       actionTrackerWeek: bodyAtWeek,
       actionTrackerYear: bodyAtYear,
+      contentChoice,
     } = body
 
-    // Current week = the week we are IN (when email is sent / meeting happened)
     const { week: currentWeek, year: currentYear } = getCurrentISOWeek()
 
-    // Report week = PREVIOUS week (what was done last week, reported this week)
-    const { week: reportWeek, year: reportYear } = forceWeek
-      ? { week: forceWeek, year: forceYear || currentYear }
-      : bodyWeek
-        ? { week: bodyWeek, year: bodyYear || currentYear }
-        : getPreviousWeek(currentWeek, currentYear)
+    // ── Determine meeting week (the week everything is labelled as) ──────
+    let meetingWeek: number
+    let meetingYear: number
 
-    // Action tracker week = CURRENT week
-    const atWeek = bodyAtWeek ?? (forceWeek ? (forceWeek + 1 > 52 ? 1 : forceWeek + 1) : currentWeek)
-    const atYear =
-      bodyAtYear ??
-      (forceWeek ? (forceWeek + 1 > 52 ? (forceYear || currentYear) + 1 : forceYear || currentYear) : currentYear)
+    if (bodyMeetingWeek) {
+      meetingWeek = bodyMeetingWeek
+      meetingYear = bodyMeetingYear || currentYear
+    } else if (forceWeek) {
+      // Legacy: use the week as-is (no offset)
+      meetingWeek = forceWeek
+      meetingYear = forceYear || currentYear
+    } else if (bodyWeek) {
+      // Legacy: use the week as-is (no offset)
+      meetingWeek = bodyWeek
+      meetingYear = bodyYear || currentYear
+    } else {
+      // Auto: current week
+      meetingWeek = currentWeek
+      meetingYear = currentYear
+    }
 
-    // The "current week" for filenames and email badge
-    const displayWeek = bodyWeek ? bodyWeek + 1 : currentWeek
-    const displayYear = displayWeek > 52 ? currentYear + 1 : currentYear
+    // ── Data weeks ──────────────────────────────────────────────────────
+    // Everything uses the same meeting week — no previous-week offset
+    const reportDataWeek = meetingWeek
+    const reportDataYear = meetingYear
+    const atWeek = bodyAtWeek ?? meetingWeek
+    const atYear = bodyAtYear ?? meetingYear
 
     console.log(
-      `[digest] Current: W${currentWeek}/${currentYear} | Report: W${reportWeek}/${reportYear} | Tracker: W${atWeek}/${atYear} | Display: W${displayWeek}`
+      `[digest] Meeting: W${meetingWeek}/${meetingYear} | ReportData: W${reportDataWeek}/${reportDataYear} | Tracker: W${atWeek}/${atYear}`
     )
 
     let reportPdfBase64: string
     let trackerPdfBase64: string
 
     if (weeklyReportBase64 && actionTrackerBase64) {
-      // ── Use pre-generated PDFs from client (preferred — matches local export) ──
       console.log("[digest] Using client-generated PDFs")
       reportPdfBase64 = weeklyReportBase64
       trackerPdfBase64 = actionTrackerBase64
     } else {
-      // ── Cron / fallback: generate PDFs server-side ────────────────────────────
       console.log("[digest] Generating PDFs server-side")
 
-      // Fetch weekly reports
+      // Fetch reports from the PREVIOUS week (work done data)
       const { data: reports, error: reportsError } = await supabase
         .from("weekly_reports")
         .select("id, department, week_number, year, work_done, tasks_new_week, challenges, status")
-        .eq("week_number", reportWeek)
-        .eq("year", reportYear)
+        .eq("week_number", reportDataWeek)
+        .eq("year", reportDataYear)
         .eq("status", "submitted")
 
       if (reportsError) throw reportsError
 
       if (!reports || reports.length === 0) {
-        console.log(`[digest] No submitted reports for W${reportWeek}/${reportYear}. Skipping.`)
+        console.log(`[digest] No submitted reports for W${reportDataWeek}/${reportDataYear}. Skipping.`)
         return new Response(
-          JSON.stringify({ skipped: true, reason: `No submitted reports for W${reportWeek}/${reportYear}` }),
+          JSON.stringify({ skipped: true, reason: `No submitted reports for W${reportDataWeek}/${reportDataYear}` }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
         )
       }
 
-      // Fetch action items
+      // Fetch action items for the meeting week
       const { data: actions, error: actionsError } = await supabase
         .from("action_items")
         .select("id, title, department, status, week_number, year")
@@ -571,13 +635,16 @@ serve(async (req) => {
 
       if (actionsError) throw actionsError
 
-      // pdf-lib (Deno) does not support WebP. Use PNG instead.
-      const logoBytes = await fetchLogoBytes("https://erp.acoblighting.com/images/acob-logo-dark.png")
+      // Fetch BOTH logos: light for cover page, dark for headers
+      const [coverLogoBytes, headerLogoBytes] = await Promise.all([
+        fetchLogoBytes(`${STORAGE_BASE}/acob-logo-light.png`),
+        fetchLogoBytes(`${STORAGE_BASE}/acob-logo-dark.png`),
+      ])
 
       console.log(`[digest] Generating PDFs: ${reports.length} reports, ${(actions || []).length} actions`)
       const [reportPdfBytes, trackerPdfBytes] = await Promise.all([
-        buildWeeklyReportPDF(reports, reportWeek, reportYear, logoBytes),
-        buildActionTrackerPDF(actions || [], atWeek, atYear, logoBytes),
+        buildWeeklyReportPDF(reports, meetingWeek, meetingYear, coverLogoBytes, headerLogoBytes),
+        buildActionTrackerPDF(actions || [], meetingWeek, meetingYear, coverLogoBytes, headerLogoBytes),
       ])
 
       const toBase64 = (bytes: Uint8Array): string => {
@@ -590,11 +657,15 @@ serve(async (req) => {
       trackerPdfBase64 = toBase64(trackerPdfBytes)
     }
 
-    // Recipients
-    const recipients = testEmail ? [testEmail] : ["i.chibuikem@org.acoblighting.com"] // TODO: expand to all staff
+    const recipients =
+      Array.isArray(bodyRecipients) && bodyRecipients.length > 0
+        ? bodyRecipients
+        : testEmail
+          ? [testEmail]
+          : ["i.chibuikem@org.acoblighting.com"]
 
-    const subject = `General Meeting Minutes \u2014 Week ${displayWeek}, ${displayYear}`
-    const html = buildEmailHtml(reportWeek, reportYear, atWeek, atYear, displayWeek, displayYear)
+    const subject = `General Meeting Minutes and Actionable \u2014 Week ${meetingWeek}, ${meetingYear}`
+    const html = buildEmailHtml(meetingWeek, meetingYear, reportDataWeek, reportDataYear)
 
     const results = []
     for (const to of recipients) {
@@ -604,8 +675,8 @@ serve(async (req) => {
         subject,
         html,
         attachments: [
-          { filename: `ACOB_Weekly_Reports_All_W${displayWeek}_${displayYear}.pdf`, content: reportPdfBase64 },
-          { filename: `ACOB_Action_Tracker_W${atWeek}_${atYear}.pdf`, content: trackerPdfBase64 },
+          { filename: `ACOB_Weekly_Reports_All_W${meetingWeek}_${meetingYear}.pdf`, content: reportPdfBase64 },
+          { filename: `ACOB_Action_Tracker_W${meetingWeek}_${meetingYear}.pdf`, content: trackerPdfBase64 },
         ],
       })
       if (error) {
@@ -618,7 +689,16 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ success: true, reportWeek, reportYear, atWeek, atYear, displayWeek, results }),
+      JSON.stringify({
+        success: true,
+        meetingWeek,
+        meetingYear,
+        reportDataWeek,
+        reportDataYear,
+        atWeek,
+        atYear,
+        results,
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
     )
   } catch (err: any) {

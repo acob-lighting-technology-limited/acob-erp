@@ -10,8 +10,36 @@ export async function middleware(request: NextRequest) {
     return await updateSession(request)
   }
 
-  // Redirect root to profile page
+  // Intercept Supabase auth codes/tokens at root — these come from email links
+  // when the redirect_to is the bare domain (no path).
+  // Forward to the callback/confirm handler so the code actually gets exchanged.
   if (pathname === "/") {
+    const code = request.nextUrl.searchParams.get("code")
+    const tokenHash = request.nextUrl.searchParams.get("token_hash")
+    const type = request.nextUrl.searchParams.get("type")
+
+    if (code) {
+      // PKCE code flow — forward to /auth/callback
+      const url = request.nextUrl.clone()
+      url.pathname = "/auth/callback"
+      // Preserve the code and set next based on type
+      url.searchParams.set("code", code)
+      if (type === "recovery") {
+        url.searchParams.set("next", "/auth/reset-password")
+      }
+      return NextResponse.redirect(url)
+    }
+
+    if (tokenHash && type) {
+      // Token hash flow — forward to /auth/confirm
+      const url = request.nextUrl.clone()
+      url.pathname = "/auth/confirm"
+      url.searchParams.set("token_hash", tokenHash)
+      url.searchParams.set("type", type)
+      return NextResponse.redirect(url)
+    }
+
+    // Normal root redirect
     const url = request.nextUrl.clone()
     url.pathname = "/profile"
     return NextResponse.redirect(url)
