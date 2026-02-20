@@ -34,7 +34,8 @@ import { getNextWeekParams } from "@/lib/utils"
 type Employee = {
   id: string
   full_name: string
-  company_email: string
+  company_email: string | null
+  additional_email: string | null
   department: string | null
   employment_status: string | null
 }
@@ -51,7 +52,7 @@ export function MailDigestContent({ employees }: Props) {
   const supabase = createClient()
 
   // ── State ──────────────────────────────────────────────────────────────────
-  const [recipientMode, setRecipientMode] = useState<RecipientMode>("all")
+  const [recipientMode, setRecipientMode] = useState<RecipientMode>("select")
   const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<Set<string>>(new Set())
   const [manualEmails, setManualEmails] = useState<string[]>([])
   const [manualInput, setManualInput] = useState("")
@@ -107,27 +108,32 @@ export function MailDigestContent({ employees }: Props) {
       (e) =>
         e.full_name?.toLowerCase().includes(q) ||
         e.company_email?.toLowerCase().includes(q) ||
+        e.additional_email?.toLowerCase().includes(q) ||
         e.department?.toLowerCase().includes(q)
     )
   }, [employees, searchQuery])
 
   const resolvedRecipients = useMemo(() => {
-    const emails: string[] = []
+    const emailSet = new Set<string>()
     if (recipientMode === "all" || recipientMode === "all_plus") {
       employees.forEach((e) => {
-        if (e.company_email) emails.push(e.company_email)
+        if (e.company_email) emailSet.add(e.company_email.toLowerCase())
+        if (e.additional_email) emailSet.add(e.additional_email.toLowerCase())
       })
     } else if (recipientMode === "select") {
       employees.forEach((e) => {
-        if (selectedEmployeeIds.has(e.id) && e.company_email) emails.push(e.company_email)
+        if (selectedEmployeeIds.has(e.id)) {
+          if (e.company_email) emailSet.add(e.company_email.toLowerCase())
+          if (e.additional_email) emailSet.add(e.additional_email.toLowerCase())
+        }
       })
     }
     if (recipientMode === "manual" || recipientMode === "all_plus") {
       manualEmails.forEach((m) => {
-        if (!emails.includes(m)) emails.push(m)
+        emailSet.add(m.toLowerCase())
       })
     }
-    return emails
+    return Array.from(emailSet)
   }, [recipientMode, employees, selectedEmployeeIds, manualEmails])
 
   // Action items derived from week N's "Tasks for New Week" are stored as week N+1.
@@ -218,12 +224,27 @@ export function MailDigestContent({ employees }: Props) {
 
     // ── Recurring: save to DB ────────────────────────────────────────────
     if (sendTiming === "recurring") {
+      const days = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]
+      const targetDay = days.indexOf(recurringDay)
+      const now = new Date()
+      const currentDay = now.getDay()
+      let daysUntil = targetDay - currentDay
+      const [h, m] = recurringTime.split(":")
+      const targetMinutes = parseInt(h, 10) * 60 + parseInt(m, 10)
+      const nowMinutes = now.getHours() * 60 + now.getMinutes()
+      // If day already passed, or same day and time has passed, schedule next week.
+      if (daysUntil < 0 || (daysUntil === 0 && nowMinutes >= targetMinutes)) daysUntil += 7
+      const nextRun = new Date(now)
+      nextRun.setDate(now.getDate() + daysUntil)
+      nextRun.setHours(parseInt(h, 10), parseInt(m, 10), 0, 0)
+
       const { error } = await supabase.from("digest_schedules").insert({
         schedule_type: "recurring",
         recipients: resolvedRecipients,
         content_choice: "both", // Recurring always sends both reports
         send_day: recurringDay,
         send_time: recurringTime,
+        next_run_at: nextRun.toISOString(),
       })
 
       if (error) {
@@ -320,7 +341,7 @@ export function MailDigestContent({ employees }: Props) {
         backLink={{ href: "/admin/reports", label: "Back to Reports" }}
       />
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid items-start gap-6 lg:grid-cols-3">
         {/* ── LEFT: Settings ────────────────────────────────────────────── */}
         <div className="space-y-6 lg:col-span-2">
           {/* Week Selection */}
@@ -494,7 +515,9 @@ export function MailDigestContent({ employees }: Props) {
                         />
                         <div className="min-w-0 flex-1">
                           <div className="truncate text-sm font-medium">{emp.full_name}</div>
-                          <div className="text-muted-foreground truncate text-xs">{emp.company_email}</div>
+                          <div className="text-muted-foreground truncate text-xs">
+                            {[emp.company_email, emp.additional_email].filter(Boolean).join(" | ")}
+                          </div>
                         </div>
                         {emp.department && (
                           <Badge variant="secondary" className="shrink-0 text-xs">
@@ -751,8 +774,8 @@ export function MailDigestContent({ employees }: Props) {
         </div>
 
         {/* ── RIGHT: Summary & Send ─────────────────────────────────────── */}
-        <div className="space-y-6">
-          <Card className="sticky top-6 border-green-200 dark:border-green-900">
+        <aside className="space-y-6 self-start">
+          <Card className="border-green-200 lg:sticky lg:top-24 dark:border-green-900">
             <CardHeader className="pb-3">
               <CardTitle className="text-lg">Summary</CardTitle>
             </CardHeader>
@@ -917,7 +940,7 @@ export function MailDigestContent({ employees }: Props) {
               </CardContent>
             </Card>
           )}
-        </div>
+        </aside>
       </div>
     </PageWrapper>
   )

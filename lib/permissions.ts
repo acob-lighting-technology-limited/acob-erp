@@ -152,6 +152,7 @@ export const DEPARTMENTS = [
   "Accounts",
   "Admin & HR",
   "Business, Growth and Innovation",
+  "Executive Management",
   "IT and Communications",
   "Legal, Regulatory and Compliance",
   "Logistics",

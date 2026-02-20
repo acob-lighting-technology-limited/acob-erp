@@ -52,14 +52,22 @@ serve(async (req) => {
 
     // 1. Fetch User (Recipient)
     const { data: recipientUser, error: userError } = await supabase.auth.admin.getUserById(record.user_id)
-    if (userError || !recipientUser.user.email) return new Response("User not found or no email", { status: 200 })
-    const email = recipientUser.user.email
+    if (userError || !recipientUser?.user) return new Response("User not found", { status: 200 })
 
     const { data: recipientProfile } = await supabase
       .from("profiles")
-      .select("full_name, department")
+      .select("full_name, department, additional_email")
       .eq("id", record.user_id)
       .single()
+
+    const recipientEmails = Array.from(
+      new Set(
+        [recipientUser.user.email, recipientProfile?.additional_email]
+          .filter((v): v is string => Boolean(v))
+          .map((v) => v.toLowerCase())
+      )
+    )
+    if (recipientEmails.length === 0) return new Response("User has no recipient email", { status: 200 })
 
     const recipientName = recipientProfile?.full_name || "Staff Member"
     const recipientFirstName = recipientName.split(" ")[0]
@@ -113,7 +121,7 @@ serve(async (req) => {
 
     // 3. Configure Email Content based on Type
     const emailType = record.type || "asset_assigned"
-    console.log(`Processing ${emailType} for ${email}. Assigner: ${assignedByName}`)
+    console.log(`Processing ${emailType} for ${recipientEmails.join(", ")}. Assigner: ${assignedByName}`)
 
     let subject = "Asset Notification"
     let title = "Asset Notification"
@@ -199,7 +207,7 @@ serve(async (req) => {
         ${row("Serial Number", serialNumber, false, true)}
         ${row("Assigned To", recipientName)}
         ${row("Department", recipientDept)}
-        ${row("Email Address", email)}
+        ${row("Email Address(es)", recipientEmails.join(", "))}
     `
 
     // Specific rows appended after base rows
@@ -297,7 +305,7 @@ serve(async (req) => {
 
     const { error } = await resend.emails.send({
       from: "ACOB Admin & HR <notifications@acoblighting.com>",
-      to: email,
+      to: recipientEmails,
       subject: subject,
       html: emailHtml,
     })
