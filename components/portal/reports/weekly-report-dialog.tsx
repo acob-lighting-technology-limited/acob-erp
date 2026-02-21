@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { Loader2, ListOrdered, Sparkles } from "lucide-react"
-import { getCurrentISOWeek, getNextWeekParams } from "@/lib/utils"
+import { getCurrentISOWeek } from "@/lib/utils"
 
 interface WeeklyReport {
   id: string
@@ -97,13 +97,12 @@ export function WeeklyReportDialog({ isOpen, onClose, onSuccess, initialData }: 
       })
 
       // Meta checks
-      const { week: nW, year: nY } = getNextWeekParams(week, year)
       const { data: nextActions } = await supabase
         .from("action_items")
         .select("*")
         .eq("department", dept)
-        .eq("week_number", nW)
-        .eq("year", nY)
+        .eq("week_number", week)
+        .eq("year", year)
       if (nextActions) {
         setIsNextWeekActive(nextActions.some((a) => a.status !== "pending"))
         if (nextActions.length > 0 && !existing) {
@@ -148,7 +147,6 @@ export function WeeklyReportDialog({ isOpen, onClose, onSuccess, initialData }: 
       }
 
       if (!isNextWeekActive) {
-        const { week: nW, year: nY } = getNextWeekParams(formData.week_number, formData.year)
         const payload: any[] = []
         currentActions
           .filter((a) => a.status === "not_started" || a.status === "in_progress")
@@ -158,8 +156,8 @@ export function WeeklyReportDialog({ isOpen, onClose, onSuccess, initialData }: 
               department: a.department,
               description: a.description,
               status: "pending",
-              week_number: nW,
-              year: nY,
+              week_number: formData.week_number,
+              year: formData.year,
               original_week: a.original_week || a.week_number,
               original_year: a.original_year || a.year,
               assigned_by: formData.user_id,
@@ -176,10 +174,10 @@ export function WeeklyReportDialog({ isOpen, onClose, onSuccess, initialData }: 
                 title,
                 department: formData.department,
                 status: "pending",
-                week_number: nW,
-                year: nY,
-                original_week: nW,
-                original_year: nY,
+                week_number: formData.week_number,
+                year: formData.year,
+                original_week: formData.week_number,
+                original_year: formData.year,
                 assigned_by: formData.user_id,
                 report_id: reportId,
               })
@@ -188,8 +186,8 @@ export function WeeklyReportDialog({ isOpen, onClose, onSuccess, initialData }: 
           .from("action_items")
           .delete()
           .eq("department", formData.department)
-          .eq("week_number", nW)
-          .eq("year", nY)
+          .eq("week_number", formData.week_number)
+          .eq("year", formData.year)
           .eq("status", "pending")
         if (payload.length > 0) await supabase.from("action_items").insert(payload)
       }

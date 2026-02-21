@@ -249,7 +249,8 @@ serve(async (req) => {
     <title>${title}</title>
     <style>
         body { margin: 0; padding: 0; background: #fff; font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif; }
-        .outer-header { background: #000; width: 100%; padding: 20px 0; text-align: center; border-bottom: 3px solid #16a34a; }
+        .email-shell { max-width: 600px; margin: 0 auto; overflow: hidden; }
+        .outer-header { background: #0f2d1f; padding: 20px 0; text-align: center; border-bottom: 3px solid #16a34a; }
         .wrapper { max-width: 600px; margin: 0 auto; background: #fff; padding: 32px 28px; }
         .title { font-size: 24px; font-weight: 700; color: #111827; margin-bottom: 14px; }
         .text { font-size: 15px; color: #374151; line-height: 1.6; margin: 0 0 18px 0; }
@@ -268,15 +269,16 @@ serve(async (req) => {
         .button { display: inline-block; background: #000; color: #fff; text-decoration: none; padding: 14px 32px; border-radius: 6px; font-weight: 600; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; }
         .support { text-align: center; font-size: 14px; color: #4b5563; margin-top: 24px; line-height: 1.5; }
         .support a { color: #16a34a; font-weight: 600; text-decoration: none; }
-        .footer { background: #000; padding: 20px; text-align: center; font-size: 11px; color: #9ca3af; border-top: 3px solid #16a34a; }
+        .footer { background: #0f2d1f; padding: 20px; text-align: center; font-size: 11px; color: #9ca3af; border-top: 3px solid #16a34a; }
         .footer strong { color: #fff; }
         .footer-system { color: #16a34a; font-weight: 600; }
         .footer-note { color: #9ca3af; font-style: italic; }
     </style>
 </head>
 <body>
-    <div class="outer-header">
-        <img src="https://erp.acoblighting.com/images/acob-logo-dark.webp" height="40" alt="ACOB Lighting">
+    <div class="email-shell">
+    <div class="outer-header" style="background-color:#0f2d1f;">
+        <img src="https://erp.acoblighting.com/images/acob-logo-dark.png" height="40" alt="ACOB Lighting">
     </div>
     <div class="wrapper">
         <div class="title" style="${emailType === "asset_status_alert" ? "color: #991b1b;" : emailType === "asset_status_fixed" || emailType === "asset_transfer_incoming" ? "color: #166534;" : ""}">
@@ -293,18 +295,19 @@ serve(async (req) => {
 
         <div class="support">${supportText}</div>
     </div>
-    <div class="footer">
+    <div class="footer" style="background-color:#0f2d1f;">
         <strong>ACOB Lighting Technology Limited</strong><br>
-        ACOB Admin & HR Department<br>
+        ACOB Internal Systems – IT & Communications Department<br>
         <span class="footer-system">Asset Management System</span>
         <br><br>
         <i class="footer-note">This is an automated system notification. Please do not reply directly to this email.</i>
+    </div>
     </div>
 </body>
 </html>`
 
     const { error } = await resend.emails.send({
-      from: "ACOB Admin & HR <notifications@acoblighting.com>",
+      from: "ACOB Internal Systems <notifications@acoblighting.com>",
       to: recipientEmails,
       subject: subject,
       html: emailHtml,

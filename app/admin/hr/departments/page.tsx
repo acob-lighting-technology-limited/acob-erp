@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { Fragment, useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -19,7 +19,7 @@ import {
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
-import { Plus, Pencil, Trash2, Users, Building } from "lucide-react"
+import { ArrowLeft, ChevronDown, ChevronUp, Mail, Pencil, Plus, Trash2, Users, Building } from "lucide-react"
 import { toast } from "sonner"
 import { PageHeader, PageWrapper } from "@/components/layout"
 import { StatCard } from "@/components/ui/stat-card"
@@ -36,8 +36,21 @@ interface Department {
   employee_count?: number
 }
 
+interface DepartmentEmployee {
+  id: string
+  first_name: string | null
+  last_name: string | null
+  company_email: string | null
+  additional_email: string | null
+  company_role: string | null
+  employment_status: string | null
+  department: string | null
+}
+
 export default function DepartmentsPage() {
   const [departments, setDepartments] = useState<Department[]>([])
+  const [departmentEmployees, setDepartmentEmployees] = useState<Record<string, DepartmentEmployee[]>>({})
+  const [expandedDepartments, setExpandedDepartments] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingDepartment, setEditingDepartment] = useState<Department | null>(null)
@@ -60,22 +73,26 @@ export default function DepartmentsPage() {
 
       if (error) throw error
 
-      // Get employee counts for each department
-      const deptsWithCounts = await Promise.all(
-        (depts || []).map(async (dept) => {
-          const { count } = await supabase
-            .from("profiles")
-            .select("*", { count: "exact", head: true })
-            .eq("department", dept.name)
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select(
+          "id, first_name, last_name, company_email, additional_email, company_role, employment_status, department"
+        )
 
-          return {
-            ...dept,
-            employee_count: count || 0,
-          }
-        })
-      )
+      const employeesByDepartment: Record<string, DepartmentEmployee[]> = {}
+      for (const profile of (profiles || []) as DepartmentEmployee[]) {
+        const deptName = profile.department || "Unassigned"
+        if (!employeesByDepartment[deptName]) employeesByDepartment[deptName] = []
+        employeesByDepartment[deptName].push(profile)
+      }
+
+      const deptsWithCounts = (depts || []).map((dept) => ({
+        ...dept,
+        employee_count: employeesByDepartment[dept.name]?.length || 0,
+      }))
 
       setDepartments(deptsWithCounts)
+      setDepartmentEmployees(employeesByDepartment)
     } catch (error) {
       console.error("Error fetching departments:", error)
       toast.error("Failed to load departments")
@@ -162,13 +179,22 @@ export default function DepartmentsPage() {
     setIsDialogOpen(true)
   }
 
+  function toggleDepartmentRow(deptId: string) {
+    setExpandedDepartments((prev) => {
+      const next = new Set(prev)
+      if (next.has(deptId)) next.delete(deptId)
+      else next.add(deptId)
+      return next
+    })
+  }
+
   return (
     <PageWrapper maxWidth="full" background="gradient">
       <PageHeader
         title="Departments"
         description="Manage company departments and organizational structure"
         icon={Building}
-        backLink={{ href: "/admin", label: "Back to Admin" }}
+        backLink={{ href: "/admin/hr", label: "Back to HR" }}
         actions={
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
@@ -276,6 +302,8 @@ export default function DepartmentsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-12">#</TableHead>
+                  <TableHead className="w-14"></TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>Description</TableHead>
                   <TableHead>Employees</TableHead>
@@ -284,47 +312,101 @@ export default function DepartmentsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {departments.map((dept) => (
-                  <TableRow key={dept.id}>
-                    <TableCell className="font-medium">{dept.name}</TableCell>
-                    <TableCell className="text-muted-foreground max-w-xs truncate">{dept.description || "—"}</TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">{dept.employee_count} employees</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={dept.is_active ? "default" : "secondary"}>
-                        {dept.is_active ? "Active" : "Inactive"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => openEditDialog(dept)}
-                          aria-label={`Edit department: ${dept.name}`}
-                          title={`Edit department: ${dept.name}`}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDelete(dept)}
-                          disabled={(dept.employee_count ?? 0) > 0}
-                          aria-label={`Delete department: ${dept.name}`}
-                          title={
-                            (dept.employee_count ?? 0) > 0
-                              ? "Cannot delete department with employees"
-                              : `Delete department: ${dept.name}`
-                          }
-                        >
-                          <Trash2 className="text-destructive h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {departments.map((dept, index) => {
+                  const isExpanded = expandedDepartments.has(dept.id)
+                  const members = departmentEmployees[dept.name] || []
+
+                  return (
+                    <Fragment key={dept.id}>
+                      <TableRow key={dept.id}>
+                        <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => toggleDepartmentRow(dept.id)}
+                            className="h-7 w-7"
+                            aria-label={isExpanded ? `Collapse ${dept.name}` : `Expand ${dept.name}`}
+                          >
+                            {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                          </Button>
+                        </TableCell>
+                        <TableCell className="font-medium">{dept.name}</TableCell>
+                        <TableCell className="text-muted-foreground max-w-xs truncate">
+                          {dept.description || "—"}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary">{dept.employee_count} employees</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={dept.is_active ? "default" : "secondary"}>
+                            {dept.is_active ? "Active" : "Inactive"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => openEditDialog(dept)}
+                              aria-label={`Edit department: ${dept.name}`}
+                              title={`Edit department: ${dept.name}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDelete(dept)}
+                              disabled={(dept.employee_count ?? 0) > 0}
+                              aria-label={`Delete department: ${dept.name}`}
+                              title={
+                                (dept.employee_count ?? 0) > 0
+                                  ? "Cannot delete department with employees"
+                                  : `Delete department: ${dept.name}`
+                              }
+                            >
+                              <Trash2 className="text-destructive h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                      {isExpanded && (
+                        <TableRow key={`${dept.id}-members`}>
+                          <TableCell colSpan={7} className="bg-muted/20 py-3">
+                            {members.length === 0 ? (
+                              <p className="text-muted-foreground px-3 text-sm">No employees in this department.</p>
+                            ) : (
+                              <div className="space-y-2 px-2">
+                                {members.map((member) => (
+                                  <div
+                                    key={member.id}
+                                    className="bg-background flex items-center justify-between rounded-md border px-3 py-2"
+                                  >
+                                    <div className="min-w-0">
+                                      <p className="truncate text-sm font-medium">
+                                        {[member.first_name, member.last_name].filter(Boolean).join(" ") || "Unknown"}
+                                      </p>
+                                      <div className="text-muted-foreground flex items-center gap-2 text-xs">
+                                        <Mail className="h-3 w-3" />
+                                        <span className="truncate">
+                                          {[member.company_email, member.additional_email].filter(Boolean).join(" | ")}
+                                        </span>
+                                      </div>
+                                    </div>
+                                    <Badge variant="outline" className="text-xs">
+                                      {member.company_role || "Employee"}
+                                    </Badge>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </Fragment>
+                  )
+                })}
               </TableBody>
             </Table>
           )}

@@ -14,6 +14,7 @@ interface DashboardStats {
   todayAttendance: number
   upcomingReviews: number
   totalEmployees: number
+  totalDepartments: number
 }
 
 export default function HRAdminDashboard() {
@@ -22,6 +23,7 @@ export default function HRAdminDashboard() {
     todayAttendance: 0,
     upcomingReviews: 0,
     totalEmployees: 0,
+    totalDepartments: 0,
   })
   const [loading, setLoading] = useState(true)
 
@@ -45,12 +47,14 @@ export default function HRAdminDashboard() {
 
       // Fetch total employees
       const { count: employeeCount } = await supabase.from("profiles").select("*", { count: "exact", head: true })
+      const { count: departmentCount } = await supabase.from("departments").select("*", { count: "exact", head: true })
 
       setStats({
         pendingLeaveRequests: leaveRequests?.length || 0,
         todayAttendance: attendance?.length || 0,
         upcomingReviews: reviews?.length || 0,
         totalEmployees: employeeCount || 0,
+        totalDepartments: departmentCount || 0,
       })
     } catch (error) {
       console.error("Error fetching dashboard data:", error)
@@ -69,7 +73,7 @@ export default function HRAdminDashboard() {
       />
 
       {/* Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         <StatCard
           title="Pending Leave"
           value={stats.pendingLeaveRequests}
@@ -93,6 +97,12 @@ export default function HRAdminDashboard() {
           value={stats.totalEmployees}
           icon={Users}
           description="Registered employees"
+        />
+        <StatCard
+          title="Total Departments"
+          value={stats.totalDepartments}
+          icon={Building}
+          description="Configured departments"
         />
       </div>
 
@@ -126,9 +136,7 @@ export default function HRAdminDashboard() {
             </CardHeader>
             <CardContent>
               <Link href="/admin/hr/departments">
-                <Button className="w-full" variant="outline">
-                  Manage Departments
-                </Button>
+                <Button className="w-full">Manage Departments ({stats.totalDepartments})</Button>
               </Link>
             </CardContent>
           </Card>

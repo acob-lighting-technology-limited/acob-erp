@@ -2,6 +2,7 @@
 
 import { useState, useEffect, Suspense, Fragment } from "react"
 import { useSearchParams } from "next/navigation"
+import Link from "next/link"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -24,6 +25,7 @@ import {
   FileText,
   File as FileIcon,
   Presentation,
+  ExternalLink,
   Edit2,
   Trash2,
   MoreVertical,
@@ -230,6 +232,16 @@ export function ActionTrackerContent({ initialDepartments }: ActionTrackerConten
               className="gap-2 border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700 dark:border-blue-900/30 dark:hover:bg-blue-950/20"
             >
               <FileIcon className="h-4 w-4" /> <span className="hidden sm:inline">Word</span>
+            </Button>
+            <Button
+              asChild
+              variant="outline"
+              className="gap-2 border-green-200 text-green-700 hover:bg-green-50 hover:text-green-800 dark:border-green-900/30 dark:hover:bg-green-950/20"
+            >
+              <Link href="/admin/reports/mail">
+                <ExternalLink className="h-4 w-4" />
+                <span className="hidden sm:inline">General Meeting Mail</span>
+              </Link>
             </Button>
           </div>
         ) : null

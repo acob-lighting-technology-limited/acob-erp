@@ -358,7 +358,7 @@ export function MeetingRemindersContent({ employees }: Props) {
     <PageWrapper maxWidth="full" background="gradient">
       <PageHeader
         title="Meeting Reminders"
-        description="Send general meeting and knowledge sharing session reminders to all employees."
+        description="Send meeting and knowledge-sharing reminders to selected recipients."
         icon={Megaphone}
         backLink={{ href: "/admin/reports", label: "Back to Reports" }}
       />

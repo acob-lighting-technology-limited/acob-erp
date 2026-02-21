@@ -26,6 +26,7 @@ import { toast } from "sonner"
 import { formatName, cn } from "@/lib/utils"
 import { format, differenceInDays } from "date-fns"
 import {
+  ArrowLeft,
   Users,
   Search,
   Filter,
@@ -163,16 +164,10 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
     Role: true,
     Position: true,
     "Phone Number": true,
-    "Additional Phone": true,
     "Residential Address": true,
     "Work Location": true,
     "Office Location": true,
-    "Bank Name": true,
-    "Bank Account Number": true,
-    "Bank Account Name": true,
-    "Date of Birth": true,
     "Employment Date": true,
-    "Is Lead": true,
     "Lead Departments": true,
     "Created At": true,
   })
@@ -1186,6 +1181,12 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <Link href="/admin/hr">
+              <Button variant="outline" className="gap-2" size="sm">
+                <ArrowLeft className="h-4 w-4" />
+                <span className="hidden sm:inline">Back to HR</span>
+              </Button>
+            </Link>
             <PendingApplicationsModal onEmployeeCreated={loadData} />
             {(userProfile?.role === "admin" || userProfile?.role === "super_admin") && (
               <Button onClick={() => setIsCreateUserDialogOpen(true)} className="gap-2" size="sm">

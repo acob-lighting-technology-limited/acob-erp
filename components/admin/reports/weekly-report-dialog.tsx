@@ -10,7 +10,7 @@ import { SearchableSelect } from "@/components/ui/searchable-select"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { Loader2, ListOrdered, Sparkles } from "lucide-react"
-import { getCurrentISOWeek, getNextWeekParams } from "@/lib/utils"
+import { getCurrentISOWeek } from "@/lib/utils"
 
 interface WeeklyReport {
   id: string
@@ -63,13 +63,12 @@ export function WeeklyReportAdminDialog({ isOpen, onClose, report, onSuccess }: 
   useEffect(() => {
     const fetchStatus = async () => {
       if (!formData.department) return
-      const { week: nW, year: nY } = getNextWeekParams(formData.week_number, formData.year)
       const { data } = await supabase
         .from("action_items")
         .select("title, status")
         .eq("department", formData.department)
-        .eq("week_number", nW)
-        .eq("year", nY)
+        .eq("week_number", formData.week_number)
+        .eq("year", formData.year)
 
       if (data) {
         setIsNextWeekActive(data.some((a) => a.status !== "pending"))
@@ -147,7 +146,6 @@ export function WeeklyReportAdminDialog({ isOpen, onClose, report, onSuccess }: 
       }
 
       if (!isNextWeekActive) {
-        const { week: nW, year: nY } = getNextWeekParams(formData.week_number, formData.year)
         const payload: any[] = []
         currentActions
           .filter((a) => a.status === "not_started" || a.status === "in_progress")
@@ -157,8 +155,8 @@ export function WeeklyReportAdminDialog({ isOpen, onClose, report, onSuccess }: 
               department: a.department,
               description: a.description,
               status: "pending",
-              week_number: nW,
-              year: nY,
+              week_number: formData.week_number,
+              year: formData.year,
               original_week: a.original_week || a.week_number,
               original_year: a.original_year || a.year,
               assigned_by: formData.user_id,
@@ -175,10 +173,10 @@ export function WeeklyReportAdminDialog({ isOpen, onClose, report, onSuccess }: 
                 title,
                 department: formData.department,
                 status: "pending",
-                week_number: nW,
-                year: nY,
-                original_week: nW,
-                original_year: nY,
+                week_number: formData.week_number,
+                year: formData.year,
+                original_week: formData.week_number,
+                original_year: formData.year,
                 assigned_by: formData.user_id,
                 report_id: reportId,
               })
@@ -187,8 +185,8 @@ export function WeeklyReportAdminDialog({ isOpen, onClose, report, onSuccess }: 
           .from("action_items")
           .delete()
           .eq("department", formData.department)
-          .eq("week_number", nW)
-          .eq("year", nY)
+          .eq("week_number", formData.week_number)
+          .eq("year", formData.year)
           .eq("status", "pending")
         if (payload.length > 0) await supabase.from("action_items").insert(payload)
       }

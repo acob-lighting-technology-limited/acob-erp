@@ -126,6 +126,7 @@ async function addCoverPage(
   week: number,
   year: number,
   subtitle: string,
+  secondaryTitle = "Weekly Report",
   coverLogoBytes: Uint8Array | null
 ) {
   const page = doc.addPage([595, 842])
@@ -166,9 +167,9 @@ async function addCoverPage(
   // Centre content
   const gmText = "General Meeting"
   const gmWidth = bold.widthOfTextAtSize(gmText, 28)
-  page.drawText(gmText, { x: W / 2 - gmWidth / 2, y: H / 2 + 30, size: 28, font: bold, color: DARK })
+  page.drawText(gmText, { x: W / 2 - gmWidth / 2, y: H / 2 + 24, size: 28, font: bold, color: DARK })
 
-  const wrText = "Weekly Report"
+  const wrText = secondaryTitle
   const wrWidth = regular.widthOfTextAtSize(wrText, 20)
   page.drawText(wrText, { x: W / 2 - wrWidth / 2, y: H / 2 + 2, size: 20, font: regular, color: GREEN })
 
@@ -202,6 +203,49 @@ async function addCoverPage(
   })
 }
 
+async function addTOCPage(
+  doc: PDFDocument,
+  bold: any,
+  regular: any,
+  title: string,
+  entries: string[],
+  headerLogoBytes: Uint8Array | null
+) {
+  const page = doc.addPage([595, 842])
+  const { width: W, height: H } = page.getSize()
+  const headerH = 52
+  const footerH = 40
+
+  page.drawRectangle({ x: 0, y: H - headerH, width: W, height: headerH, color: DARK })
+  page.drawRectangle({ x: 0, y: H - headerH - 4, width: W, height: 4, color: GREEN })
+  page.drawText("Departments in This Report", { x: 22, y: H - 32, size: 9, font: bold, color: WHITE })
+  const weekLabel = title.match(/Week\s+\d+,\s*\d+/i)?.[0] ?? ""
+  if (weekLabel) {
+    const weekW = regular.widthOfTextAtSize(weekLabel, 8)
+    page.drawText(weekLabel, { x: W - 22 - weekW, y: H - 32, size: 8, font: regular, color: WHITE })
+  }
+  await drawLogoInHeader(doc, page, headerLogoBytes, headerH, H, W)
+
+  let y = H - 136
+  for (let i = 0; i < entries.length; i++) {
+    if (y < footerH + 26) break
+    const pageNumber = i + 3 // cover + toc before content pages
+    const label = entries[i]
+    const safe = label.length > 64 ? `${label.slice(0, 61)}...` : label
+    page.drawCircle({ x: 20, y: y + 2, size: 7, color: GREEN, borderColor: GREEN, borderWidth: 1 })
+    const badge = `${i + 1}`
+    const badgeW = bold.widthOfTextAtSize(badge, 8)
+    page.drawText(badge, { x: 20 - badgeW / 2, y: y - 1, size: 8, font: bold, color: WHITE })
+    page.drawText(safe, { x: 32, y, size: 10, font: regular, color: SLATE })
+    page.drawText(String(pageNumber), { x: W - 44, y, size: 10, font: bold, color: GREEN })
+    page.drawRectangle({ x: 28, y: y - 6, width: W - 56, height: 0.5, color: rgb(0.886, 0.906, 0.941) })
+    y -= 24
+  }
+
+  page.drawRectangle({ x: 0, y: 0, width: W, height: footerH, color: GREEN })
+  page.drawText("Confidential — ACOB Internal Use Only", { x: 20, y: 14, size: 8, font: regular, color: WHITE })
+}
+
 async function addWeeklyReportContentPage(
   doc: PDFDocument,
   bold: any,
@@ -209,7 +253,7 @@ async function addWeeklyReportContentPage(
   department: string,
   report: any,
   headerLogoBytes: Uint8Array | null,
-  nextDept?: string
+  pageNumber: number
 ) {
   const page = doc.addPage([595, 842])
   const { width: W, height: H } = page.getSize()
@@ -258,11 +302,9 @@ async function addWeeklyReportContentPage(
 
   page.drawRectangle({ x: 0, y: 0, width: W, height: footerH, color: GREEN })
   page.drawText("Confidential \u2014 ACOB Internal Use Only", { x: 20, y: 14, size: 8, font: regular, color: WHITE })
-  if (nextDept) {
-    const label = `NEXT: ${nextDept}`
-    const truncated = label.length > 30 ? label.slice(0, 27) + "..." : label
-    page.drawText(truncated, { x: W - 170, y: 14, size: 8, font: bold, color: WHITE })
-  }
+  const pn = String(pageNumber)
+  const pnW = bold.widthOfTextAtSize(pn, 9)
+  page.drawText(pn, { x: W / 2 - pnW / 2, y: 14, size: 9, font: bold, color: WHITE })
 }
 
 async function addActionTrackerPage(
@@ -274,7 +316,7 @@ async function addActionTrackerPage(
   week: number,
   year: number,
   headerLogoBytes: Uint8Array | null,
-  nextDept?: string
+  pageNumber: number
 ) {
   const page = doc.addPage([595, 842])
   const { width: W, height: H } = page.getSize()
@@ -312,7 +354,8 @@ async function addActionTrackerPage(
   const actionX = snX + snW
   const statusW = 100
   const statusX = W - 20 - statusW
-  const headerY = H - headerH - 50
+  // Add a bit more vertical breathing room between title band and table header
+  const headerY = H - headerH - 58
   page.drawRectangle({ x: 20, y: headerY - 4, width: W - 40, height: 20, color: GREEN })
   page.drawText("S/N", { x: snX + 6, y: headerY + 2, size: 8, font: bold, color: WHITE })
   page.drawText("ACTION ITEM", { x: actionX + 6, y: headerY + 2, size: 8, font: bold, color: WHITE })
@@ -353,11 +396,9 @@ async function addActionTrackerPage(
 
   page.drawRectangle({ x: 0, y: 0, width: W, height: footerH, color: GREEN })
   page.drawText("Confidential \u2014 ACOB Internal Use Only", { x: 20, y: 14, size: 8, font: regular, color: WHITE })
-  if (nextDept) {
-    const label = `NEXT: ${nextDept}`
-    const truncated = label.length > 30 ? label.slice(0, 27) + "..." : label
-    page.drawText(truncated, { x: W - 170, y: 14, size: 8, font: bold, color: WHITE })
-  }
+  const pn = String(pageNumber)
+  const pnW = bold.widthOfTextAtSize(pn, 9)
+  page.drawText(pn, { x: W / 2 - pnW / 2, y: 14, size: 9, font: bold, color: WHITE })
 }
 
 async function buildWeeklyReportPDF(
@@ -380,18 +421,18 @@ async function buildWeeklyReportPDF(
     return a.department.localeCompare(b.department)
   })
 
-  await addCoverPage(doc, bold, regular, meetingWeek, meetingYear, "", coverLogoBytes)
+  await addCoverPage(doc, bold, regular, meetingWeek, meetingYear, "", "Weekly Report", coverLogoBytes)
+  await addTOCPage(
+    doc,
+    bold,
+    regular,
+    `Weekly Report — Week ${meetingWeek}, ${meetingYear}`,
+    sorted.map((r) => r.department),
+    headerLogoBytes
+  )
 
   for (let i = 0; i < sorted.length; i++) {
-    await addWeeklyReportContentPage(
-      doc,
-      bold,
-      regular,
-      sorted[i].department,
-      sorted[i],
-      headerLogoBytes,
-      sorted[i + 1]?.department
-    )
+    await addWeeklyReportContentPage(doc, bold, regular, sorted[i].department, sorted[i], headerLogoBytes, i + 3)
   }
 
   return doc.save()
@@ -408,7 +449,7 @@ async function buildActionTrackerPDF(
   const bold = await doc.embedFont(StandardFonts.HelveticaBold)
   const regular = await doc.embedFont(StandardFonts.Helvetica)
 
-  await addCoverPage(doc, bold, regular, meetingWeek, meetingYear, "Action Tracker", coverLogoBytes)
+  await addCoverPage(doc, bold, regular, meetingWeek, meetingYear, "Action Tracker", "Action Tracker", coverLogoBytes)
 
   const grouped: Record<string, any[]> = {}
   for (const a of actions) {
@@ -421,6 +462,8 @@ async function buildActionTrackerPDF(
     if (!depts.includes(d)) depts.push(d)
   }
 
+  await addTOCPage(doc, bold, regular, `Action Tracker — Week ${meetingWeek}, ${meetingYear}`, depts, headerLogoBytes)
+
   for (let i = 0; i < depts.length; i++) {
     await addActionTrackerPage(
       doc,
@@ -431,7 +474,7 @@ async function buildActionTrackerPDF(
       meetingWeek,
       meetingYear,
       headerLogoBytes,
-      depts[i + 1]
+      i + 3
     )
   }
 
@@ -455,30 +498,33 @@ function buildEmailHtml(
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { margin: 0; padding: 0; background: #fff; font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif; }
-    .outer-header { background: #000; width: 100%; padding: 20px 0; text-align: center; border-bottom: 3px solid #16a34a; }
+    .email-shell { max-width: 600px; margin: 0 auto; overflow: hidden; }
+    .outer-header { background: #0f2d1f; padding: 20px 0; text-align: center; border-bottom: 3px solid #16a34a; }
     .wrapper { max-width: 600px; margin: 0 auto; background: #fff; padding: 32px 28px; }
     .week-badge { display: inline-block; background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; padding: 4px 12px; border-radius: 20px; text-transform: uppercase; margin-bottom: 16px; }
     .title { font-size: 24px; font-weight: 700; color: #111827; margin-bottom: 14px; }
     .text { font-size: 15px; color: #374151; line-height: 1.6; margin: 0 0 18px 0; }
-    .attachments { margin: 24px 0; display: flex; flex-direction: column; gap: 12px; }
-    .attach-card { display: flex; align-items: center; gap: 14px; background: #f9fafb; border: 1px solid #d1d5db; padding: 14px 18px; }
-    .attach-icon { width: 40px; height: 40px; background: #000; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 18px; border: 1px solid #16a34a; }
-    .attach-info { flex: 1; }
-    .attach-name { font-size: 14px; font-weight: 700; color: #111827; }
-    .attach-desc { font-size: 12px; color: #6b7280; margin-top: 2px; }
-    .attach-badge { font-size: 10px; font-weight: 700; background: #000; color: #16a34a; padding: 3px 8px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; border: 1px solid #16a34a; }
+    .attachments { margin: 24px 0; border: 1px solid #d1d5db; border-radius: 8px; overflow: hidden; }
+    .attachments table { width: 100%; border-collapse: collapse; }
+    .attachments th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: #1f2937; background: #f3f4f6; padding: 10px 12px; border-bottom: 1px solid #d1d5db; }
+    .attachments td { padding: 12px; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
+    .attachments tr:last-child td { border-bottom: none; }
+    .doc-name { font-size: 14px; font-weight: 700; color: #111827; }
+    .doc-desc { font-size: 12px; color: #6b7280; margin-top: 2px; }
+    .doc-format { font-size: 11px; font-weight: 700; color: #15803d; }
     .cta { text-align: center; margin-top: 32px; }
     .button { display: inline-block; background: #000; color: #fff; text-decoration: none; padding: 14px 32px; border-radius: 6px; font-weight: 600; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; }
     .support { text-align: center; font-size: 14px; color: #4b5563; margin-top: 24px; line-height: 1.5; }
     .support a { color: #16a34a; font-weight: 600; text-decoration: none; }
-    .footer { background: #000; padding: 20px; text-align: center; font-size: 11px; color: #9ca3af; border-top: 3px solid #16a34a; }
+    .footer { background: #0f2d1f; padding: 20px; text-align: center; font-size: 11px; color: #9ca3af; border-top: 3px solid #16a34a; }
     .footer strong { color: #fff; }
     .footer-system { color: #16a34a; font-weight: 600; }
     .footer-note { color: #9ca3af; font-style: italic; }
   </style>
 </head>
 <body>
-  <div class="outer-header">
+  <div class="email-shell">
+  <div class="outer-header" style="background-color:#0f2d1f;">
     <img src="https://erp.acoblighting.com/images/acob-logo-dark.png" height="40" alt="ACOB Lighting">
   </div>
   <div class="wrapper">
@@ -494,22 +540,35 @@ function buildEmailHtml(
     </p>
     <p class="text">Thank you</p>
     <div class="attachments">
-      <div class="attach-card">
-        <div class="attach-icon">&#128196;</div>
-        <div class="attach-info">
-          <div class="attach-name">Weekly Report &mdash; Week ${meetingWeek}, ${meetingYear}</div>
-          <div class="attach-desc">Departmental work done, tasks &amp; challenges</div>
-        </div>
-        <span class="attach-badge">PDF</span>
-      </div>
-      <div class="attach-card">
-        <div class="attach-icon">&#9989;</div>
-        <div class="attach-info">
-          <div class="attach-name">Action Tracker &mdash; Week ${meetingWeek}, ${meetingYear}</div>
-          <div class="attach-desc">Upcoming departmental action items &amp; completion status</div>
-        </div>
-        <span class="attach-badge">PDF</span>
-      </div>
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 42%;">Document</th>
+            <th>Description</th>
+            <th style="width: 80px;">Format</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>
+              <div class="doc-name">Weekly Report &mdash; Week ${meetingWeek}, ${meetingYear}</div>
+            </td>
+            <td>
+              <div class="doc-desc">Departmental work done, tasks &amp; challenges</div>
+            </td>
+            <td><span class="doc-format">PDF</span></td>
+          </tr>
+          <tr>
+            <td>
+              <div class="doc-name">Action Tracker &mdash; Week ${meetingWeek}, ${meetingYear}</div>
+            </td>
+            <td>
+              <div class="doc-desc">Upcoming departmental action items &amp; completion status</div>
+            </td>
+            <td><span class="doc-format">PDF</span></td>
+          </tr>
+        </tbody>
+      </table>
     </div>
 
     <div class="support">
@@ -517,12 +576,13 @@ function buildEmailHtml(
       <a href="mailto:ict@acoblighting.com">ict@acoblighting.com</a>
     </div>
   </div>
-  <div class="footer">
+  <div class="footer" style="background-color:#0f2d1f;">
     <strong>ACOB Lighting Technology Limited</strong><br>
     ACOB Admin &amp; HR Department<br>
     <span class="footer-system">Reports &amp; Meeting Management System</span>
     <br><br>
     <i class="footer-note">This is an automated system notification. Please do not reply directly to this email.</i>
+  </div>
   </div>
 </body>
 </html>`
@@ -559,8 +619,6 @@ serve(async (req) => {
       forceYear,
       week: bodyWeek,
       year: bodyYear,
-      actionTrackerWeek: bodyAtWeek,
-      actionTrackerYear: bodyAtYear,
       contentChoice,
     } = body
 
@@ -591,8 +649,8 @@ serve(async (req) => {
     // Everything uses the same meeting week — no previous-week offset
     const reportDataWeek = meetingWeek
     const reportDataYear = meetingYear
-    const atWeek = bodyAtWeek ?? meetingWeek
-    const atYear = bodyAtYear ?? meetingYear
+    const atWeek = meetingWeek
+    const atYear = meetingYear
 
     console.log(
       `[digest] Meeting: W${meetingWeek}/${meetingYear} | ReportData: W${reportDataWeek}/${reportDataYear} | Tracker: W${atWeek}/${atYear}`
@@ -670,12 +728,12 @@ serve(async (req) => {
     const results = []
     for (const to of recipients) {
       const { data, error } = await resend.emails.send({
-        from: "ACOB Admin & HR <no-reply@acoblighting.com>",
+        from: "ACOB Admin & HR <notifications@acoblighting.com>",
         to,
         subject,
         html,
         attachments: [
-          { filename: `ACOB_Weekly_Reports_All_W${meetingWeek}_${meetingYear}.pdf`, content: reportPdfBase64 },
+          { filename: `ACOB_Weekly_Reports_W${meetingWeek}_${meetingYear}.pdf`, content: reportPdfBase64 },
           { filename: `ACOB_Action_Tracker_W${meetingWeek}_${meetingYear}.pdf`, content: trackerPdfBase64 },
         ],
       })

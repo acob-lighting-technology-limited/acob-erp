@@ -3,7 +3,9 @@ import autoTable from "jspdf-autotable"
 import { saveAs } from "file-saver"
 import {
   Document,
+  Footer,
   Packer,
+  PageNumber,
   Paragraph,
   TextRun,
   HeadingLevel,
@@ -56,6 +58,7 @@ export interface WeeklyReport {
 export const DEPARTMENT_ORDER = [
   "Accounts",
   "Business, Growth and Innovation",
+  "Executive Management",
   "IT and Communications",
   "Admin & HR",
   "Legal, Regulatory and Compliance",
@@ -211,7 +214,7 @@ const pdfCoverPage = (
   // Pill: 9mm, gap: 8mm, date: ~5mm, [subtitle: 6mm]
   const logoH = 22
   const subtitleExtra = subtitle ? 10 : 0
-  const totalContentH = logoH + 8 + 1 + 10 + 10 + 6 + 7 + 8 + 9 + 8 + 5 + subtitleExtra
+  const totalContentH = logoH + 8 + 1 + 14 + 10 + 6 + 7 + 8 + 9 + 8 + 5 + subtitleExtra
   const startY = bodyTop + (bodyH - totalContentH) / 2
 
   // Logo centred
@@ -234,7 +237,7 @@ const pdfCoverPage = (
   doc.line(30, dividerY, W - 30, dividerY)
 
   // "General Meeting"
-  const titleY = dividerY + 10
+  const titleY = dividerY + 14
   doc.setFontSize(28)
   doc.setTextColor(...PDF_DARK)
   doc.setFont("helvetica", "bold")
@@ -305,6 +308,10 @@ const pdfDeptIndexPage = (doc: jsPDF, departments: string[], week: number, year:
     doc.setTextColor(...PDF_DARK)
     doc.setFont("helvetica", "normal")
     doc.text(dept, 30, y + 1)
+    doc.setFontSize(10)
+    doc.setTextColor(...PDF_GREEN)
+    doc.setFont("helvetica", "bold")
+    doc.text(String(i + 3), W - 14, y + 1, { align: "right" })
 
     // Separator
     if (i < departments.length - 1) {
@@ -359,7 +366,7 @@ const pdfContentPage = (
   department: string,
   report: WeeklyReport,
   logoDark: string | null,
-  nextDept?: string
+  pageNumber?: number
 ) => {
   const W = 210,
     H = 297
@@ -447,11 +454,9 @@ const pdfContentPage = (
   doc.setTextColor(...PDF_WHITE)
   doc.setFont("helvetica", "normal")
   doc.text("Confidential — ACOB Internal Use Only", 14, H - 5)
-  if (nextDept) {
+  if (typeof pageNumber === "number") {
     doc.setFont("helvetica", "bold")
-    const nextLabel = `NEXT: ${nextDept}`
-    const truncated = nextLabel.length > 32 ? nextLabel.slice(0, 29) + "..." : nextLabel
-    doc.text(truncated, W - 14, H - 5, { align: "right" })
+    doc.text(String(pageNumber), W / 2, H - 5, { align: "center" })
   }
 }
 
@@ -499,13 +504,12 @@ export const exportAllToPDF = async (reports: WeeklyReport[], week: number, year
   pdfDeptIndexPage(doc, departments, week, year)
 
   sortedReports.forEach((report, idx) => {
-    const nextDept = sortedReports[idx + 1]?.department
     // Content page only — no separate green dept header page
     doc.addPage()
-    pdfContentPage(doc, report.department, report, logoDark, nextDept)
+    pdfContentPage(doc, report.department, report, logoDark, idx + 3)
   })
 
-  doc.save(`ACOB_Weekly_Reports_All_W${currentWeek}_${currentYear}.pdf`)
+  doc.save(`ACOB_Weekly_Reports_W${currentWeek}_${currentYear}.pdf`)
 }
 
 /**
@@ -530,10 +534,9 @@ export const exportAllToPDFBase64 = async (reports: WeeklyReport[], week: number
   pdfDeptIndexPage(doc, departments, week, year)
 
   sortedReports.forEach((report, idx) => {
-    const nextDept = sortedReports[idx + 1]?.department
     // No separate dept header page
     doc.addPage()
-    pdfContentPage(doc, report.department, report, logoDark, nextDept)
+    pdfContentPage(doc, report.department, report, logoDark, idx + 3)
   })
 
   return doc.output("datauristring").split(",")[1]
@@ -560,7 +563,7 @@ const pdfActionTrackerPage = (
   logoDark: string | null,
   week: number,
   year: number,
-  nextDept?: string
+  pageNumber?: number
 ) => {
   const W = 210,
     H = 297
@@ -685,11 +688,9 @@ const pdfActionTrackerPage = (
   doc.setTextColor(...PDF_WHITE)
   doc.setFont("helvetica", "normal")
   doc.text("Confidential — ACOB Internal Use Only", 14, H - 5)
-  if (nextDept) {
+  if (typeof pageNumber === "number") {
     doc.setFont("helvetica", "bold")
-    const nextLabel = `NEXT: ${nextDept}`
-    const truncated = nextLabel.length > 32 ? nextLabel.slice(0, 29) + "..." : nextLabel
-    doc.text(truncated, W - 14, H - 5, { align: "right" })
+    doc.text(String(pageNumber), W / 2, H - 5, { align: "center" })
   }
 }
 
@@ -725,11 +726,14 @@ export const exportActionTrackerToPDFBase64 = async (
     if (!departments.includes(d)) departments.push(d)
   })
 
+  // Page 2 — Dept index / TOC
+  doc.addPage()
+  pdfDeptIndexPage(doc, departments, week, year)
+
   departments.forEach((dept, idx) => {
     const deptActions = grouped[dept] || []
-    const nextDept = departments[idx + 1]
     doc.addPage()
-    pdfActionTrackerPage(doc, dept, deptActions, logoDark, week, year, nextDept)
+    pdfActionTrackerPage(doc, dept, deptActions, logoDark, week, year, idx + 3)
   })
 
   return doc.output("datauristring").split(",")[1]
@@ -766,6 +770,9 @@ export const exportActionTrackerToPPTX = async (actions: ActionItem[], week: num
   Object.keys(grouped).forEach((d) => {
     if (!departments.includes(d)) departments.push(d)
   })
+
+  // TOC slide
+  addDeptIndexSlide(pres, departments, week, year)
 
   departments.forEach((dept, idx) => {
     const deptActions = grouped[dept] || []
@@ -931,6 +938,18 @@ export const exportActionTrackerToPPTX = async (actions: ActionItem[], week: num
         bold: true,
       })
     }
+    slide.addText(String(idx + 3), {
+      x: 0,
+      y: 6.9,
+      w: "100%",
+      h: 0.6,
+      fontSize: 10,
+      color: ACOB_WHITE,
+      align: "center",
+      valign: "middle",
+      fontFace: "Calibri",
+      bold: true,
+    })
   })
 
   await pres.writeFile({ fileName: `ACOB_Action_Tracker_W${week}_${year}.pptx` })
@@ -938,18 +957,18 @@ export const exportActionTrackerToPPTX = async (actions: ActionItem[], week: num
 
 // ─── DOCX helpers ─────────────────────────────────────────────────────────────
 
-/** Returns a shaded heading paragraph for a section (coloured background). */
+/** Returns a heading paragraph with coloured text + underline (no shaded background). */
 const docxSectionHeading = (title: string, hexBg: string) =>
   new Paragraph({
     children: [
       new TextRun({
         text: title,
         bold: true,
-        color: "FFFFFF",
+        color: hexBg,
         size: 22,
       }),
     ],
-    shading: { type: ShadingType.SOLID, color: hexBg, fill: hexBg },
+    border: { bottom: { color: hexBg, size: 8, style: "single" } },
     spacing: { before: 200, after: 80 },
   })
 
@@ -1066,6 +1085,87 @@ export const exportActionTrackerToDocx = async (actions: ActionItem[], week: num
 
   const docSize = { width: 11906, height: 16838 } // A4 in twips
 
+  const grouped: Record<string, ActionItem[]> = {}
+  actions.forEach((a) => {
+    if (!grouped[a.department]) grouped[a.department] = []
+    grouped[a.department].push(a)
+  })
+  const departments = DEPARTMENT_ORDER.filter((d) => grouped[d])
+  Object.keys(grouped).forEach((d) => {
+    if (!departments.includes(d)) departments.push(d)
+  })
+
+  const pageFooter = new Footer({
+    children: [
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        children: [new TextRun({ children: [PageNumber.CURRENT] })],
+      }),
+    ],
+  })
+
+  const tocRows = departments.map(
+    (dept, i) =>
+      new TableRow({
+        children: [
+          new TableCell({ children: [new Paragraph(dept)] }),
+          new TableCell({
+            width: { size: 15, type: WidthType.PERCENTAGE },
+            children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun(String(i + 3))] })],
+          }),
+        ],
+      })
+  )
+
+  const deptChildren: any[] = []
+  departments.forEach((dept, i) => {
+    const deptActions = grouped[dept] || []
+    deptChildren.push(
+      new Paragraph({
+        children: [new TextRun({ text: dept.toUpperCase(), bold: true, size: 28, color: "1A7A4A" })],
+        pageBreakBefore: i > 0,
+        spacing: { after: 100 },
+      }),
+      new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        rows: [
+          new TableRow({
+            children: [
+              new TableCell({
+                children: [
+                  new Paragraph({ children: [new TextRun({ text: "ACTION ITEM", bold: true, color: "FFFFFF" })] }),
+                ],
+                shading: { type: ShadingType.SOLID, color: "1A7A4A", fill: "1A7A4A" },
+                width: { size: 75, type: WidthType.PERCENTAGE },
+              }),
+              new TableCell({
+                children: [new Paragraph({ children: [new TextRun({ text: "STATUS", bold: true, color: "FFFFFF" })] })],
+                shading: { type: ShadingType.SOLID, color: "1A7A4A", fill: "1A7A4A" },
+                width: { size: 25, type: WidthType.PERCENTAGE },
+              }),
+            ],
+          }),
+          ...deptActions.map(
+            (a) =>
+              new TableRow({
+                children: [
+                  new TableCell({ children: [new Paragraph(a.title)] }),
+                  new TableCell({
+                    children: [
+                      new Paragraph({
+                        children: [new TextRun({ text: a.status.replace("_", " ").toUpperCase(), bold: true })],
+                      }),
+                    ],
+                  }),
+                ],
+              })
+          ),
+        ],
+      }),
+      new Paragraph({ text: "", spacing: { after: 120 } })
+    )
+  })
+
   const doc = new Document({
     sections: [
       {
@@ -1091,67 +1191,22 @@ export const exportActionTrackerToDocx = async (actions: ActionItem[], week: num
           new Paragraph({
             children: [new TextRun({ text: mondayDate, size: 20, color: "64748B" })],
             alignment: AlignmentType.CENTER,
-            spacing: { after: 300 },
+            spacing: { after: 120 },
           }),
-
+          new Paragraph({
+            children: [new TextRun({ text: "Departments in This Report", bold: true, size: 24, color: "0F2D1F" })],
+            spacing: { after: 100 },
+          }),
           new Table({
             width: { size: 100, type: WidthType.PERCENTAGE },
-            rows: [
-              new TableRow({
-                children: [
-                  new TableCell({
-                    children: [
-                      new Paragraph({ children: [new TextRun({ text: "ACTION ITEM", bold: true, color: "FFFFFF" })] }),
-                    ],
-                    shading: { type: ShadingType.SOLID, color: "1A7A4A", fill: "1A7A4A" },
-                    width: { size: 60, type: WidthType.PERCENTAGE },
-                  }),
-                  new TableCell({
-                    children: [
-                      new Paragraph({ children: [new TextRun({ text: "DEPARTMENT", bold: true, color: "FFFFFF" })] }),
-                    ],
-                    shading: { type: ShadingType.SOLID, color: "1A7A4A", fill: "1A7A4A" },
-                    width: { size: 20, type: WidthType.PERCENTAGE },
-                  }),
-                  new TableCell({
-                    children: [
-                      new Paragraph({ children: [new TextRun({ text: "STATUS", bold: true, color: "FFFFFF" })] }),
-                    ],
-                    shading: { type: ShadingType.SOLID, color: "1A7A4A", fill: "1A7A4A" },
-                    width: { size: 20, type: WidthType.PERCENTAGE },
-                  }),
-                ],
-              }),
-              ...actions.map(
-                (a) =>
-                  new TableRow({
-                    children: [
-                      new TableCell({ children: [new Paragraph(a.title)] }),
-                      new TableCell({ children: [new Paragraph(a.department)] }),
-                      new TableCell({
-                        children: [
-                          new Paragraph({
-                            children: [
-                              new TextRun({
-                                text: a.status.replace("_", " ").toUpperCase(),
-                                bold: true,
-                                color:
-                                  a.status === "completed"
-                                    ? "166534"
-                                    : a.status === "in_progress"
-                                      ? "1D4ED8"
-                                      : "C2410C",
-                              }),
-                            ],
-                          }),
-                        ],
-                      }),
-                    ],
-                  })
-              ),
-            ],
+            rows: tocRows,
           }),
         ],
+      },
+      {
+        properties: { page: { pageNumbers: { start: 3 } } },
+        footers: { default: pageFooter },
+        children: deptChildren,
       },
     ],
   })
@@ -1164,8 +1219,7 @@ export const exportAllToDocx = async (reports: WeeklyReport[], week: number, yea
   const sortedReports = sortReportsByDepartment(reports)
   const mondayDate = getWeekMonday(week, year)
 
-  const children: any[] = [
-    // ... cover block Paragraphs ...
+  const tocChildren: any[] = [
     new Paragraph({
       children: [new TextRun({ text: "ACOB LIGHTING TECHNOLOGY LIMITED", bold: true, size: 36, color: "1A7A4A" })],
       alignment: AlignmentType.CENTER,
@@ -1186,67 +1240,67 @@ export const exportAllToDocx = async (reports: WeeklyReport[], week: number, yea
       alignment: AlignmentType.CENTER,
       spacing: { after: 300 },
     }),
-
-    // ── Dept index ────────────────────────────────────────────────────────
     new Paragraph({
       children: [new TextRun({ text: "Departments in This Report", bold: true, size: 24, color: "0F2D1F" })],
       spacing: { after: 100 },
     }),
-    ...sortedReports.map(
-      (r, i) =>
-        new Paragraph({
-          children: [new TextRun({ text: `${i + 1}.  ${r.department}`, size: 22, color: "334155" })],
-          spacing: { after: 60 },
-        })
-    ),
-    new Paragraph({ text: "", spacing: { after: 200 } }),
+    new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      rows: sortedReports.map(
+        (r, i) =>
+          new TableRow({
+            children: [
+              new TableCell({ children: [new Paragraph(r.department)] }),
+              new TableCell({
+                width: { size: 15, type: WidthType.PERCENTAGE },
+                children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun(String(i + 3))] })],
+              }),
+            ],
+          })
+      ),
+    }),
   ]
 
+  const reportChildren: any[] = []
   sortedReports.forEach((report, idx) => {
-    const p = Array.isArray(report.profiles) ? report.profiles[0] : report.profiles
-    const name = p ? `${p.first_name} ${p.last_name}` : "Employee"
-    const nextDept = sortedReports[idx + 1]?.department
-
-    children.push(
-      // Dept heading (page break)
+    reportChildren.push(
       new Paragraph({
         children: [new TextRun({ text: report.department.toUpperCase(), bold: true, size: 32, color: "FFFFFF" })],
         shading: { type: ShadingType.SOLID, color: "1A7A4A", fill: "1A7A4A" },
-        pageBreakBefore: true,
+        pageBreakBefore: idx > 0,
         spacing: { after: 80 },
       }),
-      // new Paragraph({
-      //     children: [new TextRun({ text: `Submitted by: ${name}`, size: 20, color: "334155" })],
-      //     spacing: { after: 200 },
-      // }),
-
-      // Sections
       docxSectionHeading("WORK DONE", "1A7A4A"),
       ...docxNumberedItems(report.work_done, "No data provided."),
       new Paragraph({ text: "", spacing: { after: 120 } }),
-
       docxSectionHeading("TASKS FOR NEW WEEK", "1D6A96"),
       ...docxNumberedItems(report.tasks_new_week, "No data provided."),
       new Paragraph({ text: "", spacing: { after: 120 } }),
-
       docxSectionHeading("CHALLENGES", "B91C1C"),
       ...docxNumberedItems(report.challenges, "No challenges reported."),
       new Paragraph({ text: "", spacing: { after: 120 } })
     )
-
-    // NEXT: dept label
-    if (nextDept) {
-      children.push(
-        new Paragraph({
-          children: [new TextRun({ text: `NEXT: ${nextDept}`, bold: true, size: 18, color: "1A7A4A" })],
-          alignment: AlignmentType.RIGHT,
-          spacing: { after: 60 },
-        })
-      )
-    }
   })
 
-  const doc = new Document({ sections: [{ children }] })
+  const pageFooter = new Footer({
+    children: [
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        children: [new TextRun({ children: [PageNumber.CURRENT] })],
+      }),
+    ],
+  })
+
+  const doc = new Document({
+    sections: [
+      { children: tocChildren },
+      {
+        properties: { page: { pageNumbers: { start: 3 } } },
+        footers: { default: pageFooter },
+        children: reportChildren,
+      },
+    ],
+  })
   const blob = await Packer.toBlob(doc)
   saveAs(blob, `ACOB_Weekly_Reports_All_W${week}_${year}.docx`)
 }
@@ -1437,7 +1491,7 @@ const addCoverSlide = (pres: any, week: number, year: number, subtitle?: string)
 /**
  * Adds a department title slide (full-bleed green).
  */
-const addDeptTitleSlide = (pres: any, department: string, submittedBy: string) => {
+const addDeptTitleSlide = (pres: any, department: string, submittedBy: string, pageNumber?: number) => {
   const slide = pres.addSlide()
   slide.background = { color: ACOB_GREEN }
 
@@ -1478,13 +1532,34 @@ const addDeptTitleSlide = (pres: any, department: string, submittedBy: string) =
   //     transparency: 20,
   // })
 
+  if (typeof pageNumber === "number") {
+    slide.addText(String(pageNumber), {
+      x: 0,
+      y: 6.9,
+      w: "100%",
+      h: 0.5,
+      fontSize: 10,
+      bold: true,
+      color: ACOB_WHITE,
+      align: "center",
+      valign: "middle",
+      fontFace: "Calibri",
+    })
+  }
+
   return slide
 }
 
 /**
  * Adds a numbered department index slide (shown after the cover in bulk export).
  */
-const addDeptIndexSlide = (pres: any, departments: string[], week: number, year: number) => {
+const addDeptIndexSlide = (
+  pres: any,
+  departments: string[],
+  week: number,
+  year: number,
+  pageNumberForDepartment: (index: number) => number = (index) => index + 3
+) => {
   const slide = pres.addSlide()
   slide.background = { color: ACOB_OFFWHITE }
 
@@ -1549,11 +1624,23 @@ const addDeptIndexSlide = (pres: any, departments: string[], week: number, year:
     slide.addText(dept, {
       x: 1.05,
       y: y,
-      w: 11.5,
+      w: 10.5,
       h: 0.45,
       fontSize: 16,
       color: ACOB_DARK,
       valign: "middle",
+      fontFace: "Calibri",
+    })
+    slide.addText(String(pageNumberForDepartment(i)), {
+      x: 11.5,
+      y: y,
+      w: 1.3,
+      h: 0.45,
+      fontSize: 14,
+      bold: true,
+      color: ACOB_GREEN,
+      valign: "middle",
+      align: "right",
       fontFace: "Calibri",
     })
     // subtle separator line
@@ -1582,9 +1669,14 @@ const addDeptIndexSlide = (pres: any, departments: string[], week: number, year:
 
 /**
  * Adds the content slide with 2-row / 2-col layout.
- * nextDept: if provided, shows "NEXT: {dept}" in the bottom-right corner.
  */
-const addContentSlide = (pres: any, department: string, report: WeeklyReport, nextDept?: string) => {
+const addContentSlide = (
+  pres: any,
+  department: string,
+  report: WeeklyReport,
+  nextDept?: string,
+  pageNumber?: number
+) => {
   const slide = pres.addSlide()
   slide.background = { color: ACOB_OFFWHITE }
 
@@ -1599,7 +1691,7 @@ const addContentSlide = (pres: any, department: string, report: WeeklyReport, ne
     line: { color: ACOB_DARK },
   })
   // Department name — left
-  slide.addText(department, {
+  slide.addText(department.toUpperCase(), {
     x: 0.3,
     y: 0,
     w: 9,
@@ -1648,28 +1740,29 @@ const addContentSlide = (pres: any, department: string, report: WeeklyReport, ne
     fill: { color: ACOB_WHITE },
     line: { color: "E2E8F0", width: 1 },
   })
-  slide.addText("WORK DONE", {
+  slide.addShape(pres.ShapeType?.rect ?? "rect", {
     x: marginX + 0.15,
     y: row1Y + 0.1,
     w: col1W - 0.3,
-    h: 0.32,
-    fontSize: 9,
-    bold: true,
-    color: ACOB_GREEN,
-    fontFace: "Calibri",
+    h: 0.3,
+    fill: { color: ACOB_GREEN },
+    line: { color: ACOB_GREEN, width: 0 },
   })
-  slide.addShape(pres.ShapeType?.line ?? "line", {
-    x: marginX + 0.15,
-    y: row1Y + 0.44,
-    w: col1W - 0.3,
-    h: 0,
-    line: { color: ACOB_GREEN, width: 1 },
+  slide.addText("WORK DONE", {
+    x: marginX + 0.2,
+    y: row1Y + 0.12,
+    w: col1W - 0.4,
+    h: 0.22,
+    fontSize: 8,
+    bold: true,
+    color: ACOB_WHITE,
+    fontFace: "Calibri",
   })
   slide.addText(autoNumberLines(report.work_done) || "No data provided.", {
     x: marginX + 0.15,
-    y: row1Y + 0.52,
+    y: row1Y + 0.46,
     w: col1W - 0.3,
-    h: row1H - 0.62,
+    h: row1H - 0.56,
     fontSize: 11,
     color: ACOB_SLATE,
     valign: "top",
@@ -1686,28 +1779,29 @@ const addContentSlide = (pres: any, department: string, report: WeeklyReport, ne
     fill: { color: ACOB_WHITE },
     line: { color: "E2E8F0", width: 1 },
   })
-  slide.addText("TASKS FOR NEW WEEK", {
+  slide.addShape(pres.ShapeType?.rect ?? "rect", {
     x: col2X + 0.15,
     y: row1Y + 0.1,
     w: col2W - 0.3,
-    h: 0.32,
-    fontSize: 9,
-    bold: true,
-    color: "1D6A96",
-    fontFace: "Calibri",
+    h: 0.3,
+    fill: { color: "1D6A96" },
+    line: { color: "1D6A96", width: 0 },
   })
-  slide.addShape(pres.ShapeType?.line ?? "line", {
-    x: col2X + 0.15,
-    y: row1Y + 0.44,
-    w: col2W - 0.3,
-    h: 0,
-    line: { color: "1D6A96", width: 1 },
+  slide.addText("TASKS FOR NEW WEEK", {
+    x: col2X + 0.2,
+    y: row1Y + 0.12,
+    w: col2W - 0.4,
+    h: 0.22,
+    fontSize: 8,
+    bold: true,
+    color: ACOB_WHITE,
+    fontFace: "Calibri",
   })
   slide.addText(autoNumberLines(report.tasks_new_week) || "No data provided.", {
     x: col2X + 0.15,
-    y: row1Y + 0.52,
+    y: row1Y + 0.46,
     w: col2W - 0.3,
-    h: row1H - 0.62,
+    h: row1H - 0.56,
     fontSize: 11,
     color: ACOB_SLATE,
     valign: "top",
@@ -1724,28 +1818,29 @@ const addContentSlide = (pres: any, department: string, report: WeeklyReport, ne
     fill: { color: ACOB_WHITE },
     line: { color: "E2E8F0", width: 1 },
   })
-  slide.addText("CHALLENGES", {
+  slide.addShape(pres.ShapeType?.rect ?? "rect", {
     x: marginX + 0.15,
     y: row2Y + 0.1,
     w: fullW - 0.3,
-    h: 0.32,
-    fontSize: 9,
-    bold: true,
-    color: "B91C1C",
-    fontFace: "Calibri",
+    h: 0.3,
+    fill: { color: "B91C1C" },
+    line: { color: "B91C1C", width: 0 },
   })
-  slide.addShape(pres.ShapeType?.line ?? "line", {
-    x: marginX + 0.15,
-    y: row2Y + 0.44,
-    w: fullW - 0.3,
-    h: 0,
-    line: { color: "B91C1C", width: 1 },
+  slide.addText("CHALLENGES", {
+    x: marginX + 0.2,
+    y: row2Y + 0.12,
+    w: fullW - 0.4,
+    h: 0.22,
+    fontSize: 8,
+    bold: true,
+    color: ACOB_WHITE,
+    fontFace: "Calibri",
   })
   slide.addText(autoNumberLines(report.challenges) || "No challenges reported.", {
     x: marginX + 0.15,
-    y: row2Y + 0.52,
+    y: row2Y + 0.46,
     w: fullW - 0.3,
-    h: row2H - 0.62,
+    h: row2H - 0.56,
     fontSize: 11,
     color: ACOB_SLATE,
     valign: "top",
@@ -1763,7 +1858,6 @@ const addContentSlide = (pres: any, department: string, report: WeeklyReport, ne
     line: { color: ACOB_GREEN },
   })
 
-  // "NEXT: {dept}" label on the right of the footer (bulk export only)
   if (nextDept) {
     slide.addText(`NEXT: ${nextDept}`, {
       x: 7,
@@ -1773,6 +1867,21 @@ const addContentSlide = (pres: any, department: string, report: WeeklyReport, ne
       fontSize: 10,
       color: ACOB_WHITE,
       align: "right",
+      valign: "middle",
+      fontFace: "Calibri",
+      bold: true,
+    })
+  }
+
+  if (typeof pageNumber === "number") {
+    slide.addText(String(pageNumber), {
+      x: 0,
+      y: 6.9,
+      w: "100%",
+      h: 0.6,
+      fontSize: 10,
+      color: ACOB_WHITE,
+      align: "center",
       valign: "middle",
       fontFace: "Calibri",
       bold: true,
@@ -1799,7 +1908,7 @@ export const exportToPPTX = async (report: WeeklyReport) => {
   addDeptTitleSlide(pres, report.department, name)
 
   // Slide 3 — Content (no "NEXT" for single export)
-  addContentSlide(pres, report.department, report)
+  addContentSlide(pres, report.department, report, undefined, 3)
 
   await pres.writeFile({ fileName: `ACOB_Report_${report.department}_W${report.week_number}.pptx` })
 }
@@ -1816,18 +1925,16 @@ export const exportAllToPPTX = async (reports: WeeklyReport[], week: number, yea
   addCoverSlide(pres, week, year)
 
   // Slide 2 — Dept index
-  addDeptIndexSlide(pres, departments, week, year)
+  addDeptIndexSlide(pres, departments, week, year, (index) => 3 + index * 2)
 
   sortedReports.forEach((report, idx) => {
     const p = Array.isArray(report.profiles) ? report.profiles[0] : report.profiles
     const name = p ? `${p.first_name} ${p.last_name}` : "Employee"
-    const nextDept = sortedReports[idx + 1]?.department
-
     // Department title slide
     addDeptTitleSlide(pres, report.department, name)
 
-    // Content slide — pass nextDept so footer shows "NEXT: ..."
-    addContentSlide(pres, report.department, report, nextDept)
+    // Content slide
+    addContentSlide(pres, report.department, report, sortedReports[idx + 1]?.department, 4 + idx * 2)
   })
 
   await pres.writeFile({ fileName: `ACOB_Weekly_Reports_All_W${week}_${year}.pptx` })
