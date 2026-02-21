@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { createClient } from "@/lib/supabase/client"
-import { getCurrentISOWeek, getNextWeekParams } from "@/lib/utils"
+import { getCurrentISOWeek } from "@/lib/utils"
 import { toast } from "sonner"
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -29,7 +29,6 @@ import {
   FileBarChart,
   Loader2,
   Search,
-  Mail,
 } from "lucide-react"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
 import {
@@ -48,12 +47,9 @@ import {
   exportAllToPDF,
   exportAllToDocx,
   exportAllToPPTX,
-  exportAllToPDFBase64,
-  exportActionTrackerToPDFBase64,
   autoNumberLines,
   sortReportsByDepartment,
   type WeeklyReport,
-  type ActionItem,
 } from "@/lib/export-utils"
 import { WeeklyReportAdminDialog } from "@/components/admin/reports/weekly-report-dialog"
 import { cn } from "@/lib/utils"
@@ -82,7 +78,6 @@ export function WeeklyReportsContent({ initialDepartments }: WeeklyReportsConten
   const [editingReport, setEditingReport] = useState<WeeklyReport | null>(null)
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
   const [trackingData, setTrackingData] = useState<TrackerStatus[]>([])
-  const [isSendingDigest, setIsSendingDigest] = useState(false)
 
   const supabase = createClient()
 
@@ -109,13 +104,12 @@ export function WeeklyReportsContent({ initialDepartments }: WeeklyReportsConten
       const sortedData = sortReportsByDepartment(data || [])
       setReports(sortedData)
 
-      // ─── Fetch Action Items for Aggregate Status (NEXT WEEK) ─────────────────
-      const { week: nextW, year: nextY } = getNextWeekParams(weekFilter, yearFilter)
+      // ─── Fetch Action Items for Aggregate Status (SAME WEEK) ─────────────────
       const { data: actions, error: actionsError } = await supabase
         .from("action_items")
         .select("id, department, status")
-        .eq("week_number", nextW)
-        .eq("year", nextY)
+        .eq("week_number", weekFilter)
+        .eq("year", yearFilter)
 
       if (!actionsError) {
         setTrackingData(actions || [])
@@ -140,70 +134,6 @@ export function WeeklyReportsContent({ initialDepartments }: WeeklyReportsConten
       newExpanded.add(id)
     }
     setExpandedRows(newExpanded)
-  }
-
-  const handleSendDigest = async () => {
-    if (filteredReports.length === 0) {
-      toast.error("No reports to send for this week.")
-      return
-    }
-    if (!confirm(`Send weekly digest for Week ${weekFilter}, ${yearFilter} to i.chibuikem@org.acoblighting.com?`))
-      return
-
-    setIsSendingDigest(true)
-    const toastId = toast.loading("Generating PDFs and sending digest...")
-    try {
-      // The action tracker for week N is derived from "Tasks for New Week" in week N's reports,
-      // which get synced into action_items for week N+1.
-      const { week: nextW, year: nextY } = getNextWeekParams(weekFilter, yearFilter)
-
-      // 1. Fetch action items for NEXT week (week N+1)
-      const { data: actions, error: actionsError } = await supabase
-        .from("action_items")
-        .select("id, title, description, status, department, week_number, year")
-        .eq("week_number", nextW)
-        .eq("year", nextY)
-
-      if (actionsError) throw actionsError
-
-      // 2. Generate both PDFs as base64
-      //    - Weekly Report: week N (the reports being viewed)
-      //    - Action Tracker: week N+1 (the tasks derived from those reports)
-      const [weeklyReportBase64, actionTrackerBase64] = await Promise.all([
-        exportAllToPDFBase64(filteredReports, weekFilter, yearFilter),
-        exportActionTrackerToPDFBase64(actions || [], nextW, nextY),
-      ])
-
-      // 3. Call the Edge Function
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-      const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-      const res = await fetch(`${supabaseUrl}/functions/v1/send-weekly-digest`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${supabaseKey}`,
-        },
-        body: JSON.stringify({
-          weeklyReportBase64,
-          actionTrackerBase64,
-          week: weekFilter,
-          year: yearFilter,
-          actionTrackerWeek: nextW,
-          actionTrackerYear: nextY,
-          testEmail: "i.chibuikem@org.acoblighting.com",
-        }),
-      })
-
-      const result = await res.json()
-      if (!res.ok) throw new Error(result.error || "Failed to send digest")
-
-      toast.success(`Digest sent — Weekly Report W${weekFilter} + Action Tracker W${nextW}`, { id: toastId })
-    } catch (err: any) {
-      console.error("[Send Digest Error]", err)
-      toast.error(err.message || "Failed to send digest", { id: toastId })
-    } finally {
-      setIsSendingDigest(false)
-    }
   }
 
   const handleDelete = async (id: string) => {
@@ -359,13 +289,14 @@ export function WeeklyReportsContent({ initialDepartments }: WeeklyReportsConten
                 <Presentation className="h-4 w-4" /> <span className="hidden sm:inline">PPTX</span>
               </Button>
               <Button
+                asChild
                 variant="outline"
-                onClick={handleSendDigest}
-                disabled={isSendingDigest}
                 className="gap-2 border-green-200 text-green-700 hover:bg-green-50 hover:text-green-800 dark:border-green-900/30 dark:hover:bg-green-950/20"
               >
-                {isSendingDigest ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
-                <span className="hidden sm:inline">{isSendingDigest ? "Sending..." : "Send Digest"}</span>
+                <Link href="/admin/reports/mail">
+                  <ExternalLink className="h-4 w-4" />
+                  <span className="hidden sm:inline">General Meeting Mail</span>
+                </Link>
               </Button>
             </>
           )}
@@ -495,7 +426,7 @@ export function WeeklyReportsContent({ initialDepartments }: WeeklyReportsConten
                     </TableCell>
                     <TableCell className="text-center">
                       <Link
-                        href={`/admin/reports/action-tracker?week=${getNextWeekParams(report.week_number, report.year).week}&year=${getNextWeekParams(report.week_number, report.year).year}&dept=${report.department}`}
+                        href={`/admin/reports/action-tracker?week=${report.week_number}&year=${report.year}&dept=${report.department}`}
                         className="group flex flex-col items-center gap-1 transition-all"
                         onClick={(e) => e.stopPropagation()}
                       >

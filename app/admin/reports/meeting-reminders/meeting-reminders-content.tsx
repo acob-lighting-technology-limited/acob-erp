@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useCallback } from "react"
+import { useState, useMemo, useCallback, useEffect } from "react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
 import { PageWrapper, PageHeader } from "@/components/layout"
@@ -29,12 +29,14 @@ import {
   Video,
   BookOpen,
   Repeat,
+  Trash2,
 } from "lucide-react"
 
 type Employee = {
   id: string
   full_name: string
-  company_email: string
+  company_email: string | null
+  additional_email: string | null
   department: string | null
   employment_status: string | null
 }
@@ -87,7 +89,7 @@ function capitalize(s: string): string {
 export function MeetingRemindersContent({ employees }: Props) {
   // ── State ──────────────────────────────────────────────────────────────────
   const [reminderType, setReminderType] = useState<ReminderType>("meeting")
-  const [recipientMode, setRecipientMode] = useState<RecipientMode>("all")
+  const [recipientMode, setRecipientMode] = useState<RecipientMode>("select")
   const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<Set<string>>(new Set())
   const [manualEmails, setManualEmails] = useState<string[]>([])
   const [manualInput, setManualInput] = useState("")
@@ -113,8 +115,26 @@ export function MeetingRemindersContent({ employees }: Props) {
 
   const [isSending, setIsSending] = useState(false)
   const [sendResult, setSendResult] = useState<any>(null)
+  const [activeSchedules, setActiveSchedules] = useState<any[]>([])
 
   const supabase = createClient()
+
+  const fetchSchedules = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from("reminder_schedules")
+        .select("*")
+        .eq("is_active", true)
+        .order("created_at", { ascending: false })
+      if (!error && data) setActiveSchedules(data)
+    } catch {
+      // ignore
+    }
+  }, [supabase])
+
+  useEffect(() => {
+    fetchSchedules()
+  }, [fetchSchedules])
 
   // ── Computed ────────────────────────────────────────────────────────────────
   const filteredEmployees = useMemo(() => {
@@ -124,27 +144,32 @@ export function MeetingRemindersContent({ employees }: Props) {
       (e) =>
         e.full_name?.toLowerCase().includes(q) ||
         e.company_email?.toLowerCase().includes(q) ||
+        e.additional_email?.toLowerCase().includes(q) ||
         e.department?.toLowerCase().includes(q)
     )
   }, [employees, searchQuery])
 
   const resolvedRecipients = useMemo(() => {
-    const emails: string[] = []
+    const emailSet = new Set<string>()
     if (recipientMode === "all" || recipientMode === "all_plus") {
       employees.forEach((e) => {
-        if (e.company_email) emails.push(e.company_email)
+        if (e.company_email) emailSet.add(e.company_email.toLowerCase())
+        if (e.additional_email) emailSet.add(e.additional_email.toLowerCase())
       })
     } else if (recipientMode === "select") {
       employees.forEach((e) => {
-        if (selectedEmployeeIds.has(e.id) && e.company_email) emails.push(e.company_email)
+        if (selectedEmployeeIds.has(e.id)) {
+          if (e.company_email) emailSet.add(e.company_email.toLowerCase())
+          if (e.additional_email) emailSet.add(e.additional_email.toLowerCase())
+        }
       })
     }
     if (recipientMode === "manual" || recipientMode === "all_plus") {
       manualEmails.forEach((m) => {
-        if (!emails.includes(m)) emails.push(m)
+        emailSet.add(m.toLowerCase())
       })
     }
-    return emails
+    return Array.from(emailSet)
   }, [recipientMode, employees, selectedEmployeeIds, manualEmails])
 
   // ── Handlers ────────────────────────────────────────────────────────────────
@@ -222,11 +247,14 @@ export function MeetingRemindersContent({ employees }: Props) {
           const now = new Date()
           const currentDay = now.getDay()
           let daysUntil = targetDay - currentDay
-          if (daysUntil <= 0) daysUntil += 7
+          const [h, m] = recurringTime.split(":")
+          const targetMinutes = parseInt(h, 10) * 60 + parseInt(m, 10)
+          const nowMinutes = now.getHours() * 60 + now.getMinutes()
+          // If day already passed, or same day and time has passed, schedule next week.
+          if (daysUntil < 0 || (daysUntil === 0 && nowMinutes >= targetMinutes)) daysUntil += 7
           const nextRun = new Date(now)
           nextRun.setDate(now.getDate() + daysUntil)
-          const [h, m] = recurringTime.split(":")
-          nextRun.setHours(parseInt(h), parseInt(m), 0, 0)
+          nextRun.setHours(parseInt(h, 10), parseInt(m, 10), 0, 0)
           schedulePayload.next_run_at = nextRun.toISOString()
         }
 
@@ -245,6 +273,7 @@ export function MeetingRemindersContent({ employees }: Props) {
             : `✅ Recurring every ${capitalize(recurringDay)} at ${recurringTime}`,
           { id: toastId }
         )
+        fetchSchedules()
       } catch (err: any) {
         console.error("[Schedule Error]", err)
         toast.error(err.message || "Failed to save schedule", { id: toastId })
@@ -314,17 +343,27 @@ export function MeetingRemindersContent({ employees }: Props) {
     }
   }
 
+  const deactivateSchedule = async (id: string) => {
+    const { error } = await supabase.from("reminder_schedules").update({ is_active: false }).eq("id", id)
+    if (error) {
+      toast.error("Failed to deactivate schedule")
+      return
+    }
+    toast.success("Schedule deactivated")
+    fetchSchedules()
+  }
+
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <PageWrapper maxWidth="full" background="gradient">
       <PageHeader
         title="Meeting Reminders"
-        description="Send general meeting and knowledge sharing session reminders to all employees."
+        description="Send meeting and knowledge-sharing reminders to selected recipients."
         icon={Megaphone}
         backLink={{ href: "/admin/reports", label: "Back to Reports" }}
       />
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid items-start gap-6 lg:grid-cols-3">
         {/* ── LEFT: Settings ────────────────────────────────────────────── */}
         <div className="space-y-6 lg:col-span-2">
           {/* Reminder Type */}
@@ -547,7 +586,9 @@ export function MeetingRemindersContent({ employees }: Props) {
                         />
                         <div className="min-w-0 flex-1">
                           <div className="truncate text-sm font-medium">{emp.full_name}</div>
-                          <div className="text-muted-foreground truncate text-xs">{emp.company_email}</div>
+                          <div className="text-muted-foreground truncate text-xs">
+                            {[emp.company_email, emp.additional_email].filter(Boolean).join(" | ")}
+                          </div>
                         </div>
                         {emp.department && (
                           <Badge variant="secondary" className="shrink-0 text-xs">
@@ -754,13 +795,57 @@ export function MeetingRemindersContent({ employees }: Props) {
                   </p>
                 </div>
               )}
+
+              {activeSchedules.length > 0 && (
+                <div className="space-y-2 border-t pt-2">
+                  <div className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
+                    Active Schedules
+                  </div>
+                  {activeSchedules.map((s) => (
+                    <div
+                      key={s.id}
+                      className="bg-muted/40 flex items-center justify-between rounded-lg px-3 py-2 text-sm"
+                    >
+                      <div className="flex items-center gap-2">
+                        {s.schedule_type === "recurring" ? (
+                          <Repeat className="h-4 w-4 text-orange-600" />
+                        ) : (
+                          <Clock className="h-4 w-4 text-orange-600" />
+                        )}
+                        <span>
+                          {s.schedule_type === "recurring"
+                            ? `Every ${capitalize(s.send_day || "sunday")} at ${String(s.send_time || "18:00").slice(0, 5)}`
+                            : `One-time: ${new Date(s.next_run_at).toLocaleString("en-GB", {
+                                weekday: "short",
+                                day: "numeric",
+                                month: "short",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}`}
+                        </span>
+                        <Badge variant="secondary" className="text-xs">
+                          {(s.recipients as string[])?.length || 0} recipients
+                        </Badge>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:text-destructive h-7 w-7 p-0"
+                        onClick={() => deactivateSchedule(s.id)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
 
         {/* ── RIGHT: Summary & Send ─────────────────────────────────────── */}
-        <div className="space-y-6">
-          <Card className="sticky top-6 border-orange-200 dark:border-orange-900">
+        <aside className="space-y-6 self-start">
+          <Card className="border-orange-200 lg:sticky lg:top-24 dark:border-orange-900">
             <CardHeader className="pb-3">
               <CardTitle className="text-lg">Summary</CardTitle>
             </CardHeader>
@@ -930,7 +1015,7 @@ export function MeetingRemindersContent({ employees }: Props) {
               </CardContent>
             </Card>
           )}
-        </div>
+        </aside>
       </div>
     </PageWrapper>
   )

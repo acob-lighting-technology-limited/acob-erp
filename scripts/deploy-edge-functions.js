@@ -72,7 +72,7 @@ async function deployFunction(slug) {
 }
 
 async function main() {
-  const functions = ["send-email-notification", "send-weekly-digest"]
+  const functions = ["send-email-notification", "send-weekly-digest", "send-meeting-reminder"]
 
   for (const fn of functions) {
     await deployFunction(fn)

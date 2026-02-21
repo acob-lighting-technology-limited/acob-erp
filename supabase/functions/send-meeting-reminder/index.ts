@@ -36,7 +36,8 @@ function buildMeetingReminderHtml(
     "<title>Meeting Reminder</title>" +
     "<style>" +
     'body { margin: 0; padding: 0; background: #fff; font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif; }' +
-    ".outer-header { background: #000; width: 100%; padding: 20px 0; text-align: center; border-bottom: 3px solid #16a34a; }" +
+    ".email-shell { max-width: 600px; margin: 0 auto; overflow: hidden; }" +
+    ".outer-header { background: #0f2d1f; padding: 20px 0; text-align: center; border-bottom: 3px solid #16a34a; }" +
     ".wrapper { max-width: 600px; margin: 0 auto; background: #fff; padding: 32px 28px; }" +
     ".title { font-size: 22px; font-weight: 700; color: #111827; margin-bottom: 14px; }" +
     ".text { font-size: 15px; color: #374151; line-height: 1.7; margin: 0 0 18px 0; }" +
@@ -47,16 +48,18 @@ function buildMeetingReminderHtml(
     ".note-box { background: #fefce8; border: 1px solid #fde68a; border-radius: 8px; padding: 16px 20px; font-size: 14px; color: #92400e; margin: 20px 0; line-height: 1.6; }" +
     ".support { text-align: center; font-size: 14px; color: #4b5563; margin-top: 24px; line-height: 1.5; }" +
     ".support a { color: #16a34a; font-weight: 600; text-decoration: none; }" +
-    ".footer { background: #000; padding: 20px; text-align: center; font-size: 11px; color: #9ca3af; border-top: 3px solid #16a34a; }" +
+    ".footer { background: #0f2d1f; padding: 20px; text-align: center; font-size: 11px; color: #9ca3af; border-top: 3px solid #16a34a; }" +
     ".footer strong { color: #fff; }" +
     ".footer-system { color: #16a34a; font-weight: 600; }" +
     ".footer-note { color: #9ca3af; font-style: italic; }" +
     "</style>" +
     "</head>" +
     "<body>" +
-    '<div class="outer-header">' +
-    '<img src="https://erp.acoblighting.com/images/acob-logo-dark.webp" height="40" alt="ACOB Lighting">' +
-    "</div>" +
+    '<div class="email-shell">' +
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#0f2d1f" style="background:#0f2d1f !important;background-color:#0f2d1f !important;border-bottom:3px solid #16a34a;">' +
+    '<tr><td align="center" style="padding:20px 0;background:#0f2d1f !important;background-color:#0f2d1f !important;">' +
+    '<img src="https://erp.acoblighting.com/images/acob-logo-dark.png" height="40" alt="ACOB Lighting">' +
+    "</td></tr></table>" +
     '<div class="wrapper">' +
     '<div class="title">Reminder for General Weekly Meeting</div>' +
     '<p class="text">Dear All,</p>' +
@@ -90,12 +93,14 @@ function buildMeetingReminderHtml(
     '<a href="mailto:ict@acoblighting.com">ict@acoblighting.com</a>' +
     "</div>" +
     "</div>" +
-    '<div class="footer">' +
-    "<strong>ACOB Lighting Technology Limited</strong><br>" +
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#0f2d1f" style="background:#0f2d1f !important;background-color:#0f2d1f !important;border-top:3px solid #16a34a;">' +
+    '<tr><td align="center" style="padding:20px;background:#0f2d1f !important;background-color:#0f2d1f !important;font-size:11px;color:#9ca3af;">' +
+    '<strong style="color:#fff;">ACOB Lighting Technology Limited</strong><br>' +
     "ACOB Admin &amp; HR Department<br>" +
-    '<span class="footer-system">Meeting Management System</span>' +
+    '<span style="color:#16a34a;font-weight:600;">Meeting Management System</span>' +
     "<br><br>" +
-    '<i class="footer-note">This is an automated system notification. Please do not reply directly to this email.</i>' +
+    '<i style="color:#9ca3af;">This is an automated system notification. Please do not reply directly to this email.</i>' +
+    "</td></tr></table>" +
     "</div>" +
     "</body>" +
     "</html>"
@@ -112,7 +117,8 @@ function buildKnowledgeSharingHtml(sessionDate: string, sessionTime: string, dur
     "<title>Knowledge Sharing Reminder</title>" +
     "<style>" +
     'body { margin: 0; padding: 0; background: #fff; font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif; }' +
-    ".outer-header { background: #000; width: 100%; padding: 20px 0; text-align: center; border-bottom: 3px solid #16a34a; }" +
+    ".email-shell { max-width: 600px; margin: 0 auto; overflow: hidden; }" +
+    ".outer-header { background: #0f2d1f; padding: 20px 0; text-align: center; border-bottom: 3px solid #16a34a; }" +
     ".wrapper { max-width: 600px; margin: 0 auto; background: #fff; padding: 32px 28px; }" +
     ".title { font-size: 22px; font-weight: 700; color: #111827; margin-bottom: 14px; }" +
     ".text { font-size: 15px; color: #374151; line-height: 1.7; margin: 0 0 18px 0; }" +
@@ -120,16 +126,18 @@ function buildKnowledgeSharingHtml(sessionDate: string, sessionTime: string, dur
     ".alert-badge { display: inline-block; background: #dc2626; color: #fff; font-size: 11px; font-weight: 700; padding: 4px 12px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px; }" +
     ".support { text-align: center; font-size: 14px; color: #4b5563; margin-top: 24px; line-height: 1.5; }" +
     ".support a { color: #16a34a; font-weight: 600; text-decoration: none; }" +
-    ".footer { background: #000; padding: 20px; text-align: center; font-size: 11px; color: #9ca3af; border-top: 3px solid #16a34a; }" +
+    ".footer { background: #0f2d1f; padding: 20px; text-align: center; font-size: 11px; color: #9ca3af; border-top: 3px solid #16a34a; }" +
     ".footer strong { color: #fff; }" +
     ".footer-system { color: #16a34a; font-weight: 600; }" +
     ".footer-note { color: #9ca3af; font-style: italic; }" +
     "</style>" +
     "</head>" +
     "<body>" +
-    '<div class="outer-header">' +
-    '<img src="https://erp.acoblighting.com/images/acob-logo-dark.webp" height="40" alt="ACOB Lighting">' +
-    "</div>" +
+    '<div class="email-shell">' +
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#0f2d1f" style="background:#0f2d1f !important;background-color:#0f2d1f !important;border-bottom:3px solid #16a34a;">' +
+    '<tr><td align="center" style="padding:20px 0;background:#0f2d1f !important;background-color:#0f2d1f !important;">' +
+    '<img src="https://erp.acoblighting.com/images/acob-logo-dark.png" height="40" alt="ACOB Lighting">' +
+    "</td></tr></table>" +
     '<div class="wrapper">' +
     '<div class="title">Reminder: Knowledge Sharing Session</div>' +
     '<p class="text">Dear Team,</p>' +
@@ -155,12 +163,14 @@ function buildKnowledgeSharingHtml(sessionDate: string, sessionTime: string, dur
     '<a href="mailto:ict@acoblighting.com">ict@acoblighting.com</a>' +
     "</div>" +
     "</div>" +
-    '<div class="footer">' +
-    "<strong>ACOB Lighting Technology Limited</strong><br>" +
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#0f2d1f" style="background:#0f2d1f !important;background-color:#0f2d1f !important;border-top:3px solid #16a34a;">' +
+    '<tr><td align="center" style="padding:20px;background:#0f2d1f !important;background-color:#0f2d1f !important;font-size:11px;color:#9ca3af;">' +
+    '<strong style="color:#fff;">ACOB Lighting Technology Limited</strong><br>' +
     "ACOB Admin &amp; HR Department<br>" +
-    '<span class="footer-system">Meeting Management System</span>' +
+    '<span style="color:#16a34a;font-weight:600;">Meeting Management System</span>' +
     "<br><br>" +
-    '<i class="footer-note">This is an automated system notification. Please do not reply directly to this email.</i>' +
+    '<i style="color:#9ca3af;">This is an automated system notification. Please do not reply directly to this email.</i>' +
+    "</td></tr></table>" +
     "</div>" +
     "</body>" +
     "</html>"
@@ -198,20 +208,31 @@ serve(async (req) => {
     let subject: string
 
     if (type === "meeting") {
+      const normalizedAgenda = Array.isArray(agenda)
+        ? agenda
+        : typeof agenda === "string"
+          ? agenda
+              .split(/\r?\n/)
+              .map((line) => line.replace(/^\d+\.\s*/, "").trim())
+              .filter(Boolean)
+          : []
+
       subject = "Reminder for General Weekly Meeting"
       html = buildMeetingReminderHtml(
         meetingDate || "Monday",
         meetingTime || "8:30 AM",
         teamsLink || "",
-        agenda || [
-          "Opening Prayer",
-          "Knowledge Sharing Session (30 minutes)",
-          "Departmental Updates",
-          "Progress on Ongoing Projects",
-          "Upcoming Events and Deadlines",
-          "Any Other Business",
-          "Adjournment",
-        ]
+        normalizedAgenda.length > 0
+          ? normalizedAgenda
+          : [
+              "Opening Prayer",
+              "Knowledge Sharing Session (30 minutes)",
+              "Departmental Updates",
+              "Progress on Ongoing Projects",
+              "Upcoming Events and Deadlines",
+              "Any Other Business",
+              "Adjournment",
+            ]
       )
     } else {
       subject = "Reminder: Knowledge Sharing Session"

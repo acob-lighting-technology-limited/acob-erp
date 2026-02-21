@@ -26,6 +26,7 @@ import { toast } from "sonner"
 import { formatName, cn } from "@/lib/utils"
 import { format, differenceInDays } from "date-fns"
 import {
+  ArrowLeft,
   Users,
   Search,
   Filter,
@@ -77,6 +78,7 @@ export interface Employee {
   last_name: string
   other_names: string | null
   company_email: string
+  additional_email: string | null
   department: string
   company_role: string | null
   role: UserRole
@@ -157,20 +159,15 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
     "First Name": true,
     "Other Names": true,
     Email: true,
+    "Additional Email": true,
     Department: true,
     Role: true,
     Position: true,
     "Phone Number": true,
-    "Additional Phone": true,
     "Residential Address": true,
     "Work Location": true,
     "Office Location": true,
-    "Bank Name": true,
-    "Bank Account Number": true,
-    "Bank Account Name": true,
-    "Date of Birth": true,
     "Employment Date": true,
-    "Is Lead": true,
     "Lead Departments": true,
     "Created At": true,
   })
@@ -207,6 +204,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
     last_name: "",
     other_names: "",
     company_email: "",
+    additional_email: "",
     phone_number: "",
     additional_phone: "",
     residential_address: "",
@@ -276,6 +274,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
           last_name: fullProfile.last_name || "",
           other_names: fullProfile.other_names || "",
           company_email: fullProfile.company_email || "",
+          additional_email: fullProfile.additional_email || "",
           phone_number: fullProfile.phone_number || "",
           additional_phone: fullProfile.additional_phone || "",
           residential_address: fullProfile.residential_address || "",
@@ -300,6 +299,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
           last_name: employee.last_name || "",
           other_names: employee.other_names || "",
           company_email: employee.company_email || "",
+          additional_email: employee.additional_email || "",
           phone_number: employee.phone_number || "",
           additional_phone: "",
           residential_address: employee.residential_address || "",
@@ -644,6 +644,12 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         setIsSaving(false)
         return
       }
+      const trimmedAdditionalEmail = editForm.additional_email.trim()
+      if (trimmedAdditionalEmail && !formValidation.isEmail(trimmedAdditionalEmail)) {
+        toast.error("Additional email must be a valid email address")
+        setIsSaving(false)
+        return
+      }
 
       // Validate: If role is lead, at least one department must be selected
       if (editForm.role === "lead" && editForm.lead_departments.length === 0) {
@@ -671,6 +677,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         last_name: editForm.last_name || null,
         other_names: editForm.other_names || null,
         company_email: editForm.company_email || null,
+        additional_email: trimmedAdditionalEmail || null,
         phone_number: editForm.phone_number || null,
         additional_phone: editForm.additional_phone || null,
         residential_address: editForm.residential_address || null,
@@ -707,7 +714,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
       loadData()
     } catch (error: any) {
       console.error("Error updating employees:", error)
-      toast.error("Failed to update employees member")
+      toast.error(error?.message || "Failed to update employees member")
     } finally {
       setIsSaving(false)
     }
@@ -796,6 +803,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         (member.first_name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
         (member.last_name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
         (member.company_email || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (member.additional_email || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
         (member.company_role || "").toLowerCase().includes(searchQuery.toLowerCase())
 
       const matchesDepartment = departmentFilter.length === 0 || departmentFilter.includes(member.department)
@@ -848,6 +856,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
       if (selectedColumns["First Name"]) row["First Name"] = formatName(member.first_name) || "-"
       if (selectedColumns["Other Names"]) row["Other Names"] = member.other_names || "-"
       if (selectedColumns["Email"]) row["Email"] = member.company_email || "-"
+      if (selectedColumns["Additional Email"]) row["Additional Email"] = member.additional_email || "-"
       if (selectedColumns["Department"]) row["Department"] = member.department || "-"
       if (selectedColumns["Role"]) row["Role"] = getRoleDisplayName(member.role)
       if (selectedColumns["Position"]) row["Position"] = member.company_role || "-"
@@ -955,6 +964,10 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         if (selectedColumns["Email"]) {
           row.push(member.company_email || "-")
           headers.push("Email")
+        }
+        if (selectedColumns["Additional Email"]) {
+          row.push(member.additional_email || "-")
+          headers.push("Additional Email")
         }
         if (selectedColumns["Department"]) {
           row.push(member.department || "-")
@@ -1168,6 +1181,12 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <Link href="/admin/hr">
+              <Button variant="outline" className="gap-2" size="sm">
+                <ArrowLeft className="h-4 w-4" />
+                <span className="hidden sm:inline">Back to HR</span>
+              </Button>
+            </Link>
             <PendingApplicationsModal onEmployeeCreated={loadData} />
             {(userProfile?.role === "admin" || userProfile?.role === "super_admin") && (
               <Button onClick={() => setIsCreateUserDialogOpen(true)} className="gap-2" size="sm">
@@ -1465,9 +1484,18 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                           </div>
                         </TableCell>
                         <TableCell>
-                          <div className="text-muted-foreground flex items-center gap-2 text-sm">
-                            <Mail className="h-3 w-3" />
-                            <span className="max-w-[200px] truncate">{member.company_email}</span>
+                          <div className="text-muted-foreground flex flex-col gap-1 text-sm">
+                            <div className="flex items-center gap-2">
+                              <Mail className="h-3 w-3" />
+                              <span className="max-w-[200px] truncate">{member.company_email}</span>
+                            </div>
+                            {member.additional_email && (
+                              <div className="pl-5 text-xs">
+                                <span className="text-muted-foreground/80 max-w-[200px] truncate">
+                                  {member.additional_email}
+                                </span>
+                              </div>
+                            )}
                           </div>
                         </TableCell>
                         <TableCell>
@@ -1552,7 +1580,12 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                   <CardContent className="space-y-3 p-4">
                     <div className="text-muted-foreground flex items-center gap-2 text-sm">
                       <Mail className="h-4 w-4" />
-                      <span className="truncate">{member.company_email}</span>
+                      <div className="flex min-w-0 flex-col">
+                        <span className="truncate">{member.company_email}</span>
+                        {member.additional_email && (
+                          <span className="text-muted-foreground/80 truncate text-xs">{member.additional_email}</span>
+                        )}
+                      </div>
                     </div>
 
                     <div className="text-muted-foreground flex items-center gap-2 text-sm">
@@ -1865,6 +1898,9 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                         <div>
                           <p className="text-muted-foreground text-sm">Email</p>
                           <p className="font-medium">{viewEmployeeProfile.company_email}</p>
+                          {viewEmployeeProfile.additional_email && (
+                            <p className="text-muted-foreground text-xs">{viewEmployeeProfile.additional_email}</p>
+                          )}
                         </div>
                       </div>
 
@@ -2431,6 +2467,18 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                               placeholder="email@company.com"
                             />
                           </div>
+                          <div>
+                            <Label htmlFor="edit_additional_email">Additional Email</Label>
+                            <Input
+                              id="edit_additional_email"
+                              type="email"
+                              value={editForm.additional_email}
+                              onChange={(e) => setEditForm({ ...editForm, additional_email: e.target.value })}
+                              placeholder="email@example.com"
+                            />
+                          </div>
+                        </div>
+                        <div className="grid gap-4 md:grid-cols-2">
                           <div>
                             <Label htmlFor="edit_phone_number">Phone Number</Label>
                             <Input
