@@ -34,7 +34,17 @@ import {
 import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { WeeklyReportDialog } from "@/components/portal/reports/weekly-report-dialog"
-import { exportToPDF, exportToDocx, exportToPPTX, autoNumberLines, type WeeklyReport } from "@/lib/export-utils"
+import {
+  exportToPDF,
+  exportToDocx,
+  exportToPPTX,
+  exportAllToPDF,
+  exportAllToDocx,
+  exportAllToPPTX,
+  autoNumberLines,
+  sortReportsByDepartment,
+  type WeeklyReport,
+} from "@/lib/export-utils"
 import { format } from "date-fns"
 
 export default function WeeklyReportsPortal() {
@@ -100,7 +110,7 @@ export default function WeeklyReportsPortal() {
 
       const { data, error } = await query
       if (error) throw error
-      setReports(data || [])
+      setReports(sortReportsByDepartment(data || []))
     } catch (error) {
       console.error("Error loading reports:", error)
       toast.error("Failed to load reports")
@@ -145,18 +155,45 @@ export default function WeeklyReportsPortal() {
       backLinkHref="/portal/reports"
       backLinkLabel="Back to Reports"
       actions={
-        isLead ? (
-          <Button
-            className="gap-2 shadow-sm"
-            onClick={() => {
-              setSelectedReportParams({ week: weekFilter, year: yearFilter, dept: profile?.department })
-              setIsDialogOpen(true)
-            }}
-          >
-            <Plus className="h-4 w-4" />
-            Submit New Report
-          </Button>
-        ) : null
+        <div className="flex items-center gap-2">
+          {filteredReports.length > 0 && (
+            <>
+              <Button
+                variant="outline"
+                onClick={() => exportAllToPDF(filteredReports, weekFilter, yearFilter)}
+                className="gap-2 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-900/30 dark:hover:bg-red-950/20"
+              >
+                <FileText className="h-4 w-4" /> <span className="hidden sm:inline">PDF</span>
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => exportAllToDocx(filteredReports, weekFilter, yearFilter)}
+                className="gap-2 border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700 dark:border-blue-900/30 dark:hover:bg-blue-950/20"
+              >
+                <FileIcon className="h-4 w-4" /> <span className="hidden sm:inline">Word</span>
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => exportAllToPPTX(filteredReports, weekFilter, yearFilter)}
+                className="gap-2 border-orange-200 text-orange-600 hover:bg-orange-50 hover:text-orange-700 dark:border-orange-900/30 dark:hover:bg-orange-950/20"
+              >
+                <Presentation className="h-4 w-4" /> <span className="hidden sm:inline">PPTX</span>
+              </Button>
+            </>
+          )}
+          {isLead && (
+            <Button
+              className="gap-2 shadow-sm"
+              onClick={() => {
+                setSelectedReportParams({ week: weekFilter, year: yearFilter, dept: profile?.department })
+                setIsDialogOpen(true)
+              }}
+            >
+              <Plus className="h-4 w-4" />
+              Submit New Report
+            </Button>
+          )}
+        </div>
       }
       filters={
         <div className="mb-6 flex flex-col items-end justify-between gap-4 md:flex-row">
