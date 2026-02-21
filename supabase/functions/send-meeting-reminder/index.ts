@@ -10,6 +10,62 @@ const corsHeaders = {
 
 type ReminderType = "meeting" | "knowledge_sharing"
 
+type KnowledgePresenter = {
+  id?: string
+  full_name?: string
+  department?: string | null
+}
+
+function buildKnowledgeSharingAgendaLabel(presenter?: KnowledgePresenter, department?: string): string {
+  const base = "Knowledge Sharing Session (30 minutes)"
+  const presenterName = presenter?.full_name?.trim()
+  const dept = (department || presenter?.department || "").trim()
+
+  if (presenterName && dept) return `${base} - ${dept}: ${presenterName}`
+  if (presenterName) return `${base} - ${presenterName}`
+  if (dept) return `${base} - ${dept}`
+  return base
+}
+
+function normalizeMeetingAgenda(
+  agendaInput: string[] | string | undefined,
+  presenter?: KnowledgePresenter,
+  department?: string
+): string[] {
+  const parsedAgenda = Array.isArray(agendaInput)
+    ? agendaInput
+    : typeof agendaInput === "string"
+      ? agendaInput
+          .split(/\r?\n/)
+          .map((line) => line.replace(/^\d+\.\s*/, "").trim())
+          .filter(Boolean)
+      : []
+
+  const fallbackAgenda = [
+    "Opening Prayer",
+    "Knowledge Sharing Session (30 minutes)",
+    "Departmental Updates",
+    "Progress on Ongoing Projects",
+    "Upcoming Events and Deadlines",
+    "Any Other Business",
+    "Adjournment",
+  ]
+
+  const baseAgenda = parsedAgenda.length > 0 ? parsedAgenda : fallbackAgenda
+  const knowledgeLine = buildKnowledgeSharingAgendaLabel(presenter, department)
+  const knowledgePattern = /^Knowledge Sharing Session\s*\(30\s*minutes?\)/i
+  const foundIndex = baseAgenda.findIndex((item) => knowledgePattern.test(item))
+
+  if (foundIndex >= 0) {
+    return baseAgenda.map((item, idx) => (idx === foundIndex ? knowledgeLine : item))
+  }
+  if (presenter?.full_name || department) {
+    const insertIndex = Math.min(1, baseAgenda.length)
+    return [...baseAgenda.slice(0, insertIndex), knowledgeLine, ...baseAgenda.slice(insertIndex)]
+  }
+  return baseAgenda
+}
+
 function buildMeetingReminderHtml(
   meetingDate: string,
   meetingTime: string,
@@ -20,10 +76,16 @@ function buildMeetingReminderHtml(
   for (let i = 0; i < agenda.length; i++) {
     agendaHtml +=
       '<tr><td style="padding: 10px 18px; font-size: 14px; color: #374151; border-bottom: 1px solid #e5e7eb;">' +
-      '<span style="display: inline-block; background: #000; color: #16a34a; font-weight: 700; width: 24px; height: 24px; border-radius: 50%; text-align: center; line-height: 24px; font-size: 12px; margin-right: 12px;">' +
+      '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>' +
+      '<td valign="top" style="width: 36px; padding: 0 12px 0 0;">' +
+      '<span style="display: inline-block; background: #000; color: #16a34a; font-weight: 700; width: 24px; height: 24px; border-radius: 50%; text-align: center; line-height: 24px; font-size: 12px;">' +
       (i + 1) +
       "</span>" +
+      "</td>" +
+      '<td valign="top" style="padding: 2px 0 0 0; color: #374151; line-height: 1.5;">' +
       agenda[i] +
+      "</td>" +
+      "</tr></table>" +
       "</td></tr>"
   }
 
@@ -187,18 +249,31 @@ serve(async (req) => {
     const resend = new Resend(RESEND_API_KEY)
     const body = await req.json()
 
-    const { type, recipients, meetingDate, meetingTime, teamsLink, agenda, sessionDate, sessionTime, duration } =
-      body as {
-        type: ReminderType
-        recipients: string[]
-        meetingDate?: string
-        meetingTime?: string
-        teamsLink?: string
-        agenda?: string[]
-        sessionDate?: string
-        sessionTime?: string
-        duration?: string
-      }
+    const {
+      type,
+      recipients,
+      meetingDate,
+      meetingTime,
+      teamsLink,
+      agenda,
+      sessionDate,
+      sessionTime,
+      duration,
+      knowledgeSharingDepartment,
+      knowledgeSharingPresenter,
+    } = body as {
+      type: ReminderType
+      recipients: string[]
+      meetingDate?: string
+      meetingTime?: string
+      teamsLink?: string
+      agenda?: string[]
+      sessionDate?: string
+      sessionTime?: string
+      duration?: string
+      knowledgeSharingDepartment?: string
+      knowledgeSharingPresenter?: KnowledgePresenter
+    }
 
     if (!recipients || recipients.length === 0) {
       return new Response(JSON.stringify({ error: "No recipients" }), { status: 400 })
@@ -208,31 +283,14 @@ serve(async (req) => {
     let subject: string
 
     if (type === "meeting") {
-      const normalizedAgenda = Array.isArray(agenda)
-        ? agenda
-        : typeof agenda === "string"
-          ? agenda
-              .split(/\r?\n/)
-              .map((line) => line.replace(/^\d+\.\s*/, "").trim())
-              .filter(Boolean)
-          : []
+      const normalizedAgenda = normalizeMeetingAgenda(agenda, knowledgeSharingPresenter, knowledgeSharingDepartment)
 
       subject = "Reminder for General Weekly Meeting"
       html = buildMeetingReminderHtml(
         meetingDate || "Monday",
         meetingTime || "8:30 AM",
         teamsLink || "",
-        normalizedAgenda.length > 0
-          ? normalizedAgenda
-          : [
-              "Opening Prayer",
-              "Knowledge Sharing Session (30 minutes)",
-              "Departmental Updates",
-              "Progress on Ongoing Projects",
-              "Upcoming Events and Deadlines",
-              "Any Other Business",
-              "Adjournment",
-            ]
+        normalizedAgenda
       )
     } else {
       subject = "Reminder: Knowledge Sharing Session"

@@ -105,6 +105,8 @@ export function MeetingRemindersContent({ employees }: Props) {
   const [sessionDate, setSessionDate] = useState(getNextMondayFormatted())
   const [sessionTime, setSessionTime] = useState("08:30")
   const [duration, setDuration] = useState("30 minutes")
+  const [knowledgeDepartment, setKnowledgeDepartment] = useState("none")
+  const [knowledgePresenterId, setKnowledgePresenterId] = useState("none")
 
   // Delivery timing
   const [sendTiming, setSendTiming] = useState<SendTiming>("now")
@@ -118,6 +120,24 @@ export function MeetingRemindersContent({ employees }: Props) {
   const [activeSchedules, setActiveSchedules] = useState<any[]>([])
 
   const supabase = createClient()
+
+  const departmentOptions = useMemo(() => {
+    return Array.from(new Set(employees.map((e) => e.department).filter(Boolean) as string[])).sort((a, b) =>
+      a.localeCompare(b)
+    )
+  }, [employees])
+
+  const presenterOptions = useMemo(() => {
+    if (knowledgeDepartment === "none") return []
+    return employees
+      .filter((e) => e.department === knowledgeDepartment)
+      .sort((a, b) => (a.full_name || "").localeCompare(b.full_name || ""))
+  }, [employees, knowledgeDepartment])
+
+  const selectedPresenter = useMemo(() => {
+    if (knowledgePresenterId === "none") return null
+    return employees.find((e) => e.id === knowledgePresenterId) || null
+  }, [employees, knowledgePresenterId])
 
   const fetchSchedules = useCallback(async () => {
     try {
@@ -232,6 +252,16 @@ export function MeetingRemindersContent({ employees }: Props) {
             meetingTime: reminderType === "meeting" ? meetingTime : undefined,
             teamsLink: reminderType === "meeting" ? teamsLink : undefined,
             agenda: reminderType === "meeting" ? agendaText : undefined,
+            knowledgeSharingDepartment:
+              reminderType === "meeting" && knowledgeDepartment !== "none" ? knowledgeDepartment : undefined,
+            knowledgeSharingPresenter:
+              reminderType === "meeting" && selectedPresenter
+                ? {
+                    id: selectedPresenter.id,
+                    full_name: selectedPresenter.full_name,
+                    department: selectedPresenter.department,
+                  }
+                : undefined,
             sessionDate: reminderType === "knowledge_sharing" ? sessionDate : undefined,
             sessionTime: reminderType === "knowledge_sharing" ? sessionTime : undefined,
             duration: reminderType === "knowledge_sharing" ? duration : undefined,
@@ -308,6 +338,16 @@ export function MeetingRemindersContent({ employees }: Props) {
           .split("\n")
           .map((l) => l.replace(/^\d+\.\s*/, "").trim())
           .filter(Boolean)
+        if (knowledgeDepartment !== "none") {
+          payload.knowledgeSharingDepartment = knowledgeDepartment
+        }
+        if (selectedPresenter) {
+          payload.knowledgeSharingPresenter = {
+            id: selectedPresenter.id,
+            full_name: selectedPresenter.full_name,
+            department: selectedPresenter.department,
+          }
+        }
       } else {
         payload.sessionDate = formatDateNice(sessionDate)
         payload.sessionTime = sessionTime
@@ -477,6 +517,59 @@ export function MeetingRemindersContent({ employees }: Props) {
                     <p className="text-muted-foreground text-xs">
                       Each line becomes one agenda item. Numbering is automatic.
                     </p>
+                  </div>
+                  <div className="space-y-3 rounded-lg border border-dashed p-3">
+                    <div>
+                      <Label className="text-sm">Knowledge Sharing Presenter (Optional)</Label>
+                      <p className="text-muted-foreground mt-1 text-xs">
+                        This updates the agenda line "Knowledge Sharing Session (30 minutes)" with department and
+                        presenter.
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-3">
+                      <div className="space-y-2">
+                        <Label htmlFor="ks-department">Department</Label>
+                        <Select
+                          value={knowledgeDepartment}
+                          onValueChange={(value) => {
+                            setKnowledgeDepartment(value)
+                            setKnowledgePresenterId("none")
+                          }}
+                        >
+                          <SelectTrigger id="ks-department" className="w-[220px]">
+                            <SelectValue placeholder="Select department" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">Not selected</SelectItem>
+                            {departmentOptions.map((dept) => (
+                              <SelectItem key={dept} value={dept}>
+                                {dept}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="ks-presenter">Presenter</Label>
+                        <Select
+                          value={knowledgePresenterId}
+                          onValueChange={setKnowledgePresenterId}
+                          disabled={knowledgeDepartment === "none"}
+                        >
+                          <SelectTrigger id="ks-presenter" className="w-[260px]">
+                            <SelectValue placeholder="Select presenter" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">Not selected</SelectItem>
+                            {presenterOptions.map((emp) => (
+                              <SelectItem key={emp.id} value={emp.id}>
+                                {emp.full_name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
                   </div>
                 </>
               ) : (
@@ -882,6 +975,14 @@ export function MeetingRemindersContent({ employees }: Props) {
                   <span className="text-muted-foreground">Time</span>
                   <Badge variant="secondary">{reminderType === "meeting" ? meetingTime : sessionTime}</Badge>
                 </div>
+                {reminderType === "meeting" && selectedPresenter && (
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Knowledge Sharing</span>
+                    <Badge variant="secondary" className="max-w-[70%] truncate">
+                      {selectedPresenter.full_name} ({knowledgeDepartment !== "none" ? knowledgeDepartment : "N/A"})
+                    </Badge>
+                  </div>
+                )}
               </div>
 
               <div className="border-t" />
@@ -894,19 +995,14 @@ export function MeetingRemindersContent({ employees }: Props) {
                   <span className="text-2xl font-bold">{resolvedRecipients.length}</span>
                   <span className="text-muted-foreground text-sm">email(s)</span>
                 </div>
-                {resolvedRecipients.length > 0 && resolvedRecipients.length <= 10 && (
-                  <div className="text-muted-foreground mt-2 max-h-[120px] space-y-0.5 overflow-y-auto text-xs">
+                {resolvedRecipients.length > 0 && (
+                  <div className="mt-2 max-h-[160px] space-y-0.5 overflow-y-auto rounded-md border p-2 text-xs">
                     {resolvedRecipients.map((email) => (
                       <div key={email} className="truncate">
                         {email}
                       </div>
                     ))}
                   </div>
-                )}
-                {resolvedRecipients.length > 10 && (
-                  <p className="text-muted-foreground mt-1 text-xs">
-                    {resolvedRecipients.slice(0, 3).join(", ")} and {resolvedRecipients.length - 3} more...
-                  </p>
                 )}
               </div>
 
