@@ -20,6 +20,9 @@ const MUTED = rgb(0.392, 0.455, 0.545)
 const BLUE = rgb(0.114, 0.416, 0.588)
 const RED = rgb(0.725, 0.11, 0.11)
 const LIGHT = rgb(0.976, 0.984, 0.992)
+const RESEND_MAX_REQ_PER_SEC = 2
+const SEND_INTERVAL_MS = Math.ceil(1000 / RESEND_MAX_REQ_PER_SEC) + 100 // ~0.6s with safety margin
+const MAX_429_RETRIES = 5
 
 function getCurrentISOWeek(): { week: number; year: number } {
   const now = new Date()
@@ -81,6 +84,41 @@ function wrapText(text: string, maxChars: number): string[] {
   }
   if (current) lines.push(current.trim())
   return lines
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function isRateLimitError(error: any): boolean {
+  if (!error) return false
+  const statusCode = Number(error?.statusCode || error?.status || 0)
+  const name = String(error?.name || "").toLowerCase()
+  const msg = String(error?.message || "").toLowerCase()
+  return statusCode === 429 || name.includes("rate_limit") || msg.includes("too many requests")
+}
+
+async function sendWithRetry(
+  resend: Resend,
+  payload: {
+    from: string
+    to: string
+    subject: string
+    html: string
+    attachments: { filename: string; content: string }[]
+  }
+): Promise<{ data?: any; error?: any }> {
+  let attempt = 0
+  while (attempt <= MAX_429_RETRIES) {
+    const { data, error } = await resend.emails.send(payload)
+    if (!error) return { data }
+    if (!isRateLimitError(error) || attempt === MAX_429_RETRIES) return { error }
+    const backoffMs = 1000 * (attempt + 1)
+    console.warn(`[digest] Rate limit for ${payload.to}. Retry ${attempt + 1}/${MAX_429_RETRIES} in ${backoffMs}ms`)
+    await sleep(backoffMs)
+    attempt += 1
+  }
+  return { error: { message: "Unexpected retry flow termination" } }
 }
 
 const STORAGE_BASE = "https://itqegqxeqkeogwrvlzlj.supabase.co/storage/v1/object/public/assets/logos"
@@ -278,6 +316,42 @@ async function addWeeklyReportContentPage(
     { label: "CHALLENGES", color: RED, text: autoNumber(report.challenges || "No challenges reported.") },
   ]
 
+  const drawFittedSectionLines = (linesInput: string[], startX: number, startY: number, bottomLimit: number) => {
+    const tryConfigs = [
+      { chars: 92, size: 8, lineH: 12 },
+      { chars: 100, size: 7.5, lineH: 11 },
+      { chars: 110, size: 7, lineH: 10 },
+      { chars: 120, size: 6.5, lineH: 9 },
+      { chars: 130, size: 6, lineH: 8.5 },
+    ]
+
+    for (const cfg of tryConfigs) {
+      const wrapped: string[] = []
+      for (const rawLine of linesInput) wrapped.push(...wrapText(rawLine, cfg.chars))
+      const availableHeight = startY - bottomLimit
+      const maxLines = Math.max(1, Math.floor(availableHeight / cfg.lineH))
+      if (wrapped.length <= maxLines) {
+        let ty = startY
+        for (const line of wrapped) {
+          page.drawText(line, { x: startX, y: ty, size: cfg.size, font: regular, color: SLATE })
+          ty -= cfg.lineH
+        }
+        return
+      }
+    }
+
+    // Last fallback: clipped + continuation hint.
+    let ty = startY
+    const wrapped: string[] = []
+    for (const rawLine of linesInput) wrapped.push(...wrapText(rawLine, 130))
+    const maxLines = Math.max(1, Math.floor((startY - bottomLimit) / 8.5) - 1)
+    for (const line of wrapped.slice(0, maxLines)) {
+      page.drawText(line, { x: startX, y: ty, size: 6, font: regular, color: SLATE })
+      ty -= 8.5
+    }
+    page.drawText("... continued", { x: startX, y: Math.max(bottomLimit + 1, ty), size: 6, font: bold, color: RED })
+  }
+
   for (let i = 0; i < sections.length; i++) {
     const s = sections[i]
     const sectionTop = bodyTop - i * rowH
@@ -285,15 +359,9 @@ async function addWeeklyReportContentPage(
     page.drawRectangle({ x: padX, y: sectionTop - labelH, width: innerW, height: labelH, color: s.color })
     page.drawText(s.label, { x: padX + 6, y: sectionTop - labelH + 7, size: 8, font: bold, color: WHITE })
 
-    let ty = sectionTop - labelH - 14
+    const textStartY = sectionTop - labelH - 14
     const bottomLimit = sectionTop - rowH + 6
-    for (const rawLine of s.text.split("\n")) {
-      for (const wrapped of wrapText(rawLine, 92)) {
-        if (ty < bottomLimit) break
-        page.drawText(wrapped, { x: padX + 6, y: ty, size: 8, font: regular, color: SLATE })
-        ty -= 12
-      }
-    }
+    drawFittedSectionLines(s.text.split("\n"), padX + 6, textStartY, bottomLimit)
 
     if (i < 2) {
       page.drawRectangle({ x: padX, y: sectionTop - rowH, width: innerW, height: 0.5, color: rgb(0.8, 0.85, 0.9) })
@@ -727,7 +795,7 @@ serve(async (req) => {
 
     const results = []
     for (const to of recipients) {
-      const { data, error } = await resend.emails.send({
+      const { data, error } = await sendWithRetry(resend, {
         from: "ACOB Admin & HR <notifications@acoblighting.com>",
         to,
         subject,
@@ -744,6 +812,7 @@ serve(async (req) => {
         console.log(`[digest] Sent to ${to}. ID: ${data?.id}`)
         results.push({ to, success: true, emailId: data?.id })
       }
+      await sleep(SEND_INTERVAL_MS)
     }
 
     return new Response(
