@@ -415,6 +415,78 @@ const pdfContentPage = (
     { title: "CHALLENGES", color: PDF_RED, text: autoNumberLines(report.challenges) || "No challenges reported." },
   ]
 
+  const drawFittedSectionText = (text: string, x: number, y: number, width: number, availableH: number) => {
+    const buildLinesWithIndent = (
+      content: string,
+      textWidth: number,
+      numberIndentMm: number
+    ): Array<{ text: string; indent: number }> => {
+      const out: Array<{ text: string; indent: number }> = []
+      const sourceLines = String(content || "").split("\n")
+      sourceLines.forEach((rawLine) => {
+        const line = rawLine.trim()
+        if (!line) {
+          out.push({ text: "", indent: 0 })
+          return
+        }
+        const numbered = line.match(/^(\d+\.)\s+(.*)$/)
+        if (!numbered) {
+          const plainLines = doc.splitTextToSize(line, textWidth)
+          plainLines.forEach((pl: string) => out.push({ text: pl, indent: 0 }))
+          return
+        }
+        const numberToken = `${numbered[1]} `
+        const bodyText = numbered[2] || ""
+        const firstLineMaxW = Math.max(8, textWidth - numberIndentMm)
+        const bodyLines = doc.splitTextToSize(bodyText, firstLineMaxW)
+        if (!bodyLines.length) {
+          out.push({ text: numberToken.trim(), indent: 0 })
+          return
+        }
+        out.push({ text: `${numberToken}${bodyLines[0]}`, indent: 0 })
+        bodyLines.slice(1).forEach((bl: string) => out.push({ text: bl, indent: numberIndentMm }))
+      })
+      return out
+    }
+
+    const tryConfigs = [
+      { fontSize: 10, lineSpacing: 6 },
+      { fontSize: 9, lineSpacing: 5.5 },
+      { fontSize: 8.5, lineSpacing: 5 },
+      { fontSize: 8, lineSpacing: 4.6 },
+      { fontSize: 7.5, lineSpacing: 4.2 },
+      { fontSize: 7, lineSpacing: 3.9 },
+    ]
+
+    for (const cfg of tryConfigs) {
+      doc.setFontSize(cfg.fontSize)
+      const numberIndentMm = Math.max(5.0, cfg.fontSize * 0.42 - 0.4)
+      const lines = buildLinesWithIndent(text, width, numberIndentMm)
+      const maxLines = Math.floor(availableH / cfg.lineSpacing)
+      if (lines.length <= maxLines) {
+        let ty = y
+        lines.forEach((line) => {
+          doc.text(line.text, x + line.indent, ty)
+          ty += cfg.lineSpacing
+        })
+        return
+      }
+    }
+
+    // Last fallback: render as much as possible and add continuation hint.
+    doc.setFontSize(7)
+    const lines = buildLinesWithIndent(text, width, 5.0)
+    const maxLines = Math.max(1, Math.floor(availableH / 3.9) - 1)
+    let ty = y
+    lines.slice(0, maxLines).forEach((line) => {
+      doc.text(line.text, x + line.indent, ty)
+      ty += 3.9
+    })
+    doc.setTextColor(...PDF_RED)
+    doc.text("... continued (content too long for one page layout)", x, Math.min(y + availableH, ty + 2))
+    doc.setTextColor(...PDF_SLATE)
+  }
+
   sections.forEach((s, i) => {
     const sectionTop = bodyStart + i * rowH
 
@@ -430,14 +502,7 @@ const pdfContentPage = (
     doc.setFontSize(fontSize)
     doc.setTextColor(...PDF_SLATE)
     doc.setFont("helvetica", "normal")
-    const lines = doc.splitTextToSize(s.text, innerW - 6)
-    // Clip lines to available row height
-    const maxLines = Math.floor((rowH - labelH - 6) / lineSpacing)
-    let ty = sectionTop + labelH + 6
-    lines.slice(0, maxLines).forEach((line: string) => {
-      doc.text(line, padX + 3, ty)
-      ty += lineSpacing
-    })
+    drawFittedSectionText(s.text, padX + 3, sectionTop + labelH + 6, innerW - 6, rowH - labelH - 6)
 
     // Row divider (not after last)
     if (i < 2) {
@@ -979,7 +1044,8 @@ const docxNumberedItems = (text: string, fallback: string) => {
   return lines.map(
     (l, i) =>
       new Paragraph({
-        text: `${i + 1}. ${l.trim()}`,
+        children: [new TextRun(`${i + 1}. ${l.trim()}`)],
+        indent: { left: 480, hanging: 360 },
         spacing: { after: 60 },
       })
   )
@@ -1667,6 +1733,94 @@ const addDeptIndexSlide = (
   return slide
 }
 
+const wrapTextByChars = (text: string, maxCharsPerLine: number): string[] => {
+  const sourceLines = String(text || "")
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+  const wrapped: string[] = []
+
+  const wrapPlainLine = (line: string, limit: number): string[] => {
+    if (!line) return [""]
+    if (line.length <= limit) return [line]
+    const words = line.split(/\s+/)
+    const out: string[] = []
+    let current = ""
+    words.forEach((w) => {
+      const candidate = current ? `${current} ${w}` : w
+      if (candidate.length <= limit) {
+        current = candidate
+      } else {
+        if (current) out.push(current)
+        if (w.length > limit) {
+          for (let i = 0; i < w.length; i += limit) out.push(w.slice(i, i + limit))
+          current = ""
+        } else {
+          current = w
+        }
+      }
+    })
+    if (current) out.push(current)
+    return out
+  }
+
+  sourceLines.forEach((raw) => {
+    const line = raw.trimEnd()
+    if (!line) {
+      wrapped.push("")
+      return
+    }
+    const numberedMatch = line.match(/^(\d+\.)\s+(.*)$/)
+    if (!numberedMatch) {
+      wrapped.push(...wrapPlainLine(line, maxCharsPerLine))
+      return
+    }
+
+    const prefix = `${numberedMatch[1]} `
+    const body = numberedMatch[2] || ""
+    const bodyLimit = Math.max(10, maxCharsPerLine - prefix.length)
+    const bodyLines = wrapPlainLine(body, bodyLimit)
+    if (bodyLines.length === 0) {
+      wrapped.push(prefix.trimEnd())
+      return
+    }
+    wrapped.push(prefix + bodyLines[0])
+    const continuationPad = " ".repeat(prefix.length + 1)
+    for (let i = 1; i < bodyLines.length; i++) {
+      wrapped.push(continuationPad + bodyLines[i])
+    }
+  })
+
+  return wrapped
+}
+
+const fitTextToPptxBox = (
+  text: string,
+  boxWIn: number,
+  boxHIn: number,
+  preferredFont = 11,
+  minFont = 7
+): { text: string; fontSize: number } => {
+  const lineHeightRatio = 1.25
+  const avgCharWidthRatio = 0.56
+
+  for (let fontSize = preferredFont; fontSize >= minFont; fontSize -= 0.5) {
+    const charsPerLine = Math.max(10, Math.floor((boxWIn * 72) / (fontSize * avgCharWidthRatio)))
+    const maxLines = Math.max(1, Math.floor((boxHIn * 72) / (fontSize * lineHeightRatio)))
+    const lines = wrapTextByChars(text, charsPerLine)
+    if (lines.length <= maxLines) {
+      return { text: lines.join("\n"), fontSize }
+    }
+  }
+
+  const finalSize = minFont
+  const charsPerLine = Math.max(10, Math.floor((boxWIn * 72) / (finalSize * avgCharWidthRatio)))
+  const maxLines = Math.max(1, Math.floor((boxHIn * 72) / (finalSize * lineHeightRatio)))
+  const lines = wrapTextByChars(text, charsPerLine)
+  const clipped = lines.slice(0, Math.max(1, maxLines - 1))
+  clipped.push("... continued")
+  return { text: clipped.join("\n"), fontSize: finalSize }
+}
+
 /**
  * Adds the content slide with 2-row / 2-col layout.
  */
@@ -1758,16 +1912,21 @@ const addContentSlide = (
     color: ACOB_WHITE,
     fontFace: "Calibri",
   })
-  slide.addText(autoNumberLines(report.work_done) || "No data provided.", {
+  const workDoneFitted = fitTextToPptxBox(
+    autoNumberLines(report.work_done) || "No data provided.",
+    col1W - 0.3,
+    row1H - 0.56
+  )
+  slide.addText(workDoneFitted.text, {
     x: marginX + 0.15,
     y: row1Y + 0.46,
     w: col1W - 0.3,
     h: row1H - 0.56,
-    fontSize: 11,
+    fontSize: workDoneFitted.fontSize,
     color: ACOB_SLATE,
     valign: "top",
     fontFace: "Calibri",
-    wrap: true,
+    breakLine: true,
   })
 
   // ── Row 1 right: Tasks for New Week ──────────────────────────────────────
@@ -1797,16 +1956,21 @@ const addContentSlide = (
     color: ACOB_WHITE,
     fontFace: "Calibri",
   })
-  slide.addText(autoNumberLines(report.tasks_new_week) || "No data provided.", {
+  const tasksFitted = fitTextToPptxBox(
+    autoNumberLines(report.tasks_new_week) || "No data provided.",
+    col2W - 0.3,
+    row1H - 0.56
+  )
+  slide.addText(tasksFitted.text, {
     x: col2X + 0.15,
     y: row1Y + 0.46,
     w: col2W - 0.3,
     h: row1H - 0.56,
-    fontSize: 11,
+    fontSize: tasksFitted.fontSize,
     color: ACOB_SLATE,
     valign: "top",
     fontFace: "Calibri",
-    wrap: true,
+    breakLine: true,
   })
 
   // ── Row 2: Challenges (full width) ────────────────────────────────────────
@@ -1836,16 +2000,21 @@ const addContentSlide = (
     color: ACOB_WHITE,
     fontFace: "Calibri",
   })
-  slide.addText(autoNumberLines(report.challenges) || "No challenges reported.", {
+  const challengesFitted = fitTextToPptxBox(
+    autoNumberLines(report.challenges) || "No challenges reported.",
+    fullW - 0.3,
+    row2H - 0.56
+  )
+  slide.addText(challengesFitted.text, {
     x: marginX + 0.15,
     y: row2Y + 0.46,
     w: fullW - 0.3,
     h: row2H - 0.56,
-    fontSize: 11,
+    fontSize: challengesFitted.fontSize,
     color: ACOB_SLATE,
     valign: "top",
     fontFace: "Calibri",
-    wrap: true,
+    breakLine: true,
   })
 
   // ── Bottom green strip ────────────────────────────────────────────────────

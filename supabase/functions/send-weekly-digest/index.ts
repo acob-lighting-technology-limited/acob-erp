@@ -20,6 +20,9 @@ const MUTED = rgb(0.392, 0.455, 0.545)
 const BLUE = rgb(0.114, 0.416, 0.588)
 const RED = rgb(0.725, 0.11, 0.11)
 const LIGHT = rgb(0.976, 0.984, 0.992)
+const RESEND_MAX_REQ_PER_SEC = 2
+const SEND_INTERVAL_MS = Math.ceil(1000 / RESEND_MAX_REQ_PER_SEC) + 100 // ~0.6s with safety margin
+const MAX_429_RETRIES = 5
 
 function getCurrentISOWeek(): { week: number; year: number } {
   const now = new Date()
@@ -81,6 +84,64 @@ function wrapText(text: string, maxChars: number): string[] {
   }
   if (current) lines.push(current.trim())
   return lines
+}
+
+function sanitizeForPdf(text: string, font: any): string {
+  if (!text) return ""
+  let out = ""
+  for (const ch of text) {
+    if (ch === "\r") continue
+    if (ch === "\n") {
+      out += "\n"
+      continue
+    }
+    if (ch === "\t") {
+      out += " "
+      continue
+    }
+    try {
+      font.encodeText(ch)
+      out += ch
+    } catch {
+      // Drop unsupported characters (e.g. U+2060 WORD JOINER).
+    }
+  }
+  return out
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function isRateLimitError(error: any): boolean {
+  if (!error) return false
+  const statusCode = Number(error?.statusCode || error?.status || 0)
+  const name = String(error?.name || "").toLowerCase()
+  const msg = String(error?.message || "").toLowerCase()
+  return statusCode === 429 || name.includes("rate_limit") || msg.includes("too many requests")
+}
+
+async function sendWithRetry(
+  resend: Resend,
+  payload: {
+    from: string
+    to: string
+    subject: string
+    html: string
+    attachments: { filename: string; content: string }[]
+  }
+): Promise<{ data?: any; error?: any }> {
+  let attempt = 0
+  while (attempt <= MAX_429_RETRIES) {
+    const { data, error } = await resend.emails.send(payload)
+    if (!error) return { data }
+    if (!isRateLimitError(error) || attempt === MAX_429_RETRIES) return { error }
+    const backoffMs = 1000 * (attempt + 1)
+    console.warn(`[digest] Rate limit for ${payload.to}. Retry ${attempt + 1}/${MAX_429_RETRIES} in ${backoffMs}ms`)
+    await sleep(backoffMs)
+    attempt += 1
+  }
+  return { error: { message: "Unexpected retry flow termination" } }
 }
 
 const STORAGE_BASE = "https://itqegqxeqkeogwrvlzlj.supabase.co/storage/v1/object/public/assets/logos"
@@ -230,7 +291,7 @@ async function addTOCPage(
   for (let i = 0; i < entries.length; i++) {
     if (y < footerH + 26) break
     const pageNumber = i + 3 // cover + toc before content pages
-    const label = entries[i]
+    const label = sanitizeForPdf(entries[i], regular)
     const safe = label.length > 64 ? `${label.slice(0, 61)}...` : label
     page.drawCircle({ x: 20, y: y + 2, size: 7, color: GREEN, borderColor: GREEN, borderWidth: 1 })
     const badge = `${i + 1}`
@@ -262,7 +323,7 @@ async function addWeeklyReportContentPage(
 
   page.drawRectangle({ x: 0, y: H - headerH, width: W, height: headerH, color: DARK })
   page.drawRectangle({ x: 0, y: H - headerH - 4, width: W, height: 4, color: GREEN })
-  page.drawText(department.toUpperCase(), { x: 22, y: H - 32, size: 9, font: bold, color: WHITE })
+  page.drawText(sanitizeForPdf(department.toUpperCase(), bold), { x: 22, y: H - 32, size: 9, font: bold, color: WHITE })
   await drawLogoInHeader(doc, page, headerLogoBytes, headerH, H, W)
 
   const bodyTop = H - headerH - 8
@@ -273,10 +334,90 @@ async function addWeeklyReportContentPage(
   const labelH = 22
 
   const sections = [
-    { label: "WORK DONE", color: GREEN, text: autoNumber(report.work_done || "No data provided.") },
-    { label: "TASKS FOR NEW WEEK", color: BLUE, text: autoNumber(report.tasks_new_week || "No data provided.") },
-    { label: "CHALLENGES", color: RED, text: autoNumber(report.challenges || "No challenges reported.") },
+    {
+      label: "WORK DONE",
+      color: GREEN,
+      text: sanitizeForPdf(autoNumber(report.work_done || "No data provided."), regular),
+    },
+    {
+      label: "TASKS FOR NEW WEEK",
+      color: BLUE,
+      text: sanitizeForPdf(autoNumber(report.tasks_new_week || "No data provided."), regular),
+    },
+    {
+      label: "CHALLENGES",
+      color: RED,
+      text: sanitizeForPdf(autoNumber(report.challenges || "No challenges reported."), regular),
+    },
   ]
+
+  const drawFittedSectionLines = (linesInput: string[], startX: number, startY: number, bottomLimit: number) => {
+    const buildLinesWithIndent = (
+      lines: string[],
+      firstChars: number,
+      continuationChars: number,
+      continuationIndentPx: number
+    ): Array<{ text: string; indent: number }> => {
+      const out: Array<{ text: string; indent: number }> = []
+      lines.forEach((raw) => {
+        const line = (raw || "").trim()
+        if (!line) {
+          out.push({ text: "", indent: 0 })
+          return
+        }
+        const numbered = line.match(/^(\d+\.)\s+(.*)$/)
+        if (!numbered) {
+          wrapText(line, firstChars).forEach((w) => out.push({ text: w, indent: 0 }))
+          return
+        }
+        const prefix = `${numbered[1]} `
+        const body = numbered[2] || ""
+        const firstBodyLines = wrapText(body, Math.max(10, firstChars - prefix.length))
+        if (!firstBodyLines.length) {
+          out.push({ text: prefix.trimEnd(), indent: 0 })
+          return
+        }
+        out.push({ text: `${prefix}${firstBodyLines[0]}`, indent: 0 })
+        const remainder = firstBodyLines.slice(1).join(" ")
+        if (remainder) {
+          wrapText(remainder, continuationChars).forEach((w) => out.push({ text: w, indent: continuationIndentPx }))
+        }
+      })
+      return out
+    }
+
+    const tryConfigs = [
+      { chars: 92, size: 8, lineH: 12 },
+      { chars: 100, size: 7.5, lineH: 11 },
+      { chars: 110, size: 7, lineH: 10 },
+      { chars: 120, size: 6.5, lineH: 9 },
+      { chars: 130, size: 6, lineH: 8.5 },
+    ]
+
+    for (const cfg of tryConfigs) {
+      const wrapped = buildLinesWithIndent(linesInput, cfg.chars, Math.max(10, cfg.chars - 6), 8)
+      const availableHeight = startY - bottomLimit
+      const maxLines = Math.max(1, Math.floor(availableHeight / cfg.lineH))
+      if (wrapped.length <= maxLines) {
+        let ty = startY
+        for (const line of wrapped) {
+          page.drawText(line.text, { x: startX + line.indent, y: ty, size: cfg.size, font: regular, color: SLATE })
+          ty -= cfg.lineH
+        }
+        return
+      }
+    }
+
+    // Last fallback: clipped + continuation hint.
+    let ty = startY
+    const wrapped = buildLinesWithIndent(linesInput, 130, 124, 8)
+    const maxLines = Math.max(1, Math.floor((startY - bottomLimit) / 8.5) - 1)
+    for (const line of wrapped.slice(0, maxLines)) {
+      page.drawText(line.text, { x: startX + line.indent, y: ty, size: 6, font: regular, color: SLATE })
+      ty -= 8.5
+    }
+    page.drawText("... continued", { x: startX, y: Math.max(bottomLimit + 1, ty), size: 6, font: bold, color: RED })
+  }
 
   for (let i = 0; i < sections.length; i++) {
     const s = sections[i]
@@ -285,15 +426,9 @@ async function addWeeklyReportContentPage(
     page.drawRectangle({ x: padX, y: sectionTop - labelH, width: innerW, height: labelH, color: s.color })
     page.drawText(s.label, { x: padX + 6, y: sectionTop - labelH + 7, size: 8, font: bold, color: WHITE })
 
-    let ty = sectionTop - labelH - 14
+    const textStartY = sectionTop - labelH - 14
     const bottomLimit = sectionTop - rowH + 6
-    for (const rawLine of s.text.split("\n")) {
-      for (const wrapped of wrapText(rawLine, 92)) {
-        if (ty < bottomLimit) break
-        page.drawText(wrapped, { x: padX + 6, y: ty, size: 8, font: regular, color: SLATE })
-        ty -= 12
-      }
-    }
+    drawFittedSectionLines(s.text.split("\n"), padX + 6, textStartY, bottomLimit)
 
     if (i < 2) {
       page.drawRectangle({ x: padX, y: sectionTop - rowH, width: innerW, height: 0.5, color: rgb(0.8, 0.85, 0.9) })
@@ -325,7 +460,7 @@ async function addActionTrackerPage(
 
   page.drawRectangle({ x: 0, y: H - headerH, width: W, height: headerH, color: DARK })
   page.drawRectangle({ x: 0, y: H - headerH - 4, width: W, height: 4, color: GREEN })
-  page.drawText(department.toUpperCase(), { x: 22, y: H - 32, size: 9, font: bold, color: WHITE })
+  page.drawText(sanitizeForPdf(department.toUpperCase(), bold), { x: 22, y: H - 32, size: 9, font: bold, color: WHITE })
   await drawLogoInHeader(doc, page, headerLogoBytes, headerH, H, W)
 
   const badgeW = 85,
@@ -384,7 +519,7 @@ async function addActionTrackerPage(
       page.drawRectangle({ x: 20, y: rowY - 12, width: W - 40, height: rowH, color: LIGHT })
     }
     page.drawText(`${i + 1}`, { x: snX + 10, y: rowY - 4, size: 8, font: bold, color: SLATE })
-    const titleLines = wrapText(action.title, 60)
+    const titleLines = wrapText(sanitizeForPdf(action.title || "", regular), 60)
     page.drawText(titleLines[0], { x: actionX + 6, y: rowY - 4, size: 8, font: regular, color: SLATE })
     const sc = statusColors[action.status] || statusColors.pending
     const sl = statusLabels[action.status] || action.status
@@ -727,7 +862,7 @@ serve(async (req) => {
 
     const results = []
     for (const to of recipients) {
-      const { data, error } = await resend.emails.send({
+      const { data, error } = await sendWithRetry(resend, {
         from: "ACOB Admin & HR <notifications@acoblighting.com>",
         to,
         subject,
@@ -744,6 +879,7 @@ serve(async (req) => {
         console.log(`[digest] Sent to ${to}. ID: ${data?.id}`)
         results.push({ to, success: true, emailId: data?.id })
       }
+      await sleep(SEND_INTERVAL_MS)
     }
 
     return new Response(
