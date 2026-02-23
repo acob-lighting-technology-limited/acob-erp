@@ -86,6 +86,29 @@ function wrapText(text: string, maxChars: number): string[] {
   return lines
 }
 
+function sanitizeForPdf(text: string, font: any): string {
+  if (!text) return ""
+  let out = ""
+  for (const ch of text) {
+    if (ch === "\r") continue
+    if (ch === "\n") {
+      out += "\n"
+      continue
+    }
+    if (ch === "\t") {
+      out += " "
+      continue
+    }
+    try {
+      font.encodeText(ch)
+      out += ch
+    } catch {
+      // Drop unsupported characters (e.g. U+2060 WORD JOINER).
+    }
+  }
+  return out
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
@@ -268,7 +291,7 @@ async function addTOCPage(
   for (let i = 0; i < entries.length; i++) {
     if (y < footerH + 26) break
     const pageNumber = i + 3 // cover + toc before content pages
-    const label = entries[i]
+    const label = sanitizeForPdf(entries[i], regular)
     const safe = label.length > 64 ? `${label.slice(0, 61)}...` : label
     page.drawCircle({ x: 20, y: y + 2, size: 7, color: GREEN, borderColor: GREEN, borderWidth: 1 })
     const badge = `${i + 1}`
@@ -300,7 +323,7 @@ async function addWeeklyReportContentPage(
 
   page.drawRectangle({ x: 0, y: H - headerH, width: W, height: headerH, color: DARK })
   page.drawRectangle({ x: 0, y: H - headerH - 4, width: W, height: 4, color: GREEN })
-  page.drawText(department.toUpperCase(), { x: 22, y: H - 32, size: 9, font: bold, color: WHITE })
+  page.drawText(sanitizeForPdf(department.toUpperCase(), bold), { x: 22, y: H - 32, size: 9, font: bold, color: WHITE })
   await drawLogoInHeader(doc, page, headerLogoBytes, headerH, H, W)
 
   const bodyTop = H - headerH - 8
@@ -311,12 +334,58 @@ async function addWeeklyReportContentPage(
   const labelH = 22
 
   const sections = [
-    { label: "WORK DONE", color: GREEN, text: autoNumber(report.work_done || "No data provided.") },
-    { label: "TASKS FOR NEW WEEK", color: BLUE, text: autoNumber(report.tasks_new_week || "No data provided.") },
-    { label: "CHALLENGES", color: RED, text: autoNumber(report.challenges || "No challenges reported.") },
+    {
+      label: "WORK DONE",
+      color: GREEN,
+      text: sanitizeForPdf(autoNumber(report.work_done || "No data provided."), regular),
+    },
+    {
+      label: "TASKS FOR NEW WEEK",
+      color: BLUE,
+      text: sanitizeForPdf(autoNumber(report.tasks_new_week || "No data provided."), regular),
+    },
+    {
+      label: "CHALLENGES",
+      color: RED,
+      text: sanitizeForPdf(autoNumber(report.challenges || "No challenges reported."), regular),
+    },
   ]
 
   const drawFittedSectionLines = (linesInput: string[], startX: number, startY: number, bottomLimit: number) => {
+    const buildLinesWithIndent = (
+      lines: string[],
+      firstChars: number,
+      continuationChars: number,
+      continuationIndentPx: number
+    ): Array<{ text: string; indent: number }> => {
+      const out: Array<{ text: string; indent: number }> = []
+      lines.forEach((raw) => {
+        const line = (raw || "").trim()
+        if (!line) {
+          out.push({ text: "", indent: 0 })
+          return
+        }
+        const numbered = line.match(/^(\d+\.)\s+(.*)$/)
+        if (!numbered) {
+          wrapText(line, firstChars).forEach((w) => out.push({ text: w, indent: 0 }))
+          return
+        }
+        const prefix = `${numbered[1]} `
+        const body = numbered[2] || ""
+        const firstBodyLines = wrapText(body, Math.max(10, firstChars - prefix.length))
+        if (!firstBodyLines.length) {
+          out.push({ text: prefix.trimEnd(), indent: 0 })
+          return
+        }
+        out.push({ text: `${prefix}${firstBodyLines[0]}`, indent: 0 })
+        const remainder = firstBodyLines.slice(1).join(" ")
+        if (remainder) {
+          wrapText(remainder, continuationChars).forEach((w) => out.push({ text: w, indent: continuationIndentPx }))
+        }
+      })
+      return out
+    }
+
     const tryConfigs = [
       { chars: 92, size: 8, lineH: 12 },
       { chars: 100, size: 7.5, lineH: 11 },
@@ -326,14 +395,13 @@ async function addWeeklyReportContentPage(
     ]
 
     for (const cfg of tryConfigs) {
-      const wrapped: string[] = []
-      for (const rawLine of linesInput) wrapped.push(...wrapText(rawLine, cfg.chars))
+      const wrapped = buildLinesWithIndent(linesInput, cfg.chars, Math.max(10, cfg.chars - 6), 8)
       const availableHeight = startY - bottomLimit
       const maxLines = Math.max(1, Math.floor(availableHeight / cfg.lineH))
       if (wrapped.length <= maxLines) {
         let ty = startY
         for (const line of wrapped) {
-          page.drawText(line, { x: startX, y: ty, size: cfg.size, font: regular, color: SLATE })
+          page.drawText(line.text, { x: startX + line.indent, y: ty, size: cfg.size, font: regular, color: SLATE })
           ty -= cfg.lineH
         }
         return
@@ -342,11 +410,10 @@ async function addWeeklyReportContentPage(
 
     // Last fallback: clipped + continuation hint.
     let ty = startY
-    const wrapped: string[] = []
-    for (const rawLine of linesInput) wrapped.push(...wrapText(rawLine, 130))
+    const wrapped = buildLinesWithIndent(linesInput, 130, 124, 8)
     const maxLines = Math.max(1, Math.floor((startY - bottomLimit) / 8.5) - 1)
     for (const line of wrapped.slice(0, maxLines)) {
-      page.drawText(line, { x: startX, y: ty, size: 6, font: regular, color: SLATE })
+      page.drawText(line.text, { x: startX + line.indent, y: ty, size: 6, font: regular, color: SLATE })
       ty -= 8.5
     }
     page.drawText("... continued", { x: startX, y: Math.max(bottomLimit + 1, ty), size: 6, font: bold, color: RED })
@@ -393,7 +460,7 @@ async function addActionTrackerPage(
 
   page.drawRectangle({ x: 0, y: H - headerH, width: W, height: headerH, color: DARK })
   page.drawRectangle({ x: 0, y: H - headerH - 4, width: W, height: 4, color: GREEN })
-  page.drawText(department.toUpperCase(), { x: 22, y: H - 32, size: 9, font: bold, color: WHITE })
+  page.drawText(sanitizeForPdf(department.toUpperCase(), bold), { x: 22, y: H - 32, size: 9, font: bold, color: WHITE })
   await drawLogoInHeader(doc, page, headerLogoBytes, headerH, H, W)
 
   const badgeW = 85,
@@ -452,7 +519,7 @@ async function addActionTrackerPage(
       page.drawRectangle({ x: 20, y: rowY - 12, width: W - 40, height: rowH, color: LIGHT })
     }
     page.drawText(`${i + 1}`, { x: snX + 10, y: rowY - 4, size: 8, font: bold, color: SLATE })
-    const titleLines = wrapText(action.title, 60)
+    const titleLines = wrapText(sanitizeForPdf(action.title || "", regular), 60)
     page.drawText(titleLines[0], { x: actionX + 6, y: rowY - 4, size: 8, font: regular, color: SLATE })
     const sc = statusColors[action.status] || statusColors.pending
     const sl = statusLabels[action.status] || action.status

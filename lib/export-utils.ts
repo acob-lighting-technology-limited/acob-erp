@@ -416,6 +416,39 @@ const pdfContentPage = (
   ]
 
   const drawFittedSectionText = (text: string, x: number, y: number, width: number, availableH: number) => {
+    const buildLinesWithIndent = (
+      content: string,
+      textWidth: number,
+      numberIndentMm: number
+    ): Array<{ text: string; indent: number }> => {
+      const out: Array<{ text: string; indent: number }> = []
+      const sourceLines = String(content || "").split("\n")
+      sourceLines.forEach((rawLine) => {
+        const line = rawLine.trim()
+        if (!line) {
+          out.push({ text: "", indent: 0 })
+          return
+        }
+        const numbered = line.match(/^(\d+\.)\s+(.*)$/)
+        if (!numbered) {
+          const plainLines = doc.splitTextToSize(line, textWidth)
+          plainLines.forEach((pl: string) => out.push({ text: pl, indent: 0 }))
+          return
+        }
+        const numberToken = `${numbered[1]} `
+        const bodyText = numbered[2] || ""
+        const firstLineMaxW = Math.max(8, textWidth - numberIndentMm)
+        const bodyLines = doc.splitTextToSize(bodyText, firstLineMaxW)
+        if (!bodyLines.length) {
+          out.push({ text: numberToken.trim(), indent: 0 })
+          return
+        }
+        out.push({ text: `${numberToken}${bodyLines[0]}`, indent: 0 })
+        bodyLines.slice(1).forEach((bl: string) => out.push({ text: bl, indent: numberIndentMm }))
+      })
+      return out
+    }
+
     const tryConfigs = [
       { fontSize: 10, lineSpacing: 6 },
       { fontSize: 9, lineSpacing: 5.5 },
@@ -427,12 +460,13 @@ const pdfContentPage = (
 
     for (const cfg of tryConfigs) {
       doc.setFontSize(cfg.fontSize)
-      const lines = doc.splitTextToSize(text, width)
+      const numberIndentMm = Math.max(5.0, cfg.fontSize * 0.42 - 0.4)
+      const lines = buildLinesWithIndent(text, width, numberIndentMm)
       const maxLines = Math.floor(availableH / cfg.lineSpacing)
       if (lines.length <= maxLines) {
         let ty = y
-        lines.forEach((line: string) => {
-          doc.text(line, x, ty)
+        lines.forEach((line) => {
+          doc.text(line.text, x + line.indent, ty)
           ty += cfg.lineSpacing
         })
         return
@@ -441,11 +475,11 @@ const pdfContentPage = (
 
     // Last fallback: render as much as possible and add continuation hint.
     doc.setFontSize(7)
-    const lines = doc.splitTextToSize(text, width)
+    const lines = buildLinesWithIndent(text, width, 5.0)
     const maxLines = Math.max(1, Math.floor(availableH / 3.9) - 1)
     let ty = y
-    lines.slice(0, maxLines).forEach((line: string) => {
-      doc.text(line, x, ty)
+    lines.slice(0, maxLines).forEach((line) => {
+      doc.text(line.text, x + line.indent, ty)
       ty += 3.9
     })
     doc.setTextColor(...PDF_RED)
@@ -1010,7 +1044,8 @@ const docxNumberedItems = (text: string, fallback: string) => {
   return lines.map(
     (l, i) =>
       new Paragraph({
-        text: `${i + 1}. ${l.trim()}`,
+        children: [new TextRun(`${i + 1}. ${l.trim()}`)],
+        indent: { left: 480, hanging: 360 },
         spacing: { after: 60 },
       })
   )
@@ -1704,36 +1739,55 @@ const wrapTextByChars = (text: string, maxCharsPerLine: number): string[] => {
     .split("\n")
   const wrapped: string[] = []
 
-  sourceLines.forEach((raw) => {
-    const line = raw.trimEnd()
-    if (!line) {
-      wrapped.push("")
-      return
-    }
-    if (line.length <= maxCharsPerLine) {
-      wrapped.push(line)
-      return
-    }
+  const wrapPlainLine = (line: string, limit: number): string[] => {
+    if (!line) return [""]
+    if (line.length <= limit) return [line]
     const words = line.split(/\s+/)
+    const out: string[] = []
     let current = ""
     words.forEach((w) => {
       const candidate = current ? `${current} ${w}` : w
-      if (candidate.length <= maxCharsPerLine) {
+      if (candidate.length <= limit) {
         current = candidate
       } else {
-        if (current) wrapped.push(current)
-        if (w.length > maxCharsPerLine) {
-          // Hard-split very long tokens.
-          for (let i = 0; i < w.length; i += maxCharsPerLine) {
-            wrapped.push(w.slice(i, i + maxCharsPerLine))
-          }
+        if (current) out.push(current)
+        if (w.length > limit) {
+          for (let i = 0; i < w.length; i += limit) out.push(w.slice(i, i + limit))
           current = ""
         } else {
           current = w
         }
       }
     })
-    if (current) wrapped.push(current)
+    if (current) out.push(current)
+    return out
+  }
+
+  sourceLines.forEach((raw) => {
+    const line = raw.trimEnd()
+    if (!line) {
+      wrapped.push("")
+      return
+    }
+    const numberedMatch = line.match(/^(\d+\.)\s+(.*)$/)
+    if (!numberedMatch) {
+      wrapped.push(...wrapPlainLine(line, maxCharsPerLine))
+      return
+    }
+
+    const prefix = `${numberedMatch[1]} `
+    const body = numberedMatch[2] || ""
+    const bodyLimit = Math.max(10, maxCharsPerLine - prefix.length)
+    const bodyLines = wrapPlainLine(body, bodyLimit)
+    if (bodyLines.length === 0) {
+      wrapped.push(prefix.trimEnd())
+      return
+    }
+    wrapped.push(prefix + bodyLines[0])
+    const continuationPad = " ".repeat(prefix.length + 1)
+    for (let i = 1; i < bodyLines.length; i++) {
+      wrapped.push(continuationPad + bodyLines[i])
+    }
   })
 
   return wrapped
