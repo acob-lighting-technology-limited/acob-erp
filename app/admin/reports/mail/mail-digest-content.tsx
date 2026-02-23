@@ -812,19 +812,14 @@ export function MailDigestContent({ employees }: Props) {
                   <span className="text-2xl font-bold">{resolvedRecipients.length}</span>
                   <span className="text-muted-foreground text-sm">email(s)</span>
                 </div>
-                {resolvedRecipients.length > 0 && resolvedRecipients.length <= 10 && (
-                  <div className="text-muted-foreground mt-2 max-h-[120px] space-y-0.5 overflow-y-auto text-xs">
+                {resolvedRecipients.length > 0 && (
+                  <div className="mt-2 max-h-[160px] space-y-0.5 overflow-y-auto rounded-md border p-2 text-xs">
                     {resolvedRecipients.map((email) => (
                       <div key={email} className="truncate">
                         {email}
                       </div>
                     ))}
                   </div>
-                )}
-                {resolvedRecipients.length > 10 && (
-                  <p className="text-muted-foreground mt-1 text-xs">
-                    {resolvedRecipients.slice(0, 3).join(", ")} and {resolvedRecipients.length - 3} more...
-                  </p>
                 )}
               </div>
 
