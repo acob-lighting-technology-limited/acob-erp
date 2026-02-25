@@ -458,7 +458,8 @@ export function MeetingRemindersContent({ employees, mode = "meetings" }: Props)
         payload.broadcastPreparedByName = selectedBroadcastPreparedBy?.full_name || null
       }
 
-      const res = await fetch(`${supabaseUrl}/functions/v1/send-meeting-reminder`, {
+      const targetFunction = reminderType === "admin_broadcast" ? "send-communications-mail" : "send-meeting-reminder"
+      const res = await fetch(`${supabaseUrl}/functions/v1/${targetFunction}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
