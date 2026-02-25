@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useCallback, useEffect } from "react"
+import { useState, useMemo, useCallback, useEffect, useRef } from "react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
 import { PageWrapper, PageHeader } from "@/components/layout"
@@ -28,6 +28,15 @@ import {
   Clock,
   Video,
   BookOpen,
+  FileText,
+  Bold,
+  Italic,
+  Underline,
+  List,
+  ListOrdered,
+  Undo2,
+  Redo2,
+  Link2,
   Repeat,
   Trash2,
 } from "lucide-react"
@@ -42,11 +51,12 @@ type Employee = {
 }
 
 type RecipientMode = "all" | "select" | "manual" | "all_plus"
-type ReminderType = "meeting" | "knowledge_sharing"
+type ReminderType = "meeting" | "knowledge_sharing" | "admin_broadcast"
 type SendTiming = "now" | "scheduled" | "recurring"
 
 interface Props {
   employees: Employee[]
+  mode?: "meetings" | "communications"
 }
 
 const DEFAULT_TEAMS_LINK =
@@ -86,9 +96,19 @@ function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1)
 }
 
-export function MeetingRemindersContent({ employees }: Props) {
+function stripHtmlToText(html: string): string {
+  return html
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
+export function MeetingRemindersContent({ employees, mode = "meetings" }: Props) {
   // ── State ──────────────────────────────────────────────────────────────────
-  const [reminderType, setReminderType] = useState<ReminderType>("meeting")
+  const [reminderType, setReminderType] = useState<ReminderType>(
+    mode === "communications" ? "admin_broadcast" : "meeting"
+  )
   const [recipientMode, setRecipientMode] = useState<RecipientMode>("select")
   const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<Set<string>>(new Set())
   const [manualEmails, setManualEmails] = useState<string[]>([])
@@ -107,6 +127,11 @@ export function MeetingRemindersContent({ employees }: Props) {
   const [duration, setDuration] = useState("30 minutes")
   const [knowledgeDepartment, setKnowledgeDepartment] = useState("none")
   const [knowledgePresenterId, setKnowledgePresenterId] = useState("none")
+  const [broadcastSubject, setBroadcastSubject] = useState("Administrative Notice")
+  const [broadcastBodyHtml, setBroadcastBodyHtml] = useState("<p>Type your message here...</p>")
+  const [broadcastDepartment, setBroadcastDepartment] = useState("Admin & HR")
+  const [broadcastPreparedById, setBroadcastPreparedById] = useState("none")
+  const editorRef = useRef<HTMLDivElement | null>(null)
 
   // Delivery timing
   const [sendTiming, setSendTiming] = useState<SendTiming>("now")
@@ -122,9 +147,11 @@ export function MeetingRemindersContent({ employees }: Props) {
   const supabase = createClient()
 
   const departmentOptions = useMemo(() => {
-    return Array.from(new Set(employees.map((e) => e.department).filter(Boolean) as string[])).sort((a, b) =>
-      a.localeCompare(b)
-    )
+    const set = new Set<string>(["Admin & HR"])
+    for (const dept of employees.map((e) => e.department).filter(Boolean) as string[]) {
+      set.add(dept)
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b))
   }, [employees])
 
   const presenterOptions = useMemo(() => {
@@ -139,18 +166,61 @@ export function MeetingRemindersContent({ employees }: Props) {
     return employees.find((e) => e.id === knowledgePresenterId) || null
   }, [employees, knowledgePresenterId])
 
+  const broadcastPreparedByOptions = useMemo(() => {
+    return employees
+      .filter((e) => (e.department || "").trim() === broadcastDepartment)
+      .sort((a, b) => (a.full_name || "").localeCompare(b.full_name || ""))
+  }, [employees, broadcastDepartment])
+
+  const selectedBroadcastPreparedBy = useMemo(() => {
+    if (broadcastPreparedById === "none") return null
+    return employees.find((e) => e.id === broadcastPreparedById) || null
+  }, [employees, broadcastPreparedById])
+
+  useEffect(() => {
+    if (mode === "communications" && reminderType !== "admin_broadcast") {
+      setReminderType("admin_broadcast")
+    }
+  }, [mode, reminderType])
+
+  useEffect(() => {
+    if (reminderType !== "admin_broadcast") return
+    const el = editorRef.current
+    if (!el) return
+    if (el.innerHTML !== broadcastBodyHtml) {
+      el.innerHTML = broadcastBodyHtml
+    }
+  }, [reminderType, broadcastBodyHtml])
+
+  const runEditorCommand = useCallback((command: string, value?: string) => {
+    if (!editorRef.current) return
+    editorRef.current.focus()
+    document.execCommand(command, false, value)
+    setBroadcastBodyHtml(editorRef.current.innerHTML)
+  }, [])
+
+  const addEditorLink = useCallback(() => {
+    const url = window.prompt("Enter link URL (https://...)")
+    if (!url) return
+    runEditorCommand("createLink", url.trim())
+  }, [runEditorCommand])
+
   const fetchSchedules = useCallback(async () => {
     try {
+      const allowedTypes =
+        mode === "communications" ? (["admin_broadcast"] as const) : (["meeting", "knowledge_sharing"] as const)
+
       const { data, error } = await supabase
         .from("reminder_schedules")
         .select("*")
         .eq("is_active", true)
+        .in("reminder_type", [...allowedTypes])
         .order("created_at", { ascending: false })
       if (!error && data) setActiveSchedules(data)
     } catch {
       // ignore
     }
-  }, [supabase])
+  }, [supabase, mode])
 
   useEffect(() => {
     fetchSchedules()
@@ -235,6 +305,25 @@ export function MeetingRemindersContent({ employees }: Props) {
       return
     }
 
+    if (reminderType === "admin_broadcast") {
+      if (!broadcastSubject.trim()) {
+        toast.error("Broadcast subject is required")
+        return
+      }
+      if (!broadcastDepartment.trim()) {
+        toast.error("Broadcast department is required")
+        return
+      }
+      if (!stripHtmlToText(broadcastBodyHtml)) {
+        toast.error("Broadcast body is required")
+        return
+      }
+      if (!selectedBroadcastPreparedBy?.full_name) {
+        toast.error("Prepared by is required")
+        return
+      }
+    }
+
     // For scheduled/recurring, save the schedule to DB
     if (sendTiming === "scheduled" || sendTiming === "recurring") {
       const toastId = toast.loading("Saving schedule...")
@@ -265,6 +354,11 @@ export function MeetingRemindersContent({ employees }: Props) {
             sessionDate: reminderType === "knowledge_sharing" ? sessionDate : undefined,
             sessionTime: reminderType === "knowledge_sharing" ? sessionTime : undefined,
             duration: reminderType === "knowledge_sharing" ? duration : undefined,
+            broadcastSubject: reminderType === "admin_broadcast" ? broadcastSubject : undefined,
+            broadcastBodyHtml: reminderType === "admin_broadcast" ? broadcastBodyHtml : undefined,
+            broadcastDepartment: reminderType === "admin_broadcast" ? broadcastDepartment : undefined,
+            broadcastPreparedByName:
+              reminderType === "admin_broadcast" ? selectedBroadcastPreparedBy?.full_name || null : undefined,
           },
         }
 
@@ -314,7 +408,12 @@ export function MeetingRemindersContent({ employees }: Props) {
     // Send immediately
     setIsSending(true)
     setSendResult(null)
-    const label = reminderType === "meeting" ? "Meeting Reminder" : "Knowledge Sharing Reminder"
+    const label =
+      reminderType === "meeting"
+        ? "Meeting Reminder"
+        : reminderType === "knowledge_sharing"
+          ? "Knowledge Sharing Reminder"
+          : "Admin Broadcast"
     const toastId = toast.loading(`Sending ${label} to ${resolvedRecipients.length} recipient(s)...`)
 
     try {
@@ -348,10 +447,15 @@ export function MeetingRemindersContent({ employees }: Props) {
             department: selectedPresenter.department,
           }
         }
-      } else {
+      } else if (reminderType === "knowledge_sharing") {
         payload.sessionDate = formatDateNice(sessionDate)
         payload.sessionTime = sessionTime
         payload.duration = duration
+      } else {
+        payload.broadcastSubject = broadcastSubject.trim()
+        payload.broadcastBodyHtml = broadcastBodyHtml
+        payload.broadcastDepartment = broadcastDepartment
+        payload.broadcastPreparedByName = selectedBroadcastPreparedBy?.full_name || null
       }
 
       const res = await fetch(`${supabaseUrl}/functions/v1/send-meeting-reminder`, {
@@ -397,66 +501,75 @@ export function MeetingRemindersContent({ employees }: Props) {
   return (
     <PageWrapper maxWidth="full" background="gradient">
       <PageHeader
-        title="Meeting Reminders"
-        description="Send meeting and knowledge-sharing reminders to selected recipients."
+        title={mode === "communications" ? "Broadcast Communications" : "Meeting Reminders"}
+        description={
+          mode === "communications"
+            ? "Send branded department-level broadcast emails to selected recipients."
+            : "Send meeting reminders and knowledge-sharing alerts to selected recipients."
+        }
         icon={Megaphone}
-        backLink={{ href: "/admin/reports", label: "Back to Reports" }}
+        backLink={{
+          href: mode === "communications" ? "/admin/communications" : "/admin/communications/meetings",
+          label: "Back",
+        }}
       />
 
       <div className="grid items-start gap-6 lg:grid-cols-3">
         {/* ── LEFT: Settings ────────────────────────────────────────────── */}
         <div className="space-y-6 lg:col-span-2">
           {/* Reminder Type */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Mail className="h-5 w-5 text-orange-600" />
-                Reminder Type
-              </CardTitle>
-              <CardDescription>Choose which reminder to send</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-wrap gap-3">
-                {[
-                  {
-                    value: "meeting" as ReminderType,
-                    label: "General Meeting Reminder",
-                    icon: Video,
-                    desc: "Weekly meeting with agenda & Teams link",
-                  },
-                  {
-                    value: "knowledge_sharing" as ReminderType,
-                    label: "Knowledge Sharing Session",
-                    icon: BookOpen,
-                    desc: "Pre-meeting knowledge sharing reminder",
-                  },
-                ].map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => setReminderType(opt.value)}
-                    className={`flex min-w-[240px] flex-1 items-start gap-3 rounded-lg border-2 p-4 text-left transition-all ${
-                      reminderType === opt.value
-                        ? "border-orange-600 bg-orange-50 dark:border-orange-500 dark:bg-orange-950/30"
-                        : "hover:border-muted-foreground/30 bg-muted/30 border-transparent"
-                    }`}
-                  >
-                    <opt.icon
-                      className={`mt-0.5 h-5 w-5 shrink-0 ${reminderType === opt.value ? "text-orange-600" : "text-muted-foreground"}`}
-                    />
-                    <div>
-                      <div
-                        className={`font-semibold ${reminderType === opt.value ? "text-orange-700 dark:text-orange-400" : ""}`}
-                      >
-                        {opt.label}
+          {mode !== "communications" && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Mail className="h-5 w-5 text-orange-600" />
+                  Reminder Type
+                </CardTitle>
+                <CardDescription>Choose which reminder to send</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap gap-3">
+                  {[
+                    {
+                      value: "meeting" as ReminderType,
+                      label: "General Meeting Reminder",
+                      icon: Video,
+                      desc: "Weekly meeting with agenda & Teams link",
+                    },
+                    {
+                      value: "knowledge_sharing" as ReminderType,
+                      label: "Knowledge Sharing Session",
+                      icon: BookOpen,
+                      desc: "Pre-meeting knowledge sharing reminder",
+                    },
+                  ].map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setReminderType(opt.value)}
+                      className={`flex min-w-[240px] flex-1 items-start gap-3 rounded-lg border-2 p-4 text-left transition-all ${
+                        reminderType === opt.value
+                          ? "border-orange-600 bg-orange-50 dark:border-orange-500 dark:bg-orange-950/30"
+                          : "hover:border-muted-foreground/30 bg-muted/30 border-transparent"
+                      }`}
+                    >
+                      <opt.icon
+                        className={`mt-0.5 h-5 w-5 shrink-0 ${reminderType === opt.value ? "text-orange-600" : "text-muted-foreground"}`}
+                      />
+                      <div>
+                        <div
+                          className={`font-semibold ${reminderType === opt.value ? "text-orange-700 dark:text-orange-400" : ""}`}
+                        >
+                          {opt.label}
+                        </div>
+                        <div className="text-muted-foreground mt-0.5 text-xs">{opt.desc}</div>
                       </div>
-                      <div className="text-muted-foreground mt-0.5 text-xs">{opt.desc}</div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                    </button>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Meeting Details */}
           <Card>
@@ -468,7 +581,9 @@ export function MeetingRemindersContent({ employees }: Props) {
               <CardDescription>
                 {reminderType === "meeting"
                   ? "Configure the meeting date, time, Teams link, and agenda"
-                  : "Configure the session date, time, and duration"}
+                  : reminderType === "knowledge_sharing"
+                    ? "Configure the session date, time, and duration"
+                    : "Write your custom subject and formatted message body"}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -572,7 +687,7 @@ export function MeetingRemindersContent({ employees }: Props) {
                     </div>
                   </div>
                 </>
-              ) : (
+              ) : reminderType === "knowledge_sharing" ? (
                 <>
                   <div className="flex flex-wrap gap-4">
                     <div className="space-y-2">
@@ -607,6 +722,141 @@ export function MeetingRemindersContent({ employees }: Props) {
                     </div>
                   </div>
                 </>
+              ) : (
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="broadcast-department">Department</Label>
+                    <Select
+                      value={broadcastDepartment}
+                      onValueChange={(value) => {
+                        setBroadcastDepartment(value)
+                        setBroadcastPreparedById("none")
+                      }}
+                    >
+                      <SelectTrigger id="broadcast-department" className="w-[260px]">
+                        <SelectValue placeholder="Select department" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {departmentOptions.map((dept) => (
+                          <SelectItem key={dept} value={dept}>
+                            {dept}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-muted-foreground text-xs">
+                      Sender label and footer branding will use this department.
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="broadcast-prepared-by">Prepared by</Label>
+                    <Select value={broadcastPreparedById} onValueChange={setBroadcastPreparedById}>
+                      <SelectTrigger id="broadcast-prepared-by" className="w-[320px]">
+                        <SelectValue placeholder="Select person" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Select person</SelectItem>
+                        {broadcastPreparedByOptions.map((emp) => (
+                          <SelectItem key={emp.id} value={emp.id}>
+                            {emp.full_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-muted-foreground text-xs">This will appear as “Prepared by” in the footer.</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="broadcast-subject">Email Subject</Label>
+                    <Input
+                      id="broadcast-subject"
+                      value={broadcastSubject}
+                      onChange={(e) => setBroadcastSubject(e.target.value)}
+                      placeholder="Enter broadcast subject..."
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Message Body (rich text)</Label>
+                    <div className="bg-muted/50 flex flex-wrap items-center gap-1 rounded-t-lg border border-b-0 p-2">
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8"
+                        onClick={() => runEditorCommand("bold")}
+                      >
+                        <Bold className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8"
+                        onClick={() => runEditorCommand("italic")}
+                      >
+                        <Italic className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8"
+                        onClick={() => runEditorCommand("underline")}
+                      >
+                        <Underline className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8"
+                        onClick={() => runEditorCommand("insertUnorderedList")}
+                      >
+                        <List className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8"
+                        onClick={() => runEditorCommand("insertOrderedList")}
+                      >
+                        <ListOrdered className="h-4 w-4" />
+                      </Button>
+                      <Button type="button" size="icon" variant="ghost" className="h-8 w-8" onClick={addEditorLink}>
+                        <Link2 className="h-4 w-4" />
+                      </Button>
+                      <div className="bg-border mx-1 h-5 w-px" />
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8"
+                        onClick={() => runEditorCommand("undo")}
+                      >
+                        <Undo2 className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8"
+                        onClick={() => runEditorCommand("redo")}
+                      >
+                        <Redo2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <div
+                      ref={editorRef}
+                      contentEditable
+                      suppressContentEditableWarning
+                      className="bg-background min-h-[220px] rounded-b-lg border p-3 text-sm leading-6 outline-none focus:ring-2 focus:ring-orange-500"
+                      onInput={(e) => setBroadcastBodyHtml((e.currentTarget as HTMLDivElement).innerHTML)}
+                    />
+                    <p className="text-muted-foreground text-xs">
+                      Paste text from Word or type directly. This message is placed between the ACOB header and footer.
+                    </p>
+                  </div>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -952,29 +1202,58 @@ export function MeetingRemindersContent({ employees }: Props) {
                       <>
                         <Video className="h-3 w-3" /> Meeting
                       </>
-                    ) : (
+                    ) : reminderType === "knowledge_sharing" ? (
                       <>
                         <BookOpen className="h-3 w-3" /> Knowledge Sharing
+                      </>
+                    ) : (
+                      <>
+                        <FileText className="h-3 w-3" /> Admin Broadcast
                       </>
                     )}
                   </Badge>
                 </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Date</span>
-                  <Badge>
-                    {reminderType === "meeting"
-                      ? meetingDate
-                        ? formatDateNice(meetingDate)
-                        : "Not set"
-                      : sessionDate
-                        ? formatDateNice(sessionDate)
-                        : "Not set"}
-                  </Badge>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Time</span>
-                  <Badge variant="secondary">{reminderType === "meeting" ? meetingTime : sessionTime}</Badge>
-                </div>
+                {reminderType !== "admin_broadcast" ? (
+                  <>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Date</span>
+                      <Badge>
+                        {reminderType === "meeting"
+                          ? meetingDate
+                            ? formatDateNice(meetingDate)
+                            : "Not set"
+                          : sessionDate
+                            ? formatDateNice(sessionDate)
+                            : "Not set"}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Time</span>
+                      <Badge variant="secondary">{reminderType === "meeting" ? meetingTime : sessionTime}</Badge>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between gap-2 text-sm">
+                      <span className="text-muted-foreground">Department</span>
+                      <Badge variant="outline" className="max-w-[68%] truncate">
+                        {broadcastDepartment}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between gap-2 text-sm">
+                      <span className="text-muted-foreground">Prepared by</span>
+                      <Badge variant="outline" className="max-w-[68%] truncate">
+                        {selectedBroadcastPreparedBy?.full_name || "Not set"}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between gap-2 text-sm">
+                      <span className="text-muted-foreground">Subject</span>
+                      <Badge variant="secondary" className="max-w-[68%] truncate">
+                        {broadcastSubject.trim() || "Not set"}
+                      </Badge>
+                    </div>
+                  </>
+                )}
                 {reminderType === "meeting" && selectedPresenter && (
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">Knowledge Sharing</span>

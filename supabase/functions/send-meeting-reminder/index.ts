@@ -8,12 +8,69 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 }
 
-type ReminderType = "meeting" | "knowledge_sharing"
+type ReminderType = "meeting" | "knowledge_sharing" | "admin_broadcast"
 
 type KnowledgePresenter = {
   id?: string
   full_name?: string
   department?: string | null
+}
+
+const RESEND_MAX_REQ_PER_SEC = 2
+const SEND_INTERVAL_MS = Math.ceil(1000 / RESEND_MAX_REQ_PER_SEC) + 100 // safety margin
+const MAX_429_RETRIES = 5
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function isRateLimitError(error: any): boolean {
+  if (!error) return false
+  const statusCode = Number(error?.statusCode || error?.status || 0)
+  const name = String(error?.name || "").toLowerCase()
+  const msg = String(error?.message || "").toLowerCase()
+  return statusCode === 429 || name.includes("rate_limit") || msg.includes("too many requests")
+}
+
+async function sendWithRetry(
+  resend: Resend,
+  from: string,
+  to: string,
+  subject: string,
+  html: string
+): Promise<{ data?: any; error?: any }> {
+  let attempt = 0
+  while (attempt <= MAX_429_RETRIES) {
+    const { data, error } = await resend.emails.send({
+      from,
+      to,
+      subject,
+      html,
+    })
+
+    if (!error) return { data }
+
+    if (!isRateLimitError(error) || attempt === MAX_429_RETRIES) {
+      return { error }
+    }
+
+    // Backoff: 1s, 2s, 3s... for 429 bursts.
+    const backoffMs = 1000 * (attempt + 1)
+    console.warn(`[meeting-reminder] Rate limit for ${to}. Retry ${attempt + 1}/${MAX_429_RETRIES} in ${backoffMs}ms`)
+    await sleep(backoffMs)
+    attempt += 1
+  }
+
+  return { error: { message: "Unexpected retry flow termination" } }
+}
+
+function escapeHtml(input: string): string {
+  return input
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&#39;")
 }
 
 function buildKnowledgeSharingAgendaLabel(presenter?: KnowledgePresenter, department?: string): string {
@@ -239,6 +296,77 @@ function buildKnowledgeSharingHtml(sessionDate: string, sessionTime: string, dur
   )
 }
 
+function buildAdminBroadcastHtml(title: string, bodyHtml: string, department: string, preparedByName: string): string {
+  const safeDepartment = escapeHtml(department.trim() || "Admin & HR")
+  const safeTitle = escapeHtml(title)
+  const safePreparedBy = escapeHtml(preparedByName.trim() || "ACOB Team")
+  return (
+    "<!DOCTYPE html>" +
+    '<html lang="en">' +
+    "<head>" +
+    '<meta charset="UTF-8">' +
+    '<meta name="viewport" content="width=device-width, initial-scale=1.0">' +
+    "<title>Admin Broadcast</title>" +
+    "<style>" +
+    'body { margin: 0; padding: 0; background: #fff; font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif; }' +
+    ".email-shell { max-width: 600px; margin: 0 auto; overflow: hidden; }" +
+    ".wrapper { max-width: 600px; margin: 0 auto; background: #fff; padding: 32px 28px; }" +
+    ".title { font-size: 22px; font-weight: 700; color: #111827; margin-bottom: 14px; }" +
+    ".text { font-size: 15px; color: #374151; line-height: 1.7; margin: 0 0 12px 0; }" +
+    ".body-content { font-size: 15px; color: #374151; line-height: 1.7; }" +
+    ".body-content p { margin: 0 0 12px 0; }" +
+    ".body-content ul, .body-content ol { margin: 0 0 12px 20px; }" +
+    ".body-content a { color: #1e40af; text-decoration: underline; }" +
+    ".footer { background: #0f2d1f; padding: 20px; text-align: center; font-size: 11px; color: #9ca3af; border-top: 3px solid #16a34a; }" +
+    ".footer strong { color: #fff; }" +
+    ".footer-system { color: #16a34a; font-weight: 600; }" +
+    ".footer-note { color: #9ca3af; font-style: italic; }" +
+    "</style>" +
+    "</head>" +
+    "<body>" +
+    '<div class="email-shell">' +
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#0f2d1f" style="background:#0f2d1f !important;background-color:#0f2d1f !important;border-bottom:3px solid #16a34a;">' +
+    '<tr><td align="center" style="padding:20px 0;background:#0f2d1f !important;background-color:#0f2d1f !important;">' +
+    '<img src="https://erp.acoblighting.com/images/acob-logo-dark.png" height="40" alt="ACOB Lighting">' +
+    "</td></tr></table>" +
+    '<div class="wrapper">' +
+    '<div class="title">' +
+    safeTitle +
+    "</div>" +
+    '<div class="body-content">' +
+    bodyHtml +
+    "</div>" +
+    "</div>" +
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#0f2d1f" style="background:#0f2d1f !important;background-color:#0f2d1f !important;border-top:3px solid #16a34a;">' +
+    '<tr><td align="center" style="padding:20px;background:#0f2d1f !important;background-color:#0f2d1f !important;font-size:11px;color:#9ca3af;">' +
+    '<strong style="color:#fff;">ACOB Lighting Technology Limited</strong><br>' +
+    "Prepared by " +
+    safePreparedBy +
+    "<br>" +
+    safeDepartment +
+    " Department<br>" +
+    '<span style="color:#16a34a;font-weight:600;">Communications System</span>' +
+    "<br><br>" +
+    '<i style="color:#9ca3af;">This is an automated system notification. Please do not reply directly to this email.</i>' +
+    "</td></tr></table>" +
+    "</div>" +
+    "</body>" +
+    "</html>"
+  )
+}
+
+function sanitizeBroadcastHtml(rawHtml: string): string {
+  if (!rawHtml?.trim()) return ""
+  return rawHtml
+    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, "")
+    .replace(/<(iframe|object|embed|form|input|button|textarea|select)[\s\S]*?>[\s\S]*?<\/\1>/gi, "")
+    .replace(/\son\w+=(["']).*?\1/gi, "")
+    .replace(/\son\w+=\S+/gi, "")
+    .replace(/javascript:/gi, "")
+    .trim()
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders })
 
@@ -261,6 +389,10 @@ serve(async (req) => {
       duration,
       knowledgeSharingDepartment,
       knowledgeSharingPresenter,
+      broadcastSubject,
+      broadcastBodyHtml,
+      broadcastDepartment,
+      broadcastPreparedByName,
     } = body as {
       type: ReminderType
       recipients: string[]
@@ -273,6 +405,10 @@ serve(async (req) => {
       duration?: string
       knowledgeSharingDepartment?: string
       knowledgeSharingPresenter?: KnowledgePresenter
+      broadcastSubject?: string
+      broadcastBodyHtml?: string
+      broadcastDepartment?: string
+      broadcastPreparedByName?: string
     }
 
     if (!recipients || recipients.length === 0) {
@@ -281,6 +417,7 @@ serve(async (req) => {
 
     let html: string
     let subject: string
+    let from = "ACOB Admin & HR <notifications@acoblighting.com>"
 
     if (type === "meeting") {
       const normalizedAgenda = normalizeMeetingAgenda(agenda, knowledgeSharingPresenter, knowledgeSharingDepartment)
@@ -292,21 +429,26 @@ serve(async (req) => {
         teamsLink || "",
         normalizedAgenda
       )
-    } else {
+    } else if (type === "knowledge_sharing") {
       subject = "Reminder: Knowledge Sharing Session"
       html = buildKnowledgeSharingHtml(sessionDate || "Monday", sessionTime || "8:30am", duration || "30 minutes")
+    } else {
+      const cleanBody = sanitizeBroadcastHtml(broadcastBodyHtml || "")
+      if (!cleanBody) {
+        return new Response(JSON.stringify({ error: "Broadcast body is required" }), { status: 400 })
+      }
+      const department = (broadcastDepartment || "Admin & HR").trim() || "Admin & HR"
+      const preparedBy = (broadcastPreparedByName || "").trim() || "ACOB Team"
+      subject = (broadcastSubject || "Administrative Notice").trim() || "Administrative Notice"
+      html = buildAdminBroadcastHtml(subject, cleanBody, department, preparedBy)
+      from = `ACOB ${department} <notifications@acoblighting.com>`
     }
 
     console.log("[meeting-reminder] Sending " + type + " to " + recipients.length + " recipients")
 
     const results: any[] = []
     for (const to of recipients) {
-      const { data, error } = await resend.emails.send({
-        from: "ACOB Admin & HR <notifications@acoblighting.com>",
-        to,
-        subject,
-        html,
-      })
+      const { data, error } = await sendWithRetry(resend, from, to, subject, html)
       if (error) {
         console.error("[meeting-reminder] Failed to send to " + to + ":", JSON.stringify(error))
         results.push({ to, success: false, error })
@@ -314,6 +456,9 @@ serve(async (req) => {
         console.log("[meeting-reminder] Sent to " + to + ". ID: " + data?.id)
         results.push({ to, success: true, emailId: data?.id })
       }
+
+      // Throttle base send cadence to stay under provider limits.
+      await sleep(SEND_INTERVAL_MS)
     }
 
     return new Response(JSON.stringify({ success: true, type, results }), {

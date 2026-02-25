@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation"
 
-export default function MeetingsMailLegacyPage() {
+export default function NotificationMeetingsMailLegacyPage() {
   redirect("/admin/communications/meetings/mail")
 }
