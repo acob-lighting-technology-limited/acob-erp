@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -29,6 +30,8 @@ import {
   CreditCard,
   CalendarClock,
   RefreshCw,
+  Mail,
+  Megaphone,
 } from "lucide-react"
 
 export interface DynamicNotification {
@@ -392,6 +395,18 @@ export function AdminNotificationContent({ initialNotifications }: AdminNotifica
         backLink={{ href: "/admin", label: "Back to Admin" }}
         actions={
           <div className="flex items-center gap-2">
+            <Link href="/admin/communications/meetings">
+              <Button variant="outline" className="gap-2">
+                <Mail className="h-4 w-4" />
+                Meetings
+              </Button>
+            </Link>
+            <Link href="/admin/communications/broadcast">
+              <Button variant="outline" className="gap-2">
+                <Megaphone className="h-4 w-4" />
+                Broadcast
+              </Button>
+            </Link>
             <Button onClick={loadNotifications} variant="outline" size="icon" title="Refresh" disabled={isLoading}>
               <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
             </Button>

@@ -28,18 +28,17 @@ export default function AdminReportsPage() {
 
   const meetingCards = [
     {
-      title: "Meeting Mailings",
-      description:
-        "Send meeting packs (weekly reports + action tracker) as one-time or recurring mailings to selected recipients.",
-      href: "/admin/reports/mail",
+      title: "Meetings",
+      description: "Manage meeting mailings and reminders from a dedicated meetings workspace.",
+      href: "/admin/communications/meetings",
       icon: Mail,
       color: "text-indigo-600 dark:text-indigo-400",
       bgColor: "bg-indigo-100 dark:bg-indigo-900/30",
     },
     {
-      title: "Meeting Reminders",
-      description: "Send meeting and knowledge-sharing reminders with custom schedule, agenda, and Teams links.",
-      href: "/admin/reports/meeting-reminders",
+      title: "Communications",
+      description: "Send department-branded broadcast emails with flexible recipient and scheduling controls.",
+      href: "/admin/communications/broadcast",
       icon: Megaphone,
       color: "text-orange-600 dark:text-orange-400",
       bgColor: "bg-orange-100 dark:bg-orange-900/30",

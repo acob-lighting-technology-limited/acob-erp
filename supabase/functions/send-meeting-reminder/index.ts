@@ -16,6 +16,54 @@ type KnowledgePresenter = {
   department?: string | null
 }
 
+const RESEND_MAX_REQ_PER_SEC = 2
+const SEND_INTERVAL_MS = Math.ceil(1000 / RESEND_MAX_REQ_PER_SEC) + 100 // safety margin
+const MAX_429_RETRIES = 5
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function isRateLimitError(error: any): boolean {
+  if (!error) return false
+  const statusCode = Number(error?.statusCode || error?.status || 0)
+  const name = String(error?.name || "").toLowerCase()
+  const msg = String(error?.message || "").toLowerCase()
+  return statusCode === 429 || name.includes("rate_limit") || msg.includes("too many requests")
+}
+
+async function sendWithRetry(
+  resend: Resend,
+  from: string,
+  to: string,
+  subject: string,
+  html: string
+): Promise<{ data?: any; error?: any }> {
+  let attempt = 0
+  while (attempt <= MAX_429_RETRIES) {
+    const { data, error } = await resend.emails.send({
+      from,
+      to,
+      subject,
+      html,
+    })
+
+    if (!error) return { data }
+
+    if (!isRateLimitError(error) || attempt === MAX_429_RETRIES) {
+      return { error }
+    }
+
+    // Backoff: 1s, 2s, 3s... for 429 bursts.
+    const backoffMs = 1000 * (attempt + 1)
+    console.warn(`[meeting-reminder] Rate limit for ${to}. Retry ${attempt + 1}/${MAX_429_RETRIES} in ${backoffMs}ms`)
+    await sleep(backoffMs)
+    attempt += 1
+  }
+
+  return { error: { message: "Unexpected retry flow termination" } }
+}
+
 function buildKnowledgeSharingAgendaLabel(presenter?: KnowledgePresenter, department?: string): string {
   const base = "Knowledge Sharing Session (30 minutes)"
   const presenterName = presenter?.full_name?.trim()
@@ -281,6 +329,7 @@ serve(async (req) => {
 
     let html: string
     let subject: string
+    const from = "ACOB Admin & HR <notifications@acoblighting.com>"
 
     if (type === "meeting") {
       const normalizedAgenda = normalizeMeetingAgenda(agenda, knowledgeSharingPresenter, knowledgeSharingDepartment)
@@ -301,12 +350,7 @@ serve(async (req) => {
 
     const results: any[] = []
     for (const to of recipients) {
-      const { data, error } = await resend.emails.send({
-        from: "ACOB Admin & HR <notifications@acoblighting.com>",
-        to,
-        subject,
-        html,
-      })
+      const { data, error } = await sendWithRetry(resend, from, to, subject, html)
       if (error) {
         console.error("[meeting-reminder] Failed to send to " + to + ":", JSON.stringify(error))
         results.push({ to, success: false, error })
@@ -314,6 +358,9 @@ serve(async (req) => {
         console.log("[meeting-reminder] Sent to " + to + ". ID: " + data?.id)
         results.push({ to, success: true, emailId: data?.id })
       }
+
+      // Throttle base send cadence to stay under provider limits.
+      await sleep(SEND_INTERVAL_MS)
     }
 
     return new Response(JSON.stringify({ success: true, type, results }), {
