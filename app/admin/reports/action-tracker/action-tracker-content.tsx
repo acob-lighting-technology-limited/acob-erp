@@ -11,7 +11,8 @@ import { Label } from "@/components/ui/label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { createClient } from "@/lib/supabase/client"
-import { getCurrentISOWeek, cn } from "@/lib/utils"
+import { cn } from "@/lib/utils"
+import { getCurrentOfficeWeek } from "@/lib/meeting-week"
 import { toast } from "sonner"
 import {
   FileSpreadsheet,
@@ -58,6 +59,7 @@ interface ActionTrackerContentProps {
 }
 
 export function ActionTrackerContent({ initialDepartments }: ActionTrackerContentProps) {
+  const currentOfficeWeek = getCurrentOfficeWeek()
   const [tasks, setTasks] = useState<ActionTask[]>([])
   const [loading, setLoading] = useState(true)
   const searchParams = useSearchParams()
@@ -67,11 +69,11 @@ export function ActionTrackerContent({ initialDepartments }: ActionTrackerConten
 
   const [weekFilter, setWeekFilter] = useState(() => {
     const w = searchParams.get("week")
-    return w ? parseInt(w) : getCurrentISOWeek()
+    return w ? parseInt(w) : currentOfficeWeek.week
   })
   const [yearFilter, setYearFilter] = useState(() => {
     const y = searchParams.get("year")
-    return y ? parseInt(y) : new Date().getFullYear()
+    return y ? parseInt(y) : currentOfficeWeek.year
   })
   const [deptFilter, setDeptFilter] = useState(() => {
     const d = searchParams.get("dept")
@@ -238,7 +240,7 @@ export function ActionTrackerContent({ initialDepartments }: ActionTrackerConten
               variant="outline"
               className="gap-2 border-green-200 text-green-700 hover:bg-green-50 hover:text-green-800 dark:border-green-900/30 dark:hover:bg-green-950/20"
             >
-              <Link href="/admin/reports/mail">
+              <Link href="/admin/communications/meetings/mail">
                 <ExternalLink className="h-4 w-4" />
                 <span className="hidden sm:inline">General Meeting Mail</span>
               </Link>

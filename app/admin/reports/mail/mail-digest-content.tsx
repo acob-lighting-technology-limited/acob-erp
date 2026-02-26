@@ -29,6 +29,7 @@ import {
   Trash2,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { getCurrentOfficeWeek } from "@/lib/meeting-week"
 
 type Employee = {
   id: string
@@ -40,8 +41,15 @@ type Employee = {
 }
 
 type RecipientMode = "all" | "select" | "manual" | "all_plus"
-type ContentChoice = "both" | "weekly_report" | "action_tracker"
+type ContentChoice = "both" | "weekly_report" | "action_tracker" | "manual_upload"
 type SendTiming = "now" | "scheduled" | "recurring"
+const MAX_PDF_BYTES = 1 * 1024 * 1024
+
+type ManualAttachmentKind = "weekly_report" | "action_tracker"
+type ManualAttachmentState = {
+  file: File | null
+  base64: string
+}
 
 interface Props {
   employees: Employee[]
@@ -49,6 +57,7 @@ interface Props {
 
 export function MailDigestContent({ employees }: Props) {
   const supabase = createClient()
+  const currentOfficeWeek = getCurrentOfficeWeek()
 
   // ── State ──────────────────────────────────────────────────────────────────
   const [recipientMode, setRecipientMode] = useState<RecipientMode>("select")
@@ -58,9 +67,12 @@ export function MailDigestContent({ employees }: Props) {
   const [searchQuery, setSearchQuery] = useState("")
 
   const [contentChoice, setContentChoice] = useState<ContentChoice>("both")
+  const [manualWeeklyReport, setManualWeeklyReport] = useState<ManualAttachmentState>({ file: null, base64: "" })
+  const [manualActionTracker, setManualActionTracker] = useState<ManualAttachmentState>({ file: null, base64: "" })
+  const [selectedPreparedBy, setSelectedPreparedBy] = useState("ACOB Team")
 
-  const currentYear = new Date().getFullYear()
-  const currentWeekNumber = getISOWeek()
+  const currentYear = currentOfficeWeek.year
+  const currentWeekNumber = currentOfficeWeek.week
   // Default = CURRENT week (the meeting week)
   const [weekNumber, setWeekNumber] = useState(currentWeekNumber)
   const [yearNumber, setYearNumber] = useState(currentYear)
@@ -135,6 +147,23 @@ export function MailDigestContent({ employees }: Props) {
     return Array.from(emailSet)
   }, [recipientMode, employees, selectedEmployeeIds, manualEmails])
 
+  const adminHrPreparers = useMemo(() => {
+    return employees
+      .filter((e) => {
+        const dept = (e.department || "").toLowerCase()
+        return dept.includes("admin") && dept.includes("hr")
+      })
+      .map((e) => e.full_name)
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b))
+  }, [employees])
+
+  useEffect(() => {
+    if (adminHrPreparers.length > 0 && !adminHrPreparers.includes(selectedPreparedBy)) {
+      setSelectedPreparedBy(adminHrPreparers[0])
+    }
+  }, [adminHrPreparers, selectedPreparedBy])
+
   // ── Handlers ────────────────────────────────────────────────────────────────
   const toggleEmployee = useCallback((id: string) => {
     setSelectedEmployeeIds((prev) => {
@@ -172,10 +201,59 @@ export function MailDigestContent({ employees }: Props) {
     setManualEmails((prev) => prev.filter((e) => e !== email))
   }, [])
 
+  const fileToBase64 = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => {
+        const result = String(reader.result || "")
+        const base64 = result.includes(",") ? result.split(",")[1] : result
+        resolve(base64)
+      }
+      reader.onerror = () => reject(new Error("Failed to read file"))
+      reader.readAsDataURL(file)
+    })
+
+  const handleManualPdfUpload = useCallback(async (kind: ManualAttachmentKind, file: File | null) => {
+    if (!file) {
+      if (kind === "weekly_report") setManualWeeklyReport({ file: null, base64: "" })
+      else setManualActionTracker({ file: null, base64: "" })
+      return
+    }
+
+    if (file.type !== "application/pdf") {
+      toast.error("Only PDF files are allowed")
+      return
+    }
+    if (file.size > MAX_PDF_BYTES) {
+      toast.error("PDF must be 1MB or less")
+      return
+    }
+
+    try {
+      const base64 = await fileToBase64(file)
+      if (kind === "weekly_report") setManualWeeklyReport({ file, base64 })
+      else setManualActionTracker({ file, base64 })
+      toast.success(`${kind === "weekly_report" ? "Weekly report" : "Action tracker"} PDF ready`)
+    } catch (err: any) {
+      toast.error(err?.message || "Could not process file")
+    }
+  }, [])
+
   const handleSend = async () => {
     if (resolvedRecipients.length === 0) {
       toast.error("No recipients selected")
       return
+    }
+
+    if (contentChoice === "manual_upload") {
+      if (!manualWeeklyReport.base64 || !manualActionTracker.base64) {
+        toast.error("Please upload both weekly report and action tracker PDFs")
+        return
+      }
+      if (sendTiming !== "now") {
+        toast.error("Manual PDF uploads can only be sent immediately")
+        return
+      }
     }
 
     // ── Scheduled: save to DB ────────────────────────────────────────────
@@ -269,12 +347,18 @@ export function MailDigestContent({ employees }: Props) {
         recipients: resolvedRecipients,
         meetingWeek: weekNumber,
         meetingYear: yearNumber,
+        preparedByName: selectedPreparedBy,
       }
 
       if (contentChoice === "weekly_report") {
         payload.skipActionTracker = true
       } else if (contentChoice === "action_tracker") {
         payload.skipWeeklyReport = true
+      } else if (contentChoice === "manual_upload") {
+        payload.weeklyReportBase64 = manualWeeklyReport.base64
+        payload.actionTrackerBase64 = manualActionTracker.base64
+        payload.weeklyReportFilename = manualWeeklyReport.file?.name || undefined
+        payload.actionTrackerFilename = manualActionTracker.file?.name || undefined
       }
 
       const res = await fetch(`${supabaseUrl}/functions/v1/send-weekly-digest`, {
@@ -319,11 +403,6 @@ export function MailDigestContent({ employees }: Props) {
   // ── Render ──────────────────────────────────────────────────────────────────
   const weekOptions = Array.from({ length: 52 }, (_, i) => i + 1)
   const yearOptions = [currentYear - 1, currentYear, currentYear + 1]
-
-  const departments = useMemo(() => {
-    const depts = new Set(employees.map((e) => e.department).filter(Boolean))
-    return Array.from(depts).sort() as string[]
-  }, [employees])
 
   return (
     <PageWrapper maxWidth="full" background="gradient">
@@ -412,6 +491,12 @@ export function MailDigestContent({ employees }: Props) {
                     icon: ClipboardList,
                     desc: "Upcoming action items & completion status",
                   },
+                  {
+                    value: "manual_upload",
+                    label: "Upload Your PDFs",
+                    icon: FileText,
+                    desc: "Manually upload weekly report + action tracker (max 1MB each)",
+                  },
                 ].map((opt) => (
                   <button
                     key={opt.value}
@@ -436,6 +521,66 @@ export function MailDigestContent({ employees }: Props) {
                     </div>
                   </button>
                 ))}
+              </div>
+
+              {contentChoice === "manual_upload" && (
+                <div className="mt-4 grid gap-4 rounded-lg border border-green-200 bg-green-50/40 p-4 md:grid-cols-2 dark:border-green-900 dark:bg-green-950/20">
+                  <div className="space-y-2">
+                    <Label htmlFor="manual-weekly-report">Weekly Report PDF (max 1MB)</Label>
+                    <Input
+                      id="manual-weekly-report"
+                      type="file"
+                      accept="application/pdf"
+                      onChange={(e) => handleManualPdfUpload("weekly_report", e.target.files?.[0] || null)}
+                    />
+                    {manualWeeklyReport.file && (
+                      <p className="text-muted-foreground text-xs">
+                        {manualWeeklyReport.file.name} ({(manualWeeklyReport.file.size / 1024).toFixed(0)}KB)
+                      </p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="manual-action-tracker">Action Tracker PDF (max 1MB)</Label>
+                    <Input
+                      id="manual-action-tracker"
+                      type="file"
+                      accept="application/pdf"
+                      onChange={(e) => handleManualPdfUpload("action_tracker", e.target.files?.[0] || null)}
+                    />
+                    {manualActionTracker.file && (
+                      <p className="text-muted-foreground text-xs">
+                        {manualActionTracker.file.name} ({(manualActionTracker.file.size / 1024).toFixed(0)}KB)
+                      </p>
+                    )}
+                  </div>
+                  <p className="text-muted-foreground text-xs md:col-span-2">
+                    Uploaded files are sent as attachments exactly as provided. Manual upload mode currently supports
+                    only immediate send.
+                  </p>
+                </div>
+              )}
+
+              <div className="mt-4 rounded-lg border p-4">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <Label htmlFor="prepared-by">Prepared by</Label>
+                  <Badge variant="outline">Admin & HR only</Badge>
+                </div>
+                <Select value={selectedPreparedBy} onValueChange={setSelectedPreparedBy}>
+                  <SelectTrigger id="prepared-by" className="w-full">
+                    <SelectValue placeholder="Select a name" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {adminHrPreparers.length > 0 ? (
+                      adminHrPreparers.map((name) => (
+                        <SelectItem key={name} value={name}>
+                          {name}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="ACOB Team">ACOB Team</SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
               </div>
             </CardContent>
           </Card>
@@ -789,6 +934,16 @@ export function MailDigestContent({ employees }: Props) {
               <div className="space-y-1">
                 <div className="text-muted-foreground text-xs font-medium tracking-wider uppercase">Attachments</div>
                 <div className="flex flex-wrap gap-1.5">
+                  {contentChoice === "manual_upload" && manualWeeklyReport.file && (
+                    <Badge variant="secondary" className="gap-1">
+                      <FileText className="h-3 w-3" /> {manualWeeklyReport.file.name}
+                    </Badge>
+                  )}
+                  {contentChoice === "manual_upload" && manualActionTracker.file && (
+                    <Badge variant="secondary" className="gap-1">
+                      <ClipboardList className="h-3 w-3" /> {manualActionTracker.file.name}
+                    </Badge>
+                  )}
                   {(contentChoice === "both" || contentChoice === "weekly_report") && (
                     <Badge variant="secondary" className="gap-1">
                       <FileText className="h-3 w-3" /> Weekly Report
@@ -863,7 +1018,11 @@ export function MailDigestContent({ employees }: Props) {
               <Button
                 className="mt-4 w-full bg-green-600 text-white hover:bg-green-700"
                 size="lg"
-                disabled={isSending || resolvedRecipients.length === 0}
+                disabled={
+                  isSending ||
+                  resolvedRecipients.length === 0 ||
+                  (contentChoice === "manual_upload" && (!manualWeeklyReport.base64 || !manualActionTracker.base64))
+                }
                 onClick={handleSend}
               >
                 {isSending ? (
@@ -935,16 +1094,6 @@ export function MailDigestContent({ employees }: Props) {
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
-function getISOWeek(): number {
-  const now = new Date()
-  const jan4 = new Date(now.getFullYear(), 0, 4)
-  const dayOfWeek = jan4.getDay() || 7
-  const week1Monday = new Date(jan4)
-  week1Monday.setDate(jan4.getDate() - (dayOfWeek - 1))
-  const diff = now.getTime() - week1Monday.getTime()
-  return Math.floor(diff / (7 * 24 * 60 * 60 * 1000)) + 1
-}
-
 function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1)
 }
