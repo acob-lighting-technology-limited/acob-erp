@@ -127,6 +127,7 @@ export function MeetingRemindersContent({ employees, mode = "meetings" }: Props)
   const [duration, setDuration] = useState("30 minutes")
   const [knowledgeDepartment, setKnowledgeDepartment] = useState("none")
   const [knowledgePresenterId, setKnowledgePresenterId] = useState("none")
+  const [meetingPreparedById, setMeetingPreparedById] = useState("none")
   const [broadcastSubject, setBroadcastSubject] = useState("Administrative Notice")
   const [broadcastBodyHtml, setBroadcastBodyHtml] = useState("<p>Type your message here...</p>")
   const [broadcastDepartment, setBroadcastDepartment] = useState("Admin & HR")
@@ -166,6 +167,20 @@ export function MeetingRemindersContent({ employees, mode = "meetings" }: Props)
     return employees.find((e) => e.id === knowledgePresenterId) || null
   }, [employees, knowledgePresenterId])
 
+  const meetingPreparedByOptions = useMemo(() => {
+    return employees
+      .filter((e) => {
+        const dept = (e.department || "").toLowerCase()
+        return dept.includes("admin") && dept.includes("hr")
+      })
+      .sort((a, b) => (a.full_name || "").localeCompare(b.full_name || ""))
+  }, [employees])
+
+  const selectedMeetingPreparedBy = useMemo(() => {
+    if (meetingPreparedById === "none") return null
+    return employees.find((e) => e.id === meetingPreparedById) || null
+  }, [employees, meetingPreparedById])
+
   const broadcastPreparedByOptions = useMemo(() => {
     return employees
       .filter((e) => (e.department || "").trim() === broadcastDepartment)
@@ -182,6 +197,12 @@ export function MeetingRemindersContent({ employees, mode = "meetings" }: Props)
       setReminderType("admin_broadcast")
     }
   }, [mode, reminderType])
+
+  useEffect(() => {
+    if (meetingPreparedByOptions.length > 0 && !meetingPreparedByOptions.some((p) => p.id === meetingPreparedById)) {
+      setMeetingPreparedById(meetingPreparedByOptions[0].id)
+    }
+  }, [meetingPreparedById, meetingPreparedByOptions])
 
   useEffect(() => {
     if (reminderType !== "admin_broadcast") return
@@ -324,6 +345,11 @@ export function MeetingRemindersContent({ employees, mode = "meetings" }: Props)
       }
     }
 
+    if (reminderType === "meeting" && !selectedMeetingPreparedBy?.full_name) {
+      toast.error("Prepared by is required")
+      return
+    }
+
     // For scheduled/recurring, save the schedule to DB
     if (sendTiming === "scheduled" || sendTiming === "recurring") {
       const toastId = toast.loading("Saving schedule...")
@@ -351,6 +377,8 @@ export function MeetingRemindersContent({ employees, mode = "meetings" }: Props)
                     department: selectedPresenter.department,
                   }
                 : undefined,
+            meetingPreparedByName:
+              reminderType === "meeting" ? selectedMeetingPreparedBy?.full_name || "ACOB Team" : undefined,
             sessionDate: reminderType === "knowledge_sharing" ? sessionDate : undefined,
             sessionTime: reminderType === "knowledge_sharing" ? sessionTime : undefined,
             duration: reminderType === "knowledge_sharing" ? duration : undefined,
@@ -426,7 +454,7 @@ export function MeetingRemindersContent({ employees, mode = "meetings" }: Props)
       }
 
       if (reminderType === "meeting") {
-        payload.meetingDate = formatDateNice(meetingDate)
+        payload.meetingDate = meetingDate
         payload.meetingTime = new Date(`2000-01-01T${meetingTime}`).toLocaleTimeString("en-US", {
           hour: "numeric",
           minute: "2-digit",
@@ -447,6 +475,7 @@ export function MeetingRemindersContent({ employees, mode = "meetings" }: Props)
             department: selectedPresenter.department,
           }
         }
+        payload.meetingPreparedByName = selectedMeetingPreparedBy?.full_name || "ACOB Team"
       } else if (reminderType === "knowledge_sharing") {
         payload.sessionDate = formatDateNice(sessionDate)
         payload.sessionTime = sessionTime
@@ -686,6 +715,25 @@ export function MeetingRemindersContent({ employees, mode = "meetings" }: Props)
                         </Select>
                       </div>
                     </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="meeting-prepared-by">Prepared by</Label>
+                    <Select value={meetingPreparedById} onValueChange={setMeetingPreparedById}>
+                      <SelectTrigger id="meeting-prepared-by" className="w-[320px]">
+                        <SelectValue placeholder="Select person" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Select person</SelectItem>
+                        {meetingPreparedByOptions.map((emp) => (
+                          <SelectItem key={emp.id} value={emp.id}>
+                            {emp.full_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-muted-foreground text-xs">
+                      Admin &amp; HR only. This appears as “Prepared by” in the footer.
+                    </p>
                   </div>
                 </>
               ) : reminderType === "knowledge_sharing" ? (
@@ -1232,6 +1280,14 @@ export function MeetingRemindersContent({ employees, mode = "meetings" }: Props)
                       <span className="text-muted-foreground">Time</span>
                       <Badge variant="secondary">{reminderType === "meeting" ? meetingTime : sessionTime}</Badge>
                     </div>
+                    {reminderType === "meeting" && (
+                      <div className="flex items-center justify-between gap-2 text-sm">
+                        <span className="text-muted-foreground">Prepared by</span>
+                        <Badge variant="outline" className="max-w-[68%] truncate">
+                          {selectedMeetingPreparedBy?.full_name || "Not set"}
+                        </Badge>
+                      </div>
+                    )}
                   </>
                 ) : (
                   <>

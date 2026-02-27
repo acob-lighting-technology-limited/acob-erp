@@ -10,7 +10,8 @@ import { Label } from "@/components/ui/label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { createClient } from "@/lib/supabase/client"
-import { getCurrentISOWeek, cn } from "@/lib/utils"
+import { cn } from "@/lib/utils"
+import { getCurrentOfficeWeek } from "@/lib/meeting-week"
 import { toast } from "sonner"
 import {
   FileSpreadsheet,
@@ -48,6 +49,7 @@ interface ActionTask {
 }
 
 export default function ActionTrackerPortal() {
+  const currentOfficeWeek = getCurrentOfficeWeek()
   const [tasks, setTasks] = useState<ActionTask[]>([])
   const [loading, setLoading] = useState(true)
   const searchParams = useSearchParams()
@@ -57,11 +59,11 @@ export default function ActionTrackerPortal() {
 
   const [week, setWeek] = useState(() => {
     const w = searchParams.get("week")
-    return w ? parseInt(w) : getCurrentISOWeek()
+    return w ? parseInt(w) : currentOfficeWeek.week
   })
   const [year, setYear] = useState(() => {
     const y = searchParams.get("year")
-    return y ? parseInt(y) : new Date().getFullYear()
+    return y ? parseInt(y) : currentOfficeWeek.year
   })
   const [deptFilter, setDeptFilter] = useState("all")
   const [searchQuery, setSearchQuery] = useState("")

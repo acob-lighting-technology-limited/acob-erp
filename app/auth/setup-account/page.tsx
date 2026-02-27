@@ -88,9 +88,10 @@ function SetupAccountContent() {
     setIsLoading(true)
 
     try {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://erp.acoblighting.com"
       // Use the callback route for proper PKCE code exchange, then redirect to setup-account
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/callback?next=/auth/setup-account`,
+        redirectTo: `${appUrl}/auth/callback?next=/auth/setup-account`,
       })
 
       if (error) throw error

@@ -38,8 +38,9 @@ export default function ForgotPasswordPage() {
     setIsLoading(true)
 
     try {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://erp.acoblighting.com"
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/callback?next=/auth/reset-password`,
+        redirectTo: `${appUrl}/auth/callback?next=/auth/reset-password`,
       })
 
       if (error) throw error

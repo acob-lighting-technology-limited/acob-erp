@@ -24,33 +24,50 @@ const RESEND_MAX_REQ_PER_SEC = 2
 const SEND_INTERVAL_MS = Math.ceil(1000 / RESEND_MAX_REQ_PER_SEC) + 100 // ~0.6s with safety margin
 const MAX_429_RETRIES = 5
 
-function getCurrentISOWeek(): { week: number; year: number } {
-  const now = new Date()
-  const jan4 = new Date(now.getFullYear(), 0, 4)
-  const dayOfWeek = jan4.getDay() || 7
-  const week1Monday = new Date(jan4)
-  week1Monday.setDate(jan4.getDate() - (dayOfWeek - 1))
-  const diff = now.getTime() - week1Monday.getTime()
-  const week = Math.floor(diff / (7 * 24 * 60 * 60 * 1000)) + 1
-  return { week, year: now.getFullYear() }
+const OFFICE_WEEK_ANCHOR_MONTH_INDEX = 0
+const OFFICE_WEEK_ANCHOR_DAY = 12
+
+function getOfficeYearStart(year: number): Date {
+  return new Date(year, OFFICE_WEEK_ANCHOR_MONTH_INDEX, OFFICE_WEEK_ANCHOR_DAY)
 }
 
-function getPreviousWeek(week: number, year: number): { week: number; year: number } {
-  if (week === 1) return { week: 52, year: year - 1 }
-  return { week: week - 1, year }
+function getCurrentOfficeWeek(): { week: number; year: number } {
+  return getOfficeWeekFromDate(new Date())
+}
+
+function getOfficeWeekFromDate(date: Date): { week: number; year: number } {
+  const input = new Date(date)
+  let year = input.getFullYear()
+  let yearStart = getOfficeYearStart(year)
+
+  if (input < yearStart) {
+    year -= 1
+    yearStart = getOfficeYearStart(year)
+  }
+
+  const diffMs = input.getTime() - yearStart.getTime()
+  const week = Math.floor(diffMs / (7 * 24 * 60 * 60 * 1000)) + 1
+  return { week, year }
 }
 
 function getWeekMonday(week: number, year: number): string {
-  const jan4 = new Date(year, 0, 4)
-  const dayOfWeek = jan4.getDay() || 7
-  const week1Monday = new Date(jan4)
-  week1Monday.setDate(jan4.getDate() - (dayOfWeek - 1))
-  const monday = new Date(week1Monday)
-  monday.setDate(week1Monday.getDate() + (week - 1) * 7)
-  const day = monday.getDate()
+  const monday = new Date(getOfficeYearStart(year))
+  monday.setDate(monday.getDate() + (week - 1) * 7)
+  return formatDateWithOrdinal(monday)
+}
+
+function formatDateWithOrdinal(date: Date): string {
+  const day = date.getDate()
   const suffix = [1, 21, 31].includes(day) ? "st" : [2, 22].includes(day) ? "nd" : [3, 23].includes(day) ? "rd" : "th"
-  const month = monday.toLocaleString("en-GB", { month: "long" })
-  return `${day}${suffix} ${month} ${monday.getFullYear()}`
+  const month = date.toLocaleString("en-GB", { month: "long" })
+  return `${day}${suffix} ${month}, ${date.getFullYear()}`
+}
+
+function getNextMeetingDate(week: number, year: number): string {
+  const monday = new Date(getOfficeYearStart(year))
+  monday.setDate(monday.getDate() + (week - 1) * 7)
+  monday.setDate(monday.getDate() + 7)
+  return formatDateWithOrdinal(monday)
 }
 
 const DEPT_ORDER = [
@@ -107,6 +124,15 @@ function sanitizeForPdf(text: string, font: any): string {
     }
   }
   return out
+}
+
+function escapeHtml(input: string): string {
+  return input
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&#39;")
 }
 
 function sleep(ms: number): Promise<void> {
@@ -509,24 +535,42 @@ async function addActionTrackerPage(
     pending: "Pending",
   }
 
-  let rowY = headerY - 18
-  const rowH = 20
+  let rowTop = headerY - 20
+  const minRowH = 20
+  const lineH = 8
+  const maxTitleLines = 3
 
   for (let i = 0; i < actions.length; i++) {
-    if (rowY < footerH + 10) break
     const action = actions[i]
-    if (i % 2 === 0) {
-      page.drawRectangle({ x: 20, y: rowY - 12, width: W - 40, height: rowH, color: LIGHT })
+    const titleLinesRaw = wrapText(sanitizeForPdf(action.title || "", regular), 60)
+    const titleLines = titleLinesRaw.slice(0, maxTitleLines)
+    if (titleLinesRaw.length > maxTitleLines && titleLines.length > 0) {
+      titleLines[titleLines.length - 1] = `${titleLines[titleLines.length - 1]}...`
     }
-    page.drawText(`${i + 1}`, { x: snX + 10, y: rowY - 4, size: 8, font: bold, color: SLATE })
-    const titleLines = wrapText(sanitizeForPdf(action.title || "", regular), 60)
-    page.drawText(titleLines[0], { x: actionX + 6, y: rowY - 4, size: 8, font: regular, color: SLATE })
+    const rowH = Math.max(minRowH, titleLines.length * lineH + 8)
+    const rowBottom = rowTop - rowH
+    if (rowBottom < footerH + 10) break
+
+    if (i % 2 === 0) {
+      page.drawRectangle({ x: 20, y: rowBottom, width: W - 40, height: rowH, color: LIGHT })
+    }
+    page.drawText(`${i + 1}`, { x: snX + 10, y: rowBottom + rowH - 12, size: 8, font: bold, color: SLATE })
+    titleLines.forEach((line, lineIdx) => {
+      page.drawText(line, {
+        x: actionX + 6,
+        y: rowBottom + rowH - 12 - lineIdx * lineH,
+        size: 8,
+        font: regular,
+        color: SLATE,
+      })
+    })
     const sc = statusColors[action.status] || statusColors.pending
     const sl = statusLabels[action.status] || action.status
-    page.drawRectangle({ x: statusX + 4, y: rowY - 10, width: statusW - 8, height: 14, color: sc })
-    page.drawText(sl, { x: statusX + 8, y: rowY - 5, size: 7, font: bold, color: WHITE })
-    page.drawRectangle({ x: 20, y: rowY - 13, width: W - 40, height: 0.5, color: rgb(0.886, 0.906, 0.941) })
-    rowY -= rowH
+    const badgeY = rowBottom + (rowH - 14) / 2
+    page.drawRectangle({ x: statusX + 4, y: badgeY, width: statusW - 8, height: 14, color: sc })
+    page.drawText(sl, { x: statusX + 8, y: badgeY + 5, size: 7, font: bold, color: WHITE })
+    page.drawRectangle({ x: 20, y: rowBottom, width: W - 40, height: 0.5, color: rgb(0.886, 0.906, 0.941) })
+    rowTop = rowBottom
   }
 
   page.drawRectangle({ x: 0, y: 0, width: W, height: footerH, color: GREEN })
@@ -616,13 +660,10 @@ async function buildActionTrackerPDF(
   return doc.save()
 }
 
-function buildEmailHtml(
-  meetingWeek: number,
-  meetingYear: number,
-  reportDataWeek: number,
-  reportDataYear: number
-): string {
+function buildEmailHtml(meetingWeek: number, meetingYear: number, preparedByName: string): string {
   const meetingDate = getWeekMonday(meetingWeek, meetingYear)
+  const nextMeetingDate = getNextMeetingDate(meetingWeek, meetingYear)
+  const safePreparedBy = escapeHtml((preparedByName || "").trim() || "ACOB Team")
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -639,18 +680,8 @@ function buildEmailHtml(
     .week-badge { display: inline-block; background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; padding: 4px 12px; border-radius: 20px; text-transform: uppercase; margin-bottom: 16px; }
     .title { font-size: 24px; font-weight: 700; color: #111827; margin-bottom: 14px; }
     .text { font-size: 15px; color: #374151; line-height: 1.6; margin: 0 0 18px 0; }
-    .attachments { margin: 24px 0; border: 1px solid #d1d5db; border-radius: 8px; overflow: hidden; }
-    .attachments table { width: 100%; border-collapse: collapse; }
-    .attachments th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: #1f2937; background: #f3f4f6; padding: 10px 12px; border-bottom: 1px solid #d1d5db; }
-    .attachments td { padding: 12px; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
-    .attachments tr:last-child td { border-bottom: none; }
-    .doc-name { font-size: 14px; font-weight: 700; color: #111827; }
-    .doc-desc { font-size: 12px; color: #6b7280; margin-top: 2px; }
-    .doc-format { font-size: 11px; font-weight: 700; color: #15803d; }
     .cta { text-align: center; margin-top: 32px; }
     .button { display: inline-block; background: #000; color: #fff; text-decoration: none; padding: 14px 32px; border-radius: 6px; font-weight: 600; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; }
-    .support { text-align: center; font-size: 14px; color: #4b5563; margin-top: 24px; line-height: 1.5; }
-    .support a { color: #16a34a; font-weight: 600; text-decoration: none; }
     .footer { background: #0f2d1f; padding: 20px; text-align: center; font-size: 11px; color: #9ca3af; border-top: 3px solid #16a34a; }
     .footer strong { color: #fff; }
     .footer-system { color: #16a34a; font-weight: 600; }
@@ -664,55 +695,19 @@ function buildEmailHtml(
   </div>
   <div class="wrapper">
     <span class="week-badge">Week ${meetingWeek} &bull; ${meetingYear}</span>
-    <div class="title">General Meeting Minutes and Actionable</div>
+    <div class="title">Minutes of Meeting and Actionables</div>
     <p class="text">Dear All,</p>
     <p class="text">
-      Please find attached the <strong>Weekly Report and Actionable Items</strong>
-      for the general meeting which held on <strong>Monday, ${meetingDate}</strong>.
+      Please find attached the <strong>Minutes and Actionable of the General Meeting</strong> that held on <strong>${meetingDate}</strong>.
     </p>
     <p class="text">
-      Kindly review and note any observations or questions you may have ahead of the next General Meeting.
+      Kindly review and note any observations or questions you may have ahead of the next General Meeting on <strong>${nextMeetingDate}</strong>.
     </p>
     <p class="text">Thank you</p>
-    <div class="attachments">
-      <table>
-        <thead>
-          <tr>
-            <th style="width: 42%;">Document</th>
-            <th>Description</th>
-            <th style="width: 80px;">Format</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>
-              <div class="doc-name">Weekly Report &mdash; Week ${meetingWeek}, ${meetingYear}</div>
-            </td>
-            <td>
-              <div class="doc-desc">Departmental work done, tasks &amp; challenges</div>
-            </td>
-            <td><span class="doc-format">PDF</span></td>
-          </tr>
-          <tr>
-            <td>
-              <div class="doc-name">Action Tracker &mdash; Week ${meetingWeek}, ${meetingYear}</div>
-            </td>
-            <td>
-              <div class="doc-desc">Upcoming departmental action items &amp; completion status</div>
-            </td>
-            <td><span class="doc-format">PDF</span></td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <div class="support">
-      If you have any questions, please contact<br>
-      <a href="mailto:ict@acoblighting.com">ict@acoblighting.com</a>
-    </div>
   </div>
   <div class="footer" style="background-color:#0f2d1f;">
     <strong>ACOB Lighting Technology Limited</strong><br>
+    Prepared by ${safePreparedBy}<br>
     ACOB Admin &amp; HR Department<br>
     <span class="footer-system">Reports &amp; Meeting Management System</span>
     <br><br>
@@ -755,9 +750,14 @@ serve(async (req) => {
       week: bodyWeek,
       year: bodyYear,
       contentChoice,
+      skipWeeklyReport: bodySkipWeeklyReport,
+      skipActionTracker: bodySkipActionTracker,
+      weeklyReportFilename,
+      actionTrackerFilename,
+      preparedByName,
     } = body
 
-    const { week: currentWeek, year: currentYear } = getCurrentISOWeek()
+    const { week: currentWeek, year: currentYear } = getCurrentOfficeWeek()
 
     // ── Determine meeting week (the week everything is labelled as) ──────
     let meetingWeek: number
@@ -791,14 +791,34 @@ serve(async (req) => {
       `[digest] Meeting: W${meetingWeek}/${meetingYear} | ReportData: W${reportDataWeek}/${reportDataYear} | Tracker: W${atWeek}/${atYear}`
     )
 
-    let reportPdfBase64: string
-    let trackerPdfBase64: string
+    let includeWeeklyReport = !bodySkipWeeklyReport
+    let includeActionTracker = !bodySkipActionTracker
 
-    if (weeklyReportBase64 && actionTrackerBase64) {
-      console.log("[digest] Using client-generated PDFs")
+    if (contentChoice === "weekly_report") includeActionTracker = false
+    if (contentChoice === "action_tracker") includeWeeklyReport = false
+
+    // If caller provides a specific attachment, include it by default.
+    if (weeklyReportBase64) includeWeeklyReport = true
+    if (actionTrackerBase64) includeActionTracker = true
+
+    if (!includeWeeklyReport && !includeActionTracker) {
+      throw new Error("No attachments selected")
+    }
+
+    let reportPdfBase64: string | undefined
+    let trackerPdfBase64: string | undefined
+
+    if (weeklyReportBase64) {
+      console.log("[digest] Using client-provided weekly report PDF")
       reportPdfBase64 = weeklyReportBase64
+    }
+
+    if (actionTrackerBase64) {
+      console.log("[digest] Using client-provided action tracker PDF")
       trackerPdfBase64 = actionTrackerBase64
-    } else {
+    }
+
+    if ((includeWeeklyReport && !reportPdfBase64) || (includeActionTracker && !trackerPdfBase64)) {
       console.log("[digest] Generating PDFs server-side")
 
       // Fetch reports from the PREVIOUS week (work done data)
@@ -836,8 +856,12 @@ serve(async (req) => {
 
       console.log(`[digest] Generating PDFs: ${reports.length} reports, ${(actions || []).length} actions`)
       const [reportPdfBytes, trackerPdfBytes] = await Promise.all([
-        buildWeeklyReportPDF(reports, meetingWeek, meetingYear, coverLogoBytes, headerLogoBytes),
-        buildActionTrackerPDF(actions || [], meetingWeek, meetingYear, coverLogoBytes, headerLogoBytes),
+        includeWeeklyReport && !reportPdfBase64
+          ? buildWeeklyReportPDF(reports, meetingWeek, meetingYear, coverLogoBytes, headerLogoBytes)
+          : Promise.resolve<Uint8Array | null>(null),
+        includeActionTracker && !trackerPdfBase64
+          ? buildActionTrackerPDF(actions || [], meetingWeek, meetingYear, coverLogoBytes, headerLogoBytes)
+          : Promise.resolve<Uint8Array | null>(null),
       ])
 
       const toBase64 = (bytes: Uint8Array): string => {
@@ -846,8 +870,8 @@ serve(async (req) => {
         return btoa(binary)
       }
 
-      reportPdfBase64 = toBase64(reportPdfBytes)
-      trackerPdfBase64 = toBase64(trackerPdfBytes)
+      if (reportPdfBytes) reportPdfBase64 = toBase64(reportPdfBytes)
+      if (trackerPdfBytes) trackerPdfBase64 = toBase64(trackerPdfBytes)
     }
 
     const recipients =
@@ -857,8 +881,24 @@ serve(async (req) => {
           ? [testEmail]
           : ["i.chibuikem@org.acoblighting.com"]
 
-    const subject = `General Meeting Minutes and Actionable \u2014 Week ${meetingWeek}, ${meetingYear}`
-    const html = buildEmailHtml(meetingWeek, meetingYear, reportDataWeek, reportDataYear)
+    const meetingDate = getWeekMonday(meetingWeek, meetingYear)
+    const subject = `Minutes of Meeting and Actionables - ${meetingDate}`
+    const html = buildEmailHtml(meetingWeek, meetingYear, preparedByName || "ACOB Team")
+
+    const attachments: { filename: string; content: string }[] = []
+    if (includeWeeklyReport && reportPdfBase64) {
+      attachments.push({
+        filename: weeklyReportFilename || `ACOB_Weekly_Reports_W${meetingWeek}_${meetingYear}.pdf`,
+        content: reportPdfBase64,
+      })
+    }
+    if (includeActionTracker && trackerPdfBase64) {
+      attachments.push({
+        filename: actionTrackerFilename || `ACOB_Action_Tracker_W${meetingWeek}_${meetingYear}.pdf`,
+        content: trackerPdfBase64,
+      })
+    }
+    if (attachments.length === 0) throw new Error("No attachments to send")
 
     const results = []
     for (const to of recipients) {
@@ -867,10 +907,7 @@ serve(async (req) => {
         to,
         subject,
         html,
-        attachments: [
-          { filename: `ACOB_Weekly_Reports_W${meetingWeek}_${meetingYear}.pdf`, content: reportPdfBase64 },
-          { filename: `ACOB_Action_Tracker_W${meetingWeek}_${meetingYear}.pdf`, content: trackerPdfBase64 },
-        ],
+        attachments,
       })
       if (error) {
         console.error(`[digest] Failed to send to ${to}:`, JSON.stringify(error))

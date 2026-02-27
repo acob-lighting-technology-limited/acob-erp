@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { createClient } from "@/lib/supabase/client"
-import { getCurrentISOWeek } from "@/lib/utils"
+import { getCurrentOfficeWeek } from "@/lib/meeting-week"
 import { toast } from "sonner"
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -68,10 +68,11 @@ interface WeeklyReportsContentProps {
 }
 
 export function WeeklyReportsContent({ initialDepartments }: WeeklyReportsContentProps) {
+  const currentOfficeWeek = getCurrentOfficeWeek()
   const [reports, setReports] = useState<WeeklyReport[]>([])
   const [loading, setLoading] = useState(true)
-  const [weekFilter, setWeekFilter] = useState(getCurrentISOWeek())
-  const [yearFilter, setYearFilter] = useState(new Date().getFullYear())
+  const [weekFilter, setWeekFilter] = useState(currentOfficeWeek.week)
+  const [yearFilter, setYearFilter] = useState(currentOfficeWeek.year)
   const [deptFilter, setDeptFilter] = useState("all")
   const [searchQuery, setSearchQuery] = useState("")
   const [isAdminDialogOpen, setIsAdminDialogOpen] = useState(false)
@@ -293,7 +294,7 @@ export function WeeklyReportsContent({ initialDepartments }: WeeklyReportsConten
                 variant="outline"
                 className="gap-2 border-green-200 text-green-700 hover:bg-green-50 hover:text-green-800 dark:border-green-900/30 dark:hover:bg-green-950/20"
               >
-                <Link href="/admin/reports/mail">
+                <Link href="/admin/communications/meetings/mail">
                   <ExternalLink className="h-4 w-4" />
                   <span className="hidden sm:inline">General Meeting Mail</span>
                 </Link>

@@ -9,7 +9,8 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { createClient } from "@/lib/supabase/client"
-import { getCurrentISOWeek, cn } from "@/lib/utils"
+import { cn } from "@/lib/utils"
+import { getCurrentOfficeWeek } from "@/lib/meeting-week"
 import { toast } from "sonner"
 import {
   FileBarChart,
@@ -48,13 +49,14 @@ import {
 import { format } from "date-fns"
 
 export default function WeeklyReportsPortal() {
+  const currentOfficeWeek = getCurrentOfficeWeek()
   const [reports, setReports] = useState<WeeklyReport[]>([])
   const [loading, setLoading] = useState(true)
   const [profile, setProfile] = useState<any>(null)
   const [searchQuery, setSearchQuery] = useState("")
   const [deptFilter, setDeptFilter] = useState("all")
-  const [yearFilter, setYearFilter] = useState(new Date().getFullYear())
-  const [weekFilter, setWeekFilter] = useState(getCurrentISOWeek())
+  const [yearFilter, setYearFilter] = useState(currentOfficeWeek.year)
+  const [weekFilter, setWeekFilter] = useState(currentOfficeWeek.week)
   const [allDepartments, setAllDepartments] = useState<string[]>([])
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [selectedReportParams, setSelectedReportParams] = useState<any>(null)

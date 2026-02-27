@@ -19,6 +19,7 @@ type KnowledgePresenter = {
 const RESEND_MAX_REQ_PER_SEC = 2
 const SEND_INTERVAL_MS = Math.ceil(1000 / RESEND_MAX_REQ_PER_SEC) + 100 // safety margin
 const MAX_429_RETRIES = 5
+const DEFAULT_TIME_ZONE = "Africa/Lagos"
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
@@ -115,11 +116,15 @@ function normalizeMeetingAgenda(
 }
 
 function buildMeetingReminderHtml(
-  meetingDate: string,
+  meetingDate: string | undefined,
   meetingTime: string,
   teamsLink: string,
-  agenda: string[]
+  agenda: string[],
+  preparedByName?: string
 ): string {
+  const { timingPhrase, effectiveDate } = getMeetingReminderDescriptor(meetingDate, meetingTime)
+  const displayTime = formatTimeWithMeridiem(meetingTime)
+  const preparedBy = escapeHtml(preparedByName?.trim() || "ACOB Team")
   let agendaHtml = ""
   for (let i = 0; i < agenda.length; i++) {
     agendaHtml +=
@@ -156,8 +161,6 @@ function buildMeetingReminderHtml(
     ".cta { text-align: center; margin: 28px 0; }" +
     ".button { display: inline-block; background: #1e40af; color: #fff; text-decoration: none; padding: 14px 32px; border-radius: 6px; font-weight: 600; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; }" +
     ".note-box { background: #fefce8; border: 1px solid #fde68a; border-radius: 8px; padding: 16px 20px; font-size: 14px; color: #92400e; margin: 20px 0; line-height: 1.6; }" +
-    ".support { text-align: center; font-size: 14px; color: #4b5563; margin-top: 24px; line-height: 1.5; }" +
-    ".support a { color: #16a34a; font-weight: 600; text-decoration: none; }" +
     ".footer { background: #0f2d1f; padding: 20px; text-align: center; font-size: 11px; color: #9ca3af; border-top: 3px solid #16a34a; }" +
     ".footer strong { color: #fff; }" +
     ".footer-system { color: #16a34a; font-weight: 600; }" +
@@ -174,11 +177,13 @@ function buildMeetingReminderHtml(
     '<div class="title">Reminder for General Weekly Meeting</div>' +
     '<p class="text">Dear All,</p>' +
     '<p class="text">' +
-    "Please find attached the agenda for our general weekly meeting, scheduled to take place tomorrow " +
+    "Please find below the agenda for our general weekly meeting, scheduled to take place " +
+    timingPhrase +
+    " " +
     "<strong>" +
-    meetingDate +
+    effectiveDate +
     "</strong>, at <strong>" +
-    meetingTime +
+    displayTime +
     "</strong>. " +
     "You can access the meeting using the link below:" +
     "</p>" +
@@ -195,17 +200,16 @@ function buildMeetingReminderHtml(
     "</div>" +
     '<div class="note-box">' +
     "<strong>Note:</strong> Your attendance is crucial to ensure we're all on the same page and can collaborate effectively. " +
-    "Please join on time, and feel free to reach out to me or any team member if you have questions or concerns." +
+    'Please join on time, and feel free to reach out to <a href="mailto:e.rafiat@org.acoblighting.com" style="color:#1e40af;font-weight:600;text-decoration:none;">me</a> or any team member if you have questions or concerns.' +
     "</div>" +
     '<p class="text" style="text-align: center; font-weight: 600; color: #16a34a;">Looking forward to seeing you there.</p>' +
-    '<div class="support">' +
-    "If you have any questions, please contact<br>" +
-    '<a href="mailto:ict@acoblighting.com">ict@acoblighting.com</a>' +
-    "</div>" +
     "</div>" +
     '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#0f2d1f" style="background:#0f2d1f !important;background-color:#0f2d1f !important;border-top:3px solid #16a34a;">' +
     '<tr><td align="center" style="padding:20px;background:#0f2d1f !important;background-color:#0f2d1f !important;font-size:11px;color:#9ca3af;">' +
     '<strong style="color:#fff;">ACOB Lighting Technology Limited</strong><br>' +
+    "Prepared by " +
+    preparedBy +
+    "<br>" +
     "ACOB Admin &amp; HR Department<br>" +
     '<span style="color:#16a34a;font-weight:600;">Meeting Management System</span>' +
     "<br><br>" +
@@ -215,6 +219,25 @@ function buildMeetingReminderHtml(
     "</body>" +
     "</html>"
   )
+}
+
+function formatTimeWithMeridiem(timeText: string): string {
+  const value = String(timeText || "")
+    .trim()
+    .toLowerCase()
+  const ampmMatch = value.match(/^(\d{1,2}):(\d{2})\s*(am|pm)$/)
+  if (ampmMatch) {
+    const hour = Number(ampmMatch[1])
+    const minute = ampmMatch[2]
+    const period = ampmMatch[3].toUpperCase()
+    return `${hour}:${minute} ${period}`
+  }
+  const simpleMatch = value.match(/^(\d{1,2}):(\d{2})$/)
+  if (simpleMatch) {
+    const date = new Date(`2000-01-01T${simpleMatch[1].padStart(2, "0")}:${simpleMatch[2]}:00`)
+    return date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })
+  }
+  return "8:30 AM"
 }
 
 function buildKnowledgeSharingHtml(sessionDate: string, sessionTime: string, duration: string): string {
@@ -234,8 +257,6 @@ function buildKnowledgeSharingHtml(sessionDate: string, sessionTime: string, dur
     ".text { font-size: 15px; color: #374151; line-height: 1.7; margin: 0 0 18px 0; }" +
     ".note-box { background: #fef3c7; border: 1px solid #fde68a; border-radius: 8px; padding: 16px 20px; font-size: 14px; color: #92400e; margin: 20px 0; line-height: 1.6; text-align: center; }" +
     ".alert-badge { display: inline-block; background: #dc2626; color: #fff; font-size: 11px; font-weight: 700; padding: 4px 12px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px; }" +
-    ".support { text-align: center; font-size: 14px; color: #4b5563; margin-top: 24px; line-height: 1.5; }" +
-    ".support a { color: #16a34a; font-weight: 600; text-decoration: none; }" +
     ".footer { background: #0f2d1f; padding: 20px; text-align: center; font-size: 11px; color: #9ca3af; border-top: 3px solid #16a34a; }" +
     ".footer strong { color: #fff; }" +
     ".footer-system { color: #16a34a; font-weight: 600; }" +
@@ -268,10 +289,6 @@ function buildKnowledgeSharingHtml(sessionDate: string, sessionTime: string, dur
     '<span class="alert-badge">Mandatory</span><br><br>' +
     "Attendance is mandatory for all team members." +
     "</div>" +
-    '<div class="support">' +
-    "If you have any questions, please contact<br>" +
-    '<a href="mailto:ict@acoblighting.com">ict@acoblighting.com</a>' +
-    "</div>" +
     "</div>" +
     '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#0f2d1f" style="background:#0f2d1f !important;background-color:#0f2d1f !important;border-top:3px solid #16a34a;">' +
     '<tr><td align="center" style="padding:20px;background:#0f2d1f !important;background-color:#0f2d1f !important;font-size:11px;color:#9ca3af;">' +
@@ -287,6 +304,146 @@ function buildKnowledgeSharingHtml(sessionDate: string, sessionTime: string, dur
   )
 }
 
+function escapeHtml(input: string): string {
+  return input
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;")
+}
+
+function getLagosNowParts(now: Date): {
+  weekday: number
+  year: number
+  month: number
+  day: number
+  hour: number
+  minute: number
+} {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: DEFAULT_TIME_ZONE,
+    weekday: "short",
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    hour: "numeric",
+    minute: "numeric",
+    hourCycle: "h23",
+  }).formatToParts(now)
+
+  const getPart = (type: string): string => parts.find((p) => p.type === type)?.value || ""
+  const weekdayRaw = getPart("weekday").toLowerCase()
+  const weekdayMap: Record<string, number> = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 }
+
+  return {
+    weekday: weekdayMap[weekdayRaw.slice(0, 3)] ?? 0,
+    year: Number(getPart("year")),
+    month: Number(getPart("month")),
+    day: Number(getPart("day")),
+    hour: Number(getPart("hour")),
+    minute: Number(getPart("minute")),
+  }
+}
+
+function parseTimeToMinutes(timeText: string): number {
+  const value = String(timeText || "")
+    .trim()
+    .toLowerCase()
+  const ampmMatch = value.match(/^(\d{1,2}):(\d{2})\s*(am|pm)$/)
+  if (ampmMatch) {
+    let hour = Number(ampmMatch[1]) % 12
+    const minute = Number(ampmMatch[2])
+    if (ampmMatch[3] === "pm") hour += 12
+    return hour * 60 + minute
+  }
+  const simpleMatch = value.match(/^(\d{1,2}):(\d{2})$/)
+  if (simpleMatch) {
+    return Number(simpleMatch[1]) * 60 + Number(simpleMatch[2])
+  }
+  return 8 * 60 + 30
+}
+
+function formatDateWithOrdinal(date: Date): string {
+  const day = date.getUTCDate()
+  const suffix = [1, 21, 31].includes(day) ? "st" : [2, 22].includes(day) ? "nd" : [3, 23].includes(day) ? "rd" : "th"
+  const month = date.toLocaleString("en-GB", { month: "long", timeZone: "UTC" })
+  const year = date.getUTCFullYear()
+  return `${day}${suffix} ${month}, ${year}`
+}
+
+function parseMeetingDateInput(meetingDate: string | undefined): Date | null {
+  if (!meetingDate) return null
+  const raw = String(meetingDate).trim()
+
+  const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (isoMatch) {
+    return new Date(Date.UTC(Number(isoMatch[1]), Number(isoMatch[2]) - 1, Number(isoMatch[3])))
+  }
+
+  const normalized = raw
+    .replace(/(\d+)(st|nd|rd|th)/gi, "$1")
+    .replace(/,\s*/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+  const parsed = new Date(normalized)
+  if (Number.isNaN(parsed.getTime())) return null
+
+  return new Date(Date.UTC(parsed.getFullYear(), parsed.getMonth(), parsed.getDate()))
+}
+
+function formatWeekday(date: Date): string {
+  return date.toLocaleString("en-GB", { weekday: "long", timeZone: "UTC" })
+}
+
+function getMeetingReminderDescriptor(
+  meetingDate: string | undefined,
+  meetingTime: string
+): { timingPhrase: string; effectiveDate: string } {
+  const now = new Date()
+  const lagos = getLagosNowParts(now)
+  const threshold = parseTimeToMinutes(meetingTime)
+  const currentMinutes = lagos.hour * 60 + lagos.minute
+
+  const todayUtc = new Date(Date.UTC(lagos.year, lagos.month - 1, lagos.day))
+  const targetDate = parseMeetingDateInput(meetingDate)
+
+  // Fallback for older payloads: preserve Monday automation.
+  let resolved = targetDate
+  if (!resolved) {
+    let daysUntilMonday = (8 - lagos.weekday) % 7
+    if (lagos.weekday === 1 && currentMinutes >= threshold) daysUntilMonday = 7
+    resolved = new Date(todayUtc)
+    resolved.setUTCDate(resolved.getUTCDate() + daysUntilMonday)
+  }
+
+  let diffDays = Math.floor((resolved.getTime() - todayUtc.getTime()) / (24 * 60 * 60 * 1000))
+  let effective = new Date(resolved)
+  let timingPhrase = `on ${formatWeekday(effective)},`
+
+  if (diffDays < 0) {
+    effective = new Date(effective)
+    effective.setUTCDate(effective.getUTCDate() + 7)
+    diffDays = Math.floor((effective.getTime() - todayUtc.getTime()) / (24 * 60 * 60 * 1000))
+  }
+
+  if (diffDays === 0) {
+    if (currentMinutes < threshold) {
+      timingPhrase = "today,"
+    } else {
+      effective = new Date(effective)
+      effective.setUTCDate(effective.getUTCDate() + 7)
+      timingPhrase = `next week ${formatWeekday(effective)},`
+    }
+  } else if (diffDays === 1) {
+    timingPhrase = "tomorrow,"
+  } else if (diffDays === 2) {
+    timingPhrase = "next tomorrow,"
+  }
+
+  return { timingPhrase, effectiveDate: formatDateWithOrdinal(effective) }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders })
 
@@ -300,10 +457,11 @@ serve(async (req) => {
     const {
       type,
       recipients,
-      meetingDate,
       meetingTime,
+      meetingDate,
       teamsLink,
       agenda,
+      meetingPreparedByName,
       sessionDate,
       sessionTime,
       duration,
@@ -316,6 +474,7 @@ serve(async (req) => {
       meetingTime?: string
       teamsLink?: string
       agenda?: string[]
+      meetingPreparedByName?: string
       sessionDate?: string
       sessionTime?: string
       duration?: string
@@ -336,10 +495,11 @@ serve(async (req) => {
 
       subject = "Reminder for General Weekly Meeting"
       html = buildMeetingReminderHtml(
-        meetingDate || "Monday",
+        meetingDate,
         meetingTime || "8:30 AM",
         teamsLink || "",
-        normalizedAgenda
+        normalizedAgenda,
+        meetingPreparedByName
       )
     } else {
       subject = "Reminder: Knowledge Sharing Session"

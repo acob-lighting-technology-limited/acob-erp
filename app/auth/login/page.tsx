@@ -200,19 +200,17 @@ export default function LoginPage() {
 
   return (
     <div className="from-background via-background to-muted/20 flex min-h-screen w-full items-center justify-center bg-gradient-to-br p-4 md:p-6">
-      <div className="w-full max-w-lg">
-        <div className="flex flex-col gap-8">
-          {/* Header Section */}
-          <div className="space-y-4 text-center">
-            <div className="mx-auto flex h-20 items-center justify-center">
-              <Image src={logoSrc} alt="ACOB Lighting" width={200} height={60} priority className="h-12 w-auto" />
-            </div>
-            <h1 className="text-4xl font-bold tracking-tight">Welcome Back</h1>
-            <p className="text-muted-foreground text-lg">Login to access your ACOB employee portal</p>
-          </div>
-
+      <div className="w-full max-w-6xl">
+        <div className="grid items-stretch gap-6 lg:grid-cols-[minmax(0,1fr)_420px] xl:gap-8">
           <Card className="border-2 shadow-xl">
             <CardHeader className="space-y-3 pb-6">
+              <div className="mb-2 flex justify-center lg:hidden">
+                <Image src={logoSrc} alt="ACOB Lighting" width={170} height={52} priority className="h-10 w-auto" />
+              </div>
+              <h1 className="text-3xl font-bold tracking-tight lg:text-4xl">Welcome Back</h1>
+              <p className="text-muted-foreground text-base lg:text-lg">
+                Sign in to continue to the ACOB employee portal
+              </p>
               <CardTitle className="text-2xl font-semibold">
                 {step === "credentials" ? "Sign In" : "Verify Your Code"}
               </CardTitle>
@@ -419,6 +417,34 @@ export default function LoginPage() {
               )}
             </CardContent>
           </Card>
+
+          <aside className="hidden rounded-2xl border bg-zinc-950 p-8 text-zinc-100 shadow-xl lg:flex lg:flex-col lg:justify-between">
+            <div className="space-y-8">
+              <Image
+                src="/images/acob-logo-dark.webp"
+                alt="ACOB Lighting"
+                width={220}
+                height={64}
+                className="h-12 w-auto"
+              />
+              <div className="space-y-3">
+                <h2 className="text-2xl font-semibold tracking-tight">ACOB Internal Workspace</h2>
+                <p className="text-sm leading-6 text-zinc-300">
+                  Secure access for authorized employees across operations, reporting, and administrative workflows.
+                </p>
+              </div>
+              <div className="space-y-3 text-sm text-zinc-200">
+                <p className="border-l-2 border-emerald-400/70 pl-3">Use your company email domain to sign in.</p>
+                <p className="border-l-2 border-emerald-400/70 pl-3">
+                  Choose password or one-time code based on your access setup.
+                </p>
+                <p className="border-l-2 border-emerald-400/70 pl-3">
+                  Contact Admin & HR if your account has not been provisioned.
+                </p>
+              </div>
+            </div>
+            <p className="text-xs text-zinc-400">ACOB Lighting Technology Limited</p>
+          </aside>
         </div>
       </div>
     </div>
