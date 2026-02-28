@@ -61,6 +61,17 @@
   --max-width-content: 56rem; /* 896px - Content pages */
   --max-width-form: 42rem; /* 672px - Forms, profiles */
   --max-width-narrow: 32rem; /* 512px - Narrow forms, modals */
+
+  /* Admin context tokens (scoped by .admin-shell) */
+  --admin-primary: oklch(0.52 0.16 65);
+  --admin-primary-foreground: oklch(0.145 0 0);
+  --admin-badge-bg: oklch(0.96 0.05 75);
+  --admin-badge-border: oklch(0.86 0.08 75);
+  --admin-accent-soft: oklch(0.95 0.03 75);
+  --admin-sidebar-bg: oklch(0.99 0.005 75);
+  --admin-sidebar-border: oklch(0.9 0.01 70);
+  --admin-content-bg: linear-gradient(to bottom, oklch(0.985 0.007 75), oklch(0.975 0.004 70));
+  --admin-ribbon-bg: oklch(0.985 0.01 75 / 0.92);
 }
 
 .dark {
@@ -96,6 +107,21 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(0.269 0 0);
   --sidebar-ring: oklch(0.65 0.15 142);
+
+  --admin-primary: oklch(0.72 0.14 72);
+  --admin-primary-foreground: oklch(0.145 0 0);
+  --admin-badge-bg: oklch(0.36 0.05 72);
+  --admin-badge-border: oklch(0.5 0.06 72);
+  --admin-accent-soft: oklch(0.3 0.02 72);
+  --admin-sidebar-bg: oklch(0.18 0.004 72);
+  --admin-sidebar-border: oklch(0.28 0.006 72);
+  --admin-content-bg: linear-gradient(to bottom, oklch(0.16 0.004 72), oklch(0.145 0.002 70));
+  --admin-ribbon-bg: oklch(0.19 0.004 72 / 0.88);
+}
+
+.admin-shell {
+  --primary: var(--admin-primary);
+  --primary-foreground: var(--admin-primary-foreground);
 }
 
 @theme inline {
@@ -148,13 +174,15 @@
   }
 
   /* Mobile responsiveness fixes */
+  /* Use overflow-x: clip instead of hidden to prevent horizontal scroll
+     without creating a new scroll container (which breaks position: sticky) */
   html {
-    overflow-x: hidden;
+    overflow-x: clip;
     width: 100%;
   }
 
   body {
-    overflow-x: hidden;
+    overflow-x: clip;
     width: 100%;
     position: relative;
   }

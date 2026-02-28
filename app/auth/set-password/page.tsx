@@ -88,7 +88,7 @@ export default function SetPasswordPage() {
 
       // Redirect to dashboard after 2 seconds
       setTimeout(() => {
-        window.location.href = "/dashboard"
+        window.location.href = "/profile"
       }, 2000)
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Failed to set password"
@@ -152,7 +152,7 @@ export default function SetPasswordPage() {
                       Your password has been set successfully. You&apos;ll be redirected to your dashboard shortly.
                     </p>
                   </div>
-                  <Link href="/dashboard" className="block">
+                  <Link href="/profile" className="block">
                     <Button className="h-11 w-full">Go to Dashboard</Button>
                   </Link>
                 </div>

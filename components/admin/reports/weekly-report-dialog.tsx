@@ -29,9 +29,20 @@ interface WeeklyReportAdminDialogProps {
   onClose: () => void
   report?: WeeklyReport | null
   onSuccess: () => void
+  currentUser: {
+    id: string
+    role: string
+    department: string | null
+  }
 }
 
-export function WeeklyReportAdminDialog({ isOpen, onClose, report, onSuccess }: WeeklyReportAdminDialogProps) {
+export function WeeklyReportAdminDialog({
+  isOpen,
+  onClose,
+  report,
+  onSuccess,
+  currentUser,
+}: WeeklyReportAdminDialogProps) {
   const [loading, setLoading] = useState(false)
   const [departments, setDepartments] = useState<string[]>([])
   const [currentActions, setCurrentActions] = useState<any[]>([])
@@ -48,9 +59,14 @@ export function WeeklyReportAdminDialog({ isOpen, onClose, report, onSuccess }: 
   })
 
   const supabase = createClient()
+  const isLead = currentUser.role === "lead"
 
   useEffect(() => {
     const fetchMetadata = async () => {
+      if (isLead && currentUser.department) {
+        setDepartments([currentUser.department])
+        return
+      }
       const { data: deptData } = await supabase.from("profiles").select("department").not("department", "is", null)
       if (deptData) {
         const uniqueDepts = Array.from(new Set(deptData.map((d) => d.department))).sort()
@@ -58,7 +74,7 @@ export function WeeklyReportAdminDialog({ isOpen, onClose, report, onSuccess }: 
       }
     }
     fetchMetadata()
-  }, [])
+  }, [currentUser.department, isLead])
 
   useEffect(() => {
     const fetchStatus = async () => {
@@ -96,7 +112,7 @@ export function WeeklyReportAdminDialog({ isOpen, onClose, report, onSuccess }: 
     if (report) {
       setFormData({
         user_id: report.user_id,
-        department: report.department,
+        department: isLead ? currentUser.department || report.department : report.department,
         week_number: report.week_number,
         year: report.year,
         work_done: report.work_done || "",
@@ -105,22 +121,16 @@ export function WeeklyReportAdminDialog({ isOpen, onClose, report, onSuccess }: 
         status: report.status || "submitted",
       })
     } else {
-      const setupUser = async () => {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser()
-        setFormData((prev) => ({
-          ...prev,
-          user_id: user?.id || "",
-          department: "",
-          work_done: "",
-          tasks_new_week: "",
-          challenges: "",
-        }))
-      }
-      setupUser()
+      setFormData((prev) => ({
+        ...prev,
+        user_id: currentUser.id || "",
+        department: isLead ? currentUser.department || "" : "",
+        work_done: "",
+        tasks_new_week: "",
+        challenges: "",
+      }))
     }
-  }, [report, isOpen])
+  }, [currentUser.department, currentUser.id, isLead, report, isOpen])
 
   const handleSubmit = async () => {
     if (!formData.department || !formData.work_done) {
@@ -129,15 +139,25 @@ export function WeeklyReportAdminDialog({ isOpen, onClose, report, onSuccess }: 
     }
     setLoading(true)
     try {
+      if (isLead && report && report.user_id !== currentUser.id) {
+        throw new Error("You can only edit reports you created")
+      }
+
+      const safeFormData = {
+        ...formData,
+        user_id: isLead ? currentUser.id : formData.user_id,
+        department: isLead ? currentUser.department || formData.department : formData.department,
+      }
+
       let reportId = report?.id
       if (report) {
-        const { error } = await supabase.from("weekly_reports").update(formData).eq("id", report.id)
+        const { error } = await supabase.from("weekly_reports").update(safeFormData).eq("id", report.id)
         if (error) throw error
         toast.success("Updated")
       } else {
         const { data: newReport, error } = await supabase
           .from("weekly_reports")
-          .insert([formData])
+          .insert([safeFormData])
           .select("id")
           .single()
         if (error) throw error
@@ -159,7 +179,7 @@ export function WeeklyReportAdminDialog({ isOpen, onClose, report, onSuccess }: 
               year: formData.year,
               original_week: a.original_week || a.week_number,
               original_year: a.original_year || a.year,
-              assigned_by: formData.user_id,
+              assigned_by: safeFormData.user_id,
               report_id: reportId,
             })
           })
@@ -177,7 +197,7 @@ export function WeeklyReportAdminDialog({ isOpen, onClose, report, onSuccess }: 
                 year: formData.year,
                 original_week: formData.week_number,
                 original_year: formData.year,
-                assigned_by: formData.user_id,
+                assigned_by: safeFormData.user_id,
                 report_id: reportId,
               })
           })
@@ -238,6 +258,7 @@ export function WeeklyReportAdminDialog({ isOpen, onClose, report, onSuccess }: 
                 onValueChange={(val) => setFormData((p) => ({ ...p, department: val }))}
                 options={departments.map((d) => ({ value: d, label: d }))}
                 placeholder="Select department"
+                disabled={isLead}
               />
             </div>
             <div className="space-y-2">

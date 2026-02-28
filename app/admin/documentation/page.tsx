@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
+import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
 import {
   AdminDocumentationContent,
   type Documentation,
@@ -19,16 +20,16 @@ async function getAdminDocumentationData() {
     return { redirect: "/auth/login" as const }
   }
 
-  // Get user profile
-  const { data: profile } = await supabase.from("profiles").select("role, lead_departments").eq("id", user.id).single()
-
-  if (!profile || !["super_admin", "admin", "lead"].includes(profile.role)) {
+  const scope = await resolveAdminScope(supabase as any, user.id)
+  if (!scope) {
     return { redirect: "/dashboard" as const }
   }
+  const departmentScope = getDepartmentScope(scope, "general")
 
   const userProfile: UserProfile = {
-    role: profile.role,
-    lead_departments: profile.lead_departments,
+    role: scope.role as any,
+    lead_departments: scope.leadDepartments,
+    managed_departments: scope.managedDepartments,
   }
 
   // Fetch documentation - leads can only see documentation from their departments
@@ -37,9 +38,11 @@ async function getAdminDocumentationData() {
 
   let docsQuery = supabase.from("user_documentation").select("*").order("created_at", { ascending: false })
 
-  // If user is a lead, filter by their lead departments
-  if (profile.role === "lead" && profile.lead_departments && profile.lead_departments.length > 0) {
-    const { data: deptUsers } = await supabase.from("profiles").select("id").in("department", profile.lead_departments)
+  if (departmentScope) {
+    const { data: deptUsers } =
+      departmentScope.length > 0
+        ? await supabase.from("profiles").select("id").in("department", departmentScope)
+        : { data: [] as { id: string }[] }
 
     const userIds = deptUsers?.map((u) => u.id) || []
     if (userIds.length > 0) {
@@ -75,10 +78,15 @@ async function getAdminDocumentationData() {
   }
 
   // Load employee for filter
-  const { data: employeeData } = await supabase
+  let employeeQuery = supabase
     .from("profiles")
     .select("id, first_name, last_name, department")
     .order("last_name", { ascending: true })
+  if (departmentScope) {
+    employeeQuery =
+      departmentScope.length > 0 ? employeeQuery.in("department", departmentScope) : employeeQuery.eq("id", "__none__")
+  }
+  const { data: employeeData } = await employeeQuery
 
   employee = employeeData || []
 

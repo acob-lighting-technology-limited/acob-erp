@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { evaluateLeaveEligibility, getLeavePolicy } from "@/lib/hr/leave-workflow"
 
-export async function GET(request: NextRequest) {
+export async function GET(_: NextRequest) {
   try {
     const supabase = await createClient()
 
@@ -13,14 +14,53 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { data: leaveTypes, error } = await supabase.from("leave_types").select("*").order("name")
+    const [{ data: leaveTypes, error }, { data: profile }] = await Promise.all([
+      supabase.from("leave_types").select("*").order("name"),
+      supabase
+        .from("profiles")
+        .select("id, gender, employment_date, employment_type, marital_status, has_children, pregnancy_status")
+        .eq("id", user.id)
+        .single(),
+    ])
+    const requesterProfile = profile || {
+      id: user.id,
+      gender: "unspecified",
+      employment_date: null,
+      employment_type: null,
+      marital_status: "unspecified",
+      has_children: false,
+      pregnancy_status: "unspecified",
+    }
 
     if (error) {
       console.error("Error fetching leave types:", error)
       return NextResponse.json({ error: "Failed to fetch leave types" }, { status: 500 })
     }
 
-    return NextResponse.json({ data: leaveTypes })
+    const enriched = await Promise.all(
+      (leaveTypes || []).map(async (leaveType: any) => {
+        const policy = await getLeavePolicy(supabase, leaveType.id)
+        const evaluation = await evaluateLeaveEligibility({
+          supabase,
+          policy,
+          requesterProfile,
+          leaveType,
+          startDate: new Date().toISOString().slice(0, 10),
+          daysCount: 1,
+        })
+
+        return {
+          ...leaveType,
+          policy,
+          eligibility_status: evaluation.status,
+          eligibility_reason: evaluation.reason,
+          required_documents: evaluation.requiredDocuments,
+          missing_documents: evaluation.missingDocuments,
+        }
+      })
+    )
+
+    return NextResponse.json({ data: enriched })
   } catch (error) {
     console.error("Error in GET /api/hr/leave/types:", error)
     return NextResponse.json({ error: "An error occurred" }, { status: 500 })

@@ -53,13 +53,19 @@ export function FeedbackViewerClient({ feedback }: FeedbackViewerClientProps) {
 
         const { data: userProfile } = await supabase
           .from("profiles")
-          .select("role, lead_departments")
+          .select("role, department, lead_departments")
           .eq("id", user.id)
           .single()
 
+        const scopedDepartments = userProfile?.lead_departments?.length
+          ? userProfile.lead_departments
+          : userProfile?.department
+            ? [userProfile.department]
+            : []
+
         if (userProfile) {
           setUserRole(userProfile.role)
-          setLeadDepartments(userProfile.lead_departments || [])
+          setLeadDepartments(scopedDepartments || [])
         }
 
         // Load employee - leads can only see employee in their departments
@@ -69,8 +75,8 @@ export function FeedbackViewerClient({ feedback }: FeedbackViewerClientProps) {
           .order("last_name", { ascending: true })
 
         // If user is a lead, filter by their lead departments
-        if (userProfile?.role === "lead" && userProfile.lead_departments && userProfile.lead_departments.length > 0) {
-          employeeQuery = employeeQuery.in("department", userProfile.lead_departments)
+        if (userProfile?.role === "lead" && scopedDepartments.length > 0) {
+          employeeQuery = employeeQuery.in("department", scopedDepartments)
         }
 
         const { data: employeeData } = await employeeQuery
@@ -80,8 +86,8 @@ export function FeedbackViewerClient({ feedback }: FeedbackViewerClientProps) {
 
           // Extract unique departments - for leads, only show their lead departments
           let uniqueDepartments: string[] = []
-          if (userProfile?.role === "lead" && userProfile.lead_departments && userProfile.lead_departments.length > 0) {
-            uniqueDepartments = userProfile.lead_departments.sort()
+          if (userProfile?.role === "lead" && scopedDepartments.length > 0) {
+            uniqueDepartments = [...scopedDepartments].sort()
           } else {
             uniqueDepartments = Array.from(
               new Set(employeeData.map((s: any) => s.department).filter(Boolean))

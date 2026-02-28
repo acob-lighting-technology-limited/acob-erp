@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { AdminNotificationContent, type DynamicNotification } from "./admin-notification-content"
+import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
 
 async function formatRelativeTime(dateString: string): Promise<string> {
   const date = new Date(dateString)
@@ -36,12 +37,18 @@ async function getAdminNotificationsData() {
     return { redirect: "/auth/login" as const }
   }
 
-  // Check if user is admin
-  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
-
-  if (!profile || !["super_admin", "admin", "lead"].includes(profile.role)) {
+  const scope = await resolveAdminScope(supabase as any, user.id)
+  if (!scope) {
     return { redirect: "/dashboard" as const }
   }
+  const departmentScope = getDepartmentScope(scope, "general")
+  const profileIdsInScope = departmentScope
+    ? (departmentScope.length > 0
+        ? await supabase.from("profiles").select("id").in("department", departmentScope)
+        : ({ data: [] as { id: string }[] } as any)
+      ).data || []
+    : null
+  const scopedUserIds = profileIdsInScope ? profileIdsInScope.map((p: any) => p.id) : []
 
   const notificationList: DynamicNotification[] = []
   const now = new Date()
@@ -73,10 +80,14 @@ async function getAdminNotificationsData() {
 
   // Open feedback
   try {
-    const { count: openFeedbackCount } = await supabase
-      .from("feedback")
-      .select("*", { count: "exact", head: true })
-      .eq("status", "open")
+    let openFeedbackQuery = supabase.from("feedback").select("*", { count: "exact", head: true }).eq("status", "open")
+    if (departmentScope) {
+      openFeedbackQuery =
+        scopedUserIds.length > 0
+          ? openFeedbackQuery.in("user_id", scopedUserIds)
+          : openFeedbackQuery.eq("id", "__none__")
+    }
+    const { count: openFeedbackCount } = await openFeedbackQuery
 
     if (openFeedbackCount && openFeedbackCount > 0) {
       notificationList.push({
@@ -96,11 +107,18 @@ async function getAdminNotificationsData() {
 
   // Urgent tasks
   try {
-    const { count: urgentTasksCount } = await supabase
+    let urgentTasksQuery = supabase
       .from("tasks")
       .select("*", { count: "exact", head: true })
       .eq("priority", "urgent")
       .in("status", ["pending", "in_progress"])
+    if (departmentScope) {
+      urgentTasksQuery =
+        departmentScope.length > 0
+          ? urgentTasksQuery.in("department", departmentScope)
+          : urgentTasksQuery.eq("id", "__none__")
+    }
+    const { count: urgentTasksCount } = await urgentTasksQuery
 
     if (urgentTasksCount && urgentTasksCount > 0) {
       notificationList.push({
@@ -120,11 +138,18 @@ async function getAdminNotificationsData() {
 
   // Overdue tasks
   try {
-    const { data: overdueTasks } = await supabase
+    let overdueTasksQuery = supabase
       .from("tasks")
       .select("id")
       .lt("due_date", today)
       .in("status", ["pending", "in_progress"])
+    if (departmentScope) {
+      overdueTasksQuery =
+        departmentScope.length > 0
+          ? overdueTasksQuery.in("department", departmentScope)
+          : overdueTasksQuery.eq("id", "__none__")
+    }
+    const { data: overdueTasks } = await overdueTasksQuery
 
     if (overdueTasks && overdueTasks.length > 0) {
       notificationList.push({
@@ -158,7 +183,7 @@ async function getAdminNotificationsData() {
         title: "Overdue Payments",
         message: `${overduePayments.length} payment${overduePayments.length > 1 ? "s" : ""} past due date`,
         timestamp,
-        link: "/admin/payments",
+        link: "/admin/finance/payments",
         linkText: "View Payments",
         read: false,
         priority: "urgent",
@@ -185,7 +210,7 @@ async function getAdminNotificationsData() {
         title: "Payments Due Soon",
         message: `${dueSoonPayments.length} payment${dueSoonPayments.length > 1 ? "s" : ""} due within 7 days`,
         timestamp,
-        link: "/admin/payments",
+        link: "/admin/finance/payments",
         linkText: "View Payments",
         read: false,
         priority: "high",
@@ -195,10 +220,17 @@ async function getAdminNotificationsData() {
 
   // Pending leave requests
   try {
-    const { count: pendingLeaveCount } = await supabase
+    let pendingLeaveQuery = supabase
       .from("leave_requests")
       .select("*", { count: "exact", head: true })
       .eq("status", "pending")
+    if (departmentScope) {
+      pendingLeaveQuery =
+        scopedUserIds.length > 0
+          ? pendingLeaveQuery.in("user_id", scopedUserIds)
+          : pendingLeaveQuery.eq("id", "__none__")
+    }
+    const { count: pendingLeaveCount } = await pendingLeaveQuery
 
     if (pendingLeaveCount && pendingLeaveCount > 0) {
       notificationList.push({
@@ -241,10 +273,17 @@ async function getAdminNotificationsData() {
 
   // Assets in maintenance
   try {
-    const { count: maintenanceCount } = await supabase
+    let maintenanceQuery = supabase
       .from("assets")
       .select("*", { count: "exact", head: true })
       .eq("status", "maintenance")
+    if (departmentScope) {
+      maintenanceQuery =
+        departmentScope.length > 0
+          ? maintenanceQuery.in("department", departmentScope)
+          : maintenanceQuery.eq("id", "__none__")
+    }
+    const { count: maintenanceCount } = await maintenanceQuery
 
     if (maintenanceCount && maintenanceCount > 0) {
       notificationList.push({

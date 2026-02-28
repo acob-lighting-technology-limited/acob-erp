@@ -37,8 +37,8 @@ export type Database = {
           employment_status: Database["public"]["Enums"]["employment_status"]
           status_changed_at: string | null
           status_changed_by: string | null
-          termination_date: string | null
-          termination_reason: string | null
+          separation_date: string | null
+          separation_reason: string | null
           // DEPRECATED fields (use assets table instead)
           device_allocated: boolean | null
           device_type: string | null
@@ -74,8 +74,8 @@ export type Database = {
           employment_status?: Database["public"]["Enums"]["employment_status"]
           status_changed_at?: string | null
           status_changed_by?: string | null
-          termination_date?: string | null
-          termination_reason?: string | null
+          separation_date?: string | null
+          separation_reason?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -107,8 +107,8 @@ export type Database = {
           employment_status?: Database["public"]["Enums"]["employment_status"]
           status_changed_at?: string | null
           status_changed_by?: string | null
-          termination_date?: string | null
-          termination_reason?: string | null
+          separation_date?: string | null
+          separation_reason?: string | null
           updated_at?: string
         }
       }
@@ -259,7 +259,7 @@ export type Database = {
     }
     Enums: {
       user_role: "visitor" | "employee" | "lead" | "admin" | "super_admin"
-      employment_status: "active" | "suspended" | "terminated" | "on_leave"
+      employment_status: "active" | "suspended" | "separated" | "on_leave"
     }
   }
 }
@@ -307,8 +307,8 @@ export interface Profile {
   employment_status: EmploymentStatus
   status_changed_at?: string
   status_changed_by?: string
-  termination_date?: string
-  termination_reason?: string
+  separation_date?: string
+  separation_reason?: string
   created_at: string
   updated_at: string
 }

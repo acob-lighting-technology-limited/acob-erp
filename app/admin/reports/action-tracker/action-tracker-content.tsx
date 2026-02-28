@@ -56,9 +56,10 @@ interface ActionTask {
 
 interface ActionTrackerContentProps {
   initialDepartments: string[]
+  scopedDepartments?: string[]
 }
 
-export function ActionTrackerContent({ initialDepartments }: ActionTrackerContentProps) {
+export function ActionTrackerContent({ initialDepartments, scopedDepartments = [] }: ActionTrackerContentProps) {
   const currentOfficeWeek = getCurrentOfficeWeek()
   const [tasks, setTasks] = useState<ActionTask[]>([])
   const [loading, setLoading] = useState(true)
@@ -93,6 +94,10 @@ export function ActionTrackerContent({ initialDepartments }: ActionTrackerConten
         .eq("year", yearFilter)
         .order("department", { ascending: true })
         .order("created_at", { ascending: true })
+
+      if (scopedDepartments.length > 0) {
+        query = query.in("department", scopedDepartments)
+      }
 
       if (deptFilter !== "all") {
         query = query.eq("department", deptFilter)

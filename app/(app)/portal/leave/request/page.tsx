@@ -1,206 +1,140 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { createClient } from "@/lib/supabase/client"
+import { useState } from "react"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { ArrowLeft } from "lucide-react"
+import { toast } from "sonner"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { useRouter } from "next/navigation"
-import { ArrowLeft, Calendar } from "lucide-react"
-import Link from "next/link"
-import { toast } from "sonner"
-
-interface LeaveType {
-  id: string
-  name: string
-  max_days: number
-}
-
-interface LeaveBalance {
-  leave_type_id: string
-  total_days: number
-  used_days: number
-}
 
 export default function LeaveRequestPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
-  const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([])
-  const [balances, setBalances] = useState<LeaveBalance[]>([])
   const [formData, setFormData] = useState({
     leave_type_id: "",
     start_date: "",
-    end_date: "",
+    days_count: 1,
+    reliever_identifier: "",
     reason: "",
+    handover_note: "",
   })
 
-  useEffect(() => {
-    fetchLeaveTypes()
-    fetchBalances()
-  }, [])
+  const previewEnd = (() => {
+    if (!formData.start_date || !formData.days_count) return ""
+    const end = new Date(`${formData.start_date}T00:00:00.000Z`)
+    end.setUTCDate(end.getUTCDate() + Number(formData.days_count) - 1)
+    return end.toISOString().slice(0, 10)
+  })()
 
-  async function fetchLeaveTypes() {
-    const supabase = createClient()
-    const { data } = await supabase.from("leave_types").select("id, name, max_days").eq("is_active", true)
-    if (data) setLeaveTypes(data)
-  }
+  const previewResume = (() => {
+    if (!previewEnd) return ""
+    const resume = new Date(`${previewEnd}T00:00:00.000Z`)
+    resume.setUTCDate(resume.getUTCDate() + 1)
+    return resume.toISOString().slice(0, 10)
+  })()
 
-  async function fetchBalances() {
-    const supabase = createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) return
-
-    const { data } = await supabase
-      .from("leave_balances")
-      .select("leave_type_id, total_days, used_days")
-      .eq("user_id", user.id)
-    if (data) setBalances(data)
-  }
-
-  function calculateDays(): number {
-    if (!formData.start_date || !formData.end_date) return 0
-    const start = new Date(formData.start_date)
-    const end = new Date(formData.end_date)
-    const diff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1
-    return diff > 0 ? diff : 0
-  }
-
-  function getAvailableDays(): number {
-    const balance = balances.find((b) => b.leave_type_id === formData.leave_type_id)
-    if (!balance) return 0
-    return balance.total_days - balance.used_days
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault()
     setLoading(true)
 
     try {
       const response = await fetch("/api/hr/leave/requests", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...formData,
-          days_count: calculateDays(),
-        }),
+        body: JSON.stringify(formData),
       })
 
-      const data = await response.json()
+      const payload = await response.json()
+      if (!response.ok) throw new Error(payload.error || "Failed to submit leave request")
 
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to submit request")
-      }
-
-      toast.success("Leave request submitted successfully")
-      router.push("/hr/leave")
-    } catch (error: any) {
-      toast.error(error.message)
+      toast.success("Leave request submitted")
+      router.push("/dashboard/leave")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "An error occurred")
     } finally {
       setLoading(false)
     }
   }
 
-  const daysRequested = calculateDays()
-  const availableDays = getAvailableDays()
-  const isValid =
-    formData.leave_type_id &&
-    formData.start_date &&
-    formData.end_date &&
-    formData.reason.length >= 10 &&
-    daysRequested <= availableDays
-
   return (
     <div className="container mx-auto max-w-2xl p-6">
-      <div className="mb-6">
-        <Link href="/dashboard/leave" className="text-muted-foreground hover:text-foreground flex items-center gap-2">
-          <ArrowLeft className="h-4 w-4" />
-          Back to Leave
-        </Link>
-      </div>
+      <Link href="/dashboard/leave" className="text-muted-foreground mb-4 inline-flex items-center gap-2 text-sm">
+        <ArrowLeft className="h-4 w-4" />
+        Back to leave management
+      </Link>
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5" />
-            Request Leave
-          </CardTitle>
-          <CardDescription>Submit a new leave request for approval</CardDescription>
+          <CardTitle>Submit Leave Request</CardTitle>
+          <CardDescription>Reliever approval is required before supervisor and HR review.</CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form className="space-y-4" onSubmit={handleSubmit}>
             <div className="space-y-2">
-              <Label htmlFor="leave_type">Leave Type</Label>
-              <Select
+              <Label>Leave Type ID</Label>
+              <Input
                 value={formData.leave_type_id}
-                onValueChange={(value) => setFormData({ ...formData, leave_type_id: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select leave type" />
-                </SelectTrigger>
-                <SelectContent>
-                  {leaveTypes.map((type) => (
-                    <SelectItem key={type.id} value={type.id}>
-                      {type.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {formData.leave_type_id && (
-                <p className="text-muted-foreground text-sm">Available: {availableDays} days</p>
-              )}
+                onChange={(e) => setFormData((p) => ({ ...p, leave_type_id: e.target.value }))}
+              />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label htmlFor="start_date">Start Date</Label>
+                <Label>Start Date</Label>
                 <Input
-                  id="start_date"
                   type="date"
                   value={formData.start_date}
-                  onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
-                  min={new Date().toISOString().split("T")[0]}
+                  onChange={(e) => setFormData((p) => ({ ...p, start_date: e.target.value }))}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="end_date">End Date</Label>
+                <Label>Days</Label>
                 <Input
-                  id="end_date"
-                  type="date"
-                  value={formData.end_date}
-                  onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
-                  min={formData.start_date || new Date().toISOString().split("T")[0]}
+                  type="number"
+                  min={1}
+                  value={formData.days_count}
+                  onChange={(e) => setFormData((p) => ({ ...p, days_count: Number(e.target.value || 1) }))}
                 />
               </div>
             </div>
 
-            {daysRequested > 0 && (
-              <div
-                className={`rounded-lg p-3 ${daysRequested <= availableDays ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}
-              >
-                Days requested: {daysRequested}
-                {daysRequested > availableDays && " (exceeds available balance)"}
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <Label htmlFor="reason">Reason</Label>
-              <Textarea
-                id="reason"
-                placeholder="Please provide a reason for your leave request (min 10 characters)"
-                value={formData.reason}
-                onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
-                rows={4}
-              />
-              <p className="text-muted-foreground text-sm">{formData.reason.length}/10 characters minimum</p>
+            <div className="rounded border p-3 text-sm">
+              <p>Computed End Date: {previewEnd || "-"}</p>
+              <p>Computed Resume Date: {previewResume || "-"}</p>
             </div>
 
-            <Button type="submit" className="w-full" disabled={loading || !isValid}>
-              {loading ? "Submitting..." : "Submit Request"}
+            <div className="space-y-2">
+              <Label>Reliever (name/email/id)</Label>
+              <Input
+                value={formData.reliever_identifier}
+                onChange={(e) => setFormData((p) => ({ ...p, reliever_identifier: e.target.value }))}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Reason</Label>
+              <Textarea
+                value={formData.reason}
+                onChange={(e) => setFormData((p) => ({ ...p, reason: e.target.value }))}
+                rows={3}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Handover Note</Label>
+              <Textarea
+                value={formData.handover_note}
+                onChange={(e) => setFormData((p) => ({ ...p, handover_note: e.target.value }))}
+                rows={3}
+              />
+            </div>
+
+            <Button type="submit" disabled={loading}>
+              {loading ? "Submitting..." : "Submit"}
             </Button>
           </form>
         </CardContent>

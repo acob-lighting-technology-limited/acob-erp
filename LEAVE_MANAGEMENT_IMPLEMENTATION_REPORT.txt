@@ -1,0 +1,138 @@
+Management Report: Leave Management System Implementation
+
+Date: February 24, 2026
+
+Overview
+We have completed the design and implementation planning for a full upgrade of the leave management process. The new model is structured to match real operational workflow and provide stronger governance, policy compliance, and visibility for HR and leadership.
+
+The system moves from a simple one-step approval pattern to a controlled multi-stage process:
+- Reliever confirms coverage first,
+- then Supervisor (department lead) approves,
+- then HR gives final endorsement.
+
+Only after HR endorsement will leave be finalized and balances deducted.
+
+Why This Upgrade Is Needed
+The existing leave process is functional but limited. It does not fully enforce operational dependencies (who covers work, supervisor accountability, HR final gate), and it lacks some enterprise controls required for scale and audit readiness.
+
+This upgrade addresses those gaps directly by combining:
+- workflow enforcement,
+- policy-driven eligibility/allocation,
+- conflict prevention,
+- lifecycle flexibility (cancel/extend/early return),
+- integration with attendance and payroll.
+
+Approved Target Workflow
+1. Employee submits leave request.
+2. Employee selects a reliever.
+3. System automatically assigns supervisor from department lead.
+4. Reliever approves/rejects.
+5. If approved, supervisor approves/rejects.
+6. If approved, HR endorses/rejects.
+7. Employee receives final decision notice with approved leave period and resume date.
+8. On approval, leave balance and attendance/payroll states are updated.
+
+Key Functional Improvements
+
+1. Automatic Date Calculation
+- Employee enters start date and number of days.
+- System computes:
+  - end date
+  - resume date (day after leave ends, or next business day where policy applies)
+- This removes manual date errors and standardizes approvals.
+
+2. Policy-Driven Allocation and Eligibility
+- Leave entitlements will come from policy tables, not ad hoc manual entries.
+- Policies support:
+  - annual days,
+  - gender eligibility (e.g., maternity/paternity),
+  - tenure thresholds,
+  - notice period rules,
+  - carry-forward limits/expiry.
+- Enforcement is backend-based (cannot be bypassed by UI manipulation).
+
+3. Professional Conflict Controls
+- Prevent overlapping leave requests for the same employee.
+- Prevent selecting a reliever who is on leave during the same period.
+- Prevent invalid actor combinations (requester cannot be reliever/supervisor).
+
+4. Submission Quality Controls
+- Mandatory handover note.
+- Optional handover checklist/task reference.
+- Policy warning and blocking for late notice submissions where applicable.
+
+5. Approval Governance (SLA + Escalation)
+- Stage-specific response windows:
+  - reliever SLA,
+  - supervisor SLA,
+  - HR SLA.
+- Automated reminders before deadlines.
+- Escalation path for overdue requests.
+
+6. Leave Lifecycle Management
+- Support for:
+  - withdraw request,
+  - cancel approved leave (before start),
+  - extension requests,
+  - early return handling.
+- All lifecycle changes are tracked and synchronized to balances/attendance.
+
+7. Audit and Compliance
+- Immutable stage-by-stage audit history:
+  - who acted,
+  - what changed,
+  - when,
+  - why.
+- Designed to support internal controls and management reporting.
+
+8. Attendance and Payroll Synchronization
+- Final approved leave automatically updates attendance status.
+- Leave events exposed for payroll cutoff and adjustments.
+- Cancellation/early return triggers reverse updates.
+
+Data Readiness Requirement
+To enforce policy correctly (especially gender-based leave), staff profile data must be complete and reliable. Required fields include:
+- gender,
+- employment date,
+- employment type,
+- work location (for holiday/business-day logic).
+
+Without this data, policy enforcement becomes inconsistent. Data quality controls are included in the plan.
+
+Decisions Confirmed
+- Reliever: employee-selected (validated by system).
+- Supervisor: auto-derived department lead.
+- HR final authority: admin/super_admin roles.
+- Default leave counting: calendar days unless policy sets business-day mode.
+- Gender-specific leave: strictly backend enforced.
+
+Implementation Deliverables
+1. Database schema updates and policy tables.
+2. API upgrades for request, staged approval, and lifecycle actions.
+3. Employee UI enhancements (request form, stage timeline, calculated dates).
+4. Approver dashboards (stage-based action queues with SLA indicators).
+5. HR policy admin screens.
+6. Notification/email orchestration by approval stage.
+7. Audit/reporting integration.
+
+Current Status
+- Requirements and architecture: Completed.
+- Technical implementation: Pending start.
+- Testing/UAT: Not started.
+
+Execution Approach
+Implementation should proceed in controlled phases:
+1. Schema and policy foundation.
+2. API logic and authorization enforcement.
+3. UI rollout for employees and approvers.
+4. Notifications and SLA automation.
+5. Attendance/payroll integration.
+6. UAT and production rollout.
+
+Expected Outcome for Management
+After rollout, management should expect:
+- clearer ownership at each approval stage,
+- fewer leave processing errors,
+- better compliance and auditability,
+- stronger workforce continuity planning,
+- improved HR operational efficiency and reporting confidence.

@@ -249,7 +249,7 @@ export function NotificationBell({ isAdmin = false }: NotificationBellProps) {
               message: `${overduePayments.length} payment${overduePayments.length > 1 ? "s" : ""} past due date`,
               timestamp: formatRelativeTime(now.toISOString()),
               createdAt: now.toISOString(),
-              link: "/admin/payments",
+              link: "/admin/finance/payments",
               linkText: "View Payments",
               read: readIds.has("overdue-payments"),
             })
@@ -277,7 +277,7 @@ export function NotificationBell({ isAdmin = false }: NotificationBellProps) {
               message: `${dueSoonPayments.length} payment${dueSoonPayments.length > 1 ? "s" : ""} due within 7 days`,
               timestamp: formatRelativeTime(now.toISOString()),
               createdAt: now.toISOString(),
-              link: "/admin/payments",
+              link: "/admin/finance/payments",
               linkText: "View Payments",
               read: readIds.has("due-soon-payments"),
             })

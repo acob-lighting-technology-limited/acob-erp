@@ -56,9 +56,14 @@ serve(async (req) => {
 
     const { data: recipientProfile } = await supabase
       .from("profiles")
-      .select("full_name, department, additional_email")
+      .select("full_name, department, additional_email, employment_status")
       .eq("id", record.user_id)
       .single()
+
+    if (recipientProfile?.employment_status !== "active") {
+      console.log(`[INFO] Skipping notification for inactive recipient ${record.user_id}`)
+      return new Response("Recipient is not active", { status: 200 })
+    }
 
     const recipientEmails = Array.from(
       new Set(

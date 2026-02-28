@@ -11,10 +11,11 @@ import { OneDriveBrowser } from "./onedrive-browser"
 import { Skeleton } from "@/components/ui/skeleton"
 import { PageHeader, PageWrapper } from "@/components/layout"
 import { FolderOpen } from "lucide-react"
+import { resolveAdminScope } from "@/lib/admin/rbac"
 
 export const dynamic = "force-dynamic"
 
-async function getUser() {
+async function getUserAndScope() {
   const cookieStore = cookies()
 
   const supabase = createServerClient(
@@ -41,10 +42,15 @@ async function getUser() {
   } = await supabase.auth.getUser()
 
   if (!user) {
-    redirect("/login")
+    redirect("/auth/login")
   }
 
-  return user
+  const scope = await resolveAdminScope(supabase as any, user.id)
+  if (!scope) {
+    redirect("/dashboard")
+  }
+
+  return { user, scope }
 }
 
 function LoadingSkeleton() {
@@ -68,10 +74,21 @@ function LoadingSkeleton() {
 }
 
 export default async function OneDrivePage() {
-  await getUser()
+  const { scope } = await getUserAndScope()
 
   // Determine initial path - default to Projects folder if configured
-  const projectsFolder = process.env.ONEDRIVE_PROJECTS_FOLDER || "/Projects"
+  const defaultProjectsFolder = process.env.ONEDRIVE_PROJECTS_FOLDER || "/Projects"
+  const leadRootDepartment = scope.managedDepartments[0]
+
+  if (!scope.isAdminLike && !leadRootDepartment) {
+    redirect("/admin?rbac=missing-lead-scope")
+  }
+
+  const projectsFolder =
+    scope.isAdminLike || !leadRootDepartment
+      ? defaultProjectsFolder
+      : `${defaultProjectsFolder.replace(/\/+$/, "")}/${leadRootDepartment}`
+  const rootLabel = scope.isAdminLike ? "Projects" : leadRootDepartment || "Projects"
 
   return (
     <PageWrapper maxWidth="full" background="gradient">
@@ -82,7 +99,7 @@ export default async function OneDrivePage() {
         backLink={{ href: "/admin", label: "Back to Admin" }}
       />
       <Suspense fallback={<LoadingSkeleton />}>
-        <OneDriveBrowser initialPath={projectsFolder} rootLabel="Projects" showProjectsOnly={true} />
+        <OneDriveBrowser initialPath={projectsFolder} rootLabel={rootLabel} showProjectsOnly={true} />
       </Suspense>
     </PageWrapper>
   )

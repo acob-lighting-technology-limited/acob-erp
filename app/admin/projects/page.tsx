@@ -30,6 +30,7 @@ export interface employee {
   last_name: string
   company_email: string
   department: string
+  employment_status?: string | null
 }
 
 async function getAdminProjectsData() {
@@ -71,7 +72,8 @@ async function getAdminProjectsData() {
       .order("created_at", { ascending: false }),
     supabase
       .from("profiles")
-      .select("id, first_name, last_name, company_email, department")
+      .select("id, first_name, last_name, company_email, department, employment_status")
+      .eq("employment_status", "active")
       .order("last_name", { ascending: true }),
   ])
 

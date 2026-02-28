@@ -31,13 +31,7 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   const pathname = request.nextUrl.pathname
-
-  // Allow unauthenticated access to auth pages, public routes, and the form
-  if (pathname !== "/" && !user && !pathname.startsWith("/auth") && !pathname.startsWith("/employee/new")) {
-    const url = request.nextUrl.clone()
-    url.pathname = "/auth/login"
-    return NextResponse.redirect(url)
-  }
+  const intendedPath = `${request.nextUrl.pathname}${request.nextUrl.search}`
 
   // Check maintenance mode
   const { data: settings } = await supabase
@@ -45,8 +39,8 @@ export async function updateSession(request: NextRequest) {
     .select("value")
     .eq("key", "maintenance_mode")
     .single()
-
-  const isMaintenanceMode = settings?.value?.enabled || false
+  const rawMaintenance = settings?.value as any
+  const isMaintenanceMode = typeof rawMaintenance === "boolean" ? rawMaintenance : Boolean(rawMaintenance?.enabled)
 
   // If maintenance is on, and not already on maintenance page or statics
   if (
@@ -94,12 +88,12 @@ export async function updateSession(request: NextRequest) {
           return NextResponse.redirect(url)
         }
 
-        // Handle terminated employees - sign out and redirect to login with error
-        if (status === "terminated") {
+        // Handle separated employees - sign out and redirect to login with error
+        if (status === "separated") {
           // Clear session cookies and redirect to login
           const url = request.nextUrl.clone()
           url.pathname = "/auth/login"
-          url.searchParams.set("error", "account_terminated")
+          url.searchParams.set("error", "account_separated")
 
           // Sign out the user
           await supabase.auth.signOut()
@@ -111,6 +105,16 @@ export async function updateSession(request: NextRequest) {
       // If we are here, maintenance is on but user is admin, or maintenance is off (but we are inside isMaintenanceMode block? No wait)
       // Logic correction needed below
     }
+  }
+
+  // Allow unauthenticated access to auth pages, public routes, and the form
+  // Maintenance mode check must run before this block so non-authenticated users
+  // are redirected to /maintenance when maintenance is enabled.
+  if (pathname !== "/" && !user && !pathname.startsWith("/auth") && !pathname.startsWith("/employee/new")) {
+    const url = request.nextUrl.clone()
+    url.pathname = "/auth/login"
+    url.searchParams.set("next", intendedPath || "/profile")
+    return NextResponse.redirect(url)
   }
 
   // Check employment status for authenticated users (Normal flow if maintenance is OFF)
@@ -132,12 +136,12 @@ export async function updateSession(request: NextRequest) {
         return NextResponse.redirect(url)
       }
 
-      // Handle terminated employees - sign out and redirect to login with error
-      if (status === "terminated") {
+      // Handle separated employees - sign out and redirect to login with error
+      if (status === "separated") {
         // Clear session cookies and redirect to login
         const url = request.nextUrl.clone()
         url.pathname = "/auth/login"
-        url.searchParams.set("error", "account_terminated")
+        url.searchParams.set("error", "account_separated")
 
         // Sign out the user
         await supabase.auth.signOut()

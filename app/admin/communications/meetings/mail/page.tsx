@@ -14,7 +14,11 @@ export default async function CommunicationsMeetingsMailPage() {
     redirect("/auth/login")
   }
 
-  const { data: profile } = await supabase.from("profiles").select("role, full_name").eq("id", user.id).single()
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role, full_name, department")
+    .eq("id", user.id)
+    .single()
 
   if (!profile || !["super_admin", "admin"].includes(profile.role)) {
     redirect("/dashboard")
@@ -27,5 +31,14 @@ export default async function CommunicationsMeetingsMailPage() {
     .or("company_email.not.is.null,additional_email.not.is.null")
     .order("full_name")
 
-  return <MailDigestContent employees={employees || []} />
+  return (
+    <MailDigestContent
+      employees={employees || []}
+      currentUser={{
+        id: user.id,
+        full_name: profile?.full_name || null,
+        department: profile?.department || null,
+      }}
+    />
+  )
 }

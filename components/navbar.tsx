@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,6 +35,7 @@ import Image from "next/image"
 import { useSidebarSafe } from "@/components/sidebar-context"
 import { useTheme } from "next-themes"
 import { ThemeToggle } from "@/components/ui/theme-toggle"
+import { cn } from "@/lib/utils"
 
 interface NavbarProps {
   user?: {
@@ -42,15 +44,18 @@ interface NavbarProps {
       first_name?: string
     }
   }
-  isAdmin?: boolean
+  canAccessAdmin?: boolean
+  isAdminMode?: boolean
 }
 
-export function Navbar({ user, isAdmin = false }: NavbarProps) {
+export function Navbar({ user, canAccessAdmin = false, isAdminMode = false }: NavbarProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
   const router = useRouter()
   const { resolvedTheme } = useTheme()
+  const dashboardHref = isAdminMode ? "/admin" : "/dashboard"
+  const dashboardLabel = isAdminMode ? "Admin Dashboard" : "Dashboard"
 
   // Get sidebar context safely (returns null if not available)
   const sidebarContext = useSidebarSafe()
@@ -103,7 +108,14 @@ export function Navbar({ user, isAdmin = false }: NavbarProps) {
   }
 
   return (
-    <nav className="border-border bg-background fixed top-0 right-0 left-0 z-50 w-full overflow-visible border-b">
+    <nav
+      className={cn(
+        "fixed top-0 right-0 left-0 z-50 w-full overflow-visible border-b",
+        isAdminMode
+          ? "border-amber-300/70 bg-amber-50/90 backdrop-blur-md dark:border-amber-950/70 dark:bg-amber-950/80"
+          : "border-border bg-background"
+      )}
+    >
       <div className="flex h-16 w-full max-w-full items-center overflow-visible">
         {/* Left side - Collapse Button and Logo (aligned with sidebar edge) */}
         {sidebarContext && (
@@ -117,7 +129,7 @@ export function Navbar({ user, isAdmin = false }: NavbarProps) {
             >
               {isCollapsed ? <ChevronRight className="h-5 w-5" /> : <ChevronLeft className="h-5 w-5" />}
             </Button>
-            <Link href="/dashboard" className="flex h-full items-center px-4">
+            <Link href={dashboardHref} className="flex h-full items-center px-4">
               <Image
                 key={logoSrc}
                 src={logoSrc}
@@ -128,12 +140,21 @@ export function Navbar({ user, isAdmin = false }: NavbarProps) {
                 className="h-8 w-auto"
               />
             </Link>
+            {isAdminMode && (
+              <Badge
+                variant="outline"
+                className="border-amber-500/40 bg-amber-100/60 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+              >
+                <ShieldCheck className="mr-1 h-3 w-3" />
+                Admin Console
+              </Badge>
+            )}
           </div>
         )}
 
         {/* Mobile - Logo only */}
         <div className="flex items-center gap-2 px-4 lg:hidden">
-          <Link href="/dashboard" className="flex items-center">
+          <Link href={dashboardHref} className="flex items-center">
             <Image
               key={logoSrc}
               src={logoSrc}
@@ -148,9 +169,9 @@ export function Navbar({ user, isAdmin = false }: NavbarProps) {
 
         {/* Right side - search, notifications and user menu */}
         <div className="flex flex-1 items-center justify-end gap-2 overflow-visible px-2 sm:gap-4 sm:px-4 lg:px-8">
-          <div className="hidden max-w-md flex-1 items-center gap-4 md:flex">{isAdmin && <UniversalSearch />}</div>
+          <div className="hidden max-w-md flex-1 items-center gap-4 md:flex">{isAdminMode && <UniversalSearch />}</div>
           <div className="hidden items-center gap-4 overflow-visible md:flex">
-            <NotificationBell isAdmin={isAdmin} />
+            <NotificationBell isAdmin={isAdminMode} />
             <ThemeToggle />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -171,9 +192,9 @@ export function Navbar({ user, isAdmin = false }: NavbarProps) {
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
-                  <Link href="/dashboard" className="cursor-pointer">
+                  <Link href={dashboardHref} className="cursor-pointer">
                     <LayoutDashboard className="mr-2 h-4 w-4" />
-                    Dashboard
+                    {dashboardLabel}
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
@@ -200,13 +221,24 @@ export function Navbar({ user, isAdmin = false }: NavbarProps) {
                     Watermark
                   </Link>
                 </DropdownMenuItem>
-                {isAdmin && (
+                {canAccessAdmin && !isAdminMode && (
                   <>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem asChild>
                       <Link href="/admin" className="flex cursor-pointer items-center">
                         <ShieldCheck className="mr-2 h-4 w-4" />
                         Admin
+                      </Link>
+                    </DropdownMenuItem>
+                  </>
+                )}
+                {isAdminMode && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem asChild>
+                      <Link href="/dashboard" className="flex cursor-pointer items-center">
+                        <LayoutDashboard className="mr-2 h-4 w-4" />
+                        User Dashboard
                       </Link>
                     </DropdownMenuItem>
                   </>
@@ -252,9 +284,9 @@ export function Navbar({ user, isAdmin = false }: NavbarProps) {
               <p className="text-muted-foreground text-xs">{user?.email}</p>
             </div>
           </div>
-          <Link href="/dashboard" className="hover:bg-accent flex items-center gap-2 rounded px-4 py-2 text-sm">
+          <Link href={dashboardHref} className="hover:bg-accent flex items-center gap-2 rounded px-4 py-2 text-sm">
             <LayoutDashboard className="h-4 w-4" />
-            Dashboard
+            {dashboardLabel}
           </Link>
           <Link href="/profile" className="hover:bg-accent flex items-center gap-2 rounded px-4 py-2 text-sm">
             <User className="h-4 w-4" />
@@ -272,12 +304,21 @@ export function Navbar({ user, isAdmin = false }: NavbarProps) {
             <Droplet className="h-4 w-4" />
             Watermark
           </Link>
-          {isAdmin && (
+          {canAccessAdmin && !isAdminMode && (
             <>
               <div className="border-border my-2 border-t"></div>
               <Link href="/admin" className="hover:bg-accent flex items-center gap-2 rounded px-4 py-2 text-sm">
                 <ShieldCheck className="h-4 w-4" />
                 Admin
+              </Link>
+            </>
+          )}
+          {isAdminMode && (
+            <>
+              <div className="border-border my-2 border-t"></div>
+              <Link href="/dashboard" className="hover:bg-accent flex items-center gap-2 rounded px-4 py-2 text-sm">
+                <LayoutDashboard className="h-4 w-4" />
+                User Dashboard
               </Link>
             </>
           )}

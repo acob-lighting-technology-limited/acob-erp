@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
+import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
 
 export const dynamic = "force-dynamic"
 
@@ -30,12 +31,27 @@ function createClient() {
 export async function GET() {
   try {
     const supabase = createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
 
-    const { data: departments, error } = await supabase
-      .from("departments")
-      .select("*")
-      .eq("is_active", true)
-      .order("name")
+    const scope = await resolveAdminScope(supabase as any, user.id)
+    let query = supabase.from("departments").select("*").eq("is_active", true).order("name")
+
+    if (scope) {
+      const scopedDepartments = getDepartmentScope(scope, "general")
+      if (scopedDepartments) {
+        query = scopedDepartments.length > 0 ? query.in("name", scopedDepartments) : query.eq("name", "__none__")
+      }
+    } else {
+      const { data: profile } = await supabase.from("profiles").select("department").eq("id", user.id).single()
+      if (profile?.department) query = query.eq("name", profile.department)
+    }
+
+    const { data: departments, error } = await query
 
     if (error) throw error
 
@@ -46,7 +62,7 @@ export async function GET() {
   }
 }
 
-// POST /api/departments - Create a new department (admin only)
+// POST /api/departments - Create a new department (admin/super_admin/hr_global_lead)
 export async function POST(request: Request) {
   try {
     const supabase = createClient()
@@ -59,9 +75,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { data: profile } = await supabase.from("profiles").select("is_admin").eq("id", user.id).single()
-
-    if (!profile?.is_admin) {
+    const scope = await resolveAdminScope(supabase as any, user.id)
+    const canManageDepartments =
+      !!scope && (scope.isAdminLike || (scope.role === "lead" && scope.managedDepartments.includes("Admin & HR")))
+    if (!canManageDepartments) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 

@@ -110,6 +110,7 @@ export interface Employee {
   last_name: string
   company_email: string
   department: string
+  employment_status?: string | null
 }
 
 interface AssetAssignment {
@@ -150,6 +151,8 @@ const currentYear = new Date().getFullYear()
 export interface UserProfile {
   role: string
   lead_departments?: string[]
+  managed_departments?: string[]
+  managed_offices?: string[]
 }
 
 interface AdminAssetsContentProps {
@@ -168,6 +171,9 @@ export function AdminAssetsContent({
   const router = useRouter()
   const [assets, setAssets] = useState<Asset[]>(initialAssets)
   const [employees, setEmployees] = useState<Employee[]>(initialEmployees)
+  const activeEmployees = employees.filter(
+    (member) => member.employment_status === "active" || !member.employment_status
+  )
   const [departments] = useState<string[]>(initialDepartments)
   const [isLoading, setIsLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
@@ -304,6 +310,8 @@ export function AdminAssetsContent({
   const [currentAssignment, setCurrentAssignment] = useState<AssetAssignment | null>(null)
 
   const supabase = createClient()
+  const scopedDepartments = userProfile.managed_departments ?? userProfile.lead_departments ?? []
+  const scopedOffices = userProfile.managed_offices ?? []
 
   // Initial data is passed via props from server component
   // loadAssetTypes is called on mount
@@ -439,7 +447,7 @@ export function AdminAssetsContent({
       })
 
       // Combine assets with their assignments and issue counts
-      const assetsWithAssignments = (AssetsData || []).map((asset) => {
+      let assetsWithAssignments = (AssetsData || []).map((asset) => {
         const assignment = assignmentsWithUsers.find((a: any) => a.asset_id === asset.id)
         return {
           ...asset,
@@ -456,13 +464,36 @@ export function AdminAssetsContent({
       })
 
       // Fetch updated employees
-      const { data: employeeData } = await supabase
+      let employeeQuery = supabase
         .from("profiles")
-        .select("id, first_name, last_name, company_email, department")
+        .select("id, first_name, last_name, company_email, department, employment_status")
+        .eq("employment_status", "active")
         .order("last_name", { ascending: true })
 
+      if (userProfile.role === "lead") {
+        employeeQuery =
+          scopedDepartments.length > 0
+            ? employeeQuery.in("department", scopedDepartments)
+            : employeeQuery.eq("id", "__none__")
+      }
+
+      const { data: employeeData } = await employeeQuery
+      const scopedEmployees = employeeData || []
+
+      if (userProfile.role === "lead") {
+        const deptUserIds = new Set(scopedEmployees.map((member) => member.id))
+        assetsWithAssignments = assetsWithAssignments.filter((asset: any) => {
+          const assignment = asset.current_assignment
+          if (!assignment) return false
+          if (assignment.assigned_to && deptUserIds.has(assignment.assigned_to)) return true
+          if (assignment.department && scopedDepartments.includes(assignment.department)) return true
+          if (assignment.office_location && scopedOffices.includes(assignment.office_location)) return true
+          return false
+        })
+      }
+
       setAssets(assetsWithAssignments)
-      setEmployees(employeeData || [])
+      setEmployees(scopedEmployees)
     } catch (error: any) {
       console.error("Error loading data:", error)
       toast.error("Failed to refresh data")
@@ -2046,17 +2077,17 @@ export function AdminAssetsContent({
     let matchesDepartment = true
     if (userProfile?.role === "lead") {
       // Leads: assets are already filtered, but ensure they match lead's departments
-      if (userProfile.lead_departments && userProfile.lead_departments.length > 0) {
+      if (scopedDepartments.length > 0 || scopedOffices.length > 0) {
         const assignmentDept = asset.current_assignment?.department
         const assignedUserDept = asset.current_assignment?.assigned_to
           ? employees.find((s) => s.id === asset.current_assignment?.assigned_to)?.department
           : null
+        const assignmentOffice = asset.current_assignment?.office_location
 
-        matchesDepartment = assignmentDept
-          ? userProfile.lead_departments.includes(assignmentDept)
-          : assignedUserDept
-            ? userProfile.lead_departments.includes(assignedUserDept)
-            : false
+        matchesDepartment =
+          (assignmentDept ? scopedDepartments.includes(assignmentDept) : false) ||
+          (assignedUserDept ? scopedDepartments.includes(assignedUserDept) : false) ||
+          (assignmentOffice ? scopedOffices.includes(assignmentOffice) : false)
       }
     } else {
       // Admins: use department filter
@@ -2450,7 +2481,7 @@ export function AdminAssetsContent({
                     label="Users"
                     icon={<User className="h-4 w-4" />}
                     values={userFilter}
-                    options={employees.map((member) => ({
+                    options={activeEmployees.map((member) => ({
                       value: member.id,
                       label: `${formatName(member.first_name)} ${formatName(member.last_name)} - ${member.department}`,
                       icon: <User className="h-3 w-3" />,
@@ -3076,7 +3107,7 @@ export function AdminAssetsContent({
                       placeholder="Select employees member"
                       searchPlaceholder="Search employees..."
                       icon={<User className="h-4 w-4" />}
-                      options={employees.map((member) => ({
+                      options={activeEmployees.map((member) => ({
                         value: member.id,
                         label: `${formatName(member.first_name)} ${formatName(member.last_name)} - ${member.department}`,
                         icon: <User className="h-3 w-3" />,
@@ -3131,7 +3162,7 @@ export function AdminAssetsContent({
                       placeholder="Select assigner (defaults to you)"
                       searchPlaceholder="Search employees..."
                       icon={<User className="h-4 w-4" />}
-                      options={employees.map((employee) => ({
+                      options={activeEmployees.map((employee) => ({
                         value: employee.id,
                         label: `${formatName(employee.last_name)}, ${formatName(employee.first_name)}`,
                         secondaryLabel: employee.department,
@@ -3283,7 +3314,7 @@ export function AdminAssetsContent({
                   placeholder="Select employees member"
                   searchPlaceholder="Search employees..."
                   icon={<User className="h-4 w-4" />}
-                  options={employees.map((member) => ({
+                  options={activeEmployees.map((member) => ({
                     value: member.id,
                     label: `${formatName(member.first_name)} ${formatName(member.last_name)} - ${member.department}`,
                     icon: <User className="h-3 w-3" />,
@@ -3343,7 +3374,7 @@ export function AdminAssetsContent({
                   placeholder="Select assigner (defaults to you)"
                   searchPlaceholder="Search employees..."
                   icon={<User className="h-4 w-4" />}
-                  options={employees.map((employee) => ({
+                  options={activeEmployees.map((employee) => ({
                     value: employee.id,
                     label: `${formatName(employee.last_name)}, ${formatName(employee.first_name)}`,
                     secondaryLabel: employee.department,

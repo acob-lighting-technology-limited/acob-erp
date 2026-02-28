@@ -692,8 +692,10 @@ const pdfActionTrackerPage = (
   doc.text("STATUS", statusX + 2, headerY)
 
   // Rows
-  let rowY = headerY + 8
-  const rowH = 10
+  let rowTop = headerY + 3
+  const minRowH = 10
+  const titleLineH = 3.8
+  const maxTitleLines = 3
   const statusColors: Record<string, [number, number, number]> = {
     completed: [22, 101, 52],
     in_progress: [29, 78, 216],
@@ -708,42 +710,50 @@ const pdfActionTrackerPage = (
   }
 
   actions.forEach((action, i) => {
-    if (rowY > H - footerH - 4) return // Overflow guard
+    const titleLinesRaw = doc.splitTextToSize(action.title || "", actionW - 4)
+    const titleLines = titleLinesRaw.slice(0, maxTitleLines)
+    if (titleLinesRaw.length > maxTitleLines && titleLines.length > 0) {
+      titleLines[titleLines.length - 1] = `${titleLines[titleLines.length - 1]}...`
+    }
+    const rowH = Math.max(minRowH, titleLines.length * titleLineH + 3)
+    if (rowTop + rowH > H - footerH - 4) return // Overflow guard
     const isEven = i % 2 === 0
     if (isEven) {
       doc.setFillColor(248, 250, 252)
-      doc.rect(14, rowY - 5, W - 28, rowH, "F")
+      doc.rect(14, rowTop, W - 28, rowH, "F")
     }
 
     // S/N
     doc.setFontSize(8)
     doc.setTextColor(...PDF_SLATE)
     doc.setFont("helvetica", "bold")
-    doc.text(`${i + 1}`, snX + 4, rowY)
+    doc.text(`${i + 1}`, snX + 4, rowTop + 5.5)
 
-    // Action item — full width, no truncation
+    // Action item — wrapped over multiple lines (up to maxTitleLines)
     doc.setFontSize(9)
     doc.setTextColor(...PDF_SLATE)
     doc.setFont("helvetica", "normal")
-    const titleLines = doc.splitTextToSize(action.title, actionW - 4)
-    doc.text(titleLines[0], actionX + 2, rowY)
+    titleLines.forEach((line: string, lineIdx: number) => {
+      doc.text(line, actionX + 2, rowTop + 4.2 + lineIdx * titleLineH)
+    })
 
     // Status badge
     const statusColor = statusColors[action.status] || statusColors.pending
     const statusLabel = statusLabels[action.status] || action.status
     doc.setFillColor(...statusColor)
-    doc.roundedRect(statusX + 1, rowY - 4, statusW - 2, 6, 1, 1, "F")
+    const badgeY = rowTop + Math.max(0.8, (rowH - 6) / 2)
+    doc.roundedRect(statusX + 1, badgeY, statusW - 2, 6, 1, 1, "F")
     doc.setTextColor(...PDF_WHITE)
     doc.setFont("helvetica", "bold")
     doc.setFontSize(7)
-    doc.text(statusLabel, statusX + statusW / 2, rowY, { align: "center" })
+    doc.text(statusLabel, statusX + statusW / 2, badgeY + 4.1, { align: "center" })
 
     // Separator
     doc.setDrawColor(226, 232, 240)
     doc.setLineWidth(0.2)
-    doc.line(14, rowY + 5, W - 14, rowY + 5)
+    doc.line(14, rowTop + rowH, W - 14, rowTop + rowH)
 
-    rowY += rowH
+    rowTop += rowH
   })
 
   // Footer

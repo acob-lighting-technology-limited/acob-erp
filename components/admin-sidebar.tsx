@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
   LayoutDashboard,
-  Users,
   Package,
   ClipboardList,
   FileText,
@@ -16,8 +15,6 @@ import {
   ScrollText,
   ShieldCheck,
   LogOut,
-  Menu,
-  X,
   Briefcase,
   FolderKanban,
   CreditCard,
@@ -27,7 +24,6 @@ import {
   Bell,
   Megaphone,
 } from "lucide-react"
-import Image from "next/image"
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
@@ -55,22 +51,112 @@ interface AdminSidebarProps {
 }
 
 const adminNavigation = [
-  { name: "Dashboard", href: "/admin", icon: LayoutDashboard, roles: ["super_admin", "admin", "lead"] },
-  { name: "HR", href: "/admin/hr", icon: Calendar, roles: ["super_admin", "admin", "lead"] },
-  { name: "Finance", href: "/admin/finance", icon: CreditCard, roles: ["super_admin", "admin"] },
-  { name: "Inventory", href: "/admin/inventory", icon: Package, roles: ["super_admin", "admin"] },
-  { name: "Purchasing", href: "/admin/purchasing", icon: Briefcase, roles: ["super_admin", "admin"] },
-  { name: "Projects", href: "/admin/projects", icon: FolderKanban, roles: ["super_admin", "admin", "lead"] },
-  { name: "Tasks", href: "/admin/tasks", icon: ClipboardList, roles: ["super_admin", "admin", "lead"] },
-  { name: "Help Desk", href: "/admin/help-desk", icon: ClipboardList, roles: ["super_admin", "admin", "lead"] },
-  { name: "Reports", href: "/admin/reports", icon: FileBarChart, roles: ["super_admin", "admin", "lead"] },
-  { name: "Notifications", href: "/admin/notification", icon: Bell, roles: ["super_admin", "admin", "lead"] },
-  { name: "Communications", href: "/admin/communications", icon: Megaphone, roles: ["super_admin", "admin", "lead"] },
-  { name: "Assets", href: "/admin/assets", icon: Package, roles: ["super_admin", "admin", "lead"] },
-  { name: "Documentation", href: "/admin/documentation", icon: FileText, roles: ["super_admin", "admin", "lead"] },
-  { name: "Feedback", href: "/admin/feedback", icon: MessageSquare, roles: ["super_admin", "admin", "lead"] },
-  { name: "Audit Logs", href: "/admin/audit-logs", icon: ScrollText, roles: ["super_admin", "admin", "lead"] },
-  { name: "Settings", href: "/admin/settings", icon: Target, roles: ["super_admin"] },
+  {
+    section: "overview",
+    name: "Dashboard",
+    href: "/admin",
+    icon: LayoutDashboard,
+    roles: ["super_admin", "admin", "lead"],
+  },
+  { section: "management", name: "HR", href: "/admin/hr", icon: Calendar, roles: ["super_admin", "admin", "lead"] },
+  {
+    section: "management",
+    name: "Finance",
+    href: "/admin/finance",
+    icon: CreditCard,
+    roles: ["super_admin", "admin"],
+  },
+  {
+    section: "management",
+    name: "Inventory",
+    href: "/admin/inventory",
+    icon: Package,
+    roles: ["super_admin", "admin"],
+  },
+  {
+    section: "management",
+    name: "Purchasing",
+    href: "/admin/purchasing",
+    icon: Briefcase,
+    roles: ["super_admin", "admin"],
+  },
+  {
+    section: "management",
+    name: "Projects",
+    href: "/admin/projects",
+    icon: FolderKanban,
+    roles: ["super_admin", "admin", "lead"],
+  },
+  {
+    section: "management",
+    name: "Tasks",
+    href: "/admin/tasks",
+    icon: ClipboardList,
+    roles: ["super_admin", "admin", "lead"],
+  },
+  {
+    section: "operations",
+    name: "Help Desk",
+    href: "/admin/help-desk",
+    icon: ClipboardList,
+    roles: ["super_admin", "admin", "lead"],
+  },
+  {
+    section: "operations",
+    name: "Reports",
+    href: "/admin/reports",
+    icon: FileBarChart,
+    roles: ["super_admin", "admin", "lead"],
+  },
+  {
+    section: "operations",
+    name: "Notifications",
+    href: "/admin/notification",
+    icon: Bell,
+    roles: ["super_admin", "admin", "lead"],
+  },
+  {
+    section: "operations",
+    name: "Communications",
+    href: "/admin/communications",
+    icon: Megaphone,
+    roles: ["super_admin", "admin", "lead"],
+  },
+  {
+    section: "operations",
+    name: "Assets",
+    href: "/admin/assets",
+    icon: Package,
+    roles: ["super_admin", "admin", "lead"],
+  },
+  {
+    section: "operations",
+    name: "Documentation",
+    href: "/admin/documentation",
+    icon: FileText,
+    roles: ["super_admin", "admin", "lead"],
+  },
+  {
+    section: "operations",
+    name: "Feedback",
+    href: "/admin/feedback",
+    icon: MessageSquare,
+    roles: ["super_admin", "admin", "lead"],
+  },
+  {
+    section: "compliance",
+    name: "Audit Logs",
+    href: "/admin/audit-logs",
+    icon: ScrollText,
+    roles: ["super_admin", "admin", "lead"],
+  },
+  { section: "compliance", name: "Settings", href: "/admin/settings", icon: Target, roles: ["super_admin"] },
+]
+const adminSections = [
+  { key: "overview", label: "Overview" },
+  { key: "management", label: "Management" },
+  { key: "operations", label: "Operations" },
+  { key: "compliance", label: "Compliance" },
 ]
 
 export function AdminSidebar({ user, profile }: AdminSidebarProps) {
@@ -131,6 +217,12 @@ export function AdminSidebar({ user, profile }: AdminSidebarProps) {
   }
 
   const filteredNavigation = adminNavigation.filter((item) => canAccessRoute(item.roles))
+  const groupedNavigation = adminSections
+    .map((section) => ({
+      ...section,
+      items: filteredNavigation.filter((item) => item.section === section.key),
+    }))
+    .filter((section) => section.items.length > 0)
 
   const SidebarContent = () => (
     <>
@@ -146,16 +238,6 @@ export function AdminSidebar({ user, profile }: AdminSidebarProps) {
           isCollapsed ? "mx-0 items-center px-0" : "px-3"
         )}
       >
-        {/* Admin Panel Badge - Commented out */}
-        {/* <div className={cn("transition-all duration-300 overflow-hidden", isCollapsed ? "max-h-0 opacity-0" : "max-h-10 opacity-100")}>
-        <div className="flex items-center gap-2">
-          <Badge className="bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">
-            <ShieldCheck className="h-3 w-3 mr-1" />
-            Admin Panel
-          </Badge>
-        </div>
-        </div> */}
-
         {/* User Profile - Fixed height container */}
         <div
           className={cn(
@@ -225,43 +307,50 @@ export function AdminSidebar({ user, profile }: AdminSidebarProps) {
 
       {/* Navigation */}
       <nav className="scrollbar-custom flex-1 space-y-0.5 overflow-y-auto px-2.5 py-3">
-        {filteredNavigation.map((item) => {
-          const isActive =
-            item.href === "/admin"
-              ? pathname === "/admin"
-              : pathname === item.href || pathname?.startsWith(item.href + "/")
-          return (
-            <Link
-              key={item.name}
-              href={item.href}
-              onClick={() => setIsMobileMenuOpen(false)}
-              className={cn(
-                "flex min-h-[36px] items-center rounded-md transition-[padding,gap,background-color,color] duration-300 ease-in-out",
-                isCollapsed ? "justify-center px-2.5 py-2" : "gap-2.5 px-3 py-2",
-                "text-sm font-medium",
-                isActive
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
-              )}
-              title={isCollapsed ? item.name : undefined}
-            >
-              <item.icon className="h-4 w-4 shrink-0" />
-              <AnimatePresence mode="wait">
-                {!isCollapsed && (
-                  <motion.span
-                    initial={{ width: 0, opacity: 0 }}
-                    animate={{ width: "auto", opacity: 1 }}
-                    exit={{ width: 0, opacity: 0 }}
-                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                    className="overflow-hidden whitespace-nowrap"
-                  >
-                    {item.name}
-                  </motion.span>
-                )}
-              </AnimatePresence>
-            </Link>
-          )
-        })}
+        {groupedNavigation.map((section) => (
+          <div key={section.key} className="space-y-0.5">
+            {!isCollapsed && (
+              <p className="text-muted-foreground px-3 pt-1 pb-1 text-[11px] font-semibold">{section.label}</p>
+            )}
+            {section.items.map((item) => {
+              const isActive =
+                item.href === "/admin"
+                  ? pathname === "/admin"
+                  : pathname === item.href || pathname?.startsWith(item.href + "/")
+              return (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className={cn(
+                    "flex min-h-[36px] items-center rounded-md transition-[padding,gap,background-color,color] duration-300 ease-in-out",
+                    isCollapsed ? "justify-center px-2.5 py-2" : "gap-2.5 px-3 py-2",
+                    "text-sm font-medium",
+                    isActive
+                      ? "bg-[var(--admin-primary)] text-[var(--admin-primary-foreground)] shadow-sm"
+                      : "text-muted-foreground hover:text-foreground hover:bg-[var(--admin-accent-soft)]"
+                  )}
+                  title={isCollapsed ? item.name : undefined}
+                >
+                  <item.icon className="h-4 w-4 shrink-0" />
+                  <AnimatePresence mode="wait">
+                    {!isCollapsed && (
+                      <motion.span
+                        initial={{ width: 0, opacity: 0 }}
+                        animate={{ width: "auto", opacity: 1 }}
+                        exit={{ width: 0, opacity: 0 }}
+                        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                        className="overflow-hidden whitespace-nowrap"
+                      >
+                        {item.name}
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
+                </Link>
+              )
+            })}
+          </div>
+        ))}
       </nav>
 
       {/* Back to Dashboard & Logout */}
@@ -332,7 +421,7 @@ export function AdminSidebar({ user, profile }: AdminSidebarProps) {
           stiffness: 300,
           damping: 30,
         }}
-        className="bg-card hidden overflow-hidden border-r lg:fixed lg:top-16 lg:bottom-0 lg:flex lg:flex-col"
+        className="hidden overflow-hidden border-r border-[var(--admin-sidebar-border)] bg-[var(--admin-sidebar-bg)] lg:fixed lg:top-16 lg:bottom-0 lg:flex lg:flex-col"
       >
         <SidebarContent />
       </motion.aside>
@@ -350,7 +439,7 @@ export function AdminSidebar({ user, profile }: AdminSidebarProps) {
         />
         <aside
           className={cn(
-            "bg-card fixed inset-y-0 right-0 z-[60] flex w-64 flex-col border-l shadow-xl transition-transform duration-300 ease-out lg:hidden",
+            "fixed inset-y-0 right-0 z-[60] flex w-64 flex-col border-l border-[var(--admin-sidebar-border)] bg-[var(--admin-sidebar-bg)] shadow-xl transition-transform duration-300 ease-out lg:hidden",
             isMobileMenuOpen ? "translate-x-0" : "translate-x-full"
           )}
         >

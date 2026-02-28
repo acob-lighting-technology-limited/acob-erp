@@ -53,9 +53,14 @@ type ManualAttachmentState = {
 
 interface Props {
   employees: Employee[]
+  currentUser?: {
+    id: string
+    full_name: string | null
+    department: string | null
+  }
 }
 
-export function MailDigestContent({ employees }: Props) {
+export function MailDigestContent({ employees, currentUser }: Props) {
   const supabase = createClient()
   const currentOfficeWeek = getCurrentOfficeWeek()
 
@@ -159,10 +164,23 @@ export function MailDigestContent({ employees }: Props) {
   }, [employees])
 
   useEffect(() => {
-    if (adminHrPreparers.length > 0 && !adminHrPreparers.includes(selectedPreparedBy)) {
-      setSelectedPreparedBy(adminHrPreparers[0])
+    if (adminHrPreparers.length === 0) {
+      setSelectedPreparedBy("ACOB Team")
+      return
     }
-  }, [adminHrPreparers, selectedPreparedBy])
+
+    const currentDept = (currentUser?.department || "").toLowerCase()
+    const currentName = (currentUser?.full_name || "").trim()
+    const isCurrentUserAdminHr = currentDept.includes("admin") && currentDept.includes("hr")
+
+    // If sender is Admin & HR, default to sender name. Otherwise default to first Admin & HR name.
+    const preferredName =
+      isCurrentUserAdminHr && currentName && adminHrPreparers.includes(currentName) ? currentName : adminHrPreparers[0]
+
+    if (!selectedPreparedBy || !adminHrPreparers.includes(selectedPreparedBy)) {
+      setSelectedPreparedBy(preferredName)
+    }
+  }, [adminHrPreparers, currentUser?.department, currentUser?.full_name, selectedPreparedBy])
 
   // ── Handlers ────────────────────────────────────────────────────────────────
   const toggleEmployee = useCallback((id: string) => {

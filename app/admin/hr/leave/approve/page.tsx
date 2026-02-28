@@ -1,352 +1,232 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { createClient } from "@/lib/supabase/client"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Textarea } from "@/components/ui/textarea"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ArrowLeft, CheckCircle, XCircle, Calendar, Clock, User, History } from "lucide-react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
+import { ArrowLeft, Clock, History } from "lucide-react"
 import { toast } from "sonner"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
-interface LeaveRequest {
+interface LeaveItem {
   id: string
   user_id: string
   start_date: string
   end_date: string
+  resume_date: string
   days_count: number
   reason: string
   status: string
+  approval_stage: string
   created_at: string
-  approved_at?: string
-  rejected_reason?: string
-  user: {
-    first_name: string
-    last_name: string
-    company_email: string
-    department_id: string
-  }
-  leave_type: {
-    name: string
-  }
-  approver?: {
-    first_name: string
-    last_name: string
-  }
+  user?: { full_name: string; company_email: string }
+  leave_type?: { name: string }
+  evidence?: Array<{
+    id: string
+    document_type: string
+    file_url: string
+    status: "pending" | "verified" | "rejected"
+    notes?: string | null
+  }>
+  required_documents?: string[]
+  missing_documents?: string[]
+  evidence_complete?: boolean
+}
+
+const STAGE_LABELS: Record<string, string> = {
+  reliever_pending: "Waiting Reliever",
+  supervisor_pending: "Waiting Supervisor",
+  hr_pending: "Waiting HR",
+  completed: "Completed",
+  rejected: "Rejected",
+  cancelled: "Cancelled",
 }
 
 export default function LeaveApprovePage() {
   const [loading, setLoading] = useState(true)
-  const [pendingRequests, setPendingRequests] = useState<LeaveRequest[]>([])
-  const [allRequests, setAllRequests] = useState<LeaveRequest[]>([])
-  const [processing, setProcessing] = useState<string | null>(null)
-  const [comments, setComments] = useState<{ [key: string]: string }>({})
-  const [activeTab, setActiveTab] = useState("pending")
+  const [pendingQueue, setPendingQueue] = useState<LeaveItem[]>([])
+  const [history, setHistory] = useState<LeaveItem[]>([])
 
   useEffect(() => {
-    fetchAllRequests()
+    void loadData()
   }, [])
 
-  async function fetchAllRequests() {
+  async function loadData() {
+    setLoading(true)
     try {
-      const supabase = createClient()
+      const [queueRes, requestsRes] = await Promise.all([fetch("/api/hr/leave/queue"), fetch("/api/hr/leave/requests")])
+      const queuePayload = await queueRes.json()
+      const requestPayload = await requestsRes.json()
 
-      // Fetch all leave requests
-      const { data: requestsData, error } = await supabase
-        .from("leave_requests")
-        .select(
-          `
-                    *,
-                    leave_type:leave_types(name)
-                `
-        )
-        .order("created_at", { ascending: false })
-        .limit(100)
-
-      if (error) {
-        console.error("Error fetching requests:", error)
-        toast.error("Failed to fetch leave requests")
-        return
-      }
-
-      if (requestsData && requestsData.length > 0) {
-        // Get unique user IDs and approver IDs
-        const userIds = Array.from(new Set(requestsData.map((r) => r.user_id)))
-        const approverIds = Array.from(new Set(requestsData.filter((r) => r.approved_by).map((r) => r.approved_by)))
-        const allProfileIds = Array.from(new Set([...userIds, ...approverIds]))
-
-        const { data: profiles } = await supabase
-          .from("profiles")
-          .select("id, first_name, last_name, company_email, department_id")
-          .in("id", allProfileIds)
-
-        const profileMap = new Map(profiles?.map((p) => [p.id, p]) || [])
-
-        const enrichedRequests = requestsData.map((r) => ({
-          ...r,
-          user: profileMap.get(r.user_id) || {
-            first_name: "Unknown",
-            last_name: "User",
-            company_email: "",
-            department_id: null,
-          },
-          approver: r.approved_by ? profileMap.get(r.approved_by) : undefined,
-        }))
-
-        setPendingRequests(enrichedRequests.filter((r) => r.status === "pending"))
-        setAllRequests(enrichedRequests)
-      } else {
-        setPendingRequests([])
-        setAllRequests([])
-      }
-    } catch (error) {
-      console.error("Error fetching requests:", error)
-      toast.error("Failed to load leave requests")
+      setPendingQueue(queuePayload.data || [])
+      setHistory(requestPayload.data || [])
+    } catch {
+      toast.error("Failed to load leave data")
     } finally {
       setLoading(false)
     }
   }
 
-  async function handleApproval(requestId: string, status: "approved" | "rejected") {
-    setProcessing(requestId)
+  async function handleAction(id: string, action: "approve" | "reject") {
+    const target = pendingQueue.find((item) => item.id === id) || history.find((item) => item.id === id)
+    const needsOverride = action === "approve" && target && target.evidence_complete === false
+
+    let comments = action === "reject" ? window.prompt("Rejection reason") || "" : ""
+    let overrideEvidence = false
+
+    if (needsOverride) {
+      comments =
+        window.prompt(
+          `Evidence is incomplete (${(target?.missing_documents || []).join(", ")}). Enter override reason to proceed:`
+        ) || ""
+      if (!comments.trim()) {
+        toast.error("Override reason is required when evidence is incomplete")
+        return
+      }
+      overrideEvidence = true
+    }
+
+    if (action === "reject" && !comments.trim()) {
+      toast.error("Rejection reason is required")
+      return
+    }
+
     try {
       const response = await fetch("/api/hr/leave/approve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          leave_request_id: requestId,
-          status,
-          comments: comments[requestId] || "",
-        }),
+        body: JSON.stringify({ leave_request_id: id, action, comments, override_evidence: overrideEvidence }),
       })
 
-      const data = await response.json()
+      const payload = await response.json()
+      if (!response.ok) throw new Error(payload.error || "Failed to process action")
 
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to process request")
-      }
-
-      toast.success(`Leave request ${status} successfully`)
-      fetchAllRequests() // Refresh all data
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "An error occurred"
-      toast.error(errorMessage)
-    } finally {
-      setProcessing(null)
+      toast.success(payload.message || "Action completed")
+      await loadData()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to process action")
     }
   }
-
-  function formatDate(dateString: string) {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    })
-  }
-
-  function getStatusColor(status: string) {
-    switch (status) {
-      case "approved":
-        return "bg-green-500"
-      case "rejected":
-        return "bg-red-500"
-      case "pending":
-        return "bg-orange-500"
-      default:
-        return "bg-gray-500"
-    }
-  }
-
-  const approvedCount = allRequests.filter((r) => r.status === "approved").length
-  const rejectedCount = allRequests.filter((r) => r.status === "rejected").length
 
   return (
     <div className="container mx-auto p-6">
-      <div className="mb-6">
-        <Link href="/admin/hr" className="text-muted-foreground hover:text-foreground flex items-center gap-2">
-          <ArrowLeft className="h-4 w-4" />
-          Back to HR Dashboard
+      <div className="mb-4">
+        <Link href="/admin/hr" className="text-muted-foreground inline-flex items-center gap-2 text-sm">
+          <ArrowLeft className="h-4 w-4" /> Back to HR Dashboard
         </Link>
       </div>
 
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Leave Management</h1>
-          <p className="text-muted-foreground">Review, approve, and track employee leave requests</p>
-        </div>
-        <div className="flex gap-2">
-          <Badge variant="outline" className="border-orange-500 px-4 py-2 text-lg text-orange-600">
-            <Clock className="mr-1 h-4 w-4" />
-            {pendingRequests.length} Pending
-          </Badge>
-          <Badge variant="outline" className="border-green-500 px-4 py-2 text-lg text-green-600">
-            <CheckCircle className="mr-1 h-4 w-4" />
-            {approvedCount} Approved
-          </Badge>
-          <Badge variant="outline" className="border-red-500 px-4 py-2 text-lg text-red-600">
-            <XCircle className="mr-1 h-4 w-4" />
-            {rejectedCount} Rejected
-          </Badge>
-        </div>
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold">Leave Approvals</h1>
+        <p className="text-muted-foreground">HR final endorsement dashboard with full leave history</p>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <Tabs defaultValue="pending">
         <TabsList className="mb-4">
-          <TabsTrigger value="pending" className="flex items-center gap-2">
-            <Clock className="h-4 w-4" />
-            Pending Approval ({pendingRequests.length})
+          <TabsTrigger value="pending" className="gap-2">
+            <Clock className="h-4 w-4" /> Pending Queue ({pendingQueue.length})
           </TabsTrigger>
-          <TabsTrigger value="history" className="flex items-center gap-2">
-            <History className="h-4 w-4" />
-            All History ({allRequests.length})
+          <TabsTrigger value="history" className="gap-2">
+            <History className="h-4 w-4" /> History ({history.length})
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="pending">
-          {loading ? (
-            <div className="py-12 text-center">Loading...</div>
-          ) : pendingRequests.length === 0 ? (
-            <Card>
-              <CardContent className="py-12 text-center">
-                <CheckCircle className="mx-auto mb-4 h-12 w-12 text-green-500" />
-                <h3 className="text-lg font-semibold">All caught up!</h3>
-                <p className="text-muted-foreground">No pending leave requests to approve</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-4">
-              {pendingRequests.map((request) => (
-                <Card key={request.id}>
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <CardTitle className="flex items-center gap-2">
-                          <User className="h-5 w-5" />
-                          {request.user.first_name} {request.user.last_name}
-                        </CardTitle>
-                        <CardDescription>{request.user.company_email}</CardDescription>
+          <Card>
+            <CardHeader>
+              <CardTitle>Pending HR Actions</CardTitle>
+              <CardDescription>Only requests that reached HR stage appear here.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {loading && <p>Loading...</p>}
+              {!loading && pendingQueue.length === 0 && (
+                <p className="text-muted-foreground text-sm">No pending requests.</p>
+              )}
+              {pendingQueue.map((item) => (
+                <div key={item.id} className="rounded border p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-medium">{item.user?.full_name || "Employee"}</p>
+                    <Badge variant="outline">{STAGE_LABELS[item.approval_stage] || item.approval_stage}</Badge>
+                  </div>
+                  <p className="text-muted-foreground mt-1 text-sm">
+                    {item.start_date} to {item.end_date} | Resume {item.resume_date} | {item.days_count} day(s)
+                  </p>
+                  <p className="mt-2 text-sm">{item.reason}</p>
+                  <div className="mt-2 space-y-1 text-xs">
+                    <p>
+                      Evidence:{" "}
+                      <span className={item.evidence_complete ? "text-green-600" : "text-amber-600"}>
+                        {item.evidence_complete ? "Complete" : "Incomplete"}
+                      </span>
+                    </p>
+                    {(item.required_documents || []).length > 0 && (
+                      <p>Required docs: {(item.required_documents || []).join(", ")}</p>
+                    )}
+                    {(item.missing_documents || []).length > 0 && (
+                      <p className="text-amber-600">Missing docs: {(item.missing_documents || []).join(", ")}</p>
+                    )}
+                    {(item.evidence || []).length > 0 && (
+                      <div className="space-y-1">
+                        {(item.evidence || []).map((doc) => (
+                          <p key={doc.id}>
+                            - {doc.document_type} ({doc.status}){" "}
+                            <a href={doc.file_url} target="_blank" className="text-blue-600 underline" rel="noreferrer">
+                              view
+                            </a>
+                          </p>
+                        ))}
                       </div>
-                      <Badge>{request.leave_type.name}</Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-                      <div>
-                        <p className="text-muted-foreground text-sm">Start Date</p>
-                        <p className="font-medium">{formatDate(request.start_date)}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground text-sm">End Date</p>
-                        <p className="font-medium">{formatDate(request.end_date)}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground text-sm">Days</p>
-                        <p className="font-medium">{request.days_count}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground text-sm">Requested</p>
-                        <p className="font-medium">{formatDate(request.created_at)}</p>
-                      </div>
-                    </div>
-
-                    <div>
-                      <p className="text-muted-foreground mb-1 text-sm">Reason</p>
-                      <p className="bg-muted rounded-lg p-3">{request.reason}</p>
-                    </div>
-
-                    <div>
-                      <p className="text-muted-foreground mb-1 text-sm">Comments (optional)</p>
-                      <Textarea
-                        placeholder="Add comments for the employee..."
-                        value={comments[request.id] || ""}
-                        onChange={(e) => setComments({ ...comments, [request.id]: e.target.value })}
-                        rows={2}
-                      />
-                    </div>
-
-                    <div className="flex gap-2">
-                      <Button
-                        className="flex-1"
-                        onClick={() => handleApproval(request.id, "approved")}
-                        disabled={processing === request.id}
-                      >
-                        <CheckCircle className="mr-2 h-4 w-4" />
-                        {processing === request.id ? "Processing..." : "Approve"}
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        className="flex-1"
-                        onClick={() => handleApproval(request.id, "rejected")}
-                        disabled={processing === request.id}
-                      >
-                        <XCircle className="mr-2 h-4 w-4" />
-                        {processing === request.id ? "Processing..." : "Reject"}
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+                    )}
+                  </div>
+                  <div className="mt-3 flex gap-2">
+                    <Button size="sm" onClick={() => handleAction(item.id, "approve")}>
+                      Endorse
+                    </Button>
+                    <Button size="sm" variant="destructive" onClick={() => handleAction(item.id, "reject")}>
+                      Reject
+                    </Button>
+                  </div>
+                </div>
               ))}
-            </div>
-          )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="history">
-          {loading ? (
-            <div className="py-12 text-center">Loading...</div>
-          ) : allRequests.length === 0 ? (
-            <Card>
-              <CardContent className="py-12 text-center">
-                <Calendar className="text-muted-foreground mx-auto mb-4 h-12 w-12" />
-                <h3 className="text-lg font-semibold">No leave history</h3>
-                <p className="text-muted-foreground">No leave requests have been submitted yet</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card>
-              <CardHeader>
-                <CardTitle>Leave Request History</CardTitle>
-                <CardDescription>All leave requests and their outcomes</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {allRequests.map((request) => (
-                    <div key={request.id} className="flex items-start justify-between rounded-lg border p-4">
-                      <div className="flex items-start gap-4">
-                        <div className="bg-muted rounded-full p-2">
-                          <User className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <p className="font-semibold">
-                            {request.user.first_name} {request.user.last_name}
-                          </p>
-                          <p className="text-muted-foreground text-sm">
-                            {request.leave_type.name} • {request.days_count} days
-                          </p>
-                          <p className="text-muted-foreground text-sm">
-                            {formatDate(request.start_date)} - {formatDate(request.end_date)}
-                          </p>
-                          <p className="text-muted-foreground mt-1 line-clamp-1 text-sm">Reason: {request.reason}</p>
-                          {request.status !== "pending" && request.approver && (
-                            <p className="text-muted-foreground mt-1 text-sm">
-                              {request.status === "approved" ? "Approved" : "Rejected"} by {request.approver.first_name}{" "}
-                              {request.approver.last_name}
-                              {request.approved_at && ` on ${formatDate(request.approved_at)}`}
-                            </p>
-                          )}
-                          {request.rejected_reason && (
-                            <p className="mt-1 text-sm text-red-600">Rejection reason: {request.rejected_reason}</p>
-                          )}
-                        </div>
-                      </div>
-                      <Badge className={getStatusColor(request.status)}>{request.status}</Badge>
+          <Card>
+            <CardHeader>
+              <CardTitle>All Leave Requests</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {loading && <p>Loading...</p>}
+              {!loading && history.length === 0 && <p className="text-muted-foreground text-sm">No history found.</p>}
+              {history.map((item) => (
+                <div key={item.id} className="rounded border p-3">
+                  <div className="flex items-center justify-between">
+                    <p className="font-medium">{item.user?.full_name || "Employee"}</p>
+                    <div className="flex gap-2">
+                      <Badge
+                        variant={
+                          item.status === "approved"
+                            ? "default"
+                            : item.status === "rejected"
+                              ? "destructive"
+                              : "secondary"
+                        }
+                      >
+                        {item.status}
+                      </Badge>
+                      <Badge variant="outline">{STAGE_LABELS[item.approval_stage] || item.approval_stage}</Badge>
                     </div>
-                  ))}
+                  </div>
+                  <p className="text-muted-foreground text-sm">
+                    {item.start_date} to {item.end_date} | Resume {item.resume_date}
+                  </p>
                 </div>
-              </CardContent>
-            </Card>
-          )}
+              ))}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>

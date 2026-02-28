@@ -19,7 +19,7 @@ import {
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
-import { ArrowLeft, ChevronDown, ChevronUp, Mail, Pencil, Plus, Trash2, Users, Building } from "lucide-react"
+import { ChevronDown, ChevronUp, Mail, Pencil, Plus, Trash2, Users, Building } from "lucide-react"
 import { toast } from "sonner"
 import { PageHeader, PageWrapper } from "@/components/layout"
 import { StatCard } from "@/components/ui/stat-card"
@@ -47,6 +47,10 @@ interface DepartmentEmployee {
   department: string | null
 }
 
+interface CurrentUserAccess {
+  canManageDepartments: boolean
+}
+
 export default function DepartmentsPage() {
   const [departments, setDepartments] = useState<Department[]>([])
   const [departmentEmployees, setDepartmentEmployees] = useState<Record<string, DepartmentEmployee[]>>({})
@@ -54,6 +58,9 @@ export default function DepartmentsPage() {
   const [loading, setLoading] = useState(true)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingDepartment, setEditingDepartment] = useState<Department | null>(null)
+  const [currentUserAccess, setCurrentUserAccess] = useState<CurrentUserAccess>({
+    canManageDepartments: false,
+  })
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -68,6 +75,30 @@ export default function DepartmentsPage() {
     try {
       const supabase = createClient()
 
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role, department, lead_departments")
+          .eq("id", user.id)
+          .single()
+
+        const leadDepartments = Array.isArray(profile?.lead_departments)
+          ? profile.lead_departments
+          : profile?.department
+            ? [profile.department]
+            : []
+        const isHrGlobalLead = profile?.role === "lead" && leadDepartments.includes("Admin & HR")
+        const canManageDepartments = profile?.role === "super_admin" || profile?.role === "admin" || isHrGlobalLead
+
+        setCurrentUserAccess({
+          canManageDepartments,
+        })
+      }
+
       // Fetch departments
       const { data: depts, error } = await supabase.from("departments").select("*").order("name")
 
@@ -78,6 +109,7 @@ export default function DepartmentsPage() {
         .select(
           "id, first_name, last_name, company_email, additional_email, company_role, employment_status, department"
         )
+        .eq("employment_status", "active")
 
       const employeesByDepartment: Record<string, DepartmentEmployee[]> = {}
       for (const profile of (profiles || []) as DepartmentEmployee[]) {
@@ -105,6 +137,11 @@ export default function DepartmentsPage() {
     e.preventDefault()
 
     try {
+      if (!currentUserAccess.canManageDepartments) {
+        toast.error("You can view departments but cannot modify them")
+        return
+      }
+
       const supabase = createClient()
 
       if (editingDepartment) {
@@ -144,6 +181,11 @@ export default function DepartmentsPage() {
   }
 
   async function handleDelete(dept: Department) {
+    if (!currentUserAccess.canManageDepartments) {
+      toast.error("You can view departments but cannot delete them")
+      return
+    }
+
     if (!confirm(`Are you sure you want to delete "${dept.name}"? This cannot be undone.`)) {
       return
     }
@@ -164,6 +206,11 @@ export default function DepartmentsPage() {
   }
 
   function openEditDialog(dept: Department) {
+    if (!currentUserAccess.canManageDepartments) {
+      toast.error("You can view departments but cannot edit them")
+      return
+    }
+
     setEditingDepartment(dept)
     setFormData({
       name: dept.name,
@@ -174,6 +221,11 @@ export default function DepartmentsPage() {
   }
 
   function openCreateDialog() {
+    if (!currentUserAccess.canManageDepartments) {
+      toast.error("You can view departments but cannot create departments")
+      return
+    }
+
     setEditingDepartment(null)
     setFormData({ name: "", description: "", is_active: true })
     setIsDialogOpen(true)
@@ -196,62 +248,64 @@ export default function DepartmentsPage() {
         icon={Building}
         backLink={{ href: "/admin/hr", label: "Back to HR" }}
         actions={
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button onClick={openCreateDialog}>
-                <Plus className="mr-2 h-4 w-4" />
-                Add Department
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <form onSubmit={handleSubmit}>
-                <DialogHeader>
-                  <DialogTitle>{editingDepartment ? "Edit Department" : "Create Department"}</DialogTitle>
-                  <DialogDescription>
-                    {editingDepartment
-                      ? "Update the department details below."
-                      : "Add a new department to your organization."}
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="name">Department Name</Label>
-                    <Input
-                      id="name"
-                      value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      placeholder="e.g., Engineering, Sales, Marketing"
-                      required
-                    />
+          currentUserAccess.canManageDepartments ? (
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button onClick={openCreateDialog}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Department
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <form onSubmit={handleSubmit}>
+                  <DialogHeader>
+                    <DialogTitle>{editingDepartment ? "Edit Department" : "Create Department"}</DialogTitle>
+                    <DialogDescription>
+                      {editingDepartment
+                        ? "Update the department details below."
+                        : "Add a new department to your organization."}
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="grid gap-4 py-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="name">Department Name</Label>
+                      <Input
+                        id="name"
+                        value={formData.name}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        placeholder="e.g., Engineering, Sales, Marketing"
+                        required
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="description">Description</Label>
+                      <Textarea
+                        id="description"
+                        value={formData.description}
+                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                        placeholder="Brief description of the department's responsibilities..."
+                        rows={3}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="is_active">Active</Label>
+                      <Switch
+                        id="is_active"
+                        checked={formData.is_active}
+                        onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
+                      />
+                    </div>
                   </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="description">Description</Label>
-                    <Textarea
-                      id="description"
-                      value={formData.description}
-                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                      placeholder="Brief description of the department's responsibilities..."
-                      rows={3}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="is_active">Active</Label>
-                    <Switch
-                      id="is_active"
-                      checked={formData.is_active}
-                      onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
-                    />
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button type="submit">{editingDepartment ? "Update" : "Create"}</Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
+                  <DialogFooter>
+                    <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button type="submit">{editingDepartment ? "Update" : "Create"}</Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+          ) : null
         }
       />
 
@@ -296,7 +350,11 @@ export default function DepartmentsPage() {
               icon={Building}
               title="No departments yet"
               description="Create your first department to get started."
-              action={{ label: "Add Department", onClick: openCreateDialog, icon: Plus }}
+              action={
+                currentUserAccess.canManageDepartments
+                  ? { label: "Add Department", onClick: openCreateDialog, icon: Plus }
+                  : undefined
+              }
             />
           ) : (
             <Table>
@@ -345,29 +403,33 @@ export default function DepartmentsPage() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => openEditDialog(dept)}
-                              aria-label={`Edit department: ${dept.name}`}
-                              title={`Edit department: ${dept.name}`}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleDelete(dept)}
-                              disabled={(dept.employee_count ?? 0) > 0}
-                              aria-label={`Delete department: ${dept.name}`}
-                              title={
-                                (dept.employee_count ?? 0) > 0
-                                  ? "Cannot delete department with employees"
-                                  : `Delete department: ${dept.name}`
-                              }
-                            >
-                              <Trash2 className="text-destructive h-4 w-4" />
-                            </Button>
+                            {currentUserAccess.canManageDepartments && (
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => openEditDialog(dept)}
+                                  aria-label={`Edit department: ${dept.name}`}
+                                  title={`Edit department: ${dept.name}`}
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleDelete(dept)}
+                                  disabled={(dept.employee_count ?? 0) > 0}
+                                  aria-label={`Delete department: ${dept.name}`}
+                                  title={
+                                    (dept.employee_count ?? 0) > 0
+                                      ? "Cannot delete department with employees"
+                                      : `Delete department: ${dept.name}`
+                                  }
+                                >
+                                  <Trash2 className="text-destructive h-4 w-4" />
+                                </Button>
+                              </>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>

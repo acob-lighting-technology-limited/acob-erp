@@ -57,6 +57,9 @@ export function AdminProjectsContent({ initialProjects, initialemployee }: Admin
   const router = useRouter()
   const [projects, setProjects] = useState<Project[]>(initialProjects)
   const [employee] = useState<employee[]>(initialemployee)
+  const activeEmployees = employee.filter(
+    (member) => member.employment_status === "active" || !member.employment_status
+  )
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
 
@@ -569,7 +572,7 @@ export function AdminProjectsContent({ initialProjects, initialemployee }: Admin
                 icon={<User className="h-4 w-4" />}
                 options={[
                   { value: "none", label: "None" },
-                  ...employee.map((member) => ({
+                  ...activeEmployees.map((member) => ({
                     value: member.id,
                     label: `${member.first_name} ${member.last_name} - ${member.department}`,
                   })),

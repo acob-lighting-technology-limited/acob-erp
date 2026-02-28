@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { createClient as createServerClient } from "@/lib/supabase/server"
+import { resolveAdminScope } from "@/lib/admin/rbac"
 import { formValidation } from "@/lib/validation"
 
 export const dynamic = "force-dynamic"
 
 export async function POST(request: NextRequest) {
-  // First, verify the caller is an authenticated admin
+  // First, verify the caller is authenticated and has user-management privileges
   const supabase = await createServerClient()
   const {
     data: { user },
@@ -16,10 +17,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 })
   }
 
-  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
-
-  if (!profile || !["super_admin", "admin"].includes(profile.role)) {
-    return NextResponse.json({ success: false, error: "Forbidden: Admin access required" }, { status: 403 })
+  const scope = await resolveAdminScope(supabase as any, user.id)
+  const canManageUsers =
+    !!scope && (scope.isAdminLike || (scope.role === "lead" && scope.managedDepartments.includes("Admin & HR")))
+  if (!canManageUsers) {
+    return NextResponse.json({ success: false, error: "Forbidden: Insufficient privileges" }, { status: 403 })
   }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL

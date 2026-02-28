@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { NextRequest, NextResponse } from "next/server"
 import type { EmploymentStatus } from "@/types/database"
+import { getSeparationBlockers } from "@/lib/hr/separation-blockers"
 
 // Force dynamic rendering to allow cookies/auth
 export const dynamic = "force-dynamic"
@@ -8,8 +9,12 @@ export const dynamic = "force-dynamic"
 interface StatusUpdateBody {
   status: EmploymentStatus
   reason?: string
+  reason_code?: string
+  reason_label?: string
+  leave_type_id?: string
+  leave_type_name?: string
   suspension_end_date?: string
-  termination_date?: string
+  separation_date?: string
 }
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -38,10 +43,20 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
 
     const body: StatusUpdateBody = await request.json()
-    const { status, reason, suspension_end_date, termination_date } = body
+    const {
+      status,
+      reason,
+      reason_code,
+      reason_label,
+      leave_type_id,
+      leave_type_name,
+      suspension_end_date,
+      separation_date,
+    } = body
+    const selectedReason = reason_label || reason_code || reason || null
 
     // Validate status
-    const validStatuses: EmploymentStatus[] = ["active", "suspended", "terminated", "on_leave"]
+    const validStatuses: EmploymentStatus[] = ["active", "suspended", "separated", "on_leave"]
     if (!validStatuses.includes(status)) {
       return NextResponse.json({ error: "Invalid status" }, { status: 400 })
     }
@@ -59,6 +74,19 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     const oldStatus = currentEmployee.employment_status
 
+    if (status === "separated") {
+      const blockers = await getSeparationBlockers(supabase, employeeId)
+      if (blockers.total > 0) {
+        return NextResponse.json(
+          {
+            error: "Cannot separate employee with active assignments",
+            blockers,
+          },
+          { status: 409 }
+        )
+      }
+    }
+
     // Update profile with new status
     const updateData: Record<string, unknown> = {
       employment_status: status,
@@ -67,21 +95,21 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       updated_at: new Date().toISOString(),
     }
 
-    // Add termination details if terminating
-    if (status === "terminated") {
-      updateData.termination_date = termination_date || new Date().toISOString().split("T")[0]
-      updateData.termination_reason = reason
+    // Add separation details if separating
+    if (status === "separated") {
+      updateData.separation_date = separation_date || new Date().toISOString().split("T")[0]
+      updateData.separation_reason = selectedReason
 
-      // CRITICAL: Downgrade permissions and remove roles upon termination
+      // CRITICAL: Downgrade permissions and remove roles upon separation
       updateData.role = "visitor"
       updateData.company_role = null
       updateData.is_admin = false
       updateData.is_department_lead = false
       updateData.lead_departments = []
     } else {
-      // Clear termination fields if not terminated
-      updateData.termination_date = null
-      updateData.termination_reason = null
+      // Clear separation fields if not separated
+      updateData.separation_date = null
+      updateData.separation_reason = null
     }
 
     const { error: updateError } = await supabase.from("profiles").update(updateData).eq("id", employeeId)
@@ -96,7 +124,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       const { error: suspensionError } = await supabase.from("employee_suspensions").insert({
         employee_id: employeeId,
         suspended_by: user.id,
-        reason: reason || "No reason provided",
+        reason: selectedReason || "No reason provided",
         start_date: new Date().toISOString().split("T")[0],
         end_date: suspension_end_date || null,
         is_active: true,
@@ -116,7 +144,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           is_active: false,
           lifted_by: user.id,
           lifted_at: new Date().toISOString(),
-          lift_reason: reason || "Suspension lifted",
+          lift_reason: selectedReason || "Suspension lifted",
         })
         .eq("employee_id", employeeId)
         .eq("is_active", true)
@@ -135,9 +163,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       old_values: { employment_status: oldStatus },
       new_values: {
         employment_status: status,
-        reason,
+        reason: selectedReason,
+        ...(status === "on_leave" && leave_type_id && { leave_type_id }),
+        ...(status === "on_leave" && leave_type_name && { leave_type_name }),
         ...(status === "suspended" && suspension_end_date && { suspension_end_date }),
-        ...(status === "terminated" && termination_date && { termination_date }),
+        ...(status === "separated" && separation_date && { separation_date }),
       },
     })
 
@@ -173,7 +203,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     // Get employee status
     const { data: employee, error } = await supabase
       .from("profiles")
-      .select("employment_status, status_changed_at, status_changed_by, termination_date, termination_reason")
+      .select("employment_status, status_changed_at, status_changed_by, separation_date, separation_reason")
       .eq("id", employeeId)
       .single()
 
@@ -196,13 +226,16 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       suspension = suspensionData
     }
 
+    const blockers = await getSeparationBlockers(supabase, employeeId)
+
     return NextResponse.json({
       employment_status: employee.employment_status,
       status_changed_at: employee.status_changed_at,
       status_changed_by: employee.status_changed_by,
-      termination_date: employee.termination_date,
-      termination_reason: employee.termination_reason,
+      separation_date: employee.separation_date,
+      separation_reason: employee.separation_reason,
       suspension,
+      blockers,
     })
   } catch (error) {
     console.error("Error fetching status:", error)

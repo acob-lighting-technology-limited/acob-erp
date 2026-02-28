@@ -4,10 +4,10 @@ import { NextResponse } from "next/server"
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const code = searchParams.get("code")
-  const next = searchParams.get("next") || "/dashboard"
+  const next = searchParams.get("next") || "/profile"
 
   // Validate and sanitize 'next' to prevent open redirects
-  let safeNext = "/dashboard"
+  let safeNext = "/profile"
   if (
     next &&
     typeof next === "string" &&

@@ -94,3 +94,6 @@ export type {
 
 // Re-export DocumentType from payments (unique to that module)
 export type { DocumentType } from "./payments"
+
+// Help Desk types
+export type { HelpDeskPriority, HelpDeskStatus, HelpDeskTicket } from "./help-desk"

@@ -65,9 +65,19 @@ interface TrackerStatus {
 
 interface WeeklyReportsContentProps {
   initialDepartments: string[]
+  scopedDepartments?: string[]
+  currentUser: {
+    id: string
+    role: string
+    department: string | null
+  }
 }
 
-export function WeeklyReportsContent({ initialDepartments }: WeeklyReportsContentProps) {
+export function WeeklyReportsContent({
+  initialDepartments,
+  scopedDepartments = [],
+  currentUser,
+}: WeeklyReportsContentProps) {
   const currentOfficeWeek = getCurrentOfficeWeek()
   const [reports, setReports] = useState<WeeklyReport[]>([])
   const [loading, setLoading] = useState(true)
@@ -81,6 +91,8 @@ export function WeeklyReportsContent({ initialDepartments }: WeeklyReportsConten
   const [trackingData, setTrackingData] = useState<TrackerStatus[]>([])
 
   const supabase = createClient()
+  const isLead = currentUser.role === "lead"
+  const canMutateReport = (report: WeeklyReport) => !isLead || report.user_id === currentUser.id
 
   const loadReports = async () => {
     setLoading(true)
@@ -98,6 +110,9 @@ export function WeeklyReportsContent({ initialDepartments }: WeeklyReportsConten
       if (deptFilter !== "all") {
         query = query.eq("department", deptFilter)
       }
+      if (scopedDepartments.length > 0) {
+        query = query.in("department", scopedDepartments)
+      }
 
       const { data, error } = await query
       if (error) throw error
@@ -111,6 +126,7 @@ export function WeeklyReportsContent({ initialDepartments }: WeeklyReportsConten
         .select("id, department, status")
         .eq("week_number", weekFilter)
         .eq("year", yearFilter)
+        .in("department", scopedDepartments.length > 0 ? scopedDepartments : initialDepartments)
 
       if (!actionsError) {
         setTrackingData(actions || [])
@@ -138,6 +154,11 @@ export function WeeklyReportsContent({ initialDepartments }: WeeklyReportsConten
   }
 
   const handleDelete = async (id: string) => {
+    const target = reports.find((r) => r.id === id)
+    if (target && !canMutateReport(target)) {
+      toast.error("You can only modify reports you created")
+      return
+    }
     if (!confirm("Are you sure? Admin delete is permanent.")) return
     try {
       const { error } = await supabase.from("weekly_reports").delete().eq("id", id)
@@ -490,7 +511,12 @@ export function WeeklyReportsContent({ initialDepartments }: WeeklyReportsConten
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem
+                              disabled={!canMutateReport(report)}
                               onClick={() => {
+                                if (!canMutateReport(report)) {
+                                  toast.error("You can only edit your own reports")
+                                  return
+                                }
                                 setEditingReport(report)
                                 setIsAdminDialogOpen(true)
                               }}
@@ -506,6 +532,7 @@ export function WeeklyReportsContent({ initialDepartments }: WeeklyReportsConten
                             </Link>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
+                              disabled={!canMutateReport(report)}
                               className="text-red-600 focus:bg-red-50 focus:text-red-600"
                               onClick={() => handleDelete(report.id)}
                             >
@@ -575,6 +602,7 @@ export function WeeklyReportsContent({ initialDepartments }: WeeklyReportsConten
         onClose={() => setIsAdminDialogOpen(false)}
         report={editingReport}
         onSuccess={loadReports}
+        currentUser={currentUser}
       />
     </AdminTablePage>
   )
