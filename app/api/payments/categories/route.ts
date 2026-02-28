@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
+import { resolveAdminScope } from "@/lib/admin/rbac"
 
 export const dynamic = "force-dynamic"
 
@@ -30,6 +31,17 @@ function createClient() {
 export async function GET() {
   try {
     const supabase = createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const scope = await resolveAdminScope(supabase as any, user.id)
+    if (!scope) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
 
     const { data: categories, error } = await supabase.from("payment_categories").select("*").order("name")
 
@@ -53,6 +65,11 @@ export async function POST(request: Request) {
     } = await supabase.auth.getUser()
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const scope = await resolveAdminScope(supabase as any, user.id)
+    if (!scope || !scope.isAdminLike) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
     const body = await request.json()

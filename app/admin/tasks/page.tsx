@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
+import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
 import {
   AdminTasksContent,
   type Task,
@@ -20,16 +21,16 @@ async function getAdminTasksData() {
     return { redirect: "/auth/login" as const }
   }
 
-  // Get user profile
-  const { data: profile } = await supabase.from("profiles").select("role, lead_departments").eq("id", user.id).single()
-
-  if (!profile || !["super_admin", "admin", "lead"].includes(profile.role)) {
+  const scope = await resolveAdminScope(supabase as any, user.id)
+  if (!scope) {
     return { redirect: "/dashboard" as const }
   }
+  const departmentScope = getDepartmentScope(scope, "general")
 
   const userProfile: UserProfile = {
-    role: profile.role,
-    lead_departments: profile.lead_departments,
+    role: scope.role,
+    lead_departments: scope.leadDepartments,
+    managed_departments: scope.managedDepartments,
   }
 
   // Build query based on role - exclude weekly action tracker items
@@ -42,11 +43,13 @@ async function getAdminTasksData() {
   // Fetch employee - leads can only see employee in their departments
   let employeeQuery = supabase
     .from("profiles")
-    .select("id, first_name, last_name, company_email, department")
+    .select("id, first_name, last_name, company_email, department, employment_status")
+    .eq("employment_status", "active")
     .order("last_name", { ascending: true })
 
-  if (profile.role === "lead" && profile.lead_departments && profile.lead_departments.length > 0) {
-    employeeQuery = employeeQuery.in("department", profile.lead_departments)
+  if (departmentScope) {
+    employeeQuery =
+      departmentScope.length > 0 ? employeeQuery.in("department", departmentScope) : employeeQuery.eq("id", "__none__")
   }
 
   const [tasksResult, employeeResult, projectsResult] = await Promise.all([
@@ -135,16 +138,16 @@ async function getAdminTasksData() {
 
   // For leads, filter tasks strictly by their departments
   let filteredTasks = tasksWithUsers || []
-  if (profile.role === "lead" && profile.lead_departments && profile.lead_departments.length > 0) {
+  if (departmentScope) {
     filteredTasks = filteredTasks.filter((task: any) => {
-      if (task.department && profile.lead_departments.includes(task.department)) {
+      if (task.department && departmentScope.includes(task.department)) {
         return true
       }
-      if (task.assigned_to_user?.department && profile.lead_departments.includes(task.assigned_to_user.department)) {
+      if (task.assigned_to_user?.department && departmentScope.includes(task.assigned_to_user.department)) {
         return true
       }
       if (task.assigned_users && task.assigned_users.length > 0) {
-        return task.assigned_users.some((u: any) => u.department && profile.lead_departments.includes(u.department))
+        return task.assigned_users.some((u: any) => u.department && departmentScope.includes(u.department))
       }
       return false
     })
@@ -152,8 +155,8 @@ async function getAdminTasksData() {
 
   // Get unique departments
   let departments: string[] = []
-  if (profile.role === "lead" && profile.lead_departments && profile.lead_departments.length > 0) {
-    departments = profile.lead_departments.sort()
+  if (departmentScope) {
+    departments = [...departmentScope].sort()
   } else {
     departments = Array.from(new Set(employeeResult.data?.map((s: any) => s.department).filter(Boolean))) as string[]
     departments.sort()

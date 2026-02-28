@@ -7,6 +7,7 @@ import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 import { getOneDriveService, getFileCategory } from "@/lib/onedrive"
+import { resolveAdminScope } from "@/lib/admin/rbac"
 
 export const dynamic = "force-dynamic"
 
@@ -29,6 +30,20 @@ function createClient() {
   })
 }
 
+function normalizePath(path: string): string {
+  const normalized = `/${path || ""}`.replace(/\/+/g, "/")
+  return normalized.length > 1 && normalized.endsWith("/") ? normalized.slice(0, -1) : normalized
+}
+
+function leadAllowedPrefixes(managedDepartments: string[]): string[] {
+  return managedDepartments.map((dept) => normalizePath(`/Projects/${dept}`))
+}
+
+function isPathAllowed(path: string, prefixes: string[]): boolean {
+  const normalizedPath = normalizePath(path)
+  return prefixes.some((prefix) => normalizedPath === prefix || normalizedPath.startsWith(`${prefix}/`))
+}
+
 /**
  * GET /api/onedrive/preview
  * Get preview/embed URL for a file
@@ -45,6 +60,10 @@ export async function GET(request: Request) {
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
+    const scope = await resolveAdminScope(supabase as any, user.id)
+    if (!scope) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
 
     const onedrive = getOneDriveService()
 
@@ -57,6 +76,13 @@ export async function GET(request: Request) {
 
     if (!path) {
       return NextResponse.json({ error: "No path provided" }, { status: 400 })
+    }
+
+    if (!scope.isAdminLike) {
+      const allowed = leadAllowedPrefixes(scope.managedDepartments)
+      if (allowed.length === 0 || !isPathAllowed(path, allowed)) {
+        return NextResponse.json({ error: "Forbidden: outside your allowed department folders" }, { status: 403 })
+      }
     }
 
     // Get file info first

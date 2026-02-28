@@ -7,6 +7,7 @@ import { Settings, Users, Building2, Shield } from "lucide-react"
 import Link from "next/link"
 import { PageHeader, PageWrapper } from "@/components/layout"
 import { MaintenanceToggle } from "@/components/admin/maintenance-toggle"
+import { resolveAdminScope } from "@/lib/admin/rbac"
 
 export default async function AdminSettingsPage() {
   const supabase = await createClient()
@@ -20,10 +21,8 @@ export default async function AdminSettingsPage() {
     redirect("/auth/login")
   }
 
-  // Check if user is admin
-  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
-
-  if (!profile || !["super_admin", "admin"].includes(profile.role)) {
+  const scope = await resolveAdminScope(supabase as any, user.id)
+  if (!scope) {
     redirect("/dashboard")
   }
 
@@ -31,7 +30,11 @@ export default async function AdminSettingsPage() {
     <PageWrapper maxWidth="full" background="gradient">
       <PageHeader
         title="Settings"
-        description="Manage users, roles, and company settings"
+        description={
+          scope.isAdminLike
+            ? "Manage users, roles, and company settings"
+            : "Manage department-scoped settings and access controls"
+        }
         icon={Settings}
         backLink={{ href: "/admin", label: "Back to Admin" }}
       />
@@ -77,7 +80,9 @@ export default async function AdminSettingsPage() {
               <Building2 className="h-5 w-5" />
               Company Settings
             </CardTitle>
-            <CardDescription>Configure company information</CardDescription>
+            <CardDescription>
+              {scope.isAdminLike ? "Configure company information" : "View company information (read-only for leads)"}
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
             <Link href="/admin/settings/company" className={cn(buttonVariants({ variant: "default" }), "w-full")}>
@@ -87,18 +92,20 @@ export default async function AdminSettingsPage() {
         </Card>
 
         {/* System Settings */}
-        <Card className="md:col-span-2 lg:col-span-3">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Settings className="h-5 w-5" />
-              System Settings
-            </CardTitle>
-            <CardDescription>Global system configuration</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <MaintenanceToggle />
-          </CardContent>
-        </Card>
+        {scope.isAdminLike && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Settings className="h-5 w-5" />
+                System Settings
+              </CardTitle>
+              <CardDescription>Global system configuration</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <MaintenanceToggle />
+            </CardContent>
+          </Card>
+        )}
       </div>
     </PageWrapper>
   )

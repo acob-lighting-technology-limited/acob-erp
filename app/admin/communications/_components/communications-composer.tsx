@@ -57,6 +57,11 @@ type SendTiming = "now" | "scheduled" | "recurring"
 interface Props {
   employees: Employee[]
   mode?: "meetings" | "communications"
+  currentUser?: {
+    id: string
+    full_name: string | null
+    department: string | null
+  }
 }
 
 const DEFAULT_TEAMS_LINK =
@@ -104,7 +109,7 @@ function stripHtmlToText(html: string): string {
     .trim()
 }
 
-export function MeetingRemindersContent({ employees, mode = "meetings" }: Props) {
+export function CommunicationsComposer({ employees, mode = "meetings", currentUser }: Props) {
   // ── State ──────────────────────────────────────────────────────────────────
   const [reminderType, setReminderType] = useState<ReminderType>(
     mode === "communications" ? "admin_broadcast" : "meeting"
@@ -130,7 +135,7 @@ export function MeetingRemindersContent({ employees, mode = "meetings" }: Props)
   const [meetingPreparedById, setMeetingPreparedById] = useState("none")
   const [broadcastSubject, setBroadcastSubject] = useState("Administrative Notice")
   const [broadcastBodyHtml, setBroadcastBodyHtml] = useState("<p>Type your message here...</p>")
-  const [broadcastDepartment, setBroadcastDepartment] = useState("Admin & HR")
+  const [broadcastDepartment, setBroadcastDepartment] = useState(currentUser?.department || "Admin & HR")
   const [broadcastPreparedById, setBroadcastPreparedById] = useState("none")
   const editorRef = useRef<HTMLDivElement | null>(null)
 
@@ -146,6 +151,10 @@ export function MeetingRemindersContent({ employees, mode = "meetings" }: Props)
   const [activeSchedules, setActiveSchedules] = useState<any[]>([])
 
   const supabase = createClient()
+  const currentUserDept = (currentUser?.department || "").trim()
+  const currentUserName = (currentUser?.full_name || "").trim()
+  const isCurrentUserAdminHr =
+    currentUserDept.toLowerCase().includes("admin") && currentUserDept.toLowerCase().includes("hr")
 
   const departmentOptions = useMemo(() => {
     const set = new Set<string>(["Admin & HR"])
@@ -200,9 +209,32 @@ export function MeetingRemindersContent({ employees, mode = "meetings" }: Props)
 
   useEffect(() => {
     if (meetingPreparedByOptions.length > 0 && !meetingPreparedByOptions.some((p) => p.id === meetingPreparedById)) {
-      setMeetingPreparedById(meetingPreparedByOptions[0].id)
+      const preferred =
+        isCurrentUserAdminHr && currentUserName && meetingPreparedByOptions.some((p) => p.full_name === currentUserName)
+          ? meetingPreparedByOptions.find((p) => p.full_name === currentUserName)?.id
+          : meetingPreparedByOptions[0].id
+      setMeetingPreparedById(preferred || meetingPreparedByOptions[0].id)
     }
-  }, [meetingPreparedById, meetingPreparedByOptions])
+  }, [currentUserName, isCurrentUserAdminHr, meetingPreparedById, meetingPreparedByOptions])
+
+  useEffect(() => {
+    if (mode !== "communications") return
+    if (!currentUserDept) return
+    if (broadcastDepartment !== currentUserDept) {
+      setBroadcastDepartment(currentUserDept)
+    }
+  }, [broadcastDepartment, currentUserDept, mode])
+
+  useEffect(() => {
+    if (broadcastPreparedByOptions.length === 0) return
+    if (!broadcastPreparedByOptions.some((p) => p.id === broadcastPreparedById)) {
+      const preferred =
+        currentUserName && broadcastPreparedByOptions.some((p) => p.full_name === currentUserName)
+          ? broadcastPreparedByOptions.find((p) => p.full_name === currentUserName)?.id
+          : broadcastPreparedByOptions[0].id
+      setBroadcastPreparedById(preferred || broadcastPreparedByOptions[0].id)
+    }
+  }, [broadcastPreparedById, broadcastPreparedByOptions, currentUserName])
 
   useEffect(() => {
     if (reminderType !== "admin_broadcast") return
@@ -773,137 +805,124 @@ export function MeetingRemindersContent({ employees, mode = "meetings" }: Props)
                 </>
               ) : (
                 <div className="space-y-3">
-                  <div className="space-y-2">
-                    <Label htmlFor="broadcast-department">Department</Label>
-                    <Select
-                      value={broadcastDepartment}
-                      onValueChange={(value) => {
-                        setBroadcastDepartment(value)
-                        setBroadcastPreparedById("none")
-                      }}
-                    >
-                      <SelectTrigger id="broadcast-department" className="w-[260px]">
-                        <SelectValue placeholder="Select department" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {departmentOptions.map((dept) => (
-                          <SelectItem key={dept} value={dept}>
-                            {dept}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <p className="text-muted-foreground text-xs">
-                      Sender label and footer branding will use this department.
-                    </p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="broadcast-prepared-by">Prepared by</Label>
-                    <Select value={broadcastPreparedById} onValueChange={setBroadcastPreparedById}>
-                      <SelectTrigger id="broadcast-prepared-by" className="w-[320px]">
-                        <SelectValue placeholder="Select person" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Select person</SelectItem>
-                        {broadcastPreparedByOptions.map((emp) => (
-                          <SelectItem key={emp.id} value={emp.id}>
-                            {emp.full_name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <p className="text-muted-foreground text-xs">This will appear as “Prepared by” in the footer.</p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="broadcast-subject">Email Subject</Label>
-                    <Input
-                      id="broadcast-subject"
-                      value={broadcastSubject}
-                      onChange={(e) => setBroadcastSubject(e.target.value)}
-                      placeholder="Enter broadcast subject..."
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Message Body (rich text)</Label>
-                    <div className="bg-muted/50 flex flex-wrap items-center gap-1 rounded-t-lg border border-b-0 p-2">
-                      <Button
-                        type="button"
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8"
-                        onClick={() => runEditorCommand("bold")}
-                      >
-                        <Bold className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        type="button"
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8"
-                        onClick={() => runEditorCommand("italic")}
-                      >
-                        <Italic className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        type="button"
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8"
-                        onClick={() => runEditorCommand("underline")}
-                      >
-                        <Underline className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        type="button"
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8"
-                        onClick={() => runEditorCommand("insertUnorderedList")}
-                      >
-                        <List className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        type="button"
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8"
-                        onClick={() => runEditorCommand("insertOrderedList")}
-                      >
-                        <ListOrdered className="h-4 w-4" />
-                      </Button>
-                      <Button type="button" size="icon" variant="ghost" className="h-8 w-8" onClick={addEditorLink}>
-                        <Link2 className="h-4 w-4" />
-                      </Button>
-                      <div className="bg-border mx-1 h-5 w-px" />
-                      <Button
-                        type="button"
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8"
-                        onClick={() => runEditorCommand("undo")}
-                      >
-                        <Undo2 className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        type="button"
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8"
-                        onClick={() => runEditorCommand("redo")}
-                      >
-                        <Redo2 className="h-4 w-4" />
-                      </Button>
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="broadcast-department">Department</Label>
+                      <Input id="broadcast-department" value={broadcastDepartment || "—"} readOnly className="w-full" />
+                      <p className="text-muted-foreground text-xs">Locked to sender department.</p>
                     </div>
-                    <div
-                      ref={editorRef}
-                      contentEditable
-                      suppressContentEditableWarning
-                      className="bg-background min-h-[220px] rounded-b-lg border p-3 text-sm leading-6 outline-none focus:ring-2 focus:ring-orange-500"
-                      onInput={(e) => setBroadcastBodyHtml((e.currentTarget as HTMLDivElement).innerHTML)}
-                    />
-                    <p className="text-muted-foreground text-xs">
-                      Paste text from Word or type directly. This message is placed between the ACOB header and footer.
-                    </p>
+                    <div className="space-y-2">
+                      <Label htmlFor="broadcast-prepared-by">Prepared by</Label>
+                      <Select value={broadcastPreparedById} onValueChange={setBroadcastPreparedById}>
+                        <SelectTrigger id="broadcast-prepared-by" className="w-full">
+                          <SelectValue placeholder="Select person" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Select person</SelectItem>
+                          {broadcastPreparedByOptions.map((emp) => (
+                            <SelectItem key={emp.id} value={emp.id}>
+                              {emp.full_name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-muted-foreground text-xs">This will appear as “Prepared by” in the footer.</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="broadcast-subject">Email Subject</Label>
+                      <Input
+                        id="broadcast-subject"
+                        value={broadcastSubject}
+                        onChange={(e) => setBroadcastSubject(e.target.value)}
+                        placeholder="Enter broadcast subject..."
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Message Body (rich text)</Label>
+                      <div className="bg-muted/50 flex flex-wrap items-center gap-1 rounded-t-lg border border-b-0 p-2">
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8"
+                          onClick={() => runEditorCommand("bold")}
+                        >
+                          <Bold className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8"
+                          onClick={() => runEditorCommand("italic")}
+                        >
+                          <Italic className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8"
+                          onClick={() => runEditorCommand("underline")}
+                        >
+                          <Underline className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8"
+                          onClick={() => runEditorCommand("insertUnorderedList")}
+                        >
+                          <List className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8"
+                          onClick={() => runEditorCommand("insertOrderedList")}
+                        >
+                          <ListOrdered className="h-4 w-4" />
+                        </Button>
+                        <Button type="button" size="icon" variant="ghost" className="h-8 w-8" onClick={addEditorLink}>
+                          <Link2 className="h-4 w-4" />
+                        </Button>
+                        <div className="bg-border mx-1 h-5 w-px" />
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8"
+                          onClick={() => runEditorCommand("undo")}
+                        >
+                          <Undo2 className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8"
+                          onClick={() => runEditorCommand("redo")}
+                        >
+                          <Redo2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <div
+                        ref={editorRef}
+                        contentEditable
+                        suppressContentEditableWarning
+                        className="bg-background min-h-[220px] rounded-b-lg border p-3 text-sm leading-6 outline-none focus:ring-2 focus:ring-orange-500"
+                        onInput={(e) => setBroadcastBodyHtml((e.currentTarget as HTMLDivElement).innerHTML)}
+                      />
+                      <p className="text-muted-foreground text-xs">
+                        Paste text from Word or type directly. This message is placed between the ACOB header and
+                        footer.
+                      </p>
+                    </div>
                   </div>
                 </div>
               )}
@@ -1236,8 +1255,8 @@ export function MeetingRemindersContent({ employees, mode = "meetings" }: Props)
         </div>
 
         {/* ── RIGHT: Summary & Send ─────────────────────────────────────── */}
-        <aside className="space-y-6 self-start">
-          <Card className="border-orange-200 lg:sticky lg:top-24 dark:border-orange-900">
+        <aside className="space-y-6 self-start lg:sticky lg:top-[120px] lg:max-h-[calc(100vh-136px)] lg:overflow-y-auto lg:pr-1">
+          <Card className="border-orange-200 dark:border-orange-900">
             <CardHeader className="pb-3">
               <CardTitle className="text-lg">Summary</CardTitle>
             </CardHeader>

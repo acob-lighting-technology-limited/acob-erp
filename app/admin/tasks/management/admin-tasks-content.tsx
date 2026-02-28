@@ -86,11 +86,13 @@ export interface employee {
   last_name: string
   company_email: string
   department: string
+  employment_status?: string | null
 }
 
 export interface UserProfile {
   role: string
   lead_departments?: string[]
+  managed_departments?: string[]
 }
 
 export interface Project {
@@ -115,6 +117,9 @@ export function AdminTasksContent({
 }: AdminTasksContentProps) {
   const [tasks, setTasks] = useState<Task[]>(initialTasks)
   const [employee] = useState<employee[]>(initialemployee)
+  const activeEmployees = employee.filter(
+    (member) => member.employment_status === "active" || !member.employment_status
+  )
   const [departments] = useState<string[]>(initialDepartments)
   const [projects] = useState<Project[]>(initialProjects)
   const [searchQuery, setSearchQuery] = useState("")
@@ -147,6 +152,7 @@ export function AdminTasksContent({
   })
 
   const supabase = createClient()
+  const scopedDepartments = userProfile.managed_departments ?? userProfile.lead_departments ?? []
 
   const loadData = async () => {
     try {
@@ -156,8 +162,8 @@ export function AdminTasksContent({
         .neq("category", "weekly_action")
         .order("created_at", { ascending: false })
 
-      if (userProfile?.role === "lead" && userProfile?.lead_departments && userProfile.lead_departments.length > 0) {
-        tasksQuery = tasksQuery.in("department", userProfile.lead_departments)
+      if (userProfile?.role === "lead" && scopedDepartments.length > 0) {
+        tasksQuery = tasksQuery.in("department", scopedDepartments)
       }
 
       const { data: tasksData, error: tasksError } = await tasksQuery
@@ -209,17 +215,12 @@ export function AdminTasksContent({
       )
 
       let filteredTasks = tasksWithUsers || []
-      if (userProfile?.role === "lead" && userProfile?.lead_departments && userProfile.lead_departments.length > 0) {
+      if (userProfile?.role === "lead" && scopedDepartments.length > 0) {
         filteredTasks = filteredTasks.filter((task: any) => {
-          if (task.department && userProfile.lead_departments?.includes(task.department)) return true
-          if (
-            task.assigned_to_user?.department &&
-            userProfile.lead_departments?.includes(task.assigned_to_user.department)
-          )
+          if (task.department && scopedDepartments.includes(task.department)) return true
+          if (task.assigned_to_user?.department && scopedDepartments.includes(task.assigned_to_user.department))
             return true
-          if (
-            task.assigned_users?.some((u: any) => u.department && userProfile.lead_departments?.includes(u.department))
-          )
+          if (task.assigned_users?.some((u: any) => u.department && scopedDepartments.includes(u.department)))
             return true
           return false
         })
@@ -498,8 +499,8 @@ export function AdminTasksContent({
 
     let matchesDepartment = true
     if (userProfile?.role === "lead") {
-      if (userProfile.lead_departments && userProfile.lead_departments.length > 0) {
-        const leadDepartments = userProfile.lead_departments
+      if (scopedDepartments.length > 0) {
+        const leadDepartments = scopedDepartments
         matchesDepartment =
           leadDepartments.includes(task.department || "") ||
           (task.assigned_to_user ? leadDepartments.includes(task.assigned_to_user.department || "") : false) ||
@@ -732,7 +733,7 @@ export function AdminTasksContent({
                         ? `All ${departments.length === 1 ? departments[0] : "Department"} employee`
                         : "All employee",
                   },
-                  ...employee.map((member) => ({
+                  ...activeEmployees.map((member) => ({
                     value: member.id,
                     label: `${formatName(member.first_name)} ${formatName(member.last_name)} - ${member.department}`,
                     icon: <User className="h-3 w-3" />,
@@ -1056,7 +1057,7 @@ export function AdminTasksContent({
                 <SearchableSelect
                   value={taskForm.assigned_to}
                   onValueChange={(value) => {
-                    const selectedemployee = employee.find((s) => s.id === value)
+                    const selectedemployee = activeEmployees.find((s) => s.id === value)
                     setTaskForm({
                       ...taskForm,
                       assigned_to: value,
@@ -1066,7 +1067,7 @@ export function AdminTasksContent({
                   placeholder="Select employee member"
                   searchPlaceholder="Search employee..."
                   icon={<User className="h-4 w-4" />}
-                  options={employee.map((member) => ({
+                  options={activeEmployees.map((member) => ({
                     value: member.id,
                     label: `${member.first_name} ${member.last_name} - ${member.department}`,
                   }))}
@@ -1080,10 +1081,10 @@ export function AdminTasksContent({
                 <Card className="mt-2 border-2">
                   <ScrollArea className="h-[200px]">
                     <CardContent className="space-y-2 p-4">
-                      {employee.length === 0 ? (
+                      {activeEmployees.length === 0 ? (
                         <p className="text-muted-foreground py-4 text-center text-sm">No employee members found</p>
                       ) : (
-                        employee.map((member) => (
+                        activeEmployees.map((member) => (
                           <div key={member.id} className="hover:bg-muted flex items-center space-x-2 rounded-md p-2">
                             <Checkbox
                               id={`member-${member.id}`}

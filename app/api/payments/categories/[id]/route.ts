@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
+import { resolveAdminScope } from "@/lib/admin/rbac"
 
 export const dynamic = "force-dynamic"
 
@@ -39,6 +40,11 @@ export async function PUT(request: Request, { params }: { params: { id: string }
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    const scope = await resolveAdminScope(supabase as any, user.id)
+    if (!scope || !scope.isAdminLike) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
+
     const body = await request.json()
     const { name } = body
 
@@ -73,6 +79,11 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
     } = await supabase.auth.getUser()
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const scope = await resolveAdminScope(supabase as any, user.id)
+    if (!scope || !scope.isAdminLike) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
     const { error } = await supabase.from("payment_categories").delete().eq("id", params.id)

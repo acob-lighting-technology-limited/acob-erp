@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { AdminAuditLogsContent, type AuditLog, type employeeMember, type UserProfile } from "./admin-audit-logs-content"
+import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -20,25 +21,30 @@ async function getAuditLogsData(): Promise<AuditLogsData> {
     return { kind: "redirect", redirect: "/auth/login" }
   }
 
-  // Get user profile
-  const { data: profile } = await supabase.from("profiles").select("role, lead_departments").eq("id", user.id).single()
-
-  if (!profile || !["super_admin", "admin", "lead"].includes(profile.role)) {
+  const scope = await resolveAdminScope(supabase as any, user.id)
+  if (!scope) {
     return { kind: "redirect", redirect: "/dashboard" }
   }
+  const departmentScope = getDepartmentScope(scope, "general")
 
   const userProfile: UserProfile = {
-    role: profile.role,
-    lead_departments: profile.lead_departments,
+    role: scope.role,
+    lead_departments: scope.leadDepartments,
+    managed_departments: scope.managedDepartments,
   }
 
   // Fetch audit logs - Filter out internal system logs to prevent them from eclipsing user actions
-  const { data: logsData, error: logsError } = await supabase
+  let logsQuery = supabase
     .from("audit_logs")
     .select("*")
     .not("action", "in", '("sync","migrate","update_schema","migration")')
     .order("created_at", { ascending: false })
     .limit(500)
+  if (departmentScope) {
+    logsQuery =
+      departmentScope.length > 0 ? logsQuery.in("department", departmentScope) : logsQuery.eq("id", "__none__")
+  }
+  const { data: logsData, error: logsError } = await logsQuery
 
   if (logsError) {
     console.error("Audit logs error:", logsError)
@@ -150,10 +156,15 @@ async function getAuditLogsData(): Promise<AuditLogsData> {
     let usersData: any[] = []
 
     if (allUserIds.length > 0) {
-      const { data, error: usersError } = await supabase
+      let usersQuery = supabase
         .from("profiles")
-        .select("id, first_name, last_name, company_email, employee_number")
+        .select("id, first_name, last_name, company_email, employee_number, department")
         .in("id", allUserIds)
+      if (departmentScope) {
+        usersQuery =
+          departmentScope.length > 0 ? usersQuery.in("department", departmentScope) : usersQuery.eq("id", "__none__")
+      }
+      const { data, error: usersError } = await usersQuery
 
       if (usersError) {
         console.error("Error fetching users for audit logs:", usersError)
@@ -259,8 +270,9 @@ async function getAuditLogsData(): Promise<AuditLogsData> {
     .select("id, first_name, last_name, department")
     .order("last_name", { ascending: true })
 
-  if (profile.role === "lead" && profile.lead_departments && profile.lead_departments.length > 0) {
-    employeeQuery = employeeQuery.in("department", profile.lead_departments)
+  if (departmentScope) {
+    employeeQuery =
+      departmentScope.length > 0 ? employeeQuery.in("department", departmentScope) : employeeQuery.eq("id", "__none__")
   }
 
   const { data: employeeData } = await employeeQuery
@@ -268,8 +280,8 @@ async function getAuditLogsData(): Promise<AuditLogsData> {
 
   // Get unique departments from audit logs department column and employee profiles
   const logDepartments = logsData?.map((log: any) => log.department).filter(Boolean) || []
-  if (profile.role === "lead" && profile.lead_departments && profile.lead_departments.length > 0) {
-    departments = profile.lead_departments.sort()
+  if (departmentScope) {
+    departments = [...departmentScope].sort()
   } else {
     const employeeDepartments = employeeData?.map((s: any) => s.department).filter(Boolean) || []
     departments = Array.from(new Set([...employeeDepartments, ...logDepartments])) as string[]

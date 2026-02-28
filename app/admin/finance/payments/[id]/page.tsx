@@ -608,7 +608,7 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
 
       if (response.ok) {
         toast.success("Payment deleted successfully")
-        router.push("/admin/payments")
+        router.push("/admin/finance/payments")
       } else {
         const data = await response.json()
         toast.error(data.error || "Failed to delete payment")
@@ -824,7 +824,7 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4">
         <p className="text-muted-foreground">Payment not found</p>
-        <Link href="/admin/payments">
+        <Link href="/admin/finance/payments">
           <Button variant="outline">Back to Payments</Button>
         </Link>
       </div>
@@ -838,7 +838,7 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <Link
-              href="/admin/payments"
+              href="/admin/finance/payments"
               className="text-muted-foreground hover:text-foreground mb-2 inline-flex items-center text-sm"
             >
               <ArrowLeft className="mr-1 h-4 w-4" />

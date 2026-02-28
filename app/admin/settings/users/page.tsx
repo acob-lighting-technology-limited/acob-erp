@@ -119,7 +119,7 @@ export default function UsersPage() {
       }
 
       // Use the explicit employment_status from formData instead of deriving from is_active
-      // This preserves 'terminated' status and only changes when explicitly modified
+      // This preserves 'separated' status and only changes when explicitly modified
       const { error } = await supabase
         .from("profiles")
         .update({
@@ -397,11 +397,7 @@ export default function UsersPage() {
                     <TableCell className="text-muted-foreground">{user.department || "—"}</TableCell>
                     <TableCell>
                       <Badge variant={user.is_active ? "default" : "secondary"}>
-                        {user.employment_status === "terminated"
-                          ? "Terminated"
-                          : user.is_active
-                            ? "Active"
-                            : "Inactive"}
+                        {user.employment_status === "separated" ? "Separated" : user.is_active ? "Active" : "Inactive"}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-sm">{formatDate(user.created_at)}</TableCell>
@@ -458,7 +454,7 @@ export default function UsersPage() {
                   <SelectContent>
                     <SelectItem value="active">Active</SelectItem>
                     <SelectItem value="suspended">Suspended</SelectItem>
-                    <SelectItem value="terminated">Terminated</SelectItem>
+                    <SelectItem value="separated">Separated</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

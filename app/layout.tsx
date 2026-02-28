@@ -34,10 +34,10 @@ async function HeaderWrapperWithData() {
     return null
   }
 
-  // Fetch admin status from profile
-  let isAdmin = false
-  const { data: profile } = await supabase.from("profiles").select("is_admin").eq("id", data.user.id).single()
-  isAdmin = profile?.is_admin === true
+  // Use role-based access to keep header behavior aligned with admin route guard rules.
+  let canAccessAdmin = false
+  const { data: profile } = await supabase.from("profiles").select("role").eq("id", data.user.id).single()
+  canAccessAdmin = !!profile?.role && ["super_admin", "admin", "lead"].includes(profile.role)
 
   // Serialize only the necessary user data to avoid hydration issues
   const userData = {
@@ -45,7 +45,7 @@ async function HeaderWrapperWithData() {
     user_metadata: data.user.user_metadata,
   }
 
-  return <HeaderWrapper user={userData} isAdmin={isAdmin} />
+  return <HeaderWrapper user={userData} canAccessAdmin={canAccessAdmin} />
 }
 
 export default function RootLayout({
@@ -55,7 +55,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable} overflow-x-hidden`}>
+      <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable} overflow-x-clip`}>
         <Suspense fallback={null}>
           {/* Theme follows system preference automatically (light/dark mode) */}
           <ThemeProvider attribute="class" defaultTheme="system" enableSystem enableColorScheme storageKey="acob-theme">

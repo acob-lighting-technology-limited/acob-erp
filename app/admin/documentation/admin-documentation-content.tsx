@@ -37,6 +37,7 @@ export interface Documentation {
 export interface UserProfile {
   role: UserRole
   lead_departments?: string[]
+  managed_departments?: string[]
 }
 
 export interface employeeMember {
@@ -57,6 +58,7 @@ export function AdminDocumentationContent({
   initialemployee,
   userProfile,
 }: AdminDocumentationContentProps) {
+  const scopedDepartments = userProfile.managed_departments ?? userProfile.lead_departments ?? []
   const [documentation] = useState<Documentation[]>(initialDocumentation)
   const [employee] = useState<employeeMember[]>(initialemployee)
   const [searchQuery, setSearchQuery] = useState("")
@@ -89,8 +91,8 @@ export function AdminDocumentationContent({
 
     let matchesDepartment = true
     if (userProfile?.role === "lead") {
-      if (userProfile.lead_departments && userProfile.lead_departments.length > 0) {
-        matchesDepartment = doc.user?.department ? userProfile.lead_departments.includes(doc.user.department) : false
+      if (scopedDepartments.length > 0) {
+        matchesDepartment = doc.user?.department ? scopedDepartments.includes(doc.user.department) : false
       }
     } else {
       matchesDepartment = departmentFilter === "all" || doc.user?.department === departmentFilter

@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
+import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
 
 export const dynamic = "force-dynamic"
 
@@ -45,8 +46,12 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // Check if user is admin
-    const { data: profile } = await supabase.from("profiles").select("is_admin, department").eq("id", user.id).single()
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role, department, is_admin")
+      .eq("id", user.id)
+      .single()
+    const scope = await resolveAdminScope(supabase as any, user.id)
 
     let query = supabase
       .from("department_payments")
@@ -59,17 +64,24 @@ export async function GET(request: Request) {
       )
       .order("created_at", { ascending: false })
 
-    // If not admin, filter by user's department
-    if (!profile?.is_admin) {
+    if (scope) {
+      const scopedDepartments = getDepartmentScope(scope, "finance")
+      if (scopedDepartments && scopedDepartments.length > 0) {
+        const { data: deptRows } = await supabase.from("departments").select("id").in("name", scopedDepartments)
+        const deptIds = (deptRows || []).map((row) => row.id)
+        query = deptIds.length > 0 ? query.in("department_id", deptIds) : query.eq("department_id", "__none__")
+      } else if (scopedDepartments && scopedDepartments.length === 0) {
+        query = query.eq("department_id", "__none__")
+      } else if (departmentId) {
+        query = query.eq("department_id", departmentId)
+      }
+    } else if (!profile?.is_admin) {
       const { data: userDept } = await supabase
         .from("departments")
         .select("id")
         .eq("name", profile?.department)
         .single()
-
-      if (userDept) {
-        query = query.eq("department_id", userDept.id)
-      }
+      query = userDept ? query.eq("department_id", userDept.id) : query.eq("department_id", "__none__")
     } else if (departmentId) {
       // Admin can filter by specific department
       query = query.eq("department_id", departmentId)
@@ -156,17 +168,34 @@ export async function POST(request: Request) {
 
     // Note: Categories are now fixed ("one-time" or "recurring"), no need to auto-create
 
-    // Check if user can create payment in this department
-    const { data: profile } = await supabase.from("profiles").select("is_admin, department").eq("id", user.id).single()
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role, is_admin, department")
+      .eq("id", user.id)
+      .single()
+    const scope = await resolveAdminScope(supabase as any, user.id)
 
-    if (!profile?.is_admin) {
-      // Non-admin can only create in their own department
+    if (scope) {
+      const scopedDepartments = getDepartmentScope(scope, "finance")
+      if (scopedDepartments) {
+        const { data: targetDepartment } = await supabase
+          .from("departments")
+          .select("name")
+          .eq("id", department_id)
+          .single()
+        if (!targetDepartment || !scopedDepartments.includes(targetDepartment.name)) {
+          return NextResponse.json(
+            { error: "You can only create finance records in your scoped departments" },
+            { status: 403 }
+          )
+        }
+      }
+    } else if (!profile?.is_admin) {
       const { data: userDept } = await supabase
         .from("departments")
         .select("id")
         .eq("name", profile?.department)
         .single()
-
       if (!userDept || userDept.id !== department_id) {
         return NextResponse.json({ error: "You can only create payments in your own department" }, { status: 403 })
       }

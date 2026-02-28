@@ -2,6 +2,7 @@ import { Suspense } from "react"
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { ActionTrackerContent } from "./action-tracker-content"
+import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
 
 export default async function ActionTrackerPage() {
   const supabase = await createClient()
@@ -15,22 +16,26 @@ export default async function ActionTrackerPage() {
     redirect("/auth/login")
   }
 
-  // Get user profile to check if employee/admin
-  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
-
-  if (!profile || !["super_admin", "admin"].includes(profile.role)) {
+  const scope = await resolveAdminScope(supabase as any, user.id)
+  if (!scope) {
     redirect("/dashboard")
   }
+  const departmentScope = getDepartmentScope(scope, "general")
 
   // Fetch departments for filtering
-  const { data: employeeData } = await supabase.from("profiles").select("department").not("department", "is", null)
+  let employeeQuery = supabase.from("profiles").select("department").not("department", "is", null)
+  if (departmentScope) {
+    employeeQuery =
+      departmentScope.length > 0 ? employeeQuery.in("department", departmentScope) : employeeQuery.eq("id", "__none__")
+  }
+  const { data: employeeData } = await employeeQuery
 
   const departments = Array.from(new Set(employeeData?.map((s: any) => s.department).filter(Boolean))) as string[]
   departments.sort()
 
   return (
     <Suspense fallback={<div className="flex justify-center py-20">Loading Tracker...</div>}>
-      <ActionTrackerContent initialDepartments={departments} />
+      <ActionTrackerContent initialDepartments={departments} scopedDepartments={departmentScope ?? []} />
     </Suspense>
   )
 }

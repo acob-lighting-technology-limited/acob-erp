@@ -101,6 +101,7 @@ export interface Employee {
 
 export interface UserProfile {
   role: UserRole
+  managed_departments?: string[]
 }
 
 interface AdminEmployeeContentProps {
@@ -116,7 +117,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
   const [departmentFilter, setDepartmentFilter] = useState<string[]>([])
   const [employeeFilter, setEmployeeFilter] = useState<string[]>([])
   const [roleFilter, setRoleFilter] = useState<string[]>([])
-  const [statusFilter, setStatusFilter] = useState<string[]>([])
+  const [statusFilter, setStatusFilter] = useState<string[]>(["active", "suspended", "on_leave"])
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" }>({
     key: "last_name",
     direction: "asc",
@@ -219,6 +220,8 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
   const [showMoreOptions, setShowMoreOptions] = useState(false)
 
   const supabase = createClient()
+  const isHrGlobalLead = userProfile?.role === "lead" && (userProfile?.managed_departments || []).includes("Admin & HR")
+  const canManageUsers = userProfile?.role === "super_admin" || userProfile?.role === "admin" || isHrGlobalLead
 
   // Handle userId from search params (for edit dialog)
   useEffect(() => {
@@ -234,12 +237,8 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
   const loadData = async () => {
     setIsLoading(true)
     try {
-      // Fetch employees - leads can only see employees in their departments
+      // Fetch employees - all leads can view users; mutation is restricted to HR lead/admin/super admin.
       let query = supabase.from("profiles").select("*").order("last_name", { ascending: true })
-
-      if (userProfile?.role === "lead") {
-        // Leads see their departments (filtered server-side, but keep for refresh)
-      }
 
       const { data, error } = await query
 
@@ -255,6 +254,11 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
   }
 
   const handleEditEmployee = async (employee: Employee) => {
+    if (!canManageUsers) {
+      toast.error("You can view users but cannot edit them")
+      return
+    }
+
     try {
       setSelectedEmployee(employee)
 
@@ -528,6 +532,11 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
   }
 
   const handleDeleteEmployee = async (employee: Employee) => {
+    if (!canManageUsers) {
+      toast.error("You can view users but cannot delete them")
+      return
+    }
+
     try {
       setSelectedEmployee(employee)
       const assigned = await checkAssignedItems(employee)
@@ -564,9 +573,8 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
 
     setIsDeleting(true)
     try {
-      // Check permissions - only super_admin can delete users
-      if (userProfile?.role !== "super_admin") {
-        toast.error("Only super admins can delete users")
+      if (!canManageUsers) {
+        toast.error("You don't have permission to delete users")
         setIsDeleting(false)
         return
       }
@@ -626,13 +634,19 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
     if (isSaving) return // Prevent duplicate submissions
     setIsSaving(true)
     try {
+      if (!canManageUsers) {
+        toast.error("You can view users but cannot edit them")
+        setIsSaving(false)
+        return
+      }
+
       if (!selectedEmployee) {
         setIsSaving(false)
         return
       }
 
       // Check if user can assign this role
-      if (userProfile && !canAssignRoles(userProfile.role, editForm.role)) {
+      if (userProfile && !isHrGlobalLead && !canAssignRoles(userProfile.role, editForm.role)) {
         toast.error("You don't have permission to assign this role")
         setIsSaving(false)
         return
@@ -725,6 +739,12 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
     setIsCreatingUser(true)
 
     try {
+      if (!canManageUsers) {
+        toast.error("You can view users but cannot create users")
+        setIsCreatingUser(false)
+        return
+      }
+
       // Validate required fields
       if (!createUserForm.firstName.trim() || !createUserForm.lastName.trim() || !createUserForm.email.trim()) {
         toast.error("First name, last name, and email are required")
@@ -755,7 +775,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
       }
 
       // Check if user can assign this role
-      if (userProfile && !canAssignRoles(userProfile.role, createUserForm.role)) {
+      if (userProfile && !isHrGlobalLead && !canAssignRoles(userProfile.role, createUserForm.role)) {
         toast.error("You don't have permission to assign this role")
         setIsCreatingUser(false)
         return
@@ -1187,8 +1207,8 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                 <span className="hidden sm:inline">Back to HR</span>
               </Button>
             </Link>
-            <PendingApplicationsModal onEmployeeCreated={loadData} />
-            {(userProfile?.role === "admin" || userProfile?.role === "super_admin") && (
+            {canManageUsers && <PendingApplicationsModal onEmployeeCreated={loadData} />}
+            {canManageUsers && (
               <Button onClick={() => setIsCreateUserDialogOpen(true)} className="gap-2" size="sm">
                 <Plus className="h-4 w-4" />
                 <span className="hidden sm:inline">Create User</span>
@@ -1284,7 +1304,13 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                 <Download className="text-muted-foreground h-4 w-4" />
                 <span className="text-foreground text-sm font-medium">Export Filtered Employee:</span>
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
+                <Link href="/admin/hr/employees/offboarding-conflicts">
+                  <Button variant="secondary" size="sm" className="gap-2">
+                    <AlertTriangle className="h-4 w-4" />
+                    Offboarding Conflicts
+                  </Button>
+                </Link>
                 <Button
                   variant="outline"
                   size="sm"
@@ -1379,7 +1405,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                   options={[
                     { value: "active", label: "Active" },
                     { value: "suspended", label: "Suspended" },
-                    { value: "terminated", label: "Terminated" },
+                    { value: "separated", label: "Separated" },
                     { value: "on_leave", label: "On Leave" },
                   ]}
                   onChange={setStatusFilter}
@@ -1463,7 +1489,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                     {filteredEmployees.map((member, index) => (
                       <TableRow
                         key={member.id}
-                        className={member.employment_status === "terminated" ? "opacity-60" : ""}
+                        className={member.employment_status === "separated" ? "opacity-60" : ""}
                       >
                         <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
                         <TableCell>
@@ -1476,7 +1502,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                             <span
                               className={cn(
                                 "text-foreground font-medium",
-                                member.employment_status === "terminated" && "text-muted-foreground line-through"
+                                member.employment_status === "separated" && "text-muted-foreground line-through"
                               )}
                             >
                               {formatName(member.last_name)}, {formatName(member.first_name)}
@@ -1544,7 +1570,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
               {filteredEmployees.map((member) => (
                 <Card
                   key={member.id}
-                  className={`border-2 transition-shadow hover:shadow-lg ${member.employment_status === "terminated" ? "opacity-60" : ""}`}
+                  className={`border-2 transition-shadow hover:shadow-lg ${member.employment_status === "separated" ? "opacity-60" : ""}`}
                 >
                   <CardHeader className="from-primary/5 to-background border-b bg-linear-to-r">
                     <div className="flex items-start justify-between">
@@ -1556,7 +1582,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                           <CardTitle
                             className={cn(
                               "text-lg",
-                              member.employment_status === "terminated" && "text-muted-foreground line-through"
+                              member.employment_status === "separated" && "text-muted-foreground line-through"
                             )}
                           >
                             {member.first_name} {member.last_name}
@@ -2204,14 +2230,14 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                     </div>
                   </div>
 
-                  {viewEmployeeProfile.employment_status === "terminated" && (
+                  {viewEmployeeProfile.employment_status === "separated" && (
                     <div className="rounded-lg border border-red-100 bg-red-50 p-4 dark:border-red-900/30 dark:bg-red-950/20">
                       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                         <div className="space-y-1">
-                          <p className="text-sm font-semibold text-red-700 dark:text-red-400">Termination Date</p>
+                          <p className="text-sm font-semibold text-red-700 dark:text-red-400">Separation Date</p>
                           <p className="text-foreground font-medium">
-                            {viewEmployeeProfile.termination_date
-                              ? new Date(viewEmployeeProfile.termination_date).toLocaleDateString("en-GB", {
+                            {viewEmployeeProfile.separation_date
+                              ? new Date(viewEmployeeProfile.separation_date).toLocaleDateString("en-GB", {
                                   day: "numeric",
                                   month: "long",
                                   year: "numeric",
@@ -2220,9 +2246,9 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                           </p>
                         </div>
                         <div className="space-y-1">
-                          <p className="text-sm font-semibold text-red-700 dark:text-red-400">Termination Reason</p>
+                          <p className="text-sm font-semibold text-red-700 dark:text-red-400">Separation Reason</p>
                           <p className="text-foreground font-medium italic">
-                            {viewEmployeeProfile.termination_reason || "No reason specified"}
+                            {viewEmployeeProfile.separation_reason || "No reason specified"}
                           </p>
                         </div>
                       </div>
@@ -2634,15 +2660,17 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                     <UserCircle className="h-4 w-4" />
                     Employment
                   </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => handleEditEmployee(viewEmployeeProfile as any)}
-                    className="gap-2"
-                  >
-                    <Edit className="h-4 w-4" />
-                    Edit Profile
-                  </Button>
-                  {userProfile?.role === "super_admin" && (
+                  {canManageUsers && (
+                    <Button
+                      variant="outline"
+                      onClick={() => handleEditEmployee(viewEmployeeProfile as any)}
+                      className="gap-2"
+                    >
+                      <Edit className="h-4 w-4" />
+                      Edit Profile
+                    </Button>
+                  )}
+                  {canManageUsers && (
                     <Button
                       variant="outline"
                       onClick={() => {

@@ -1,4 +1,5 @@
 import { AdminSidebar } from "@/components/admin-sidebar"
+import { AdminContextRibbon } from "@/components/admin-context-ribbon"
 import { SidebarContent } from "@/components/sidebar-content"
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
@@ -31,9 +32,14 @@ export async function AdminLayout({ children }: AdminLayoutProps) {
   }
 
   return (
-    <div className="flex min-h-screen">
+    <div className="admin-shell flex min-h-screen">
       <AdminSidebar user={userData} profile={profile} />
-      <SidebarContent>{children}</SidebarContent>
+      <SidebarContent>
+        <div className="min-h-screen bg-[var(--admin-content-bg)]">
+          <AdminContextRibbon role={profile.role} department={profile.department} />
+          {children}
+        </div>
+      </SidebarContent>
     </div>
   )
 }

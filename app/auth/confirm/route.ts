@@ -8,20 +8,20 @@ import { NextResponse } from "next/server"
  * Query params:
  * - token_hash: The token hash from the email link
  * - type: The type of confirmation (invite, recovery, email, signup)
- * - next: Optional redirect path after confirmation (defaults to /dashboard)
+ * - next: Optional redirect path after confirmation (defaults to /profile)
  */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const tokenHash = searchParams.get("token_hash")
   const rawType = searchParams.get("type")
-  const rawNext = searchParams.get("next") || "/dashboard"
+  const rawNext = searchParams.get("next") || "/profile"
 
   // Validate type parameter
   const ALLOWED_TYPES = new Set(["invite", "recovery", "email", "signup"])
   const type = ALLOWED_TYPES.has(rawType || "") ? (rawType as "invite" | "recovery" | "email" | "signup") : "signup"
 
   // Validate and sanitize 'next' to prevent open redirects
-  let safeNext = "/dashboard"
+  let safeNext = "/profile"
   if (
     rawNext &&
     rawNext.startsWith("/") &&
@@ -56,7 +56,7 @@ export async function GET(request: Request) {
 
   // For recovery, redirect to reset-password page (or custom next if provided)
   if (type === "recovery") {
-    const recoveryDest = safeNext !== "/dashboard" ? safeNext : "/auth/reset-password"
+    const recoveryDest = safeNext !== "/profile" ? safeNext : "/auth/reset-password"
     return NextResponse.redirect(new URL(recoveryDest, request.url))
   }
 

@@ -30,7 +30,9 @@ export function MaintenanceToggle() {
           console.error("Error loading maintenance settings:", error)
         }
       } else if (data?.value) {
-        setEnabled(data.value.enabled)
+        const raw = data.value as any
+        const parsedEnabled = typeof raw === "boolean" ? raw : Boolean(raw?.enabled)
+        setEnabled(parsedEnabled)
       }
     } finally {
       setLoading(false)

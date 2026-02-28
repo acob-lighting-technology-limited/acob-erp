@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { AdminEmployeeContent, type Employee, type UserProfile } from "./admin-employee-content"
+import { resolveAdminScope } from "@/lib/admin/rbac"
 
 async function getAdminemployeeData() {
   const supabase = await createClient()
@@ -14,23 +15,17 @@ async function getAdminemployeeData() {
     return { redirect: "/auth/login" as const }
   }
 
-  // Get user profile
-  const { data: profile } = await supabase.from("profiles").select("role, lead_departments").eq("id", user.id).single()
-
-  if (!profile || !["super_admin", "admin", "lead"].includes(profile.role)) {
+  const scope = await resolveAdminScope(supabase as any, user.id)
+  if (!scope) {
     return { redirect: "/dashboard" as const }
   }
-
   const userProfile: UserProfile = {
-    role: profile.role,
+    role: scope.role as any,
+    managed_departments: scope.managedDepartments,
   }
 
-  // Fetch employee - leads can only see employee in their departments
+  // Fetch employees - all leads can view users; mutation is restricted in the UI and backend.
   let query = supabase.from("profiles").select("*").order("last_name", { ascending: true })
-
-  if (profile.role === "lead" && profile.lead_departments && profile.lead_departments.length > 0) {
-    query = query.in("department", profile.lead_departments)
-  }
 
   const { data: employeeData, error: employeeError } = await query
 

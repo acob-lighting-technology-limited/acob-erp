@@ -7,6 +7,7 @@ import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 import { getOneDriveService } from "@/lib/onedrive"
+import { resolveAdminScope } from "@/lib/admin/rbac"
 
 export const dynamic = "force-dynamic"
 
@@ -30,6 +31,21 @@ function createClient() {
   })
 }
 
+function normalizePath(path: string): string {
+  const normalized = `/${path || ""}`.replace(/\/+/g, "/")
+  return normalized.length > 1 && normalized.endsWith("/") ? normalized.slice(0, -1) : normalized
+}
+
+function leadAllowedPrefixes(managedDepartments: string[]): string[] {
+  return managedDepartments.map((dept) => normalizePath(`/Projects/${dept}`))
+}
+
+function isPathAllowed(path: string, prefixes: string[]): boolean {
+  const normalizedPath = normalizePath(path)
+  if (normalizedPath === "/Projects") return true
+  return prefixes.some((prefix) => normalizedPath === prefix || normalizedPath.startsWith(`${prefix}/`))
+}
+
 /**
  * GET /api/onedrive
  * List folder contents from OneDrive
@@ -49,6 +65,11 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    const scope = await resolveAdminScope(supabase as any, user.id)
+    if (!scope) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
+
     const onedrive = getOneDriveService()
 
     // Check if OneDrive is enabled
@@ -57,8 +78,22 @@ export async function GET(request: Request) {
     }
 
     const { searchParams } = new URL(request.url)
-    const path = searchParams.get("path") || "/"
+    const requestedPath = searchParams.get("path") || "/Projects"
     const search = searchParams.get("search")
+    const path = normalizePath(requestedPath)
+
+    const allowedPrefixes = !scope.isAdminLike ? leadAllowedPrefixes(scope.managedDepartments) : []
+    if (!scope.isAdminLike) {
+      if (allowedPrefixes.length === 0) {
+        return NextResponse.json(
+          { error: "No managed department folders configured for your account" },
+          { status: 403 }
+        )
+      }
+      if (!isPathAllowed(path, allowedPrefixes)) {
+        return NextResponse.json({ error: "Forbidden: outside your allowed department folders" }, { status: 403 })
+      }
+    }
 
     let files
 
@@ -68,6 +103,19 @@ export async function GET(request: Request) {
     } else {
       // List folder contents
       files = await onedrive.listFolder(path)
+    }
+
+    if (!scope.isAdminLike) {
+      // When lead views /Projects root, expose only folders for managed departments.
+      if (path === "/Projects") {
+        const allowedDepartmentNames = new Set(scope.managedDepartments)
+        files = files.filter((file) => file.isFolder && allowedDepartmentNames.has(file.name))
+      } else {
+        files = files.filter((file) => {
+          const candidatePath = normalizePath(`${path}/${file.name}`)
+          return isPathAllowed(candidatePath, allowedPrefixes)
+        })
+      }
     }
 
     // Sort: folders first, then by name
@@ -109,11 +157,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // Check if user is admin (only admins can upload to OneDrive directly)
-    const { data: profile } = await supabase.from("profiles").select("is_admin").eq("id", user.id).single()
-
-    if (!profile?.is_admin) {
-      return NextResponse.json({ error: "Only administrators can upload files directly to OneDrive" }, { status: 403 })
+    const scope = await resolveAdminScope(supabase as any, user.id)
+    if (!scope) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
     const onedrive = getOneDriveService()
@@ -136,7 +182,14 @@ export async function POST(request: Request) {
     }
 
     const fileName = customFileName || file.name
-    const fullPath = `${path}/${fileName}`.replace(/\/+/g, "/")
+    const fullPath = normalizePath(`${path}/${fileName}`)
+
+    if (!scope.isAdminLike) {
+      const allowedPrefixes = leadAllowedPrefixes(scope.managedDepartments)
+      if (allowedPrefixes.length === 0 || !isPathAllowed(fullPath, allowedPrefixes)) {
+        return NextResponse.json({ error: "Forbidden: outside your allowed department folders" }, { status: 403 })
+      }
+    }
 
     // Get file content as ArrayBuffer
     const arrayBuffer = await file.arrayBuffer()

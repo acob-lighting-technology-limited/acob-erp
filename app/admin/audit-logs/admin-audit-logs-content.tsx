@@ -104,6 +104,7 @@ export interface employeeMember {
 export interface UserProfile {
   role: string
   lead_departments?: string[]
+  managed_departments?: string[]
 }
 
 interface AdminAuditLogsContentProps {
@@ -119,6 +120,7 @@ export function AdminAuditLogsContent({
   initialDepartments,
   userProfile,
 }: AdminAuditLogsContentProps) {
+  const scopedDepartments = userProfile.managed_departments ?? userProfile.lead_departments ?? []
   // Actions to hide from display (system/internal operations)
   const HIDDEN_ACTIONS = ["sync", "migrate", "update_schema", "migration"]
 
@@ -788,9 +790,9 @@ export function AdminAuditLogsContent({
     let matchesDepartment = true
     if (userProfile?.role === "lead") {
       // Leads: logs are already filtered, but ensure they match lead's departments
-      if (userProfile.lead_departments && userProfile.lead_departments.length > 0) {
+      if (scopedDepartments.length > 0) {
         const userDept = employee.find((s) => s.id === log.user_id)?.department
-        matchesDepartment = userDept ? userProfile.lead_departments.includes(userDept) : false
+        matchesDepartment = userDept ? scopedDepartments.includes(userDept) : false
       }
     } else {
       // Admins: use department filter
@@ -1672,10 +1674,8 @@ export function AdminAuditLogsContent({
                 value={employeeFilter}
                 onValueChange={setemployeeFilter}
                 placeholder={
-                  userProfile?.role === "lead" &&
-                  userProfile.lead_departments &&
-                  userProfile.lead_departments.length > 0
-                    ? `All ${userProfile.lead_departments.length === 1 ? userProfile.lead_departments[0] : "Department"} employee`
+                  userProfile?.role === "lead" && scopedDepartments.length > 0
+                    ? `All ${scopedDepartments.length === 1 ? scopedDepartments[0] : "Department"} employee`
                     : "All employee"
                 }
                 searchPlaceholder="Search employee..."
@@ -1684,10 +1684,8 @@ export function AdminAuditLogsContent({
                   {
                     value: "all",
                     label:
-                      userProfile?.role === "lead" &&
-                      userProfile.lead_departments &&
-                      userProfile.lead_departments.length > 0
-                        ? `All ${userProfile.lead_departments.length === 1 ? userProfile.lead_departments[0] : "Department"} employee`
+                      userProfile?.role === "lead" && scopedDepartments.length > 0
+                        ? `All ${scopedDepartments.length === 1 ? scopedDepartments[0] : "Department"} employee`
                         : "All employee",
                   },
                   ...employee.map((member) => ({

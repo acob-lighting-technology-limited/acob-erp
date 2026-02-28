@@ -33,8 +33,8 @@ export interface Employee {
   employment_status: EmploymentStatus
   status_changed_at?: string
   status_changed_by?: string
-  termination_date?: string
-  termination_reason?: string
+  separation_date?: string
+  separation_reason?: string
   created_at: string
   updated_at: string
 }
@@ -58,7 +58,7 @@ export interface EmployeeStatusChange {
   new_status: EmploymentStatus
   reason?: string
   suspension_end_date?: string // For suspended status
-  termination_date?: string // For terminated status
+  separation_date?: string // For separated status
 }
 
 export interface EmployeeFormData {
@@ -127,6 +127,13 @@ export interface AttendanceSummary {
 
 export type LeaveType = "annual" | "sick" | "maternity" | "paternity" | "unpaid" | "compassionate" | "study"
 export type LeaveStatus = "pending" | "approved" | "rejected" | "cancelled"
+export type LeaveApprovalStage =
+  | "reliever_pending"
+  | "supervisor_pending"
+  | "hr_pending"
+  | "completed"
+  | "rejected"
+  | "cancelled"
 
 export interface LeaveRequest {
   id: string
@@ -134,12 +141,38 @@ export interface LeaveRequest {
   leave_type: LeaveType
   start_date: string
   end_date: string
+  resume_date?: string
   days_requested: number
   reason?: string
+  handover_note?: string
+  handover_checklist_url?: string
+  reliever_id?: string
+  supervisor_id?: string
+  approval_stage?: LeaveApprovalStage
+  requested_days_mode?: "calendar_days" | "business_days"
   status: LeaveStatus
   approved_by?: string
   approved_at?: string
   rejection_reason?: string
+  workflow_rejection_stage?: "reliever" | "supervisor" | "hr"
+  reliever_decision_at?: string
+  supervisor_decision_at?: string
+  hr_decision_at?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface LeavePolicy {
+  id: string
+  leave_type_id: string
+  annual_days: number
+  eligibility: "all" | "female_only" | "male_only" | "custom"
+  min_tenure_months: number
+  notice_days: number
+  accrual_mode: "calendar_days" | "business_days"
+  carry_forward_cap: number
+  carry_forward_expiry?: string
+  is_active: boolean
   created_at: string
   updated_at: string
 }

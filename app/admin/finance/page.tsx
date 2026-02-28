@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { DollarSign, FileText, Receipt, TrendingUp, CreditCard, Clock, CheckCircle, AlertCircle } from "lucide-react"
@@ -36,16 +35,10 @@ export default function FinanceDashboard() {
 
   async function fetchFinanceData() {
     try {
-      const supabase = createClient()
-
-      const { data: payments, error } = await supabase
-        .from("department_payments")
-        .select("*")
-        .order("created_at", { ascending: false })
-
-      if (error) throw error
-
-      const allPayments = payments || []
+      const response = await fetch("/api/payments")
+      if (!response.ok) throw new Error("Failed to load finance data")
+      const payload = await response.json()
+      const allPayments: any[] = payload.data || []
 
       const pendingCount = allPayments.filter((p) => p.status === "pending" || p.status === "due").length
       const paidCount = allPayments.filter((p) => p.status === "paid").length
@@ -134,7 +127,7 @@ export default function FinanceDashboard() {
               <Link href="/admin/finance/payments">
                 <Button className="w-full">Manage Payments ({stats.totalPayments})</Button>
               </Link>
-              <Link href="/admin/finance/payments/departments">
+              <Link href="/admin/finance/payments">
                 <Button className="w-full" variant="outline">
                   By Department
                 </Button>

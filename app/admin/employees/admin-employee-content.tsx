@@ -92,6 +92,7 @@ export interface Employee {
 
 export interface UserProfile {
   role: UserRole
+  managed_departments?: string[]
 }
 
 interface AdminEmployeeContentProps {
@@ -208,6 +209,8 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
   const [showMoreOptions, setShowMoreOptions] = useState(false)
 
   const supabase = createClient()
+  const isHrGlobalLead = userProfile?.role === "lead" && (userProfile?.managed_departments || []).includes("Admin & HR")
+  const canManageUsers = userProfile?.role === "super_admin" || userProfile?.role === "admin" || isHrGlobalLead
 
   // Handle userId from search params (for edit dialog)
   useEffect(() => {
@@ -223,12 +226,8 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
   const loadData = async () => {
     setIsLoading(true)
     try {
-      // Fetch employee - leads can only see employee in their departments
+      // Fetch employees - all leads can view users; mutation is restricted to HR lead/admin/super admin.
       let query = supabase.from("profiles").select("*").order("last_name", { ascending: true })
-
-      if (userProfile?.role === "lead") {
-        // Leads see their departments (filtered server-side, but keep for refresh)
-      }
 
       const { data, error } = await query
 
@@ -244,6 +243,11 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
   }
 
   const handleEditEmployee = async (employee: Employee) => {
+    if (!canManageUsers) {
+      toast.error("You can view users but cannot edit them")
+      return
+    }
+
     try {
       setSelectedEmployee(employee)
 
@@ -509,6 +513,11 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
   }
 
   const handleDeleteEmployee = async (employee: Employee) => {
+    if (!canManageUsers) {
+      toast.error("You can view users but cannot delete them")
+      return
+    }
+
     try {
       setSelectedEmployee(employee)
       const assigned = await checkAssignedItems(employee)
@@ -545,9 +554,8 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
 
     setIsDeleting(true)
     try {
-      // Check permissions - only super_admin can delete users
-      if (userProfile?.role !== "super_admin") {
-        toast.error("Only super admins can delete users")
+      if (!canManageUsers) {
+        toast.error("You don't have permission to delete users")
         setIsDeleting(false)
         return
       }
@@ -607,13 +615,19 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
     if (isSaving) return // Prevent duplicate submissions
     setIsSaving(true)
     try {
+      if (!canManageUsers) {
+        toast.error("You can view users but cannot edit them")
+        setIsSaving(false)
+        return
+      }
+
       if (!selectedEmployee) {
         setIsSaving(false)
         return
       }
 
       // Check if user can assign this role
-      if (userProfile && !canAssignRoles(userProfile.role, editForm.role)) {
+      if (userProfile && !isHrGlobalLead && !canAssignRoles(userProfile.role, editForm.role)) {
         toast.error("You don't have permission to assign this role")
         setIsSaving(false)
         return
@@ -697,6 +711,12 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
     setIsCreatingUser(true)
 
     try {
+      if (!canManageUsers) {
+        toast.error("You can view users but cannot create users")
+        setIsCreatingUser(false)
+        return
+      }
+
       // Validate required fields
       if (
         !createUserForm.firstName.trim() ||
@@ -710,7 +730,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
       }
 
       // Check if user can assign this role
-      if (userProfile && !canAssignRoles(userProfile.role, createUserForm.role)) {
+      if (userProfile && !isHrGlobalLead && !canAssignRoles(userProfile.role, createUserForm.role)) {
         toast.error("You don't have permission to assign this role")
         setIsCreatingUser(false)
         return
@@ -1110,7 +1130,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
       icon={Users}
       actions={
         <div className="flex items-center gap-2">
-          {(userProfile?.role === "admin" || userProfile?.role === "super_admin") && (
+          {canManageUsers && (
             <Button onClick={() => setIsCreateUserDialogOpen(true)} className="gap-2" size="sm">
               <Plus className="h-4 w-4" />
               <span className="hidden sm:inline">Create User</span>
@@ -1393,15 +1413,17 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                             <span className="hidden sm:inline">View</span>
                             <span className="sm:hidden">👁</span>
                           </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-8 w-8 p-0 sm:h-auto sm:w-auto sm:p-2"
-                            onClick={() => handleEditEmployee(member)}
-                          >
-                            <Edit className="h-3 w-3" />
-                          </Button>
-                          {userProfile?.role === "super_admin" && (
+                          {canManageUsers && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 w-8 p-0 sm:h-auto sm:w-auto sm:p-2"
+                              onClick={() => handleEditEmployee(member)}
+                            >
+                              <Edit className="h-3 w-3" />
+                            </Button>
+                          )}
+                          {canManageUsers && (
                             <Button
                               variant="outline"
                               size="sm"
@@ -1448,16 +1470,18 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                         </div>
                       </div>
                     </Link>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleEditEmployee(member)
-                      }}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
+                    {canManageUsers && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleEditEmployee(member)
+                        }}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3 p-4">
@@ -1521,16 +1545,18 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                     >
                       <FileSignature className="h-4 w-4" />
                     </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleEditEmployee(member)}
-                      className="flex-1 gap-2"
-                    >
-                      <Edit className="h-4 w-4" />
-                      Edit
-                    </Button>
-                    {userProfile?.role === "super_admin" && (
+                    {canManageUsers && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleEditEmployee(member)}
+                        className="flex-1 gap-2"
+                      >
+                        <Edit className="h-4 w-4" />
+                        Edit
+                      </Button>
+                    )}
+                    {canManageUsers && (
                       <Button
                         variant="outline"
                         size="sm"

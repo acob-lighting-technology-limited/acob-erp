@@ -54,7 +54,7 @@ interface SidebarProps {
     role?: UserRole
     lead_departments?: string[]
   }
-  isAdmin?: boolean
+  canAccessAdmin?: boolean
 }
 
 const navigation = [
@@ -62,6 +62,7 @@ const navigation = [
   { name: "Job Description", href: "/job-description", icon: Briefcase },
   { name: "Projects", href: "/projects", icon: FolderKanban },
   { name: "Tasks", href: "/portal/tasks", icon: ClipboardList },
+  { name: "Help Desk", href: "/portal/help-desk", icon: ClipboardList },
   { name: "Reports", href: "/portal/reports", icon: FileBarChart },
   { name: "Assets", href: "/assets", icon: Package },
   { name: "Payments", href: "/payments", icon: CreditCard },
@@ -78,7 +79,7 @@ const hrNavigation = [
 
 const adminNavigation = [{ name: "Admin Dashboard", href: "/admin", icon: ShieldCheck }]
 
-export function Sidebar({ user, profile, isAdmin }: SidebarProps) {
+export function Sidebar({ user, profile, canAccessAdmin }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
@@ -297,7 +298,10 @@ export function Sidebar({ user, profile, isAdmin }: SidebarProps) {
       {/* Footer - Admin & Logout */}
       <div className="space-y-1.5 border-t px-2.5 py-2.5">
         {/* Go to Admin - Only for admins/leads */}
-        {(isAdmin || profile?.role === "lead" || profile?.role === "admin" || profile?.role === "super_admin") && (
+        {(canAccessAdmin ||
+          profile?.role === "lead" ||
+          profile?.role === "admin" ||
+          profile?.role === "super_admin") && (
           <Link href="/admin" className="block">
             <Button
               variant="outline"

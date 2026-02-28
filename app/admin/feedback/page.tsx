@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { FeedbackViewerClient } from "@/components/feedback-viewer-client"
+import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
 import { MessageSquare, AlertCircle, Clock, CheckCircle, XCircle } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { PageHeader, PageWrapper } from "@/components/layout"
@@ -13,22 +14,24 @@ export default async function AdminFeedbackPage() {
     redirect("/auth/login")
   }
 
-  // Check if user is admin or lead
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role, lead_departments")
-    .eq("id", data.user.id)
-    .single()
-
-  if (!profile || !["super_admin", "admin", "lead"].includes(profile.role)) {
+  const scope = await resolveAdminScope(supabase as any, data.user.id)
+  if (!scope) {
     redirect("/dashboard")
   }
+  const departmentScope = getDepartmentScope(scope, "general")
 
-  // Fetch feedback - RLS will filter by department for leads
-  const { data: feedbackData, error: feedbackError } = await supabase
-    .from("feedback")
-    .select("*")
-    .order("created_at", { ascending: false })
+  let feedbackQuery = supabase.from("feedback").select("*").order("created_at", { ascending: false })
+  if (departmentScope) {
+    const { data: scopedUsers } =
+      departmentScope.length > 0
+        ? await supabase.from("profiles").select("id").in("department", departmentScope)
+        : { data: [] as { id: string }[] }
+    const scopedUserIds = (scopedUsers || []).map((row) => row.id)
+    feedbackQuery =
+      scopedUserIds.length > 0 ? feedbackQuery.in("user_id", scopedUserIds) : feedbackQuery.eq("id", "__none__")
+  }
+
+  const { data: feedbackData, error: feedbackError } = await feedbackQuery
 
   if (feedbackError) {
     console.error("Error fetching feedback:", feedbackError)
@@ -40,10 +43,17 @@ export default async function AdminFeedbackPage() {
     const userIds = Array.from(new Set(feedbackData.map((f) => f.user_id).filter(Boolean)))
 
     if (userIds.length > 0) {
-      const { data: profilesData, error: profilesError } = await supabase
+      let profilesQuery = supabase
         .from("profiles")
         .select("id, first_name, last_name, company_email, department")
         .in("id", userIds)
+      if (departmentScope) {
+        profilesQuery =
+          departmentScope.length > 0
+            ? profilesQuery.in("department", departmentScope)
+            : profilesQuery.eq("id", "__none__")
+      }
+      const { data: profilesData, error: profilesError } = await profilesQuery
 
       if (profilesError) {
         console.error("Error fetching profiles:", profilesError)

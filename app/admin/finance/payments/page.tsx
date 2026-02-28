@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { PaymentsTable } from "@/components/payments/payments-table"
+import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
 
 interface Payment {
   id: string
@@ -55,12 +56,13 @@ async function getPaymentsData() {
     return { redirect: "/auth/login" as const }
   }
 
-  // Check if user is admin
-  const { data: profile } = await supabase.from("profiles").select("is_admin").eq("id", user.id).single()
-  const isAdmin = profile?.is_admin || false
+  const scope = await resolveAdminScope(supabase as any, user.id)
+  if (!scope) {
+    return { redirect: "/dashboard" as const }
+  }
+  const departmentScope = getDepartmentScope(scope, "finance")
 
-  // Fetch all payments (admin sees all)
-  const { data: payments, error: paymentsError } = await supabase
+  let paymentsQuery = supabase
     .from("department_payments")
     .select(
       `
@@ -71,12 +73,25 @@ async function getPaymentsData() {
     )
     .order("created_at", { ascending: false })
 
+  if (departmentScope) {
+    const { data: scopedDepartments } = await supabase.from("departments").select("id").in("name", departmentScope)
+    const departmentIds = (scopedDepartments || []).map((dept) => dept.id)
+    paymentsQuery =
+      departmentIds.length > 0 ? paymentsQuery.in("department_id", departmentIds) : paymentsQuery.eq("id", "__none__")
+  }
+
+  const { data: payments, error: paymentsError } = await paymentsQuery
+
   if (paymentsError) {
     console.error("Error loading payments:", paymentsError)
   }
 
-  // Fetch departments
-  const { data: departments } = await supabase.from("departments").select("id, name").order("name")
+  let departmentsQuery = supabase.from("departments").select("id, name").order("name")
+  if (departmentScope) {
+    departmentsQuery =
+      departmentScope.length > 0 ? departmentsQuery.in("name", departmentScope) : departmentsQuery.eq("id", "__none__")
+  }
+  const { data: departments } = await departmentsQuery
 
   // Fetch categories
   const { data: categories } = await supabase.from("payment_categories").select("id, name").order("name")
@@ -88,7 +103,7 @@ async function getPaymentsData() {
     currentUser: {
       id: user.id,
       department_id: null, // Admin doesn't have a specific department filter
-      is_admin: isAdmin,
+      is_admin: true,
     },
   }
 }
@@ -113,7 +128,7 @@ export default async function AdminPaymentsPage() {
       initialDepartments={paymentsData.departments}
       initialCategories={paymentsData.categories}
       currentUser={paymentsData.currentUser}
-      basePath="/admin/payments"
+      basePath="/admin/finance/payments"
     />
   )
 }

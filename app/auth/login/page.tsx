@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import { useState, useRef, useEffect } from "react"
 import { toast } from "sonner"
 import { KeyRound, Mail, ArrowLeft, Eye, EyeOff } from "lucide-react"
@@ -25,7 +25,7 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [mounted, setMounted] = useState(false)
-  const router = useRouter()
+  const searchParams = useSearchParams()
   const { resolvedTheme } = useTheme()
   const otpRefs = useRef<(HTMLInputElement | null)[]>([])
 
@@ -155,7 +155,8 @@ export default function LoginPage() {
       })
       if (error) throw error
       toast.success("Login successful!")
-      window.location.href = "/dashboard"
+      const nextPath = getSafeNextPath(searchParams.get("next"))
+      window.location.href = nextPath
     } catch (error: unknown) {
       console.error("Password Login Error:", error)
       const message = error instanceof Error ? error.message : "Invalid email or password"
@@ -187,7 +188,8 @@ export default function LoginPage() {
       })
       if (error) throw error
       toast.success("Login successful!")
-      window.location.href = "/dashboard"
+      const nextPath = getSafeNextPath(searchParams.get("next"))
+      window.location.href = nextPath
     } catch (error: unknown) {
       console.error("OTP Verification Error:", error)
       const message = error instanceof Error ? error.message : "Invalid OTP"
@@ -449,4 +451,20 @@ export default function LoginPage() {
       </div>
     </div>
   )
+}
+
+function getSafeNextPath(next: string | null): string {
+  if (!next) return "/profile"
+
+  if (
+    next.startsWith("/") &&
+    !next.startsWith("//") &&
+    !next.includes(":") &&
+    !/https?:\/\//i.test(next) &&
+    !/[\r\n]/.test(next)
+  ) {
+    return next
+  }
+
+  return "/profile"
 }
