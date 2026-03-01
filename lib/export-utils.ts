@@ -16,6 +16,7 @@ import {
   WidthType,
   ShadingType,
 } from "docx"
+import { formatOfficeDateWithOrdinal, getOfficeWeekMonday } from "./meeting-week"
 
 // Load pptxgenjs via a script tag (the correct browser usage pattern).
 // The UMD bundle sets window.PptxGenJS as a side effect, bypassing all webpack issues.
@@ -115,23 +116,8 @@ export const autoNumberLines = (text: string): string => {
 
 /** Returns the Monday date of a given ISO week as a formatted string e.g. "Monday, 17th February 2026" */
 const getWeekMonday = (week: number, year: number): string => {
-  const jan4 = new Date(year, 0, 4)
-  const dayOfWeek = jan4.getDay() || 7
-  const week1Monday = new Date(jan4)
-  week1Monday.setDate(jan4.getDate() - (dayOfWeek - 1))
-  const monday = new Date(week1Monday)
-  monday.setDate(week1Monday.getDate() + (week - 1) * 7)
-  const day = monday.getDate()
-  const suffix =
-    day === 1 || day === 21 || day === 31
-      ? "st"
-      : day === 2 || day === 22
-        ? "nd"
-        : day === 3 || day === 23
-          ? "rd"
-          : "th"
-  const monthName = monday.toLocaleString("en-GB", { month: "long" })
-  return `Monday, ${day}${suffix} ${monthName} ${monday.getFullYear()}`
+  const monday = getOfficeWeekMonday(week, year)
+  return `Monday, ${formatOfficeDateWithOrdinal(monday)}`
 }
 
 /**
@@ -1743,7 +1729,387 @@ const addDeptIndexSlide = (
   return slide
 }
 
-const wrapTextByChars = (text: string, maxCharsPerLine: number): string[] => {
+const PPTX_WEEKLY_BODY_FONT_SIZE = 14
+const PPTX_WEEKLY_MIN_BODY_FONT_SIZE = 10
+const PPTX_WEEKLY_LINE_HEIGHT_RATIO = 1.25
+const PPTX_WEEKLY_AVG_CHAR_WIDTH_RATIO = 0.56
+const PPTX_WEEKLY_LINE_SPACING_MULTIPLE = 1.3
+
+const WEEKLY_CONTENT_LAYOUT = {
+  headerH: 0.65,
+  marginX: 0.25,
+  slideW: 13.33,
+  footerY: 6.9,
+  footerH: 0.6,
+}
+
+const applyWeeklySlideTransition = (slide: any) => {
+  // PptxGenJS transition support varies by viewer/version; keep this guarded.
+  try {
+    slide.transition = {
+      type: "fade",
+      duration: 0.4,
+    }
+  } catch {
+    /* no-op */
+  }
+}
+
+const getWeeklyContentBoxes = () => {
+  const { headerH, marginX, slideW, footerY } = WEEKLY_CONTENT_LAYOUT
+  const bodyBottomSafety = 0.35
+  const textBottomSafety = 0.1
+  const usableW = slideW - marginX * 2
+  const col1W = usableW * (3 / 5)
+  const col2W = usableW * (2 / 5) - 0.15
+  const col2X = marginX + col1W + 0.15
+
+  const startY = headerH + 0.15
+  const availH = footerY - startY - bodyBottomSafety
+  const row1H = availH * (4 / 6)
+  const row2H = availH * (2 / 6) - 0.15
+  const row1Y = startY
+  const row2Y = startY + row1H + 0.15
+  const page2Gap = 0.2
+  const page2TopH = (availH - page2Gap) * 0.65
+  const page2BottomH = (availH - page2Gap) * 0.35
+
+  return {
+    row1Left: {
+      x: marginX,
+      y: row1Y,
+      w: col1W,
+      h: row1H,
+      textW: col1W - 0.3,
+      textH: Math.max(0.6, row1H - 0.56 - textBottomSafety),
+    },
+    row1Right: {
+      x: col2X,
+      y: row1Y,
+      w: col2W,
+      h: row1H,
+      textW: col2W - 0.3,
+      textH: Math.max(0.6, row1H - 0.56 - textBottomSafety),
+    },
+    row2Full: {
+      x: marginX,
+      y: row2Y,
+      w: usableW,
+      h: row2H,
+      textW: usableW - 0.3,
+      textH: Math.max(0.6, row2H - 0.56 - textBottomSafety),
+    },
+    continuation: {
+      x: marginX,
+      y: startY,
+      w: usableW,
+      h: availH,
+      textW: usableW - 0.3,
+      textH: Math.max(0.6, availH - 0.56 - textBottomSafety),
+    },
+    page2Top: {
+      x: marginX,
+      y: startY,
+      w: usableW,
+      h: page2TopH,
+      textW: usableW - 0.3,
+      textH: Math.max(0.6, page2TopH - 0.56 - textBottomSafety),
+    },
+    page2Bottom: {
+      x: marginX,
+      y: startY + page2TopH + page2Gap,
+      w: usableW,
+      h: page2BottomH,
+      textW: usableW - 0.3,
+      textH: Math.max(0.6, page2BottomH - 0.56 - textBottomSafety),
+    },
+  }
+}
+
+type WeeklySectionPlan = {
+  key: "work_done" | "tasks_new_week" | "challenges"
+  title: string
+  color: string
+  text: string
+  fontSize: number
+  allowAutoShrink: boolean
+}
+
+export type WeeklyPptxMode = "compact" | "full"
+
+const withListItemSpacing = (text: string): string => {
+  const lines = String(text || "")
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .map((l) => l.trimEnd())
+    .filter((l) => l.length > 0)
+  if (lines.length === 0) return ""
+  return lines.join("\n")
+}
+
+const countWrappedLines = (text: string, maxCharsPerLine: number): number => {
+  const sourceLines = String(text || "")
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+  let total = 0
+
+  const wrapPlainLineCount = (line: string, limit: number): number => {
+    if (!line) return 1
+    if (line.length <= limit) return 1
+    const words = line.split(/\s+/)
+    let lines = 0
+    let current = ""
+    words.forEach((w) => {
+      const candidate = current ? `${current} ${w}` : w
+      if (candidate.length <= limit) {
+        current = candidate
+      } else {
+        if (current) lines += 1
+        if (w.length > limit) {
+          lines += Math.ceil(w.length / limit)
+          current = ""
+        } else {
+          current = w
+        }
+      }
+    })
+    if (current) lines += 1
+    return Math.max(1, lines)
+  }
+
+  sourceLines.forEach((raw) => {
+    const line = raw.trimEnd()
+    if (!line) {
+      total += 1
+      return
+    }
+    const numberedMatch = line.match(/^(\d+\.)\s+(.*)$/)
+    if (!numberedMatch) {
+      total += wrapPlainLineCount(line, maxCharsPerLine)
+      return
+    }
+    const prefix = `${numberedMatch[1]} `
+    const body = numberedMatch[2] || ""
+    const bodyLimit = Math.max(10, maxCharsPerLine - prefix.length)
+    total += wrapPlainLineCount(body, bodyLimit)
+  })
+
+  return total
+}
+
+const chooseSectionFontSize = (
+  text: string,
+  boxWIn: number,
+  boxHIn: number,
+  preferredFont = PPTX_WEEKLY_BODY_FONT_SIZE,
+  minFont = PPTX_WEEKLY_MIN_BODY_FONT_SIZE,
+  strictFit = true
+): number => {
+  for (let fontSize = preferredFont; fontSize >= minFont; fontSize -= 1) {
+    const charsPerLine = Math.max(10, Math.floor((boxWIn * 72) / (fontSize * PPTX_WEEKLY_AVG_CHAR_WIDTH_RATIO)))
+    const effectiveLineHeight =
+      fontSize * PPTX_WEEKLY_LINE_HEIGHT_RATIO * PPTX_WEEKLY_LINE_SPACING_MULTIPLE * (strictFit ? 1.05 : 1.0)
+    const maxLines = Math.max(1, Math.floor((boxHIn * 72) / effectiveLineHeight))
+    if (countWrappedLines(text, charsPerLine) <= maxLines) return fontSize
+  }
+  return minFont
+}
+
+const buildWeeklySectionPlan = (
+  key: WeeklySectionPlan["key"],
+  title: string,
+  color: string,
+  rawText: string,
+  fallbackText: string,
+  boxWIn: number,
+  boxHIn: number,
+  minFont = PPTX_WEEKLY_MIN_BODY_FONT_SIZE,
+  strictFit = true,
+  allowAutoShrink = true
+): WeeklySectionPlan => {
+  const normalized = autoNumberLines(rawText) || fallbackText
+  const text = withListItemSpacing(normalized)
+  return {
+    key,
+    title,
+    color,
+    text,
+    fontSize: chooseSectionFontSize(text, boxWIn, boxHIn, PPTX_WEEKLY_BODY_FONT_SIZE, minFont, strictFit),
+    allowAutoShrink,
+  }
+}
+
+const getReportSectionPlans = (report: WeeklyReport): WeeklySectionPlan[] => {
+  const boxes = getWeeklyContentBoxes()
+  return [
+    buildWeeklySectionPlan(
+      "work_done",
+      "WORK DONE",
+      ACOB_GREEN,
+      report.work_done,
+      "No data provided.",
+      boxes.continuation.textW,
+      boxes.continuation.textH,
+      13,
+      false,
+      false
+    ),
+    buildWeeklySectionPlan(
+      "tasks_new_week",
+      "TASKS FOR NEW WEEK",
+      "1D6A96",
+      report.tasks_new_week,
+      "No data provided.",
+      boxes.page2Top.textW,
+      boxes.page2Top.textH,
+      11
+    ),
+    buildWeeklySectionPlan(
+      "challenges",
+      "CHALLENGES",
+      "B91C1C",
+      report.challenges,
+      "No challenges reported.",
+      boxes.page2Bottom.textW,
+      boxes.page2Bottom.textH
+    ),
+  ]
+}
+
+const addWeeklyHeaderAndFooter = (
+  pres: any,
+  slide: any,
+  department: string,
+  nextDept?: string,
+  pageNumber?: number
+) => {
+  const { headerH, footerY, footerH } = WEEKLY_CONTENT_LAYOUT
+
+  slide.addShape(pres.ShapeType?.rect ?? "rect", {
+    x: 0,
+    y: 0,
+    w: "100%",
+    h: headerH,
+    fill: { color: ACOB_DARK },
+    line: { color: ACOB_DARK },
+  })
+
+  slide.addText(department.toUpperCase(), {
+    x: 0.3,
+    y: 0,
+    w: 9,
+    h: headerH,
+    fontSize: 16,
+    bold: true,
+    color: ACOB_WHITE,
+    valign: "middle",
+    fontFace: "Calibri",
+  })
+
+  try {
+    slide.addImage({
+      path: LOGO_ICON,
+      x: 11.45,
+      y: 0.14,
+      w: 1.7,
+      h: 0.37,
+    })
+  } catch {
+    /* skip */
+  }
+
+  slide.addShape(pres.ShapeType?.rect ?? "rect", {
+    x: 0,
+    y: footerY,
+    w: "100%",
+    h: footerH,
+    fill: { color: ACOB_GREEN },
+    line: { color: ACOB_GREEN },
+  })
+
+  if (nextDept) {
+    slide.addText(`NEXT: ${nextDept}`, {
+      x: 7,
+      y: footerY,
+      w: 6.1,
+      h: footerH,
+      fontSize: 10,
+      color: ACOB_WHITE,
+      align: "right",
+      valign: "middle",
+      fontFace: "Calibri",
+      bold: true,
+    })
+  }
+
+  if (typeof pageNumber === "number") {
+    slide.addText(String(pageNumber), {
+      x: 0,
+      y: footerY,
+      w: "100%",
+      h: footerH,
+      fontSize: 10,
+      color: ACOB_WHITE,
+      align: "center",
+      valign: "middle",
+      fontFace: "Calibri",
+      bold: true,
+    })
+  }
+}
+
+const addSectionCard = (
+  pres: any,
+  slide: any,
+  box: { x: number; y: number; w: number; h: number; textW: number; textH: number },
+  title: string,
+  color: string,
+  text: string,
+  fontSize: number,
+  allowAutoShrink = true
+) => {
+  slide.addShape(pres.ShapeType?.rect ?? "rect", {
+    x: box.x,
+    y: box.y,
+    w: box.w,
+    h: box.h,
+    fill: { color: ACOB_WHITE },
+    line: { color: "E2E8F0", width: 1 },
+  })
+  slide.addShape(pres.ShapeType?.rect ?? "rect", {
+    x: box.x + 0.15,
+    y: box.y + 0.1,
+    w: box.w - 0.3,
+    h: 0.3,
+    fill: { color },
+    line: { color, width: 0 },
+  })
+  slide.addText(title, {
+    x: box.x + 0.2,
+    y: box.y + 0.12,
+    w: box.w - 0.4,
+    h: 0.22,
+    fontSize: 8,
+    bold: true,
+    color: ACOB_WHITE,
+    fontFace: "Calibri",
+  })
+  slide.addText(text, {
+    x: box.x + 0.15,
+    y: box.y + 0.46,
+    w: box.textW,
+    h: box.textH,
+    fontSize,
+    color: ACOB_SLATE,
+    valign: "top",
+    fontFace: "Calibri",
+    breakLine: true,
+    lineSpacingMultiple: PPTX_WEEKLY_LINE_SPACING_MULTIPLE,
+    fit: allowAutoShrink ? "shrink" : undefined,
+  })
+}
+
+const wrapTextByCharsCompact = (text: string, maxCharsPerLine: number): string[] => {
   const sourceLines = String(text || "")
     .replace(/\r\n/g, "\n")
     .split("\n")
@@ -1803,7 +2169,7 @@ const wrapTextByChars = (text: string, maxCharsPerLine: number): string[] => {
   return wrapped
 }
 
-const fitTextToPptxBox = (
+const fitTextToPptxBoxCompact = (
   text: string,
   boxWIn: number,
   boxHIn: number,
@@ -1816,7 +2182,7 @@ const fitTextToPptxBox = (
   for (let fontSize = preferredFont; fontSize >= minFont; fontSize -= 0.5) {
     const charsPerLine = Math.max(10, Math.floor((boxWIn * 72) / (fontSize * avgCharWidthRatio)))
     const maxLines = Math.max(1, Math.floor((boxHIn * 72) / (fontSize * lineHeightRatio)))
-    const lines = wrapTextByChars(text, charsPerLine)
+    const lines = wrapTextByCharsCompact(text, charsPerLine)
     if (lines.length <= maxLines) {
       return { text: lines.join("\n"), fontSize }
     }
@@ -1825,16 +2191,13 @@ const fitTextToPptxBox = (
   const finalSize = minFont
   const charsPerLine = Math.max(10, Math.floor((boxWIn * 72) / (finalSize * avgCharWidthRatio)))
   const maxLines = Math.max(1, Math.floor((boxHIn * 72) / (finalSize * lineHeightRatio)))
-  const lines = wrapTextByChars(text, charsPerLine)
+  const lines = wrapTextByCharsCompact(text, charsPerLine)
   const clipped = lines.slice(0, Math.max(1, maxLines - 1))
   clipped.push("... continued")
   return { text: clipped.join("\n"), fontSize: finalSize }
 }
 
-/**
- * Adds the content slide with 2-row / 2-col layout.
- */
-const addContentSlide = (
+const addCompactContentSlide = (
   pres: any,
   department: string,
   report: WeeklyReport,
@@ -1843,278 +2206,265 @@ const addContentSlide = (
 ) => {
   const slide = pres.addSlide()
   slide.background = { color: ACOB_OFFWHITE }
+  addWeeklyHeaderAndFooter(pres, slide, department, nextDept, pageNumber)
 
-  // ── Header bar ───────────────────────────────────────────────────────────
-  const headerH = 0.65
-  slide.addShape(pres.ShapeType?.rect ?? "rect", {
-    x: 0,
-    y: 0,
-    w: "100%",
-    h: headerH,
-    fill: { color: ACOB_DARK },
-    line: { color: ACOB_DARK },
-  })
-  // Department name — left
-  slide.addText(department.toUpperCase(), {
-    x: 0.3,
-    y: 0,
-    w: 9,
-    h: headerH,
-    fontSize: 16,
-    bold: true,
-    color: ACOB_WHITE,
-    valign: "middle",
-    fontFace: "Calibri",
-  })
-  // Logo — right side of header: dark logo (acob-logo-dark.webp) on dark bg
-  // headerH = 0.65" → logo h=0.48" (with 0.085" top/bottom margin), w=2.2"
-  try {
-    slide.addImage({
-      path: LOGO_ICON,
-      x: 11.45,
-      y: 0.14,
-      w: 1.7,
-      h: 0.37,
-    })
-  } catch {
-    /* skip */
-  }
+  const boxes = getWeeklyContentBoxes()
+  const workDoneText = autoNumberLines(report.work_done) || "No data provided."
+  const tasksText = autoNumberLines(report.tasks_new_week) || "No data provided."
+  const challengesText = autoNumberLines(report.challenges) || "No challenges reported."
 
-  // ── Layout constants ─────────────────────────────────────────────────────
-  const marginX = 0.25
-  const usableW = 13.33 - marginX * 2 // ≈ 12.83"
-  const col1W = usableW * (3 / 5) // Work Done — 3/5
-  const col2W = usableW * (2 / 5) - 0.15 // Tasks for New Week — 2/5 (minus gap)
-  const col2X = marginX + col1W + 0.15
+  const workDoneFitted = fitTextToPptxBoxCompact(workDoneText, boxes.row1Left.textW, boxes.row1Left.textH)
+  const tasksFitted = fitTextToPptxBoxCompact(tasksText, boxes.row1Right.textW, boxes.row1Right.textH)
+  const challengesFitted = fitTextToPptxBoxCompact(challengesText, boxes.row2Full.textW, boxes.row2Full.textH)
 
-  const startY = headerH + 0.15
-  const availH = 6.9 - startY - 0.15 // space above footer strip
-  const row1H = availH * (4 / 6) // Row 1 — 4/6 of height
-  const row2H = availH * (2 / 6) - 0.15 // Row 2 — 2/6 of height
-  const row1Y = startY
-  const row2Y = startY + row1H + 0.15
-  const fullW = usableW
-
-  // ── Row 1 left: Work Done ─────────────────────────────────────────────────
-  slide.addShape(pres.ShapeType?.rect ?? "rect", {
-    x: marginX,
-    y: row1Y,
-    w: col1W,
-    h: row1H,
-    fill: { color: ACOB_WHITE },
-    line: { color: "E2E8F0", width: 1 },
-  })
-  slide.addShape(pres.ShapeType?.rect ?? "rect", {
-    x: marginX + 0.15,
-    y: row1Y + 0.1,
-    w: col1W - 0.3,
-    h: 0.3,
-    fill: { color: ACOB_GREEN },
-    line: { color: ACOB_GREEN, width: 0 },
-  })
-  slide.addText("WORK DONE", {
-    x: marginX + 0.2,
-    y: row1Y + 0.12,
-    w: col1W - 0.4,
-    h: 0.22,
-    fontSize: 8,
-    bold: true,
-    color: ACOB_WHITE,
-    fontFace: "Calibri",
-  })
-  const workDoneFitted = fitTextToPptxBox(
-    autoNumberLines(report.work_done) || "No data provided.",
-    col1W - 0.3,
-    row1H - 0.56
+  addSectionCard(
+    pres,
+    slide,
+    boxes.row1Left,
+    "WORK DONE",
+    ACOB_GREEN,
+    workDoneFitted.text,
+    workDoneFitted.fontSize,
+    false
   )
-  slide.addText(workDoneFitted.text, {
-    x: marginX + 0.15,
-    y: row1Y + 0.46,
-    w: col1W - 0.3,
-    h: row1H - 0.56,
-    fontSize: workDoneFitted.fontSize,
-    color: ACOB_SLATE,
-    valign: "top",
-    fontFace: "Calibri",
-    breakLine: true,
-  })
-
-  // ── Row 1 right: Tasks for New Week ──────────────────────────────────────
-  slide.addShape(pres.ShapeType?.rect ?? "rect", {
-    x: col2X,
-    y: row1Y,
-    w: col2W,
-    h: row1H,
-    fill: { color: ACOB_WHITE },
-    line: { color: "E2E8F0", width: 1 },
-  })
-  slide.addShape(pres.ShapeType?.rect ?? "rect", {
-    x: col2X + 0.15,
-    y: row1Y + 0.1,
-    w: col2W - 0.3,
-    h: 0.3,
-    fill: { color: "1D6A96" },
-    line: { color: "1D6A96", width: 0 },
-  })
-  slide.addText("TASKS FOR NEW WEEK", {
-    x: col2X + 0.2,
-    y: row1Y + 0.12,
-    w: col2W - 0.4,
-    h: 0.22,
-    fontSize: 8,
-    bold: true,
-    color: ACOB_WHITE,
-    fontFace: "Calibri",
-  })
-  const tasksFitted = fitTextToPptxBox(
-    autoNumberLines(report.tasks_new_week) || "No data provided.",
-    col2W - 0.3,
-    row1H - 0.56
+  addSectionCard(
+    pres,
+    slide,
+    boxes.row1Right,
+    "TASKS FOR NEW WEEK",
+    "1D6A96",
+    tasksFitted.text,
+    tasksFitted.fontSize,
+    false
   )
-  slide.addText(tasksFitted.text, {
-    x: col2X + 0.15,
-    y: row1Y + 0.46,
-    w: col2W - 0.3,
-    h: row1H - 0.56,
-    fontSize: tasksFitted.fontSize,
-    color: ACOB_SLATE,
-    valign: "top",
-    fontFace: "Calibri",
-    breakLine: true,
-  })
-
-  // ── Row 2: Challenges (full width) ────────────────────────────────────────
-  slide.addShape(pres.ShapeType?.rect ?? "rect", {
-    x: marginX,
-    y: row2Y,
-    w: fullW,
-    h: row2H,
-    fill: { color: ACOB_WHITE },
-    line: { color: "E2E8F0", width: 1 },
-  })
-  slide.addShape(pres.ShapeType?.rect ?? "rect", {
-    x: marginX + 0.15,
-    y: row2Y + 0.1,
-    w: fullW - 0.3,
-    h: 0.3,
-    fill: { color: "B91C1C" },
-    line: { color: "B91C1C", width: 0 },
-  })
-  slide.addText("CHALLENGES", {
-    x: marginX + 0.2,
-    y: row2Y + 0.12,
-    w: fullW - 0.4,
-    h: 0.22,
-    fontSize: 8,
-    bold: true,
-    color: ACOB_WHITE,
-    fontFace: "Calibri",
-  })
-  const challengesFitted = fitTextToPptxBox(
-    autoNumberLines(report.challenges) || "No challenges reported.",
-    fullW - 0.3,
-    row2H - 0.56
+  addSectionCard(
+    pres,
+    slide,
+    boxes.row2Full,
+    "CHALLENGES",
+    "B91C1C",
+    challengesFitted.text,
+    challengesFitted.fontSize,
+    false
   )
-  slide.addText(challengesFitted.text, {
-    x: marginX + 0.15,
-    y: row2Y + 0.46,
-    w: fullW - 0.3,
-    h: row2H - 0.56,
-    fontSize: challengesFitted.fontSize,
-    color: ACOB_SLATE,
-    valign: "top",
-    fontFace: "Calibri",
-    breakLine: true,
-  })
-
-  // ── Bottom green strip ────────────────────────────────────────────────────
-  slide.addShape(pres.ShapeType?.rect ?? "rect", {
-    x: 0,
-    y: 6.9,
-    w: "100%",
-    h: 0.6,
-    fill: { color: ACOB_GREEN },
-    line: { color: ACOB_GREEN },
-  })
-
-  if (nextDept) {
-    slide.addText(`NEXT: ${nextDept}`, {
-      x: 7,
-      y: 6.9,
-      w: 6.1,
-      h: 0.6,
-      fontSize: 10,
-      color: ACOB_WHITE,
-      align: "right",
-      valign: "middle",
-      fontFace: "Calibri",
-      bold: true,
-    })
-  }
-
-  if (typeof pageNumber === "number") {
-    slide.addText(String(pageNumber), {
-      x: 0,
-      y: 6.9,
-      w: "100%",
-      h: 0.6,
-      fontSize: 10,
-      color: ACOB_WHITE,
-      align: "center",
-      valign: "middle",
-      fontFace: "Calibri",
-      bold: true,
-    })
-  }
 
   return slide
 }
 
+const addWorkDoneSlide = (
+  pres: any,
+  department: string,
+  workDonePlan: WeeklySectionPlan,
+  nextDept?: string,
+  pageNumber?: number
+) => {
+  const slide = pres.addSlide()
+  slide.background = { color: ACOB_OFFWHITE }
+  addWeeklyHeaderAndFooter(pres, slide, department, nextDept, pageNumber)
+
+  const boxes = getWeeklyContentBoxes()
+  addSectionCard(
+    pres,
+    slide,
+    boxes.continuation,
+    workDonePlan.title,
+    workDonePlan.color,
+    workDonePlan.text,
+    workDonePlan.fontSize,
+    workDonePlan.allowAutoShrink
+  )
+
+  return slide
+}
+
+const addTasksAndChallengesSlide = (
+  pres: any,
+  department: string,
+  tasksPlan: WeeklySectionPlan,
+  challengesPlan: WeeklySectionPlan,
+  nextDept?: string,
+  pageNumber?: number
+) => {
+  const slide = pres.addSlide()
+  slide.background = { color: ACOB_OFFWHITE }
+  addWeeklyHeaderAndFooter(pres, slide, department, nextDept, pageNumber)
+
+  const boxes = getWeeklyContentBoxes()
+  addSectionCard(
+    pres,
+    slide,
+    boxes.page2Top,
+    tasksPlan.title,
+    tasksPlan.color,
+    tasksPlan.text,
+    tasksPlan.fontSize,
+    tasksPlan.allowAutoShrink
+  )
+  addSectionCard(
+    pres,
+    slide,
+    boxes.page2Bottom,
+    challengesPlan.title,
+    challengesPlan.color,
+    challengesPlan.text,
+    challengesPlan.fontSize,
+    challengesPlan.allowAutoShrink
+  )
+
+  return slide
+}
+
+type DepartmentPptxPlan = {
+  report: WeeklyReport
+  workDone: WeeklySectionPlan
+  tasks: WeeklySectionPlan
+  challenges: WeeklySectionPlan
+  totalSlides: number
+  startPage?: number
+}
+
+const buildDepartmentPptxPlan = (report: WeeklyReport): DepartmentPptxPlan => {
+  const [workDone, tasks, challenges] = getReportSectionPlans(report)
+  return {
+    report,
+    workDone,
+    tasks,
+    challenges,
+    totalSlides: 3, // title + work done page + tasks/challenges page
+  }
+}
+
+const renderDepartmentWeeklySlides = (
+  pres: any,
+  departmentPlan: DepartmentPptxPlan,
+  nextDepartmentName?: string,
+  startPageNumber?: number
+) => {
+  const { report, workDone, tasks, challenges } = departmentPlan
+  const p = Array.isArray(report.profiles) ? report.profiles[0] : report.profiles
+  const name = p ? `${p.first_name} ${p.last_name}` : "Employee"
+
+  let pageCursor = startPageNumber
+  const titleSlide = addDeptTitleSlide(pres, report.department, name)
+  applyWeeklySlideTransition(titleSlide)
+  if (typeof pageCursor === "number") pageCursor += 1
+
+  const secondPageLabel = `${report.department} 2`
+  const workDoneSlide = addWorkDoneSlide(pres, report.department, workDone, secondPageLabel, pageCursor)
+  applyWeeklySlideTransition(workDoneSlide)
+  if (typeof pageCursor === "number") pageCursor += 1
+
+  const tasksChallengesSlide = addTasksAndChallengesSlide(
+    pres,
+    report.department,
+    tasks,
+    challenges,
+    nextDepartmentName,
+    pageCursor
+  )
+  applyWeeklySlideTransition(tasksChallengesSlide)
+}
+
+const renderDepartmentCompactSlides = (
+  pres: any,
+  report: WeeklyReport,
+  nextDepartmentName?: string,
+  contentPageNumber?: number
+) => {
+  const p = Array.isArray(report.profiles) ? report.profiles[0] : report.profiles
+  const name = p ? `${p.first_name} ${p.last_name}` : "Employee"
+
+  const titleSlide = addDeptTitleSlide(pres, report.department, name)
+  applyWeeklySlideTransition(titleSlide)
+
+  const contentSlide = addCompactContentSlide(pres, report.department, report, nextDepartmentName, contentPageNumber)
+  applyWeeklySlideTransition(contentSlide)
+}
+
 // ─── Public Export Functions ──────────────────────────────────────────────────
 
-export const exportToPPTX = async (report: WeeklyReport) => {
+export const exportToPPTX = async (report: WeeklyReport, mode: WeeklyPptxMode = "full") => {
   const PptxConstructor = await loadPptxGenJS()
   const pres = new PptxConstructor()
   pres.layout = "LAYOUT_WIDE"
 
-  const p = Array.isArray(report.profiles) ? report.profiles[0] : report.profiles
-  const name = p ? `${p.first_name} ${p.last_name}` : "Employee"
-
   // Slide 1 — Cover
-  addCoverSlide(pres, report.week_number, report.year, report.department)
+  const coverSlide = addCoverSlide(pres, report.week_number, report.year, report.department)
+  applyWeeklySlideTransition(coverSlide)
 
-  // Slide 2 — Department title
-  addDeptTitleSlide(pres, report.department, name)
-
-  // Slide 3 — Content (no "NEXT" for single export)
-  addContentSlide(pres, report.department, report, undefined, 3)
+  if (mode === "compact") {
+    renderDepartmentCompactSlides(pres, report, undefined, 3)
+  } else {
+    const departmentPlan = buildDepartmentPptxPlan(report)
+    // Slides 2+ — Department title + full-mode content slides
+    renderDepartmentWeeklySlides(pres, departmentPlan, undefined, 2)
+  }
 
   await pres.writeFile({ fileName: `ACOB_Report_${report.department}_W${report.week_number}.pptx` })
 }
 
-export const exportAllToPPTX = async (reports: WeeklyReport[], week: number, year: number) => {
+export const exportAllToPPTX = async (
+  reports: WeeklyReport[],
+  week: number,
+  year: number,
+  mode: WeeklyPptxMode = "full"
+) => {
   const PptxConstructor = await loadPptxGenJS()
   const pres = new PptxConstructor()
   pres.layout = "LAYOUT_WIDE"
 
   const sortedReports = sortReportsByDepartment(reports)
-  const departments = sortedReports.map((r) => r.department)
+  const departments = sortedReports.map((entry) => entry.department)
 
   // Slide 1 — Cover
-  addCoverSlide(pres, week, year)
+  const coverSlide = addCoverSlide(pres, week, year)
+  applyWeeklySlideTransition(coverSlide)
+
+  let pageCursor = 3
+  const departmentStartPages: number[] = []
+  if (mode === "compact") {
+    sortedReports.forEach((_report) => {
+      departmentStartPages.push(pageCursor)
+      pageCursor += 2
+    })
+  } else {
+    const departmentPlans = sortedReports.map((report) => buildDepartmentPptxPlan(report))
+    departmentPlans.forEach((entry) => {
+      departmentStartPages.push(pageCursor)
+      entry.startPage = pageCursor
+      pageCursor += entry.totalSlides
+    })
+  }
 
   // Slide 2 — Dept index
-  addDeptIndexSlide(pres, departments, week, year, (index) => 3 + index * 2)
+  const indexSlide = addDeptIndexSlide(
+    pres,
+    departments,
+    week,
+    year,
+    (index) => departmentStartPages[index] ?? 3 + index * 2
+  )
+  applyWeeklySlideTransition(indexSlide)
 
-  sortedReports.forEach((report, idx) => {
-    const p = Array.isArray(report.profiles) ? report.profiles[0] : report.profiles
-    const name = p ? `${p.first_name} ${p.last_name}` : "Employee"
-    // Department title slide
-    addDeptTitleSlide(pres, report.department, name)
-
-    // Content slide
-    addContentSlide(pres, report.department, report, sortedReports[idx + 1]?.department, 4 + idx * 2)
-  })
+  if (mode === "compact") {
+    sortedReports.forEach((report, idx) => {
+      renderDepartmentCompactSlides(pres, report, sortedReports[idx + 1]?.department, departmentStartPages[idx] + 1)
+    })
+  } else {
+    const departmentPlans = sortedReports.map((report, idx) => {
+      const entry = buildDepartmentPptxPlan(report)
+      entry.startPage = departmentStartPages[idx]
+      return entry
+    })
+    departmentPlans.forEach((departmentPlan, idx) => {
+      renderDepartmentWeeklySlides(
+        pres,
+        departmentPlan,
+        departmentPlans[idx + 1]?.report.department,
+        departmentPlan.startPage
+      )
+    })
+  }
 
   await pres.writeFile({ fileName: `ACOB_Weekly_Reports_All_W${week}_${year}.pptx` })
 }

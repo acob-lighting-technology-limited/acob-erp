@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { createClient } from "@/lib/supabase/client"
 import { getCurrentOfficeWeek } from "@/lib/meeting-week"
 import { toast } from "sonner"
+import { fetchWeeklyReportLockState, getDefaultMeetingDateIso } from "@/lib/weekly-report-lock"
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
@@ -49,6 +50,7 @@ import {
   exportAllToPPTX,
   autoNumberLines,
   sortReportsByDepartment,
+  type WeeklyPptxMode,
   type WeeklyReport,
 } from "@/lib/export-utils"
 import { WeeklyReportAdminDialog } from "@/components/admin/reports/weekly-report-dialog"
@@ -56,6 +58,7 @@ import { cn } from "@/lib/utils"
 import { format } from "date-fns"
 import { Label } from "@/components/ui/label"
 import { Fragment } from "react"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
 interface TrackerStatus {
   id: string
@@ -89,9 +92,19 @@ export function WeeklyReportsContent({
   const [editingReport, setEditingReport] = useState<WeeklyReport | null>(null)
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
   const [trackingData, setTrackingData] = useState<TrackerStatus[]>([])
+  const [pptxModeDialogOpen, setPptxModeDialogOpen] = useState(false)
+  const [pendingPptxExport, setPendingPptxExport] = useState<
+    { kind: "single"; report: WeeklyReport } | { kind: "all" } | null
+  >(null)
+  const [meetingDateInput, setMeetingDateInput] = useState(
+    getDefaultMeetingDateIso(currentOfficeWeek.week, currentOfficeWeek.year)
+  )
+  const [meetingGraceHours, setMeetingGraceHours] = useState(24)
+  const [savingMeetingWindow, setSavingMeetingWindow] = useState(false)
 
   const supabase = createClient()
   const isLead = currentUser.role === "lead"
+  const isAdminRole = currentUser.role === "admin" || currentUser.role === "super_admin"
   const canMutateReport = (report: WeeklyReport) => !isLead || report.user_id === currentUser.id
 
   const loadReports = async () => {
@@ -143,6 +156,17 @@ export function WeeklyReportsContent({
     loadReports()
   }, [weekFilter, yearFilter, deptFilter])
 
+  useEffect(() => {
+    const loadMeetingWindow = async () => {
+      const state = await fetchWeeklyReportLockState(supabase, weekFilter, yearFilter)
+      setMeetingDateInput(state.meetingDate || getDefaultMeetingDateIso(weekFilter, yearFilter))
+      setMeetingGraceHours(state.graceHours || 24)
+    }
+    if (isAdminRole) {
+      loadMeetingWindow()
+    }
+  }, [isAdminRole, weekFilter, yearFilter])
+
   const toggleRow = (id: string) => {
     const newExpanded = new Set(expandedRows)
     if (newExpanded.has(id)) {
@@ -159,6 +183,13 @@ export function WeeklyReportsContent({
       toast.error("You can only modify reports you created")
       return
     }
+    if (target) {
+      const lock = await fetchWeeklyReportLockState(supabase, target.week_number, target.year)
+      if (lock.isLocked) {
+        toast.error("This report week is locked. Delete is no longer allowed.")
+        return
+      }
+    }
     if (!confirm("Are you sure? Admin delete is permanent.")) return
     try {
       const { error } = await supabase.from("weekly_reports").delete().eq("id", id)
@@ -167,6 +198,38 @@ export function WeeklyReportsContent({
       loadReports()
     } catch (error) {
       toast.error("Delete failed")
+    }
+  }
+
+  const saveMeetingWindow = async () => {
+    if (!meetingDateInput) {
+      toast.error("Meeting date is required")
+      return
+    }
+    if (meetingGraceHours < 0 || meetingGraceHours > 168) {
+      toast.error("Grace hours must be between 0 and 168")
+      return
+    }
+
+    setSavingMeetingWindow(true)
+    try {
+      const { error } = await supabase.from("weekly_report_meeting_windows").upsert(
+        {
+          week_number: weekFilter,
+          year: yearFilter,
+          meeting_date: meetingDateInput,
+          grace_hours: meetingGraceHours,
+          updated_by: currentUser.id,
+          created_by: currentUser.id,
+        },
+        { onConflict: "week_number,year" }
+      )
+      if (error) throw error
+      toast.success("Meeting window saved")
+    } catch (error: any) {
+      toast.error(error.message || "Failed to save meeting window")
+    } finally {
+      setSavingMeetingWindow(false)
     }
   }
 
@@ -278,6 +341,27 @@ export function WeeklyReportsContent({
       r.work_done.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
+  const openAllPptxModeDialog = () => {
+    setPendingPptxExport({ kind: "all" })
+    setPptxModeDialogOpen(true)
+  }
+
+  const openSinglePptxModeDialog = (report: WeeklyReport) => {
+    setPendingPptxExport({ kind: "single", report })
+    setPptxModeDialogOpen(true)
+  }
+
+  const runPptxExport = async (mode: WeeklyPptxMode) => {
+    if (!pendingPptxExport) return
+    if (pendingPptxExport.kind === "all") {
+      await exportAllToPPTX(filteredReports, weekFilter, yearFilter, mode)
+    } else {
+      await exportToPPTX(pendingPptxExport.report, mode)
+    }
+    setPptxModeDialogOpen(false)
+    setPendingPptxExport(null)
+  }
+
   return (
     <AdminTablePage
       title="Weekly Reports"
@@ -305,7 +389,7 @@ export function WeeklyReportsContent({
               </Button>
               <Button
                 variant="outline"
-                onClick={() => exportAllToPPTX(filteredReports, weekFilter, yearFilter)}
+                onClick={openAllPptxModeDialog}
                 className="gap-2 border-orange-200 text-orange-600 hover:bg-orange-50 hover:text-orange-700 dark:border-orange-900/30 dark:hover:bg-orange-950/20"
               >
                 <Presentation className="h-4 w-4" /> <span className="hidden sm:inline">PPTX</span>
@@ -334,56 +418,87 @@ export function WeeklyReportsContent({
         </div>
       }
       filters={
-        <div className="mb-6 flex flex-col items-end justify-between gap-4 md:flex-row">
-          <div className="w-full max-w-md flex-1">
-            <Label className="mb-1.5 block text-xs font-semibold">Search Content</Label>
-            <div className="relative">
-              <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-              <Input
-                placeholder="Search..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
-              />
+        <div className="mb-6 space-y-3">
+          <div className="flex flex-col items-end justify-between gap-4 md:flex-row">
+            <div className="w-full max-w-md flex-1">
+              <Label className="mb-1.5 block text-xs font-semibold">Search Content</Label>
+              <div className="relative">
+                <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+                <Input
+                  placeholder="Search..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+            </div>
+            <div className="flex w-full flex-wrap items-end gap-3 md:w-auto">
+              <div className="w-24">
+                <Label className="mb-1.5 block text-xs font-semibold">Week</Label>
+                <Input
+                  type="number"
+                  value={weekFilter}
+                  onChange={(e) => setWeekFilter(parseInt(e.target.value) || weekFilter)}
+                />
+              </div>
+              <div className="w-28">
+                <Label className="mb-1.5 block text-xs font-semibold">Year</Label>
+                <Input
+                  type="number"
+                  value={yearFilter}
+                  onChange={(e) => setYearFilter(parseInt(e.target.value) || yearFilter)}
+                />
+              </div>
+              <div className="min-w-[12rem] flex-1 md:flex-none">
+                <Label className="mb-1.5 block text-xs font-semibold">Department</Label>
+                <Select value={deptFilter} onValueChange={setDeptFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All Departments" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Every Department</SelectItem>
+                    {initialDepartments.map((dept) => (
+                      <SelectItem key={dept} value={dept}>
+                        {dept}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button variant="outline" size="icon" onClick={loadReports} disabled={loading} className="shrink-0">
+                <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
+              </Button>
             </div>
           </div>
-          <div className="flex w-full flex-wrap items-end gap-3 md:w-auto">
-            <div className="w-24">
-              <Label className="mb-1.5 block text-xs font-semibold">Week</Label>
-              <Input
-                type="number"
-                value={weekFilter}
-                onChange={(e) => setWeekFilter(parseInt(e.target.value) || weekFilter)}
-              />
+
+          {isAdminRole && (
+            <div className="bg-muted/30 rounded-lg border p-3">
+              <p className="mb-2 text-xs font-semibold">Meeting Date Lock Window (selected week)</p>
+              <div className="flex flex-col gap-3 md:flex-row md:items-end">
+                <div className="w-full max-w-[220px]">
+                  <Label className="mb-1.5 block text-xs font-semibold">Meeting Date</Label>
+                  <Input type="date" value={meetingDateInput} onChange={(e) => setMeetingDateInput(e.target.value)} />
+                </div>
+                <div className="w-full max-w-[180px]">
+                  <Label className="mb-1.5 block text-xs font-semibold">Grace Hours</Label>
+                  <Input
+                    type="number"
+                    value={meetingGraceHours}
+                    onChange={(e) => setMeetingGraceHours(parseInt(e.target.value) || 0)}
+                    min={0}
+                    max={168}
+                  />
+                </div>
+                <Button onClick={saveMeetingWindow} disabled={savingMeetingWindow} className="gap-2">
+                  {savingMeetingWindow && <Loader2 className="h-4 w-4 animate-spin" />}
+                  Save Meeting Window
+                </Button>
+              </div>
+              <p className="text-muted-foreground mt-2 text-[11px]">
+                Use this when meeting shifts from Monday (e.g., public holiday to Tuesday).
+              </p>
             </div>
-            <div className="w-28">
-              <Label className="mb-1.5 block text-xs font-semibold">Year</Label>
-              <Input
-                type="number"
-                value={yearFilter}
-                onChange={(e) => setYearFilter(parseInt(e.target.value) || yearFilter)}
-              />
-            </div>
-            <div className="min-w-[12rem] flex-1 md:flex-none">
-              <Label className="mb-1.5 block text-xs font-semibold">Department</Label>
-              <Select value={deptFilter} onValueChange={setDeptFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All Departments" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Every Department</SelectItem>
-                  {initialDepartments.map((dept) => (
-                    <SelectItem key={dept} value={dept}>
-                      {dept}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <Button variant="outline" size="icon" onClick={loadReports} disabled={loading} className="shrink-0">
-              <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
-            </Button>
-          </div>
+          )}
         </div>
       }
     >
@@ -497,7 +612,7 @@ export function WeeklyReportsContent({
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7 text-amber-600 hover:text-amber-700"
-                            onClick={() => exportToPPTX(report)}
+                            onClick={() => openSinglePptxModeDialog(report)}
                             title="Deck"
                           >
                             <Presentation className="h-3.5 w-3.5" />
@@ -604,6 +719,31 @@ export function WeeklyReportsContent({
         onSuccess={loadReports}
         currentUser={currentUser}
       />
+
+      <Dialog
+        open={pptxModeDialogOpen}
+        onOpenChange={(open) => {
+          setPptxModeDialogOpen(open)
+          if (!open) setPendingPptxExport(null)
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Select PPTX Mode</DialogTitle>
+            <DialogDescription>
+              Compact uses the previous pushed layout. Full uses the current expanded layout.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3">
+            <Button variant="outline" onClick={() => runPptxExport("compact")} className="justify-start">
+              Compact (Previous)
+            </Button>
+            <Button onClick={() => runPptxExport("full")} className="justify-start">
+              Full (Current)
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </AdminTablePage>
   )
 }

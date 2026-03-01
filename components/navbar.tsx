@@ -169,7 +169,9 @@ export function Navbar({ user, canAccessAdmin = false, isAdminMode = false }: Na
 
         {/* Right side - search, notifications and user menu */}
         <div className="flex flex-1 items-center justify-end gap-2 overflow-visible px-2 sm:gap-4 sm:px-4 lg:px-8">
-          <div className="hidden max-w-md flex-1 items-center gap-4 md:flex">{isAdminMode && <UniversalSearch />}</div>
+          <div className="hidden max-w-md flex-1 items-center gap-4 md:flex">
+            {isAdminMode && <UniversalSearch isAdminMode />}
+          </div>
           <div className="hidden items-center gap-4 overflow-visible md:flex">
             <NotificationBell isAdmin={isAdminMode} />
             <ThemeToggle />
