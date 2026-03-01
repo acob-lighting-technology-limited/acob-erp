@@ -68,6 +68,7 @@ export default function WeeklyReportsPortal() {
   const [pendingPptxExport, setPendingPptxExport] = useState<
     { kind: "single"; report: WeeklyReport } | { kind: "all" } | null
   >(null)
+  const [isFilteredWeekLocked, setIsFilteredWeekLocked] = useState(false)
 
   const supabase = createClient()
 
@@ -78,6 +79,14 @@ export default function WeeklyReportsPortal() {
   useEffect(() => {
     if (profile) loadReports()
   }, [profile, weekFilter, yearFilter, deptFilter])
+
+  useEffect(() => {
+    const loadFilteredWeekLock = async () => {
+      const state = await fetchWeeklyReportLockState(supabase, weekFilter, yearFilter)
+      setIsFilteredWeekLocked(state.isLocked)
+    }
+    loadFilteredWeekLock()
+  }, [weekFilter, yearFilter])
 
   async function fetchInitialData() {
     try {
@@ -377,7 +386,7 @@ export default function WeeklyReportsPortal() {
                               <Presentation className="h-3.5 w-3.5" />
                             </Button>
                           </div>
-                          {hasManageRights && (
+                          {hasManageRights && !isFilteredWeekLocked && (
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button variant="ghost" size="icon" className="h-8 w-8">

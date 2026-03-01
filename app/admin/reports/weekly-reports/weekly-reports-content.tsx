@@ -38,7 +38,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuSeparator,
-  DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu"
 import Link from "next/link"
 import {
@@ -101,6 +100,7 @@ export function WeeklyReportsContent({
   )
   const [meetingGraceHours, setMeetingGraceHours] = useState(24)
   const [savingMeetingWindow, setSavingMeetingWindow] = useState(false)
+  const [isFilteredWeekLocked, setIsFilteredWeekLocked] = useState(false)
 
   const supabase = createClient()
   const isLead = currentUser.role === "lead"
@@ -157,6 +157,14 @@ export function WeeklyReportsContent({
   }, [weekFilter, yearFilter, deptFilter])
 
   useEffect(() => {
+    const loadFilteredWeekLock = async () => {
+      const state = await fetchWeeklyReportLockState(supabase, weekFilter, yearFilter)
+      setIsFilteredWeekLocked(state.isLocked)
+    }
+    loadFilteredWeekLock()
+  }, [weekFilter, yearFilter])
+
+  useEffect(() => {
     const loadMeetingWindow = async () => {
       const state = await fetchWeeklyReportLockState(supabase, weekFilter, yearFilter)
       setMeetingDateInput(state.meetingDate || getDefaultMeetingDateIso(weekFilter, yearFilter))
@@ -206,8 +214,8 @@ export function WeeklyReportsContent({
       toast.error("Meeting date is required")
       return
     }
-    if (meetingGraceHours < 0 || meetingGraceHours > 168) {
-      toast.error("Grace hours must be between 0 and 168")
+    if (meetingGraceHours < 0 || meetingGraceHours > 24) {
+      toast.error("Grace hours must be between 0 and 24")
       return
     }
 
@@ -486,7 +494,7 @@ export function WeeklyReportsContent({
                     value={meetingGraceHours}
                     onChange={(e) => setMeetingGraceHours(parseInt(e.target.value) || 0)}
                     min={0}
-                    max={168}
+                    max={24}
                   />
                 </div>
                 <Button onClick={saveMeetingWindow} disabled={savingMeetingWindow} className="gap-2">
@@ -618,43 +626,38 @@ export function WeeklyReportsContent({
                             <Presentation className="h-3.5 w-3.5" />
                           </Button>
                         </div>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              disabled={!canMutateReport(report)}
-                              onClick={() => {
-                                if (!canMutateReport(report)) {
-                                  toast.error("You can only edit your own reports")
-                                  return
-                                }
-                                setEditingReport(report)
-                                setIsAdminDialogOpen(true)
-                              }}
-                            >
-                              <Edit2 className="mr-2 h-4 w-4" /> Edit Report
-                            </DropdownMenuItem>
-                            <Link
-                              href={`/portal/reports/weekly-reports/new?week=${report.week_number}&year=${report.year}&dept=${report.department}`}
-                            >
-                              <DropdownMenuItem>
-                                <ExternalLink className="mr-2 h-4 w-4" /> Portal View
+                        {!isFilteredWeekLocked && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                disabled={!canMutateReport(report)}
+                                onClick={() => {
+                                  if (!canMutateReport(report)) {
+                                    toast.error("You can only edit your own reports")
+                                    return
+                                  }
+                                  setEditingReport(report)
+                                  setIsAdminDialogOpen(true)
+                                }}
+                              >
+                                <Edit2 className="mr-2 h-4 w-4" /> Edit Report
                               </DropdownMenuItem>
-                            </Link>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              disabled={!canMutateReport(report)}
-                              className="text-red-600 focus:bg-red-50 focus:text-red-600"
-                              onClick={() => handleDelete(report.id)}
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" /> Purge Record
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                disabled={!canMutateReport(report)}
+                                className="text-red-600 focus:bg-red-50 focus:text-red-600"
+                                onClick={() => handleDelete(report.id)}
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" /> Purge Record
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
