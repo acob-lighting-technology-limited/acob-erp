@@ -9,7 +9,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { Loader2, ListOrdered, Sparkles } from "lucide-react"
-import { getCurrentISOWeek } from "@/lib/utils"
+import { getCurrentOfficeWeek } from "@/lib/meeting-week"
+import { fetchWeeklyReportLockState, type WeeklyReportLockState } from "@/lib/weekly-report-lock"
 
 interface WeeklyReport {
   id: string
@@ -40,13 +41,15 @@ export function WeeklyReportDialog({ isOpen, onClose, onSuccess, initialData }: 
   const [profile, setProfile] = useState<any>(null)
   const [currentActions, setCurrentActions] = useState<any[]>([])
   const [isNextWeekActive, setIsNextWeekActive] = useState(false)
+  const [lockState, setLockState] = useState<WeeklyReportLockState | null>(null)
 
   const [id, setId] = useState<string | null>(null)
+  const currentOfficeWeek = getCurrentOfficeWeek()
   const [formData, setFormData] = useState({
     user_id: "",
     department: "",
-    week_number: getCurrentISOWeek(),
-    year: new Date().getFullYear(),
+    week_number: currentOfficeWeek.week,
+    year: currentOfficeWeek.year,
     work_done: "",
     tasks_new_week: "",
     challenges: "",
@@ -61,6 +64,14 @@ export function WeeklyReportDialog({ isOpen, onClose, onSuccess, initialData }: 
     }
   }, [isOpen, initialData])
 
+  useEffect(() => {
+    const fetchLockState = async () => {
+      const state = await fetchWeeklyReportLockState(supabase, formData.week_number, formData.year)
+      setLockState(state)
+    }
+    fetchLockState()
+  }, [formData.week_number, formData.year])
+
   async function setupDialog() {
     setLoading(true)
     try {
@@ -71,8 +82,8 @@ export function WeeklyReportDialog({ isOpen, onClose, onSuccess, initialData }: 
       const { data: p } = await supabase.from("profiles").select("*").eq("id", user.id).single()
       setProfile(p)
 
-      const week = initialData?.week || getCurrentISOWeek()
-      const year = initialData?.year || new Date().getFullYear()
+      const week = initialData?.week || currentOfficeWeek.week
+      const year = initialData?.year || currentOfficeWeek.year
       const dept = initialData?.dept || p?.department || ""
 
       // Fetch existing report
@@ -126,6 +137,13 @@ export function WeeklyReportDialog({ isOpen, onClose, onSuccess, initialData }: 
   }
 
   const handleSubmit = async () => {
+    const state = await fetchWeeklyReportLockState(supabase, formData.week_number, formData.year)
+    setLockState(state)
+    if (state.isLocked) {
+      toast.error("This report week is locked. Contact admin for a temporary unlock.")
+      return
+    }
+
     if (!formData.work_done.trim()) {
       toast.error("Please describe work done")
       return
@@ -230,6 +248,11 @@ export function WeeklyReportDialog({ isOpen, onClose, onSuccess, initialData }: 
             Progress update for <span className="text-primary font-semibold">{formData.department}</span> — Week{" "}
             {formData.week_number}, {formData.year}
           </DialogDescription>
+          {lockState?.isLocked && (
+            <p className="text-destructive text-xs">
+              Locked after meeting date {lockState.meetingDate}. Editing is now closed for this week.
+            </p>
+          )}
         </DialogHeader>
 
         {loading ? (
@@ -273,7 +296,7 @@ export function WeeklyReportDialog({ isOpen, onClose, onSuccess, initialData }: 
           <Button variant="outline" onClick={onClose} disabled={saving}>
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={saving || loading}>
+          <Button onClick={handleSubmit} disabled={saving || loading || !!lockState?.isLocked}>
             {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {id ? "Update Report" : "Submit Report"}
           </Button>

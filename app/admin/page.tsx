@@ -96,6 +96,8 @@ const activityRouteMap: Record<string, string> = {
   payment_documents: "/admin/finance/payments",
   help_desk_ticket: "/admin/help-desk",
   help_desk_tickets: "/admin/help-desk",
+  correspondence_record: "/admin/correspondence",
+  correspondence_records: "/admin/correspondence",
   asset: "/admin/assets",
   assets: "/admin/assets",
   asset_assignment: "/admin/assets",
@@ -129,6 +131,14 @@ const primaryModules: ModuleAction[] = [
     href: "/admin/help-desk",
     icon: ClipboardList,
     color: "bg-emerald-500",
+    roles: ["super_admin", "admin", "lead"],
+  },
+  {
+    title: "Correspondence",
+    description: "Track incoming/outgoing letters and approval workflow",
+    href: "/admin/correspondence",
+    icon: FileText,
+    color: "bg-violet-500",
     roles: ["super_admin", "admin", "lead"],
   },
   {

@@ -10,7 +10,8 @@ import { SearchableSelect } from "@/components/ui/searchable-select"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { Loader2, ListOrdered, Sparkles } from "lucide-react"
-import { getCurrentISOWeek } from "@/lib/utils"
+import { getCurrentOfficeWeek } from "@/lib/meeting-week"
+import { fetchWeeklyReportLockState, type WeeklyReportLockState } from "@/lib/weekly-report-lock"
 
 interface WeeklyReport {
   id: string
@@ -47,11 +48,13 @@ export function WeeklyReportAdminDialog({
   const [departments, setDepartments] = useState<string[]>([])
   const [currentActions, setCurrentActions] = useState<any[]>([])
   const [isNextWeekActive, setIsNextWeekActive] = useState(false)
+  const [lockState, setLockState] = useState<WeeklyReportLockState | null>(null)
+  const currentOfficeWeek = getCurrentOfficeWeek()
   const [formData, setFormData] = useState({
     user_id: "",
     department: "",
-    week_number: getCurrentISOWeek(),
-    year: new Date().getFullYear(),
+    week_number: currentOfficeWeek.week,
+    year: currentOfficeWeek.year,
     work_done: "",
     tasks_new_week: "",
     challenges: "",
@@ -77,8 +80,54 @@ export function WeeklyReportAdminDialog({
   }, [currentUser.department, isLead])
 
   useEffect(() => {
+    const fetchLockState = async () => {
+      const state = await fetchWeeklyReportLockState(supabase, formData.week_number, formData.year)
+      setLockState(state)
+    }
+    fetchLockState()
+  }, [formData.week_number, formData.year])
+
+  useEffect(() => {
     const fetchStatus = async () => {
       if (!formData.department) return
+
+      // For "Add Report", prefer existing weekly report content for this dept/week/year.
+      // If none exists, fall back to syncing tasks from action items.
+      let hasExistingWeeklyReport = false
+      if (!report) {
+        const { data: existingReport } = await supabase
+          .from("weekly_reports")
+          .select("user_id, work_done, tasks_new_week, challenges, status")
+          .eq("department", formData.department)
+          .eq("week_number", formData.week_number)
+          .eq("year", formData.year)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        if (existingReport) {
+          hasExistingWeeklyReport = true
+          setFormData((prev) => ({
+            ...prev,
+            user_id: existingReport.user_id || prev.user_id || currentUser.id || "",
+            work_done: existingReport.work_done || "",
+            tasks_new_week: existingReport.tasks_new_week || "",
+            challenges: existingReport.challenges || "",
+            status: existingReport.status || prev.status,
+          }))
+        } else {
+          // Critical reset: moving to a week with no report should not keep stale text
+          setFormData((prev) => ({
+            ...prev,
+            user_id: currentUser.id || prev.user_id || "",
+            work_done: "",
+            tasks_new_week: "",
+            challenges: "",
+            status: "submitted",
+          }))
+        }
+      }
+
       const { data } = await supabase
         .from("action_items")
         .select("title, status")
@@ -88,7 +137,8 @@ export function WeeklyReportAdminDialog({
 
       if (data) {
         setIsNextWeekActive(data.some((a) => a.status !== "pending"))
-        if (data.length > 0 && !report) {
+        if (data.length > 0 && !report && !hasExistingWeeklyReport) {
+          // Only auto-sync tasks from action items when there is no existing weekly report to mirror.
           const syncedText = data.map((a, i) => `${i + 1}. ${a.title}`).join("\n")
           setFormData((prev) => ({ ...prev, tasks_new_week: syncedText }))
         }
@@ -106,7 +156,7 @@ export function WeeklyReportAdminDialog({
     }
     fetchStatus()
     fetchCurrent()
-  }, [formData.department, formData.week_number, formData.year])
+  }, [currentUser.id, formData.department, formData.week_number, formData.year, report])
 
   useEffect(() => {
     if (report) {
@@ -125,14 +175,23 @@ export function WeeklyReportAdminDialog({
         ...prev,
         user_id: currentUser.id || "",
         department: isLead ? currentUser.department || "" : "",
+        week_number: currentOfficeWeek.week,
+        year: currentOfficeWeek.year,
         work_done: "",
         tasks_new_week: "",
         challenges: "",
       }))
     }
-  }, [currentUser.department, currentUser.id, isLead, report, isOpen])
+  }, [currentUser.department, currentUser.id, currentOfficeWeek.week, currentOfficeWeek.year, isLead, report, isOpen])
 
   const handleSubmit = async () => {
+    const state = await fetchWeeklyReportLockState(supabase, formData.week_number, formData.year)
+    setLockState(state)
+    if (state.isLocked) {
+      toast.error("This report week is locked. Ask admin to set a temporary unlock window.")
+      return
+    }
+
     if (!formData.department || !formData.work_done) {
       toast.error("Required: Department and Work Done")
       return
@@ -247,6 +306,11 @@ export function WeeklyReportAdminDialog({
           <DialogDescription>
             {report ? "Update this weekly report's details" : "Add a new departmental weekly report"}
           </DialogDescription>
+          {lockState?.isLocked && (
+            <p className="text-destructive text-xs">
+              Locked after meeting date {lockState.meetingDate}. Editing is now closed for this week.
+            </p>
+          )}
         </DialogHeader>
 
         <div className="grid gap-6 py-4">
@@ -316,7 +380,7 @@ export function WeeklyReportAdminDialog({
           <Button variant="outline" onClick={onClose} disabled={loading}>
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={loading}>
+          <Button onClick={handleSubmit} disabled={loading || !!lockState?.isLocked}>
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {report ? "Update Report" : "Create Report"}
           </Button>

@@ -103,6 +103,13 @@ const adminNavigation = [
   },
   {
     section: "operations",
+    name: "Correspondence",
+    href: "/admin/correspondence",
+    icon: FileText,
+    roles: ["super_admin", "admin", "lead"],
+  },
+  {
+    section: "operations",
     name: "Reports",
     href: "/admin/reports",
     icon: FileBarChart,

@@ -31,6 +31,10 @@ interface SearchResult {
   metadata?: Record<string, any>
 }
 
+interface UniversalSearchProps {
+  isAdminMode?: boolean
+}
+
 const typeIcons = {
   profile: User,
   device: Laptop,
@@ -49,7 +53,7 @@ const typeLabels = {
   feedback: "Feedback",
 }
 
-export function UniversalSearch() {
+export function UniversalSearch({ isAdminMode = false }: UniversalSearchProps) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState("")
   const [results, setResults] = useState<SearchResult[]>([])
@@ -117,29 +121,48 @@ export function UniversalSearch() {
     <>
       <Button
         variant="outline"
-        className="text-muted-foreground relative h-10 w-full justify-start text-sm sm:pr-12 md:w-64 lg:w-80"
+        className={cn(
+          "text-muted-foreground relative h-10 w-full justify-start text-sm sm:pr-12 md:w-64 lg:w-80",
+          isAdminMode &&
+            "border-amber-300/70 bg-amber-50/60 text-amber-900 hover:bg-amber-100/70 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200 dark:hover:bg-amber-900/40"
+        )}
         onClick={() => setOpen(true)}
       >
-        <Search className="mr-2 h-4 w-4" />
+        <Search className={cn("mr-2 h-4 w-4", isAdminMode && "text-amber-700 dark:text-amber-300")} />
         <span>Search anything...</span>
-        <kbd className="bg-muted pointer-events-none absolute top-1.5 right-1.5 hidden h-6 items-center gap-1 rounded border px-1.5 font-mono text-[10px] font-medium opacity-100 select-none sm:flex">
+        <kbd
+          className={cn(
+            "bg-muted pointer-events-none absolute top-1.5 right-1.5 hidden h-6 items-center gap-1 rounded border px-1.5 font-mono text-[10px] font-medium opacity-100 select-none sm:flex",
+            isAdminMode &&
+              "border-amber-300/60 bg-amber-100/70 text-amber-900 dark:border-amber-800 dark:bg-amber-900/60 dark:text-amber-100"
+          )}
+        >
           <span className="text-xs">⌘</span>K
         </kbd>
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-2xl p-0">
+        <DialogContent className={cn("max-w-2xl p-0", isAdminMode && "border-amber-300/70 dark:border-amber-900")}>
           <DialogHeader className="px-6 pt-6">
-            <DialogTitle>Search</DialogTitle>
+            <DialogTitle className={cn(isAdminMode && "text-amber-900 dark:text-amber-200")}>Search</DialogTitle>
           </DialogHeader>
           <div className="px-6 pb-4">
             <div className="relative">
-              <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+              <Search
+                className={cn(
+                  "text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2",
+                  isAdminMode && "text-amber-700 dark:text-amber-300"
+                )}
+              />
               <Input
                 placeholder="Search employee, devices, assets, tasks, documentation, feedback..."
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                className="pl-9"
+                className={cn(
+                  "pl-9",
+                  isAdminMode &&
+                    "border-amber-300/80 focus-visible:ring-amber-500 dark:border-amber-800 dark:focus-visible:ring-amber-400"
+                )}
                 autoFocus
               />
               {query && (
@@ -184,17 +207,31 @@ export function UniversalSearch() {
                       key={`${result.type}-${result.id}`}
                       onClick={() => handleResultClick(result)}
                       className={cn(
-                        "flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors",
-                        "hover:bg-accent hover:text-accent-foreground"
+                        "group flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors",
+                        isAdminMode
+                          ? "border-amber-200/80 hover:border-amber-400/80 hover:bg-amber-50 dark:border-amber-900 dark:hover:border-amber-700 dark:hover:bg-amber-950/40"
+                          : "hover:bg-accent hover:text-accent-foreground"
                       )}
                     >
-                      <div className="bg-muted flex h-10 w-10 items-center justify-center rounded-md">
+                      <div
+                        className={cn(
+                          "bg-muted flex h-10 w-10 items-center justify-center rounded-md",
+                          isAdminMode && "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"
+                        )}
+                      >
                         <Icon className="h-5 w-5" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <p className="truncate font-medium">{result.title}</p>
-                          <Badge variant="outline" className="text-xs">
+                        <div className="mb-0.5 flex items-center gap-2">
+                          <p className="truncate text-sm font-semibold">{result.title}</p>
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "text-[11px]",
+                              isAdminMode &&
+                                "border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-200"
+                            )}
+                          >
                             {typeLabels[result.type]}
                           </Badge>
                         </div>
@@ -203,6 +240,14 @@ export function UniversalSearch() {
                           <p className="text-muted-foreground mt-1 line-clamp-1 text-xs">{result.description}</p>
                         )}
                       </div>
+                      <span
+                        className={cn(
+                          "text-muted-foreground text-xs opacity-0 transition-opacity group-hover:opacity-100",
+                          isAdminMode && "text-amber-700 dark:text-amber-300"
+                        )}
+                      >
+                        Open
+                      </span>
                     </button>
                   )
                 })}

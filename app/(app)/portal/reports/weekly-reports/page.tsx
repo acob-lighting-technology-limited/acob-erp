@@ -12,6 +12,7 @@ import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 import { getCurrentOfficeWeek } from "@/lib/meeting-week"
 import { toast } from "sonner"
+import { fetchWeeklyReportLockState } from "@/lib/weekly-report-lock"
 import {
   FileBarChart,
   FileSearch,
@@ -34,6 +35,7 @@ import {
 } from "lucide-react"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { WeeklyReportDialog } from "@/components/portal/reports/weekly-report-dialog"
 import {
   exportToPDF,
@@ -44,6 +46,7 @@ import {
   exportAllToPPTX,
   autoNumberLines,
   sortReportsByDepartment,
+  type WeeklyPptxMode,
   type WeeklyReport,
 } from "@/lib/export-utils"
 import { format } from "date-fns"
@@ -61,6 +64,10 @@ export default function WeeklyReportsPortal() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [selectedReportParams, setSelectedReportParams] = useState<any>(null)
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
+  const [pptxModeDialogOpen, setPptxModeDialogOpen] = useState(false)
+  const [pendingPptxExport, setPendingPptxExport] = useState<
+    { kind: "single"; report: WeeklyReport } | { kind: "all" } | null
+  >(null)
 
   const supabase = createClient()
 
@@ -122,6 +129,14 @@ export default function WeeklyReportsPortal() {
   }
 
   const handleDelete = async (id: string) => {
+    const target = reports.find((r) => r.id === id)
+    if (target) {
+      const lock = await fetchWeeklyReportLockState(supabase, target.week_number, target.year)
+      if (lock.isLocked) {
+        toast.error("This report week is locked. Delete is no longer allowed.")
+        return
+      }
+    }
     if (!confirm("Are you sure? Delete is permanent.")) return
     try {
       const { error } = await supabase.from("weekly_reports").delete().eq("id", id)
@@ -145,6 +160,27 @@ export default function WeeklyReportsPortal() {
       r.department.toLowerCase().includes(searchQuery.toLowerCase()) ||
       r.work_done?.toLowerCase().includes(searchQuery.toLowerCase())
   )
+
+  const openAllPptxModeDialog = () => {
+    setPendingPptxExport({ kind: "all" })
+    setPptxModeDialogOpen(true)
+  }
+
+  const openSinglePptxModeDialog = (report: WeeklyReport) => {
+    setPendingPptxExport({ kind: "single", report })
+    setPptxModeDialogOpen(true)
+  }
+
+  const runPptxExport = async (mode: WeeklyPptxMode) => {
+    if (!pendingPptxExport) return
+    if (pendingPptxExport.kind === "all") {
+      await exportAllToPPTX(filteredReports, weekFilter, yearFilter, mode)
+    } else {
+      await exportToPPTX(pendingPptxExport.report, mode)
+    }
+    setPptxModeDialogOpen(false)
+    setPendingPptxExport(null)
+  }
 
   const isLead = profile?.role === "lead" || profile?.role === "admin" || profile?.role === "super_admin"
   const isAdmin = profile?.role === "admin" || profile?.role === "super_admin"
@@ -176,7 +212,7 @@ export default function WeeklyReportsPortal() {
               </Button>
               <Button
                 variant="outline"
-                onClick={() => exportAllToPPTX(filteredReports, weekFilter, yearFilter)}
+                onClick={openAllPptxModeDialog}
                 className="gap-2 border-orange-200 text-orange-600 hover:bg-orange-50 hover:text-orange-700 dark:border-orange-900/30 dark:hover:bg-orange-950/20"
               >
                 <Presentation className="h-4 w-4" /> <span className="hidden sm:inline">PPTX</span>
@@ -335,7 +371,7 @@ export default function WeeklyReportsPortal() {
                               variant="ghost"
                               size="icon"
                               className="h-7 w-7 text-amber-600 hover:text-amber-700"
-                              onClick={() => exportToPPTX(report)}
+                              onClick={() => openSinglePptxModeDialog(report)}
                               title="PPTX"
                             >
                               <Presentation className="h-3.5 w-3.5" />
@@ -438,6 +474,31 @@ export default function WeeklyReportsPortal() {
         onSuccess={() => loadReports()}
         initialData={selectedReportParams}
       />
+
+      <Dialog
+        open={pptxModeDialogOpen}
+        onOpenChange={(open) => {
+          setPptxModeDialogOpen(open)
+          if (!open) setPendingPptxExport(null)
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Select PPTX Mode</DialogTitle>
+            <DialogDescription>
+              Compact uses the previous pushed layout. Full uses the current expanded layout.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3">
+            <Button variant="outline" onClick={() => runPptxExport("compact")} className="justify-start">
+              Compact (Previous)
+            </Button>
+            <Button onClick={() => runPptxExport("full")} className="justify-start">
+              Full (Current)
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </AdminTablePage>
   )
 }

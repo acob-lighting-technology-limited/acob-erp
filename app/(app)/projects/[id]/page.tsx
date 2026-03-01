@@ -122,7 +122,25 @@ export default function ProjectDetailPage() {
 
   const loadProjectData = async () => {
     try {
-      await Promise.all([loadProject(), loadMembers(), loadItems(), loadUpdates(), loadTasks()])
+      const results = await Promise.allSettled([loadProject(), loadMembers(), loadItems(), loadUpdates(), loadTasks()])
+      const [projectResult, membersResult, itemsResult, updatesResult, tasksResult] = results
+
+      if (projectResult.status === "rejected") {
+        throw projectResult.reason
+      }
+
+      const hasSecondaryError = [membersResult, itemsResult, updatesResult, tasksResult].some(
+        (r) => r.status === "rejected"
+      )
+      if (hasSecondaryError) {
+        console.warn("Some project sections failed to load", {
+          members: membersResult,
+          items: itemsResult,
+          updates: updatesResult,
+          tasks: tasksResult,
+        })
+        toast.warning("Some project sections could not be loaded")
+      }
     } catch (error) {
       console.error("Error loading project data:", error)
       toast.error("Failed to load project data")
