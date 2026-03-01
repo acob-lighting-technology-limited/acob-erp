@@ -185,6 +185,10 @@
     overflow-x: clip;
     width: 100%;
     position: relative;
+    /* Fix: Radix UI Dialog sets pointer-events:none on <body> when open and
+       sometimes fails to remove it on close (print dialogs, downloads, quick
+       open/close). The dialog overlay itself blocks clicks, so this is safe. */
+    pointer-events: auto !important;
   }
 
   /* Prevent horizontal scroll on all containers */
