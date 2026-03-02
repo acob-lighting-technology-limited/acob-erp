@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { ChevronDown, ChevronUp } from "lucide-react"
 import type { CorrespondenceRecord } from "@/types/correspondence"
 
 interface EmployeeOption {
@@ -41,6 +42,7 @@ export function AdminCorrespondenceContent({
   const [assignments, setAssignments] = useState<Record<string, string>>({})
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [codeForm, setCodeForm] = useState({ department_name: "", department_code: "" })
+  const [showMappings, setShowMappings] = useState(false)
 
   const filteredRecords = useMemo(() => {
     if (statusFilter === "all") return records
@@ -244,15 +246,50 @@ export function AdminCorrespondenceContent({
             </div>
           </form>
 
-          <div className="text-muted-foreground text-sm">
-            Active mappings: {departmentCodes.filter((item) => item.is_active).length}
+          <div className="space-y-3">
+            <Button
+              type="button"
+              variant="ghost"
+              className="text-muted-foreground h-8 px-0 text-sm"
+              onClick={() => setShowMappings((prev) => !prev)}
+            >
+              Active mappings: {departmentCodes.filter((item) => item.is_active).length}
+              {showMappings ? <ChevronUp className="ml-2 h-4 w-4" /> : <ChevronDown className="ml-2 h-4 w-4" />}
+            </Button>
+
+            {showMappings && (
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Department</TableHead>
+                      <TableHead>Code</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {departmentCodes.map((item) => (
+                      <TableRow key={item.department_name}>
+                        <TableCell className="font-medium">{item.department_name}</TableCell>
+                        <TableCell>{item.department_code}</TableCell>
+                        <TableCell>
+                          <Badge variant={item.is_active ? "default" : "outline"}>
+                            {item.is_active ? "Active" : "Inactive"}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Correspondence Queue</CardTitle>
+          <CardTitle>Reference Generator Queue</CardTitle>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-[220px]">
               <SelectValue />

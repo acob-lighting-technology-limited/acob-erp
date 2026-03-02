@@ -6,9 +6,10 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
-import { FileText, Plus, Edit2, Trash2, Save, Eye, EyeOff, Search, Tag } from "lucide-react"
+import { FileText, Plus, Edit2, Trash2, Save, Eye, EyeOff, Search, Tag, LayoutGrid, List } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -29,6 +30,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import type { Documentation } from "./page"
 import { AppTablePage } from "@/components/app/app-table-page"
+import { MarkdownContent } from "@/components/ui/markdown-content"
 
 const CATEGORIES = [
   "Project Documentation",
@@ -50,10 +52,12 @@ export function DocumentationContent({ initialDocs, userId }: DocumentationConte
   const [filteredDocs, setFilteredDocs] = useState<Documentation[]>(initialDocs)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
   const [selectedDoc, setSelectedDoc] = useState<Documentation | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [categoryFilter, setCategoryFilter] = useState("all")
+  const [viewMode, setViewMode] = useState<"list" | "card">("list")
   const [formData, setFormData] = useState({
     title: "",
     content: "",
@@ -224,6 +228,11 @@ export function DocumentationContent({ initialDocs, userId }: DocumentationConte
     }
   }
 
+  const handleViewDocument = (doc: Documentation) => {
+    setSelectedDoc(doc)
+    setIsViewDialogOpen(true)
+  }
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-US", {
       month: "short",
@@ -240,16 +249,43 @@ export function DocumentationContent({ initialDocs, userId }: DocumentationConte
     draft: docs.filter((d) => d.is_draft).length,
   }
 
+  const getStatusColor = (isDraft: boolean) =>
+    isDraft
+      ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
+      : "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+
   return (
     <AppTablePage
       title="My Documentation"
       description="Create and manage your work documentation"
       icon={FileText}
       actions={
-        <Button onClick={openCreateDialog} className="gap-2">
-          <Plus className="h-4 w-4" />
-          New Document
-        </Button>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center rounded-lg border p-1">
+            <Button
+              variant={viewMode === "list" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setViewMode("list")}
+              className="gap-1 sm:gap-2"
+            >
+              <List className="h-4 w-4" />
+              <span className="hidden sm:inline">List</span>
+            </Button>
+            <Button
+              variant={viewMode === "card" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setViewMode("card")}
+              className="gap-1 sm:gap-2"
+            >
+              <LayoutGrid className="h-4 w-4" />
+              <span className="hidden sm:inline">Card</span>
+            </Button>
+          </div>
+          <Button onClick={openCreateDialog} className="gap-2">
+            <Plus className="h-4 w-4" />
+            New Document
+          </Button>
+        </div>
       }
       stats={
         <div className="grid gap-4 md:grid-cols-3">
@@ -321,62 +357,152 @@ export function DocumentationContent({ initialDocs, userId }: DocumentationConte
     >
       {/* Documentation List */}
       {filteredDocs.length > 0 ? (
-        <div className="grid gap-4 md:grid-cols-2">
-          {filteredDocs.map((doc) => (
-            <Card key={doc.id} className="border-2 shadow-md transition-all hover:shadow-lg">
-              <CardHeader className="from-primary/5 to-background border-b bg-gradient-to-r">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1">
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                      {doc.title}
-                      {doc.is_draft && (
-                        <Badge variant="outline" className="bg-yellow-50 text-yellow-700 dark:bg-yellow-900/30">
-                          Draft
-                        </Badge>
-                      )}
-                    </CardTitle>
-                    {doc.category && <CardDescription className="mt-1">{doc.category}</CardDescription>}
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4 p-6">
-                <p className="text-muted-foreground line-clamp-3 text-sm">{doc.content}</p>
-
-                {doc.tags && doc.tags.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
-                    {doc.tags.map((tag, i) => (
-                      <Badge key={i} variant="outline" className="gap-1">
-                        <Tag className="h-3 w-3" />
-                        {tag}
-                      </Badge>
+        viewMode === "list" ? (
+          <Card className="border-2">
+            <CardContent className="p-6">
+              <div className="table-responsive">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12">#</TableHead>
+                      <TableHead>Title</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Updated</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredDocs.map((doc, index) => (
+                      <TableRow key={doc.id}>
+                        <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
+                        <TableCell className="font-medium">{doc.title}</TableCell>
+                        <TableCell>
+                          {doc.category ? (
+                            <Badge variant="outline" className="text-xs">
+                              {doc.category}
+                            </Badge>
+                          ) : (
+                            "-"
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={getStatusColor(doc.is_draft)}>{doc.is_draft ? "Draft" : "Published"}</Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm">{formatDate(doc.updated_at)}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleViewDocument(doc)}
+                              className="h-8 w-8 gap-1 p-0 sm:h-auto sm:w-auto sm:gap-2 sm:p-2"
+                              title="View document"
+                            >
+                              <Eye className="h-3 w-3 sm:h-4 sm:w-4" />
+                              <span className="hidden sm:inline">View</span>
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openEditDialog(doc)}
+                              className="h-8 w-8 gap-1 p-0 sm:h-auto sm:w-auto sm:gap-2 sm:p-2"
+                              title="Edit document"
+                            >
+                              <Edit2 className="h-3 w-3 sm:h-4 sm:w-4" />
+                              <span className="hidden sm:inline">Edit</span>
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedDoc(doc)
+                                setIsDeleteDialogOpen(true)
+                              }}
+                              className="h-8 w-8 gap-1 p-0 text-red-600 hover:text-red-700 sm:h-auto sm:w-auto sm:gap-2 sm:p-2"
+                              title="Delete document"
+                            >
+                              <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
+                              <span className="hidden sm:inline">Delete</span>
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
                     ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2">
+            {filteredDocs.map((doc) => (
+              <Card key={doc.id} className="border-2 shadow-md transition-all hover:shadow-lg">
+                <CardHeader className="from-primary/5 to-background border-b bg-gradient-to-r">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1">
+                      <CardTitle className="flex items-center gap-2 text-lg">
+                        {doc.title}
+                        {doc.is_draft && (
+                          <Badge variant="outline" className="bg-yellow-50 text-yellow-700 dark:bg-yellow-900/30">
+                            Draft
+                          </Badge>
+                        )}
+                      </CardTitle>
+                      {doc.category && <CardDescription className="mt-1">{doc.category}</CardDescription>}
+                    </div>
                   </div>
-                )}
+                </CardHeader>
+                <CardContent className="space-y-4 p-6">
+                  <div className="max-h-48 overflow-auto rounded-md border p-3">
+                    <MarkdownContent content={doc.content} />
+                  </div>
 
-                <div className="text-muted-foreground text-xs">Last updated: {formatDate(doc.updated_at)}</div>
+                  {doc.tags && doc.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {doc.tags.map((tag, i) => (
+                        <Badge key={i} variant="outline" className="gap-1">
+                          <Tag className="h-3 w-3" />
+                          {tag}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
 
-                <div className="flex gap-2 pt-2">
-                  <Button size="sm" variant="outline" onClick={() => openEditDialog(doc)} className="flex-1 gap-2">
-                    <Edit2 className="h-4 w-4" />
-                    Edit
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      setSelectedDoc(doc)
-                      setIsDeleteDialogOpen(true)
-                    }}
-                    className="gap-2 text-red-600 hover:text-red-700"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    Delete
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                  <div className="text-muted-foreground text-xs">Last updated: {formatDate(doc.updated_at)}</div>
+
+                  <div className="flex gap-2 pt-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleViewDocument(doc)}
+                      className="flex-1 gap-2"
+                    >
+                      <Eye className="h-4 w-4" />
+                      View
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => openEditDialog(doc)} className="flex-1 gap-2">
+                      <Edit2 className="h-4 w-4" />
+                      Edit
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setSelectedDoc(doc)
+                        setIsDeleteDialogOpen(true)
+                      }}
+                      className="gap-2 text-red-600 hover:text-red-700"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Delete
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )
       ) : (
         <Card className="border-2">
           <CardContent className="p-12 text-center">
@@ -398,6 +524,37 @@ export function DocumentationContent({ initialDocs, userId }: DocumentationConte
           </CardContent>
         </Card>
       )}
+
+      <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+        <DialogContent className="max-h-[80vh] max-w-3xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">{selectedDoc?.title}</DialogTitle>
+            <DialogDescription>
+              <div className="mt-2 flex flex-wrap items-center gap-3">
+                <Badge className={getStatusColor(selectedDoc?.is_draft || false)}>
+                  {selectedDoc?.is_draft ? "Draft" : "Published"}
+                </Badge>
+                {selectedDoc?.category && <span className="text-sm">Category: {selectedDoc.category}</span>}
+                <span className="text-sm">{selectedDoc?.updated_at && formatDate(selectedDoc.updated_at)}</span>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-4">
+            {selectedDoc?.tags && selectedDoc.tags.length > 0 && (
+              <div className="mb-4 flex flex-wrap gap-2">
+                {selectedDoc.tags.map((tag, index) => (
+                  <Badge key={index} variant="secondary">
+                    {tag}
+                  </Badge>
+                ))}
+              </div>
+            )}
+            <div className="bg-muted/50 rounded-lg p-4">
+              <MarkdownContent content={selectedDoc?.content || ""} />
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Create/Edit Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>

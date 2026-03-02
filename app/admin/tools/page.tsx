@@ -1,14 +1,20 @@
-"use client"
-
 import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { FileSignature, Droplet, ArrowRight, Wrench, Hash } from "lucide-react"
-import { PageHeader, PageWrapper } from "@/components/layout"
+import { Wrench, ArrowRight, Hash, FileSignature, Droplet } from "lucide-react"
+import { AdminTablePage } from "@/components/admin/admin-table-page"
 
 const tools = [
   {
+    name: "Reference Generator",
+    description: "Manage incoming/outgoing correspondence references and approval workflow",
+    href: "/admin/tools/reference-generator",
+    icon: Hash,
+    color: "text-violet-500",
+    bgColor: "bg-violet-50 dark:bg-violet-950/30",
+  },
+  {
     name: "Email Signature",
-    description: "Generate a professional email signature with your ACOB contact details",
+    description: "Generate professional employee email signatures",
     href: "/tools/signature",
     icon: FileSignature,
     color: "text-blue-500",
@@ -16,38 +22,29 @@ const tools = [
   },
   {
     name: "Watermark Studio",
-    description: "Add ACOB branding watermarks to your images and videos",
+    description: "Apply branded watermarks to uploaded media",
     href: "/tools/watermark",
     icon: Droplet,
     color: "text-teal-500",
     bgColor: "bg-teal-50 dark:bg-teal-950/30",
   },
-  {
-    name: "Reference Generator",
-    description: "Generate and track incoming/outgoing reference records with approval workflow",
-    href: "/tools/reference-generator",
-    icon: Hash,
-    color: "text-violet-500",
-    bgColor: "bg-violet-50 dark:bg-violet-950/30",
-  },
 ]
 
-export default function ToolsPage() {
+export default function AdminToolsPage() {
   return (
-    <PageWrapper maxWidth="full" background="gradient">
-      <PageHeader
-        title="Tools"
-        description="Utility tools to help with your work"
-        icon={Wrench}
-        backLink={{ href: "/profile", label: "Back to Dashboard" }}
-      />
-
+    <AdminTablePage
+      title="Tools"
+      description="Administrative tools and utilities"
+      icon={Wrench}
+      backLinkHref="/admin"
+      backLinkLabel="Back to Dashboard"
+    >
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {tools.map((tool) => (
           <Link key={tool.name} href={tool.href}>
             <Card className="hover:border-primary/30 group h-full cursor-pointer transition-all hover:shadow-lg">
               <CardHeader>
-                <div className={`h-12 w-12 rounded-lg ${tool.bgColor} mb-3 flex items-center justify-center`}>
+                <div className={`mb-3 flex h-12 w-12 items-center justify-center rounded-lg ${tool.bgColor}`}>
                   <tool.icon className={`h-6 w-6 ${tool.color}`} />
                 </div>
                 <CardTitle className="flex items-center justify-between">
@@ -56,10 +53,11 @@ export default function ToolsPage() {
                 </CardTitle>
                 <CardDescription>{tool.description}</CardDescription>
               </CardHeader>
+              <CardContent />
             </Card>
           </Link>
         ))}
       </div>
-    </PageWrapper>
+    </AdminTablePage>
   )
 }

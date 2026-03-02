@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { SearchableSelect } from "@/components/ui/searchable-select"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
-import { Loader2, ListOrdered, Sparkles } from "lucide-react"
+import { Loader2, Sparkles } from "lucide-react"
 import { getCurrentOfficeWeek } from "@/lib/meeting-week"
 import { fetchWeeklyReportLockState, type WeeklyReportLockState } from "@/lib/weekly-report-lock"
 
@@ -35,6 +35,22 @@ interface WeeklyReportAdminDialogProps {
     role: string
     department: string | null
   }
+}
+
+const REPORT_TEXT_FIELDS = ["work_done", "tasks_new_week", "challenges"] as const
+type ReportTextField = (typeof REPORT_TEXT_FIELDS)[number]
+
+const autoNumberReportText = (text: string): string => {
+  const lines = String(text || "")
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .map((line) => line.replace(/\u00A0/g, " ").trim())
+    .filter((line) => line.length > 0)
+    .map((line) => line.replace(/^\s*(?:\d+[\.\)]\s+|[-*•◦▪▫‣⁃]\s+)/, "").trim())
+    .filter((line) => line.length > 0)
+
+  if (lines.length === 0) return ""
+  return lines.map((line, index) => `${index + 1}. ${line}`).join("\n")
 }
 
 export function WeeklyReportAdminDialog({
@@ -110,9 +126,9 @@ export function WeeklyReportAdminDialog({
           setFormData((prev) => ({
             ...prev,
             user_id: existingReport.user_id || prev.user_id || currentUser.id || "",
-            work_done: existingReport.work_done || "",
-            tasks_new_week: existingReport.tasks_new_week || "",
-            challenges: existingReport.challenges || "",
+            work_done: autoNumberReportText(existingReport.work_done || ""),
+            tasks_new_week: autoNumberReportText(existingReport.tasks_new_week || ""),
+            challenges: autoNumberReportText(existingReport.challenges || ""),
             status: existingReport.status || prev.status,
           }))
         } else {
@@ -140,7 +156,7 @@ export function WeeklyReportAdminDialog({
         if (data.length > 0 && !report && !hasExistingWeeklyReport) {
           // Only auto-sync tasks from action items when there is no existing weekly report to mirror.
           const syncedText = data.map((a, i) => `${i + 1}. ${a.title}`).join("\n")
-          setFormData((prev) => ({ ...prev, tasks_new_week: syncedText }))
+          setFormData((prev) => ({ ...prev, tasks_new_week: autoNumberReportText(syncedText) }))
         }
       }
     }
@@ -165,9 +181,9 @@ export function WeeklyReportAdminDialog({
         department: isLead ? currentUser.department || report.department : report.department,
         week_number: report.week_number,
         year: report.year,
-        work_done: report.work_done || "",
-        tasks_new_week: report.tasks_new_week || "",
-        challenges: report.challenges || "",
+        work_done: autoNumberReportText(report.work_done || ""),
+        tasks_new_week: autoNumberReportText(report.tasks_new_week || ""),
+        challenges: autoNumberReportText(report.challenges || ""),
         status: report.status || "submitted",
       })
     } else {
@@ -278,21 +294,30 @@ export function WeeklyReportAdminDialog({
     }
   }
 
-  const applyNumbering = (field: keyof typeof formData) => {
-    const val = formData[field] as string
-    if (!val || !val.startsWith("1. ")) setFormData((p) => ({ ...p, [field]: "1. " + val }))
-  }
-
-  const handleKey = (e: React.KeyboardEvent, field: keyof typeof formData) => {
+  const handleKey = (e: React.KeyboardEvent, field: ReportTextField) => {
     if (e.key === "Enter") {
       const val = formData[field] as string
       const last = val.split("\n").pop() || ""
-      const match = last.match(/^(\d+)\.\s/)
+      const match = last.match(/^(\d+)[\.\)]\s/)
       if (match) {
         e.preventDefault()
         setFormData((p) => ({ ...p, [field]: val + "\n" + (parseInt(match[1]) + 1) + ". " }))
       }
     }
+  }
+
+  const handleTextChange = (field: ReportTextField, value: string) => {
+    setFormData((prev) => ({ ...prev, [field]: autoNumberReportText(value) }))
+  }
+
+  const handleTextPaste = (e: React.ClipboardEvent<HTMLTextAreaElement>, field: ReportTextField) => {
+    e.preventDefault()
+    const pasted = e.clipboardData.getData("text")
+    const current = (formData[field] as string) || ""
+    const start = e.currentTarget.selectionStart ?? current.length
+    const end = e.currentTarget.selectionEnd ?? current.length
+    const merged = `${current.slice(0, start)}${pasted}${current.slice(end)}`
+    setFormData((prev) => ({ ...prev, [field]: autoNumberReportText(merged) }))
   }
 
   return (
@@ -346,23 +371,14 @@ export function WeeklyReportAdminDialog({
             </div>
           </div>
 
-          {["work_done", "tasks_new_week", "challenges"].map((f) => (
+          {REPORT_TEXT_FIELDS.map((f) => (
             <div key={f} className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label className="capitalize">{f.replace(/_/g, " ")}</Label>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => applyNumbering(f as any)}
-                  className="h-6 gap-1 text-[10px]"
-                >
-                  <ListOrdered className="h-3 w-3" /> Auto-Number
-                </Button>
-              </div>
+              <Label className="capitalize">{f.replace(/_/g, " ")}</Label>
               <Textarea
-                value={formData[f as keyof typeof formData]}
-                onChange={(e) => setFormData((p) => ({ ...p, [f]: e.target.value }))}
-                onKeyDown={(e) => handleKey(e, f as any)}
+                value={formData[f]}
+                onChange={(e) => handleTextChange(f, e.target.value)}
+                onPaste={(e) => handleTextPaste(e, f)}
+                onKeyDown={(e) => handleKey(e, f)}
                 placeholder={`1. ...`}
                 rows={4}
                 disabled={f === "tasks_new_week" && isNextWeekActive}

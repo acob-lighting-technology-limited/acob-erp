@@ -23,6 +23,7 @@ import {
   FileBarChart,
   Bell,
   Megaphone,
+  Wrench,
 } from "lucide-react"
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
@@ -103,16 +104,16 @@ const adminNavigation = [
   },
   {
     section: "operations",
-    name: "Correspondence",
-    href: "/admin/correspondence",
-    icon: FileText,
+    name: "Reports",
+    href: "/admin/reports",
+    icon: FileBarChart,
     roles: ["super_admin", "admin", "lead"],
   },
   {
     section: "operations",
-    name: "Reports",
-    href: "/admin/reports",
-    icon: FileBarChart,
+    name: "Tools",
+    href: "/admin/tools",
+    icon: Wrench,
     roles: ["super_admin", "admin", "lead"],
   },
   {
@@ -366,7 +367,7 @@ export function AdminSidebar({ user, profile }: AdminSidebarProps) {
           <Button
             variant="outline"
             className={cn(
-              "text-muted-foreground hover:text-foreground min-h-[36px] w-full text-sm transition-[padding,gap] duration-300 ease-in-out",
+              "text-muted-foreground min-h-[36px] w-full text-sm transition-[padding,gap,background-color,color] duration-300 ease-in-out hover:bg-[var(--admin-accent-soft)] hover:text-[var(--admin-primary)]",
               isCollapsed ? "justify-center px-2.5" : "justify-start gap-2.5"
             )}
             title={isCollapsed ? "Back to Dashboard" : undefined}
@@ -390,7 +391,7 @@ export function AdminSidebar({ user, profile }: AdminSidebarProps) {
         <Button
           variant="outline"
           className={cn(
-            "text-muted-foreground hover:text-foreground min-h-[36px] w-full text-sm transition-[padding,gap] duration-300 ease-in-out",
+            "text-muted-foreground min-h-[36px] w-full text-sm transition-[padding,gap,background-color,color] duration-300 ease-in-out hover:bg-[var(--admin-accent-soft)] hover:text-[var(--admin-primary)]",
             isCollapsed ? "justify-center px-2.5" : "justify-start gap-2.5"
           )}
           onClick={handleLogout}

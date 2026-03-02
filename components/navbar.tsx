@@ -112,7 +112,7 @@ export function Navbar({ user, canAccessAdmin = false, isAdminMode = false }: Na
       className={cn(
         "fixed top-0 right-0 left-0 z-50 w-full overflow-visible border-b",
         isAdminMode
-          ? "border-amber-300/70 bg-amber-50/90 backdrop-blur-md dark:border-amber-950/70 dark:bg-amber-950/80"
+          ? "border-[var(--admin-sidebar-border)] bg-[var(--admin-ribbon-bg)] backdrop-blur-md"
           : "border-border bg-background"
       )}
     >
@@ -123,7 +123,10 @@ export function Navbar({ user, canAccessAdmin = false, isAdminMode = false }: Na
             <Button
               variant="ghost"
               size="icon"
-              className="h-full w-10 rounded-none"
+              className={cn(
+                "h-full w-10 rounded-none",
+                isAdminMode && "hover:bg-[var(--admin-accent-soft)] hover:text-[var(--admin-primary)]"
+              )}
               onClick={() => setIsCollapsed(!isCollapsed)}
               title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
             >
@@ -143,7 +146,7 @@ export function Navbar({ user, canAccessAdmin = false, isAdminMode = false }: Na
             {isAdminMode && (
               <Badge
                 variant="outline"
-                className="border-amber-500/40 bg-amber-100/60 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+                className="border-[var(--admin-badge-border)] bg-[var(--admin-badge-bg)] text-[var(--admin-primary)]"
               >
                 <ShieldCheck className="mr-1 h-3 w-3" />
                 Admin Console

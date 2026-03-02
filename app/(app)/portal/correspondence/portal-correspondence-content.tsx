@@ -250,7 +250,7 @@ export function PortalCorrespondenceContent({
 
       <Card>
         <CardHeader>
-          <CardTitle>Create Correspondence</CardTitle>
+          <CardTitle>Create Reference</CardTitle>
         </CardHeader>
         <CardContent>
           <form className="grid gap-4 md:grid-cols-2" onSubmit={createRecord}>
@@ -405,7 +405,7 @@ export function PortalCorrespondenceContent({
 
             <div className="md:col-span-2">
               <Button type="submit" disabled={isSaving}>
-                {isSaving ? "Saving..." : "Create Correspondence"}
+                {isSaving ? "Saving..." : "Create Reference"}
               </Button>
             </div>
           </form>
@@ -414,7 +414,7 @@ export function PortalCorrespondenceContent({
 
       <Card>
         <CardHeader>
-          <CardTitle>My Correspondence</CardTitle>
+          <CardTitle>My References</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
