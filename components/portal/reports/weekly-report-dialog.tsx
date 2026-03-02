@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
-import { Loader2, ListOrdered, Sparkles } from "lucide-react"
+import { Loader2, Sparkles } from "lucide-react"
 import { getCurrentOfficeWeek } from "@/lib/meeting-week"
 import { fetchWeeklyReportLockState, type WeeklyReportLockState } from "@/lib/weekly-report-lock"
 
@@ -33,6 +33,22 @@ interface WeeklyReportDialogProps {
     year?: number
     dept?: string
   }
+}
+
+const REPORT_TEXT_FIELDS = ["work_done", "tasks_new_week", "challenges"] as const
+type ReportTextField = (typeof REPORT_TEXT_FIELDS)[number]
+
+const autoNumberReportText = (text: string): string => {
+  const lines = String(text || "")
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .map((line) => line.replace(/\u00A0/g, " ").trim())
+    .filter((line) => line.length > 0)
+    .map((line) => line.replace(/^\s*(?:\d+[\.\)]\s+|[-*•◦▪▫‣⁃]\s+)/, "").trim())
+    .filter((line) => line.length > 0)
+
+  if (lines.length === 0) return ""
+  return lines.map((line, index) => `${index + 1}. ${line}`).join("\n")
 }
 
 export function WeeklyReportDialog({ isOpen, onClose, onSuccess, initialData }: WeeklyReportDialogProps) {
@@ -101,9 +117,9 @@ export function WeeklyReportDialog({ isOpen, onClose, onSuccess, initialData }: 
         department: dept,
         week_number: week,
         year: year,
-        work_done: existing?.work_done || "",
-        tasks_new_week: existing?.tasks_new_week || "",
-        challenges: existing?.challenges || "",
+        work_done: autoNumberReportText(existing?.work_done || ""),
+        tasks_new_week: autoNumberReportText(existing?.tasks_new_week || ""),
+        challenges: autoNumberReportText(existing?.challenges || ""),
         status: "submitted",
       })
 
@@ -118,7 +134,7 @@ export function WeeklyReportDialog({ isOpen, onClose, onSuccess, initialData }: 
         setIsNextWeekActive(nextActions.some((a) => a.status !== "pending"))
         if (nextActions.length > 0 && !existing) {
           const syncedText = nextActions.map((a, i) => `${i + 1}. ${a.title}`).join("\n")
-          setFormData((prev) => ({ ...prev, tasks_new_week: syncedText }))
+          setFormData((prev) => ({ ...prev, tasks_new_week: autoNumberReportText(syncedText) }))
         }
       }
 
@@ -219,21 +235,30 @@ export function WeeklyReportDialog({ isOpen, onClose, onSuccess, initialData }: 
     }
   }
 
-  const applyNumbering = (field: keyof typeof formData) => {
-    const val = formData[field] as string
-    if (!val || !val.startsWith("1. ")) setFormData((p) => ({ ...p, [field]: "1. " + val }))
-  }
-
-  const handleKey = (e: React.KeyboardEvent, field: keyof typeof formData) => {
+  const handleKey = (e: React.KeyboardEvent, field: ReportTextField) => {
     if (e.key === "Enter") {
       const val = formData[field] as string
       const last = val.split("\n").pop() || ""
-      const match = last.match(/^(\d+)\.\s/)
+      const match = last.match(/^(\d+)[\.\)]\s/)
       if (match) {
         e.preventDefault()
         setFormData((p) => ({ ...p, [field]: val + "\n" + (parseInt(match[1]) + 1) + ". " }))
       }
     }
+  }
+
+  const handleTextChange = (field: ReportTextField, value: string) => {
+    setFormData((prev) => ({ ...prev, [field]: autoNumberReportText(value) }))
+  }
+
+  const handleTextPaste = (e: React.ClipboardEvent<HTMLTextAreaElement>, field: ReportTextField) => {
+    e.preventDefault()
+    const pasted = e.clipboardData.getData("text")
+    const current = (formData[field] as string) || ""
+    const start = e.currentTarget.selectionStart ?? current.length
+    const end = e.currentTarget.selectionEnd ?? current.length
+    const merged = `${current.slice(0, start)}${pasted}${current.slice(end)}`
+    setFormData((prev) => ({ ...prev, [field]: autoNumberReportText(merged) }))
   }
 
   return (
@@ -261,23 +286,14 @@ export function WeeklyReportDialog({ isOpen, onClose, onSuccess, initialData }: 
           </div>
         ) : (
           <div className="grid gap-6 py-4">
-            {["work_done", "tasks_new_week", "challenges"].map((f) => (
+            {REPORT_TEXT_FIELDS.map((f) => (
               <div key={f} className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label className="capitalize">{f.replace(/_/g, " ")}</Label>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => applyNumbering(f as any)}
-                    className="h-6 gap-1 text-[10px]"
-                  >
-                    <ListOrdered className="h-3 w-3" /> Auto-Number
-                  </Button>
-                </div>
+                <Label className="capitalize">{f.replace(/_/g, " ")}</Label>
                 <Textarea
-                  value={formData[f as keyof typeof formData]}
-                  onChange={(e) => setFormData((p) => ({ ...p, [f]: e.target.value }))}
-                  onKeyDown={(e) => handleKey(e, f as any)}
+                  value={formData[f]}
+                  onChange={(e) => handleTextChange(f, e.target.value)}
+                  onPaste={(e) => handleTextPaste(e, f)}
+                  onKeyDown={(e) => handleKey(e, f)}
                   placeholder={`1. ...`}
                   rows={4}
                   disabled={f === "tasks_new_week" && isNextWeekActive}

@@ -28,6 +28,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import type { Documentation } from "./page"
+import { MarkdownContent } from "@/components/ui/markdown-content"
 
 const CATEGORIES = [
   "Project Documentation",
@@ -349,7 +350,9 @@ export function DocumentationContent({ initialDocs, userId }: DocumentationConte
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4 p-6">
-                  <p className="text-muted-foreground line-clamp-3 text-sm">{doc.content}</p>
+                  <div className="max-h-48 overflow-auto rounded-md border p-3">
+                    <MarkdownContent content={doc.content} />
+                  </div>
 
                   {doc.tags && doc.tags.length > 0 && (
                     <div className="flex flex-wrap gap-2">

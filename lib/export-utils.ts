@@ -105,13 +105,31 @@ export const sortReportsByDepartment = (reports: WeeklyReport[]) => {
 
 /**
  * Auto-numbers each non-empty line: "1. line", "2. line", ...
- * If lines already start with "1. " numbering is preserved.
+ * If lines are already numbered (including Word-pasted formats), numbering is preserved
+ * but normalized to "N. text" to avoid tab-stop spacing issues in PPTX.
  */
 export const autoNumberLines = (text: string): string => {
   if (!text?.trim()) return text || ""
-  const lines = text.split("\n").filter((l) => l.trim().length > 0)
-  if (lines[0]?.match(/^\d+\.\s/)) return text // already numbered
-  return lines.map((l, i) => `${i + 1}. ${l.trim()}`).join("\n")
+  const lines = text
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .map((l) => l.replace(/\u00A0/g, " "))
+    .filter((l) => l.trim().length > 0)
+
+  const normalizeSpacing = (line: string) => line.replace(/\t+/g, " ").trim()
+  const parseNumbered = (line: string) => normalizeSpacing(line).match(/^(\d+)[\.\)]\s*(.+)$/)
+
+  if (parseNumbered(lines[0])) {
+    return lines
+      .map((line) => {
+        const numbered = parseNumbered(line)
+        if (numbered) return `${numbered[1]}. ${numbered[2].trim()}`
+        return normalizeSpacing(line)
+      })
+      .join("\n")
+  }
+
+  return lines.map((l, i) => `${i + 1}. ${normalizeSpacing(l)}`).join("\n")
 }
 
 /** Returns the Monday date of a given ISO week as a formatted string e.g. "Monday, 17th February 2026" */
@@ -1757,7 +1775,8 @@ const applyWeeklySlideTransition = (slide: any) => {
 
 const getWeeklyContentBoxes = () => {
   const { headerH, marginX, slideW, footerY } = WEEKLY_CONTENT_LAYOUT
-  const bodyBottomSafety = 0.35
+  // Tuned so the full-page Work Done container is ~15.14cm high.
+  const bodyBottomSafety = 0.14
   const textBottomSafety = 0.1
   const usableW = slideW - marginX * 2
   const col1W = usableW * (3 / 5)
@@ -1770,9 +1789,9 @@ const getWeeklyContentBoxes = () => {
   const row2H = availH * (2 / 6) - 0.15
   const row1Y = startY
   const row2Y = startY + row1H + 0.15
-  const page2Gap = 0.2
-  const page2TopH = (availH - page2Gap) * 0.65
-  const page2BottomH = (availH - page2Gap) * 0.35
+  const page2Gap = 0.08
+  const page2TopH = (availH - page2Gap) * 0.75
+  const page2BottomH = (availH - page2Gap) * 0.25
 
   return {
     row1Left: {
@@ -1962,7 +1981,7 @@ const getReportSectionPlans = (report: WeeklyReport): WeeklySectionPlan[] => {
       "No data provided.",
       boxes.page2Top.textW,
       boxes.page2Top.textH,
-      11
+      14
     ),
     buildWeeklySectionPlan(
       "challenges",
@@ -2066,7 +2085,8 @@ const addSectionCard = (
   color: string,
   text: string,
   fontSize: number,
-  allowAutoShrink = true
+  allowAutoShrink = true,
+  useManualHangingWrap = false
 ) => {
   slide.addShape(pres.ShapeType?.rect ?? "rect", {
     x: box.x,
@@ -2094,7 +2114,15 @@ const addSectionCard = (
     color: ACOB_WHITE,
     fontFace: "Calibri",
   })
-  slide.addText(text, {
+  const wrappedText =
+    useManualHangingWrap && fontSize > 0
+      ? wrapTextByCharsCompact(
+          text,
+          Math.max(10, Math.floor((box.textW * 72) / (fontSize * PPTX_WEEKLY_AVG_CHAR_WIDTH_RATIO)))
+        ).join("\n")
+      : text
+
+  slide.addText(wrappedText, {
     x: box.x + 0.15,
     y: box.y + 0.46,
     w: box.textW,
@@ -2103,7 +2131,7 @@ const addSectionCard = (
     color: ACOB_SLATE,
     valign: "top",
     fontFace: "Calibri",
-    breakLine: true,
+    breakLine: !useManualHangingWrap,
     lineSpacingMultiple: PPTX_WEEKLY_LINE_SPACING_MULTIPLE,
     fit: allowAutoShrink ? "shrink" : undefined,
   })
@@ -2271,7 +2299,8 @@ const addWorkDoneSlide = (
     workDonePlan.color,
     workDonePlan.text,
     workDonePlan.fontSize,
-    workDonePlan.allowAutoShrink
+    workDonePlan.allowAutoShrink,
+    true
   )
 
   return slide
@@ -2298,7 +2327,8 @@ const addTasksAndChallengesSlide = (
     tasksPlan.color,
     tasksPlan.text,
     tasksPlan.fontSize,
-    tasksPlan.allowAutoShrink
+    tasksPlan.allowAutoShrink,
+    true
   )
   addSectionCard(
     pres,
@@ -2308,7 +2338,8 @@ const addTasksAndChallengesSlide = (
     challengesPlan.color,
     challengesPlan.text,
     challengesPlan.fontSize,
-    challengesPlan.allowAutoShrink
+    challengesPlan.allowAutoShrink,
+    true
   )
 
   return slide

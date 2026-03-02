@@ -14,6 +14,7 @@ import { formatName } from "@/lib/utils"
 import { FileText, Search, Filter, Eye, User, Calendar, Tag, FolderOpen, LayoutGrid, List } from "lucide-react"
 import type { UserRole } from "@/types/database"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
+import { MarkdownContent } from "@/components/ui/markdown-content"
 
 export interface Documentation {
   id: string
@@ -484,8 +485,8 @@ export function AdminDocumentationContent({
                 ))}
               </div>
             )}
-            <div className="prose dark:prose-invert max-w-none">
-              <div className="bg-muted/50 rounded-lg p-4 whitespace-pre-wrap">{selectedDoc?.content}</div>
+            <div className="bg-muted/50 rounded-lg p-4">
+              <MarkdownContent content={selectedDoc?.content || ""} />
             </div>
           </div>
         </DialogContent>

@@ -63,7 +63,6 @@ const navigation = [
   { name: "Projects", href: "/projects", icon: FolderKanban },
   { name: "Tasks", href: "/portal/tasks", icon: ClipboardList },
   { name: "Help Desk", href: "/portal/help-desk", icon: ClipboardList },
-  { name: "Correspondence", href: "/portal/correspondence", icon: FileText },
   { name: "Reports", href: "/portal/reports", icon: FileBarChart },
   { name: "Assets", href: "/assets", icon: Package },
   { name: "Payments", href: "/payments", icon: CreditCard },

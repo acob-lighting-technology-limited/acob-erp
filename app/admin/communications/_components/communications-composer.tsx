@@ -1263,8 +1263,8 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
             <CardContent className="space-y-4">
               {/* Type */}
               <div className="space-y-2">
-                <div className="flex flex-col gap-1 text-sm sm:flex-row sm:items-center sm:justify-between">
-                  <span className="text-muted-foreground">Type</span>
+                <div className="flex items-center justify-between gap-2 text-sm">
+                  <span className="text-muted-foreground shrink-0">Type</span>
                   <Badge variant="outline" className="gap-1">
                     {reminderType === "meeting" ? (
                       <>
@@ -1283,9 +1283,9 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
                 </div>
                 {reminderType !== "admin_broadcast" ? (
                   <>
-                    <div className="flex flex-col gap-1 text-sm sm:flex-row sm:items-center sm:justify-between">
-                      <span className="text-muted-foreground">Date</span>
-                      <Badge>
+                    <div className="flex min-w-0 items-center justify-between gap-2 text-sm">
+                      <span className="text-muted-foreground shrink-0">Date</span>
+                      <Badge className="max-w-[72%] truncate">
                         {reminderType === "meeting"
                           ? meetingDate
                             ? formatDateNice(meetingDate)
@@ -1295,14 +1295,16 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
                             : "Not set"}
                       </Badge>
                     </div>
-                    <div className="flex flex-col gap-1 text-sm sm:flex-row sm:items-center sm:justify-between">
-                      <span className="text-muted-foreground">Time</span>
-                      <Badge variant="secondary">{reminderType === "meeting" ? meetingTime : sessionTime}</Badge>
+                    <div className="flex min-w-0 items-center justify-between gap-2 text-sm">
+                      <span className="text-muted-foreground shrink-0">Time</span>
+                      <Badge variant="secondary" className="max-w-[72%] truncate">
+                        {reminderType === "meeting" ? meetingTime : sessionTime}
+                      </Badge>
                     </div>
                     {reminderType === "meeting" && (
-                      <div className="flex flex-col gap-1 text-sm sm:flex-row sm:items-center sm:justify-between sm:gap-2">
-                        <span className="text-muted-foreground">Prepared by</span>
-                        <Badge variant="outline" className="max-w-full truncate sm:max-w-[68%]">
+                      <div className="flex min-w-0 items-center justify-between gap-2 text-sm">
+                        <span className="text-muted-foreground shrink-0">Prepared by</span>
+                        <Badge variant="outline" className="max-w-[68%] truncate">
                           {selectedMeetingPreparedBy?.full_name || "Not set"}
                         </Badge>
                       </div>
@@ -1310,30 +1312,30 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
                   </>
                 ) : (
                   <>
-                    <div className="flex flex-col gap-1 text-sm sm:flex-row sm:items-center sm:justify-between sm:gap-2">
-                      <span className="text-muted-foreground">Department</span>
-                      <Badge variant="outline" className="max-w-full truncate sm:max-w-[68%]">
+                    <div className="flex min-w-0 items-center justify-between gap-2 text-sm">
+                      <span className="text-muted-foreground shrink-0">Department</span>
+                      <Badge variant="outline" className="max-w-[68%] truncate">
                         {broadcastDepartment}
                       </Badge>
                     </div>
-                    <div className="flex flex-col gap-1 text-sm sm:flex-row sm:items-center sm:justify-between sm:gap-2">
-                      <span className="text-muted-foreground">Prepared by</span>
-                      <Badge variant="outline" className="max-w-full truncate sm:max-w-[68%]">
+                    <div className="flex min-w-0 items-center justify-between gap-2 text-sm">
+                      <span className="text-muted-foreground shrink-0">Prepared by</span>
+                      <Badge variant="outline" className="max-w-[68%] truncate">
                         {selectedBroadcastPreparedBy?.full_name || "Not set"}
                       </Badge>
                     </div>
-                    <div className="flex flex-col gap-1 text-sm sm:flex-row sm:items-center sm:justify-between sm:gap-2">
-                      <span className="text-muted-foreground">Subject</span>
-                      <Badge variant="secondary" className="max-w-full truncate sm:max-w-[68%]">
+                    <div className="flex min-w-0 items-center justify-between gap-2 text-sm">
+                      <span className="text-muted-foreground shrink-0">Subject</span>
+                      <Badge variant="secondary" className="max-w-[68%] truncate">
                         {broadcastSubject.trim() || "Not set"}
                       </Badge>
                     </div>
                   </>
                 )}
                 {reminderType === "meeting" && selectedPresenter && (
-                  <div className="flex flex-col gap-1 text-sm sm:flex-row sm:items-center sm:justify-between">
-                    <span className="text-muted-foreground">Knowledge Sharing</span>
-                    <Badge variant="secondary" className="max-w-full truncate sm:max-w-[70%]">
+                  <div className="flex min-w-0 items-center justify-between gap-2 text-sm">
+                    <span className="text-muted-foreground shrink-0">Knowledge Sharing</span>
+                    <Badge variant="secondary" className="max-w-[70%] truncate">
                       {selectedPresenter.full_name} ({knowledgeDepartment !== "none" ? knowledgeDepartment : "N/A"})
                     </Badge>
                   </div>
@@ -1366,7 +1368,7 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
               {/* Delivery */}
               <div className="space-y-1">
                 <div className="text-muted-foreground text-xs font-medium tracking-wider uppercase">Delivery</div>
-                <div className="flex flex-col gap-1 text-sm sm:flex-row sm:items-center sm:gap-2">
+                <div className="flex items-center gap-2 text-sm">
                   {sendTiming === "now" ? (
                     <>
                       <Send className="h-4 w-4 text-orange-600" />
