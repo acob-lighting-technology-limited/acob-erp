@@ -18,7 +18,7 @@ export const CORRESPONDENCE_STATUSES: CorrespondenceStatus[] = [
 ]
 
 export function isAdminRole(role?: string | null): boolean {
-  return role === "admin" || role === "super_admin"
+  return role === "developer" || role === "admin" || role === "super_admin"
 }
 
 export async function getAuthContext() {

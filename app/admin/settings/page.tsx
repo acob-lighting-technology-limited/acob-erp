@@ -6,7 +6,6 @@ import { cn } from "@/lib/utils"
 import { Settings, Users, Building2, Shield } from "lucide-react"
 import Link from "next/link"
 import { PageHeader, PageWrapper } from "@/components/layout"
-import { MaintenanceToggle } from "@/components/admin/maintenance-toggle"
 import { resolveAdminScope } from "@/lib/admin/rbac"
 
 export default async function AdminSettingsPage() {
@@ -91,18 +90,19 @@ export default async function AdminSettingsPage() {
           </CardContent>
         </Card>
 
-        {/* System Settings */}
-        {scope.isAdminLike && (
+        {scope.role === "developer" && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Settings className="h-5 w-5" />
-                System Settings
+                Developer Control Plane
               </CardTitle>
-              <CardDescription>Global system configuration</CardDescription>
+              <CardDescription>Maintenance and deep security controls are now under DEV.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <MaintenanceToggle />
+              <Link href="/admin/dev" className={cn(buttonVariants({ variant: "default" }), "w-full")}>
+                Open DEV
+              </Link>
             </CardContent>
           </Card>
         )}

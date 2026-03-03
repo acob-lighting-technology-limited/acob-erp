@@ -66,7 +66,7 @@ export default function CreateReviewPage() {
       let usersQuery = supabase.from("profiles").select("id, first_name, last_name, department_id").neq("id", user.id)
 
       // If lead, only show department users
-      if (profile?.is_department_lead && !["admin", "super_admin"].includes(profile.role)) {
+      if (profile?.is_department_lead && !["developer", "admin", "super_admin"].includes(profile.role)) {
         usersQuery = usersQuery.eq("department_id", profile.department_id)
       }
 

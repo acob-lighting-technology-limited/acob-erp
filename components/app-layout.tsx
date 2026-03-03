@@ -17,7 +17,7 @@ export async function AppLayout({ children }: AppLayoutProps) {
 
   // Fetch user profile
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", data.user.id).single()
-  const canAccessAdmin = !!profile?.role && ["super_admin", "admin", "lead"].includes(profile.role)
+  const canAccessAdmin = !!profile?.role && ["developer", "super_admin", "admin", "lead"].includes(profile.role)
 
   const userData = {
     email: data.user.email,

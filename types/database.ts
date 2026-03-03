@@ -258,7 +258,7 @@ export type Database = {
       }
     }
     Enums: {
-      user_role: "visitor" | "employee" | "lead" | "admin" | "super_admin"
+      user_role: "visitor" | "employee" | "lead" | "admin" | "super_admin" | "developer"
       employment_status: "active" | "suspended" | "separated" | "on_leave"
     }
   }

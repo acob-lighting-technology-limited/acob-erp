@@ -154,6 +154,12 @@ export default function LoginPage() {
         password,
       })
       if (error) throw error
+      await fetch("/api/dev/login-log", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ authMethod: "password" }),
+        keepalive: true,
+      }).catch((err) => console.warn("dev login log failed (password)", err))
       toast.success("Login successful!")
       const nextPath = getSafeNextPath(searchParams.get("next"))
       window.location.href = nextPath
@@ -187,6 +193,12 @@ export default function LoginPage() {
         type: "email",
       })
       if (error) throw error
+      await fetch("/api/dev/login-log", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ authMethod: "otp" }),
+        keepalive: true,
+      }).catch((err) => console.warn("dev login log failed (otp)", err))
       toast.success("Login successful!")
       const nextPath = getSafeNextPath(searchParams.get("next"))
       window.location.href = nextPath

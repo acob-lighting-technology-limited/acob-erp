@@ -191,8 +191,8 @@ export default function WeeklyReportsPortal() {
     setPendingPptxExport(null)
   }
 
-  const isLead = profile?.role === "lead" || profile?.role === "admin" || profile?.role === "super_admin"
-  const isAdmin = profile?.role === "admin" || profile?.role === "super_admin"
+  const isLead = ["lead", "admin", "super_admin", "developer"].includes(profile?.role || "")
+  const isAdmin = ["developer", "admin", "super_admin"].includes(profile?.role || "")
 
   return (
     <AdminTablePage

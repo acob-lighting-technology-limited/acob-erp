@@ -59,7 +59,7 @@ export function getSlaTarget(priority: HelpDeskPriority, submittedAt: Date): Dat
 }
 
 export function isAdminRole(role?: string | null): boolean {
-  return role === "admin" || role === "super_admin"
+  return role === "developer" || role === "admin" || role === "super_admin"
 }
 
 export function isLeadRole(role?: string | null): boolean {

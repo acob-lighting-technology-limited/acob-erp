@@ -65,9 +65,9 @@ export async function updateSession(request: NextRequest) {
         .eq("id", user.id)
         .single()
 
-      const isAdmin = ["super_admin", "admin"].includes(profile?.role || "")
+      const isDeveloper = profile?.role === "developer"
 
-      if (!isAdmin) {
+      if (!isDeveloper) {
         const url = request.nextUrl.clone()
         url.pathname = "/maintenance"
         return NextResponse.redirect(url)
@@ -102,8 +102,7 @@ export async function updateSession(request: NextRequest) {
         }
       }
 
-      // If we are here, maintenance is on but user is admin, or maintenance is off (but we are inside isMaintenanceMode block? No wait)
-      // Logic correction needed below
+      // Maintenance is enabled and the current user is developer.
     }
   }
 

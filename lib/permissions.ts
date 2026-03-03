@@ -11,7 +11,7 @@ import type { UserRole, Profile } from "@/types/database"
 
 // Helper to check role hierarchy
 export function hasRoleOrHigher(userRole: UserRole, requiredRole: UserRole): boolean {
-  const hierarchy: UserRole[] = ["visitor", "employee", "lead", "admin", "super_admin"]
+  const hierarchy: UserRole[] = ["visitor", "employee", "lead", "admin", "super_admin", "developer"]
   const userLevel = hierarchy.indexOf(userRole)
   const requiredLevel = hierarchy.indexOf(requiredRole)
   return userLevel >= requiredLevel
@@ -114,12 +114,15 @@ export function canManageProjectMembers(
 }
 
 export function canAssignRoles(assignerRole: UserRole, targetRole: UserRole): boolean {
-  // super_admin can assign any role
-  if (assignerRole === "super_admin") return true
+  // developer can assign any role
+  if (assignerRole === "developer") return true
 
-  // admin can assign visitor, employee, and lead (but not admin or super_admin)
+  // super_admin can assign any role
+  if (assignerRole === "super_admin") return targetRole !== "developer"
+
+  // admin can assign visitor, employee, and lead (but not admin, super_admin, or developer)
   if (assignerRole === "admin") {
-    return ["visitor", "employee"].includes(targetRole)
+    return ["visitor", "employee", "lead"].includes(targetRole)
   }
 
   // Others cannot assign roles
@@ -133,6 +136,7 @@ export function getRoleDisplayName(role: UserRole): string {
     lead: "Lead",
     admin: "Admin",
     super_admin: "Super Admin",
+    developer: "Developer",
   }
   return roleNames[role]
 }
@@ -144,6 +148,7 @@ export function getRoleBadgeColor(role: UserRole): string {
     lead: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
     admin: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400",
     super_admin: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
+    developer: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
   }
   return colors[role]
 }

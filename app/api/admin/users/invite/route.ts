@@ -3,13 +3,20 @@ import { createClient as createAdminClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
 
 // Allowlist of valid roles
-const ALLOWED_ROLES = ["admin", "manager", "employee", "user", "employee", "lead", "visitor"] as const
+const ALLOWED_ROLES = ["admin", "manager", "employee", "user", "employee", "lead", "visitor", "developer"] as const
 const SUPER_ADMIN_ROLE = "super_admin"
 
 type AllowedRole = (typeof ALLOWED_ROLES)[number] | typeof SUPER_ADMIN_ROLE
 
 function isValidRole(role: string): role is AllowedRole {
   return role === SUPER_ADMIN_ROLE || ALLOWED_ROLES.includes(role as (typeof ALLOWED_ROLES)[number])
+}
+
+function canAssignRole(assignerRole: string, targetRole: string): boolean {
+  if (assignerRole === "developer") return true
+  if (assignerRole === "super_admin") return targetRole !== "developer"
+  if (assignerRole === "admin") return !["super_admin", "developer"].includes(targetRole)
+  return false
 }
 
 export async function POST(request: Request) {
@@ -35,7 +42,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Internal server error" }, { status: 500 })
     }
 
-    if (![SUPER_ADMIN_ROLE, "admin"].includes(profile?.role)) {
+    if (!["developer", SUPER_ADMIN_ROLE, "admin"].includes(profile?.role)) {
       return NextResponse.json({ error: "Forbidden: Admin access required" }, { status: 403 })
     }
 
@@ -57,12 +64,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: `Invalid role: ${role}` }, { status: 400 })
     }
 
-    // 4. Only super_admin can assign super_admin role
-    if (roleProvided && role === SUPER_ADMIN_ROLE && profile?.role !== SUPER_ADMIN_ROLE) {
-      return NextResponse.json(
-        { error: "Forbidden: Only Super Admins can assign the super_admin role" },
-        { status: 403 }
-      )
+    // 4. Role assignment guardrails
+    if (roleProvided && !canAssignRole(profile?.role || "", role)) {
+      return NextResponse.json({ error: "Forbidden: You cannot assign this role" }, { status: 403 })
     }
 
     // 5. Create admin client
@@ -126,13 +130,37 @@ export async function POST(request: Request) {
     // 7. Create/Update Profile
     const roleToApply = roleProvided ? role : existingUser ? undefined : "employee"
 
-    const profilePayload: any = {
-      id: userId,
-      email: emailNormalized,
-      is_active: true,
+    if (existingUser && roleToApply) {
+      const { data: existingProfile } = await supabaseAdmin.from("profiles").select("role").eq("id", userId).single()
+
+      if (existingProfile?.role === "developer" && profile?.role !== "developer") {
+        return NextResponse.json({ error: "Only developer can modify developer accounts" }, { status: 403 })
+      }
+
+      if (existingProfile?.role === "developer" && roleToApply !== "developer") {
+        const { count } = await supabaseAdmin
+          .from("profiles")
+          .select("id", { count: "exact", head: true })
+          .eq("role", "developer")
+
+        if ((count || 0) <= 1) {
+          return NextResponse.json({ error: "Cannot downgrade the last developer account." }, { status: 400 })
+        }
+      }
     }
 
-    if (roleToApply) profilePayload.role = roleToApply
+    const profilePayload: any = {
+      id: userId,
+      company_email: emailNormalized,
+      employment_status: "active",
+    }
+
+    if (roleToApply) {
+      profilePayload.role = roleToApply
+      profilePayload.is_admin = ["developer", "super_admin", "admin"].includes(roleToApply)
+      profilePayload.is_department_lead = roleToApply === "lead"
+      profilePayload.lead_departments = roleToApply === "lead" && department ? [department] : []
+    }
     if (first_name !== undefined) profilePayload.first_name = first_name
     if (last_name !== undefined) profilePayload.last_name = last_name
     if (department !== undefined) profilePayload.department = department

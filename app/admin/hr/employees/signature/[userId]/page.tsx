@@ -16,7 +16,7 @@ export default async function AdminEmployeeSignaturePage({ params }: { params: {
 
   // Check if user is admin
   const { data: me } = await supabase.from("profiles").select("is_admin, role").eq("id", data.user.id).single()
-  if (!me?.is_admin && !["super_admin", "admin"].includes(me?.role || "")) {
+  if (!me?.is_admin && !["developer", "super_admin", "admin"].includes(me?.role || "")) {
     redirect("/dashboard")
   }
 

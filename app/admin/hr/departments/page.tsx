@@ -92,7 +92,8 @@ export default function DepartmentsPage() {
             ? [profile.department]
             : []
         const isHrGlobalLead = profile?.role === "lead" && leadDepartments.includes("Admin & HR")
-        const canManageDepartments = profile?.role === "super_admin" || profile?.role === "admin" || isHrGlobalLead
+        const canManageDepartments =
+          ["developer", "super_admin"].includes(profile?.role || "") || profile?.role === "admin" || isHrGlobalLead
 
         setCurrentUserAccess({
           canManageDepartments,

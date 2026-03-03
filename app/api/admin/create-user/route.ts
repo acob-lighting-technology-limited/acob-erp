@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
     const { firstName, lastName, otherNames, email, department, companyRole, phoneNumber, role, employeeNumber } = body
 
     // Validate role if provided
-    const allowedRoles = ["employee", "lead", "admin", "super_admin"]
+    const allowedRoles = ["employee", "lead", "admin", "super_admin", "developer"]
     if (role && !allowedRoles.includes(role)) {
       return NextResponse.json(
         {
@@ -52,6 +52,17 @@ export async function POST(request: NextRequest) {
           error: `Invalid role. Allowed values: ${allowedRoles.join(", ")}`,
         },
         { status: 400 }
+      )
+    }
+
+    if (role === "developer" && scope?.role !== "developer") {
+      return NextResponse.json({ success: false, error: "Only developer can assign developer role" }, { status: 403 })
+    }
+
+    if (role === "super_admin" && !["developer", "super_admin"].includes(scope?.role || "")) {
+      return NextResponse.json(
+        { success: false, error: "Only super admin or developer can assign super admin role" },
+        { status: 403 }
       )
     }
 
@@ -152,7 +163,7 @@ export async function POST(request: NextRequest) {
         company_role: companyRole || null,
         phone_number: phoneNumber || null,
         role: role || "employee",
-        is_admin: ["super_admin", "admin"].includes(role || "employee"),
+        is_admin: ["developer", "super_admin", "admin"].includes(role || "employee"),
         is_department_lead: role === "lead",
         lead_departments: role === "lead" ? [department] : [],
         employment_status: "active", // Explicitly set employment status

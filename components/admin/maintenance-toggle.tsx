@@ -10,17 +10,26 @@ export function MaintenanceToggle() {
   const [enabled, setEnabled] = useState(false)
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState(false)
+  const [isDeveloper, setIsDeveloper] = useState(false)
 
   useEffect(() => {
-    fetchSettings()
+    fetchSettingsAndRole()
   }, [])
 
-  async function fetchSettings() {
+  async function fetchSettingsAndRole() {
     try {
       const supabase = createClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (user?.id) {
+        const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
+        setIsDeveloper(profile?.role === "developer")
+      }
+
       const { data, error } = await supabase
         .from("system_settings")
-        .select("value")
+        .select("value, updated_by")
         .eq("key", "maintenance_mode")
         .single()
 
@@ -46,6 +55,15 @@ export function MaintenanceToggle() {
     setUpdating(true)
     try {
       const supabase = createClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (!isDeveloper) {
+        toast.error("Only developer can change maintenance mode")
+        return
+      }
+
       const newValue = {
         enabled: checked,
         message: "System is under maintenance. Please check back later.",
@@ -54,6 +72,7 @@ export function MaintenanceToggle() {
       const { error } = await supabase.from("system_settings").upsert({
         key: "maintenance_mode",
         value: newValue,
+        updated_by: user?.id ?? null,
       })
 
       if (error) {
@@ -83,11 +102,16 @@ export function MaintenanceToggle() {
         </Label>
         <p className="text-muted-foreground text-sm">
           {enabled
-            ? "System is currently locked. Only admins can access."
+            ? "System is currently locked. Only developer can access."
             : "System is active and accessible to all users."}
         </p>
       </div>
-      <Switch id="maintenance-mode" checked={enabled} onCheckedChange={handleToggle} disabled={loading || updating} />
+      <Switch
+        id="maintenance-mode"
+        checked={enabled}
+        onCheckedChange={handleToggle}
+        disabled={loading || updating || !isDeveloper}
+      />
     </div>
   )
 }

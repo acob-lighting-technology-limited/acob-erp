@@ -22,7 +22,7 @@ export async function AdminLayout({ children }: AdminLayoutProps) {
   // Check if user has admin privileges
   // Role hierarchy: super_admin > admin > lead > employee > visitor
   // Only super_admin, admin, and lead can access admin panel
-  if (!profile || !["super_admin", "admin", "lead"].includes(profile.role)) {
+  if (!profile || !["developer", "super_admin", "admin", "lead"].includes(profile.role)) {
     redirect("/dashboard")
   }
 

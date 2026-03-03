@@ -153,7 +153,7 @@ async function getTasksData() {
       if (task.assignment_type === "department") {
         const canChangeStatus =
           userProfile?.role === "admin" ||
-          userProfile?.role === "super_admin" ||
+          ["developer", "super_admin"].includes(userProfile?.role || "") ||
           (userProfile?.role === "lead" && userProfile?.lead_departments?.includes(task.department))
         taskData.can_change_status = canChangeStatus
       }

@@ -20,7 +20,7 @@ export default async function CommunicationsMeetingsRemindersPage() {
     .eq("id", user.id)
     .single()
 
-  if (!profile || !["super_admin", "admin"].includes(profile.role)) {
+  if (!profile || !["developer", "super_admin", "admin"].includes(profile.role)) {
     redirect("/dashboard")
   }
 

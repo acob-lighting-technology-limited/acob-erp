@@ -16,6 +16,9 @@ export default function MaintenancePage() {
           <p className="text-muted-foreground mb-4">
             The system is temporarily unavailable. We apologize for the inconvenience and will be back shortly.
           </p>
+          <p className="text-muted-foreground mb-2 text-sm">
+            Access is restricted to developer accounts during maintenance.
+          </p>
           <p className="text-sm text-gray-500">Please check back in a few minutes.</p>
         </CardContent>
       </Card>

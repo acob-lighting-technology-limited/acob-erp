@@ -61,8 +61,8 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         ["admin", "super_admin", "lead"].includes(profile.role) &&
         (profile.department === "Admin & HR" || (profile.lead_departments || []).includes("Admin & HR"))) ||
       (pendingApproval.approval_stage === "managing_director" &&
-        ["super_admin", "admin"].includes(profile.role) &&
-        (profile.department === "Executive Management" || profile.role === "super_admin"))
+        ["developer", "super_admin", "admin"].includes(profile.role) &&
+        (profile.department === "Executive Management" || ["developer", "super_admin"].includes(profile.role)))
 
     if (!canApproveStage) {
       return NextResponse.json({ error: "You are not authorized to decide this approval stage" }, { status: 403 })
@@ -171,8 +171,8 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
           }
 
           return (
-            ["super_admin", "admin"].includes(p.role) &&
-            (p.department === "Executive Management" || p.role === "super_admin")
+            ["developer", "super_admin", "admin"].includes(p.role) &&
+            (p.department === "Executive Management" || ["developer", "super_admin"].includes(p.role))
           )
         })
 
