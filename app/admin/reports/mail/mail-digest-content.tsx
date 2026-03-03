@@ -95,6 +95,24 @@ export function MailDigestContent({ employees, currentUser }: Props) {
   const [activeSchedules, setActiveSchedules] = useState<any[]>([])
   const [loadingSchedules, setLoadingSchedules] = useState(false)
 
+  const logMailAudit = useCallback(
+    async (params: { action: string; entityId: string; metadata?: Record<string, unknown> }) => {
+      try {
+        await supabase.rpc("log_audit", {
+          p_action: params.action,
+          p_entity_type: "mail_digest",
+          p_entity_id: params.entityId,
+          p_user_id: currentUser?.id || null,
+          p_metadata: params.metadata || {},
+          p_department: currentUser?.department || "Admin & HR",
+        })
+      } catch (error) {
+        console.error("[mail-digest] Failed to write audit log", error)
+      }
+    },
+    [currentUser?.department, currentUser?.id, supabase]
+  )
+
   // ── Fetch active schedules ──────────────────────────────────────────────────
   const fetchSchedules = useCallback(async () => {
     setLoadingSchedules(true)
@@ -366,6 +384,7 @@ export function MailDigestContent({ employees, currentUser }: Props) {
         meetingWeek: weekNumber,
         meetingYear: yearNumber,
         preparedByName: selectedPreparedBy,
+        requestedByUserId: currentUser?.id || null,
       }
 
       if (contentChoice === "weekly_report") {
@@ -400,6 +419,20 @@ export function MailDigestContent({ employees, currentUser }: Props) {
       } else {
         toast.warning(`Sent to ${successCount}, failed for ${failCount}`, { id: toastId })
       }
+
+      await logMailAudit({
+        action: "weekly_digest_sent",
+        entityId: crypto.randomUUID(),
+        metadata: {
+          meeting_week: weekNumber,
+          meeting_year: yearNumber,
+          content_choice: contentChoice,
+          prepared_by: selectedPreparedBy,
+          success_count: successCount,
+          failure_count: failCount,
+          recipient_count: resolvedRecipients.length,
+        },
+      })
     } catch (err: any) {
       console.error("[Mail Digest Error]", err)
       toast.error(err.message || "Failed to send digest", { id: toastId })

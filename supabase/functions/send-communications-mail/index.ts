@@ -1,7 +1,10 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0"
 import { Resend } from "npm:resend@2.0.0"
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")!
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -141,6 +144,7 @@ serve(async (req) => {
     if (!authHeader) return new Response("Unauthorized", { status: 401 })
 
     const resend = new Resend(RESEND_API_KEY)
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
     const body = await req.json()
 
     const recipients = body.recipients as string[] | undefined
@@ -148,6 +152,7 @@ serve(async (req) => {
     const broadcastBodyHtml = body.broadcastBodyHtml as string | undefined
     const broadcastDepartment = body.broadcastDepartment as string | undefined
     const broadcastPreparedByName = body.broadcastPreparedByName as string | undefined
+    const requestedByUserId = (body.requestedByUserId as string | undefined) || null
 
     if (!recipients || recipients.length === 0) {
       return new Response(JSON.stringify({ error: "No recipients" }), { status: 400 })
@@ -178,6 +183,29 @@ serve(async (req) => {
       }
 
       await sleep(SEND_INTERVAL_MS)
+    }
+
+    try {
+      const successCount = results.filter((r: any) => r.success).length
+      const failureCount = results.length - successCount
+      const auditEntityId = crypto.randomUUID()
+      await supabase.from("audit_logs").insert({
+        user_id: requestedByUserId,
+        action: "communications_broadcast_sent",
+        entity_type: "communications_mail",
+        entity_id: auditEntityId,
+        department,
+        metadata: {
+          reminder_type: "admin_broadcast",
+          recipient_count: recipients.length,
+          success_count: successCount,
+          failure_count: failureCount,
+          subject,
+          prepared_by: preparedBy,
+        },
+      })
+    } catch (auditErr) {
+      console.error("[communications-mail] Failed to write audit log:", auditErr)
     }
 
     return new Response(JSON.stringify({ success: true, type: "admin_broadcast", results }), {

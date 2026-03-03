@@ -1,7 +1,10 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0"
 import { Resend } from "npm:resend@2.0.0"
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")!
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -452,6 +455,7 @@ serve(async (req) => {
     if (!authHeader) return new Response("Unauthorized", { status: 401 })
 
     const resend = new Resend(RESEND_API_KEY)
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
     const body = await req.json()
 
     const {
@@ -467,6 +471,7 @@ serve(async (req) => {
       duration,
       knowledgeSharingDepartment,
       knowledgeSharingPresenter,
+      requestedByUserId,
     } = body as {
       type: ReminderType
       recipients: string[]
@@ -480,6 +485,7 @@ serve(async (req) => {
       duration?: string
       knowledgeSharingDepartment?: string
       knowledgeSharingPresenter?: KnowledgePresenter
+      requestedByUserId?: string
     }
 
     if (!recipients || recipients.length === 0) {
@@ -521,6 +527,31 @@ serve(async (req) => {
 
       // Throttle base send cadence to stay under provider limits.
       await sleep(SEND_INTERVAL_MS)
+    }
+
+    try {
+      const successCount = results.filter((r: any) => r.success).length
+      const failureCount = results.length - successCount
+      const auditEntityId = crypto.randomUUID()
+      await supabase.from("audit_logs").insert({
+        user_id: requestedByUserId || null,
+        action: "meeting_reminder_sent",
+        entity_type: "communications_mail",
+        entity_id: auditEntityId,
+        department: "Admin & HR",
+        metadata: {
+          reminder_type: type,
+          recipient_count: recipients.length,
+          success_count: successCount,
+          failure_count: failureCount,
+          subject,
+          meeting_date: meetingDate || null,
+          meeting_time: meetingTime || null,
+          prepared_by: meetingPreparedByName || null,
+        },
+      })
+    } catch (auditErr) {
+      console.error("[meeting-reminder] Failed to write audit log:", auditErr)
     }
 
     return new Response(JSON.stringify({ success: true, type, results }), {

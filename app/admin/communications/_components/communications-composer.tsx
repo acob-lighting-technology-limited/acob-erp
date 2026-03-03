@@ -258,6 +258,29 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
     runEditorCommand("createLink", url.trim())
   }, [runEditorCommand])
 
+  const logMailAudit = useCallback(
+    async (params: {
+      action: string
+      entityId: string
+      department?: string | null
+      metadata?: Record<string, unknown>
+    }) => {
+      try {
+        await supabase.rpc("log_audit", {
+          p_action: params.action,
+          p_entity_type: "communications_mail",
+          p_entity_id: params.entityId,
+          p_user_id: currentUser?.id || null,
+          p_metadata: params.metadata || {},
+          p_department: params.department || null,
+        })
+      } catch (error) {
+        console.error("[communications-mail] Failed to write audit log", error)
+      }
+    },
+    [currentUser?.id, supabase]
+  )
+
   const fetchSchedules = useCallback(async () => {
     try {
       const allowedTypes =
@@ -395,6 +418,7 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
           send_time: sendTiming === "recurring" ? recurringTime : scheduledTime,
           meeting_config: {
             type: reminderType,
+            requestedByUserId: currentUser?.id || null,
             meetingDate: reminderType === "meeting" ? meetingDate : undefined,
             meetingTime: reminderType === "meeting" ? meetingTime : undefined,
             teamsLink: reminderType === "meeting" ? teamsLink : undefined,
@@ -483,6 +507,7 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
       const payload: any = {
         type: reminderType,
         recipients: resolvedRecipients,
+        requestedByUserId: currentUser?.id || null,
       }
 
       if (reminderType === "meeting") {
@@ -541,6 +566,23 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
       } else {
         toast.warning(`Sent to ${successCount}, failed for ${failCount}`, { id: toastId })
       }
+
+      await logMailAudit({
+        action: reminderType === "admin_broadcast" ? "communications_broadcast_sent" : "meeting_reminder_sent",
+        entityId: crypto.randomUUID(),
+        department: reminderType === "admin_broadcast" ? broadcastDepartment : currentUserDept || "Admin & HR",
+        metadata: {
+          reminder_type: reminderType,
+          success_count: successCount,
+          failure_count: failCount,
+          recipient_count: resolvedRecipients.length,
+          subject: reminderType === "admin_broadcast" ? broadcastSubject.trim() : label,
+          prepared_by:
+            reminderType === "admin_broadcast"
+              ? selectedBroadcastPreparedBy?.full_name || null
+              : selectedMeetingPreparedBy?.full_name || null,
+        },
+      })
     } catch (err: any) {
       console.error("[Meeting Reminder Error]", err)
       toast.error(err.message || "Failed to send", { id: toastId })

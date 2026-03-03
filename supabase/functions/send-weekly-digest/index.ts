@@ -755,6 +755,7 @@ serve(async (req) => {
       weeklyReportFilename,
       actionTrackerFilename,
       preparedByName,
+      requestedByUserId,
     } = body
 
     const { week: currentWeek, year: currentYear } = getCurrentOfficeWeek()
@@ -917,6 +918,34 @@ serve(async (req) => {
         results.push({ to, success: true, emailId: data?.id })
       }
       await sleep(SEND_INTERVAL_MS)
+    }
+
+    try {
+      const successCount = results.filter((r: any) => r.success).length
+      const failureCount = results.length - successCount
+      const auditEntityId = crypto.randomUUID()
+      await supabase.from("audit_logs").insert({
+        user_id: requestedByUserId || null,
+        action: "weekly_digest_sent",
+        entity_type: "mail_digest",
+        entity_id: auditEntityId,
+        department: "Admin & HR",
+        metadata: {
+          meeting_week: meetingWeek,
+          meeting_year: meetingYear,
+          report_data_week: reportDataWeek,
+          report_data_year: reportDataYear,
+          tracker_week: atWeek,
+          tracker_year: atYear,
+          recipient_count: recipients.length,
+          success_count: successCount,
+          failure_count: failureCount,
+          prepared_by: preparedByName || "ACOB Team",
+          attachments: attachments.map((a) => a.filename),
+        },
+      })
+    } catch (auditErr) {
+      console.error("[digest] Failed to write audit log:", auditErr)
     }
 
     return new Response(
