@@ -16,6 +16,7 @@ import { formatName } from "@/lib/utils"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
+import { normalizeAuditAction } from "@/lib/audit/core"
 
 export interface AuditLog {
   id: string
@@ -28,6 +29,7 @@ export interface AuditLog {
   created_at: string
   department?: string | null
   changed_fields?: string[]
+  metadata?: Record<string, any>
   user?: {
     first_name: string
     last_name: string
@@ -607,11 +609,16 @@ export function AdminAuditLogsContent({
         const logsWithUsers = logsData.map((log: any) => {
           // Map database columns to UI interface
           // IMPORTANT: Use action (semantic: create/update/delete) not operation (raw SQL: INSERT/UPDATE/DELETE)
-          const action = log.action || log.operation?.toLowerCase() || "unknown"
+          const rawAction = log.action || log.operation?.toLowerCase() || "update"
+          const action = normalizeAuditAction(rawAction).action
           const entity_type = log.entity_type || log.table_name || "unknown"
           const entity_id = log.record_id || log.entity_id
           const old_values = log.metadata?.old_values || log.old_values
           const new_values = log.metadata?.new_values || log.new_values
+          const metadata = {
+            ...(log.metadata || {}),
+            ...(log.metadata?.event ? {} : rawAction !== action ? { event: rawAction } : {}),
+          }
 
           // Determine target_user based on entity type
           // For assignments (asset/device/task), look up the assigned_to user
@@ -708,6 +715,7 @@ export function AdminAuditLogsContent({
             entity_id,
             old_values: enrichedOldValues,
             new_values: enrichedNewValues,
+            metadata,
             created_at: log.created_at,
             user: log.user_id ? usersMap.get(log.user_id) : null,
             target_user,
@@ -791,6 +799,7 @@ export function AdminAuditLogsContent({
     const matchesSearch =
       (log.entity_type || "").toLowerCase().includes(normalizedQuery) ||
       (log.action || "").toLowerCase().includes(normalizedQuery) ||
+      (typeof log.metadata?.event === "string" ? log.metadata.event.toLowerCase().includes(normalizedQuery) : false) ||
       (log.user as any)?.first_name?.toLowerCase().includes(normalizedQuery) ||
       (log.user as any)?.last_name?.toLowerCase().includes(normalizedQuery)
 
@@ -863,9 +872,29 @@ export function AdminAuditLogsContent({
         return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
       case "assign":
         return "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400"
+      case "unassign":
+        return "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400"
+      case "approve":
+        return "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400"
+      case "reject":
+        return "bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-400"
+      case "dispatch":
+        return "bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-400"
+      case "send":
+        return "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400"
+      case "status_change":
+        return "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
       default:
         return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
     }
+  }
+
+  const getActionDisplay = (log: AuditLog): string => {
+    const eventLabel =
+      typeof log.metadata?.event === "string" && log.metadata.event.trim().length > 0
+        ? log.metadata.event
+        : log.action || "unknown"
+    return eventLabel.toUpperCase()
   }
 
   // Normalize entity types to consistent categories for display
@@ -1322,7 +1351,7 @@ export function AdminAuditLogsContent({
 
       const dataToExport = filteredLogs.map((log, index) => ({
         "#": index + 1,
-        Action: (log.action || "unknown").toUpperCase(),
+        Action: getActionDisplay(log),
         Module: getNormalizedEntityType(log.entity_type),
         Object: getObjectIdentifier(log),
         Target: getTargetDescription(log),
@@ -1375,7 +1404,7 @@ export function AdminAuditLogsContent({
 
       const dataToExport = filteredLogs.map((log, index) => [
         index + 1,
-        (log.action || "unknown").toUpperCase(),
+        getActionDisplay(log),
         getNormalizedEntityType(log.entity_type),
         getObjectIdentifier(log),
         getTargetDescription(log),
@@ -1450,7 +1479,7 @@ export function AdminAuditLogsContent({
             new TableRow({
               children: [
                 new TableCell({ children: [new Paragraph((index + 1).toString())] }),
-                new TableCell({ children: [new Paragraph((log.action || "unknown").toUpperCase())] }),
+                new TableCell({ children: [new Paragraph(getActionDisplay(log))] }),
                 new TableCell({ children: [new Paragraph(getNormalizedEntityType(log.entity_type))] }),
                 new TableCell({ children: [new Paragraph(getObjectIdentifier(log))] }),
                 new TableCell({ children: [new Paragraph(getTargetDescription(log))] }),
@@ -1615,6 +1644,12 @@ export function AdminAuditLogsContent({
                   <SelectItem value="update">Update</SelectItem>
                   <SelectItem value="delete">Delete</SelectItem>
                   <SelectItem value="assign">Assign</SelectItem>
+                  <SelectItem value="unassign">Unassign</SelectItem>
+                  <SelectItem value="approve">Approve</SelectItem>
+                  <SelectItem value="reject">Reject</SelectItem>
+                  <SelectItem value="dispatch">Dispatch</SelectItem>
+                  <SelectItem value="send">Send</SelectItem>
+                  <SelectItem value="status_change">Status Change</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -1812,7 +1847,7 @@ export function AdminAuditLogsContent({
                     <TableRow key={log.id}>
                       <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
                       <TableCell>
-                        <Badge className={getActionColor(log.action)}>{(log.action || "unknown").toUpperCase()}</Badge>
+                        <Badge className={getActionColor(log.action)}>{getActionDisplay(log)}</Badge>
                       </TableCell>
                       <TableCell>
                         <span className="text-foreground text-sm font-medium">
@@ -1857,7 +1892,7 @@ export function AdminAuditLogsContent({
                   <div className="flex items-start justify-between">
                     <div className="flex-1 space-y-2">
                       <div className="flex flex-wrap items-center gap-3">
-                        <Badge className={getActionColor(log.action)}>{(log.action || "unknown").toUpperCase()}</Badge>
+                        <Badge className={getActionColor(log.action)}>{getActionDisplay(log)}</Badge>
                         <span className="text-foreground text-sm font-medium">
                           {getNormalizedEntityType(log.entity_type)}
                         </span>
@@ -1956,7 +1991,7 @@ export function AdminAuditLogsContent({
                 <div className="space-y-2">
                   <Label className="text-sm font-semibold">Action</Label>
                   <div>
-                    <Badge className={getActionColor(selectedLog.action)}>{selectedLog.action.toUpperCase()}</Badge>
+                    <Badge className={getActionColor(selectedLog.action)}>{getActionDisplay(selectedLog)}</Badge>
                   </div>
                 </div>
                 <div className="space-y-2">

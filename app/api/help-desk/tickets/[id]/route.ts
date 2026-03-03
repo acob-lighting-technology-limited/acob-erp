@@ -142,10 +142,15 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       details: updates,
     })
 
+    const auditAction = nextStatus && nextStatus !== ticket.status ? "status_change" : "update"
+
     await appendAuditLog({
       actorId: user.id,
-      action: "help_desk_ticket_updated",
+      action: auditAction,
       entityId: ticket.id,
+      department: ticket.service_department,
+      route: "/api/help-desk/tickets/[id]",
+      critical: Boolean(nextStatus && nextStatus !== ticket.status),
       oldValues: { status: ticket.status, csat_rating: ticket.csat_rating },
       newValues: { status: updated.status, csat_rating: updated.csat_rating },
     })

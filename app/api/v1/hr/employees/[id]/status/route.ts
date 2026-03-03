@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
+import { writeAuditLog } from "@/lib/audit/write-audit"
 import { NextRequest, NextResponse } from "next/server"
 import type { EmploymentStatus } from "@/types/database"
 import { getSeparationBlockers } from "@/lib/hr/separation-blockers"
@@ -64,7 +65,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     // Get current employee status for audit
     const { data: currentEmployee } = await supabase
       .from("profiles")
-      .select("employment_status, first_name, last_name")
+      .select("employment_status, first_name, last_name, department")
       .eq("id", employeeId)
       .single()
 
@@ -154,22 +155,33 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       }
     }
 
-    // Create audit log entry
-    await supabase.from("audit_logs").insert({
-      user_id: user.id,
-      action: "employee_status_change",
-      entity_type: "profile",
-      entity_id: employeeId,
-      old_values: { employment_status: oldStatus },
-      new_values: {
-        employment_status: status,
-        reason: selectedReason,
-        ...(status === "on_leave" && leave_type_id && { leave_type_id }),
-        ...(status === "on_leave" && leave_type_name && { leave_type_name }),
-        ...(status === "suspended" && suspension_end_date && { suspension_end_date }),
-        ...(status === "separated" && separation_date && { separation_date }),
+    await writeAuditLog(
+      supabase as any,
+      {
+        action: "status_change",
+        entityType: "profile",
+        entityId: employeeId,
+        oldValues: { employment_status: oldStatus },
+        newValues: {
+          employment_status: status,
+          reason: selectedReason,
+          ...(status === "on_leave" && leave_type_id && { leave_type_id }),
+          ...(status === "on_leave" && leave_type_name && { leave_type_name }),
+          ...(status === "suspended" && suspension_end_date && { suspension_end_date }),
+          ...(status === "separated" && separation_date && { separation_date }),
+        },
+        metadata: {
+          event: "employee_status_change",
+        },
+        context: {
+          actorId: user.id,
+          source: "api",
+          route: "/api/v1/hr/employees/[id]/status",
+          department: currentEmployee.department || null,
+        },
       },
-    })
+      { critical: true }
+    )
 
     return NextResponse.json({
       success: true,

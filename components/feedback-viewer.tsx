@@ -13,6 +13,7 @@ import Link from "next/link"
 import { toast } from "sonner"
 import { Eye, List, LayoutGrid, MessageSquare } from "lucide-react"
 import { formatName } from "@/lib/utils"
+import { writeAuditLogClient } from "@/lib/audit/client"
 
 interface FeedbackViewerProps {
   feedback: any[]
@@ -95,17 +96,28 @@ export function FeedbackViewer({ feedback }: FeedbackViewerProps) {
       if (error) throw error
 
       // Log audit
-      await supabase.rpc("log_audit", {
-        p_action: "update",
-        p_entity_type: "feedback",
-        p_entity_id: selectedFeedback.id,
-        p_old_values: {
-          status: selectedFeedback.status,
+      await writeAuditLogClient(
+        supabase as any,
+        {
+          action: "status_change",
+          entityType: "feedback",
+          entityId: selectedFeedback.id,
+          oldValues: {
+            status: selectedFeedback.status,
+          },
+          newValues: {
+            status: newStatus,
+          },
+          metadata: {
+            event: "feedback_status_updated",
+          },
+          context: {
+            source: "ui",
+            route: "/admin/feedback",
+          },
         },
-        p_new_values: {
-          status: newStatus,
-        },
-      })
+        { failOpen: true }
+      )
 
       toast.success("Status updated successfully!")
 

@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
+import { writeAuditLogClient } from "@/lib/audit/client"
 
 interface FeedbackEditModalProps {
   feedback: any
@@ -42,21 +43,29 @@ export function FeedbackEditModal({ feedback, onClose, onSave }: FeedbackEditMod
       if (error) throw error
 
       // Log audit
-      await supabase.rpc("log_audit", {
-        p_action: "update",
-        p_entity_type: "feedback",
-        p_entity_id: feedback.id,
-        p_old_values: {
-          feedback_type: feedback.feedback_type,
-          title: feedback.title,
-          description: feedback.description,
+      await writeAuditLogClient(
+        supabase as any,
+        {
+          action: "update",
+          entityType: "feedback",
+          entityId: feedback.id,
+          oldValues: {
+            feedback_type: feedback.feedback_type,
+            title: feedback.title,
+            description: feedback.description,
+          },
+          newValues: {
+            feedback_type: formData.feedbackType,
+            title: formData.title,
+            description: formData.description,
+          },
+          context: {
+            source: "ui",
+            route: "/feedback",
+          },
         },
-        p_new_values: {
-          feedback_type: formData.feedbackType,
-          title: formData.title,
-          description: formData.description,
-        },
-      })
+        { failOpen: true }
+      )
 
       toast.success("Feedback updated successfully!")
       onSave({

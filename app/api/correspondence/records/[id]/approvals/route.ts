@@ -128,6 +128,9 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       actorId: user.id,
       action: `correspondence_approval_${decision}`,
       recordId: record.id,
+      department: approvalScopeDepartment || null,
+      route: "/api/correspondence/records/[id]/approvals",
+      critical: true,
       oldValues: { status: record.status },
       newValues: { status: updatedRecord.status, decision },
     })

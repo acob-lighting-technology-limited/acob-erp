@@ -9,6 +9,7 @@ import { toast } from "sonner"
 import { Briefcase, Save, Edit2, Clock, Printer } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { formatName } from "@/lib/utils"
+import { writeAuditLogClient } from "@/lib/audit/client"
 
 export default function JobDescriptionPage() {
   const [jobDescription, setJobDescription] = useState("")
@@ -81,13 +82,22 @@ export default function JobDescriptionPage() {
 
       if (error) throw error
 
-      // Log audit
-      await supabase.rpc("log_audit", {
-        p_action: "update",
-        p_entity_type: "job_description",
-        p_entity_id: user.id,
-        p_new_values: { job_description: jobDescription },
-      })
+      await writeAuditLogClient(
+        supabase as any,
+        {
+          action: "update",
+          entityType: "job_description",
+          entityId: user.id,
+          newValues: { job_description: jobDescription },
+          context: {
+            source: "ui",
+            route: "/tools/job-description",
+            department: profile?.department || null,
+            actorId: user.id,
+          },
+        },
+        { failOpen: true }
+      )
 
       toast.success("Job description saved successfully")
       setIsEditing(false)

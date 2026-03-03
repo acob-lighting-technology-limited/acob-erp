@@ -224,6 +224,9 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       actorId: user.id,
       action: `help_desk_approval_${normalizedDecision}`,
       entityId: ticket.id,
+      department: ticket.service_department,
+      route: "/api/help-desk/tickets/[id]/approvals",
+      critical: true,
       newValues: {
         approval_stage: pendingApproval.approval_stage,
         decision: normalizedDecision,

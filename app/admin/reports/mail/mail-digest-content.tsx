@@ -30,6 +30,7 @@ import {
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { getCurrentOfficeWeek } from "@/lib/meeting-week"
+import { writeAuditLogClient } from "@/lib/audit/client"
 
 type Employee = {
   id: string
@@ -98,14 +99,25 @@ export function MailDigestContent({ employees, currentUser }: Props) {
   const logMailAudit = useCallback(
     async (params: { action: string; entityId: string; metadata?: Record<string, unknown> }) => {
       try {
-        await supabase.rpc("log_audit", {
-          p_action: params.action,
-          p_entity_type: "mail_digest",
-          p_entity_id: params.entityId,
-          p_user_id: currentUser?.id || null,
-          p_metadata: params.metadata || {},
-          p_department: currentUser?.department || "Admin & HR",
-        })
+        await writeAuditLogClient(
+          supabase as any,
+          {
+            action: "send",
+            entityType: "mail_digest",
+            entityId: params.entityId,
+            metadata: {
+              ...(params.metadata || {}),
+              event: params.action,
+            },
+            context: {
+              actorId: currentUser?.id || undefined,
+              department: currentUser?.department || "Admin & HR",
+              source: "ui",
+              route: "/admin/reports/mail-digest",
+            },
+          },
+          { failOpen: true }
+        )
       } catch (error) {
         console.error("[mail-digest] Failed to write audit log", error)
       }

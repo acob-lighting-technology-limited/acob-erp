@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { createClient } from "@/lib/supabase/client"
+import { writeAuditLogClient } from "@/lib/audit/client"
 import { toast } from "sonner"
 import { FileText, Plus, Edit2, Trash2, Save, Eye, EyeOff, Search, Tag, LayoutGrid, List } from "lucide-react"
 import {
@@ -166,27 +167,50 @@ export function DocumentationContent({ initialDocs, userId }: DocumentationConte
 
         if (error) throw error
 
-        await supabase.rpc("log_audit", {
-          p_action: "update",
-          p_entity_type: "documentation",
-          p_entity_id: selectedDoc.id,
-          p_new_values: docData,
-        })
+        await writeAuditLogClient(
+          supabase as any,
+          {
+            action: "update",
+            entityType: "documentation",
+            entityId: selectedDoc.id,
+            newValues: docData,
+            context: {
+              source: "ui",
+              route: "/documentation",
+              actorId: userId,
+            },
+          },
+          { failOpen: true }
+        )
 
         toast.success("Documentation updated")
       } else {
-        const { error } = await supabase.from("user_documentation").insert({
-          ...docData,
-          created_at: new Date().toISOString(),
-        })
+        const { data: createdDoc, error } = await supabase
+          .from("user_documentation")
+          .insert({
+            ...docData,
+            created_at: new Date().toISOString(),
+          })
+          .select("id")
+          .single()
 
         if (error) throw error
 
-        await supabase.rpc("log_audit", {
-          p_action: "create",
-          p_entity_type: "documentation",
-          p_new_values: docData,
-        })
+        await writeAuditLogClient(
+          supabase as any,
+          {
+            action: "create",
+            entityType: "documentation",
+            entityId: createdDoc.id,
+            newValues: docData,
+            context: {
+              source: "ui",
+              route: "/documentation",
+              actorId: userId,
+            },
+          },
+          { failOpen: true }
+        )
 
         toast.success("Documentation created")
       }
@@ -210,11 +234,24 @@ export function DocumentationContent({ initialDocs, userId }: DocumentationConte
 
       if (error) throw error
 
-      await supabase.rpc("log_audit", {
-        p_action: "delete",
-        p_entity_type: "documentation",
-        p_entity_id: selectedDoc.id,
-      })
+      await writeAuditLogClient(
+        supabase as any,
+        {
+          action: "delete",
+          entityType: "documentation",
+          entityId: selectedDoc.id,
+          oldValues: {
+            title: selectedDoc.title,
+            category: selectedDoc.category,
+          },
+          context: {
+            source: "ui",
+            route: "/documentation",
+            actorId: userId,
+          },
+        },
+        { failOpen: true }
+      )
 
       toast.success("Documentation deleted")
       setIsDeleteDialogOpen(false)

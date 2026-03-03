@@ -139,6 +139,9 @@ export async function POST(request: NextRequest) {
       actorId: user.id,
       action: "correspondence_record_created",
       recordId: created.id,
+      department: created.department_name || created.assigned_department_name || null,
+      route: "/api/correspondence/records",
+      critical: false,
       newValues: {
         reference_number: created.reference_number,
         direction: created.direction,

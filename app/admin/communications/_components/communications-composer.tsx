@@ -3,6 +3,7 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
+import { writeAuditLogClient } from "@/lib/audit/client"
 import { PageWrapper, PageHeader } from "@/components/layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -266,14 +267,25 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
       metadata?: Record<string, unknown>
     }) => {
       try {
-        await supabase.rpc("log_audit", {
-          p_action: params.action,
-          p_entity_type: "communications_mail",
-          p_entity_id: params.entityId,
-          p_user_id: currentUser?.id || null,
-          p_metadata: params.metadata || {},
-          p_department: params.department || null,
-        })
+        await writeAuditLogClient(
+          supabase as any,
+          {
+            action: "send",
+            entityType: "communications_mail",
+            entityId: params.entityId,
+            metadata: {
+              ...(params.metadata || {}),
+              event: params.action,
+            },
+            context: {
+              actorId: currentUser?.id || undefined,
+              department: params.department || null,
+              source: "ui",
+              route: "/admin/communications",
+            },
+          },
+          { failOpen: true }
+        )
       } catch (error) {
         console.error("[communications-mail] Failed to write audit log", error)
       }

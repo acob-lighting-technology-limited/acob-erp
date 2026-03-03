@@ -2,6 +2,7 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { AdminAuditLogsContent, type AuditLog, type employeeMember, type UserProfile } from "./admin-audit-logs-content"
 import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
+import { normalizeAuditAction } from "@/lib/audit/core"
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -264,14 +265,23 @@ async function getAuditLogsData(): Promise<AuditLogsData> {
         targetUser = usersMap.get(log.entity_id)
       }
 
+      const rawAction = log.action || log.operation || "update"
+      const normalizedAction = normalizeAuditAction(rawAction).action
+      const metadata = {
+        ...(log.metadata || {}),
+        ...(log.metadata?.event ? {} : rawAction !== normalizedAction ? { event: rawAction } : {}),
+      }
+
       return {
+        ...log,
         id: log.id,
         user_id: log.user_id,
-        action: log.action,
+        action: normalizedAction,
         entity_type: log.entity_type,
         entity_id: log.entity_id,
         old_values: log.old_values,
         new_values: log.new_values,
+        metadata,
         created_at: log.created_at,
         department,
         changed_fields,

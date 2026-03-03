@@ -79,6 +79,9 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       actorId: user.id,
       action: "correspondence_record_linked_incoming",
       recordId: record.id,
+      department: record.department_name || record.assigned_department_name || null,
+      route: "/api/correspondence/records/[id]/link-response",
+      critical: false,
       oldValues: { incoming_reference_id: record.incoming_reference_id },
       newValues: { incoming_reference_id: incomingRecord.id },
     })

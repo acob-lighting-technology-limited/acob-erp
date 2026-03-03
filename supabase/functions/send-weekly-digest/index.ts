@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0"
 import { Resend } from "npm:resend@2.0.0"
 import { PDFDocument, rgb, StandardFonts } from "npm:pdf-lib@1.17.1"
+import { writeEdgeAuditLog } from "../_shared/audit.ts"
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")!
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!
@@ -924,12 +925,14 @@ serve(async (req) => {
       const successCount = results.filter((r: any) => r.success).length
       const failureCount = results.length - successCount
       const auditEntityId = crypto.randomUUID()
-      await supabase.from("audit_logs").insert({
-        user_id: requestedByUserId || null,
+      await writeEdgeAuditLog(supabase as any, {
         action: "weekly_digest_sent",
-        entity_type: "mail_digest",
-        entity_id: auditEntityId,
+        entityType: "mail_digest",
+        entityId: auditEntityId,
+        actorId: requestedByUserId || null,
         department: "Admin & HR",
+        source: "edge",
+        route: "/functions/send-weekly-digest",
         metadata: {
           meeting_week: meetingWeek,
           meeting_year: meetingYear,

@@ -159,6 +159,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
         actorId: user.id,
         action: "correspondence_proof_uploaded",
         recordId: record.id,
+        department: record.department_name || record.assigned_department_name || null,
+        route: "/api/correspondence/records/[id]/documents",
+        critical: false,
         oldValues: { proof_of_delivery_path: record.proof_of_delivery_path },
         newValues: { proof_of_delivery_path: filePath },
       })
@@ -208,6 +211,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
       actorId: user.id,
       action: "correspondence_version_uploaded",
       recordId: record.id,
+      department: record.department_name || record.assigned_department_name || null,
+      route: "/api/correspondence/records/[id]/documents",
+      critical: false,
       oldValues: { current_version: record.current_version },
       newValues: { current_version: nextVersion, file_path: filePath, document_type: documentType },
     })
