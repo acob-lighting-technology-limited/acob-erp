@@ -109,6 +109,7 @@ export interface UserProfile {
 
 interface AdminAuditLogsContentProps {
   initialLogs: AuditLog[]
+  initialTotalCount: number
   initialemployee: employeeMember[]
   initialDepartments: string[]
   userProfile: UserProfile
@@ -116,6 +117,7 @@ interface AdminAuditLogsContentProps {
 
 export function AdminAuditLogsContent({
   initialLogs,
+  initialTotalCount,
   initialemployee,
   initialDepartments,
   userProfile,
@@ -125,6 +127,7 @@ export function AdminAuditLogsContent({
   const HIDDEN_ACTIONS = ["sync", "migrate", "update_schema", "migration"]
 
   const [logs, setLogs] = useState<AuditLog[]>(initialLogs)
+  const [totalCount, setTotalCount] = useState<number>(initialTotalCount)
   const [employee] = useState<employeeMember[]>(initialemployee)
   const [departments] = useState<string[]>(initialDepartments)
   const [isLoading, setIsLoading] = useState(false)
@@ -151,10 +154,18 @@ export function AdminAuditLogsContent({
   const loadLogs = async () => {
     setIsLoading(true)
     try {
+      const { count } = await supabase
+        .from("audit_logs")
+        .select("id", { count: "exact", head: true })
+        .not("action", "in", '("sync","migrate","update_schema","migration")')
+
+      setTotalCount(count || 0)
+
       // Fetch audit logs without join first
       const { data: logsData, error: logsError } = await supabase
         .from("audit_logs")
         .select("*")
+        .not("action", "in", '("sync","migrate","update_schema","migration")')
         .order("created_at", { ascending: false })
         .limit(500)
 
@@ -1488,7 +1499,7 @@ export function AdminAuditLogsContent({
   }
 
   const stats = {
-    total: logs.length,
+    total: totalCount,
     creates: logs.filter((l) => l.action === "create").length,
     updates: logs.filter((l) => l.action === "update").length,
     deletes: logs.filter((l) => l.action === "delete").length,
@@ -1926,8 +1937,8 @@ export function AdminAuditLogsContent({
       {/* Pagination info */}
       {filteredLogs.length > 0 && (
         <div className="text-muted-foreground text-center text-sm">
-          Showing {filteredLogs.length} of {logs.length} total logs
-          {logs.length >= 500 && " (limited to last 500 entries)"}
+          Showing {filteredLogs.length} of {totalCount} total logs
+          {totalCount > logs.length && ` (limited to last ${logs.length} entries)`}
         </div>
       )}
       {/* Details Dialog */}

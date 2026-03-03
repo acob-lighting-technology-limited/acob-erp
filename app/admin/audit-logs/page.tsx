@@ -7,7 +7,14 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 type AuditLogsData =
   | { kind: "redirect"; redirect: string }
-  | { kind: "data"; logs: AuditLog[]; employee: employeeMember[]; departments: string[]; userProfile: UserProfile }
+  | {
+      kind: "data"
+      logs: AuditLog[]
+      totalCount: number
+      employee: employeeMember[]
+      departments: string[]
+      userProfile: UserProfile
+    }
 
 async function getAuditLogsData(): Promise<AuditLogsData> {
   const supabase = await createClient()
@@ -48,10 +55,21 @@ async function getAuditLogsData(): Promise<AuditLogsData> {
 
   if (logsError) {
     console.error("Audit logs error:", logsError)
-    return { kind: "data", logs: [], employee: [], departments: [], userProfile }
+    return { kind: "data", logs: [], totalCount: 0, employee: [], departments: [], userProfile }
   }
 
+  let countQuery = supabase
+    .from("audit_logs")
+    .select("id", { count: "exact", head: true })
+    .not("action", "in", '("sync","migrate","update_schema","migration")')
+  if (departmentScope) {
+    countQuery =
+      departmentScope.length > 0 ? countQuery.in("department", departmentScope) : countQuery.eq("id", "__none__")
+  }
+  const { count } = await countQuery
+
   let logs: AuditLog[] = []
+  const totalCount = count || 0
   let employee: employeeMember[] = []
   let departments: string[] = []
 
@@ -288,7 +306,7 @@ async function getAuditLogsData(): Promise<AuditLogsData> {
     departments.sort()
   }
 
-  return { kind: "data", logs, employee, departments, userProfile }
+  return { kind: "data", logs, totalCount, employee, departments, userProfile }
 }
 
 export default async function AuditLogsPage() {
@@ -298,11 +316,12 @@ export default async function AuditLogsPage() {
     redirect(data.redirect)
   }
 
-  const { logs, employee, departments, userProfile } = data
+  const { logs, totalCount, employee, departments, userProfile } = data
 
   return (
     <AdminAuditLogsContent
       initialLogs={logs}
+      initialTotalCount={totalCount}
       initialemployee={employee}
       initialDepartments={departments}
       userProfile={userProfile}
