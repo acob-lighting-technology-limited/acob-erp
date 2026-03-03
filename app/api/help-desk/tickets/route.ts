@@ -136,6 +136,9 @@ export async function POST(request: NextRequest) {
       actorId: user.id,
       action: "help_desk_ticket_created",
       entityId: created.id,
+      department: serviceDepartment,
+      route: "/api/help-desk/tickets",
+      critical: false,
       newValues: {
         status: created.status,
         request_type: created.request_type,

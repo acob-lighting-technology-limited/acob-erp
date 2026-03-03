@@ -10,6 +10,7 @@ import { Briefcase, Save, Edit2, Clock, Printer } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { formatName } from "@/lib/utils"
 import { PageHeader, PageWrapper } from "@/components/layout"
+import { writeAuditLogClient } from "@/lib/audit/client"
 
 export default function JobDescriptionPage() {
   const [jobDescription, setJobDescription] = useState("")
@@ -82,18 +83,22 @@ export default function JobDescriptionPage() {
 
       if (error) throw error
 
-      // Log audit
-      const { error: auditError } = await supabase.rpc("log_audit", {
-        p_action: "update",
-        p_entity_type: "job_description",
-        p_entity_id: user.id,
-        p_new_values: { job_description: jobDescription },
-      })
-
-      if (auditError) {
-        console.error("Error logging job description audit:", auditError)
-        // Optionally handle audit error specifically
-      }
+      await writeAuditLogClient(
+        supabase as any,
+        {
+          action: "update",
+          entityType: "job_description",
+          entityId: user.id,
+          newValues: { job_description: jobDescription },
+          context: {
+            source: "ui",
+            route: "/job-description",
+            department: profile?.department || null,
+            actorId: user.id,
+          },
+        },
+        { failOpen: true }
+      )
 
       toast.success("Job description saved successfully")
       setIsEditing(false)

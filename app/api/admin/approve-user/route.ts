@@ -2,7 +2,6 @@ import { createClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
 import { Resend } from "resend"
 import { createClient as createServerClient } from "@/lib/supabase/server"
-import crypto from "crypto"
 import { renderWelcomeEmail } from "@/lib/email-templates/welcome"
 import { renderInternalNotificationEmail } from "@/lib/email-templates/internal-notification"
 
@@ -122,13 +121,8 @@ export async function POST(req: Request) {
       }
     }
 
-    // Secure Token-based Setup Flow
-    const setupToken = crypto.randomBytes(32).toString("hex")
-    // Store hash in DB, email raw token
-    const setupTokenHash = crypto.createHash("sha256").update(setupToken).digest("hex")
-    const setupTokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24 hours
-    const publicUrl = process.env.NEXT_PUBLIC_APP_URL || "https://erp.acoblighting.com"
-    const setupUrl = `${publicUrl}/auth/setup-account?token=${setupToken}`
+    const tempPassword = `Welcome${currentYear}!`
+    const portalUrl = "https://acoblighting.com/mail"
 
     // 3. Create or Update Auth User
     // First check if user already exists
@@ -143,7 +137,7 @@ export async function POST(req: Request) {
     if (!authUserId) {
       const { data: newAuthUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
         email: pendingUser.company_email,
-        password: crypto.randomBytes(16).toString("hex"), // Random secure original password
+        password: tempPassword,
         email_confirm: true,
         user_metadata: {
           first_name: pendingUser.first_name,
@@ -156,6 +150,14 @@ export async function POST(req: Request) {
         throw new Error(`Auth creation failed: ${authError.message}`)
       }
       authUserId = newAuthUser.user.id
+    } else {
+      const { error: updateAuthError } = await supabaseAdmin.auth.admin.updateUserById(authUserId, {
+        password: tempPassword,
+        email_confirm: true,
+      })
+      if (updateAuthError) {
+        throw new Error(`Auth update failed: ${updateAuthError.message}`)
+      }
     }
 
     // 4. Upsert Profile Record with Retry for Employee ID
@@ -205,9 +207,9 @@ export async function POST(req: Request) {
           office_location: pendingUser.office_location,
           employment_date: hireDate || new Date().toISOString(),
           updated_at: new Date().toISOString(),
-          setup_token: setupTokenHash,
-          setup_token_expires_at: setupTokenExpiresAt,
-          must_reset_password: true,
+          setup_token: null,
+          setup_token_expires_at: null,
+          must_reset_password: false,
         },
         { onConflict: "id" }
       )
@@ -254,7 +256,7 @@ export async function POST(req: Request) {
         from: "ACOB Admin & HR <notifications@acoblighting.com>",
         to: [pendingUser.personal_email],
         subject: "Welcome to ACOB - Login Credentials",
-        html: renderWelcomeEmail({ pendingUser, employeeId, setupUrl }),
+        html: renderWelcomeEmail({ pendingUser, employeeId, tempPassword, portalUrl }),
       })
     } catch (emailError) {
       console.error("Failed to send welcome email:", emailError)

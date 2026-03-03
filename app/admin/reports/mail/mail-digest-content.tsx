@@ -30,6 +30,7 @@ import {
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { getCurrentOfficeWeek } from "@/lib/meeting-week"
+import { writeAuditLogClient } from "@/lib/audit/client"
 
 type Employee = {
   id: string
@@ -94,6 +95,35 @@ export function MailDigestContent({ employees, currentUser }: Props) {
   // Active schedules from DB
   const [activeSchedules, setActiveSchedules] = useState<any[]>([])
   const [loadingSchedules, setLoadingSchedules] = useState(false)
+
+  const logMailAudit = useCallback(
+    async (params: { action: string; entityId: string; metadata?: Record<string, unknown> }) => {
+      try {
+        await writeAuditLogClient(
+          supabase as any,
+          {
+            action: "send",
+            entityType: "mail_digest",
+            entityId: params.entityId,
+            metadata: {
+              ...(params.metadata || {}),
+              event: params.action,
+            },
+            context: {
+              actorId: currentUser?.id || undefined,
+              department: currentUser?.department || "Admin & HR",
+              source: "ui",
+              route: "/admin/reports/mail-digest",
+            },
+          },
+          { failOpen: true }
+        )
+      } catch (error) {
+        console.error("[mail-digest] Failed to write audit log", error)
+      }
+    },
+    [currentUser?.department, currentUser?.id, supabase]
+  )
 
   // ── Fetch active schedules ──────────────────────────────────────────────────
   const fetchSchedules = useCallback(async () => {
@@ -366,6 +396,7 @@ export function MailDigestContent({ employees, currentUser }: Props) {
         meetingWeek: weekNumber,
         meetingYear: yearNumber,
         preparedByName: selectedPreparedBy,
+        requestedByUserId: currentUser?.id || null,
       }
 
       if (contentChoice === "weekly_report") {
@@ -400,6 +431,20 @@ export function MailDigestContent({ employees, currentUser }: Props) {
       } else {
         toast.warning(`Sent to ${successCount}, failed for ${failCount}`, { id: toastId })
       }
+
+      await logMailAudit({
+        action: "weekly_digest_sent",
+        entityId: crypto.randomUUID(),
+        metadata: {
+          meeting_week: weekNumber,
+          meeting_year: yearNumber,
+          content_choice: contentChoice,
+          prepared_by: selectedPreparedBy,
+          success_count: successCount,
+          failure_count: failCount,
+          recipient_count: resolvedRecipients.length,
+        },
+      })
     } catch (err: any) {
       console.error("[Mail Digest Error]", err)
       toast.error(err.message || "Failed to send digest", { id: toastId })

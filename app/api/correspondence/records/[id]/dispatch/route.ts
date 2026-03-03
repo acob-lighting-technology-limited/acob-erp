@@ -80,6 +80,9 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       actorId: user.id,
       action: "correspondence_record_dispatched",
       recordId: record.id,
+      department: record.department_name || record.assigned_department_name || null,
+      route: "/api/correspondence/records/[id]/dispatch",
+      critical: true,
       oldValues: {
         status: record.status,
         is_locked: record.is_locked,

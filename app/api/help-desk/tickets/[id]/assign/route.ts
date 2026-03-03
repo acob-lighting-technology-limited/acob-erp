@@ -66,6 +66,9 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       actorId: user.id,
       action: "help_desk_ticket_assigned",
       entityId: ticket.id,
+      department: ticket.service_department,
+      route: "/api/help-desk/tickets/[id]/assign",
+      critical: true,
       oldValues: { assigned_to: ticket.assigned_to },
       newValues: { assigned_to },
     })

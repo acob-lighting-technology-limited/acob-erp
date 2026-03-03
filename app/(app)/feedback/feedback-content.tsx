@@ -14,6 +14,7 @@ import { FeedbackEditModal } from "@/components/feedback-edit-modal"
 import { AppTablePage } from "@/components/app/app-table-page"
 import { Edit2, MessageSquare, Plus, Search, Trash2 } from "lucide-react"
 import type { Feedback } from "./page"
+import { writeAuditLogClient } from "@/lib/audit/client"
 
 interface FeedbackContentProps {
   initialFeedback: Feedback[]
@@ -85,17 +86,25 @@ export function FeedbackContent({ initialFeedback, userId }: FeedbackContentProp
 
       if (feedbackToDelete) {
         try {
-          await supabase.rpc("log_audit", {
-            p_action: "delete",
-            p_entity_type: "feedback",
-            p_entity_id: id,
-            p_old_values: {
-              feedback_type: feedbackToDelete.feedback_type,
-              title: feedbackToDelete.title,
-              description: feedbackToDelete.description,
-              status: feedbackToDelete.status,
+          await writeAuditLogClient(
+            supabase as any,
+            {
+              action: "delete",
+              entityType: "feedback",
+              entityId: id,
+              oldValues: {
+                feedback_type: feedbackToDelete.feedback_type,
+                title: feedbackToDelete.title,
+                description: feedbackToDelete.description,
+                status: feedbackToDelete.status,
+              },
+              context: {
+                source: "ui",
+                route: "/feedback",
+              },
             },
-          })
+            { failOpen: true }
+          )
         } catch (auditError) {
           console.error("Failed to log audit for feedback deletion:", auditError)
         }

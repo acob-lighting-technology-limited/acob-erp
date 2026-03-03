@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import { toast } from "sonner"
 import { EyeOff } from "lucide-react"
+import { writeAuditLogClient } from "@/lib/audit/client"
 
 interface FeedbackFormProps {
   userId: string
@@ -57,21 +58,26 @@ export function FeedbackForm({ userId, onFeedbackSubmitted, variant = "card" }: 
 
       // Log audit for all feedback - anonymous ones will show as "Anonymous" in the audit log
       if (data && data.length > 0) {
-        const { error: auditError } = await supabase.rpc("log_audit", {
-          p_action: "create",
-          p_entity_type: "feedback",
-          p_entity_id: data[0].id,
-          p_new_values: {
-            feedback_type: formData.feedbackType,
-            title: formData.title,
-            description: formData.description,
-            status: "open",
-            is_anonymous: isAnonymous,
+        await writeAuditLogClient(
+          supabase as any,
+          {
+            action: "create",
+            entityType: "feedback",
+            entityId: data[0].id,
+            newValues: {
+              feedback_type: formData.feedbackType,
+              title: formData.title,
+              description: formData.description,
+              status: "open",
+              is_anonymous: isAnonymous,
+            },
+            context: {
+              source: "ui",
+              route: "/feedback",
+            },
           },
-        })
-        if (auditError) {
-          console.error("Failed to log audit:", auditError)
-        }
+          { failOpen: true }
+        )
       }
 
       toast.success(isAnonymous ? "Anonymous feedback submitted" : "Feedback submitted successfully!")

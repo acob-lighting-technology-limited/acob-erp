@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Trash2, Edit2 } from "lucide-react"
 import { toast } from "sonner"
 import { FeedbackEditModal } from "./feedback-edit-modal"
+import { writeAuditLogClient } from "@/lib/audit/client"
 
 interface UserFeedbackListProps {
   feedback: any[]
@@ -63,17 +64,25 @@ export function UserFeedbackList({ feedback }: UserFeedbackListProps) {
 
       // Log audit
       if (feedbackToDelete) {
-        await supabase.rpc("log_audit", {
-          p_action: "delete",
-          p_entity_type: "feedback",
-          p_entity_id: id,
-          p_old_values: {
-            feedback_type: feedbackToDelete.feedback_type,
-            title: feedbackToDelete.title,
-            description: feedbackToDelete.description,
-            status: feedbackToDelete.status,
+        await writeAuditLogClient(
+          supabase as any,
+          {
+            action: "delete",
+            entityType: "feedback",
+            entityId: id,
+            oldValues: {
+              feedback_type: feedbackToDelete.feedback_type,
+              title: feedbackToDelete.title,
+              description: feedbackToDelete.description,
+              status: feedbackToDelete.status,
+            },
+            context: {
+              source: "ui",
+              route: "/feedback",
+            },
           },
-        })
+          { failOpen: true }
+        )
       }
 
       setFeedbackList(feedbackList.filter((item) => item.id !== id))

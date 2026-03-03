@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { resolveAdminScope } from "@/lib/admin/rbac"
+import { writeAuditLog } from "@/lib/audit/write-audit"
 
 export const HELP_DESK_PRIORITIES = ["low", "medium", "high", "urgent"] as const
 export const HELP_DESK_STATUSES = [
@@ -130,14 +131,28 @@ export async function appendAuditLog(params: {
   entityId: string
   oldValues?: Record<string, unknown>
   newValues?: Record<string, unknown>
+  department?: string | null
+  route?: string
+  critical?: boolean
 }) {
   const supabase = await createClient()
-  await supabase.from("audit_logs").insert({
-    user_id: params.actorId,
-    action: params.action,
-    entity_type: "help_desk_ticket",
-    entity_id: params.entityId,
-    old_values: params.oldValues ?? null,
-    new_values: params.newValues ?? null,
-  })
+  await writeAuditLog(
+    supabase as any,
+    {
+      action: params.action,
+      entityType: "help_desk_ticket",
+      entityId: params.entityId,
+      oldValues: params.oldValues ?? null,
+      newValues: params.newValues ?? null,
+      context: {
+        actorId: params.actorId,
+        department: params.department ?? null,
+        source: "api",
+        route: params.route ?? "/api/help-desk",
+      },
+    },
+    {
+      critical: params.critical,
+    }
+  )
 }

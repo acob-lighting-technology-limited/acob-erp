@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0"
 import { Resend } from "npm:resend@2.0.0"
 import { PDFDocument, rgb, StandardFonts } from "npm:pdf-lib@1.17.1"
+import { writeEdgeAuditLog } from "../_shared/audit.ts"
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")!
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!
@@ -755,6 +756,7 @@ serve(async (req) => {
       weeklyReportFilename,
       actionTrackerFilename,
       preparedByName,
+      requestedByUserId,
     } = body
 
     const { week: currentWeek, year: currentYear } = getCurrentOfficeWeek()
@@ -917,6 +919,36 @@ serve(async (req) => {
         results.push({ to, success: true, emailId: data?.id })
       }
       await sleep(SEND_INTERVAL_MS)
+    }
+
+    try {
+      const successCount = results.filter((r: any) => r.success).length
+      const failureCount = results.length - successCount
+      const auditEntityId = crypto.randomUUID()
+      await writeEdgeAuditLog(supabase as any, {
+        action: "weekly_digest_sent",
+        entityType: "mail_digest",
+        entityId: auditEntityId,
+        actorId: requestedByUserId || null,
+        department: "Admin & HR",
+        source: "edge",
+        route: "/functions/send-weekly-digest",
+        metadata: {
+          meeting_week: meetingWeek,
+          meeting_year: meetingYear,
+          report_data_week: reportDataWeek,
+          report_data_year: reportDataYear,
+          tracker_week: atWeek,
+          tracker_year: atYear,
+          recipient_count: recipients.length,
+          success_count: successCount,
+          failure_count: failureCount,
+          prepared_by: preparedByName || "ACOB Team",
+          attachments: attachments.map((a) => a.filename),
+        },
+      })
+    } catch (auditErr) {
+      console.error("[digest] Failed to write audit log:", auditErr)
     }
 
     return new Response(

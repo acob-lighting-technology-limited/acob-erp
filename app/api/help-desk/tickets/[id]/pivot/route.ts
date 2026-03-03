@@ -109,6 +109,9 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       actorId: user.id,
       action: "help_desk_ticket_pivoted_to_procurement",
       entityId: ticket.id,
+      department: ticket.service_department,
+      route: "/api/help-desk/tickets/[id]/pivot",
+      critical: true,
       oldValues: { request_type: ticket.request_type, status: ticket.status },
       newValues: { request_type: "procurement", status: "pending_approval", procurement_reason: pivotReason },
     })

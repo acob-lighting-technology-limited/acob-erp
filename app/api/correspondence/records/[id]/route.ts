@@ -162,10 +162,15 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       })
     }
 
+    const auditAction = nextStatus && nextStatus !== record.status ? "status_change" : "update"
+
     await appendCorrespondenceAuditLog({
       actorId: user.id,
-      action: "correspondence_record_updated",
+      action: auditAction,
       recordId: record.id,
+      department: record.department_name || record.assigned_department_name || null,
+      route: "/api/correspondence/records/[id]",
+      critical: Boolean(nextStatus && nextStatus !== record.status),
       oldValues: {
         status: record.status,
         is_locked: record.is_locked,

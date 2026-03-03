@@ -14,10 +14,11 @@ export interface PendingUser {
 interface WelcomeEmailProps {
   pendingUser: PendingUser
   employeeId: string
-  setupUrl: string
+  tempPassword: string
+  portalUrl: string
 }
 
-export function renderWelcomeEmail({ pendingUser, employeeId, setupUrl }: WelcomeEmailProps) {
+export function renderWelcomeEmail({ pendingUser, employeeId, tempPassword, portalUrl }: WelcomeEmailProps) {
   const firstName = escapeHtml(pendingUser.first_name)
   const lastName = escapeHtml(pendingUser.last_name)
   const dept = escapeHtml(pendingUser.department)
@@ -26,7 +27,8 @@ export function renderWelcomeEmail({ pendingUser, employeeId, setupUrl }: Welcom
   const workLoc = escapeHtml(pendingUser.current_work_location)
   const officeLoc = pendingUser.office_location ? escapeHtml(pendingUser.office_location) : ""
   const empId = escapeHtml(employeeId)
-  const safeSetupUrl = escapeHtml(setupUrl)
+  const safeTempPassword = escapeHtml(tempPassword)
+  const safePortalUrl = escapeHtml(portalUrl)
 
   return `
 <!DOCTYPE html>
@@ -102,21 +104,25 @@ export function renderWelcomeEmail({ pendingUser, employeeId, setupUrl }: Welcom
         </div>
 
         <div class="card" style="margin-top: 20px;">
-            <div class="card-header status-header-neutral" style="background: #f0fdf4; color: #15803d; border-bottom-color: #bbf7d0;">Account Activation</div>
+            <div class="card-header status-header-neutral" style="background: #f0fdf4; color: #15803d; border-bottom-color: #bbf7d0;">Login Credentials</div>
             <table>
                 <tr>
-                    <td class="label">Setup URL</td>
-                    <td class="value"><a href="${safeSetupUrl}" style="color: #16a34a; text-decoration: none; font-weight: 700;">ACTIVATE MY ACCOUNT</a></td>
+                    <td class="label">Portal URL</td>
+                    <td class="value"><a href="${safePortalUrl}" style="color: #16a34a; text-decoration: none;">Webmail Login</a></td>
                 </tr>
                 <tr>
                     <td class="label">Company Email</td>
                     <td class="value"><span class="credential">${email}</span></td>
                 </tr>
+                <tr>
+                    <td class="label">Temporary Password</td>
+                    <td class="value"><span class="credential">${safeTempPassword}</span></td>
+                </tr>
             </table>
         </div>
 
         <div class="cta">
-            <a href="${safeSetupUrl}" class="button">Set Up Password</a>
+            <a href="${safePortalUrl}" class="button">Login to Portal</a>
         </div>
         <div class="support">
             Please log in and change your password immediately.<br>
