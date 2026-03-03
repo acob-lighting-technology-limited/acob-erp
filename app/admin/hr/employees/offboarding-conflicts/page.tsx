@@ -21,7 +21,7 @@ export default async function OffboardingConflictsPage() {
   }
 
   const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
-  if (!profile || !["super_admin", "admin"].includes(profile.role)) {
+  if (!profile || !["developer", "super_admin", "admin"].includes(profile.role)) {
     redirect("/dashboard")
   }
 

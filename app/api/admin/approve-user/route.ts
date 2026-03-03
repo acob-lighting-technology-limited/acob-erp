@@ -17,7 +17,7 @@ export async function POST(req: Request) {
   }
 
   const { data: callerProfile } = await supabase.from("profiles").select("role").eq("id", caller.id).single()
-  if (!callerProfile || !["super_admin", "admin"].includes(callerProfile.role)) {
+  if (!callerProfile || !["developer", "super_admin", "admin"].includes(callerProfile.role)) {
     return NextResponse.json({ error: "Forbidden: Admin access required" }, { status: 403 })
   }
 

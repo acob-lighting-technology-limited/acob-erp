@@ -104,7 +104,7 @@ export function WeeklyReportsContent({
 
   const supabase = createClient()
   const isLead = currentUser.role === "lead"
-  const isAdminRole = currentUser.role === "admin" || currentUser.role === "super_admin"
+  const isAdminRole = ["developer", "admin", "super_admin"].includes(currentUser.role)
   const canMutateReport = (report: WeeklyReport) => !isLead || report.user_id === currentUser.id
 
   const loadReports = async () => {

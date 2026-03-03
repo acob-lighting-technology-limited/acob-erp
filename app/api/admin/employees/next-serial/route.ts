@@ -19,7 +19,7 @@ export async function GET() {
     // Check authorization - restrict to admins
     const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
 
-    if (!profile || !["super_admin", "admin"].includes(profile.role)) {
+    if (!profile || !["developer", "super_admin", "admin"].includes(profile.role)) {
       return NextResponse.json({ error: "Forbidden: Admin access required" }, { status: 403 })
     }
 

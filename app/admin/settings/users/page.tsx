@@ -15,7 +15,17 @@ import Link from "next/link"
 import { toast } from "sonner"
 
 // Allowlist of valid roles for validation
-const ALLOWED_ROLES = ["super_admin", "admin", "manager", "employee", "user", "employee", "lead", "visitor"] as const
+const ALLOWED_ROLES = [
+  "developer",
+  "super_admin",
+  "admin",
+  "manager",
+  "employee",
+  "user",
+  "employee",
+  "lead",
+  "visitor",
+] as const
 type AllowedRole = (typeof ALLOWED_ROLES)[number]
 
 function isValidRole(role: string): role is AllowedRole {
@@ -36,6 +46,7 @@ interface User {
 }
 
 const roleColors: Record<string, string> = {
+  developer: "destructive",
   super_admin: "destructive",
   admin: "default",
   manager: "default",
@@ -54,6 +65,7 @@ export default function UsersPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [formData, setFormData] = useState({ role: "", employment_status: "active" })
+  const [currentUserRole, setCurrentUserRole] = useState<string>("")
 
   useEffect(() => {
     const roleParam = searchParams.get("role")
@@ -86,6 +98,14 @@ export default function UsersPage() {
       }))
 
       setUsers(mappedUsers)
+
+      const {
+        data: { user: currentUser },
+      } = await supabase.auth.getUser()
+      if (currentUser?.id) {
+        const { data: me } = await supabase.from("profiles").select("role").eq("id", currentUser.id).single()
+        setCurrentUserRole(me?.role || "")
+      }
     } catch (error) {
       console.error("Error:", error)
       toast.error("Failed to load users")
@@ -99,36 +119,17 @@ export default function UsersPage() {
     if (!editingUser) return
 
     try {
-      const supabase = createClient()
-
-      // Security Check: Only super_admin can assign super_admin role
-      if (formData.role === "super_admin") {
-        const {
-          data: { user: currentUser },
-        } = await supabase.auth.getUser()
-        const { data: currentUserProfile } = await supabase
-          .from("profiles")
-          .select("role")
-          .eq("id", currentUser?.id)
-          .single()
-
-        if (currentUserProfile?.role !== "super_admin") {
-          toast.error("Only Super Admins can assign the Super Admin role.")
-          return
-        }
-      }
-
-      // Use the explicit employment_status from formData instead of deriving from is_active
-      // This preserves 'separated' status and only changes when explicitly modified
-      const { error } = await supabase
-        .from("profiles")
-        .update({
+      const response = await fetch("/api/admin/users/role", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          targetUserId: editingUser.id,
           role: formData.role,
           employment_status: formData.employment_status,
-        })
-        .eq("id", editingUser.id)
-
-      if (error) throw error
+        }),
+      })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || "Failed to update")
 
       toast.success("User updated")
       setIsDialogOpen(false)
@@ -162,7 +163,7 @@ export default function UsersPage() {
   const stats = {
     total: users.length,
     active: users.filter((u) => u.is_active).length,
-    admins: users.filter((u) => u.role === "admin" || u.role === "super_admin").length,
+    admins: users.filter((u) => ["developer", "admin", "super_admin"].includes(u.role)).length,
   }
 
   const roles = Array.from(new Set(users.map((u) => u.role)))
@@ -215,47 +216,13 @@ export default function UsersPage() {
     if (!userToAdd || roleFilter === "all") return
 
     try {
-      const supabase = createClient()
-
-      // 1. Security Check: Cannot change Super Admin or Self
-      const {
-        data: { user: currentUser },
-      } = await supabase.auth.getUser()
-      const targetUser = availableUsers.find((u) => u.id === userToAdd)
-
-      if (targetUser?.id === currentUser?.id) {
-        toast.error("You cannot change your own role.")
-        return
-      }
-
-      if (targetUser?.role === "super_admin") {
-        toast.error("Cannot modify a Super Admin.")
-        return
-      }
-
-      // 2. Security Check: Only super_admin can assign super_admin role
-      if (roleFilter === "super_admin") {
-        const { data: currentUserProfile } = await supabase
-          .from("profiles")
-          .select("role")
-          .eq("id", currentUser?.id)
-          .single()
-
-        if (currentUserProfile?.role !== "super_admin") {
-          toast.error("Only Super Admins can assign the Super Admin role.")
-          return
-        }
-      }
-
-      // Assuming only super_admin can create super_admins.
-      // For now, let's assume standard checks via RLS or backend.
-
-      const { error } = await supabase
-        .from("profiles")
-        .update({ role: roleFilter as any })
-        .eq("id", userToAdd)
-
-      if (error) throw error
+      const response = await fetch("/api/admin/users/role", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ targetUserId: userToAdd, role: roleFilter }),
+      })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || "Failed to update role")
 
       toast.success(`User role updated to ${roleFilter}`)
       setIsAddUserDialogOpen(false)
@@ -439,6 +406,7 @@ export default function UsersPage() {
                     <SelectItem value="lead">Lead</SelectItem>
                     <SelectItem value="admin">Admin</SelectItem>
                     <SelectItem value="super_admin">Super Admin</SelectItem>
+                    {currentUserRole === "developer" && <SelectItem value="developer">Developer</SelectItem>}
                   </SelectContent>
                 </Select>
               </div>

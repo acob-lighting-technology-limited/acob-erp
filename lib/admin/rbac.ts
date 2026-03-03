@@ -2,8 +2,9 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 
-export type AdminRole = "super_admin" | "admin" | "lead" | "employee" | "visitor" | string
+export type AdminRole = "developer" | "super_admin" | "admin" | "lead" | "employee" | "visitor" | string
 export type AdminSection =
+  | "dev"
   | "assets"
   | "audit-logs"
   | "documentation"
@@ -71,14 +72,15 @@ function hasDepartmentAlias(departments: string[], aliases: string[]): boolean {
 }
 
 export function isAdminLikeRole(role: string | null | undefined): boolean {
-  return role === "admin" || role === "super_admin"
+  return role === "developer" || role === "admin" || role === "super_admin"
 }
 
 export function roleCanEnterAdmin(role: string | null | undefined): boolean {
-  return role === "super_admin" || role === "admin" || role === "lead"
+  return role === "developer" || role === "super_admin" || role === "admin" || role === "lead"
 }
 
 export function canAccessAdminSection(scope: AdminScope, section: AdminSection): boolean {
+  if (section === "dev") return scope.role === "developer"
   if (scope.isAdminLike) return true
   if (scope.role !== "lead") return false
 

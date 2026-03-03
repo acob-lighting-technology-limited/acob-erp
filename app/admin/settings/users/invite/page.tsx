@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -15,6 +15,7 @@ import { toast } from "sonner"
 export default function InviteUserPage() {
   const router = useRouter()
   const [sending, setSending] = useState(false)
+  const [currentUserRole, setCurrentUserRole] = useState("")
   const [formData, setFormData] = useState({
     email: "",
     first_name: "",
@@ -22,6 +23,19 @@ export default function InviteUserPage() {
     role: "employee",
     department: "",
   })
+
+  useEffect(() => {
+    const loadCurrentRole = async () => {
+      const supabase = createClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) return
+      const { data: me } = await supabase.from("profiles").select("role").eq("id", user.id).single()
+      setCurrentUserRole(me?.role || "")
+    }
+    loadCurrentRole()
+  }, [])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -118,7 +132,10 @@ export default function InviteUserPage() {
                   <SelectContent>
                     <SelectItem value="employee">Employee</SelectItem>
                     <SelectItem value="manager">Manager</SelectItem>
+                    <SelectItem value="lead">Lead</SelectItem>
                     <SelectItem value="admin">Admin</SelectItem>
+                    <SelectItem value="super_admin">Super Admin</SelectItem>
+                    {currentUserRole === "developer" && <SelectItem value="developer">Developer</SelectItem>}
                   </SelectContent>
                 </Select>
               </div>

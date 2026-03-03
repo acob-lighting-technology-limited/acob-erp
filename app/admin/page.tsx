@@ -115,7 +115,7 @@ const primaryModules: ModuleAction[] = [
     href: "/admin/hr",
     icon: Users,
     color: "bg-teal-500",
-    roles: ["super_admin", "admin", "lead"],
+    roles: ["developer", "super_admin", "admin", "lead"],
   },
   {
     title: "Task Management",
@@ -123,7 +123,7 @@ const primaryModules: ModuleAction[] = [
     href: "/admin/tasks",
     icon: ClipboardList,
     color: "bg-green-500",
-    roles: ["super_admin", "admin", "lead"],
+    roles: ["developer", "super_admin", "admin", "lead"],
   },
   {
     title: "Help Desk",
@@ -131,7 +131,7 @@ const primaryModules: ModuleAction[] = [
     href: "/admin/help-desk",
     icon: ClipboardList,
     color: "bg-emerald-500",
-    roles: ["super_admin", "admin", "lead"],
+    roles: ["developer", "super_admin", "admin", "lead"],
   },
   {
     title: "Reference Generator",
@@ -139,7 +139,7 @@ const primaryModules: ModuleAction[] = [
     href: "/admin/tools/reference-generator",
     icon: FileText,
     color: "bg-violet-500",
-    roles: ["super_admin", "admin", "lead"],
+    roles: ["developer", "super_admin", "admin", "lead"],
   },
   {
     title: "Reports",
@@ -147,7 +147,7 @@ const primaryModules: ModuleAction[] = [
     href: "/admin/reports",
     icon: FileText,
     color: "bg-orange-500",
-    roles: ["super_admin", "admin", "lead"],
+    roles: ["developer", "super_admin", "admin", "lead"],
   },
   {
     title: "Finance",
@@ -155,7 +155,7 @@ const primaryModules: ModuleAction[] = [
     href: "/admin/finance",
     icon: CreditCard,
     color: "bg-indigo-500",
-    roles: ["super_admin", "admin", "lead"],
+    roles: ["developer", "super_admin", "admin", "lead"],
   },
   {
     title: "Projects",
@@ -163,7 +163,7 @@ const primaryModules: ModuleAction[] = [
     href: "/admin/projects",
     icon: FolderKanban,
     color: "bg-fuchsia-500",
-    roles: ["super_admin", "admin", "lead"],
+    roles: ["developer", "super_admin", "admin", "lead"],
   },
 ]
 
@@ -174,7 +174,7 @@ const secondaryModules: ModuleAction[] = [
     href: "/admin/hr/employees",
     icon: Users,
     color: "bg-blue-500",
-    roles: ["super_admin", "admin", "lead"],
+    roles: ["developer", "super_admin", "admin", "lead"],
   },
   {
     title: "Asset Management",
@@ -182,7 +182,7 @@ const secondaryModules: ModuleAction[] = [
     href: "/admin/assets",
     icon: Package,
     color: "bg-purple-500",
-    roles: ["super_admin", "admin", "lead"],
+    roles: ["developer", "super_admin", "admin", "lead"],
   },
   {
     title: "Documentation",
@@ -190,7 +190,7 @@ const secondaryModules: ModuleAction[] = [
     href: "/admin/documentation",
     icon: FileText,
     color: "bg-orange-500",
-    roles: ["super_admin", "admin", "lead"],
+    roles: ["developer", "super_admin", "admin", "lead"],
   },
   {
     title: "Job Descriptions",
@@ -198,7 +198,7 @@ const secondaryModules: ModuleAction[] = [
     href: "/admin/job-descriptions",
     icon: Briefcase,
     color: "bg-pink-500",
-    roles: ["super_admin", "admin", "lead"],
+    roles: ["developer", "super_admin", "admin", "lead"],
   },
   {
     title: "Feedback Management",
@@ -206,7 +206,7 @@ const secondaryModules: ModuleAction[] = [
     href: "/admin/feedback",
     icon: MessageSquare,
     color: "bg-cyan-500",
-    roles: ["super_admin", "admin", "lead"],
+    roles: ["developer", "super_admin", "admin", "lead"],
   },
   {
     title: "Audit Logs",
@@ -214,7 +214,7 @@ const secondaryModules: ModuleAction[] = [
     href: "/admin/audit-logs",
     icon: ScrollText,
     color: "bg-red-500",
-    roles: ["super_admin", "admin", "lead"],
+    roles: ["developer", "super_admin", "admin", "lead"],
   },
   {
     title: "Payments",
@@ -222,7 +222,7 @@ const secondaryModules: ModuleAction[] = [
     href: "/admin/finance/payments",
     icon: CreditCard,
     color: "bg-indigo-500",
-    roles: ["super_admin", "admin", "lead"],
+    roles: ["developer", "super_admin", "admin", "lead"],
   },
 ]
 

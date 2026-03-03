@@ -630,7 +630,7 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
         }}
       />
 
-      <div className="grid items-start gap-6 lg:grid-cols-3">
+      <div className="flex flex-col gap-6 lg:grid lg:grid-cols-3 lg:items-start">
         {/* ── LEFT: Settings ────────────────────────────────────────────── */}
         <div className="space-y-6 lg:col-span-2">
           {/* Reminder Type */}
@@ -1309,7 +1309,7 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
         </div>
 
         {/* ── RIGHT: Summary & Send ─────────────────────────────────────── */}
-        <aside className="space-y-6 self-start lg:sticky lg:top-[120px] lg:max-h-[calc(100vh-136px)] lg:overflow-y-auto lg:pr-1">
+        <aside className="space-y-6 lg:sticky lg:top-[120px] lg:max-h-[calc(100vh-136px)] lg:self-start lg:overflow-y-auto lg:pr-1">
           <Card className="border-orange-200 dark:border-orange-900">
             <CardHeader className="pb-3">
               <CardTitle className="text-lg">Summary</CardTitle>

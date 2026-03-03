@@ -79,7 +79,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       }
       if (["admin", "super_admin"].includes(p.role) && p.department === "Admin & HR") return true
       if (["admin", "super_admin"].includes(p.role) && p.department === "Executive Management") return true
-      if (p.role === "super_admin") return true
+      if (p.role === "developer" || p.role === "super_admin") return true
       return false
     })
 

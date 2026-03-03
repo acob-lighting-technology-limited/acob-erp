@@ -37,7 +37,7 @@ async function HeaderWrapperWithData() {
   // Use role-based access to keep header behavior aligned with admin route guard rules.
   let canAccessAdmin = false
   const { data: profile } = await supabase.from("profiles").select("role").eq("id", data.user.id).single()
-  canAccessAdmin = !!profile?.role && ["super_admin", "admin", "lead"].includes(profile.role)
+  canAccessAdmin = !!profile?.role && ["developer", "super_admin", "admin", "lead"].includes(profile.role)
 
   // Serialize only the necessary user data to avoid hydration issues
   const userData = {

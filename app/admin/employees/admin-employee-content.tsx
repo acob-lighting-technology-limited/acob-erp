@@ -210,7 +210,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
 
   const supabase = createClient()
   const isHrGlobalLead = userProfile?.role === "lead" && (userProfile?.managed_departments || []).includes("Admin & HR")
-  const canManageUsers = userProfile?.role === "super_admin" || userProfile?.role === "admin" || isHrGlobalLead
+  const canManageUsers = ["developer", "super_admin", "admin"].includes(userProfile?.role || "") || isHrGlobalLead
 
   // Handle userId from search params (for edit dialog)
   useEffect(() => {
@@ -651,7 +651,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         company_role: editForm.company_role || null,
         is_department_lead: isLead,
         lead_departments: isLead ? editForm.lead_departments : [],
-        is_admin: ["super_admin", "admin"].includes(editForm.role),
+        is_admin: ["developer", "super_admin", "admin"].includes(editForm.role),
         updated_at: new Date().toISOString(),
         // Always include expanded fields if they exist in form state
         first_name: editForm.first_name || null,
@@ -800,11 +800,11 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
 
   const departments = Array.from(new Set(employee.map((s) => s.department).filter(Boolean))) as string[]
 
-  const roles: UserRole[] = ["visitor", "employee", "lead", "admin", "super_admin"]
+  const roles: UserRole[] = ["visitor", "employee", "lead", "admin", "super_admin", "developer"]
 
   const stats = {
     total: employee.length,
-    admins: employee.filter((s) => ["super_admin", "admin"].includes(s.role)).length,
+    admins: employee.filter((s) => ["developer", "super_admin", "admin"].includes(s.role)).length,
     leads: employee.filter((s) => s.role === "lead").length,
     employee: employee.filter((s) => s.role === "employee").length,
   }
@@ -1103,7 +1103,9 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
   const getAvailableRoles = (): UserRole[] => {
     if (!userProfile) return []
 
-    if (userProfile.role === "super_admin") {
+    if (userProfile.role === "developer") {
+      return ["visitor", "employee", "lead", "admin", "super_admin", "developer"]
+    } else if (userProfile.role === "super_admin") {
       return ["visitor", "employee", "lead", "admin", "super_admin"]
     } else if (userProfile.role === "admin") {
       return ["visitor", "employee", "lead"]
