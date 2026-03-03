@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -10,6 +10,9 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { PageHeader, PageWrapper } from "@/components/layout"
+import { FileCode2, Plus } from "lucide-react"
 import type { CorrespondenceRecord } from "@/types/correspondence"
 
 interface DepartmentCodeOption {
@@ -21,6 +24,7 @@ interface PortalCorrespondenceContentProps {
   userId: string
   currentViewerName: string
   currentViewerDepartment: string
+  currentViewerRole?: string
   initialRecords: CorrespondenceRecord[]
   departmentCodes: DepartmentCodeOption[]
 }
@@ -28,6 +32,7 @@ interface PortalCorrespondenceContentProps {
 export function PortalCorrespondenceContent({
   currentViewerName,
   currentViewerDepartment,
+  currentViewerRole,
   initialRecords,
   departmentCodes,
 }: PortalCorrespondenceContentProps) {
@@ -37,8 +42,10 @@ export function PortalCorrespondenceContent({
 
   const [records, setRecords] = useState<CorrespondenceRecord[]>(initialRecords)
   const [isSaving, setIsSaving] = useState(false)
+  const [createOpen, setCreateOpen] = useState(false)
   const [dispatchingId, setDispatchingId] = useState<string | null>(null)
   const [linkingId, setLinkingId] = useState<string | null>(null)
+  const pendingRef = useRef<HTMLDivElement | null>(null)
   const [linkReference, setLinkReference] = useState<Record<string, string>>({})
   const [form, setForm] = useState({
     direction: "outgoing",
@@ -64,6 +71,11 @@ export function PortalCorrespondenceContent({
       incoming: records.filter((r) => r.direction === "incoming").length,
     }
   }, [records])
+  const isLead = currentViewerRole === "lead"
+  const pendingRecords = useMemo(
+    () => records.filter((r) => ["open", "under_review", "assigned_action_pending"].includes(r.status)),
+    [records]
+  )
 
   async function refreshRecords() {
     const res = await fetch("/api/correspondence/records", { cache: "no-store" })
@@ -112,6 +124,7 @@ export function PortalCorrespondenceContent({
       }
 
       toast.success("Correspondence created")
+      setCreateOpen(false)
       setForm({
         direction: "outgoing",
         department_name: initialDepartment,
@@ -212,7 +225,195 @@ export function PortalCorrespondenceContent({
   const incomingOptions = records.filter((r) => r.direction === "incoming")
 
   return (
-    <div className="space-y-6 p-6">
+    <PageWrapper maxWidth="full" background="gradient">
+      <PageHeader
+        title="Reference Generator"
+        description="Create and manage correspondence references."
+        icon={FileCode2}
+        backLink={{ href: "/profile", label: "Back to Dashboard" }}
+        actions={
+          <>
+            {isLead && pendingRecords.length > 0 && (
+              <Button
+                variant="outline"
+                onClick={() => pendingRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+              >
+                Pending ({pendingRecords.length})
+              </Button>
+            )}
+            <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Create Reference
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-3xl">
+                <DialogHeader>
+                  <DialogTitle>Create Reference</DialogTitle>
+                  <DialogDescription>Fill the correspondence details and submit.</DialogDescription>
+                </DialogHeader>
+                <form className="grid gap-4 md:grid-cols-2" onSubmit={createRecord}>
+                  <div className="space-y-2">
+                    <Label>Direction</Label>
+                    <Select
+                      value={form.direction}
+                      onValueChange={(value) => setForm((prev) => ({ ...prev, direction: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="outgoing">Outgoing</SelectItem>
+                        <SelectItem value="incoming">Incoming</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {form.direction === "outgoing" ? (
+                    <div className="space-y-2">
+                      <Label>Department</Label>
+                      <Select
+                        value={form.department_name}
+                        onValueChange={(value) => setForm((prev) => ({ ...prev, department_name: value }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select department" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {departmentCodes.map((dept) => (
+                            <SelectItem key={dept.department_name} value={dept.department_name}>
+                              {dept.department_name} ({dept.department_code})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <Label>Assign Department</Label>
+                      <Select
+                        value={form.assigned_department_name}
+                        onValueChange={(value) => setForm((prev) => ({ ...prev, assigned_department_name: value }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select department" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {departmentCodes.map((dept) => (
+                            <SelectItem key={dept.department_name} value={dept.department_name}>
+                              {dept.department_name} ({dept.department_code})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  <div className="space-y-2 md:col-span-2">
+                    <Label>Subject</Label>
+                    <Input value={form.subject} onChange={(e) => setForm((prev) => ({ ...prev, subject: e.target.value }))} />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Recipient</Label>
+                    <Input
+                      value={form.recipient_name}
+                      onChange={(e) => setForm((prev) => ({ ...prev, recipient_name: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Sender</Label>
+                    <Input
+                      value={form.sender_name}
+                      onChange={(e) => setForm((prev) => ({ ...prev, sender_name: e.target.value }))}
+                    />
+                  </div>
+
+                  {form.direction === "outgoing" ? (
+                    <>
+                      <div className="space-y-2">
+                        <Label>Letter Type</Label>
+                        <Select
+                          value={form.letter_type}
+                          onValueChange={(value) => setForm((prev) => ({ ...prev, letter_type: value }))}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="internal">Internal</SelectItem>
+                            <SelectItem value="external">External</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Category</Label>
+                        <Select
+                          value={form.category}
+                          onValueChange={(value) => setForm((prev) => ({ ...prev, category: value }))}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="approval">Approval</SelectItem>
+                            <SelectItem value="notice">Notice</SelectItem>
+                            <SelectItem value="contract">Contract</SelectItem>
+                            <SelectItem value="invoice">Invoice</SelectItem>
+                            <SelectItem value="other">Other</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="space-y-2">
+                      <Label>Source Mode</Label>
+                      <Select
+                        value={form.source_mode}
+                        onValueChange={(value) => setForm((prev) => ({ ...prev, source_mode: value }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="email">Email</SelectItem>
+                          <SelectItem value="physical">Physical</SelectItem>
+                          <SelectItem value="portal">Portal</SelectItem>
+                          <SelectItem value="courier">Courier</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    <Label>Due Date (Optional)</Label>
+                    <Input
+                      type="date"
+                      value={form.due_date}
+                      onChange={(e) => setForm((prev) => ({ ...prev, due_date: e.target.value }))}
+                    />
+                  </div>
+
+                  <div className="space-y-2 md:col-span-2">
+                    <Label>Notes (Optional)</Label>
+                    <Textarea
+                      rows={3}
+                      value={form.metadata_text}
+                      onChange={(e) => setForm((prev) => ({ ...prev, metadata_text: e.target.value }))}
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <Button type="submit" disabled={isSaving}>
+                      {isSaving ? "Saving..." : "Create Reference"}
+                    </Button>
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </>
+        }
+      />
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader>
@@ -248,169 +449,24 @@ export function PortalCorrespondenceContent({
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Create Reference</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form className="grid gap-4 md:grid-cols-2" onSubmit={createRecord}>
-            <div className="space-y-2">
-              <Label>Direction</Label>
-              <Select
-                value={form.direction}
-                onValueChange={(value) => setForm((prev) => ({ ...prev, direction: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="outgoing">Outgoing</SelectItem>
-                  <SelectItem value="incoming">Incoming</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            {form.direction === "outgoing" ? (
-              <div className="space-y-2">
-                <Label>Department</Label>
-                <Select
-                  value={form.department_name}
-                  onValueChange={(value) => setForm((prev) => ({ ...prev, department_name: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select department" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {departmentCodes.map((dept) => (
-                      <SelectItem key={dept.department_name} value={dept.department_name}>
-                        {dept.department_name} ({dept.department_code})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <Label>Assign Department</Label>
-                <Select
-                  value={form.assigned_department_name}
-                  onValueChange={(value) => setForm((prev) => ({ ...prev, assigned_department_name: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select department" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {departmentCodes.map((dept) => (
-                      <SelectItem key={dept.department_name} value={dept.department_name}>
-                        {dept.department_name} ({dept.department_code})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            <div className="space-y-2 md:col-span-2">
-              <Label>Subject</Label>
-              <Input value={form.subject} onChange={(e) => setForm((prev) => ({ ...prev, subject: e.target.value }))} />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Recipient</Label>
-              <Input
-                value={form.recipient_name}
-                onChange={(e) => setForm((prev) => ({ ...prev, recipient_name: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Sender</Label>
-              <Input
-                value={form.sender_name}
-                onChange={(e) => setForm((prev) => ({ ...prev, sender_name: e.target.value }))}
-              />
-            </div>
-
-            {form.direction === "outgoing" ? (
-              <>
-                <div className="space-y-2">
-                  <Label>Letter Type</Label>
-                  <Select
-                    value={form.letter_type}
-                    onValueChange={(value) => setForm((prev) => ({ ...prev, letter_type: value }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="internal">Internal</SelectItem>
-                      <SelectItem value="external">External</SelectItem>
-                    </SelectContent>
-                  </Select>
+      {isLead && pendingRecords.length > 0 && (
+        <Card ref={pendingRef}>
+          <CardHeader>
+            <CardTitle>Pending Items</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {pendingRecords.map((record) => (
+              <div key={record.id} className="flex items-center justify-between rounded border p-3">
+                <div>
+                  <p className="font-medium">{record.reference_number}</p>
+                  <p className="text-muted-foreground text-xs">{record.subject}</p>
                 </div>
-                <div className="space-y-2">
-                  <Label>Category</Label>
-                  <Select
-                    value={form.category}
-                    onValueChange={(value) => setForm((prev) => ({ ...prev, category: value }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="approval">Approval</SelectItem>
-                      <SelectItem value="notice">Notice</SelectItem>
-                      <SelectItem value="contract">Contract</SelectItem>
-                      <SelectItem value="invoice">Invoice</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </>
-            ) : (
-              <div className="space-y-2">
-                <Label>Source Mode</Label>
-                <Select
-                  value={form.source_mode}
-                  onValueChange={(value) => setForm((prev) => ({ ...prev, source_mode: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="email">Email</SelectItem>
-                    <SelectItem value="physical">Physical</SelectItem>
-                    <SelectItem value="portal">Portal</SelectItem>
-                    <SelectItem value="courier">Courier</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Badge variant="secondary">{record.status}</Badge>
               </div>
-            )}
-
-            <div className="space-y-2">
-              <Label>Due Date (Optional)</Label>
-              <Input
-                type="date"
-                value={form.due_date}
-                onChange={(e) => setForm((prev) => ({ ...prev, due_date: e.target.value }))}
-              />
-            </div>
-
-            <div className="space-y-2 md:col-span-2">
-              <Label>Notes (Optional)</Label>
-              <Textarea
-                rows={3}
-                value={form.metadata_text}
-                onChange={(e) => setForm((prev) => ({ ...prev, metadata_text: e.target.value }))}
-              />
-            </div>
-
-            <div className="md:col-span-2">
-              <Button type="submit" disabled={isSaving}>
-                {isSaving ? "Saving..." : "Create Reference"}
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
@@ -492,6 +548,6 @@ export function PortalCorrespondenceContent({
           </Table>
         </CardContent>
       </Card>
-    </div>
+    </PageWrapper>
   )
 }

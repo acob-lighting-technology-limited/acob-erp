@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { ArrowLeft } from "lucide-react"
@@ -10,10 +10,12 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { SearchableSelect } from "@/components/ui/searchable-select"
 
 export default function LeaveRequestPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
+  const [relieverOptions, setRelieverOptions] = useState<{ value: string; label: string }[]>([])
   const [formData, setFormData] = useState({
     leave_type_id: "",
     start_date: "",
@@ -36,6 +38,19 @@ export default function LeaveRequestPage() {
     resume.setUTCDate(resume.getUTCDate() + 1)
     return resume.toISOString().slice(0, 10)
   })()
+
+  useEffect(() => {
+    const loadRelievers = async () => {
+      const response = await fetch("/api/hr/leave/relievers")
+      const payload = await response.json()
+      if (!response.ok) throw new Error(payload.error || "Failed to load relievers")
+      setRelieverOptions(payload.data || [])
+    }
+
+    loadRelievers().catch((error) => {
+      toast.error(error instanceof Error ? error.message : "Failed to load relievers")
+    })
+  }, [])
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
@@ -108,10 +123,13 @@ export default function LeaveRequestPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Reliever (name/email/id)</Label>
-              <Input
+              <Label>Reliever</Label>
+              <SearchableSelect
                 value={formData.reliever_identifier}
-                onChange={(e) => setFormData((p) => ({ ...p, reliever_identifier: e.target.value }))}
+                onValueChange={(value) => setFormData((p) => ({ ...p, reliever_identifier: value }))}
+                options={relieverOptions}
+                placeholder="Select reliever"
+                searchPlaceholder="Search employee..."
               />
             </div>
 

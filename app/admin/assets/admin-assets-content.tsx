@@ -32,7 +32,7 @@ import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { formatName } from "@/lib/utils"
 import { ASSET_TYPES, ASSET_TYPE_MAP, generateUniqueCodePreview } from "@/lib/asset-types"
-import { DEPARTMENTS, OFFICE_LOCATIONS } from "@/lib/permissions"
+import { OFFICE_LOCATIONS } from "@/lib/permissions"
 import { getDepartmentForOffice } from "@/lib/office-locations"
 import { assignmentValidation } from "@/lib/validation"
 import {
@@ -440,11 +440,11 @@ export function AdminAssetsContent({
 
       // Count unresolved issues per asset
       const issueCountsByAsset: Record<string, number> = {}
-      ;(issuesData || []).forEach((issue: any) => {
-        if (!issue.resolved) {
-          issueCountsByAsset[issue.asset_id] = (issueCountsByAsset[issue.asset_id] || 0) + 1
-        }
-      })
+        ; (issuesData || []).forEach((issue: any) => {
+          if (!issue.resolved) {
+            issueCountsByAsset[issue.asset_id] = (issueCountsByAsset[issue.asset_id] || 0) + 1
+          }
+        })
 
       // Combine assets with their assignments and issue counts
       let assetsWithAssignments = (AssetsData || []).map((asset) => {
@@ -453,11 +453,11 @@ export function AdminAssetsContent({
           ...asset,
           current_assignment: assignment
             ? {
-                assigned_to: assignment.assigned_to,
-                department: assignment.department,
-                office_location: assignment.office_location,
-                user: assignment.user || null,
-              }
+              assigned_to: assignment.assigned_to,
+              department: assignment.department,
+              office_location: assignment.office_location,
+              user: assignment.user || null,
+            }
             : undefined,
           unresolved_issues_count: issueCountsByAsset[asset.id] || 0,
         }
@@ -1249,8 +1249,8 @@ export function AdminAssetsContent({
             const assetTypeName = ASSET_TYPE_MAP[assetType]?.label || assetType
             toast.error(
               `Cannot delete ${assetToDelete.unique_code}. ` +
-                `Higher-numbered ${assetTypeName} assets exist (serial number ${currentSerialNumber + 1} or higher). ` +
-                `Delete assets in reverse order (highest number first) to maintain sequential numbering.`
+              `Higher-numbered ${assetTypeName} assets exist (serial number ${currentSerialNumber + 1} or higher). ` +
+              `Delete assets in reverse order (highest number first) to maintain sequential numbering.`
             )
             setIsDeleting(false)
             return
@@ -2935,13 +2935,13 @@ export function AdminAssetsContent({
             <h3 className="text-foreground mb-2 text-xl font-semibold">No Assets Found</h3>
             <p className="text-muted-foreground">
               {searchQuery ||
-              statusFilter.length > 0 ||
-              departmentFilter.length > 0 ||
-              userFilter.length > 0 ||
-              assetTypeFilter.length > 0 ||
-              yearFilter.length > 0 ||
-              officeLocationFilter.length > 0 ||
-              issueStatusFilter.length > 0
+                statusFilter.length > 0 ||
+                departmentFilter.length > 0 ||
+                userFilter.length > 0 ||
+                assetTypeFilter.length > 0 ||
+                yearFilter.length > 0 ||
+                officeLocationFilter.length > 0 ||
+                issueStatusFilter.length > 0
                 ? "No assets match your filters"
                 : "Get started by adding your first asset"}
             </p>
@@ -3463,9 +3463,8 @@ export function AdminAssetsContent({
               assetHistory.map((activity, index) => (
                 <div
                   key={activity.id}
-                  className={`rounded-lg border-2 p-4 transition-all hover:shadow-md ${
-                    index === 0 ? "bg-primary/5 border-primary/30" : "bg-muted/30 border-muted"
-                  }`}
+                  className={`rounded-lg border-2 p-4 transition-all hover:shadow-md ${index === 0 ? "bg-primary/5 border-primary/30" : "bg-muted/30 border-muted"
+                    }`}
                 >
                   <div className="mb-3 flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -3608,11 +3607,10 @@ export function AdminAssetsContent({
                   assetIssues.map((issue) => (
                     <div
                       key={issue.id}
-                      className={`flex items-start gap-3 rounded-lg border p-3 transition-colors ${
-                        issue.resolved
+                      className={`flex items-start gap-3 rounded-lg border p-3 transition-colors ${issue.resolved
                           ? "border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950/20"
                           : "border-orange-200 bg-orange-50 dark:border-orange-900 dark:bg-orange-950/20"
-                      }`}
+                        }`}
                     >
                       <Button
                         variant="ghost"
@@ -3629,9 +3627,8 @@ export function AdminAssetsContent({
                       </Button>
                       <div className="min-w-0 flex-1">
                         <p
-                          className={`text-sm ${
-                            issue.resolved ? "text-muted-foreground line-through" : "text-foreground font-medium"
-                          }`}
+                          className={`text-sm ${issue.resolved ? "text-muted-foreground line-through" : "text-foreground font-medium"
+                            }`}
                         >
                           {issue.description}
                         </p>
@@ -3799,9 +3796,8 @@ export function AdminAssetsContent({
               {Object.keys(selectedColumns).map((column) => (
                 <div
                   key={column}
-                  className={`group hover:bg-muted/80 flex items-center space-x-3 rounded-md px-3 py-2.5 transition-colors ${
-                    selectedColumns[column] ? "bg-primary/5 hover:bg-primary/10" : ""
-                  }`}
+                  className={`group hover:bg-muted/80 flex items-center space-x-3 rounded-md px-3 py-2.5 transition-colors ${selectedColumns[column] ? "bg-primary/5 hover:bg-primary/10" : ""
+                    }`}
                 >
                   <Checkbox
                     id={column}
@@ -3816,11 +3812,10 @@ export function AdminAssetsContent({
                   />
                   <Label
                     htmlFor={column}
-                    className={`flex-1 cursor-pointer text-sm font-medium transition-colors ${
-                      selectedColumns[column]
+                    className={`flex-1 cursor-pointer text-sm font-medium transition-colors ${selectedColumns[column]
                         ? "text-foreground"
                         : "text-muted-foreground group-hover:text-foreground dark:group-hover:text-foreground"
-                    }`}
+                      }`}
                   >
                     {column}
                   </Label>
@@ -3896,9 +3891,8 @@ export function AdminAssetsContent({
                 {assetTypes.map((type) => (
                   <div
                     key={type.code}
-                    className={`group hover:bg-muted/80 flex items-center space-x-3 rounded-md px-3 py-2 transition-colors ${
-                      employeeReportSelectedTypes[type.code] ? "bg-primary/5 hover:bg-primary/10" : ""
-                    }`}
+                    className={`group hover:bg-muted/80 flex items-center space-x-3 rounded-md px-3 py-2 transition-colors ${employeeReportSelectedTypes[type.code] ? "bg-primary/5 hover:bg-primary/10" : ""
+                      }`}
                   >
                     <Checkbox
                       id={`employees-report-${type.code}`}
@@ -3913,11 +3907,10 @@ export function AdminAssetsContent({
                     />
                     <Label
                       htmlFor={`employees-report-${type.code}`}
-                      className={`flex-1 cursor-pointer text-sm font-medium transition-colors ${
-                        employeeReportSelectedTypes[type.code]
+                      className={`flex-1 cursor-pointer text-sm font-medium transition-colors ${employeeReportSelectedTypes[type.code]
                           ? "text-foreground"
                           : "text-muted-foreground group-hover:text-foreground"
-                      }`}
+                        }`}
                     >
                       {type.label}
                     </Label>

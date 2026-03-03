@@ -13,7 +13,7 @@ export async function POST() {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
-    if (!["admin", "super_admin"].includes(profile?.role)) {
+    if (!["developer", "admin", "super_admin"].includes(profile?.role)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
@@ -46,7 +46,10 @@ export async function POST() {
       if (request.approval_stage === "reliever_pending" && request.reliever_id) recipients = [request.reliever_id]
       if (request.approval_stage === "supervisor_pending" && request.supervisor_id) recipients = [request.supervisor_id]
       if (request.approval_stage === "hr_pending") {
-        const { data: hrUsers } = await supabase.from("profiles").select("id").in("role", ["admin", "super_admin"])
+        const { data: hrUsers } = await supabase
+          .from("profiles")
+          .select("id")
+          .in("role", ["developer", "admin", "super_admin"])
         recipients = (hrUsers || []).map((row: any) => row.id)
       }
 

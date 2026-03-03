@@ -53,7 +53,8 @@ import {
   AlertTriangle,
 } from "lucide-react"
 import type { UserRole } from "@/types/database"
-import { getRoleDisplayName, getRoleBadgeColor, canAssignRoles, DEPARTMENTS, OFFICE_LOCATIONS } from "@/lib/permissions"
+import { getRoleDisplayName, getRoleBadgeColor, canAssignRoles, OFFICE_LOCATIONS } from "@/lib/permissions"
+import { useDepartments } from "@/hooks/use-departments"
 import { SignatureCreator } from "@/components/signature-creator"
 import { ASSET_TYPE_MAP } from "@/lib/asset-types"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -101,6 +102,7 @@ interface AdminEmployeeContentProps {
 }
 
 export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmployeeContentProps) {
+  const { departments: DEPARTMENTS } = useDepartments()
   const searchParams = useSearchParams()
   const [employee, setEmployees] = useState<Employee[]>(initialEmployees)
   const [isLoading, setIsLoading] = useState(false)
@@ -361,26 +363,26 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
             // Department assets (if user has department)
             profileData.department
               ? supabase
-                  .from("assets")
-                  .select(
-                    "id, asset_name, asset_type, asset_model, serial_number, unique_code, status, assignment_type, department, created_at"
-                  )
-                  .eq("assignment_type", "department")
-                  .eq("department", profileData.department)
-                  .eq("status", "assigned")
-                  .limit(10)
+                .from("assets")
+                .select(
+                  "id, asset_name, asset_type, asset_model, serial_number, unique_code, status, assignment_type, department, created_at"
+                )
+                .eq("assignment_type", "department")
+                .eq("department", profileData.department)
+                .eq("status", "assigned")
+                .limit(10)
               : Promise.resolve({ data: [] }),
             // Office location assets (if user has office_location)
             profileData.office_location
               ? supabase
-                  .from("assets")
-                  .select(
-                    "id, asset_name, asset_type, asset_model, serial_number, unique_code, status, assignment_type, office_location, created_at"
-                  )
-                  .eq("assignment_type", "office")
-                  .eq("office_location", profileData.office_location)
-                  .eq("status", "assigned")
-                  .limit(10)
+                .from("assets")
+                .select(
+                  "id, asset_name, asset_type, asset_model, serial_number, unique_code, status, assignment_type, office_location, created_at"
+                )
+                .eq("assignment_type", "office")
+                .eq("office_location", profileData.office_location)
+                .eq("status", "assigned")
+                .limit(10)
               : Promise.resolve({ data: [] }),
             supabase
               .from("user_documentation")
@@ -2785,9 +2787,8 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
               {Object.keys(selectedColumns).map((column) => (
                 <div
                   key={column}
-                  className={`group hover:bg-muted/80 flex items-center space-x-3 rounded-md px-3 py-2.5 transition-colors ${
-                    selectedColumns[column] ? "bg-primary/5 hover:bg-primary/10" : ""
-                  }`}
+                  className={`group hover:bg-muted/80 flex items-center space-x-3 rounded-md px-3 py-2.5 transition-colors ${selectedColumns[column] ? "bg-primary/5 hover:bg-primary/10" : ""
+                    }`}
                 >
                   <Checkbox
                     id={column}
@@ -2802,11 +2803,10 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                   />
                   <Label
                     htmlFor={column}
-                    className={`flex-1 cursor-pointer text-sm font-medium transition-colors ${
-                      selectedColumns[column]
+                    className={`flex-1 cursor-pointer text-sm font-medium transition-colors ${selectedColumns[column]
                         ? "text-foreground"
                         : "text-muted-foreground group-hover:text-foreground dark:group-hover:text-foreground"
-                    }`}
+                      }`}
                   >
                     {column}
                   </Label>

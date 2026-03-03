@@ -77,8 +77,9 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
           (p.lead_departments || []).includes(ticket.service_department) || p.department === ticket.service_department
         )
       }
-      if (["admin", "super_admin"].includes(p.role) && p.department === "Admin & HR") return true
-      if (["admin", "super_admin"].includes(p.role) && p.department === "Executive Management") return true
+      if (["developer", "admin", "super_admin"].includes(p.role) && p.department === "Admin & HR") return true
+      if (["developer", "admin", "super_admin"].includes(p.role) && p.department === "Executive Management")
+        return true
       if (p.role === "developer" || p.role === "super_admin") return true
       return false
     })

@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
+import { useDepartments } from "@/hooks/use-departments"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -14,17 +15,7 @@ import Link from "next/link"
 import { AdminUserModal } from "./admin-user-modal"
 import { formatName } from "@/lib/utils"
 
-const DEPARTMENTS = [
-  "All Departments",
-  "Accounts",
-  "Admin & HR",
-  "Business, Growth and Innovation",
-  "IT and Communications",
-  "Legal, Regulatory and Compliance",
-  "Logistics",
-  "Operations",
-  "Technical",
-]
+
 
 interface AdminDashboardProps {
   users: any[]
@@ -33,6 +24,8 @@ interface AdminDashboardProps {
 }
 
 export function AdminDashboard({ users, currentUserId, feedbackByUserId = {} }: AdminDashboardProps) {
+  const { departments: dbDepartments } = useDepartments()
+  const DEPARTMENTS = useMemo(() => ["All Departments", ...dbDepartments], [dbDepartments])
   const [filteredUsers, setFilteredUsers] = useState(users)
   const [selectedDepartment, setSelectedDepartment] = useState("All Departments")
 

@@ -72,6 +72,14 @@ export default function RolesPage() {
             },
             {
               id: "2",
+              name: "developer",
+              description: "Developer-level access (matches Super Admin)",
+              permissions: defaultPermissions.map((p) => p.key),
+              is_system: true,
+              created_at: new Date().toISOString(),
+            },
+            {
+              id: "3",
               name: "admin",
               description: "Administrative access",
               permissions: ["users.view", "users.manage", "hr.view", "hr.manage", "finance.view", "reports.view"],
@@ -79,7 +87,7 @@ export default function RolesPage() {
               created_at: new Date().toISOString(),
             },
             {
-              id: "3",
+              id: "4",
               name: "manager",
               description: "Department manager access",
               permissions: ["hr.view", "finance.view", "inventory.view", "reports.view"],
@@ -87,7 +95,7 @@ export default function RolesPage() {
               created_at: new Date().toISOString(),
             },
             {
-              id: "4",
+              id: "5",
               name: "employee",
               description: "Standard employee access",
               permissions: ["hr.view"],
@@ -128,6 +136,14 @@ export default function RolesPage() {
           },
           {
             id: "2",
+            name: "developer",
+            description: "Developer-level access (matches Super Admin)",
+            permissions: defaultPermissions.map((p) => p.key),
+            is_system: true,
+            created_at: new Date().toISOString(),
+          },
+          {
+            id: "3",
             name: "admin",
             description: "Administrative access",
             permissions: ["users.view", "users.manage", "hr.view", "hr.manage", "finance.view", "reports.view"],
@@ -135,7 +151,7 @@ export default function RolesPage() {
             created_at: new Date().toISOString(),
           },
           {
-            id: "3",
+            id: "4",
             name: "manager",
             description: "Department manager access",
             permissions: ["hr.view", "finance.view", "inventory.view", "reports.view"],
@@ -143,7 +159,7 @@ export default function RolesPage() {
             created_at: new Date().toISOString(),
           },
           {
-            id: "4",
+            id: "5",
             name: "employee",
             description: "Standard employee access",
             permissions: ["hr.view"],

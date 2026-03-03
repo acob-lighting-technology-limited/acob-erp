@@ -2,6 +2,7 @@
 
 import type React from "react"
 import { useState } from "react"
+import { useDepartments } from "@/hooks/use-departments"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -15,16 +16,7 @@ import { X } from "lucide-react"
 
 import { Switch } from "@/components/ui/switch"
 
-const DEPARTMENTS = [
-  "Accounts",
-  "Admin & HR",
-  "Business, Growth and Innovation",
-  "IT and Communications",
-  "Legal, Regulatory and Compliance",
-  "Logistics",
-  "Operations",
-  "Technical",
-]
+
 
 interface ProfileFormProps {
   user: any
@@ -32,6 +24,7 @@ interface ProfileFormProps {
 }
 
 export function ProfileForm({ user, profile }: ProfileFormProps) {
+  const { departments: DEPARTMENTS } = useDepartments()
   const [formData, setFormData] = useState({
     firstName: profile?.first_name || "",
     lastName: profile?.last_name || "",
