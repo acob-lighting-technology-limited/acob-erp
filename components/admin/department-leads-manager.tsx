@@ -139,9 +139,9 @@ export function DepartmentLeadsManager() {
 
     let warning = null
 
-    // Check if user is already a lead
-    if (user.is_department_lead) {
-      warning = `${user.first_name || "User"} is already a lead for ${user.department}. They will be reassigned to ${selectedDept?.name}.`
+    // Check if user is already a lead for another department
+    if (user.is_department_lead && user.department !== selectedDept?.name) {
+      warning = `⚠️ ${user.first_name || "User"} is currently the lead for "${user.department}". Assigning them here will remove them as lead of "${user.department}" (that department will have no lead), and make them lead of "${selectedDept?.name}" instead. Each person can only lead one department.`
     }
     // Check if user has a different role that will be changed
     else if (user.role !== "lead") {

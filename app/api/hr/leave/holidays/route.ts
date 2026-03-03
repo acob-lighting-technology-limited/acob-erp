@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server"
 
 async function assertHR(supabase: any, userId: string) {
   const { data } = await supabase.from("profiles").select("role").eq("id", userId).single()
-  return ["admin", "super_admin"].includes(data?.role)
+  return ["developer", "admin", "super_admin"].includes(data?.role)
 }
 
 export async function GET(request: NextRequest) {

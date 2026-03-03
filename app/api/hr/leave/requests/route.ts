@@ -111,7 +111,6 @@ export async function POST(request: NextRequest) {
       reason,
       reliever_identifier,
       handover_note,
-      handover_checklist_url,
     } = body
 
     if (!leave_type_id || !start_date || !reason || !handover_note || !reliever_identifier) {
@@ -239,7 +238,6 @@ export async function POST(request: NextRequest) {
         reliever_id: reliever.id,
         supervisor_id: supervisor.id,
         handover_note,
-        handover_checklist_url: handover_checklist_url || null,
         requested_days_mode: policy.accrual_mode || "calendar_days",
         request_kind: "standard",
       })
@@ -299,7 +297,6 @@ export async function PUT(request: NextRequest) {
       reason,
       reliever_identifier,
       handover_note,
-      handover_checklist_url,
     } = body
 
     if (!id) return NextResponse.json({ error: "Leave request ID is required" }, { status: 400 })
@@ -415,7 +412,6 @@ export async function PUT(request: NextRequest) {
         reason: reason || existingRequest.reason,
         reliever_id: relieverId,
         handover_note: handover_note || existingRequest.handover_note,
-        handover_checklist_url: handover_checklist_url ?? existingRequest.handover_checklist_url,
         requested_days_mode: policy.accrual_mode || "calendar_days",
         status: eligibility.status === "missing_evidence" ? "pending_evidence" : "pending",
       })

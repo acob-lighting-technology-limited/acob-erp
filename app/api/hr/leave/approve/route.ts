@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
     }
 
     const stage = leaveRequest.approval_stage || LEAVE_PENDING_STAGES.RELIEVER
-    const isHR = ["admin", "super_admin"].includes(actorProfile?.role)
+    const isHR = ["developer", "admin", "super_admin"].includes(actorProfile?.role)
 
     if (leaveRequest.status === "pending_evidence" && !isHR) {
       return NextResponse.json({ error: "Request is awaiting evidence verification before approval." }, { status: 400 })
@@ -158,7 +158,10 @@ export async function POST(request: NextRequest) {
     }
 
     if (stage === LEAVE_PENDING_STAGES.SUPERVISOR) {
-      const { data: hrUsers } = await supabase.from("profiles").select("id").in("role", ["admin", "super_admin"])
+      const { data: hrUsers } = await supabase
+        .from("profiles")
+        .select("id")
+        .in("role", ["developer", "admin", "super_admin"])
 
       const { error: updateError } = await supabase
         .from("leave_requests")

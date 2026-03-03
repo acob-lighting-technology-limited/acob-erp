@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
-    if (!["admin", "super_admin"].includes(profile?.role)) {
+    if (!["developer", "admin", "super_admin"].includes(profile?.role)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 

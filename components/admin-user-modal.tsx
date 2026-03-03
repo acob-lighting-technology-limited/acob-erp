@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useDepartments } from "@/hooks/use-departments"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -9,16 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "sonner"
 
-const DEPARTMENTS = [
-  "Accounts",
-  "Admin & HR",
-  "Business, Growth and Innovation",
-  "IT and Communications",
-  "Legal, Regulatory and Compliance",
-  "Logistics",
-  "Operations",
-  "Technical",
-]
+
 
 interface AdminUserModalProps {
   user: any
@@ -27,6 +19,7 @@ interface AdminUserModalProps {
 }
 
 export function AdminUserModal({ user, onClose, onSave }: AdminUserModalProps) {
+  const { departments: DEPARTMENTS } = useDepartments()
   const [formData, setFormData] = useState({
     firstName: user.first_name || "",
     lastName: user.last_name || "",

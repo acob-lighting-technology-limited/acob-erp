@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -8,7 +8,9 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { SearchableSelect } from "@/components/ui/searchable-select"
 import { Textarea } from "@/components/ui/textarea"
+import { PageHeader, PageWrapper } from "@/components/layout"
 import { toast } from "sonner"
 import { CalendarDays, Clock, Plus, Upload } from "lucide-react"
 import type { LeaveBalance, LeaveRequest, LeaveType } from "./page"
@@ -63,9 +65,11 @@ export function LeaveContent({ initialRequests, initialBalances, initialLeaveTyp
   const [balances, setBalances] = useState<LeaveBalance[]>(initialBalances)
   const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>(initialLeaveTypes)
   const [approverQueue, setApproverQueue] = useState<LeaveRequest[]>([])
+  const [relieverOptions, setRelieverOptions] = useState<{ value: string; label: string }[]>([])
   const [open, setOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [uploadingEvidenceFor, setUploadingEvidenceFor] = useState<string | null>(null)
+  const approvalQueueRef = useRef<HTMLDivElement | null>(null)
   const [formData, setFormData] = useState({
     leave_type_id: "",
     start_date: "",
@@ -73,7 +77,6 @@ export function LeaveContent({ initialRequests, initialBalances, initialLeaveTyp
     reason: "",
     reliever_identifier: "",
     handover_note: "",
-    handover_checklist_url: "",
   })
 
   const hasPendingRequest = requests.some((request) => ["pending", "pending_evidence"].includes(request.status))
@@ -101,23 +104,43 @@ export function LeaveContent({ initialRequests, initialBalances, initialLeaveTyp
     formData.reliever_identifier.trim().length > 0 &&
     selectedLeaveType?.eligibility_status !== "not_eligible" &&
     Number(formData.days_count) <= availableDays
+  const pendingSupervisorReviews = useMemo(
+    () => approverQueue.filter((item) => item.approval_stage === "supervisor_pending").length,
+    [approverQueue]
+  )
+
+  async function fetchRelieverOptions() {
+    const response = await fetch("/api/hr/leave/relievers")
+    const payload = await response.json()
+    if (!response.ok) throw new Error(payload.error || "Failed to load relievers")
+    setRelieverOptions(payload.data || [])
+  }
 
   async function refreshData() {
-    const [requestRes, queueRes, typesRes] = await Promise.all([
+    const [requestRes, queueRes, typesRes, relieversRes] = await Promise.all([
       fetch("/api/hr/leave/requests"),
       fetch("/api/hr/leave/queue"),
       fetch("/api/hr/leave/types"),
+      fetch("/api/hr/leave/relievers"),
     ])
 
     const requestPayload = await requestRes.json()
     const queuePayload = await queueRes.json()
     const typesPayload = await typesRes.json()
+    const relieversPayload = await relieversRes.json()
 
     setRequests(requestPayload.data || [])
     setBalances(requestPayload.balances || [])
     setApproverQueue(queuePayload.data || [])
     setLeaveTypes(typesPayload.data || [])
+    setRelieverOptions(relieversPayload.data || [])
   }
+
+  useEffect(() => {
+    fetchRelieverOptions().catch(() => {
+      toast.error("Failed to load reliever list")
+    })
+  }, [])
 
   async function handleCreateRequest(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -143,7 +166,6 @@ export function LeaveContent({ initialRequests, initialBalances, initialLeaveTyp
         reason: "",
         reliever_identifier: "",
         handover_note: "",
-        handover_checklist_url: "",
       })
       await refreshData()
     } catch (error) {
@@ -210,20 +232,29 @@ export function LeaveContent({ initialRequests, initialBalances, initialLeaveTyp
   }
 
   return (
-    <div className="container mx-auto space-y-6 p-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Leave Management</h1>
-          <p className="text-muted-foreground">
-            All leave types are visible with explicit eligibility and evidence rules.
-          </p>
-        </div>
-        <Button onClick={() => setOpen(true)} disabled={hasPendingRequest}>
-          <Plus className="mr-2 h-4 w-4" />
-          New Request
-        </Button>
-      </div>
-
+    <PageWrapper maxWidth="full" background="gradient">
+      <PageHeader
+        title="Leave Management"
+        description="All leave types are visible with explicit eligibility and evidence rules."
+        icon={CalendarDays}
+        backLink={{ href: "/profile", label: "Back to Dashboard" }}
+        actions={
+          <>
+            {pendingSupervisorReviews > 0 && (
+              <Button
+                variant="outline"
+                onClick={() => approvalQueueRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+              >
+                Pending Reviews ({pendingSupervisorReviews})
+              </Button>
+            )}
+            <Button onClick={() => setOpen(true)} disabled={hasPendingRequest}>
+              <Plus className="mr-2 h-4 w-4" />
+              New Request
+            </Button>
+          </>
+        }
+      />
       <Card>
         <CardHeader>
           <CardTitle>Leave Types and Balances</CardTitle>
@@ -262,7 +293,7 @@ export function LeaveContent({ initialRequests, initialBalances, initialLeaveTyp
       </Card>
 
       {approverQueue.length > 0 && (
-        <Card>
+        <Card ref={approvalQueueRef}>
           <CardHeader>
             <CardTitle>My Approval Queue</CardTitle>
             <CardDescription>Requests awaiting your action</CardDescription>
@@ -430,11 +461,13 @@ export function LeaveContent({ initialRequests, initialBalances, initialLeaveTyp
             </div>
 
             <div className="space-y-2">
-              <Label>Reliever (name, email, or ID)</Label>
-              <Input
+              <Label>Reliever</Label>
+              <SearchableSelect
                 value={formData.reliever_identifier}
-                onChange={(event) => setFormData((prev) => ({ ...prev, reliever_identifier: event.target.value }))}
-                placeholder="e.g. staff@company.com"
+                onValueChange={(value) => setFormData((prev) => ({ ...prev, reliever_identifier: value }))}
+                options={relieverOptions}
+                placeholder="Select reliever"
+                searchPlaceholder="Search employee..."
               />
             </div>
 
@@ -458,16 +491,6 @@ export function LeaveContent({ initialRequests, initialBalances, initialLeaveTyp
               />
             </div>
 
-            <div className="space-y-2">
-              <Label>Handover Checklist URL (optional)</Label>
-              <Input
-                type="url"
-                value={formData.handover_checklist_url}
-                onChange={(event) => setFormData((prev) => ({ ...prev, handover_checklist_url: event.target.value }))}
-                placeholder="https://..."
-              />
-            </div>
-
             <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                 Cancel
@@ -486,6 +509,6 @@ export function LeaveContent({ initialRequests, initialBalances, initialLeaveTyp
           You currently have an active leave request in workflow.
         </div>
       )}
-    </div>
+    </PageWrapper>
   )
 }

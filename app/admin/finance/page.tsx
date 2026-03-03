@@ -3,7 +3,16 @@
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { DollarSign, FileText, Receipt, TrendingUp, CreditCard, Clock, CheckCircle, AlertCircle } from "lucide-react"
+import {
+  DollarSign,
+  TrendingUp,
+  CreditCard,
+  Clock,
+  CheckCircle,
+  AlertCircle,
+  Package,
+  ShoppingCart,
+} from "lucide-react"
 import Link from "next/link"
 import { PageWrapper, PageHeader, Section } from "@/components/layout"
 import { StatCard } from "@/components/ui/stat-card"
@@ -74,7 +83,7 @@ export default function FinanceDashboard() {
     <PageWrapper maxWidth="full" background="gradient">
       <PageHeader
         title="Finance"
-        description="Manage payments, invoices, and financial reports"
+        description="Manage finance modules: Payments, Inventory, and Purchasing"
         icon={DollarSign}
         backLink={{ href: "/admin", label: "Back to Admin" }}
       />
@@ -112,20 +121,20 @@ export default function FinanceDashboard() {
       </div>
 
       {/* Finance Modules */}
-      <Section title="Finance Management">
+      <Section title="Finance Modules">
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {/* Payments */}
+          {/* Payments Folder */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <CreditCard className="h-5 w-5" />
                 Payments
               </CardTitle>
-              <CardDescription>Manage department payments and bills</CardDescription>
+              <CardDescription>Manage department payments and related finance records</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
               <Link href="/admin/finance/payments">
-                <Button className="w-full">Manage Payments ({stats.totalPayments})</Button>
+                <Button className="w-full">Open Payments ({stats.totalPayments})</Button>
               </Link>
               <Link href="/admin/finance/payments">
                 <Button className="w-full" variant="outline">
@@ -135,61 +144,43 @@ export default function FinanceDashboard() {
             </CardContent>
           </Card>
 
-          {/* Invoices */}
+          {/* Inventory Folder */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                Invoices
+                <Package className="h-5 w-5" />
+                Inventory
               </CardTitle>
-              <CardDescription>Create and manage customer invoices</CardDescription>
+              <CardDescription>Manage products, stock levels, categories, and warehouses</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
-              <Link href="/admin/finance/invoices">
-                <Button className="w-full">Manage Invoices</Button>
+              <Link href="/admin/inventory">
+                <Button className="w-full">Open Inventory</Button>
               </Link>
-              <Link href="/admin/finance/invoices/new">
+              <Link href="/admin/inventory/products">
                 <Button className="w-full" variant="outline">
-                  Create Invoice
+                  Products
                 </Button>
               </Link>
             </CardContent>
           </Card>
 
-          {/* Bills */}
+          {/* Purchasing Folder */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Receipt className="h-5 w-5" />
-                Bills
+                <ShoppingCart className="h-5 w-5" />
+                Purchasing
               </CardTitle>
-              <CardDescription>Track vendor bills and expenses</CardDescription>
+              <CardDescription>Manage suppliers, purchase orders, and goods receipts</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
-              <Link href="/admin/finance/bills">
-                <Button className="w-full">Manage Bills</Button>
+              <Link href="/admin/purchasing">
+                <Button className="w-full">Open Purchasing</Button>
               </Link>
-              <Link href="/admin/finance/bills/new">
+              <Link href="/admin/purchasing/orders">
                 <Button className="w-full" variant="outline">
-                  Add Bill
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-
-          {/* Reports */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5" />
-                Reports
-              </CardTitle>
-              <CardDescription>Financial analytics and reports</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Link href="/admin/finance/reports">
-                <Button className="w-full" variant="outline">
-                  View Reports
+                  Purchase Orders
                 </Button>
               </Link>
             </CardContent>

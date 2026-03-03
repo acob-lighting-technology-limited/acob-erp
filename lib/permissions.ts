@@ -153,6 +153,11 @@ export function getRoleBadgeColor(role: UserRole): string {
   return colors[role]
 }
 
+/**
+ * @deprecated Use the `useDepartments()` hook from `@/hooks/use-departments`
+ * in client components. This static list is kept ONLY as a server-side
+ * fallback and will drift out of sync with the database.
+ */
 export const DEPARTMENTS = [
   "Accounts",
   "Admin & HR",
@@ -161,7 +166,9 @@ export const DEPARTMENTS = [
   "IT and Communications",
   "Legal, Regulatory and Compliance",
   "Logistics",
+  "Monitoring and Evaluation",
   "Operations",
+  "Project",
   "Technical",
 ] as const
 

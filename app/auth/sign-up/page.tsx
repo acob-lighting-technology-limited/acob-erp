@@ -11,22 +11,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
+import { useDepartments } from "@/hooks/use-departments"
 import { toast } from "sonner"
 import Image from "next/image"
 
-const DEPARTMENTS = [
-  "Accounts",
-  "Admin & HR",
-  "Business, Growth and Innovation",
-  "Executive Management",
-  "IT and Communications",
-  "Legal, Regulatory and Compliance",
-  "Logistics",
-  "Operations",
-  "Technical",
-]
+
 
 export default function SignUpPage() {
+  const { departments: DEPARTMENTS } = useDepartments()
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",

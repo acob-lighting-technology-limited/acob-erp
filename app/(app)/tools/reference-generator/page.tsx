@@ -14,7 +14,7 @@ async function getData() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("full_name, first_name, last_name, department")
+    .select("full_name, first_name, last_name, department, role, lead_departments")
     .eq("id", user.id)
     .single()
 
@@ -27,8 +27,20 @@ async function getData() {
   const { data: records } = await supabase
     .from("correspondence_records")
     .select("*")
-    .or(`originator_id.eq.${user.id},responsible_officer_id.eq.${user.id}`)
     .order("created_at", { ascending: false })
+
+  const role = profile?.role || ""
+  const managedDepartments = Array.from(
+    new Set([...(Array.isArray(profile?.lead_departments) ? profile.lead_departments : []), profile?.department].filter(Boolean))
+  )
+  const scopedRecords = (records || []).filter((record: any) => {
+    if (record.originator_id === user.id || record.responsible_officer_id === user.id) return true
+    if (["developer", "admin", "super_admin"].includes(role)) return true
+    if (role === "lead") {
+      return managedDepartments.includes(record.department_name) || managedDepartments.includes(record.assigned_department_name)
+    }
+    return false
+  })
 
   const { data: departmentCodes } = await supabase
     .from("correspondence_department_codes")
@@ -38,9 +50,10 @@ async function getData() {
 
   return {
     userId: user.id,
+    currentViewerRole: role,
     currentViewerName,
     currentViewerDepartment: profile?.department || "",
-    records: records || [],
+    records: scopedRecords || [],
     departmentCodes: departmentCodes || [],
   }
 }
@@ -55,6 +68,7 @@ export default async function ToolsReferenceGeneratorPage() {
   return (
     <PortalCorrespondenceContent
       userId={data.userId}
+      currentViewerRole={data.currentViewerRole}
       currentViewerName={data.currentViewerName}
       currentViewerDepartment={data.currentViewerDepartment}
       initialRecords={data.records as any}

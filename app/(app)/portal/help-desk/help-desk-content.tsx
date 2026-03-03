@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -10,6 +10,9 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { PageHeader, PageWrapper } from "@/components/layout"
+import { Headset, Plus } from "lucide-react"
 
 interface HelpDeskTicket {
   id: string
@@ -36,6 +39,9 @@ const departments = ["IT and Communications", "Operations", "Admin & HR", "Accou
 export function HelpDeskContent({ userId, initialTickets }: HelpDeskContentProps) {
   const [tickets, setTickets] = useState<HelpDeskTicket[]>(initialTickets)
   const [isSaving, setIsSaving] = useState(false)
+  const [createOpen, setCreateOpen] = useState(false)
+  const [pendingApprovals, setPendingApprovals] = useState<HelpDeskTicket[]>([])
+  const pendingRef = useRef<HTMLDivElement | null>(null)
   const [form, setForm] = useState({
     title: "",
     description: "",
@@ -48,6 +54,21 @@ export function HelpDeskContent({ userId, initialTickets }: HelpDeskContentProps
     () => tickets.filter((t) => !["resolved", "closed", "cancelled"].includes(t.status)).length,
     [tickets]
   )
+  const pendingReviewCount = pendingApprovals.length
+
+  useEffect(() => {
+    const loadPendingApprovals = async () => {
+      const res = await fetch("/api/help-desk/tickets?scope=department&status=pending_approval", { cache: "no-store" })
+      if (!res.ok) {
+        setPendingApprovals([])
+        return
+      }
+      const json = await res.json()
+      setPendingApprovals(json.data || [])
+    }
+
+    loadPendingApprovals().catch(() => setPendingApprovals([]))
+  }, [])
 
   async function refreshTickets() {
     const res = await fetch("/api/help-desk/tickets?scope=mine", { cache: "no-store" })
@@ -77,6 +98,7 @@ export function HelpDeskContent({ userId, initialTickets }: HelpDeskContentProps
       }
 
       toast.success("Ticket submitted")
+      setCreateOpen(false)
       setForm({
         title: "",
         description: "",
@@ -133,7 +155,110 @@ export function HelpDeskContent({ userId, initialTickets }: HelpDeskContentProps
   }
 
   return (
-    <div className="space-y-6 p-6">
+    <PageWrapper maxWidth="full" background="gradient">
+      <PageHeader
+        title="Help Desk"
+        description="Submit and track support/procurement tickets."
+        icon={Headset}
+        backLink={{ href: "/profile", label: "Back to Dashboard" }}
+        actions={
+          <>
+            {pendingReviewCount > 0 && (
+              <Button
+                variant="outline"
+                onClick={() => pendingRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+              >
+                Pending Reviews ({pendingReviewCount})
+              </Button>
+            )}
+            <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="mr-2 h-4 w-4" />
+                  New Ticket
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Submit Help Desk Ticket</DialogTitle>
+                  <DialogDescription>Fill in the details and submit your ticket.</DialogDescription>
+                </DialogHeader>
+                <form onSubmit={createTicket} className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2 md:col-span-2">
+                    <Label>Title</Label>
+                    <Input
+                      value={form.title}
+                      onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
+                      placeholder="Brief summary of issue"
+                    />
+                  </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <Label>Description</Label>
+                    <Textarea
+                      rows={3}
+                      value={form.description}
+                      onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Department</Label>
+                    <Select
+                      value={form.service_department}
+                      onValueChange={(value) => setForm((prev) => ({ ...prev, service_department: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {departments.map((d) => (
+                          <SelectItem key={d} value={d}>
+                            {d}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Priority</Label>
+                    <Select value={form.priority} onValueChange={(value) => setForm((prev) => ({ ...prev, priority: value }))}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="low">Low</SelectItem>
+                        <SelectItem value="medium">Medium</SelectItem>
+                        <SelectItem value="high">High</SelectItem>
+                        <SelectItem value="urgent">Urgent</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Type</Label>
+                    <Select
+                      value={form.request_type}
+                      onValueChange={(value) => setForm((prev) => ({ ...prev, request_type: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="support">Support</SelectItem>
+                        <SelectItem value="procurement">Procurement</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="md:col-span-2">
+                    <Button type="submit" disabled={isSaving}>
+                      {isSaving ? "Submitting..." : "Submit Ticket"}
+                    </Button>
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </>
+        }
+      />
+
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader>
@@ -168,86 +293,24 @@ export function HelpDeskContent({ userId, initialTickets }: HelpDeskContentProps
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Submit Help Desk Ticket</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={createTicket} className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2 md:col-span-2">
-              <Label>Title</Label>
-              <Input
-                value={form.title}
-                onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
-                placeholder="Brief summary of issue"
-              />
-            </div>
-            <div className="space-y-2 md:col-span-2">
-              <Label>Description</Label>
-              <Textarea
-                rows={3}
-                value={form.description}
-                onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Department</Label>
-              <Select
-                value={form.service_department}
-                onValueChange={(value) => setForm((prev) => ({ ...prev, service_department: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {departments.map((d) => (
-                    <SelectItem key={d} value={d}>
-                      {d}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Priority</Label>
-              <Select
-                value={form.priority}
-                onValueChange={(value) => setForm((prev) => ({ ...prev, priority: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="low">Low</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
-                  <SelectItem value="urgent">Urgent</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Type</Label>
-              <Select
-                value={form.request_type}
-                onValueChange={(value) => setForm((prev) => ({ ...prev, request_type: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="support">Support</SelectItem>
-                  <SelectItem value="procurement">Procurement</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="md:col-span-2">
-              <Button type="submit" disabled={isSaving}>
-                {isSaving ? "Submitting..." : "Submit Ticket"}
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+      {pendingReviewCount > 0 && (
+        <Card ref={pendingRef}>
+          <CardHeader>
+            <CardTitle>Pending Department Reviews</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {pendingApprovals.map((ticket) => (
+              <div key={ticket.id} className="flex items-center justify-between rounded border p-3">
+                <div>
+                  <p className="font-medium">{ticket.ticket_number}</p>
+                  <p className="text-muted-foreground text-xs">{ticket.title}</p>
+                </div>
+                <Badge variant="secondary">{ticket.status}</Badge>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
@@ -313,6 +376,6 @@ export function HelpDeskContent({ userId, initialTickets }: HelpDeskContentProps
           </Table>
         </CardContent>
       </Card>
-    </div>
+    </PageWrapper>
   )
 }

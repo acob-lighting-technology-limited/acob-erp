@@ -15,7 +15,6 @@ import {
   ScrollText,
   ShieldCheck,
   LogOut,
-  Briefcase,
   FolderKanban,
   CreditCard,
   Calendar,
@@ -73,20 +72,6 @@ const adminNavigation = [
     name: "Finance",
     href: "/admin/finance",
     icon: CreditCard,
-    roles: ["developer", "super_admin", "admin"],
-  },
-  {
-    section: "management",
-    name: "Inventory",
-    href: "/admin/inventory",
-    icon: Package,
-    roles: ["developer", "super_admin", "admin"],
-  },
-  {
-    section: "management",
-    name: "Purchasing",
-    href: "/admin/purchasing",
-    icon: Briefcase,
     roles: ["developer", "super_admin", "admin"],
   },
   {

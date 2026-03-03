@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { data: actorProfile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
-    const isHR = ["admin", "super_admin"].includes(actorProfile?.role)
+    const isHR = ["developer", "admin", "super_admin"].includes(actorProfile?.role)
 
     const { data: leaveRequest, error: fetchError } = await supabase
       .from("leave_requests")
@@ -139,7 +139,6 @@ export async function POST(request: NextRequest) {
           reliever_id: leaveRequest.reliever_id,
           supervisor_id: leaveRequest.supervisor_id,
           handover_note: leaveRequest.handover_note,
-          handover_checklist_url: leaveRequest.handover_checklist_url,
           requested_days_mode: leaveRequest.requested_days_mode || "calendar_days",
           original_request_id: leaveRequest.id,
           request_kind: "extension",

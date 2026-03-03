@@ -58,7 +58,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       isAdminRole(profile.role) ||
       (pendingApproval.approval_stage === "department_lead" && canLeadDepartment(profile, ticket.service_department)) ||
       (pendingApproval.approval_stage === "head_corporate_services" &&
-        ["admin", "super_admin", "lead"].includes(profile.role) &&
+        ["developer", "admin", "super_admin", "lead"].includes(profile.role) &&
         (profile.department === "Admin & HR" || (profile.lead_departments || []).includes("Admin & HR"))) ||
       (pendingApproval.approval_stage === "managing_director" &&
         ["developer", "super_admin", "admin"].includes(profile.role) &&
@@ -165,7 +165,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         const nextApprover = (potentialApprovers || []).find((p: any) => {
           if (upcomingStage === "head_corporate_services") {
             return (
-              ["admin", "super_admin", "lead"].includes(p.role) &&
+              ["developer", "admin", "super_admin", "lead"].includes(p.role) &&
               (p.department === "Admin & HR" || (p.lead_departments || []).includes("Admin & HR"))
             )
           }

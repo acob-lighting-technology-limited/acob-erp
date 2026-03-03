@@ -31,10 +31,14 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // Check if current user has admin/super_admin role
-    const { data: currentUserProfile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
+    // Check if current user has admin-level access.
+    // Accept developer and legacy superadmin naming; fallback to is_admin to reduce false 403s.
+    const { data: currentUserProfile } = await supabase.from("profiles").select("role, is_admin").eq("id", user.id).single()
+    const actorRole = (currentUserProfile?.role || "").toLowerCase()
+    const hasAdminAccess =
+      ["developer", "super_admin", "superadmin", "admin"].includes(actorRole) || currentUserProfile?.is_admin === true
 
-    if (!currentUserProfile || !["admin", "super_admin"].includes(currentUserProfile.role)) {
+    if (!currentUserProfile || !hasAdminAccess) {
       return NextResponse.json({ error: "Forbidden - Admin access required" }, { status: 403 })
     }
 

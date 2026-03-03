@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
       .eq("status", "pending")
       .order("created_at", { ascending: true })
 
-    if (["admin", "super_admin"].includes(profile?.role)) {
+    if (["developer", "admin", "super_admin"].includes(profile?.role)) {
       query = query.eq("approval_stage", LEAVE_PENDING_STAGES.HR)
     } else {
       query = query.or(
