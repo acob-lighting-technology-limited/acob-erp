@@ -108,28 +108,55 @@ export const sortReportsByDepartment = (reports: WeeklyReport[]) => {
  * If lines are already numbered (including Word-pasted formats), numbering is preserved
  * but normalized to "N. text" to avoid tab-stop spacing issues in PPTX.
  */
+/**
+ * Strips ALL non-ASCII characters from report text.
+ * Uses a whitelist approach: only printable ASCII (0x20-0x7E), newline, and carriage-return
+ * are kept. This eliminates every possible Unicode backtick / tick / accent / fancy-quote /
+ * zero-width character that copy-paste from Word / Outlook / email can introduce.
+ */
+export const sanitizeReportText = (s: string): string => s.replace(/[^\x20-\x7E\n\r]/g, "")
+
+/** @deprecated use sanitizeReportText */
+const cleanPastedText = sanitizeReportText
+
 export const autoNumberLines = (text: string): string => {
   if (!text?.trim()) return text || ""
-  const lines = text
+
+  // First pass: strip all stray tick / backtick / accent characters from raw input
+  const cleaned = cleanPastedText(text)
+
+  const collapseSpacedLetters = (line: string) =>
+    line.replace(/\b(?:[A-Za-z]\s+){3,}[A-Za-z]\b/g, (match) => match.replace(/\s+/g, ""))
+
+  const sanitizeLine = (line: string) => {
+    const result = line
+      .replace(/\t+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      // strip stray punctuation marks that often appear before copied bullet/list text
+      .replace(/^['`.,;:!?-]+\s*/, "")
+
+    return collapseSpacedLetters(result)
+  }
+
+  const lines = cleaned
     .replace(/\r\n/g, "\n")
     .split("\n")
-    .map((l) => l.replace(/\u00A0/g, " "))
+    .map((l) => sanitizeLine(l))
     .filter((l) => l.trim().length > 0)
-
-  const normalizeSpacing = (line: string) => line.replace(/\t+/g, " ").trim()
-  const parseNumbered = (line: string) => normalizeSpacing(line).match(/^(\d+)[\.\)]\s*(.+)$/)
+  const parseNumbered = (line: string) => sanitizeLine(line).match(/^(\d+)[.)]\s*(.+)$/)
 
   if (parseNumbered(lines[0])) {
     return lines
       .map((line) => {
         const numbered = parseNumbered(line)
         if (numbered) return `${numbered[1]}. ${numbered[2].trim()}`
-        return normalizeSpacing(line)
+        return sanitizeLine(line)
       })
       .join("\n")
   }
 
-  return lines.map((l, i) => `${i + 1}. ${normalizeSpacing(l)}`).join("\n")
+  return lines.map((l, i) => `${i + 1}. ${sanitizeLine(l)}`).join("\n")
 }
 
 /** Returns the Monday date of a given ISO week as a formatted string e.g. "Monday, 17th February 2026" */
@@ -398,11 +425,11 @@ const pdfContentPage = (
     doc.addImage(logoDark, "PNG", W - logoW - 6, logoY, logoW, logoH, "LOGO_DARK", "FAST")
   }
 
-  // Body: 3 equal rows stacked vertically
+  // Body: weighted rows — Work Done 50%, Tasks 30%, Challenges 20%
   const bodyStart = headerH + 4
   const footerStart = H - footerH
   const bodyH = footerStart - bodyStart
-  const rowH = bodyH / 3
+  const sectionWeights = [0.5, 0.3, 0.2] // Work Done, Tasks, Challenges
   const labelH = 8 // slightly taller label bar
   const padX = 14
   const innerW = W - padX * 2
@@ -428,7 +455,7 @@ const pdfContentPage = (
       const out: Array<{ text: string; indent: number }> = []
       const sourceLines = String(content || "").split("\n")
       sourceLines.forEach((rawLine) => {
-        const line = rawLine.trim()
+        const line = cleanPastedText(rawLine.trim())
         if (!line) {
           out.push({ text: "", indent: 0 })
           return
@@ -440,7 +467,7 @@ const pdfContentPage = (
           return
         }
         const numberToken = `${numbered[1]} `
-        const bodyText = numbered[2] || ""
+        const bodyText = cleanPastedText(numbered[2] || "")
         const firstLineMaxW = Math.max(8, textWidth - numberIndentMm)
         const bodyLines = doc.splitTextToSize(bodyText, firstLineMaxW)
         if (!bodyLines.length) {
@@ -477,22 +504,20 @@ const pdfContentPage = (
       }
     }
 
-    // Last fallback: render as much as possible and add continuation hint.
+    // Last fallback: render as many lines as fit at the smallest font size.
     doc.setFontSize(7)
     const lines = buildLinesWithIndent(text, width, 5.0)
-    const maxLines = Math.max(1, Math.floor(availableH / 3.9) - 1)
+    const maxLines = Math.max(1, Math.floor(availableH / 3.9))
     let ty = y
     lines.slice(0, maxLines).forEach((line) => {
       doc.text(line.text, x + line.indent, ty)
       ty += 3.9
     })
-    doc.setTextColor(...PDF_RED)
-    doc.text("... continued (content too long for one page layout)", x, Math.min(y + availableH, ty + 2))
-    doc.setTextColor(...PDF_SLATE)
   }
 
+  let sectionTop = bodyStart
   sections.forEach((s, i) => {
-    const sectionTop = bodyStart + i * rowH
+    const rowH = bodyH * sectionWeights[i]
 
     // Label bar
     doc.setFillColor(...s.color)
@@ -514,6 +539,8 @@ const pdfContentPage = (
       doc.setLineWidth(0.3)
       doc.line(padX, sectionTop + rowH, W - padX, sectionTop + rowH)
     }
+
+    sectionTop += rowH
   })
 
   // Footer
@@ -1748,9 +1775,9 @@ const addDeptIndexSlide = (
 }
 
 const PPTX_WEEKLY_BODY_FONT_SIZE = 14
-const PPTX_WEEKLY_MIN_BODY_FONT_SIZE = 10
-const PPTX_WEEKLY_LINE_HEIGHT_RATIO = 1.25
-const PPTX_WEEKLY_AVG_CHAR_WIDTH_RATIO = 0.56
+const PPTX_WEEKLY_MIN_BODY_FONT_SIZE = 7
+const PPTX_WEEKLY_LINE_HEIGHT_RATIO = 1.15
+const PPTX_WEEKLY_AVG_CHAR_WIDTH_RATIO = 0.48
 const PPTX_WEEKLY_LINE_SPACING_MULTIPLE = 1.3
 
 const WEEKLY_CONTENT_LAYOUT = {
@@ -1924,10 +1951,9 @@ const chooseSectionFontSize = (
   minFont = PPTX_WEEKLY_MIN_BODY_FONT_SIZE,
   strictFit = true
 ): number => {
-  for (let fontSize = preferredFont; fontSize >= minFont; fontSize -= 1) {
+  for (let fontSize = preferredFont; fontSize >= minFont; fontSize -= 0.5) {
     const charsPerLine = Math.max(10, Math.floor((boxWIn * 72) / (fontSize * PPTX_WEEKLY_AVG_CHAR_WIDTH_RATIO)))
-    const effectiveLineHeight =
-      fontSize * PPTX_WEEKLY_LINE_HEIGHT_RATIO * PPTX_WEEKLY_LINE_SPACING_MULTIPLE * (strictFit ? 1.05 : 1.0)
+    const effectiveLineHeight = fontSize * PPTX_WEEKLY_LINE_HEIGHT_RATIO * PPTX_WEEKLY_LINE_SPACING_MULTIPLE
     const maxLines = Math.max(1, Math.floor((boxHIn * 72) / effectiveLineHeight))
     if (countWrappedLines(text, charsPerLine) <= maxLines) return fontSize
   }
@@ -1968,10 +1994,7 @@ const getReportSectionPlans = (report: WeeklyReport): WeeklySectionPlan[] => {
       report.work_done,
       "No data provided.",
       boxes.continuation.textW,
-      boxes.continuation.textH,
-      13,
-      false,
-      false
+      boxes.continuation.textH
     ),
     buildWeeklySectionPlan(
       "tasks_new_week",
@@ -1980,8 +2003,7 @@ const getReportSectionPlans = (report: WeeklyReport): WeeklySectionPlan[] => {
       report.tasks_new_week,
       "No data provided.",
       boxes.page2Top.textW,
-      boxes.page2Top.textH,
-      14
+      boxes.page2Top.textH
     ),
     buildWeeklySectionPlan(
       "challenges",
@@ -2118,7 +2140,7 @@ const addSectionCard = (
     useManualHangingWrap && fontSize > 0
       ? wrapTextByCharsCompact(
           text,
-          Math.max(10, Math.floor((box.textW * 72) / (fontSize * PPTX_WEEKLY_AVG_CHAR_WIDTH_RATIO)))
+          Math.max(10, Math.floor(((box.textW * 72) / (fontSize * PPTX_WEEKLY_AVG_CHAR_WIDTH_RATIO)) * 1.12))
         ).join("\n")
       : text
 
@@ -2299,8 +2321,8 @@ const addWorkDoneSlide = (
     workDonePlan.color,
     workDonePlan.text,
     workDonePlan.fontSize,
-    workDonePlan.allowAutoShrink,
-    true
+    true,
+    false
   )
 
   return slide
@@ -2327,8 +2349,8 @@ const addTasksAndChallengesSlide = (
     tasksPlan.color,
     tasksPlan.text,
     tasksPlan.fontSize,
-    tasksPlan.allowAutoShrink,
-    true
+    true,
+    false
   )
   addSectionCard(
     pres,
@@ -2338,8 +2360,8 @@ const addTasksAndChallengesSlide = (
     challengesPlan.color,
     challengesPlan.text,
     challengesPlan.fontSize,
-    challengesPlan.allowAutoShrink,
-    true
+    true,
+    false
   )
 
   return slide

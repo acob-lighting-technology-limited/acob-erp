@@ -11,6 +11,7 @@ import { toast } from "sonner"
 import { Loader2, Sparkles } from "lucide-react"
 import { getCurrentOfficeWeek } from "@/lib/meeting-week"
 import { fetchWeeklyReportLockState, type WeeklyReportLockState } from "@/lib/weekly-report-lock"
+import { sanitizeReportText } from "@/lib/export-utils"
 
 interface WeeklyReport {
   id: string
@@ -39,12 +40,12 @@ const REPORT_TEXT_FIELDS = ["work_done", "tasks_new_week", "challenges"] as cons
 type ReportTextField = (typeof REPORT_TEXT_FIELDS)[number]
 
 const autoNumberReportText = (text: string): string => {
-  const lines = String(text || "")
+  const lines = sanitizeReportText(String(text || ""))
     .replace(/\r\n/g, "\n")
     .split("\n")
-    .map((line) => line.replace(/\u00A0/g, " ").trim())
+    .map((line) => line.trim())
     .filter((line) => line.length > 0)
-    .map((line) => line.replace(/^\s*(?:\d+[\.\)]\s+|[-*•◦▪▫‣⁃]\s+)/, "").trim())
+    .map((line) => line.replace(/^\s*(?:\d+[.)]\s+|[-*]\s+)/, "").trim())
     .filter((line) => line.length > 0)
 
   if (lines.length === 0) return ""
