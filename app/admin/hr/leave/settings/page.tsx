@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, Plus, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -26,12 +26,58 @@ interface LeavePolicy {
   leave_type?: { name: string }
 }
 
+interface FlowRole {
+  code: string
+  name: string
+  description?: string | null
+  resolution_mode: "fixed_user" | "department_lead" | "rule_based"
+  is_active: boolean
+}
+
+interface FlowRoute {
+  requester_kind: "employee" | "dept_lead" | "admin_hr_lead" | "hcs" | "md"
+  stage_order: number
+  approver_role_code: string
+  is_active: boolean
+}
+
+interface FlowAssignment {
+  approver_role_code: string
+  user_id: string
+  scope_type: "global" | "department" | "office"
+  scope_value?: string | null
+  is_primary: boolean
+  is_active: boolean
+}
+
+interface FlowHealth {
+  admin_hr_lead_count: number
+  md_count: number
+  hcs_count: number
+  employee_stage_count: number
+  dept_lead_stage_count: number
+  admin_hr_lead_stage_count: number
+  hcs_stage_count: number
+  md_stage_count: number
+  is_configured: boolean
+}
+
 export default function LeaveSettingsPage() {
   const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([])
   const [policies, setPolicies] = useState<LeavePolicy[]>([])
   const [holidays, setHolidays] = useState<any[]>([])
   const [slas, setSlas] = useState<any[]>([])
   const [dataQuality, setDataQuality] = useState<any[]>([])
+
+  const [flowRoles, setFlowRoles] = useState<FlowRole[]>([])
+  const [flowRoutes, setFlowRoutes] = useState<FlowRoute[]>([])
+  const [flowAssignments, setFlowAssignments] = useState<FlowAssignment[]>([])
+  const [flowHealth, setFlowHealth] = useState<FlowHealth | null>(null)
+  const [canEditFlow, setCanEditFlow] = useState(false)
+
+  const [previewUserId, setPreviewUserId] = useState("")
+  const [previewRelieverId, setPreviewRelieverId] = useState("")
+  const [previewResult, setPreviewResult] = useState<any>(null)
 
   const [policyForm, setPolicyForm] = useState({
     leave_type_id: "",
@@ -55,12 +101,13 @@ export default function LeaveSettingsPage() {
   }, [])
 
   async function loadData() {
-    const [typesRes, policyRes, holidayRes, slaRes, qualityRes] = await Promise.all([
+    const [typesRes, policyRes, holidayRes, slaRes, qualityRes, flowRes] = await Promise.all([
       fetch("/api/hr/leave/types"),
       fetch("/api/hr/leave/policies"),
       fetch("/api/hr/leave/holidays"),
       fetch("/api/hr/leave/sla"),
       fetch("/api/hr/leave/data-quality"),
+      fetch("/api/hr/leave/flow"),
     ])
 
     const typesPayload = await typesRes.json()
@@ -68,12 +115,19 @@ export default function LeaveSettingsPage() {
     const holidayPayload = await holidayRes.json()
     const slaPayload = await slaRes.json()
     const qualityPayload = await qualityRes.json()
+    const flowPayload = await flowRes.json()
 
     setLeaveTypes(typesPayload.data || [])
     setPolicies(policyPayload.data || [])
     setHolidays(holidayPayload.data || [])
     setSlas(slaPayload.data || [])
     setDataQuality(qualityPayload.data || [])
+
+    setFlowRoles(flowPayload?.data?.roles || [])
+    setFlowRoutes(flowPayload?.data?.routes || [])
+    setFlowAssignments(flowPayload?.data?.assignments || [])
+    setFlowHealth(flowPayload?.data?.health || null)
+    setCanEditFlow(Boolean(flowPayload?.permissions?.can_edit))
   }
 
   async function savePolicy() {
@@ -126,6 +180,83 @@ export default function LeaveSettingsPage() {
     }
   }
 
+  async function saveFlowBuilder() {
+    try {
+      const response = await fetch("/api/hr/leave/flow", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          roles: flowRoles,
+          routes: flowRoutes,
+          assignments: flowAssignments,
+        }),
+      })
+      const payload = await response.json()
+      if (!response.ok) throw new Error(payload.error || "Failed to save flow")
+      toast.success("Leave approval flow saved")
+      await loadData()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to save flow")
+    }
+  }
+
+  async function runPreview() {
+    try {
+      if (!previewUserId || !previewRelieverId) {
+        toast.error("Enter requester and reliever user IDs")
+        return
+      }
+
+      const response = await fetch(
+        `/api/hr/leave/flow/preview?user_id=${encodeURIComponent(previewUserId)}&reliever_id=${encodeURIComponent(previewRelieverId)}`
+      )
+      const payload = await response.json()
+      if (!response.ok) throw new Error(payload.error || "Failed to preview flow")
+      setPreviewResult(payload.data)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to preview flow")
+    }
+  }
+
+  function addRouteRow() {
+    setFlowRoutes((prev) => [
+      ...prev,
+      {
+        requester_kind: "employee",
+        stage_order: 1,
+        approver_role_code: "reliever",
+        is_active: true,
+      },
+    ])
+  }
+
+  function addRoleRow() {
+    setFlowRoles((prev) => [
+      ...prev,
+      {
+        code: "",
+        name: "",
+        description: "",
+        resolution_mode: "rule_based",
+        is_active: true,
+      },
+    ])
+  }
+
+  function addAssignmentRow() {
+    setFlowAssignments((prev) => [
+      ...prev,
+      {
+        approver_role_code: "",
+        user_id: "",
+        scope_type: "global",
+        scope_value: "",
+        is_primary: true,
+        is_active: true,
+      },
+    ])
+  }
+
   return (
     <div className="container mx-auto space-y-6 p-6">
       <Link href="/admin/hr" className="text-muted-foreground inline-flex items-center gap-2 text-sm">
@@ -134,8 +265,350 @@ export default function LeaveSettingsPage() {
 
       <div>
         <h1 className="text-3xl font-bold">Leave Settings</h1>
-        <p className="text-muted-foreground">Manage policies, holidays, SLA windows and profile data quality</p>
+        <p className="text-muted-foreground">
+          Manage policies, holidays, SLA windows, data quality, and approval flows
+        </p>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Approval Flow Builder</CardTitle>
+          <CardDescription>
+            Editable routing engine for leave approvals (super admin/developer controls)
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="rounded border p-3 text-sm">
+            <p className="font-medium">Routing Health</p>
+            {flowHealth ? (
+              <div className="mt-2 space-y-1">
+                <p>Configured: {flowHealth.is_configured ? "Yes" : "No"}</p>
+                <p>Admin & HR lead count: {flowHealth.admin_hr_lead_count}</p>
+                <p>MD lead count: {flowHealth.md_count}</p>
+                <p>HCS lead count: {flowHealth.hcs_count}</p>
+              </div>
+            ) : (
+              <p className="text-muted-foreground">Health unavailable</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <h3 className="font-medium">Approver Roles</h3>
+              {canEditFlow && (
+                <Button size="sm" variant="outline" onClick={addRoleRow}>
+                  <Plus className="mr-1 h-3 w-3" /> Add Role
+                </Button>
+              )}
+            </div>
+            {flowRoles.map((role, idx) => (
+              <div key={`${role.code || "new"}-${idx}`} className="grid gap-2 rounded border p-3 md:grid-cols-5">
+                <Input
+                  value={role.code}
+                  disabled={!canEditFlow}
+                  placeholder="code"
+                  onChange={(e) =>
+                    setFlowRoles((prev) =>
+                      prev.map((item, i) => (i === idx ? { ...item, code: e.target.value } : item))
+                    )
+                  }
+                />
+                <Input
+                  value={role.name}
+                  disabled={!canEditFlow}
+                  placeholder="name"
+                  onChange={(e) =>
+                    setFlowRoles((prev) =>
+                      prev.map((item, i) => (i === idx ? { ...item, name: e.target.value } : item))
+                    )
+                  }
+                />
+                <Input
+                  value={role.description || ""}
+                  disabled={!canEditFlow}
+                  placeholder="description"
+                  onChange={(e) =>
+                    setFlowRoles((prev) =>
+                      prev.map((item, i) => (i === idx ? { ...item, description: e.target.value } : item))
+                    )
+                  }
+                />
+                <Select
+                  value={role.resolution_mode}
+                  disabled={!canEditFlow}
+                  onValueChange={(value) =>
+                    setFlowRoles((prev) =>
+                      prev.map((item, i) =>
+                        i === idx ? { ...item, resolution_mode: value as FlowRole["resolution_mode"] } : item
+                      )
+                    )
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="rule_based">rule_based</SelectItem>
+                    <SelectItem value="department_lead">department_lead</SelectItem>
+                    <SelectItem value="fixed_user">fixed_user</SelectItem>
+                  </SelectContent>
+                </Select>
+                <div className="flex items-center gap-2">
+                  <Select
+                    value={role.is_active ? "true" : "false"}
+                    disabled={!canEditFlow}
+                    onValueChange={(value) =>
+                      setFlowRoles((prev) =>
+                        prev.map((item, i) => (i === idx ? { ...item, is_active: value === "true" } : item))
+                      )
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="true">active</SelectItem>
+                      <SelectItem value="false">inactive</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {canEditFlow && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setFlowRoles((prev) => prev.filter((_, i) => i !== idx))}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <h3 className="font-medium">Route Matrix</h3>
+              {canEditFlow && (
+                <Button size="sm" variant="outline" onClick={addRouteRow}>
+                  <Plus className="mr-1 h-3 w-3" /> Add Stage
+                </Button>
+              )}
+            </div>
+            {flowRoutes.map((route, idx) => (
+              <div
+                key={`${route.requester_kind}-${route.stage_order}-${idx}`}
+                className="grid gap-2 rounded border p-3 md:grid-cols-5"
+              >
+                <Select
+                  value={route.requester_kind}
+                  disabled={!canEditFlow}
+                  onValueChange={(value) =>
+                    setFlowRoutes((prev) =>
+                      prev.map((item, i) =>
+                        i === idx ? { ...item, requester_kind: value as FlowRoute["requester_kind"] } : item
+                      )
+                    )
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="employee">employee</SelectItem>
+                    <SelectItem value="dept_lead">dept_lead</SelectItem>
+                    <SelectItem value="admin_hr_lead">admin_hr_lead</SelectItem>
+                    <SelectItem value="hcs">hcs</SelectItem>
+                    <SelectItem value="md">md</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Input
+                  type="number"
+                  min={1}
+                  value={route.stage_order}
+                  disabled={!canEditFlow}
+                  onChange={(e) =>
+                    setFlowRoutes((prev) =>
+                      prev.map((item, i) => (i === idx ? { ...item, stage_order: Number(e.target.value || 1) } : item))
+                    )
+                  }
+                />
+                <Input
+                  value={route.approver_role_code}
+                  disabled={!canEditFlow}
+                  placeholder="approver role code"
+                  onChange={(e) =>
+                    setFlowRoutes((prev) =>
+                      prev.map((item, i) => (i === idx ? { ...item, approver_role_code: e.target.value } : item))
+                    )
+                  }
+                />
+                <Select
+                  value={route.is_active ? "true" : "false"}
+                  disabled={!canEditFlow}
+                  onValueChange={(value) =>
+                    setFlowRoutes((prev) =>
+                      prev.map((item, i) => (i === idx ? { ...item, is_active: value === "true" } : item))
+                    )
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="true">active</SelectItem>
+                    <SelectItem value="false">inactive</SelectItem>
+                  </SelectContent>
+                </Select>
+                <div className="flex justify-end">
+                  {canEditFlow && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setFlowRoutes((prev) => prev.filter((_, i) => i !== idx))}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <h3 className="font-medium">Fixed Assignments (optional)</h3>
+              {canEditFlow && (
+                <Button size="sm" variant="outline" onClick={addAssignmentRow}>
+                  <Plus className="mr-1 h-3 w-3" /> Add Assignment
+                </Button>
+              )}
+            </div>
+            {flowAssignments.map((assignment, idx) => (
+              <div
+                key={`${assignment.approver_role_code}-${assignment.user_id}-${idx}`}
+                className="grid gap-2 rounded border p-3 md:grid-cols-6"
+              >
+                <Input
+                  value={assignment.approver_role_code}
+                  disabled={!canEditFlow}
+                  placeholder="role code"
+                  onChange={(e) =>
+                    setFlowAssignments((prev) =>
+                      prev.map((item, i) => (i === idx ? { ...item, approver_role_code: e.target.value } : item))
+                    )
+                  }
+                />
+                <Input
+                  value={assignment.user_id}
+                  disabled={!canEditFlow}
+                  placeholder="user id"
+                  onChange={(e) =>
+                    setFlowAssignments((prev) =>
+                      prev.map((item, i) => (i === idx ? { ...item, user_id: e.target.value } : item))
+                    )
+                  }
+                />
+                <Select
+                  value={assignment.scope_type}
+                  disabled={!canEditFlow}
+                  onValueChange={(value) =>
+                    setFlowAssignments((prev) =>
+                      prev.map((item, i) =>
+                        i === idx ? { ...item, scope_type: value as FlowAssignment["scope_type"] } : item
+                      )
+                    )
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="global">global</SelectItem>
+                    <SelectItem value="department">department</SelectItem>
+                    <SelectItem value="office">office</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Input
+                  value={assignment.scope_value || ""}
+                  disabled={!canEditFlow}
+                  placeholder="scope value"
+                  onChange={(e) =>
+                    setFlowAssignments((prev) =>
+                      prev.map((item, i) => (i === idx ? { ...item, scope_value: e.target.value } : item))
+                    )
+                  }
+                />
+                <Select
+                  value={assignment.is_active ? "true" : "false"}
+                  disabled={!canEditFlow}
+                  onValueChange={(value) =>
+                    setFlowAssignments((prev) =>
+                      prev.map((item, i) => (i === idx ? { ...item, is_active: value === "true" } : item))
+                    )
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="true">active</SelectItem>
+                    <SelectItem value="false">inactive</SelectItem>
+                  </SelectContent>
+                </Select>
+                <div className="flex justify-end">
+                  {canEditFlow && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setFlowAssignments((prev) => prev.filter((_, i) => i !== idx))}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex gap-2">
+            <Button onClick={saveFlowBuilder} disabled={!canEditFlow}>
+              Save Flow Configuration
+            </Button>
+            {!canEditFlow && (
+              <p className="text-muted-foreground text-sm">View only. Super admin/developer can edit.</p>
+            )}
+          </div>
+
+          <div className="space-y-2 rounded border p-3">
+            <p className="font-medium">Route Preview</p>
+            <div className="grid gap-2 md:grid-cols-3">
+              <Input
+                placeholder="Requester user_id"
+                value={previewUserId}
+                onChange={(e) => setPreviewUserId(e.target.value)}
+              />
+              <Input
+                placeholder="Reliever user_id"
+                value={previewRelieverId}
+                onChange={(e) => setPreviewRelieverId(e.target.value)}
+              />
+              <Button onClick={runPreview}>Preview</Button>
+            </div>
+            {previewResult && (
+              <div className="text-sm">
+                <p>Requester kind: {previewResult.requester_kind}</p>
+                <div className="mt-1 space-y-1">
+                  {(previewResult.route_snapshot || []).map((stage: any) => (
+                    <p key={`${stage.stage_order}-${stage.approver_role_code}`}>
+                      {stage.stage_order}. {stage.approver_role_code} ({stage.approver_user_id})
+                    </p>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

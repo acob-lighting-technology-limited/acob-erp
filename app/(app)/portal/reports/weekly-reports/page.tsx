@@ -32,6 +32,7 @@ import {
   Target,
   AlertTriangle,
   Building2,
+  FileSpreadsheet,
 } from "lucide-react"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
@@ -44,6 +45,8 @@ import {
   exportAllToPDF,
   exportAllToDocx,
   exportAllToPPTX,
+  exportToXLSX,
+  exportAllToXLSX,
   autoNumberLines,
   sortReportsByDepartment,
   type WeeklyPptxMode,
@@ -226,6 +229,13 @@ export default function WeeklyReportsPortal() {
               >
                 <Presentation className="h-4 w-4" /> <span className="hidden sm:inline">PPTX</span>
               </Button>
+              <Button
+                variant="outline"
+                onClick={() => exportAllToXLSX(filteredReports, weekFilter, yearFilter)}
+                className="gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 dark:border-emerald-900/30 dark:hover:bg-emerald-950/20"
+              >
+                <FileSpreadsheet className="h-4 w-4" /> <span className="hidden sm:inline">XLSX</span>
+              </Button>
             </>
           )}
           {isLead && (
@@ -384,6 +394,15 @@ export default function WeeklyReportsPortal() {
                               title="PPTX"
                             >
                               <Presentation className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-emerald-600 hover:text-emerald-700"
+                              onClick={() => exportToXLSX(report)}
+                              title="XLSX"
+                            >
+                              <FileSpreadsheet className="h-3.5 w-3.5" />
                             </Button>
                           </div>
                           {hasManageRights && !isFilteredWeekLocked && (

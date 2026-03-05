@@ -16,7 +16,7 @@ export type AuditEntityType =
   | "help_desk_ticket"
   | "correspondence_record"
   | "communications_mail"
-  | "mail_digest"
+  | "mail_summary"
   | "profile"
   | "asset"
   | "asset_assignment"

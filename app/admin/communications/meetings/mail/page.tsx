@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import { MailDigestContent } from "@/app/admin/reports/mail/mail-digest-content"
+import { WeeklySummaryContent } from "@/app/admin/reports/mail/weekly-summary-content"
 
 export default async function CommunicationsMeetingsMailPage() {
   const supabase = await createClient()
@@ -32,7 +32,7 @@ export default async function CommunicationsMeetingsMailPage() {
     .order("full_name")
 
   return (
-    <MailDigestContent
+    <WeeklySummaryContent
       employees={employees || []}
       currentUser={{
         id: user.id,

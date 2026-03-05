@@ -19,6 +19,8 @@ interface LeaveItem {
   reason: string
   status: string
   approval_stage: string
+  current_stage_code?: string
+  current_stage_order?: number
   created_at: string
   user?: { full_name: string; company_email: string }
   leave_type?: { name: string }
@@ -35,9 +37,14 @@ interface LeaveItem {
 }
 
 const STAGE_LABELS: Record<string, string> = {
+  pending_reliever: "Waiting Reliever",
+  pending_department_lead: "Waiting Department Lead",
+  pending_admin_hr_lead: "Waiting Admin & HR Lead",
+  pending_md: "Waiting MD",
+  pending_hcs: "Waiting HCS",
   reliever_pending: "Waiting Reliever",
-  supervisor_pending: "Waiting Supervisor",
-  hr_pending: "Waiting HR",
+  supervisor_pending: "Waiting Department Lead",
+  hr_pending: "Waiting Admin & HR Lead",
   completed: "Completed",
   rejected: "Rejected",
   cancelled: "Cancelled",
@@ -147,7 +154,11 @@ export default function LeaveApprovePage() {
                 <div key={item.id} className="rounded border p-3">
                   <div className="flex items-center justify-between gap-2">
                     <p className="font-medium">{item.user?.full_name || "Employee"}</p>
-                    <Badge variant="outline">{STAGE_LABELS[item.approval_stage] || item.approval_stage}</Badge>
+                    <Badge variant="outline">
+                      {STAGE_LABELS[item.current_stage_code || item.approval_stage] ||
+                        item.current_stage_code ||
+                        item.approval_stage}
+                    </Badge>
                   </div>
                   <p className="text-muted-foreground mt-1 text-sm">
                     {item.start_date} to {item.end_date} | Resume {item.resume_date} | {item.days_count} day(s)
@@ -217,7 +228,11 @@ export default function LeaveApprovePage() {
                       >
                         {item.status}
                       </Badge>
-                      <Badge variant="outline">{STAGE_LABELS[item.approval_stage] || item.approval_stage}</Badge>
+                      <Badge variant="outline">
+                        {STAGE_LABELS[item.current_stage_code || item.approval_stage] ||
+                          item.current_stage_code ||
+                          item.approval_stage}
+                      </Badge>
                     </div>
                   </div>
                   <p className="text-muted-foreground text-sm">

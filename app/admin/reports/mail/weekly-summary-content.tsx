@@ -61,7 +61,7 @@ interface Props {
   }
 }
 
-export function MailDigestContent({ employees, currentUser }: Props) {
+export function WeeklySummaryContent({ employees, currentUser }: Props) {
   const supabase = createClient()
   const currentOfficeWeek = getCurrentOfficeWeek()
 
@@ -103,7 +103,7 @@ export function MailDigestContent({ employees, currentUser }: Props) {
           supabase as any,
           {
             action: "send",
-            entityType: "mail_digest",
+            entityType: "mail_summary",
             entityId: params.entityId,
             metadata: {
               ...(params.metadata || {}),
@@ -113,13 +113,13 @@ export function MailDigestContent({ employees, currentUser }: Props) {
               actorId: currentUser?.id || undefined,
               department: currentUser?.department || "Admin & HR",
               source: "ui",
-              route: "/admin/reports/mail-digest",
+              route: "/admin/reports/weekly-summary",
             },
           },
           { failOpen: true }
         )
       } catch (error) {
-        console.error("[mail-digest] Failed to write audit log", error)
+        console.error("[weekly-summary] Failed to write audit log", error)
       }
     },
     [currentUser?.department, currentUser?.id, supabase]
@@ -295,7 +295,7 @@ export function MailDigestContent({ employees, currentUser }: Props) {
 
     if (contentChoice === "manual_upload") {
       if (!manualWeeklyReport.base64 || !manualActionTracker.base64) {
-        toast.error("Please upload both weekly report and action tracker PDFs")
+        toast.error("Please upload both weekly report and action points PDFs")
         return
       }
       if (sendTiming !== "now") {
@@ -385,7 +385,7 @@ export function MailDigestContent({ employees, currentUser }: Props) {
   const doSend = async () => {
     setIsSending(true)
     setSendResult(null)
-    const toastId = toast.loading(`Sending digest to ${resolvedRecipients.length} recipient(s)...`)
+    const toastId = toast.loading(`Sending weekly summary to ${resolvedRecipients.length} recipient(s)...`)
 
     try {
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -420,20 +420,20 @@ export function MailDigestContent({ employees, currentUser }: Props) {
       })
 
       const result = await res.json()
-      if (!res.ok) throw new Error(result.error || "Failed to send digest")
+      if (!res.ok) throw new Error(result.error || "Failed to send weekly summary")
 
       setSendResult(result)
       const successCount = result.results?.filter((r: any) => r.success).length || 0
       const failCount = result.results?.filter((r: any) => !r.success).length || 0
 
       if (failCount === 0) {
-        toast.success(`✅ Digest sent to ${successCount} recipient(s)`, { id: toastId })
+        toast.success(`✅ Weekly summary sent to ${successCount} recipient(s)`, { id: toastId })
       } else {
         toast.warning(`Sent to ${successCount}, failed for ${failCount}`, { id: toastId })
       }
 
       await logMailAudit({
-        action: "weekly_digest_sent",
+        action: "weekly_summary_sent",
         entityId: crypto.randomUUID(),
         metadata: {
           meeting_week: weekNumber,
@@ -446,8 +446,8 @@ export function MailDigestContent({ employees, currentUser }: Props) {
         },
       })
     } catch (err: any) {
-      console.error("[Mail Digest Error]", err)
-      toast.error(err.message || "Failed to send digest", { id: toastId })
+      console.error("[Weekly Summary Error]", err)
+      toast.error(err.message || "Failed to send weekly summary", { id: toastId })
     } finally {
       setIsSending(false)
     }
@@ -470,8 +470,8 @@ export function MailDigestContent({ employees, currentUser }: Props) {
   return (
     <PageWrapper maxWidth="full" background="gradient">
       <PageHeader
-        title="Meeting Mailings"
-        description="Send meeting packs (weekly reports + action tracker) to selected recipients."
+        title="Weekly Summary Mailings"
+        description="Send weekly summary packs (weekly reports + action points) to selected recipients."
         icon={Mail}
         backLink={{ href: "/admin/reports", label: "Back to Reports" }}
       />
@@ -541,7 +541,7 @@ export function MailDigestContent({ employees, currentUser }: Props) {
             <CardContent>
               <div className="flex flex-wrap gap-3">
                 {[
-                  { value: "both", label: "Both Reports", icon: FileText, desc: "Weekly Report + Action Tracker" },
+                  { value: "both", label: "Both Reports", icon: FileText, desc: "Weekly Report + Action Points" },
                   {
                     value: "weekly_report",
                     label: "Weekly Report Only",
@@ -550,7 +550,7 @@ export function MailDigestContent({ employees, currentUser }: Props) {
                   },
                   {
                     value: "action_tracker",
-                    label: "Action Tracker Only",
+                    label: "Action Points Only",
                     icon: ClipboardList,
                     desc: "Upcoming action items & completion status",
                   },
@@ -558,7 +558,7 @@ export function MailDigestContent({ employees, currentUser }: Props) {
                     value: "manual_upload",
                     label: "Upload Your PDFs",
                     icon: FileText,
-                    desc: "Manually upload weekly report + action tracker (max 1MB each)",
+                    desc: "Manually upload weekly report + action points (max 1MB each)",
                   },
                 ].map((opt) => (
                   <button
@@ -603,7 +603,7 @@ export function MailDigestContent({ employees, currentUser }: Props) {
                     )}
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="manual-action-tracker">Action Tracker PDF (max 1MB)</Label>
+                    <Label htmlFor="manual-action-tracker">Action Points PDF (max 1MB)</Label>
                     <Input
                       id="manual-action-tracker"
                       type="file"
@@ -784,7 +784,7 @@ export function MailDigestContent({ employees, currentUser }: Props) {
 
               {recipientMode === "all" && (
                 <p className="text-muted-foreground text-sm">
-                  The digest will be sent to all <strong>{employees.length}</strong> active employees.
+                  The weekly summary will be sent to all <strong>{employees.length}</strong> active employees.
                 </p>
               )}
             </CardContent>
@@ -975,8 +975,8 @@ export function MailDigestContent({ employees, currentUser }: Props) {
         </div>
 
         {/* ── RIGHT: Summary & Send ─────────────────────────────────────── */}
-        <aside className="space-y-6 self-start">
-          <Card className="border-green-200 lg:sticky lg:top-24 dark:border-green-900">
+        <aside className="space-y-6 lg:sticky lg:top-[120px] lg:max-h-[calc(100vh-136px)] lg:self-start lg:overflow-y-auto lg:pr-1">
+          <Card className="border-green-200 dark:border-green-900">
             <CardHeader className="pb-3">
               <CardTitle className="text-lg">Summary</CardTitle>
             </CardHeader>
@@ -1014,7 +1014,7 @@ export function MailDigestContent({ employees, currentUser }: Props) {
                   )}
                   {(contentChoice === "both" || contentChoice === "action_tracker") && (
                     <Badge variant="secondary" className="gap-1">
-                      <ClipboardList className="h-3 w-3" /> Action Tracker
+                      <ClipboardList className="h-3 w-3" /> Action Points
                     </Badge>
                   )}
                 </div>

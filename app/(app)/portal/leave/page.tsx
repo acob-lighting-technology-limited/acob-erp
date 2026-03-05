@@ -13,6 +13,12 @@ export interface LeaveRequest {
   reason: string
   status: string
   approval_stage: string
+  current_stage_code?: string
+  current_stage_order?: number
+  current_approver_user_id?: string
+  requester_route_kind?: string
+  lead_reconfirm_required?: boolean
+  reliever_revision?: number
   created_at: string
   leave_type: {
     name: string

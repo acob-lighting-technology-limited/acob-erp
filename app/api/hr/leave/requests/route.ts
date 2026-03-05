@@ -1,17 +1,25 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import {
-  LEAVE_PENDING_STAGES,
   areRequiredDocumentsVerified,
   assertNoOverlap,
   assertRelieverAvailability,
   computeLeaveDates,
   evaluateLeaveEligibility,
   getLeavePolicy,
-  getSupervisorForUser,
-  notifyUsers,
   resolveProfileByIdentifier,
 } from "@/lib/hr/leave-workflow"
+import {
+  buildResolvedRouteSnapshot,
+  classifyRequesterKind,
+  getRouteStageByOrder,
+  notifyStageApprover,
+  stageCodeForRole,
+} from "@/lib/hr/leave-routing"
+
+function isRelieverStage(request: any) {
+  return request.current_stage_code === "pending_reliever" || request.approval_stage === "reliever_pending"
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -47,7 +55,7 @@ export async function GET(request: NextRequest) {
           id, document_type, file_url, status, verified_by, verified_at, notes, created_at
         ),
         approvals:leave_approvals (
-          id, approver_id, approval_level, status, comments, approved_at,
+          id, approver_id, approval_level, status, comments, approved_at, stage_code, stage_order, superseded, reliever_revision,
           approver:profiles!leave_approvals_approver_id_fkey (id, first_name, last_name, full_name)
         )
       `
@@ -73,12 +81,12 @@ export async function GET(request: NextRequest) {
       .order("leave_type_id")
 
     const enriched = await Promise.all(
-      (requests || []).map(async (request: any) => {
-        const policy = await getLeavePolicy(supabase, request.leave_type_id)
+      (requests || []).map(async (leaveRequest: any) => {
+        const policy = await getLeavePolicy(supabase, leaveRequest.leave_type_id)
         const requiredDocs = policy.required_documents || []
-        const evidence = await areRequiredDocumentsVerified(supabase, request.id, requiredDocs)
+        const evidence = await areRequiredDocumentsVerified(supabase, leaveRequest.id, requiredDocs)
         return {
-          ...request,
+          ...leaveRequest,
           required_documents: requiredDocs,
           evidence_complete: evidence.complete,
           missing_documents: evidence.missing,
@@ -103,15 +111,7 @@ export async function POST(request: NextRequest) {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const body = await request.json()
-    const {
-      leave_type_id,
-      start_date,
-      days_count,
-      end_date,
-      reason,
-      reliever_identifier,
-      handover_note,
-    } = body
+    const { leave_type_id, start_date, days_count, end_date, reason, reliever_identifier, handover_note } = body
 
     if (!leave_type_id || !start_date || !reason || !handover_note || !reliever_identifier) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
@@ -133,7 +133,7 @@ export async function POST(request: NextRequest) {
     const { data: requester, error: requesterError } = await supabase
       .from("profiles")
       .select(
-        "id, full_name, first_name, last_name, company_email, department_id, gender, employment_date, work_location, employment_type, marital_status, has_children, pregnancy_status"
+        "id, full_name, first_name, last_name, company_email, department, department_id, is_department_lead, lead_departments, gender, employment_date, work_location, employment_type, marital_status, has_children, pregnancy_status"
       )
       .eq("id", user.id)
       .single()
@@ -150,8 +150,8 @@ export async function POST(request: NextRequest) {
     if (!leaveType) {
       return NextResponse.json({ error: "Leave type not found" }, { status: 400 })
     }
-    const policy = await getLeavePolicy(supabase, leave_type_id)
 
+    const policy = await getLeavePolicy(supabase, leave_type_id)
     const eligibility = await evaluateLeaveEligibility({
       supabase,
       policy,
@@ -177,14 +177,10 @@ export async function POST(request: NextRequest) {
     })
 
     const reliever = await resolveProfileByIdentifier(supabase, reliever_identifier, "Reliever")
-    const supervisor = await getSupervisorForUser(supabase, user.id)
 
-    if (reliever.id === user.id)
+    if (reliever.id === user.id) {
       return NextResponse.json({ error: "You cannot assign yourself as reliever" }, { status: 400 })
-    if (supervisor.id === user.id)
-      return NextResponse.json({ error: "You cannot approve your own leave request" }, { status: 400 })
-    if (reliever.id === supervisor.id)
-      return NextResponse.json({ error: "Reliever and supervisor must be different people" }, { status: 400 })
+    }
 
     if (requester.department_id && reliever.department_id && requester.department_id !== reliever.department_id) {
       return NextResponse.json({ error: "Reliever must be from the same department" }, { status: 400 })
@@ -221,6 +217,21 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const requesterRouteKind = classifyRequesterKind(requester)
+    const routeSnapshot = await buildResolvedRouteSnapshot({
+      supabase,
+      requester,
+      requesterId: user.id,
+      requesterKind: requesterRouteKind,
+      relieverId: reliever.id,
+    })
+
+    const firstStage = getRouteStageByOrder(routeSnapshot, 1)
+    if (!firstStage) {
+      return NextResponse.json({ error: "LEAVE_APPROVER_NOT_CONFIGURED:first_stage" }, { status: 400 })
+    }
+
+    const departmentLeadStage = routeSnapshot.find((stage) => stage.approver_role_code === "department_lead")
     const initialStatus = eligibility.status === "missing_evidence" ? "pending_evidence" : "pending"
 
     const { data: newRequest, error } = await supabase
@@ -234,9 +245,14 @@ export async function POST(request: NextRequest) {
         days_count: effectiveDays,
         reason,
         status: initialStatus,
-        approval_stage: LEAVE_PENDING_STAGES.RELIEVER,
+        approval_stage: firstStage.stage_code,
+        current_stage_code: firstStage.stage_code,
+        current_stage_order: firstStage.stage_order,
+        current_approver_user_id: firstStage.approver_user_id,
+        requester_route_kind: requesterRouteKind,
+        route_snapshot: routeSnapshot,
         reliever_id: reliever.id,
-        supervisor_id: supervisor.id,
+        supervisor_id: departmentLeadStage?.approver_user_id || null,
         handover_note,
         requested_days_mode: policy.accrual_mode || "calendar_days",
         request_kind: "standard",
@@ -251,13 +267,14 @@ export async function POST(request: NextRequest) {
     const requesterName = requester.full_name || `${requester.first_name || ""} ${requester.last_name || ""}`.trim()
 
     if (initialStatus === "pending") {
-      await notifyUsers(supabase, {
-        userIds: [reliever.id, supervisor.id],
-        title: "Leave request awaiting review",
+      await notifyStageApprover({
+        supabase,
+        approverUserId: firstStage.approver_user_id,
+        title: "Leave request awaiting your approval",
         message: `${requesterName || "Employee"} requested ${effectiveDays} day(s) leave from ${start_date} to ${endDate}.`,
         actorId: user.id,
-        linkUrl: "/dashboard/leave",
         entityId: newRequest.id,
+        linkUrl: "/dashboard/leave",
       })
     }
 
@@ -288,16 +305,7 @@ export async function PUT(request: NextRequest) {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const body = await request.json()
-    const {
-      id,
-      leave_type_id,
-      start_date,
-      days_count,
-      end_date,
-      reason,
-      reliever_identifier,
-      handover_note,
-    } = body
+    const { id, leave_type_id, start_date, days_count, end_date, reason, reliever_identifier, handover_note } = body
 
     if (!id) return NextResponse.json({ error: "Leave request ID is required" }, { status: 400 })
 
@@ -306,13 +314,87 @@ export async function PUT(request: NextRequest) {
       .select("*")
       .eq("id", id)
       .single()
-    if (fetchError || !existingRequest) return NextResponse.json({ error: "Leave request not found" }, { status: 404 })
-    if (existingRequest.user_id !== user.id)
-      return NextResponse.json({ error: "You can only edit your own leave requests" }, { status: 403 })
+
+    if (fetchError || !existingRequest) {
+      return NextResponse.json({ error: "Leave request not found" }, { status: 404 })
+    }
+
+    // Lead-stage reliever reassignment workflow (reset to reliever)
     if (
-      !["pending", "pending_evidence"].includes(existingRequest.status) ||
-      existingRequest.approval_stage !== LEAVE_PENDING_STAGES.RELIEVER
+      reliever_identifier &&
+      existingRequest.status === "pending" &&
+      (existingRequest.current_stage_code === stageCodeForRole("department_lead") ||
+        existingRequest.approval_stage === "supervisor_pending") &&
+      existingRequest.current_approver_user_id === user.id
     ) {
+      const newReliever = await resolveProfileByIdentifier(supabase, reliever_identifier, "Reliever")
+
+      if (!newReliever?.id || newReliever.id === existingRequest.user_id) {
+        return NextResponse.json({ error: "Invalid reliever selected" }, { status: 400 })
+      }
+
+      await assertRelieverAvailability(
+        supabase,
+        newReliever.id,
+        existingRequest.start_date,
+        existingRequest.end_date,
+        existingRequest.id
+      )
+
+      const routeSnapshot = Array.isArray(existingRequest.route_snapshot) ? [...existingRequest.route_snapshot] : []
+      const updatedSnapshot = routeSnapshot.map((stage: any) => {
+        if (Number(stage.stage_order) === 1 && stage.approver_role_code === "reliever") {
+          return { ...stage, approver_user_id: newReliever.id }
+        }
+        return stage
+      })
+
+      const newRevision = Number(existingRequest.reliever_revision || 1) + 1
+
+      const { error: updateError } = await supabase
+        .from("leave_requests")
+        .update({
+          reliever_id: newReliever.id,
+          route_snapshot: updatedSnapshot,
+          current_stage_order: 1,
+          current_stage_code: stageCodeForRole("reliever"),
+          current_approver_user_id: newReliever.id,
+          approval_stage: stageCodeForRole("reliever"),
+          reliever_revision: newRevision,
+          lead_reconfirm_required: true,
+        })
+        .eq("id", existingRequest.id)
+
+      if (updateError) {
+        return NextResponse.json({ error: "Failed to update reliever" }, { status: 500 })
+      }
+
+      await supabase
+        .from("leave_approvals")
+        .update({ superseded: true })
+        .eq("leave_request_id", existingRequest.id)
+        .eq("stage_code", stageCodeForRole("reliever"))
+        .eq("superseded", false)
+
+      await notifyStageApprover({
+        supabase,
+        approverUserId: newReliever.id,
+        title: "Leave request reassigned to you as reliever",
+        message: "A leave request now requires your reliever approval before workflow continues.",
+        actorId: user.id,
+        entityId: existingRequest.id,
+        linkUrl: "/dashboard/leave",
+      })
+
+      return NextResponse.json({ message: "Reliever updated and request returned to reliever approval" })
+    }
+
+    // Requester self-edit allowed only while still at reliever stage
+    if (existingRequest.user_id !== user.id) {
+      return NextResponse.json({ error: "You can only edit your own leave requests" }, { status: 403 })
+    }
+
+    if (!["pending", "pending_evidence"].includes(existingRequest.status) || !isRelieverStage(existingRequest)) {
       return NextResponse.json({ error: "You can only edit requests pending reliever review" }, { status: 400 })
     }
 
@@ -332,10 +414,11 @@ export async function PUT(request: NextRequest) {
     const { data: requester } = await supabase
       .from("profiles")
       .select(
-        "id, gender, employment_date, work_location, employment_type, marital_status, has_children, pregnancy_status"
+        "id, department, department_id, is_department_lead, lead_departments, gender, employment_date, work_location, employment_type, marital_status, has_children, pregnancy_status"
       )
       .eq("id", user.id)
       .single()
+
     if (!requester) {
       return NextResponse.json({ error: "Failed to load employee profile" }, { status: 400 })
     }
@@ -345,11 +428,12 @@ export async function PUT(request: NextRequest) {
       .select("id, name, code")
       .eq("id", targetLeaveTypeId)
       .single()
+
     if (!leaveType) {
       return NextResponse.json({ error: "Leave type not found" }, { status: 400 })
     }
-    const policy = await getLeavePolicy(supabase, targetLeaveTypeId)
 
+    const policy = await getLeavePolicy(supabase, targetLeaveTypeId)
     const eligibility = await evaluateLeaveEligibility({
       supabase,
       policy,
@@ -371,7 +455,7 @@ export async function PUT(request: NextRequest) {
       startDate: targetStartDate,
       daysCount: targetDays,
       accrualMode: (policy.accrual_mode as "calendar_days" | "business_days") || "calendar_days",
-      location: requester?.work_location || "global",
+      location: requester.work_location || "global",
     })
 
     let relieverId = existingRequest.reliever_id
@@ -380,7 +464,7 @@ export async function PUT(request: NextRequest) {
       relieverId = reliever.id
     }
 
-    if (!relieverId || relieverId === user.id || relieverId === existingRequest.supervisor_id) {
+    if (!relieverId || relieverId === user.id) {
       return NextResponse.json({ error: "Invalid reliever selected" }, { status: 400 })
     }
 
@@ -401,6 +485,22 @@ export async function PUT(request: NextRequest) {
       )
     }
 
+    const requesterRouteKind = classifyRequesterKind(requester)
+    const routeSnapshot = await buildResolvedRouteSnapshot({
+      supabase,
+      requester,
+      requesterId: user.id,
+      requesterKind: requesterRouteKind,
+      relieverId,
+    })
+
+    const firstStage = getRouteStageByOrder(routeSnapshot, 1)
+    if (!firstStage) {
+      return NextResponse.json({ error: "LEAVE_APPROVER_NOT_CONFIGURED:first_stage" }, { status: 400 })
+    }
+
+    const departmentLeadStage = routeSnapshot.find((stage) => stage.approver_role_code === "department_lead")
+
     const { data: updatedRequest, error } = await supabase
       .from("leave_requests")
       .update({
@@ -411,9 +511,17 @@ export async function PUT(request: NextRequest) {
         days_count: targetDays,
         reason: reason || existingRequest.reason,
         reliever_id: relieverId,
+        supervisor_id: departmentLeadStage?.approver_user_id || null,
         handover_note: handover_note || existingRequest.handover_note,
         requested_days_mode: policy.accrual_mode || "calendar_days",
         status: eligibility.status === "missing_evidence" ? "pending_evidence" : "pending",
+        requester_route_kind: requesterRouteKind,
+        route_snapshot: routeSnapshot,
+        current_stage_order: 1,
+        current_stage_code: firstStage.stage_code,
+        current_approver_user_id: firstStage.approver_user_id,
+        approval_stage: firstStage.stage_code,
+        lead_reconfirm_required: false,
       })
       .eq("id", id)
       .select()
@@ -451,18 +559,17 @@ export async function DELETE(request: NextRequest) {
 
     const { data: existingRequest, error: fetchError } = await supabase
       .from("leave_requests")
-      .select("id, user_id, status, approval_stage")
+      .select("id, user_id, status, approval_stage, current_stage_code")
       .eq("id", id)
       .single()
 
     if (fetchError || !existingRequest) return NextResponse.json({ error: "Leave request not found" }, { status: 404 })
-    if (existingRequest.user_id !== user.id)
-      return NextResponse.json({ error: "You can only delete your own leave requests" }, { status: 403 })
 
-    if (
-      !["pending", "pending_evidence"].includes(existingRequest.status) ||
-      existingRequest.approval_stage !== LEAVE_PENDING_STAGES.RELIEVER
-    ) {
+    if (existingRequest.user_id !== user.id) {
+      return NextResponse.json({ error: "You can only delete your own leave requests" }, { status: 403 })
+    }
+
+    if (!["pending", "pending_evidence"].includes(existingRequest.status) || !isRelieverStage(existingRequest)) {
       return NextResponse.json({ error: "Only requests pending reliever review can be deleted" }, { status: 400 })
     }
 

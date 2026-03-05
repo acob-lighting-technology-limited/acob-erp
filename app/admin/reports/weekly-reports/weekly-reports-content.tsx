@@ -30,6 +30,7 @@ import {
   FileBarChart,
   Loader2,
   Search,
+  FileSpreadsheet,
 } from "lucide-react"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
 import {
@@ -47,6 +48,8 @@ import {
   exportAllToPDF,
   exportAllToDocx,
   exportAllToPPTX,
+  exportToXLSX,
+  exportAllToXLSX,
   autoNumberLines,
   sortReportsByDepartment,
   type WeeklyPptxMode,
@@ -403,6 +406,13 @@ export function WeeklyReportsContent({
                 <Presentation className="h-4 w-4" /> <span className="hidden sm:inline">PPTX</span>
               </Button>
               <Button
+                variant="outline"
+                onClick={() => exportAllToXLSX(filteredReports, weekFilter, yearFilter)}
+                className="gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 dark:border-emerald-900/30 dark:hover:bg-emerald-950/20"
+              >
+                <FileSpreadsheet className="h-4 w-4" /> <span className="hidden sm:inline">XLSX</span>
+              </Button>
+              <Button
                 asChild
                 variant="outline"
                 className="gap-2 border-green-200 text-green-700 hover:bg-green-50 hover:text-green-800 dark:border-green-900/30 dark:hover:bg-green-950/20"
@@ -624,6 +634,15 @@ export function WeeklyReportsContent({
                             title="Deck"
                           >
                             <Presentation className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-emerald-600 hover:text-emerald-700"
+                            onClick={() => exportToXLSX(report)}
+                            title="XLSX"
+                          >
+                            <FileSpreadsheet className="h-3.5 w-3.5" />
                           </Button>
                         </div>
                         {!isFilteredWeekLocked && (

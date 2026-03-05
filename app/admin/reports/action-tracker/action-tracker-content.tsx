@@ -38,6 +38,7 @@ import {
   exportActionTrackerToPDF,
   exportActionTrackerToPPTX,
   exportActionTrackerToDocx,
+  exportActionTrackerToXLSX,
   type ActionItem,
 } from "@/lib/export-utils"
 
@@ -176,6 +177,8 @@ export function ActionTrackerContent({ initialDepartments, scopedDepartments = [
     total: tasks.length,
     completed: tasks.filter((t) => t.status === "completed").length,
     pending: tasks.filter((t) => t.status !== "completed").length,
+    notStarted: tasks.filter((t) => t.status === "not_started").length,
+    inProgress: tasks.filter((t) => t.status === "in_progress").length,
   }
 
   const getDeptStatus = (dept: string) => {
@@ -241,6 +244,13 @@ export function ActionTrackerContent({ initialDepartments, scopedDepartments = [
               <FileIcon className="h-4 w-4" /> <span className="hidden sm:inline">Word</span>
             </Button>
             <Button
+              variant="outline"
+              onClick={() => exportActionTrackerToXLSX(actionItemsForExport, weekFilter, yearFilter)}
+              className="gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 dark:border-emerald-900/30 dark:hover:bg-emerald-950/20"
+            >
+              <FileSpreadsheet className="h-4 w-4" /> <span className="hidden sm:inline">XLSX</span>
+            </Button>
+            <Button
               asChild
               variant="outline"
               className="gap-2 border-green-200 text-green-700 hover:bg-green-50 hover:text-green-800 dark:border-green-900/30 dark:hover:bg-green-950/20"
@@ -254,7 +264,7 @@ export function ActionTrackerContent({ initialDepartments, scopedDepartments = [
         ) : null
       }
       stats={
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-5">
           <Card>
             <CardContent className="flex items-center justify-between p-4">
               <div>
@@ -280,6 +290,24 @@ export function ActionTrackerContent({ initialDepartments, scopedDepartments = [
                 <p className="text-2xl font-bold text-orange-600">{stats.pending}</p>
               </div>
               <Clock className="h-8 w-8 text-orange-500 opacity-20" />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="flex items-center justify-between p-4">
+              <div>
+                <p className="text-muted-foreground text-sm font-medium">Not Started</p>
+                <p className="text-2xl font-bold text-amber-600">{stats.notStarted}</p>
+              </div>
+              <Clock className="h-8 w-8 text-amber-500 opacity-20" />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="flex items-center justify-between p-4">
+              <div>
+                <p className="text-muted-foreground text-sm font-medium">In Progress</p>
+                <p className="text-2xl font-bold text-blue-600">{stats.inProgress}</p>
+              </div>
+              <RefreshCw className="h-8 w-8 text-blue-500 opacity-20" />
             </CardContent>
           </Card>
         </div>
@@ -374,6 +402,16 @@ export function ActionTrackerContent({ initialDepartments, scopedDepartments = [
                 const completedCount = deptActions.filter((a) => a.status === "completed").length
                 const totalCount = deptActions.length
                 const status = getDeptStatus(dept)
+                const deptActionItemsForExport: ActionItem[] = deptActions.map((item) => ({
+                  id: item.id,
+                  title: item.title,
+                  description: item.description,
+                  department: item.department,
+                  status: item.status,
+                  week_number: item.week_number,
+                  year: item.year,
+                  original_week: item.original_week,
+                }))
 
                 return (
                   <Fragment key={dept}>
@@ -402,10 +440,49 @@ export function ActionTrackerContent({ initialDepartments, scopedDepartments = [
                           {status.label}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="ghost" size="sm" className="h-8 text-xs font-medium">
-                          {expandedDepts.has(dept) ? "Hide" : "View"}
-                        </Button>
+                      <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-1">
+                          <Button variant="ghost" size="sm" className="h-8 text-xs font-medium">
+                            {expandedDepts.has(dept) ? "Hide" : "View"}
+                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onClick={() =>
+                                  exportActionTrackerToPDF(deptActionItemsForExport, weekFilter, yearFilter)
+                                }
+                              >
+                                <FileText className="mr-2 h-4 w-4" /> Export PDF
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() =>
+                                  exportActionTrackerToDocx(deptActionItemsForExport, weekFilter, yearFilter)
+                                }
+                              >
+                                <FileIcon className="mr-2 h-4 w-4" /> Export Word
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() =>
+                                  exportActionTrackerToPPTX(deptActionItemsForExport, weekFilter, yearFilter)
+                                }
+                              >
+                                <Presentation className="mr-2 h-4 w-4" /> Export PPTX
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() =>
+                                  exportActionTrackerToXLSX(deptActionItemsForExport, weekFilter, yearFilter, dept)
+                                }
+                              >
+                                <FileSpreadsheet className="mr-2 h-4 w-4" /> Export XLSX
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
                       </TableCell>
                     </TableRow>
                     {expandedDepts.has(dept) && (
@@ -416,6 +493,9 @@ export function ActionTrackerContent({ initialDepartments, scopedDepartments = [
                               <Table>
                                 <TableHeader className="bg-muted/30">
                                   <TableRow>
+                                    <TableHead className="text-muted-foreground w-[70px] text-[10px] font-black tracking-widest uppercase">
+                                      S/N
+                                    </TableHead>
                                     <TableHead className="text-muted-foreground text-[10px] font-black tracking-widest uppercase">
                                       Action Item (Task)
                                     </TableHead>
@@ -426,8 +506,11 @@ export function ActionTrackerContent({ initialDepartments, scopedDepartments = [
                                   </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                  {deptActions.map((task) => (
+                                  {deptActions.map((task, taskIndex) => (
                                     <TableRow key={task.id} className="hover:bg-muted/5">
+                                      <TableCell className="text-muted-foreground text-xs font-semibold">
+                                        {taskIndex + 1}
+                                      </TableCell>
                                       <TableCell>
                                         <div className="text-sm font-semibold">{task.title}</div>
                                         {task.description && (
