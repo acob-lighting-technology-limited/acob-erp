@@ -6,6 +6,13 @@ import { formValidation } from "@/lib/validation"
 
 export const dynamic = "force-dynamic"
 
+function canAssignRole(assignerRole: string, targetRole: string): boolean {
+  if (assignerRole === "developer") return true
+  if (assignerRole === "super_admin") return targetRole !== "developer"
+  if (assignerRole === "admin") return ["visitor", "employee", "lead"].includes(targetRole)
+  return false
+}
+
 export async function POST(request: NextRequest) {
   // First, verify the caller is authenticated and has user-management privileges
   const supabase = await createServerClient()
@@ -62,6 +69,17 @@ export async function POST(request: NextRequest) {
     if (role === "super_admin" && !["developer", "super_admin"].includes(scope?.role || "")) {
       return NextResponse.json(
         { success: false, error: "Only super admin or developer can assign super admin role" },
+        { status: 403 }
+      )
+    }
+
+    const targetRole = role || "employee"
+    if (!canAssignRole(scope?.role || "", targetRole)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "You do not have permission to assign this role.",
+        },
         { status: 403 }
       )
     }
@@ -162,10 +180,10 @@ export async function POST(request: NextRequest) {
         department: department,
         company_role: companyRole || null,
         phone_number: phoneNumber || null,
-        role: role || "employee",
-        is_admin: ["developer", "super_admin", "admin"].includes(role || "employee"),
-        is_department_lead: role === "lead",
-        lead_departments: role === "lead" ? [department] : [],
+        role: targetRole,
+        is_admin: ["developer", "super_admin", "admin"].includes(targetRole),
+        is_department_lead: targetRole === "lead",
+        lead_departments: targetRole === "lead" ? [department] : [],
         employment_status: "active", // Explicitly set employment status
         employee_number: employeeNumber || null, // Employee number (ACOB/YEAR/NUMBER)
       })

@@ -211,10 +211,10 @@ function buildMeetingReminderHtml(
     '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#0f2d1f" style="background:#0f2d1f !important;background-color:#0f2d1f !important;border-top:3px solid #16a34a;">' +
     '<tr><td align="center" style="padding:20px;background:#0f2d1f !important;background-color:#0f2d1f !important;font-size:11px;color:#9ca3af;">' +
     '<strong style="color:#fff;">ACOB Lighting Technology Limited</strong><br>' +
-    "Prepared by " +
+    '<span style="color:#d1d5db;">Prepared by ' +
     preparedBy +
-    "<br>" +
-    "ACOB Admin &amp; HR Department<br>" +
+    "</span><br>" +
+    "Admin &amp; HR Department<br>" +
     '<span style="color:#16a34a;font-weight:600;">Meeting Management System</span>' +
     "<br><br>" +
     '<i style="color:#9ca3af;">This is an automated system notification. Please do not reply directly to this email.</i>' +
@@ -297,7 +297,7 @@ function buildKnowledgeSharingHtml(sessionDate: string, sessionTime: string, dur
     '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#0f2d1f" style="background:#0f2d1f !important;background-color:#0f2d1f !important;border-top:3px solid #16a34a;">' +
     '<tr><td align="center" style="padding:20px;background:#0f2d1f !important;background-color:#0f2d1f !important;font-size:11px;color:#9ca3af;">' +
     '<strong style="color:#fff;">ACOB Lighting Technology Limited</strong><br>' +
-    "ACOB Admin &amp; HR Department<br>" +
+    "Admin &amp; HR Department<br>" +
     '<span style="color:#16a34a;font-weight:600;">Meeting Management System</span>' +
     "<br><br>" +
     '<i style="color:#9ca3af;">This is an automated system notification. Please do not reply directly to this email.</i>' +

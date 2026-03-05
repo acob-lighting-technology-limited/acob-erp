@@ -164,7 +164,9 @@ async function sendWithRetry(
     if (!error) return { data }
     if (!isRateLimitError(error) || attempt === MAX_429_RETRIES) return { error }
     const backoffMs = 1000 * (attempt + 1)
-    console.warn(`[digest] Rate limit for ${payload.to}. Retry ${attempt + 1}/${MAX_429_RETRIES} in ${backoffMs}ms`)
+    console.warn(
+      `[weekly-summary] Rate limit for ${payload.to}. Retry ${attempt + 1}/${MAX_429_RETRIES} in ${backoffMs}ms`
+    )
     await sleep(backoffMs)
     attempt += 1
   }
@@ -696,20 +698,20 @@ function buildEmailHtml(meetingWeek: number, meetingYear: number, preparedByName
   </div>
   <div class="wrapper">
     <span class="week-badge">Week ${meetingWeek} &bull; ${meetingYear}</span>
-    <div class="title">Minutes of Meeting and Actionables</div>
+    <div class="title">General Meeting Minutes &amp; Action Points</div>
     <p class="text">Dear All,</p>
     <p class="text">
-      Please find attached the <strong>Minutes and Actionable of the General Meeting</strong> that held on <strong>${meetingDate}</strong>.
+      Please find attached the Minutes and Action Points of the General Meeting held on <strong>${meetingDate}</strong>.
     </p>
     <p class="text">
-      Kindly review and note any observations or questions you may have ahead of the next General Meeting on <strong>${nextMeetingDate}</strong>.
+      Kindly review and share any observations or questions you may have ahead of the next General Meeting on <strong>${nextMeetingDate}</strong>.
     </p>
-    <p class="text">Thank you</p>
+    <p class="text">Thank you.</p>
   </div>
   <div class="footer" style="background-color:#0f2d1f;">
     <strong>ACOB Lighting Technology Limited</strong><br>
-    Prepared by ${safePreparedBy}<br>
-    ACOB Admin &amp; HR Department<br>
+    <span style="color:#d1d5db;">Prepared by ${safePreparedBy}</span><br>
+    Admin &amp; HR Department<br>
     <span class="footer-system">Reports &amp; Meeting Management System</span>
     <br><br>
     <i class="footer-note">This is an automated system notification. Please do not reply directly to this email.</i>
@@ -790,7 +792,7 @@ serve(async (req) => {
     const atYear = meetingYear
 
     console.log(
-      `[digest] Meeting: W${meetingWeek}/${meetingYear} | ReportData: W${reportDataWeek}/${reportDataYear} | Tracker: W${atWeek}/${atYear}`
+      `[weekly-summary] Meeting: W${meetingWeek}/${meetingYear} | ReportData: W${reportDataWeek}/${reportDataYear} | Tracker: W${atWeek}/${atYear}`
     )
 
     let includeWeeklyReport = !bodySkipWeeklyReport
@@ -811,17 +813,17 @@ serve(async (req) => {
     let trackerPdfBase64: string | undefined
 
     if (weeklyReportBase64) {
-      console.log("[digest] Using client-provided weekly report PDF")
+      console.log("[weekly-summary] Using client-provided weekly report PDF")
       reportPdfBase64 = weeklyReportBase64
     }
 
     if (actionTrackerBase64) {
-      console.log("[digest] Using client-provided action tracker PDF")
+      console.log("[weekly-summary] Using client-provided action tracker PDF")
       trackerPdfBase64 = actionTrackerBase64
     }
 
     if ((includeWeeklyReport && !reportPdfBase64) || (includeActionTracker && !trackerPdfBase64)) {
-      console.log("[digest] Generating PDFs server-side")
+      console.log("[weekly-summary] Generating PDFs server-side")
 
       // Fetch reports from the PREVIOUS week (work done data)
       const { data: reports, error: reportsError } = await supabase
@@ -834,7 +836,7 @@ serve(async (req) => {
       if (reportsError) throw reportsError
 
       if (!reports || reports.length === 0) {
-        console.log(`[digest] No submitted reports for W${reportDataWeek}/${reportDataYear}. Skipping.`)
+        console.log(`[weekly-summary] No submitted reports for W${reportDataWeek}/${reportDataYear}. Skipping.`)
         return new Response(
           JSON.stringify({ skipped: true, reason: `No submitted reports for W${reportDataWeek}/${reportDataYear}` }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
@@ -856,7 +858,7 @@ serve(async (req) => {
         fetchLogoBytes(`${STORAGE_BASE}/acob-logo-dark.png`),
       ])
 
-      console.log(`[digest] Generating PDFs: ${reports.length} reports, ${(actions || []).length} actions`)
+      console.log(`[weekly-summary] Generating PDFs: ${reports.length} reports, ${(actions || []).length} actions`)
       const [reportPdfBytes, trackerPdfBytes] = await Promise.all([
         includeWeeklyReport && !reportPdfBase64
           ? buildWeeklyReportPDF(reports, meetingWeek, meetingYear, coverLogoBytes, headerLogoBytes)
@@ -884,7 +886,7 @@ serve(async (req) => {
           : ["i.chibuikem@org.acoblighting.com"]
 
     const meetingDate = getWeekMonday(meetingWeek, meetingYear)
-    const subject = `Minutes of Meeting and Actionables - ${meetingDate}`
+    const subject = `Minutes and Action Points of the General Meeting - ${meetingDate}`
     const html = buildEmailHtml(meetingWeek, meetingYear, preparedByName || "ACOB Team")
 
     const attachments: { filename: string; content: string }[] = []
@@ -912,10 +914,10 @@ serve(async (req) => {
         attachments,
       })
       if (error) {
-        console.error(`[digest] Failed to send to ${to}:`, JSON.stringify(error))
+        console.error(`[weekly-summary] Failed to send to ${to}:`, JSON.stringify(error))
         results.push({ to, success: false, error })
       } else {
-        console.log(`[digest] Sent to ${to}. ID: ${data?.id}`)
+        console.log(`[weekly-summary] Sent to ${to}. ID: ${data?.id}`)
         results.push({ to, success: true, emailId: data?.id })
       }
       await sleep(SEND_INTERVAL_MS)
@@ -926,8 +928,8 @@ serve(async (req) => {
       const failureCount = results.length - successCount
       const auditEntityId = crypto.randomUUID()
       await writeEdgeAuditLog(supabase as any, {
-        action: "weekly_digest_sent",
-        entityType: "mail_digest",
+        action: "weekly_summary_sent",
+        entityType: "mail_summary",
         entityId: auditEntityId,
         actorId: requestedByUserId || null,
         department: "Admin & HR",
@@ -948,7 +950,7 @@ serve(async (req) => {
         },
       })
     } catch (auditErr) {
-      console.error("[digest] Failed to write audit log:", auditErr)
+      console.error("[weekly-summary] Failed to write audit log:", auditErr)
     }
 
     return new Response(

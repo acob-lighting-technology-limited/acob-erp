@@ -651,6 +651,12 @@ export interface ActionItem {
   original_week?: number
 }
 
+const formatStatusLabel = (status: string) =>
+  status
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ")
+
 /** Draws a single Action Tracker content page for a department. */
 const pdfActionTrackerPage = (
   doc: jsPDF,
@@ -1322,6 +1328,39 @@ export const exportActionTrackerToDocx = async (actions: ActionItem[], week: num
   saveAs(blob, `ACOB_Action_Tracker_W${week}_${year}.docx`)
 }
 
+export const exportActionTrackerToXLSX = async (
+  actions: ActionItem[],
+  week: number,
+  year: number,
+  department?: string
+) => {
+  const XLSX = await import("xlsx")
+  const filteredActions = department ? actions.filter((item) => item.department === department) : actions
+
+  const rows = filteredActions.map((item, index) => ({
+    "S/N": index + 1,
+    Department: item.department,
+    "Action Item": item.title,
+    Description: item.description || "",
+    Status: formatStatusLabel(item.status),
+    Week: item.week_number || week,
+    Year: item.year || year,
+  }))
+
+  const worksheet = XLSX.utils.json_to_sheet(rows.length > 0 ? rows : [{ Message: "No action items to export." }])
+  const workbook = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Action Tracker")
+
+  const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" })
+  const safeDepartment = department ? department.replace(/[^a-z0-9]+/gi, "_") : "All"
+  saveAs(
+    new Blob([excelBuffer], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    }),
+    `ACOB_Action_Tracker_${safeDepartment}_W${week}_${year}.xlsx`
+  )
+}
+
 export const exportAllToDocx = async (reports: WeeklyReport[], week: number, year: number) => {
   const sortedReports = sortReportsByDepartment(reports)
   const mondayDate = getWeekMonday(week, year)
@@ -1410,6 +1449,110 @@ export const exportAllToDocx = async (reports: WeeklyReport[], week: number, yea
   })
   const blob = await Packer.toBlob(doc)
   saveAs(blob, `ACOB_Weekly_Reports_All_W${week}_${year}.docx`)
+}
+
+export const exportToXLSX = async (report: WeeklyReport) => {
+  const buildSectionRows = (section: string, text: string) => {
+    const lines = autoNumberLines(text || "")
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+
+    if (lines.length === 0) {
+      return [
+        {
+          Department: report.department,
+          Week: report.week_number,
+          Year: report.year,
+          Section: section,
+          "Item #": "",
+          Item: "No entry",
+        },
+      ]
+    }
+
+    return lines.map((line, index) => ({
+      Department: report.department,
+      Week: report.week_number,
+      Year: report.year,
+      Section: section,
+      "Item #": index + 1,
+      Item: line.replace(/^\d+[.)]\s*/, "").trim(),
+    }))
+  }
+
+  const XLSX = await import("xlsx")
+  const rows = [
+    ...buildSectionRows("Work Done", report.work_done || ""),
+    ...buildSectionRows("Tasks for New Week", report.tasks_new_week || ""),
+    ...buildSectionRows("Challenges", report.challenges || ""),
+  ]
+
+  const worksheet = XLSX.utils.json_to_sheet(rows)
+  worksheet["!cols"] = [{ wch: 28 }, { wch: 8 }, { wch: 8 }, { wch: 20 }, { wch: 8 }, { wch: 90 }]
+  const workbook = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Weekly Report")
+
+  const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" })
+  const safeDepartment = report.department.replace(/[^a-z0-9]+/gi, "_")
+  saveAs(
+    new Blob([excelBuffer], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    }),
+    `ACOB_Report_${safeDepartment}_W${report.week_number}_${report.year}.xlsx`
+  )
+}
+
+export const exportAllToXLSX = async (reports: WeeklyReport[], week: number, year: number) => {
+  const buildSectionRows = (report: WeeklyReport, section: string, text: string) => {
+    const lines = autoNumberLines(text || "")
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+
+    if (lines.length === 0) {
+      return [
+        {
+          Department: report.department,
+          Week: report.week_number,
+          Year: report.year,
+          Section: section,
+          "Item #": "",
+          Item: "No entry",
+        },
+      ]
+    }
+
+    return lines.map((line, index) => ({
+      Department: report.department,
+      Week: report.week_number,
+      Year: report.year,
+      Section: section,
+      "Item #": index + 1,
+      Item: line.replace(/^\d+[.)]\s*/, "").trim(),
+    }))
+  }
+
+  const XLSX = await import("xlsx")
+  const sortedReports = sortReportsByDepartment(reports)
+  const rows = sortedReports.flatMap((report) => [
+    ...buildSectionRows(report, "Work Done", report.work_done || ""),
+    ...buildSectionRows(report, "Tasks for New Week", report.tasks_new_week || ""),
+    ...buildSectionRows(report, "Challenges", report.challenges || ""),
+  ])
+
+  const worksheet = XLSX.utils.json_to_sheet(rows.length > 0 ? rows : [{ Message: "No weekly reports to export." }])
+  worksheet["!cols"] = [{ wch: 28 }, { wch: 8 }, { wch: 8 }, { wch: 20 }, { wch: 8 }, { wch: 90 }]
+  const workbook = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Weekly Reports")
+
+  const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" })
+  saveAs(
+    new Blob([excelBuffer], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    }),
+    `ACOB_Weekly_Reports_All_W${week}_${year}.xlsx`
+  )
 }
 
 // ─── ACOB PPTX Design Helpers ────────────────────────────────────────────────

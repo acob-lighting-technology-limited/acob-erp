@@ -3,7 +3,6 @@
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -143,15 +142,6 @@ export function Navbar({ user, canAccessAdmin = false, isAdminMode = false }: Na
                 className="h-8 w-auto"
               />
             </Link>
-            {isAdminMode && (
-              <Badge
-                variant="outline"
-                className="border-[var(--admin-badge-border)] bg-[var(--admin-badge-bg)] text-[var(--admin-primary)]"
-              >
-                <ShieldCheck className="mr-1 h-3 w-3" />
-                Admin Console
-              </Badge>
-            )}
           </div>
         )}
 

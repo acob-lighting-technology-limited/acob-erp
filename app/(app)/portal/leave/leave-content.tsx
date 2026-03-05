@@ -22,9 +22,14 @@ interface LeaveContentProps {
 }
 
 const STAGE_LABELS: Record<string, string> = {
+  pending_reliever: "Waiting Reliever",
+  pending_department_lead: "Waiting Department Lead",
+  pending_admin_hr_lead: "Waiting Admin & HR Lead",
+  pending_md: "Waiting MD",
+  pending_hcs: "Waiting HCS",
   reliever_pending: "Waiting Reliever",
-  supervisor_pending: "Waiting Supervisor",
-  hr_pending: "Waiting HR",
+  supervisor_pending: "Waiting Department Lead",
+  hr_pending: "Waiting Admin & HR Lead",
   completed: "Completed",
   rejected: "Rejected",
   cancelled: "Cancelled",
@@ -105,7 +110,10 @@ export function LeaveContent({ initialRequests, initialBalances, initialLeaveTyp
     selectedLeaveType?.eligibility_status !== "not_eligible" &&
     Number(formData.days_count) <= availableDays
   const pendingSupervisorReviews = useMemo(
-    () => approverQueue.filter((item) => item.approval_stage === "supervisor_pending").length,
+    () =>
+      approverQueue.filter((item) =>
+        ["pending_department_lead", "supervisor_pending"].includes(item.current_stage_code || item.approval_stage)
+      ).length,
     [approverQueue]
   )
 
@@ -306,7 +314,11 @@ export function LeaveContent({ initialRequests, initialBalances, initialLeaveTyp
                   <p className="text-muted-foreground text-sm">
                     {item.start_date} to {item.end_date} ({item.days_count} days)
                   </p>
-                  <Badge variant="outline">{STAGE_LABELS[item.approval_stage] || item.approval_stage}</Badge>
+                  <Badge variant="outline">
+                    {STAGE_LABELS[item.current_stage_code || item.approval_stage] ||
+                      item.current_stage_code ||
+                      item.approval_stage}
+                  </Badge>
                 </div>
                 <div className="flex gap-2">
                   <Button size="sm" onClick={() => handleAction(item.id, "approve")}>
@@ -344,7 +356,10 @@ export function LeaveContent({ initialRequests, initialBalances, initialLeaveTyp
                     {request.status}
                   </Badge>
                   <Badge variant="outline">
-                    {STAGE_LABELS[request.approval_stage] || request.approval_stage || "N/A"}
+                    {STAGE_LABELS[request.current_stage_code || request.approval_stage] ||
+                      request.current_stage_code ||
+                      request.approval_stage ||
+                      "N/A"}
                   </Badge>
                 </div>
               </div>

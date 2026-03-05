@@ -64,7 +64,7 @@
 
   /* Admin context tokens (scoped by .admin-shell) */
   --admin-primary: oklch(0.52 0.16 65);
-  --admin-primary-foreground: oklch(0.145 0 0);
+  --admin-primary-foreground: oklch(0.985 0 0);
   --admin-badge-bg: oklch(0.96 0.05 75);
   --admin-badge-border: oklch(0.86 0.08 75);
   --admin-accent-soft: oklch(0.95 0.03 75);

@@ -84,6 +84,7 @@ function sanitizeBroadcastHtml(rawHtml: string): string {
 
 function buildAdminBroadcastHtml(title: string, bodyHtml: string, department: string, preparedByName: string): string {
   const safeDepartment = escapeHtml(department.trim() || "Admin & HR")
+  const displayDepartment = safeDepartment.replace(/^ACOB\s+/i, "")
   const safeTitle = escapeHtml(title)
   const safePreparedBy = escapeHtml(preparedByName.trim() || "ACOB Team")
 
@@ -122,10 +123,10 @@ function buildAdminBroadcastHtml(title: string, bodyHtml: string, department: st
     '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#0f2d1f" style="background:#0f2d1f !important;background-color:#0f2d1f !important;border-top:3px solid #16a34a;">' +
     '<tr><td align="center" style="padding:20px;background:#0f2d1f !important;background-color:#0f2d1f !important;font-size:11px;color:#9ca3af;">' +
     '<strong style="color:#fff;">ACOB Lighting Technology Limited</strong><br>' +
-    "Prepared by " +
+    '<span style="color:#d1d5db;">Prepared by ' +
     safePreparedBy +
-    "<br>" +
-    safeDepartment +
+    "</span><br>" +
+    displayDepartment +
     " Department<br>" +
     '<span style="color:#16a34a;font-weight:600;">Communications System</span>' +
     "<br><br>" +

@@ -7,7 +7,7 @@ const ASSIGNABLE_ROLES = ["visitor", "employee", "lead", "admin", "super_admin",
 function canAssignRole(assignerRole: string, targetRole: string): boolean {
   if (assignerRole === "developer") return true
   if (assignerRole === "super_admin") return targetRole !== "developer"
-  if (assignerRole === "admin") return !["super_admin", "developer"].includes(targetRole)
+  if (assignerRole === "admin") return ["visitor", "employee", "lead"].includes(targetRole)
   return false
 }
 

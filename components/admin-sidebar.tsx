@@ -363,8 +363,8 @@ export function AdminSidebar({ user, profile }: AdminSidebarProps) {
                     isCollapsed ? "justify-center px-2.5 py-2" : "gap-2.5 px-3 py-2",
                     "text-sm font-medium",
                     isActive
-                      ? "bg-[var(--admin-primary)] text-[var(--admin-primary-foreground)] shadow-sm"
-                      : "text-muted-foreground hover:text-foreground hover:bg-[var(--admin-accent-soft)]"
+                      ? "bg-[var(--admin-primary)] text-white shadow-sm dark:text-[var(--admin-primary-foreground)]"
+                      : "text-muted-foreground hover:bg-[var(--admin-accent-soft)] hover:text-[var(--admin-primary)]"
                   )}
                   title={isCollapsed ? item.name : undefined}
                 >

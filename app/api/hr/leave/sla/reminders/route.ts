@@ -2,6 +2,14 @@ import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { notifyUsers } from "@/lib/hr/leave-workflow"
 
+const LEGACY_SLA_STAGE_MAP: Record<string, string> = {
+  pending_reliever: "reliever_pending",
+  pending_department_lead: "supervisor_pending",
+  pending_admin_hr_lead: "hr_pending",
+  pending_md: "hr_pending",
+  pending_hcs: "hr_pending",
+}
+
 export async function POST() {
   try {
     const supabase = await createClient()
@@ -26,7 +34,7 @@ export async function POST() {
 
     const { data: pendingRequests, error } = await supabase
       .from("leave_requests")
-      .select("id, user_id, reliever_id, supervisor_id, approval_stage, created_at, start_date, end_date")
+      .select("id, current_stage_code, current_approver_user_id, created_at")
       .eq("status", "pending")
 
     if (error) return NextResponse.json({ error: "Failed to fetch pending leave requests" }, { status: 500 })
@@ -35,33 +43,25 @@ export async function POST() {
     let remindersSent = 0
 
     for (const request of pendingRequests || []) {
-      const policy = policyMap.get(request.approval_stage)
+      if (!request.current_approver_user_id) continue
+
+      const slaStage = LEGACY_SLA_STAGE_MAP[request.current_stage_code || ""] || "reliever_pending"
+      const policy = policyMap.get(slaStage)
       if (!policy) continue
 
       const createdAt = new Date(request.created_at).getTime()
       const dueAt = createdAt + policy.due_hours * 60 * 60 * 1000
       const reminderAt = dueAt - policy.reminder_hours_before * 60 * 60 * 1000
 
-      let recipients: string[] = []
-      if (request.approval_stage === "reliever_pending" && request.reliever_id) recipients = [request.reliever_id]
-      if (request.approval_stage === "supervisor_pending" && request.supervisor_id) recipients = [request.supervisor_id]
-      if (request.approval_stage === "hr_pending") {
-        const { data: hrUsers } = await supabase
-          .from("profiles")
-          .select("id")
-          .in("role", ["developer", "admin", "super_admin"])
-        recipients = (hrUsers || []).map((row: any) => row.id)
-      }
-
-      if (now >= reminderAt && now < dueAt && recipients.length) {
+      if (now >= reminderAt && now < dueAt) {
         await notifyUsers(supabase, {
-          userIds: recipients,
+          userIds: [request.current_approver_user_id],
           title: "Leave approval SLA reminder",
           message: `Leave request ${request.id} is due soon. Please review before SLA breach.`,
           linkUrl: "/dashboard/leave",
           entityId: request.id,
         })
-        remindersSent += recipients.length
+        remindersSent += 1
       }
 
       if (now >= dueAt && policy.escalate_to_role) {
@@ -69,12 +69,13 @@ export async function POST() {
           .from("profiles")
           .select("id")
           .eq("role", policy.escalate_to_role)
+
         const escalateRecipients = (escalatedUsers || []).map((row: any) => row.id)
         if (escalateRecipients.length) {
           await notifyUsers(supabase, {
             userIds: escalateRecipients,
             title: "Leave approval SLA breached",
-            message: `Leave request ${request.id} has breached SLA at ${request.approval_stage}.`,
+            message: `Leave request ${request.id} has breached SLA at ${request.current_stage_code}.`,
             linkUrl: "/admin/hr/leave/approve",
             entityId: request.id,
           })
