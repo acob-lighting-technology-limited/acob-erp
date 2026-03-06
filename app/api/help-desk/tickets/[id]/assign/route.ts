@@ -16,11 +16,8 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { assigned_to } = await request.json()
-
-    if (!assigned_to) {
-      return NextResponse.json({ error: "assigned_to is required" }, { status: 400 })
-    }
+    const { assigned_to, action } = await request.json()
+    const normalizedAction = String(action || "assign_staff")
 
     const { data: ticket, error: ticketError } = await supabase
       .from("help_desk_tickets")
@@ -38,15 +35,57 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     }
 
     const now = new Date().toISOString()
+    let updates: Record<string, unknown>
+    let eventType = "ticket_assigned"
+    let newAssignedTo = assigned_to || null
+
+    if (normalizedAction === "send_to_queue") {
+      updates = {
+        assigned_to: null,
+        assigned_by: user.id,
+        handling_mode: "queue",
+        status: "department_queue",
+      }
+      eventType = "ticket_sent_to_queue"
+      newAssignedTo = null
+    } else if (normalizedAction === "assign_department") {
+      updates = {
+        assigned_to: null,
+        assigned_by: user.id,
+        handling_mode: "department",
+        status: "department_assigned",
+      }
+      eventType = "ticket_assigned_to_department"
+      newAssignedTo = null
+    } else if (normalizedAction === "assign_me") {
+      updates = {
+        assigned_to: user.id,
+        assigned_by: user.id,
+        handling_mode: "individual",
+        status:
+          ticket.status === "pending_lead_review" || ticket.status === "department_queue" ? "assigned" : ticket.status,
+        assigned_at: ticket.assigned_at ?? now,
+      }
+      newAssignedTo = user.id
+    } else {
+      if (!assigned_to) {
+        return NextResponse.json({ error: "assigned_to is required" }, { status: 400 })
+      }
+      updates = {
+        assigned_to,
+        assigned_by: user.id,
+        handling_mode: "individual",
+        status:
+          ticket.status === "new" || ticket.status === "pending_lead_review" || ticket.status === "department_queue"
+            ? "assigned"
+            : ticket.status,
+        assigned_at: ticket.assigned_at ?? now,
+      }
+    }
 
     const { data: updated, error: updateError } = await supabase
       .from("help_desk_tickets")
-      .update({
-        assigned_to,
-        assigned_by: user.id,
-        status: ticket.status === "new" ? "assigned" : ticket.status,
-        assigned_at: ticket.assigned_at ?? now,
-      })
+      .update(updates)
       .eq("id", ticket.id)
       .select("*")
       .single()
@@ -56,10 +95,10 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     await appendHelpDeskEvent({
       ticketId: ticket.id,
       actorId: user.id,
-      eventType: "ticket_assigned",
+      eventType,
       oldStatus: ticket.status,
       newStatus: updated.status,
-      details: { from: ticket.assigned_to, to: assigned_to },
+      details: { from: ticket.assigned_to, to: newAssignedTo, action: normalizedAction },
     })
 
     await appendAuditLog({
@@ -70,33 +109,40 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       route: "/api/help-desk/tickets/[id]/assign",
       critical: true,
       oldValues: { assigned_to: ticket.assigned_to },
-      newValues: { assigned_to },
+      newValues: {
+        assigned_to: newAssignedTo,
+        handling_mode: updated.handling_mode,
+        status: updated.status,
+        action: normalizedAction,
+      },
     })
 
-    await supabase.rpc("create_notification", {
-      p_user_id: assigned_to,
-      p_type: "task_assigned",
-      p_category: "tasks",
-      p_title: "Help desk ticket assigned",
-      p_message: `${ticket.ticket_number} - ${ticket.title}`,
-      p_priority: ticket.priority === "urgent" ? "urgent" : ticket.priority === "high" ? "high" : "normal",
-      p_link_url: "/portal/help-desk",
-      p_actor_id: user.id,
-      p_entity_type: "help_desk_ticket",
-      p_entity_id: ticket.id,
-      p_rich_content: { service_department: ticket.service_department, priority: ticket.priority },
-    })
-
-    try {
-      await sendHelpDeskMail({
-        userIds: [assigned_to],
-        subject: `Help Desk Assignment: ${ticket.ticket_number}`,
-        title: "Ticket Assigned To You",
-        message: `${ticket.title} has been assigned to you for execution.`,
-        ticketNumber: ticket.ticket_number,
+    if (newAssignedTo) {
+      await supabase.rpc("create_notification", {
+        p_user_id: newAssignedTo,
+        p_type: "task_assigned",
+        p_category: "tasks",
+        p_title: "Help desk ticket assigned",
+        p_message: `${ticket.ticket_number} - ${ticket.title}`,
+        p_priority: ticket.priority === "urgent" ? "urgent" : ticket.priority === "high" ? "high" : "normal",
+        p_link_url: "/portal/help-desk",
+        p_actor_id: user.id,
+        p_entity_type: "help_desk_ticket",
+        p_entity_id: ticket.id,
+        p_rich_content: { service_department: ticket.service_department, priority: ticket.priority },
       })
-    } catch (mailError) {
-      console.error("Help desk mail error (assign):", mailError)
+
+      try {
+        await sendHelpDeskMail({
+          userIds: [newAssignedTo],
+          subject: `Help Desk Assignment: ${ticket.ticket_number}`,
+          title: "Ticket Assigned To You",
+          message: `${ticket.title} has been assigned to you for execution.`,
+          ticketNumber: ticket.ticket_number,
+        })
+      } catch (mailError) {
+        console.error("Help desk mail error (assign):", mailError)
+      }
     }
 
     return NextResponse.json({ data: updated })

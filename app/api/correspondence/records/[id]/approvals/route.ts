@@ -46,7 +46,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     const approvalScopeDepartment = record.department_name || record.assigned_department_name
     const isApprover =
       isAdminRole(profile.role) ||
-      (profile.role === "lead" && approvalScopeDepartment && canAccessDepartment(profile, approvalScopeDepartment))
+      (profile.is_department_lead && approvalScopeDepartment && canAccessDepartment(profile, approvalScopeDepartment))
 
     if (!isApprover) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })

@@ -37,7 +37,7 @@ export function FeedbackViewerClient({ feedback }: FeedbackViewerClientProps) {
   const [employees, setEmployees] = useState<
     { id: string; first_name: string; last_name: string; department: string }[]
   >([])
-  const [userRole, setUserRole] = useState<string | null>(null)
+  const [isDepartmentLead, setIsDepartmentLead] = useState(false)
   const [leadDepartments, setLeadDepartments] = useState<string[]>([])
 
   const supabase = createClient()
@@ -54,7 +54,7 @@ export function FeedbackViewerClient({ feedback }: FeedbackViewerClientProps) {
 
         const { data: userProfile } = await supabase
           .from("profiles")
-          .select("role, department, lead_departments")
+          .select("role, department, is_department_lead, lead_departments")
           .eq("id", user.id)
           .single()
 
@@ -65,7 +65,7 @@ export function FeedbackViewerClient({ feedback }: FeedbackViewerClientProps) {
             : []
 
         if (userProfile) {
-          setUserRole(userProfile.role)
+          setIsDepartmentLead(Boolean(userProfile.is_department_lead))
           setLeadDepartments(scopedDepartments || [])
         }
 
@@ -76,7 +76,7 @@ export function FeedbackViewerClient({ feedback }: FeedbackViewerClientProps) {
           .order("last_name", { ascending: true })
 
         // If user is a lead, filter by their lead departments
-        if (userProfile?.role === "lead" && scopedDepartments.length > 0) {
+        if (userProfile?.is_department_lead && scopedDepartments.length > 0) {
           employeeQuery = employeeQuery.in("department", scopedDepartments)
         }
 
@@ -87,7 +87,7 @@ export function FeedbackViewerClient({ feedback }: FeedbackViewerClientProps) {
 
           // Extract unique departments - for leads, only show their lead departments
           let uniqueDepartments: string[] = []
-          if (userProfile?.role === "lead" && scopedDepartments.length > 0) {
+          if (userProfile?.is_department_lead && scopedDepartments.length > 0) {
             uniqueDepartments = [...scopedDepartments].sort()
           } else {
             uniqueDepartments = Array.from(
@@ -327,7 +327,7 @@ export function FeedbackViewerClient({ feedback }: FeedbackViewerClientProps) {
             </div>
 
             {/* Department filter - hidden for leads */}
-            {userRole !== "lead" && (
+            {!isDepartmentLead && (
               <div className="space-y-2">
                 <label className="text-foreground text-sm font-medium">Department</label>
                 <SearchableSelect
@@ -350,13 +350,13 @@ export function FeedbackViewerClient({ feedback }: FeedbackViewerClientProps) {
 
             <div className="space-y-2">
               <label className="text-foreground text-sm font-medium">
-                {userRole === "lead" && departments.length > 0 ? `employee (${departments.join(", ")})` : "employee"}
+                {isDepartmentLead && departments.length > 0 ? `employee (${departments.join(", ")})` : "employee"}
               </label>
               <SearchableSelect
                 value={employeeFilter}
                 onValueChange={setEmployeeFilter}
                 placeholder={
-                  userRole === "lead" && departments.length > 0
+                  isDepartmentLead && departments.length > 0
                     ? `All ${departments.length === 1 ? departments[0] : "Department"} employee`
                     : "All employee"
                 }
@@ -366,7 +366,7 @@ export function FeedbackViewerClient({ feedback }: FeedbackViewerClientProps) {
                   {
                     value: "all",
                     label:
-                      userRole === "lead" && departments.length > 0
+                      isDepartmentLead && departments.length > 0
                         ? `All ${departments.length === 1 ? departments[0] : "Department"} employee`
                         : "All employee",
                   },

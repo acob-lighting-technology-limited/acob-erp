@@ -97,14 +97,18 @@ export default function WeeklyReportsPortal() {
         data: { user },
       } = await supabase.auth.getUser()
       if (user) {
-        const { data: p } = await supabase.from("profiles").select("id, department, role").eq("id", user.id).single()
+        const { data: p } = await supabase
+          .from("profiles")
+          .select("id, department, role, is_department_lead")
+          .eq("id", user.id)
+          .single()
         setProfile(p)
 
         const { data: depts } = await supabase.from("profiles").select("department").not("department", "is", null)
         const uniqueDepts = Array.from(new Set(depts?.map((d) => d.department).filter(Boolean))) as string[]
         setAllDepartments(uniqueDepts.sort())
 
-        if (p?.role === "lead") {
+        if (p?.is_department_lead) {
           setDeptFilter(p.department || "all")
         }
       }
@@ -124,7 +128,7 @@ export default function WeeklyReportsPortal() {
         .eq("year", yearFilter)
         .order("department", { ascending: true })
 
-      const effectiveDept = profile?.role === "lead" ? profile.department || "all" : deptFilter
+      const effectiveDept = profile?.is_department_lead ? profile.department || "all" : deptFilter
       if (effectiveDept !== "all") {
         query = query.eq("department", effectiveDept)
       }
@@ -194,7 +198,8 @@ export default function WeeklyReportsPortal() {
     setPendingPptxExport(null)
   }
 
-  const isLead = ["lead", "admin", "super_admin", "developer"].includes(profile?.role || "")
+  const isLead =
+    Boolean(profile?.is_department_lead) || ["admin", "super_admin", "developer"].includes(profile?.role || "")
   const isAdmin = ["developer", "admin", "super_admin"].includes(profile?.role || "")
 
   return (
@@ -285,7 +290,7 @@ export default function WeeklyReportsPortal() {
             </div>
             <div className="min-w-[12rem] flex-1 md:flex-none">
               <Label className="mb-1.5 block text-xs font-semibold">Department</Label>
-              <Select value={deptFilter} onValueChange={setDeptFilter} disabled={profile?.role === "lead"}>
+              <Select value={deptFilter} onValueChange={setDeptFilter} disabled={profile?.is_department_lead}>
                 <SelectTrigger>
                   <SelectValue placeholder="All Departments" />
                 </SelectTrigger>

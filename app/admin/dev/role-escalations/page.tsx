@@ -3,22 +3,27 @@ import { PageHeader, PageWrapper } from "@/components/layout"
 import { ShieldEllipsis } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 function isEscalation(log: any): boolean {
-  const text = `${log.action || ""} ${log.entity_type || ""} ${JSON.stringify(log.new_values || {})}`.toLowerCase()
+  const text =
+    `${log.action || ""} ${log.operation || ""} ${log.entity_type || ""} ${JSON.stringify(log.new_values || {})} ${JSON.stringify(log.old_values || {})} ${JSON.stringify(log.metadata || {})}`.toLowerCase()
   const touchesRole = text.includes("role")
-  const elevated = ["admin", "super_admin", "developer"].some((r) => text.includes(`\"${r}\"`) || text.includes(r))
+  const elevated = ["admin", "super_admin", "developer", "admin_domains", "department_lead"].some(
+    (r) => text.includes(`\"${r}\"`) || text.includes(r)
+  )
   return touchesRole && elevated
 }
 
+export const dynamic = "force-dynamic"
+
 export default async function DevRoleEscalationsPage() {
   const supabase = await createClient()
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("audit_logs")
-    .select("id, action, entity_type, entity_id, user_id, old_values, new_values, created_at")
-    .in("entity_type", ["profile", "profiles", "user", "admin_action"])
+    .select("id, action, operation, entity_type, entity_id, user_id, old_values, new_values, metadata, created_at")
     .order("created_at", { ascending: false })
-    .limit(400)
+    .limit(1200)
 
   const rows = (data || []).filter(isEscalation)
 
@@ -36,6 +41,11 @@ export default async function DevRoleEscalationsPage() {
           <CardTitle>Escalation Events ({rows.length})</CardTitle>
         </CardHeader>
         <CardContent>
+          {error ? (
+            <Alert variant="destructive" className="mb-4">
+              <AlertDescription>{error.message}</AlertDescription>
+            </Alert>
+          ) : null}
           <Table>
             <TableHeader>
               <TableRow>

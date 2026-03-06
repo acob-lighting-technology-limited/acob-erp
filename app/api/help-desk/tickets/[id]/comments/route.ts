@@ -11,7 +11,7 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
 
     const { data: ticket, error: ticketError } = await supabase
       .from("help_desk_tickets")
-      .select("id, requester_id, assigned_to, service_department")
+      .select("id, requester_id, assigned_to, service_department, requester_department")
       .eq("id", params.id)
       .single()
 
@@ -22,6 +22,7 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
     const canView =
       isAdminRole(profile.role) ||
       canLeadDepartment(profile, ticket.service_department) ||
+      canLeadDepartment(profile, ticket.requester_department) ||
       ticket.requester_id === user.id ||
       ticket.assigned_to === user.id
 
@@ -71,6 +72,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     const canComment =
       isAdminRole(profile.role) ||
       canLeadDepartment(profile, ticket.service_department) ||
+      canLeadDepartment(profile, ticket.requester_department) ||
       ticket.requester_id === user.id ||
       ticket.assigned_to === user.id
 

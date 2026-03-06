@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { Download, RefreshCw } from "lucide-react"
 import { toast } from "sonner"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 type DevLoginLogRow = {
   id: string
@@ -43,6 +44,7 @@ export function DevLoginLogsContent() {
   const supabase = createClient()
   const [loading, setLoading] = useState(true)
   const [rows, setRows] = useState<DevLoginLogRow[]>([])
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   const [emailFilter, setEmailFilter] = useState("")
   const [ipFilter, setIpFilter] = useState("")
@@ -53,6 +55,7 @@ export function DevLoginLogsContent() {
 
   const load = async () => {
     setLoading(true)
+    setErrorMessage(null)
     const { data, error } = await supabase
       .from("dev_login_logs")
       .select("id, email, full_name, role, ip_address, user_agent, auth_method, login_at")
@@ -62,6 +65,7 @@ export function DevLoginLogsContent() {
     if (error) {
       console.error(error)
       toast.error("Failed to load developer login logs")
+      setErrorMessage(error.message || "Unknown error while loading dev login logs.")
       setRows([])
     } else {
       setRows((data || []) as DevLoginLogRow[])
@@ -106,6 +110,11 @@ export function DevLoginLogsContent() {
     <Card>
       <CardHeader className="gap-4">
         <CardTitle>Sign-in Events ({filtered.length})</CardTitle>
+        {errorMessage && (
+          <Alert variant="destructive">
+            <AlertDescription>{errorMessage}</AlertDescription>
+          </Alert>
+        )}
         <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-6">
           <Input value={emailFilter} onChange={(e) => setEmailFilter(e.target.value)} placeholder="Filter email" />
           <Input value={ipFilter} onChange={(e) => setIpFilter(e.target.value)} placeholder="Filter IP" />
@@ -169,7 +178,7 @@ export function DevLoginLogsContent() {
               </TableRow>
             ) : filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6}>No login logs found</TableCell>
+                <TableCell colSpan={6}>No login logs found yet.</TableCell>
               </TableRow>
             ) : (
               filtered.map((row) => (

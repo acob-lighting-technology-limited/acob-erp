@@ -16,9 +16,10 @@ export async function GET() {
       : []
 
     if (!isAdminRole(profile.role)) {
-      if (profile.role === "lead") {
+      if (profile.is_department_lead) {
         if (managedDepartments.length) {
-          query = query.in("service_department", managedDepartments)
+          // Filter in memory because a ticket may be actionable either by
+          // service department ownership or requester-department approval.
         } else {
           query = query.eq("requester_id", user.id)
         }
@@ -30,7 +31,14 @@ export async function GET() {
     const { data: tickets, error } = await query
     if (error) throw error
 
-    const rows = tickets || []
+    let rows = tickets || []
+    if (!isAdminRole(profile.role) && profile.is_department_lead && managedDepartments.length) {
+      rows = rows.filter(
+        (ticket: any) =>
+          managedDepartments.includes(ticket.service_department) ||
+          managedDepartments.includes(ticket.requester_department)
+      )
+    }
     const now = Date.now()
 
     const counts = {

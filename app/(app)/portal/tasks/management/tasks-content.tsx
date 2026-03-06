@@ -179,7 +179,7 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
             const canChangeStatus =
               userProfile?.role === "admin" ||
               ["developer", "super_admin"].includes(userProfile?.role || "") ||
-              (userProfile?.role === "lead" && userProfile?.lead_departments?.includes(task.department))
+              (userProfile?.is_department_lead && userProfile?.lead_departments?.includes(task.department))
             taskData.can_change_status = canChangeStatus
           }
 

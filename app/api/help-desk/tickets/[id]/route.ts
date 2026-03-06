@@ -26,6 +26,7 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
     const canView =
       isAdminRole(profile.role) ||
       canLeadDepartment(profile, ticket.service_department) ||
+      canLeadDepartment(profile, ticket.requester_department) ||
       ticket.requester_id === user.id ||
       ticket.assigned_to === user.id
 
@@ -87,6 +88,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     const canManage =
       isAdminRole(profile.role) ||
       canLeadDepartment(profile, ticket.service_department) ||
+      canLeadDepartment(profile, ticket.requester_department) ||
       ticket.assigned_to === user.id ||
       ticket.requester_id === user.id
 

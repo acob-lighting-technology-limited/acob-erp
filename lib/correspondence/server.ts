@@ -32,7 +32,7 @@ export async function getAuthContext() {
   const [{ data: profile }, scope] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id, role, department, lead_departments, first_name, last_name, full_name")
+      .select("id, role, department, lead_departments, is_department_lead, first_name, last_name, full_name")
       .eq("id", user.id)
       .single(),
     resolveAdminScope(supabase as any, user.id),
@@ -55,7 +55,7 @@ export async function getAuthContext() {
 export function canAccessDepartment(profile: any, department?: string | null): boolean {
   if (!department) return false
   if (isAdminRole(profile?.role)) return true
-  if (profile?.role !== "lead") return false
+  if (!profile?.is_department_lead) return false
 
   const managedDepartments = Array.isArray(profile?.managed_departments)
     ? profile.managed_departments

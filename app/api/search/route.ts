@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
     // Check if user is admin
     const { data: profile } = await supabase.from("profiles").select("role, is_admin").eq("id", user.id).single()
 
-    if (!profile?.is_admin && !["developer", "super_admin", "admin", "lead"].includes(profile?.role || "")) {
+    if (!profile?.is_admin && !["developer", "super_admin", "admin"].includes(profile?.role || "")) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 

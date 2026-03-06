@@ -35,6 +35,7 @@ interface WeeklyReportAdminDialogProps {
     id: string
     role: string
     department: string | null
+    is_department_lead: boolean
   }
 }
 
@@ -79,7 +80,7 @@ export function WeeklyReportAdminDialog({
   })
 
   const supabase = createClient()
-  const isLead = currentUser.role === "lead"
+  const isLead = currentUser.is_department_lead
 
   useEffect(() => {
     const fetchMetadata = async () => {

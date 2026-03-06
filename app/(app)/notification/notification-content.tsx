@@ -28,7 +28,6 @@ import {
   Settings,
   AlertTriangle,
   Trash2,
-  Archive,
   ChevronRight,
   Filter,
 } from "lucide-react"
@@ -177,40 +176,13 @@ export function NotificationContent({ initialNotifications, userId }: Notificati
     }
   }
 
-  const archiveNotification = async (notificationId: string) => {
-    try {
-      const { error } = await supabase
-        .from("notifications")
-        .update({ archived: true, archived_at: new Date().toISOString() })
-        .eq("id", notificationId)
-
-      if (error) throw error
-
-      setNotifications((prev) => prev.filter((n) => n.id !== notificationId))
-      toast.success("Notification archived")
-    } catch (error: any) {
-      console.error("Error:", error)
-      toast.error("Failed to archive notification")
-    }
-  }
-
   const handleNotificationClick = async (notification: Notification) => {
     if (!notification.read) {
       await markAsRead(notification.id)
     }
 
-    const { error: clickError } = await supabase
-      .from("notifications")
-      .update({ clicked: true, clicked_at: new Date().toISOString() })
-      .eq("id", notification.id)
-
-    if (clickError) {
-      console.error("Error updating notification click state:", clickError)
-      // We still proceed to the link if it exists, as the click update is non-critical
-    }
-
-    if (notification.link_url) {
-      router.push(notification.link_url)
+    if (notification.action_url) {
+      router.push(notification.action_url)
     }
   }
 
@@ -435,7 +407,7 @@ export function NotificationContent({ initialNotifications, userId }: Notificati
                                   </Badge>
                                 </div>
 
-                                {notification.link_url && (
+                                {notification.action_url && (
                                   <div className="text-primary mt-2 flex items-center gap-1 text-sm font-medium">
                                     View details
                                     <ChevronRight className="h-4 w-4" />
@@ -459,18 +431,6 @@ export function NotificationContent({ initialNotifications, userId }: Notificati
                                   Mark read
                                 </Button>
                               )}
-
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  archiveNotification(notification.id)
-                                }}
-                              >
-                                <Archive className="mr-1 h-4 w-4" />
-                                Archive
-                              </Button>
 
                               <Button
                                 variant="ghost"

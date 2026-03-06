@@ -40,6 +40,7 @@ export default async function WeeklyReportsPage() {
         id: user.id,
         role: scope.role,
         department: scope.department,
+        is_department_lead: scope.isDepartmentLead,
       }}
     />
   )

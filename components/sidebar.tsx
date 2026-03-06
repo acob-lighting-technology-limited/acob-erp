@@ -298,10 +298,7 @@ export function Sidebar({ user, profile, canAccessAdmin }: SidebarProps) {
       {/* Footer - Admin & Logout */}
       <div className="space-y-1.5 border-t px-2.5 py-2.5">
         {/* Go to Admin - Only for admins/leads */}
-        {(canAccessAdmin ||
-          profile?.role === "lead" ||
-          profile?.role === "admin" ||
-          profile?.role === "super_admin") && (
+        {(canAccessAdmin || profile?.role === "admin" || profile?.role === "super_admin") && (
           <Link href="/admin" className="block">
             <Button
               variant="outline"

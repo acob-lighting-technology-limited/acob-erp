@@ -27,6 +27,7 @@ export type Database = {
           employment_date: string | null
           is_admin: boolean
           role: Database["public"]["Enums"]["user_role"]
+          admin_domains: string[] | null
           is_department_lead: boolean
           lead_departments: string[]
           job_description: string | null
@@ -67,6 +68,7 @@ export type Database = {
           employment_date?: string | null
           is_admin?: boolean
           role?: Database["public"]["Enums"]["user_role"]
+          admin_domains?: string[] | null
           is_department_lead?: boolean
           lead_departments?: string[]
           job_description?: string | null
@@ -100,6 +102,7 @@ export type Database = {
           employment_date?: string | null
           is_admin?: boolean
           role?: Database["public"]["Enums"]["user_role"]
+          admin_domains?: string[] | null
           is_department_lead?: boolean
           lead_departments?: string[]
           job_description?: string | null
@@ -258,7 +261,7 @@ export type Database = {
       }
     }
     Enums: {
-      user_role: "visitor" | "employee" | "lead" | "admin" | "super_admin" | "developer"
+      user_role: "visitor" | "employee" | "admin" | "super_admin" | "developer"
       employment_status: "active" | "suspended" | "separated" | "on_leave"
     }
   }
@@ -300,6 +303,7 @@ export interface Profile {
   employment_date?: string
   is_admin: boolean
   role: UserRole
+  admin_domains?: string[] | null
   is_department_lead: boolean
   lead_departments: string[]
   job_description?: string

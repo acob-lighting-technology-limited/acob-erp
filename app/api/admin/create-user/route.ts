@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic"
 function canAssignRole(assignerRole: string, targetRole: string): boolean {
   if (assignerRole === "developer") return true
   if (assignerRole === "super_admin") return targetRole !== "developer"
-  if (assignerRole === "admin") return ["visitor", "employee", "lead"].includes(targetRole)
+  if (assignerRole === "admin") return ["visitor", "employee"].includes(targetRole)
   return false
 }
 
@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
 
   const scope = await resolveAdminScope(supabase as any, user.id)
   const canManageUsers =
-    !!scope && (scope.isAdminLike || (scope.role === "lead" && scope.managedDepartments.includes("Admin & HR")))
+    !!scope && (scope.isAdminLike || (scope.isDepartmentLead && scope.managedDepartments.includes("Admin & HR")))
   if (!canManageUsers) {
     return NextResponse.json({ success: false, error: "Forbidden: Insufficient privileges" }, { status: 403 })
   }
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
     const { firstName, lastName, otherNames, email, department, companyRole, phoneNumber, role, employeeNumber } = body
 
     // Validate role if provided
-    const allowedRoles = ["employee", "lead", "admin", "super_admin", "developer"]
+    const allowedRoles = ["visitor", "employee", "admin", "super_admin", "developer"]
     if (role && !allowedRoles.includes(role)) {
       return NextResponse.json(
         {
@@ -182,8 +182,8 @@ export async function POST(request: NextRequest) {
         phone_number: phoneNumber || null,
         role: targetRole,
         is_admin: ["developer", "super_admin", "admin"].includes(targetRole),
-        is_department_lead: targetRole === "lead",
-        lead_departments: targetRole === "lead" ? [department] : [],
+        is_department_lead: false,
+        lead_departments: [],
         employment_status: "active", // Explicitly set employment status
         employee_number: employeeNumber || null, // Employee number (ACOB/YEAR/NUMBER)
       })

@@ -31,11 +31,9 @@ import {
   Clock,
   ChevronRight,
   Trash2,
-  Archive,
 } from "lucide-react"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
-import { formatName } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 
@@ -47,21 +45,13 @@ interface Notification {
   priority: string
   title: string
   message: string
-  rich_content?: any
-  link_url?: string
-  link_text?: string
-  action_buttons?: any
-  actor_id?: string
+  data?: any
+  action_url?: string | null
   actor_name?: string
   actor_avatar?: string
-  entity_type?: string
-  entity_id?: string
   read: boolean
   read_at?: string
-  archived: boolean
-  clicked: boolean
   created_at: string
-  expires_at?: string
 }
 
 interface ProfessionalNotificationBellProps {
@@ -163,7 +153,6 @@ export function ProfessionalNotificationBell({ isAdmin = false }: ProfessionalNo
         .from("notifications")
         .select("*")
         .eq("user_id", user.id)
-        .eq("archived", false)
         .order("created_at", { ascending: false })
         .limit(50)
 
@@ -206,10 +195,10 @@ export function ProfessionalNotificationBell({ isAdmin = false }: ProfessionalNo
               // Show toast for new notification
               toast.info(payload.new.title, {
                 description: payload.new.message,
-                action: payload.new.link_url
+                action: payload.new.action_url
                   ? {
                       label: "View",
-                      onClick: () => router.push(payload.new.link_url),
+                      onClick: () => router.push(payload.new.action_url),
                     }
                   : undefined,
               })
@@ -292,24 +281,6 @@ export function ProfessionalNotificationBell({ isAdmin = false }: ProfessionalNo
     }
   }
 
-  // Archive notification
-  const archiveNotification = async (notificationId: string) => {
-    try {
-      const { error } = await supabase
-        .from("notifications")
-        .update({ archived: true, archived_at: new Date().toISOString() })
-        .eq("id", notificationId)
-
-      if (error) throw error
-
-      setNotifications((prev) => prev.filter((n) => n.id !== notificationId))
-      toast.success("Notification archived")
-    } catch (error: any) {
-      console.error("Error archiving notification:", error)
-      toast.error("Failed to archive notification")
-    }
-  }
-
   // Handle notification click
   const handleNotificationClick = async (notification: Notification) => {
     // Mark as read if not already
@@ -317,16 +288,10 @@ export function ProfessionalNotificationBell({ isAdmin = false }: ProfessionalNo
       await markAsRead(notification.id)
     }
 
-    // Update clicked status
-    await supabase
-      .from("notifications")
-      .update({ clicked: true, clicked_at: new Date().toISOString() })
-      .eq("id", notification.id)
-
     // Navigate if there's a link
-    if (notification.link_url) {
+    if (notification.action_url) {
       setIsOpen(false)
-      router.push(notification.link_url)
+      router.push(notification.action_url)
     }
   }
 
@@ -529,7 +494,7 @@ export function ProfessionalNotificationBell({ isAdmin = false }: ProfessionalNo
                                 </p>
 
                                 {/* Link indicator */}
-                                {notification.link_url && (
+                                {notification.action_url && (
                                   <div className="text-primary mt-1 flex items-center gap-1 text-xs font-medium">
                                     View details
                                     <ChevronRight className="h-3 w-3" />
@@ -560,19 +525,6 @@ export function ProfessionalNotificationBell({ isAdmin = false }: ProfessionalNo
                                   Mark read
                                 </Button>
                               )}
-
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 px-2 text-xs"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  archiveNotification(notification.id)
-                                }}
-                              >
-                                <Archive className="mr-1 h-3 w-3" />
-                                Archive
-                              </Button>
 
                               <Button
                                 variant="ghost"

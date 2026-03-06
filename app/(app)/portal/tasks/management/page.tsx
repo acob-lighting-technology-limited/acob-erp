@@ -44,7 +44,7 @@ async function getTasksData() {
   // Get user profile to check department and role
   const { data: userProfile } = await supabase
     .from("profiles")
-    .select("department, role, lead_departments")
+    .select("department, role, is_department_lead, lead_departments")
     .eq("id", user.id)
     .single()
 
@@ -154,7 +154,7 @@ async function getTasksData() {
         const canChangeStatus =
           userProfile?.role === "admin" ||
           ["developer", "super_admin"].includes(userProfile?.role || "") ||
-          (userProfile?.role === "lead" && userProfile?.lead_departments?.includes(task.department))
+          (userProfile?.is_department_lead && userProfile?.lead_departments?.includes(task.department))
         taskData.can_change_status = canChangeStatus
       }
 

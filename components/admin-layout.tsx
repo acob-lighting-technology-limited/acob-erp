@@ -20,9 +20,9 @@ export async function AdminLayout({ children }: AdminLayoutProps) {
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", data.user.id).single()
 
   // Check if user has admin privileges
-  // Role hierarchy: super_admin > admin > lead > employee > visitor
-  // Only super_admin, admin, and lead can access admin panel
-  if (!profile || !["developer", "super_admin", "admin", "lead"].includes(profile.role)) {
+  // Role hierarchy: developer > super_admin > admin > employee > visitor
+  // Department leads also get admin access via is_department_lead
+  if (!profile || (!["developer", "super_admin", "admin"].includes(profile.role) && !profile.is_department_lead)) {
     redirect("/dashboard")
   }
 

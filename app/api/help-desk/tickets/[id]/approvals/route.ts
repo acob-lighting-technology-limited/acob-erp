@@ -5,10 +5,16 @@ import {
   canLeadDepartment,
   getAuthContext,
   isAdminRole,
+  resolveLeadForDepartment,
 } from "@/lib/help-desk/server"
 import { sendHelpDeskMail } from "@/lib/help-desk/mailer"
 
-const STAGE_ORDER = ["department_lead", "head_corporate_services", "managing_director"] as const
+const STAGE_ORDER = [
+  "requester_department_lead",
+  "service_department_lead",
+  "head_corporate_services",
+  "managing_director",
+] as const
 
 function nextStage(currentStage: string) {
   const idx = STAGE_ORDER.indexOf(currentStage as (typeof STAGE_ORDER)[number])
@@ -56,10 +62,14 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     const canApproveStage =
       isAdminRole(profile.role) ||
-      (pendingApproval.approval_stage === "department_lead" && canLeadDepartment(profile, ticket.service_department)) ||
+      (pendingApproval.approval_stage === "requester_department_lead" &&
+        canLeadDepartment(profile, ticket.requester_department)) ||
+      (pendingApproval.approval_stage === "service_department_lead" &&
+        canLeadDepartment(profile, ticket.service_department)) ||
       (pendingApproval.approval_stage === "head_corporate_services" &&
-        ["developer", "admin", "super_admin", "lead"].includes(profile.role) &&
-        (profile.department === "Admin & HR" || (profile.lead_departments || []).includes("Admin & HR"))) ||
+        (isAdminRole(profile.role) || profile.is_department_lead) &&
+        (profile.department === "Corporate Services" ||
+          (profile.lead_departments || []).includes("Corporate Services"))) ||
       (pendingApproval.approval_stage === "managing_director" &&
         ["developer", "super_admin", "admin"].includes(profile.role) &&
         (profile.department === "Executive Management" || ["developer", "super_admin"].includes(profile.role)))
@@ -86,7 +96,10 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     if (normalizedDecision === "rejected") {
       finalStatus = "rejected"
-      await supabase.from("help_desk_tickets").update({ status: "rejected" }).eq("id", ticket.id)
+      await supabase
+        .from("help_desk_tickets")
+        .update({ status: "rejected", current_approval_stage: null })
+        .eq("id", ticket.id)
 
       await supabase.rpc("create_notification", {
         p_user_id: ticket.requester_id,
@@ -124,6 +137,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
             status: "approved_for_procurement",
             resumed_at: now,
             paused_at: null,
+            current_approval_stage: null,
           })
           .eq("id", ticket.id)
 
@@ -160,21 +174,38 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
         const { data: potentialApprovers } = await supabase
           .from("profiles")
-          .select("id, role, department, lead_departments")
+          .select("id, full_name, role, department, is_department_lead, lead_departments")
+          .eq("employment_status", "active")
 
-        const nextApprover = (potentialApprovers || []).find((p: any) => {
+        const nextApprover = ((): any | null => {
+          const rows = potentialApprovers || []
+          if (upcomingStage === "requester_department_lead") {
+            return resolveLeadForDepartment(rows, ticket.requester_department)
+          }
+          if (upcomingStage === "service_department_lead") {
+            return resolveLeadForDepartment(rows, ticket.service_department)
+          }
           if (upcomingStage === "head_corporate_services") {
             return (
-              ["developer", "admin", "super_admin", "lead"].includes(p.role) &&
-              (p.department === "Admin & HR" || (p.lead_departments || []).includes("Admin & HR"))
+              rows.find((p: any) => {
+                return (
+                  (isAdminRole(p.role) || p.is_department_lead) &&
+                  (p.department === "Corporate Services" || (p.lead_departments || []).includes("Corporate Services"))
+                )
+              }) || null
             )
           }
-
           return (
-            ["developer", "super_admin", "admin"].includes(p.role) &&
-            (p.department === "Executive Management" || ["developer", "super_admin"].includes(p.role))
+            rows.find((p: any) => {
+              return (
+                ["developer", "super_admin", "admin"].includes(p.role) &&
+                (p.department === "Executive Management" || ["developer", "super_admin"].includes(p.role))
+              )
+            }) || null
           )
-        })
+        })()
+
+        await supabase.from("help_desk_tickets").update({ current_approval_stage: upcomingStage }).eq("id", ticket.id)
 
         if (nextApprover?.id) {
           await supabase.rpc("create_notification", {

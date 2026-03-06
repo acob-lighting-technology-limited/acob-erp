@@ -77,7 +77,7 @@ export async function POST(request: Request) {
 
     const scope = await resolveAdminScope(supabase as any, user.id)
     const canManageDepartments =
-      !!scope && (scope.isAdminLike || (scope.role === "lead" && scope.managedDepartments.includes("Admin & HR")))
+      !!scope && (scope.isAdminLike || (scope.isDepartmentLead && scope.managedDepartments.includes("Admin & HR")))
     if (!canManageDepartments) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
