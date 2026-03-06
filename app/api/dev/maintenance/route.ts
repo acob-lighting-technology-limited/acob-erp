@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createClient as createAdminClient } from "@supabase/supabase-js"
-
-const DEFAULT_MESSAGE = "System is under maintenance. Please check back later."
+import { DEFAULT_MAINTENANCE_MESSAGE, canManageMaintenanceMode, parseMaintenanceMode } from "@/lib/maintenance"
 
 export async function GET() {
   try {
@@ -35,9 +34,7 @@ export async function GET() {
       return NextResponse.json({ error: "Failed to load maintenance mode" }, { status: 500 })
     }
 
-    const raw = settings?.value as any
-    const enabled = typeof raw === "boolean" ? raw : Boolean(raw?.enabled)
-    const message = typeof raw === "object" && raw?.message ? String(raw.message) : DEFAULT_MESSAGE
+    const { enabled, message } = parseMaintenanceMode(settings?.value)
 
     return NextResponse.json({
       data: {
@@ -46,7 +43,7 @@ export async function GET() {
         updated_at: settings?.updated_at || null,
         updated_by: settings?.updated_by || null,
       },
-      can_toggle: profile?.role === "developer",
+      can_toggle: canManageMaintenanceMode(profile?.role),
     })
   } catch (error) {
     console.error("Error in GET /api/dev/maintenance:", error)
@@ -75,13 +72,13 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "Failed to resolve user role" }, { status: 500 })
     }
 
-    if (profile?.role !== "developer") {
-      return NextResponse.json({ error: "Only developer can change maintenance mode" }, { status: 403 })
+    if (!canManageMaintenanceMode(profile?.role)) {
+      return NextResponse.json({ error: "Only super admin or developer can change maintenance mode" }, { status: 403 })
     }
 
     const body = await request.json().catch(() => ({}))
     const enabled = Boolean(body?.enabled)
-    const message = body?.message ? String(body.message) : DEFAULT_MESSAGE
+    const message = body?.message ? String(body.message) : DEFAULT_MAINTENANCE_MESSAGE
 
     if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
       return NextResponse.json({ error: "Server is missing Supabase service credentials" }, { status: 500 })

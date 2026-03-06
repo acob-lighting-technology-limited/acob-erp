@@ -9,6 +9,14 @@ function isSecurityEvent(log: any): boolean {
   const text =
     `${log.action || ""} ${log.operation || ""} ${log.entity_type || ""} ${log.status || ""} ` +
     `${JSON.stringify(log.metadata || {})} ${JSON.stringify(log.old_values || {})} ${JSON.stringify(log.new_values || {})}`.toLowerCase()
+  const roleChangeSignal =
+    text.includes("role") ||
+    text.includes("super_admin") ||
+    text.includes("developer") ||
+    text.includes("is_admin") ||
+    text.includes("admin_domains") ||
+    text.includes("lead_departments")
+
   return (
     text.includes("auth") ||
     text.includes("permission_denied") ||
@@ -19,7 +27,8 @@ function isSecurityEvent(log: any): boolean {
     text.includes("failed") ||
     text.includes("invalid") ||
     text.includes("blocked") ||
-    text.includes("escalat")
+    text.includes("escalat") ||
+    roleChangeSignal
   )
 }
 

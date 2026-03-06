@@ -89,6 +89,7 @@ async function getAssetsData() {
       `
       )
       .eq("status", "assigned")
+      .is("deleted_at", null)
       .or(
         `and(assignment_type.eq.department,department.eq.${profile.department}),and(assignment_type.eq.office,office_location.eq.${profile.office_location})`
       )
@@ -125,6 +126,7 @@ async function getAssetsData() {
           .from("assets")
           .select("id, unique_code, asset_type, asset_model, serial_number, status, acquisition_year")
           .eq("id", assignment.asset_id)
+          .is("deleted_at", null)
           .single(),
         assignment.assigned_by
           ? supabase.from("profiles").select("first_name, last_name").eq("id", assignment.assigned_by).single()
@@ -140,7 +142,7 @@ async function getAssetsData() {
   )
 
   return {
-    assignments: assignmentsWithDetails as AssetAssignment[],
+    assignments: assignmentsWithDetails.filter((entry) => Boolean((entry as any).asset)) as AssetAssignment[],
   }
 }
 

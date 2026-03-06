@@ -136,7 +136,8 @@ async function getProfileData() {
         serial_number,
         status,
         unique_code,
-        created_at
+        created_at,
+        deleted_at
       )
     `
     )
@@ -148,6 +149,7 @@ async function getProfileData() {
     .from("assets")
     .select("*")
     .eq("status", "assigned")
+    .is("deleted_at", null)
     .or(
       `and(assignment_type.eq.department,department.eq.${profileData.department}),and(assignment_type.eq.office,office_location.eq.${profileData.current_work_location})`
     )
@@ -156,11 +158,13 @@ async function getProfileData() {
 
   // Process individual assignments
   if (individualAssignments) {
-    const indAssets = individualAssignments.map((a: any) => ({
-      ...a.asset,
-      assigned_at: a.assigned_at,
-      assignment_type: "individual" as const,
-    }))
+    const indAssets = individualAssignments
+      .map((a: any) => ({
+        ...a.asset,
+        assigned_at: a.assigned_at,
+        assignment_type: "individual" as const,
+      }))
+      .filter((asset: any) => asset && !asset.deleted_at)
     allAssets = [...allAssets, ...indAssets]
   }
 

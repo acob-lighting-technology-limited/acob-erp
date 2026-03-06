@@ -277,6 +277,7 @@ async function getAdminNotificationsData() {
       .from("assets")
       .select("*", { count: "exact", head: true })
       .eq("status", "maintenance")
+      .is("deleted_at", null)
     if (departmentScope) {
       maintenanceQuery =
         departmentScope.length > 0

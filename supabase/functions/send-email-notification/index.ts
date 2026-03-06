@@ -48,7 +48,8 @@ serve(async (req) => {
     } catch {
       console.warn("[WARN] Failed to parse record.data, using empty object")
     }
-    const assetCode = (notificationData as any).asset_code || (notificationData as any).unique_code
+    const notificationPayload = notificationData as any
+    const assetCode = notificationPayload.asset_code || notificationPayload.unique_code
 
     // 1. Fetch User (Recipient)
     const { data: recipientUser, error: userError } = await supabase.auth.admin.getUserById(record.user_id)
@@ -77,6 +78,11 @@ serve(async (req) => {
     const recipientName = recipientProfile?.full_name || "Staff Member"
     const recipientFirstName = recipientName.split(" ")[0]
     const recipientDept = recipientProfile?.department || "Unassigned"
+    const mailAudience = notificationPayload.mail_audience === "oversight" ? "oversight" : "assignee"
+    const oversightTargetRole = notificationPayload.oversight_target_role || "Oversight Recipient"
+    const assignedEmployeeName = notificationPayload.assigned_employee_name || recipientName
+    const assignedEmployeeDepartment = notificationPayload.assigned_employee_department || recipientDept
+    const assignedEmployeeEmail = notificationPayload.assigned_employee_email || recipientEmails.join(", ")
 
     // 2. Fetch Asset & Assignment Data
     let assetType = "Asset"
@@ -107,8 +113,8 @@ serve(async (req) => {
       }
 
       // Try fetch specific assignment if possible
-      if ((notificationData as any).assigned_by || (notificationData as any).actor_id) {
-        const actorId = (notificationData as any).assigned_by || (notificationData as any).actor_id
+      if (notificationPayload.assigned_by || notificationPayload.actor_id) {
+        const actorId = notificationPayload.assigned_by || notificationPayload.actor_id
 
         // If it's a UUID, fetch the name. If it's already a name, use it.
         const isUuid = typeof actorId === "string" && actorId.length === 36 && actorId.includes("-")
@@ -133,63 +139,109 @@ serve(async (req) => {
     let introText = "You have a new asset notification."
     let headerText = "Details"
     let headerColorClass = "status-header-neutral"
-    const ctaText = "View My Assets"
-    const ctaUrl = "https://erp.acoblighting.com/portal/assets"
     const supportText =
       'If you experience any issue, please contact <br><a href="mailto:ict@acoblighting.com">ict@acoblighting.com</a>'
 
-    switch (emailType) {
-      case "asset_assigned":
-      case "asset_assignment":
-        subject = `Asset Officially Assigned - ${assetCode}`
-        title = "Asset Officially Assigned"
-        introText =
-          "This is to officially notify you that an organizational asset has been assigned to you. Kindly review the details below."
-        headerText = "Assignment Details"
-        headerColorClass = "status-header-neutral"
-        break
+    if (mailAudience === "oversight") {
+      switch (emailType) {
+        case "asset_status_alert":
+          subject = `Asset Status Alert Notice - ${assetCode}`
+          title = "Asset Status Alert Notice"
+          introText = `This is to notify you that an asset assigned to <strong>${assignedEmployeeName}</strong> has a reported issue. You are receiving this copy as ${oversightTargetRole}.`
+          headerText = "Status Alert Oversight Details"
+          headerColorClass = "status-header-alert"
+          break
+        case "asset_status_fixed":
+        case "system_restored":
+          subject = `Asset Status Restored Notice - ${assetCode}`
+          title = "Asset Status Restored Notice"
+          introText = `This is to notify you that an asset assigned to <strong>${assignedEmployeeName}</strong> has been restored to operational status. You are receiving this copy as ${oversightTargetRole}.`
+          headerText = "Status Restored Oversight Details"
+          headerColorClass = "status-header-success"
+          break
+        case "asset_returned":
+          subject = `Asset Return Notice - ${assetCode}`
+          title = "Asset Return Notice"
+          introText = `This is to notify you that an asset assigned to <strong>${assignedEmployeeName}</strong> has been returned/unassigned. You are receiving this copy as ${oversightTargetRole}.`
+          headerText = "Return Oversight Details"
+          headerColorClass = "status-header-neutral"
+          break
+        case "asset_transfer_outgoing":
+          subject = `Asset Transfer Notice - ${assetCode}`
+          title = "Asset Transfer Notice"
+          introText = `This is to notify you that an organizational asset has been transferred out from <strong>${assignedEmployeeName}</strong>. You are receiving this copy as ${oversightTargetRole}.`
+          headerText = "Transfer Oversight Details"
+          headerColorClass = "status-header-neutral"
+          break
+        case "asset_transfer_incoming":
+          subject = `Asset Transfer Notice - ${assetCode}`
+          title = "Asset Transfer Notice"
+          introText = `This is to notify you that an organizational asset has been transferred to <strong>${assignedEmployeeName}</strong>. You are receiving this copy as ${oversightTargetRole}.`
+          headerText = "Transfer Oversight Details"
+          headerColorClass = "status-header-success"
+          break
+        default:
+          subject = `Asset Assignment Notice - ${assetCode}`
+          title = "Asset Assignment Notice"
+          introText = `This is to notify you that an organizational asset has been assigned to <strong>${assignedEmployeeName}</strong>. You are receiving this copy as ${oversightTargetRole}.`
+          headerText = "Oversight Details"
+          headerColorClass = "status-header-neutral"
+          break
+      }
+    } else {
+      switch (emailType) {
+        case "asset_assigned":
+        case "asset_assignment":
+          subject = `Asset Officially Assigned - ${assetCode}`
+          title = "Asset Officially Assigned"
+          introText =
+            "This is to officially notify you that an organizational asset has been assigned to you. Kindly review the details below."
+          headerText = "Assignment Details"
+          headerColorClass = "status-header-neutral"
+          break
 
-      case "asset_transfer_outgoing":
-        subject = `Asset Transfer Initiated - ${assetCode}`
-        title = "Asset Transfer Initiated"
-        introText = "This asset has been transferred from your custody. It is no longer assigned to your account."
-        headerText = "Transfer Details"
-        headerColorClass = "status-header-neutral"
-        break
+        case "asset_transfer_outgoing":
+          subject = `Asset Transfer Initiated - ${assetCode}`
+          title = "Asset Transfer Initiated"
+          introText = "This asset has been transferred from your custody. It is no longer assigned to your account."
+          headerText = "Transfer Details"
+          headerColorClass = "status-header-neutral"
+          break
 
-      case "asset_transfer_incoming":
-        subject = `Asset Transfer Received - ${assetCode}`
-        title = "Asset Transfer Received"
-        introText = "An asset has been transferred to your custody. You are now responsible for this item."
-        headerText = "Incoming Transfer"
-        headerColorClass = "status-header-success"
-        break
+        case "asset_transfer_incoming":
+          subject = `Asset Transfer Received - ${assetCode}`
+          title = "Asset Transfer Received"
+          introText = "An asset has been transferred to your custody. You are now responsible for this item."
+          headerText = "Incoming Transfer"
+          headerColorClass = "status-header-success"
+          break
 
-      case "asset_returned":
-        subject = `Asset Officially Returned - ${assetCode}`
-        title = "Asset Officially Returned"
-        introText =
-          "We confirm that you have returned the following asset. It has been successfully unassigned from your account."
-        headerText = "Return Receipt"
-        headerColorClass = "status-header-neutral"
-        break
+        case "asset_returned":
+          subject = `Asset Officially Returned - ${assetCode}`
+          title = "Asset Officially Returned"
+          introText =
+            "We confirm that you have returned the following asset. It has been successfully unassigned from your account."
+          headerText = "Return Receipt"
+          headerColorClass = "status-header-neutral"
+          break
 
-      case "asset_status_alert":
-        subject = `Asset Status Alert - ${assetCode}`
-        title = "Asset Status Alert"
-        introText = `The status of the following asset has been updated to <strong>${((notificationData as any).status_action || "REPORTED").toUpperCase()}</strong>.`
-        headerText = "Status Change: Alert"
-        headerColorClass = "status-header-alert"
-        break
+        case "asset_status_alert":
+          subject = `Asset Status Alert - ${assetCode}`
+          title = "Asset Status Alert"
+          introText = `The status of the following asset has been updated to <strong>${(notificationPayload.status_action || "REPORTED").toUpperCase()}</strong>.`
+          headerText = "Status Change: Alert"
+          headerColorClass = "status-header-alert"
+          break
 
-      case "asset_status_fixed":
-      case "system_restored":
-        subject = `Asset Status Restored - ${assetCode}`
-        title = "Asset Status Restored"
-        introText = "The following asset has been repaired and is now fully <strong>OPERATIONAL</strong>."
-        headerText = "Status Change: Operational"
-        headerColorClass = "status-header-success"
-        break
+        case "asset_status_fixed":
+        case "system_restored":
+          subject = `Asset Status Restored - ${assetCode}`
+          title = "Asset Status Restored"
+          introText = "The following asset has been repaired and is now fully <strong>OPERATIONAL</strong>."
+          headerText = "Status Change: Operational"
+          headerColorClass = "status-header-success"
+          break
+      }
     }
 
     // 4. Construct HTML
@@ -205,39 +257,50 @@ serve(async (req) => {
     }
 
     // Base rows for ALL emails
-    let tableRows = `
+    let tableRows =
+      mailAudience === "oversight"
+        ? `
+        ${row("Recipient Role", oversightTargetRole)}
+        ${row("Assigned Employee", assignedEmployeeName)}
+        ${row("Employee Department", assignedEmployeeDepartment)}
+        ${row("Employee Email", assignedEmployeeEmail)}
+        ${row("Asset Code", assetCode || "N/A", true)}
+        ${row("Asset Type", assetType)}
+        ${row("Model", assetModel)}
+        ${row("Serial Number", serialNumber, false, true)}
+    `
+        : `
         ${row("Asset Code", assetCode || "N/A", true)}
         ${row("Asset Type", assetType)}
         ${row("Model", assetModel)}
         ${row("Serial Number", serialNumber, false, true)}
         ${row("Assigned To", recipientName)}
         ${row("Department", recipientDept)}
-        ${row("Email Address(es)", recipientEmails.join(", "))}
     `
 
     // Specific rows appended after base rows
     if (emailType === "asset_transfer_outgoing") {
-      tableRows += row("Authorized By", (notificationData as any).authorized_by || assignedByName)
+      tableRows += row("Authorized By", notificationPayload.authorized_by || assignedByName)
       tableRows += row("Transfer Date", assignedDate)
     } else if (emailType === "asset_transfer_incoming") {
-      tableRows += row("Condition", (notificationData as any).condition || "Good / Working")
+      tableRows += row("Condition", notificationPayload.condition || "Good / Working")
       tableRows += row("Assigned By", assignedByName)
       tableRows += row("Assigned Date", assignedDate)
     } else if (emailType === "asset_returned") {
       tableRows += row("Returned By", recipientName)
-      tableRows += row("Authorized By", (notificationData as any).authorized_by || assignedByName)
+      tableRows += row("Authorized By", notificationPayload.authorized_by || assignedByName)
       tableRows += row("Return Date", assignedDate)
     } else if (emailType === "asset_status_alert") {
       tableRows += row(
         "Status Note",
-        (notificationData as any).status_description || (notificationData as any).status_action || "Updated",
+        notificationPayload.status_description || notificationPayload.status_action || "Updated",
         false,
         false
       )
-      tableRows += row("Reported By", (notificationData as any).reported_by || assignedByName)
+      tableRows += row("Reported By", notificationPayload.reported_by || assignedByName)
       tableRows += row("Date", assignedDate)
     } else if (emailType === "asset_status_fixed") {
-      tableRows += row("Resolution Note", (notificationData as any).resolution_note || "Issue Resolved", false, false)
+      tableRows += row("Resolution Note", notificationPayload.resolution_note || "Issue Resolved", false, false)
       tableRows += row("Date", assignedDate)
     } else {
       // Default: Initial Assignment
@@ -302,7 +365,7 @@ serve(async (req) => {
     </div>
     <div class="footer" style="background-color:#0f2d1f;">
         <strong>ACOB Lighting Technology Limited</strong><br>
-        ACOB Internal Systems – IT & Communications Department<br>
+        IT & Communications Department<br>
         <span class="footer-system">Asset Management System</span>
         <br><br>
         <i class="footer-note">This is an automated system notification. Please do not reply directly to this email.</i>

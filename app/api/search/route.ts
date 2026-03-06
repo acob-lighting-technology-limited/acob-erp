@@ -100,6 +100,7 @@ export async function GET(request: NextRequest) {
             .from("assets")
             .select("id, unique_code, asset_type, asset_model, serial_number")
             .in("id", assetIds)
+            .is("deleted_at", null)
 
           if (assets) {
             assets.forEach((asset) => {
@@ -147,6 +148,7 @@ export async function GET(request: NextRequest) {
     const { data: assets } = await supabase
       .from("assets")
       .select("id, unique_code, asset_type, asset_model, serial_number, status, acquisition_year")
+      .is("deleted_at", null)
       .or(
         `unique_code.ilike.%${searchQuery}%,asset_type.ilike.%${searchQuery}%,asset_model.ilike.%${searchQuery}%,serial_number.ilike.%${searchQuery}%`
       )

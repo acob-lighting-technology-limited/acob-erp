@@ -343,7 +343,7 @@ export default async function AdminDashboardPage() {
     { count: feedbackCount },
   ] = await Promise.all([
     supabase.from("profiles").select("*", { count: "exact", head: true }),
-    supabase.from("assets").select("*", { count: "exact", head: true }),
+    supabase.from("assets").select("*", { count: "exact", head: true }).is("deleted_at", null),
     supabase.from("tasks").select("*", { count: "exact", head: true }),
     supabase.from("user_documentation").select("*", { count: "exact", head: true }),
     supabase.from("feedback").select("*", { count: "exact", head: true }),

@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { buttonVariants } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { PageHeader, PageWrapper } from "@/components/layout"
-import { Code2, ScrollText, Wrench, ShieldEllipsis, ShieldAlert, FlaskConical } from "lucide-react"
+import { Code2, ScrollText, ShieldEllipsis, ShieldAlert, FlaskConical } from "lucide-react"
 
 const sections = [
   {
@@ -11,12 +11,6 @@ const sections = [
     description: "Track who logged in, when, from where, and with what auth method.",
     href: "/admin/dev/login-logs",
     icon: ScrollText,
-  },
-  {
-    title: "Maintenance Control",
-    description: "Developer-only system maintenance mode controls.",
-    href: "/admin/dev/maintenance",
-    icon: Wrench,
   },
   {
     title: "Role Escalations",
@@ -43,7 +37,7 @@ export default function DevHomePage() {
     <PageWrapper maxWidth="full" background="gradient">
       <PageHeader
         title="DEV Control Plane"
-        description="Developer-only operational and security control surfaces"
+        description="Developer-only operational and security control surfaces, excluding shared system settings"
         icon={Code2}
         backLink={{ href: "/admin", label: "Back to Admin" }}
       />

@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft, UserPlus, Mail } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
+import { getAssignableRolesForActor } from "@/lib/role-management"
 
 export default function InviteUserPage() {
   const router = useRouter()
@@ -23,6 +24,8 @@ export default function InviteUserPage() {
     role: "employee",
     department: "",
   })
+
+  const roleOptions = getAssignableRolesForActor(currentUserRole)
 
   useEffect(() => {
     const loadCurrentRole = async () => {
@@ -130,11 +133,11 @@ export default function InviteUserPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="visitor">Visitor</SelectItem>
-                    <SelectItem value="employee">Employee</SelectItem>
-                    <SelectItem value="admin">Admin</SelectItem>
-                    <SelectItem value="super_admin">Super Admin</SelectItem>
-                    {currentUserRole === "developer" && <SelectItem value="developer">Developer</SelectItem>}
+                    {roleOptions.map((role) => (
+                      <SelectItem key={role} value={role}>
+                        {role === "super_admin" ? "Super Admin" : role.charAt(0).toUpperCase() + role.slice(1)}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

@@ -1,22 +1,18 @@
 import { createClient } from "@/lib/supabase/server"
 import { createClient as createAdminClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
+import {
+  ASSIGNABLE_ROLES,
+  canAssignRole,
+  canManageDeveloperAccounts,
+  canManageSuperAdminAccounts,
+} from "@/lib/role-management"
 
-// Allowlist of valid roles
-const ALLOWED_ROLES = ["admin", "employee", "visitor", "developer"] as const
 const SUPER_ADMIN_ROLE = "super_admin"
-
-type AllowedRole = (typeof ALLOWED_ROLES)[number] | typeof SUPER_ADMIN_ROLE
+type AllowedRole = (typeof ASSIGNABLE_ROLES)[number]
 
 function isValidRole(role: string): role is AllowedRole {
-  return role === SUPER_ADMIN_ROLE || ALLOWED_ROLES.includes(role as (typeof ALLOWED_ROLES)[number])
-}
-
-function canAssignRole(assignerRole: string, targetRole: string): boolean {
-  if (assignerRole === "developer") return true
-  if (assignerRole === "super_admin") return targetRole !== "developer"
-  if (assignerRole === "admin") return ["visitor", "employee"].includes(targetRole)
-  return false
+  return ASSIGNABLE_ROLES.includes(role as (typeof ASSIGNABLE_ROLES)[number])
 }
 
 export async function POST(request: Request) {
@@ -133,8 +129,11 @@ export async function POST(request: Request) {
     if (existingUser && roleToApply) {
       const { data: existingProfile } = await supabaseAdmin.from("profiles").select("role").eq("id", userId).single()
 
-      if (existingProfile?.role === "developer" && profile?.role !== "developer") {
-        return NextResponse.json({ error: "Only developer can modify developer accounts" }, { status: 403 })
+      if (existingProfile?.role === "developer" && !canManageDeveloperAccounts(profile?.role || "")) {
+        return NextResponse.json(
+          { error: "Only super admin or developer can modify developer accounts" },
+          { status: 403 }
+        )
       }
 
       if (existingProfile?.role === "developer" && roleToApply !== "developer") {
@@ -147,6 +146,29 @@ export async function POST(request: Request) {
           return NextResponse.json({ error: "Cannot downgrade the last developer account." }, { status: 400 })
         }
       }
+
+      if (existingProfile?.role === "super_admin" && roleToApply !== "super_admin") {
+        const { count } = await supabaseAdmin
+          .from("profiles")
+          .select("id", { count: "exact", head: true })
+          .eq("role", "super_admin")
+
+        if ((count || 0) <= 1) {
+          return NextResponse.json({ error: "Cannot downgrade the last super admin account." }, { status: 400 })
+        }
+      }
+    }
+
+    if (roleToApply === "developer" && !canManageDeveloperAccounts(profile?.role || "")) {
+      return NextResponse.json({ error: "Only super admin or developer can assign developer role" }, { status: 403 })
+    }
+
+    if (roleToApply === "super_admin" && !canManageSuperAdminAccounts(profile?.role || "")) {
+      return NextResponse.json({ error: "Only super admin can assign super admin role" }, { status: 403 })
+    }
+
+    if (existingUser && existingUser.id === user.id && roleToApply && roleToApply !== profile?.role) {
+      return NextResponse.json({ error: "You cannot change your own role." }, { status: 400 })
     }
 
     const profilePayload: any = {

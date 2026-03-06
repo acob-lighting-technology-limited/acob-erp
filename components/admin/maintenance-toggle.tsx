@@ -9,7 +9,7 @@ export function MaintenanceToggle() {
   const [enabled, setEnabled] = useState(false)
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState(false)
-  const [isDeveloper, setIsDeveloper] = useState(false)
+  const [canToggle, setCanToggle] = useState(false)
 
   useEffect(() => {
     fetchState()
@@ -21,7 +21,7 @@ export function MaintenanceToggle() {
       const payload = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(payload.error || "Failed to load maintenance settings")
 
-      setIsDeveloper(Boolean(payload.can_toggle))
+      setCanToggle(Boolean(payload.can_toggle))
       setEnabled(Boolean(payload.data?.enabled))
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to load maintenance settings"
@@ -37,8 +37,8 @@ export function MaintenanceToggle() {
 
     setUpdating(true)
     try {
-      if (!isDeveloper) {
-        toast.error("Only developer can change maintenance mode")
+      if (!canToggle) {
+        toast.error("Only super admin or developer can change maintenance mode")
         return
       }
 
@@ -74,7 +74,7 @@ export function MaintenanceToggle() {
         </Label>
         <p className="text-muted-foreground text-sm">
           {enabled
-            ? "System is currently locked. Only developer can access."
+            ? "System is currently locked. Only super admin and developer can access."
             : "System is active and accessible to all users."}
         </p>
       </div>
@@ -82,7 +82,7 @@ export function MaintenanceToggle() {
         id="maintenance-mode"
         checked={enabled}
         onCheckedChange={handleToggle}
-        disabled={loading || updating || !isDeveloper}
+        disabled={loading || updating || !canToggle}
       />
     </div>
   )
