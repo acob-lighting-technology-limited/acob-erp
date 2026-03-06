@@ -10,21 +10,13 @@ export interface Notification {
   priority: string
   title: string
   message: string
-  rich_content?: any
-  link_url?: string
-  link_text?: string
-  action_buttons?: any
-  actor_id?: string
+  data?: any
+  action_url?: string | null
   actor_name?: string
   actor_avatar?: string
-  entity_type?: string
-  entity_id?: string
   read: boolean
   read_at?: string
-  archived: boolean
-  clicked: boolean
   created_at: string
-  expires_at?: string
 }
 
 async function getNotificationData() {
@@ -43,7 +35,6 @@ async function getNotificationData() {
     .from("notifications")
     .select("*")
     .eq("user_id", user.id)
-    .eq("archived", false)
     .order("created_at", { ascending: false })
 
   if (error) {

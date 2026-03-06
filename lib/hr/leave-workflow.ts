@@ -3,9 +3,9 @@ import { sendLeaveWorkflowEmail } from "@/lib/leave-mailer"
 type SupabaseClient = any
 
 export const LEAVE_PENDING_STAGES = {
-  RELIEVER: "reliever_pending",
-  SUPERVISOR: "supervisor_pending",
-  HR: "hr_pending",
+  RELIEVER: "pending_reliever",
+  SUPERVISOR: "pending_department_lead",
+  HR: "pending_admin_hr_lead",
 } as const
 
 export type LeavePendingStage = (typeof LEAVE_PENDING_STAGES)[keyof typeof LEAVE_PENDING_STAGES]
@@ -34,9 +34,11 @@ export interface LeaveEligibilityResult {
 }
 
 const APPROVAL_LEVELS: Record<string, number> = {
-  reliever_pending: 1,
-  supervisor_pending: 2,
-  hr_pending: 3,
+  pending_reliever: 1,
+  pending_department_lead: 2,
+  pending_admin_hr_lead: 3,
+  pending_md: 3,
+  pending_hcs: 3,
 }
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -611,6 +613,7 @@ function buildNotificationRows(params: {
   linkUrl?: string
   entityId?: string
 }) {
+  const actionUrl = params.linkUrl || "/dashboard/leave"
   return params.userIds.map((userId) => ({
     user_id: userId,
     type: "approval_request",
@@ -618,10 +621,14 @@ function buildNotificationRows(params: {
     title: params.title,
     message: params.message,
     priority: "high",
-    link_url: params.linkUrl || "/dashboard/leave",
-    actor_id: params.actorId || null,
-    entity_type: "leave_request",
-    entity_id: params.entityId || null,
+    action_url: actionUrl,
+    data: {
+      category: "approvals",
+      actor_id: params.actorId || null,
+      entity_type: "leave_request",
+      entity_id: params.entityId || null,
+      link_url: actionUrl,
+    },
   }))
 }
 
@@ -651,7 +658,10 @@ export async function notifyUsers(
     entityId: params.entityId,
   })
 
-  await supabase.from("notifications").insert(rows)
+  const { error: notifyError } = await supabase.from("notifications").insert(rows)
+  if (notifyError) {
+    console.error("Failed to create leave notifications:", notifyError)
+  }
 
   const { data: recipients } = await supabase
     .from("profiles")

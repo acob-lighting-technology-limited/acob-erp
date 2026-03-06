@@ -106,9 +106,7 @@ export function DepartmentLeadsManager() {
     setSelectedUserId("")
     setConfirmWarning(null)
 
-    // Fetch potential leads (active users, not admins/super_admins usually?)
-    // Or anyone can be lead? Usually employee/leads.
-    // User said "Team Lead" is a role.
+    // Fetch potential leads from active users (excluding visitors).
     try {
       const supabase = createClient()
       const { data, error } = await supabase
@@ -143,11 +141,6 @@ export function DepartmentLeadsManager() {
     if (user.is_department_lead && user.department !== selectedDept?.name) {
       warning = `⚠️ ${user.first_name || "User"} is currently the lead for "${user.department}". Assigning them here will remove them as lead of "${user.department}" (that department will have no lead), and make them lead of "${selectedDept?.name}" instead. Each person can only lead one department.`
     }
-    // Check if user has a different role that will be changed
-    else if (user.role !== "lead") {
-      warning = `${user.first_name || "User"} is currently a "${user.role}". Their role will be changed to "Lead".`
-    }
-
     setConfirmWarning(warning)
   }
 
@@ -187,7 +180,7 @@ export function DepartmentLeadsManager() {
           Department Leads
         </CardTitle>
         <CardDescription>
-          Manage team leads for each department. Each department must have exactly one lead.
+          Manage department lead assignments. Each department should have exactly one assigned lead.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -234,9 +227,7 @@ export function DepartmentLeadsManager() {
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Assign Lead - {selectedDept?.name}</DialogTitle>
-              <DialogDescription>
-                Select a user to lead this department. This will update their role to "Lead".
-              </DialogDescription>
+              <DialogDescription>Select a user to mark as the lead for this department.</DialogDescription>
             </DialogHeader>
 
             <div className="grid gap-4 py-4">

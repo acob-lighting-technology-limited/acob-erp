@@ -21,11 +21,8 @@ async function getData() {
   const departmentScope = getDepartmentScope(scope, "general")
 
   let ticketsQuery = supabase.from("help_desk_tickets").select("*").order("created_at", { ascending: false })
-  if (departmentScope) {
-    ticketsQuery =
-      departmentScope.length > 0
-        ? ticketsQuery.in("service_department", departmentScope)
-        : ticketsQuery.eq("id", "__none__")
+  if (departmentScope && departmentScope.length === 0) {
+    ticketsQuery = ticketsQuery.eq("id", "__none__")
   }
 
   let employeesQuery = supabase
@@ -41,8 +38,15 @@ async function getData() {
 
   const [{ data: tickets }, { data: employees }] = await Promise.all([ticketsQuery, employeesQuery])
 
+  const scopedTickets = departmentScope
+    ? (tickets || []).filter(
+        (ticket: any) =>
+          departmentScope.includes(ticket.service_department) || departmentScope.includes(ticket.requester_department)
+      )
+    : tickets || []
+
   return {
-    tickets: tickets || [],
+    tickets: scopedTickets,
     employees: employees || [],
   }
 }

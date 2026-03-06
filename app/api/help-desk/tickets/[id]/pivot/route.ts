@@ -5,6 +5,7 @@ import {
   canLeadDepartment,
   getAuthContext,
   isAdminRole,
+  resolveLeadForDepartment,
 } from "@/lib/help-desk/server"
 import { sendHelpDeskMail } from "@/lib/help-desk/mailer"
 
@@ -48,6 +49,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         pivoted_to_procurement: true,
         procurement_reason: pivotReason,
         status: "pending_approval",
+        current_approval_stage: "requester_department_lead",
         paused_at: now,
       })
       .eq("id", ticket.id)
@@ -63,33 +65,26 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     if (!existingApprovals?.length) {
       await supabase.from("help_desk_approvals").insert([
-        { ticket_id: ticket.id, approval_stage: "department_lead", status: "pending" },
+        { ticket_id: ticket.id, approval_stage: "requester_department_lead", status: "pending" },
+        { ticket_id: ticket.id, approval_stage: "service_department_lead", status: "pending" },
         { ticket_id: ticket.id, approval_stage: "head_corporate_services", status: "pending" },
         { ticket_id: ticket.id, approval_stage: "managing_director", status: "pending" },
       ])
     }
 
-    const { data: profiles } = await supabase.from("profiles").select("id, role, department, lead_departments")
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("id, full_name, role, department, is_department_lead, lead_departments")
+      .eq("employment_status", "active")
 
-    const potentialApprovers = (profiles || []).filter((p: any) => {
-      if (p.role === "lead") {
-        return (
-          (p.lead_departments || []).includes(ticket.service_department) || p.department === ticket.service_department
-        )
-      }
-      if (["developer", "admin", "super_admin"].includes(p.role) && p.department === "Admin & HR") return true
-      if (["developer", "admin", "super_admin"].includes(p.role) && p.department === "Executive Management")
-        return true
-      if (p.role === "developer" || p.role === "super_admin") return true
-      return false
-    })
+    const requesterLead = resolveLeadForDepartment(profiles || [], ticket.requester_department)
 
     try {
       await sendHelpDeskMail({
-        userIds: potentialApprovers.map((p: any) => p.id),
+        userIds: requesterLead?.id ? [requesterLead.id] : [],
         subject: `Procurement Pivot: ${ticket.ticket_number}`,
         title: "Ticket Requires Procurement Approval",
-        message: `${ticket.title} has been moved to procurement flow and is awaiting approval actions.`,
+        message: `${ticket.title} has been moved to procurement flow and is awaiting requester department approval first.`,
         ticketNumber: ticket.ticket_number,
         ctaPath: "/admin/help-desk",
       })

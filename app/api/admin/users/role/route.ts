@@ -2,12 +2,12 @@ import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 
 const ADMIN_LIKE = ["developer", "super_admin", "admin"] as const
-const ASSIGNABLE_ROLES = ["visitor", "employee", "lead", "admin", "super_admin", "developer"] as const
+const ASSIGNABLE_ROLES = ["visitor", "employee", "admin", "super_admin", "developer"] as const
 
 function canAssignRole(assignerRole: string, targetRole: string): boolean {
   if (assignerRole === "developer") return true
   if (assignerRole === "super_admin") return targetRole !== "developer"
-  if (assignerRole === "admin") return ["visitor", "employee", "lead"].includes(targetRole)
+  if (assignerRole === "admin") return ["visitor", "employee"].includes(targetRole)
   return false
 }
 
@@ -76,18 +76,11 @@ export async function POST(request: Request) {
     }
 
     const isAdmin = ["developer", "super_admin", "admin"].includes(targetRole)
-    const isLead = targetRole === "lead"
-    const leadDepartments = isLead
-      ? (targetProfile.lead_departments?.length ? targetProfile.lead_departments : [targetProfile.department]).filter(
-          Boolean
-        )
-      : []
 
+    // Role changes do NOT affect department lead status — those are independent
     const payload: Record<string, unknown> = {
       role: targetRole,
       is_admin: isAdmin,
-      is_department_lead: isLead,
-      lead_departments: leadDepartments,
     }
 
     if (employmentStatus) {

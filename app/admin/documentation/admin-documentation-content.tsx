@@ -37,6 +37,7 @@ export interface Documentation {
 
 export interface UserProfile {
   role: UserRole
+  is_department_lead?: boolean
   lead_departments?: string[]
   managed_departments?: string[]
 }
@@ -91,7 +92,7 @@ export function AdminDocumentationContent({
       (statusFilter === "draft" && doc.is_draft)
 
     let matchesDepartment = true
-    if (userProfile?.role === "lead") {
+    if (userProfile?.is_department_lead) {
       if (scopedDepartments.length > 0) {
         matchesDepartment = doc.user?.department ? scopedDepartments.includes(doc.user.department) : false
       }
@@ -245,7 +246,7 @@ export function AdminDocumentationContent({
                   ))}
                 </SelectContent>
               </Select>
-              {userProfile?.role !== "lead" && (
+              {!userProfile?.is_department_lead && (
                 <SearchableSelect
                   value={departmentFilter}
                   onValueChange={setDepartmentFilter}
@@ -267,7 +268,7 @@ export function AdminDocumentationContent({
                 value={employeeFilter}
                 onValueChange={setemployeeFilter}
                 placeholder={
-                  userProfile?.role === "lead" &&
+                  userProfile?.is_department_lead &&
                   userProfile.lead_departments &&
                   userProfile.lead_departments.length > 0
                     ? `All ${userProfile.lead_departments.length === 1 ? userProfile.lead_departments[0] : "Department"} employee`
@@ -280,7 +281,7 @@ export function AdminDocumentationContent({
                   {
                     value: "all",
                     label:
-                      userProfile?.role === "lead" &&
+                      userProfile?.is_department_lead &&
                       userProfile.lead_departments &&
                       userProfile.lead_departments.length > 0
                         ? `All ${userProfile.lead_departments.length === 1 ? userProfile.lead_departments[0] : "Department"} employee`

@@ -3,26 +3,37 @@ import { PageHeader, PageWrapper } from "@/components/layout"
 import { ShieldAlert } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 function isSecurityEvent(log: any): boolean {
-  const text = `${log.action || ""} ${JSON.stringify(log.metadata || {})}`.toLowerCase()
+  const text =
+    `${log.action || ""} ${log.operation || ""} ${log.entity_type || ""} ${log.status || ""} ` +
+    `${JSON.stringify(log.metadata || {})} ${JSON.stringify(log.old_values || {})} ${JSON.stringify(log.new_values || {})}`.toLowerCase()
   return (
     text.includes("auth") ||
     text.includes("permission_denied") ||
     text.includes("forbidden") ||
     text.includes("unauthorized") ||
     text.includes("security") ||
-    text.includes("suspicious")
+    text.includes("suspicious") ||
+    text.includes("failed") ||
+    text.includes("invalid") ||
+    text.includes("blocked") ||
+    text.includes("escalat")
   )
 }
 
+export const dynamic = "force-dynamic"
+
 export default async function DevSecurityEventsPage() {
   const supabase = await createClient()
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("audit_logs")
-    .select("id, action, entity_type, entity_id, user_id, metadata, created_at")
+    .select(
+      "id, action, operation, entity_type, entity_id, user_id, status, metadata, old_values, new_values, created_at"
+    )
     .order("created_at", { ascending: false })
-    .limit(500)
+    .limit(1200)
 
   const rows = (data || []).filter(isSecurityEvent)
 
@@ -40,6 +51,11 @@ export default async function DevSecurityEventsPage() {
           <CardTitle>Security Events ({rows.length})</CardTitle>
         </CardHeader>
         <CardContent>
+          {error ? (
+            <Alert variant="destructive" className="mb-4">
+              <AlertDescription>{error.message}</AlertDescription>
+            </Alert>
+          ) : null}
           <Table>
             <TableHeader>
               <TableRow>

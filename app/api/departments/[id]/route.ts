@@ -78,7 +78,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
 
     const scope = await resolveAdminScope(supabase as any, user.id)
     const canManageDepartments =
-      !!scope && (scope.isAdminLike || (scope.role === "lead" && scope.managedDepartments.includes("Admin & HR")))
+      !!scope && (scope.isAdminLike || (scope.isDepartmentLead && scope.managedDepartments.includes("Admin & HR")))
     if (!canManageDepartments) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
@@ -125,7 +125,7 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
 
     const scope = await resolveAdminScope(supabase as any, user.id)
     const canManageDepartments =
-      !!scope && (scope.isAdminLike || (scope.role === "lead" && scope.managedDepartments.includes("Admin & HR")))
+      !!scope && (scope.isAdminLike || (scope.isDepartmentLead && scope.managedDepartments.includes("Admin & HR")))
     if (!canManageDepartments) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }

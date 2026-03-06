@@ -18,7 +18,25 @@ import {
 } from "@/lib/hr/leave-routing"
 
 function isRelieverStage(request: any) {
-  return request.current_stage_code === "pending_reliever" || request.approval_stage === "reliever_pending"
+  const stage = request.current_stage_code || request.approval_stage
+  return stage === "pending_reliever" || stage === "reliever_pending"
+}
+
+async function canRequesterModifyBeforeRelieverDecision(supabase: any, request: any) {
+  if (!["pending", "pending_evidence"].includes(request.status)) return false
+  if (!isRelieverStage(request)) return false
+
+  const { data: relieverDecisionRows, error } = await supabase
+    .from("leave_approvals")
+    .select("id")
+    .eq("leave_request_id", request.id)
+    .eq("stage_code", stageCodeForRole("reliever"))
+    .eq("superseded", false)
+    .in("status", ["approved", "rejected"])
+    .limit(1)
+
+  if (error) throw new Error("Failed to validate reliever decision state")
+  return !(relieverDecisionRows && relieverDecisionRows.length > 0)
 }
 
 export async function GET(request: NextRequest) {
@@ -33,66 +51,138 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const status = searchParams.get("status")
     const userId = searchParams.get("user_id")
+    const all = searchParams.get("all") === "true"
 
-    let query = supabase
-      .from("leave_requests")
-      .select(
-        `
-        *,
-        user:profiles!leave_requests_user_id_fkey (
-          id, first_name, last_name, full_name, company_email, department_id
-        ),
-        reliever:profiles!leave_requests_reliever_id_fkey (
-          id, first_name, last_name, full_name, company_email
-        ),
-        supervisor:profiles!leave_requests_supervisor_id_fkey (
-          id, first_name, last_name, full_name, company_email
-        ),
-        leave_type:leave_types!leave_requests_leave_type_id_fkey (
-          id, name, code, description, max_days
-        ),
-        evidence:leave_evidence (
-          id, document_type, file_url, status, verified_by, verified_at, notes, created_at
-        ),
-        approvals:leave_approvals (
-          id, approver_id, approval_level, status, comments, approved_at, stage_code, stage_order, superseded, reliever_revision,
-          approver:profiles!leave_approvals_approver_id_fkey (id, first_name, last_name, full_name)
-        )
-      `
-      )
-      .order("created_at", { ascending: false })
+    let query = supabase.from("leave_requests").select("*").order("created_at", { ascending: false })
 
     if (status) query = query.eq("status", status)
-    if (userId) query = query.eq("user_id", userId)
-
-    const { data: requests, error } = await query
-    if (error) return NextResponse.json({ error: "Failed to fetch leave requests" }, { status: 500 })
 
     const targetUserId = userId || user.id
-    const { data: balances } = await supabase
+
+    if (!all) {
+      query = query.eq("user_id", targetUserId)
+    }
+
+    const { data: requests, error } = await query
+    if (error) {
+      return NextResponse.json({ error: `Failed to fetch leave requests: ${error.message}` }, { status: 500 })
+    }
+
+    const requestRowsRaw = requests || []
+    const requestRows = all ? requestRowsRaw : requestRowsRaw.filter((row: any) => row.user_id === targetUserId)
+    const requestIds = requestRows.map((row: any) => row.id).filter(Boolean)
+
+    const { data: balanceRows } = await supabase
       .from("leave_balances")
-      .select(
-        `
-        *,
-        leave_type:leave_types!leave_balances_leave_type_id_fkey (id, name, description, max_days, requires_approval)
-      `
-      )
+      .select("*")
       .eq("user_id", targetUserId)
       .order("leave_type_id")
 
+    let evidenceRows: any[] = []
+    let approvalRows: any[] = []
+
+    if (requestIds.length > 0) {
+      const [{ data: evidenceData }, { data: approvalsData }] = await Promise.all([
+        supabase
+          .from("leave_evidence")
+          .select("id, leave_request_id, document_type, file_url, status, verified_by, verified_at, notes, created_at")
+          .in("leave_request_id", requestIds),
+        supabase
+          .from("leave_approvals")
+          .select(
+            "id, leave_request_id, approver_id, approval_level, status, comments, approved_at, stage_code, stage_order, superseded, reliever_revision"
+          )
+          .in("leave_request_id", requestIds),
+      ])
+
+      evidenceRows = evidenceData || []
+      approvalRows = approvalsData || []
+    }
+
+    const profileIdSet = new Set<string>()
+    for (const row of requestRows) {
+      if (row.user_id) profileIdSet.add(row.user_id)
+      if (row.reliever_id) profileIdSet.add(row.reliever_id)
+      if (row.supervisor_id) profileIdSet.add(row.supervisor_id)
+    }
+    for (const approval of approvalRows) {
+      if (approval.approver_id) profileIdSet.add(approval.approver_id)
+    }
+
+    const leaveTypeIdSet = new Set<string>()
+    for (const row of requestRows) {
+      if (row.leave_type_id) leaveTypeIdSet.add(row.leave_type_id)
+    }
+    for (const balance of balanceRows || []) {
+      if (balance.leave_type_id) leaveTypeIdSet.add(balance.leave_type_id)
+    }
+
+    let profileRows: any[] = []
+    let leaveTypeRows: any[] = []
+
+    const profileIds = Array.from(profileIdSet)
+    const leaveTypeIds = Array.from(leaveTypeIdSet)
+
+    if (profileIds.length > 0) {
+      const { data } = await supabase
+        .from("profiles")
+        .select("id, first_name, last_name, full_name, company_email, department_id")
+        .in("id", profileIds)
+      profileRows = data || []
+    }
+
+    if (leaveTypeIds.length > 0) {
+      const { data } = await supabase
+        .from("leave_types")
+        .select("id, name, code, description, max_days, requires_approval")
+        .in("id", leaveTypeIds)
+      leaveTypeRows = data || []
+    }
+
+    const profileMap = new Map((profileRows || []).map((row: any) => [row.id, row]))
+    const leaveTypeMap = new Map((leaveTypeRows || []).map((row: any) => [row.id, row]))
+    const evidenceByRequest = new Map<string, any[]>()
+    const approvalsByRequest = new Map<string, any[]>()
+
+    for (const evidence of evidenceRows) {
+      const rows = evidenceByRequest.get(evidence.leave_request_id) || []
+      rows.push(evidence)
+      evidenceByRequest.set(evidence.leave_request_id, rows)
+    }
+
+    for (const approval of approvalRows) {
+      const rows = approvalsByRequest.get(approval.leave_request_id) || []
+      rows.push({
+        ...approval,
+        approver: approval.approver_id ? profileMap.get(approval.approver_id) || null : null,
+      })
+      approvalsByRequest.set(approval.leave_request_id, rows)
+    }
+
     const enriched = await Promise.all(
-      (requests || []).map(async (leaveRequest: any) => {
+      requestRows.map(async (leaveRequest: any) => {
         const policy = await getLeavePolicy(supabase, leaveRequest.leave_type_id)
         const requiredDocs = policy.required_documents || []
         const evidence = await areRequiredDocumentsVerified(supabase, leaveRequest.id, requiredDocs)
         return {
           ...leaveRequest,
+          user: leaveRequest.user_id ? profileMap.get(leaveRequest.user_id) || null : null,
+          reliever: leaveRequest.reliever_id ? profileMap.get(leaveRequest.reliever_id) || null : null,
+          supervisor: leaveRequest.supervisor_id ? profileMap.get(leaveRequest.supervisor_id) || null : null,
+          leave_type: leaveRequest.leave_type_id ? leaveTypeMap.get(leaveRequest.leave_type_id) || null : null,
+          evidence: evidenceByRequest.get(leaveRequest.id) || [],
+          approvals: approvalsByRequest.get(leaveRequest.id) || [],
           required_documents: requiredDocs,
           evidence_complete: evidence.complete,
           missing_documents: evidence.missing,
         }
       })
     )
+
+    const balances = (balanceRows || []).map((row: any) => ({
+      ...row,
+      leave_type: row.leave_type_id ? leaveTypeMap.get(row.leave_type_id) || null : null,
+    }))
 
     return NextResponse.json({ data: enriched, balances: balances || [] })
   } catch (error) {
@@ -182,10 +272,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "You cannot assign yourself as reliever" }, { status: 400 })
     }
 
-    if (requester.department_id && reliever.department_id && requester.department_id !== reliever.department_id) {
-      return NextResponse.json({ error: "Reliever must be from the same department" }, { status: 400 })
-    }
-
     await assertNoOverlap(supabase, user.id, start_date, endDate)
     await assertRelieverAvailability(supabase, reliever.id, start_date, endDate)
 
@@ -261,7 +347,10 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error || !newRequest) {
-      return NextResponse.json({ error: "Failed to create leave request" }, { status: 500 })
+      const dbMessage = error?.message
+        ? `Failed to create leave request: ${error.message}`
+        : "Failed to create leave request"
+      return NextResponse.json({ error: dbMessage }, { status: 500 })
     }
 
     const requesterName = requester.full_name || `${requester.first_name || ""} ${requester.last_name || ""}`.trim()
@@ -291,7 +380,10 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error("Error in POST /api/hr/leave/requests:", error)
-    return NextResponse.json({ error: error instanceof Error ? error.message : "An error occurred" }, { status: 500 })
+    const message = error instanceof Error ? error.message : "An error occurred"
+    const status =
+      message.startsWith("LEAVE_APPROVER_NOT_CONFIGURED:") || message.startsWith("LEAVE_APPROVER_CONFLICT:") ? 400 : 500
+    return NextResponse.json({ error: message }, { status })
   }
 }
 
@@ -324,7 +416,7 @@ export async function PUT(request: NextRequest) {
       reliever_identifier &&
       existingRequest.status === "pending" &&
       (existingRequest.current_stage_code === stageCodeForRole("department_lead") ||
-        existingRequest.approval_stage === "supervisor_pending") &&
+        existingRequest.approval_stage === stageCodeForRole("department_lead")) &&
       existingRequest.current_approver_user_id === user.id
     ) {
       const newReliever = await resolveProfileByIdentifier(supabase, reliever_identifier, "Reliever")
@@ -394,7 +486,8 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "You can only edit your own leave requests" }, { status: 403 })
     }
 
-    if (!["pending", "pending_evidence"].includes(existingRequest.status) || !isRelieverStage(existingRequest)) {
+    const canModify = await canRequesterModifyBeforeRelieverDecision(supabase, existingRequest)
+    if (!canModify) {
       return NextResponse.json({ error: "You can only edit requests pending reliever review" }, { status: 400 })
     }
 
@@ -539,7 +632,10 @@ export async function PUT(request: NextRequest) {
     })
   } catch (error) {
     console.error("Error in PUT /api/hr/leave/requests:", error)
-    return NextResponse.json({ error: error instanceof Error ? error.message : "An error occurred" }, { status: 500 })
+    const message = error instanceof Error ? error.message : "An error occurred"
+    const status =
+      message.startsWith("LEAVE_APPROVER_NOT_CONFIGURED:") || message.startsWith("LEAVE_APPROVER_CONFLICT:") ? 400 : 500
+    return NextResponse.json({ error: message }, { status })
   }
 }
 
@@ -569,7 +665,8 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "You can only delete your own leave requests" }, { status: 403 })
     }
 
-    if (!["pending", "pending_evidence"].includes(existingRequest.status) || !isRelieverStage(existingRequest)) {
+    const canModify = await canRequesterModifyBeforeRelieverDecision(supabase, existingRequest)
+    if (!canModify) {
       return NextResponse.json({ error: "Only requests pending reliever review can be deleted" }, { status: 400 })
     }
 

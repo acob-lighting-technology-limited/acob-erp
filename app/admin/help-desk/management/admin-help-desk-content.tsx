@@ -12,9 +12,12 @@ interface HelpDeskTicket {
   id: string
   ticket_number: string
   title: string
+  requester_department: string | null
   service_department: string
   priority: "low" | "medium" | "high" | "urgent"
   status: string
+  handling_mode: "individual" | "queue" | "department" | null
+  current_approval_stage: string | null
   assigned_to: string | null
   request_type: "support" | "procurement"
   sla_target_at: string | null
@@ -69,7 +72,7 @@ export function AdminHelpDeskContent({ initialTickets, employees }: AdminHelpDes
       const res = await fetch(`/api/help-desk/tickets/${ticketId}/assign`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ assigned_to: assignedTo }),
+        body: JSON.stringify({ action: "assign_staff", assigned_to: assignedTo }),
       })
 
       if (!res.ok) {
@@ -81,6 +84,29 @@ export function AdminHelpDeskContent({ initialTickets, employees }: AdminHelpDes
       await refresh()
     } catch (error: any) {
       toast.error(error.message || "Assignment failed")
+    } finally {
+      setLoadingTicketId(null)
+    }
+  }
+
+  async function routeTicket(ticketId: string, action: "send_to_queue" | "assign_department" | "assign_me") {
+    setLoadingTicketId(ticketId)
+    try {
+      const res = await fetch(`/api/help-desk/tickets/${ticketId}/assign`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      })
+
+      if (!res.ok) {
+        const body = await res.json()
+        throw new Error(body.error || "Routing failed")
+      }
+
+      toast.success("Ticket updated")
+      await refresh()
+    } catch (error: any) {
+      toast.error(error.message || "Routing failed")
     } finally {
       setLoadingTicketId(null)
     }
@@ -191,6 +217,10 @@ export function AdminHelpDeskContent({ initialTickets, employees }: AdminHelpDes
                   <TableCell>
                     <div className="font-medium">{ticket.ticket_number}</div>
                     <div className="text-muted-foreground text-xs">{ticket.title}</div>
+                    <div className="text-muted-foreground mt-1 text-[11px]">
+                      {ticket.request_type} | requester: {ticket.requester_department || "-"} | service:{" "}
+                      {ticket.service_department}
+                    </div>
                   </TableCell>
                   <TableCell>{ticket.service_department}</TableCell>
                   <TableCell>
@@ -225,6 +255,64 @@ export function AdminHelpDeskContent({ initialTickets, employees }: AdminHelpDes
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-2">
+                      {ticket.status === "pending_lead_review" && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => routeTicket(ticket.id, "send_to_queue")}
+                            disabled={loadingTicketId === ticket.id}
+                          >
+                            Send to Queue
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => routeTicket(ticket.id, "assign_department")}
+                            disabled={loadingTicketId === ticket.id}
+                          >
+                            Assign to Dept
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => routeTicket(ticket.id, "assign_me")}
+                            disabled={loadingTicketId === ticket.id}
+                          >
+                            Assign to Me
+                          </Button>
+                        </>
+                      )}
+                      {ticket.status === "department_queue" && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => routeTicket(ticket.id, "assign_me")}
+                            disabled={loadingTicketId === ticket.id}
+                          >
+                            Claim
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => routeTicket(ticket.id, "assign_department")}
+                            disabled={loadingTicketId === ticket.id}
+                          >
+                            Assign to Dept
+                          </Button>
+                        </>
+                      )}
+                      {ticket.status === "department_assigned" && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => routeTicket(ticket.id, "send_to_queue")}
+                          disabled={loadingTicketId === ticket.id}
+                        >
+                          Reopen Queue
+                        </Button>
+                      )}
                       {(ticket.status === "in_progress" || ticket.status === "assigned") && (
                         <Button
                           size="sm"
@@ -237,6 +325,7 @@ export function AdminHelpDeskContent({ initialTickets, employees }: AdminHelpDes
                       )}
                       {ticket.status === "pending_approval" && (
                         <>
+                          <Badge variant="secondary">{ticket.current_approval_stage || "approval"}</Badge>
                           <Button
                             size="sm"
                             variant="outline"

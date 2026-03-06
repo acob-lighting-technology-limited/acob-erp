@@ -67,11 +67,66 @@ async function resolveProfileByDepartmentLead(
   return matches[0] || null
 }
 
+async function resolveDepartmentHeadById(
+  supabase: SupabaseClient,
+  departmentId: string
+): Promise<{ id: string } | null> {
+  const { data: department, error: departmentError } = await supabase
+    .from("departments")
+    .select("department_head_id")
+    .eq("id", departmentId)
+    .single()
+
+  if (departmentError) throw new Error("Failed to resolve department lead")
+  if (!department?.department_head_id) return null
+
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("id", department.department_head_id)
+    .eq("employment_status", "active")
+    .single()
+
+  if (profileError || !profile?.id) return null
+  return { id: profile.id }
+}
+
+async function resolveDepartmentHeadByName(
+  supabase: SupabaseClient,
+  departmentName: string
+): Promise<{ id: string } | null> {
+  const { data: department, error: departmentError } = await supabase
+    .from("departments")
+    .select("id, department_head_id")
+    .eq("name", departmentName)
+    .limit(2)
+
+  if (departmentError) throw new Error("Failed to resolve department lead")
+  if (!department || department.length === 0) return null
+  if (department.length > 1) throw new Error(`LEAVE_APPROVER_CONFLICT:${departmentName}`)
+
+  const departmentHeadId = department[0]?.department_head_id
+  if (!departmentHeadId) return null
+
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("id", departmentHeadId)
+    .eq("employment_status", "active")
+    .single()
+
+  if (profileError || !profile?.id) return null
+  return { id: profile.id }
+}
+
 async function resolveRequesterDepartmentLead(
   supabase: SupabaseClient,
   requester: { department_id?: string | null; department?: string | null }
 ): Promise<{ id: string } | null> {
   if (requester.department_id) {
+    const departmentHead = await resolveDepartmentHeadById(supabase, requester.department_id)
+    if (departmentHead) return departmentHead
+
     const { data: leadByDeptId, error: leadByDeptIdError } = await supabase
       .from("profiles")
       .select("id")
@@ -85,6 +140,9 @@ async function resolveRequesterDepartmentLead(
   }
 
   if (requester.department) {
+    const departmentHead = await resolveDepartmentHeadByName(supabase, requester.department)
+    if (departmentHead) return departmentHead
+
     return resolveProfileByDepartmentLead(supabase, requester.department)
   }
 

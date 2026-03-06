@@ -5,14 +5,17 @@ import { LeaveContent } from "./leave-content"
 
 export interface LeaveRequest {
   id: string
+  user_id: string
   leave_type_id: string
   start_date: string
   end_date: string
   resume_date: string
   days_count: number
   reason: string
+  handover_note?: string | null
   status: string
   approval_stage: string
+  reliever_id?: string | null
   current_stage_code?: string
   current_stage_order?: number
   current_approver_user_id?: string
@@ -23,6 +26,21 @@ export interface LeaveRequest {
   leave_type: {
     name: string
   }
+  user?: {
+    id?: string
+    full_name?: string | null
+    company_email?: string | null
+  } | null
+  reliever?: {
+    id?: string
+    full_name?: string | null
+    company_email?: string | null
+  } | null
+  supervisor?: {
+    id?: string
+    full_name?: string | null
+    company_email?: string | null
+  } | null
   required_documents?: string[]
   missing_documents?: string[]
   evidence_complete?: boolean
@@ -118,6 +136,7 @@ async function getLeaveData() {
   )
 
   return {
+    currentUserId: user.id,
     requests: (requestsData || []) as LeaveRequest[],
     balances: (balancesData || []) as LeaveBalance[],
     leaveTypes: enrichedLeaveTypes as LeaveType[],
@@ -132,6 +151,7 @@ export default async function LeavePage() {
   }
 
   const leaveData = data as {
+    currentUserId: string
     requests: LeaveRequest[]
     balances: LeaveBalance[]
     leaveTypes: LeaveType[]
@@ -139,6 +159,7 @@ export default async function LeavePage() {
 
   return (
     <LeaveContent
+      currentUserId={leaveData.currentUserId}
       initialRequests={leaveData.requests}
       initialBalances={leaveData.balances}
       initialLeaveTypes={leaveData.leaveTypes}

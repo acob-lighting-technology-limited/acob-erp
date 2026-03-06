@@ -130,9 +130,8 @@ export default function InviteUserPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="visitor">Visitor</SelectItem>
                     <SelectItem value="employee">Employee</SelectItem>
-                    <SelectItem value="manager">Manager</SelectItem>
-                    <SelectItem value="lead">Lead</SelectItem>
                     <SelectItem value="admin">Admin</SelectItem>
                     <SelectItem value="super_admin">Super Admin</SelectItem>
                     {currentUserRole === "developer" && <SelectItem value="developer">Developer</SelectItem>}

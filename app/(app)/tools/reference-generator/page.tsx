@@ -14,7 +14,7 @@ async function getData() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("full_name, first_name, last_name, department, role, lead_departments")
+    .select("full_name, first_name, last_name, department, role, lead_departments, is_department_lead")
     .eq("id", user.id)
     .single()
 
@@ -30,14 +30,22 @@ async function getData() {
     .order("created_at", { ascending: false })
 
   const role = profile?.role || ""
+  const isDeptLead = Boolean(profile?.is_department_lead)
   const managedDepartments = Array.from(
-    new Set([...(Array.isArray(profile?.lead_departments) ? profile.lead_departments : []), profile?.department].filter(Boolean))
+    new Set(
+      [...(Array.isArray(profile?.lead_departments) ? profile.lead_departments : []), profile?.department].filter(
+        Boolean
+      )
+    )
   )
   const scopedRecords = (records || []).filter((record: any) => {
     if (record.originator_id === user.id || record.responsible_officer_id === user.id) return true
     if (["developer", "admin", "super_admin"].includes(role)) return true
-    if (role === "lead") {
-      return managedDepartments.includes(record.department_name) || managedDepartments.includes(record.assigned_department_name)
+    if (isDeptLead) {
+      return (
+        managedDepartments.includes(record.department_name) ||
+        managedDepartments.includes(record.assigned_department_name)
+      )
     }
     return false
   })

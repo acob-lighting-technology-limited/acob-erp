@@ -62,7 +62,10 @@ export default function LeaveApprovePage() {
   async function loadData() {
     setLoading(true)
     try {
-      const [queueRes, requestsRes] = await Promise.all([fetch("/api/hr/leave/queue"), fetch("/api/hr/leave/requests")])
+      const [queueRes, requestsRes] = await Promise.all([
+        fetch("/api/hr/leave/queue"),
+        fetch("/api/hr/leave/requests?all=true"),
+      ])
       const queuePayload = await queueRes.json()
       const requestPayload = await requestsRes.json()
 

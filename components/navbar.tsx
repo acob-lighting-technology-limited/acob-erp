@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { useState, useEffect } from "react"
 import { toast } from "sonner"
 import {
@@ -28,7 +28,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react"
-import { NotificationBell } from "@/components/notification-bell"
+import { ProfessionalNotificationBell } from "@/components/professional-notification-bell"
 import { UniversalSearch } from "@/components/universal-search"
 import Image from "next/image"
 import { useSidebarSafe } from "@/components/sidebar-context"
@@ -52,6 +52,8 @@ export function Navbar({ user, canAccessAdmin = false, isAdminMode = false }: Na
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
   const router = useRouter()
+  const pathname = usePathname()
+  const isMaintenancePage = pathname.startsWith("/maintenance")
   const { resolvedTheme } = useTheme()
   const dashboardHref = isAdminMode ? "/admin" : "/dashboard"
   const dashboardLabel = isAdminMode ? "Admin Dashboard" : "Dashboard"
@@ -163,10 +165,10 @@ export function Navbar({ user, canAccessAdmin = false, isAdminMode = false }: Na
         {/* Right side - search, notifications and user menu */}
         <div className="flex flex-1 items-center justify-end gap-2 overflow-visible px-2 sm:gap-4 sm:px-4 lg:px-8">
           <div className="hidden max-w-md flex-1 items-center gap-4 md:flex">
-            {isAdminMode && <UniversalSearch isAdminMode />}
+            {isAdminMode && !isMaintenancePage && <UniversalSearch isAdminMode />}
           </div>
           <div className="hidden items-center gap-4 overflow-visible md:flex">
-            <NotificationBell isAdmin={isAdminMode} />
+            {!isMaintenancePage && <ProfessionalNotificationBell isAdmin={isAdminMode} />}
             <ThemeToggle />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -186,56 +188,60 @@ export function Navbar({ user, canAccessAdmin = false, isAdminMode = false }: Na
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link href={dashboardHref} className="cursor-pointer">
-                    <LayoutDashboard className="mr-2 h-4 w-4" />
-                    {dashboardLabel}
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/profile" className="cursor-pointer">
-                    <User className="mr-2 h-4 w-4" />
-                    Profile
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/feedback" className="cursor-pointer">
-                    <MessageSquare className="mr-2 h-4 w-4" />
-                    Feedback
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/signature" className="cursor-pointer">
-                    <FileSignature className="mr-2 h-4 w-4" />
-                    Signature
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/watermark" className="cursor-pointer">
-                    <Droplet className="mr-2 h-4 w-4" />
-                    Watermark
-                  </Link>
-                </DropdownMenuItem>
-                {canAccessAdmin && !isAdminMode && (
+                {!isMaintenancePage && (
                   <>
-                    <DropdownMenuSeparator />
                     <DropdownMenuItem asChild>
-                      <Link href="/admin" className="flex cursor-pointer items-center">
-                        <ShieldCheck className="mr-2 h-4 w-4" />
-                        Admin
-                      </Link>
-                    </DropdownMenuItem>
-                  </>
-                )}
-                {isAdminMode && (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem asChild>
-                      <Link href="/dashboard" className="flex cursor-pointer items-center">
+                      <Link href={dashboardHref} className="cursor-pointer">
                         <LayoutDashboard className="mr-2 h-4 w-4" />
-                        User Dashboard
+                        {dashboardLabel}
                       </Link>
                     </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/profile" className="cursor-pointer">
+                        <User className="mr-2 h-4 w-4" />
+                        Profile
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/feedback" className="cursor-pointer">
+                        <MessageSquare className="mr-2 h-4 w-4" />
+                        Feedback
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/signature" className="cursor-pointer">
+                        <FileSignature className="mr-2 h-4 w-4" />
+                        Signature
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/watermark" className="cursor-pointer">
+                        <Droplet className="mr-2 h-4 w-4" />
+                        Watermark
+                      </Link>
+                    </DropdownMenuItem>
+                    {canAccessAdmin && !isAdminMode && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem asChild>
+                          <Link href="/admin" className="flex cursor-pointer items-center">
+                            <ShieldCheck className="mr-2 h-4 w-4" />
+                            Admin
+                          </Link>
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                    {isAdminMode && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem asChild>
+                          <Link href="/dashboard" className="flex cursor-pointer items-center">
+                            <LayoutDashboard className="mr-2 h-4 w-4" />
+                            User Dashboard
+                          </Link>
+                        </DropdownMenuItem>
+                      </>
+                    )}
                   </>
                 )}
                 <DropdownMenuSeparator />

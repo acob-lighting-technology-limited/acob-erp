@@ -5,18 +5,27 @@ import { writeAuditLog } from "@/lib/audit/write-audit"
 export const HELP_DESK_PRIORITIES = ["low", "medium", "high", "urgent"] as const
 export const HELP_DESK_STATUSES = [
   "new",
+  "pending_lead_review",
+  "department_queue",
+  "department_assigned",
   "assigned",
   "in_progress",
   "pending_approval",
   "approved_for_procurement",
   "rejected",
+  "returned",
   "resolved",
   "closed",
   "cancelled",
 ] as const
 
+export const HELP_DESK_SUPPORT_MODES = ["open_queue", "lead_review_required"] as const
+export const HELP_DESK_HANDLING_MODES = ["individual", "queue", "department"] as const
+
 export type HelpDeskPriority = (typeof HELP_DESK_PRIORITIES)[number]
 export type HelpDeskStatus = (typeof HELP_DESK_STATUSES)[number]
+export type HelpDeskSupportMode = (typeof HELP_DESK_SUPPORT_MODES)[number]
+export type HelpDeskHandlingMode = (typeof HELP_DESK_HANDLING_MODES)[number]
 
 export function addBusinessHours(baseDate: Date, hours: number): Date {
   const date = new Date(baseDate)
@@ -62,13 +71,13 @@ export function isAdminRole(role?: string | null): boolean {
   return role === "developer" || role === "admin" || role === "super_admin"
 }
 
-export function isLeadRole(role?: string | null): boolean {
-  return role === "lead"
+export function isLeadRole(profile?: { is_department_lead?: boolean } | null): boolean {
+  return Boolean(profile?.is_department_lead)
 }
 
 export function canLeadDepartment(profile: any, department: string): boolean {
   if (isAdminRole(profile?.role)) return true
-  if (!isLeadRole(profile?.role)) return false
+  if (!profile?.is_department_lead) return false
 
   const managedDepartments = Array.isArray(profile?.managed_departments)
     ? profile.managed_departments
@@ -76,6 +85,23 @@ export function canLeadDepartment(profile: any, department: string): boolean {
       ? profile.lead_departments
       : []
   return managedDepartments.includes(department) || profile?.department === department
+}
+
+export function canWorkDepartment(profile: any, department: string): boolean {
+  return isAdminRole(profile?.role) || profile?.department === department || canLeadDepartment(profile, department)
+}
+
+export function resolveLeadForDepartment<
+  T extends { is_department_lead?: boolean; department?: string | null; lead_departments?: string[] | null },
+>(profiles: T[], department: string | null | undefined): T | null {
+  if (!department) return null
+  return (
+    profiles.find((profile) => {
+      if (!profile?.is_department_lead) return false
+      const managedDepartments = Array.isArray(profile.lead_departments) ? profile.lead_departments : []
+      return profile.department === department || managedDepartments.includes(department)
+    }) || null
+  )
 }
 
 export async function getAuthContext() {
@@ -88,7 +114,7 @@ export async function getAuthContext() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, role, department, lead_departments, first_name, last_name, full_name")
+    .select("id, role, department, is_department_lead, lead_departments, first_name, last_name, full_name")
     .eq("id", user.id)
     .single()
   const scope = await resolveAdminScope(supabase as any, user.id)

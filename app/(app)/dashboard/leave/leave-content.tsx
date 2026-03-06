@@ -16,6 +16,7 @@ import { CalendarDays, Clock, Plus, Upload } from "lucide-react"
 import type { LeaveBalance, LeaveRequest, LeaveType } from "./page"
 
 interface LeaveContentProps {
+  currentUserId: string
   initialRequests: LeaveRequest[]
   initialBalances: LeaveBalance[]
   initialLeaveTypes: LeaveType[]
@@ -65,7 +66,21 @@ function prettyDocName(name: string) {
   return name.replaceAll("_", " ")
 }
 
-export function LeaveContent({ initialRequests, initialBalances, initialLeaveTypes }: LeaveContentProps) {
+const EMPTY_REQUEST_FORM = {
+  leave_type_id: "",
+  start_date: "",
+  days_count: 1,
+  reason: "",
+  reliever_identifier: "",
+  handover_note: "",
+}
+
+export function LeaveContent({
+  currentUserId,
+  initialRequests,
+  initialBalances,
+  initialLeaveTypes,
+}: LeaveContentProps) {
   const [requests, setRequests] = useState<LeaveRequest[]>(initialRequests)
   const [balances, setBalances] = useState<LeaveBalance[]>(initialBalances)
   const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>(initialLeaveTypes)
@@ -74,17 +89,17 @@ export function LeaveContent({ initialRequests, initialBalances, initialLeaveTyp
   const [open, setOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [uploadingEvidenceFor, setUploadingEvidenceFor] = useState<string | null>(null)
+  const [editingRequestId, setEditingRequestId] = useState<string | null>(null)
+  const [deletingRequestId, setDeletingRequestId] = useState<string | null>(null)
   const approvalQueueRef = useRef<HTMLDivElement | null>(null)
-  const [formData, setFormData] = useState({
-    leave_type_id: "",
-    start_date: "",
-    days_count: 1,
-    reason: "",
-    reliever_identifier: "",
-    handover_note: "",
-  })
+  const [formData, setFormData] = useState(EMPTY_REQUEST_FORM)
 
-  const hasPendingRequest = requests.some((request) => ["pending", "pending_evidence"].includes(request.status))
+  const myRequests = useMemo(
+    () => requests.filter((request) => request.user_id === currentUserId),
+    [requests, currentUserId]
+  )
+
+  const hasPendingRequest = myRequests.some((request) => ["pending", "pending_evidence"].includes(request.status))
   const leaveTypeMap = useMemo(() => new Map(leaveTypes.map((leaveType) => [leaveType.id, leaveType])), [leaveTypes])
   const balanceMap = useMemo(() => new Map(balances.map((balance) => [balance.leave_type_id, balance])), [balances])
 
@@ -109,13 +124,43 @@ export function LeaveContent({ initialRequests, initialBalances, initialLeaveTyp
     formData.reliever_identifier.trim().length > 0 &&
     selectedLeaveType?.eligibility_status !== "not_eligible" &&
     Number(formData.days_count) <= availableDays
-  const pendingSupervisorReviews = useMemo(
-    () =>
-      approverQueue.filter((item) =>
-        ["pending_department_lead", "supervisor_pending"].includes(item.current_stage_code || item.approval_stage)
-      ).length,
-    [approverQueue]
-  )
+  const pendingMyReviews = useMemo(() => approverQueue.length, [approverQueue])
+
+  function isRequesterEditable(request: LeaveRequest) {
+    if (request.user_id !== currentUserId) return false
+    const stage = request.current_stage_code || request.approval_stage
+    return ["pending", "pending_evidence"].includes(request.status) && stage === "pending_reliever"
+  }
+
+  function resetRequestForm() {
+    setEditingRequestId(null)
+    setFormData(EMPTY_REQUEST_FORM)
+  }
+
+  function handleDialogOpenChange(nextOpen: boolean) {
+    setOpen(nextOpen)
+    if (!nextOpen) {
+      resetRequestForm()
+    }
+  }
+
+  function openCreateDialog() {
+    resetRequestForm()
+    setOpen(true)
+  }
+
+  function openEditDialog(request: LeaveRequest) {
+    setEditingRequestId(request.id)
+    setFormData({
+      leave_type_id: request.leave_type_id,
+      start_date: request.start_date,
+      days_count: Number(request.days_count) || 1,
+      reason: request.reason || "",
+      reliever_identifier: request.reliever_id || "",
+      handover_note: request.handover_note || "",
+    })
+    setOpen(true)
+  }
 
   async function fetchRelieverOptions() {
     const response = await fetch("/api/hr/leave/relievers")
@@ -132,55 +177,104 @@ export function LeaveContent({ initialRequests, initialBalances, initialLeaveTyp
       fetch("/api/hr/leave/relievers"),
     ])
 
-    const requestPayload = await requestRes.json()
-    const queuePayload = await queueRes.json()
-    const typesPayload = await typesRes.json()
-    const relieversPayload = await relieversRes.json()
+    const [requestPayload, queuePayload, typesPayload, relieversPayload] = await Promise.all([
+      requestRes.json().catch(() => ({})),
+      queueRes.json().catch(() => ({})),
+      typesRes.json().catch(() => ({})),
+      relieversRes.json().catch(() => ({})),
+    ])
 
-    setRequests(requestPayload.data || [])
-    setBalances(requestPayload.balances || [])
-    setApproverQueue(queuePayload.data || [])
-    setLeaveTypes(typesPayload.data || [])
-    setRelieverOptions(relieversPayload.data || [])
+    const errors: string[] = []
+
+    if (requestRes.ok) {
+      const ownedRequests = (requestPayload.data || []).filter((row: LeaveRequest) => row.user_id === currentUserId)
+      setRequests(ownedRequests)
+      setBalances(requestPayload.balances || [])
+    } else {
+      errors.push(`requests: ${requestPayload.error || requestRes.statusText}`)
+    }
+
+    if (queueRes.ok) {
+      setApproverQueue(queuePayload.data || [])
+    } else {
+      errors.push(`queue: ${queuePayload.error || queueRes.statusText}`)
+    }
+
+    if (typesRes.ok) {
+      setLeaveTypes(typesPayload.data || [])
+    } else {
+      errors.push(`types: ${typesPayload.error || typesRes.statusText}`)
+    }
+
+    if (relieversRes.ok) {
+      setRelieverOptions(relieversPayload.data || [])
+    } else {
+      errors.push(`relievers: ${relieversPayload.error || relieversRes.statusText}`)
+    }
+
+    if (errors.length > 0) {
+      throw new Error(`Leave data partial failure -> ${errors.join(" | ")}`)
+    }
   }
 
   useEffect(() => {
-    fetchRelieverOptions().catch(() => {
-      toast.error("Failed to load reliever list")
+    refreshData().catch((error) => {
+      toast.error(error instanceof Error ? error.message : "Failed to load leave data")
     })
   }, [])
 
-  async function handleCreateRequest(event: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmitRequest(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!canSubmit) return
 
     setSubmitting(true)
     try {
+      const isEditing = Boolean(editingRequestId)
       const response = await fetch("/api/hr/leave/requests", {
-        method: "POST",
+        method: isEditing ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(isEditing ? { id: editingRequestId, ...formData } : formData),
       })
 
       const payload = await response.json()
-      if (!response.ok) throw new Error(payload.error || "Failed to submit leave request")
+      if (!response.ok)
+        throw new Error(
+          payload.error || (isEditing ? "Failed to update leave request" : "Failed to submit leave request")
+        )
 
-      toast.success(payload.message || "Leave request submitted successfully")
+      toast.success(
+        payload.message || (isEditing ? "Leave request updated successfully" : "Leave request submitted successfully")
+      )
       setOpen(false)
-      setFormData({
-        leave_type_id: "",
-        start_date: "",
-        days_count: 1,
-        reason: "",
-        reliever_identifier: "",
-        handover_note: "",
-      })
+      resetRequestForm()
       await refreshData()
     } catch (error) {
       const message = error instanceof Error ? error.message : "An unexpected error occurred"
       toast.error(message)
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  async function handleDeleteRequest(request: LeaveRequest) {
+    if (!isRequesterEditable(request)) return
+    if (!window.confirm("Delete this leave request before reliever approval?")) return
+
+    setDeletingRequestId(request.id)
+    try {
+      const response = await fetch(`/api/hr/leave/requests?id=${encodeURIComponent(request.id)}`, {
+        method: "DELETE",
+      })
+
+      const payload = await response.json()
+      if (!response.ok) throw new Error(payload.error || "Failed to delete leave request")
+
+      toast.success(payload.message || "Leave request deleted successfully")
+      await refreshData()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to delete leave request")
+    } finally {
+      setDeletingRequestId(null)
     }
   }
 
@@ -248,15 +342,15 @@ export function LeaveContent({ initialRequests, initialBalances, initialLeaveTyp
         backLink={{ href: "/profile", label: "Back to Dashboard" }}
         actions={
           <>
-            {pendingSupervisorReviews > 0 && (
+            {pendingMyReviews > 0 && (
               <Button
                 variant="outline"
                 onClick={() => approvalQueueRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
               >
-                Pending Reviews ({pendingSupervisorReviews})
+                Pending Reviews ({pendingMyReviews})
               </Button>
             )}
-            <Button onClick={() => setOpen(true)} disabled={hasPendingRequest}>
+            <Button onClick={openCreateDialog} disabled={hasPendingRequest}>
               <Plus className="mr-2 h-4 w-4" />
               New Request
             </Button>
@@ -314,6 +408,16 @@ export function LeaveContent({ initialRequests, initialBalances, initialLeaveTyp
                   <p className="text-muted-foreground text-sm">
                     {item.start_date} to {item.end_date} ({item.days_count} days)
                   </p>
+                  <p className="text-muted-foreground text-sm">
+                    Requester: {item.user?.full_name || item.user?.company_email || "Unknown"}
+                  </p>
+                  <p className="text-muted-foreground text-sm">
+                    Reliever: {item.reliever?.full_name || item.reliever?.company_email || "Not set"}
+                  </p>
+                  <p className="text-sm">Reason: {item.reason || "No reason provided"}</p>
+                  {item.handover_note && (
+                    <p className="text-muted-foreground text-sm">Handover: {item.handover_note}</p>
+                  )}
                   <Badge variant="outline">
                     {STAGE_LABELS[item.current_stage_code || item.approval_stage] ||
                       item.current_stage_code ||
@@ -339,7 +443,7 @@ export function LeaveContent({ initialRequests, initialBalances, initialLeaveTyp
           <CardTitle>My Leave Requests</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          {requests.map((request) => (
+          {myRequests.map((request) => (
             <div key={request.id} className="rounded-md border p-3">
               <div className="flex items-center justify-between gap-2">
                 <p className="font-medium">{request.leave_type?.name || "Leave Request"}</p>
@@ -367,6 +471,9 @@ export function LeaveContent({ initialRequests, initialBalances, initialLeaveTyp
                 {request.start_date} to {request.end_date} | Resume: {request.resume_date} | {request.days_count} day(s)
               </p>
               <p className="mt-2 text-sm">{request.reason}</p>
+              <p className="text-muted-foreground mt-2 text-sm">
+                Reliever: {request.reliever?.full_name || request.reliever?.company_email || "Not set"}
+              </p>
               {(request.required_documents || []).length > 0 && (
                 <p className="text-muted-foreground mt-2 text-xs">
                   Required documents: {(request.required_documents || []).map(prettyDocName).join(", ")}
@@ -393,24 +500,39 @@ export function LeaveContent({ initialRequests, initialBalances, initialLeaveTyp
                   )}
                 </div>
               )}
+              {isRequesterEditable(request) && (
+                <div className="mt-3 flex gap-2">
+                  <Button size="sm" variant="outline" onClick={() => openEditDialog(request)}>
+                    Edit
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={() => handleDeleteRequest(request)}
+                    disabled={deletingRequestId === request.id}
+                  >
+                    {deletingRequestId === request.id ? "Deleting..." : "Delete"}
+                  </Button>
+                </div>
+              )}
             </div>
           ))}
         </CardContent>
       </Card>
 
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={handleDialogOpenChange}>
         <DialogContent className="sm:max-w-[560px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <CalendarDays className="h-5 w-5" />
-              Submit Leave Request
+              {editingRequestId ? "Edit Leave Request" : "Submit Leave Request"}
             </DialogTitle>
             <DialogDescription>
-              Request flow: Reliever {"->"} Supervisor {"->"} HR
+              Request flow: Reliever {"->"} Supervisor {"->"} HR. Changes are allowed only before reliever approval.
             </DialogDescription>
           </DialogHeader>
 
-          <form className="space-y-4" onSubmit={handleCreateRequest}>
+          <form className="space-y-4" onSubmit={handleSubmitRequest}>
             <div className="space-y-2">
               <Label>Leave Type</Label>
               <Select
@@ -507,11 +629,17 @@ export function LeaveContent({ initialRequests, initialBalances, initialLeaveTyp
             </div>
 
             <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              <Button type="button" variant="outline" onClick={() => handleDialogOpenChange(false)}>
                 Cancel
               </Button>
               <Button type="submit" disabled={!canSubmit || submitting}>
-                {submitting ? "Submitting..." : "Submit Request"}
+                {submitting
+                  ? editingRequestId
+                    ? "Saving..."
+                    : "Submitting..."
+                  : editingRequestId
+                    ? "Save Changes"
+                    : "Submit Request"}
               </Button>
             </div>
           </form>

@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { buttonVariants } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { PageHeader, PageWrapper } from "@/components/layout"
-import { Code2, ScrollText, Wrench, ShieldEllipsis, ShieldAlert } from "lucide-react"
+import { Code2, ScrollText, Wrench, ShieldEllipsis, ShieldAlert, FlaskConical } from "lucide-react"
 
 const sections = [
   {
@@ -29,6 +29,12 @@ const sections = [
     description: "Inspect suspicious or high-risk security-related audit events.",
     href: "/admin/dev/security-events",
     icon: ShieldAlert,
+  },
+  {
+    title: "Tests",
+    description: "End-to-end flow tests for Leave, Help Desk, and Tasks — no account switching required.",
+    href: "/admin/dev/tests",
+    icon: FlaskConical,
   },
 ]
 

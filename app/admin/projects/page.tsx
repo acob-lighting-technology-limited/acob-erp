@@ -48,7 +48,7 @@ async function getAdminProjectsData() {
   // Check if user is admin
   const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
 
-  if (!profile || !["developer", "super_admin", "admin", "lead"].includes(profile.role)) {
+  if (!profile || !["developer", "super_admin", "admin"].includes(profile.role)) {
     return { redirect: "/dashboard" as const }
   }
 

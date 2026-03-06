@@ -48,6 +48,7 @@ interface Profile {
 
 interface UserProfile {
   role: UserRole
+  is_department_lead?: boolean
   lead_departments?: string[]
 }
 
@@ -80,7 +81,7 @@ export default function AdminJobDescriptionsPage() {
       // Get user profile
       const { data: profile } = await supabase
         .from("profiles")
-        .select("role, lead_departments")
+        .select("role, is_department_lead, lead_departments")
         .eq("id", user.id)
         .single()
 
@@ -90,7 +91,7 @@ export default function AdminJobDescriptionsPage() {
       let query = supabase.from("profiles").select("*").order("last_name", { ascending: true })
 
       // Role-based filtering
-      if (profile?.role === "lead" && profile.lead_departments) {
+      if (profile?.is_department_lead && profile.lead_departments) {
         // Leads can only see their department's employee
         query = query.in("department", profile.lead_departments)
       }

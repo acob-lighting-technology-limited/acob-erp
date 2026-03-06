@@ -4,6 +4,7 @@ import {
   appendCorrespondenceEvent,
   canAccessDepartment,
   getAuthContext,
+  isAdminRole,
 } from "@/lib/correspondence/server"
 import type { CorrespondenceDirection } from "@/types/correspondence"
 
@@ -80,7 +81,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "department_name is required for outgoing correspondence" }, { status: 400 })
     }
 
-    if (profile.role === "lead") {
+    if (profile.is_department_lead && !isAdminRole(profile.role)) {
       const accessDepartment = departmentName || assignedDepartmentName
       if (accessDepartment && !canAccessDepartment(profile, accessDepartment)) {
         return NextResponse.json({ error: "Forbidden: outside your department scope" }, { status: 403 })
@@ -154,8 +155,8 @@ export async function POST(request: NextRequest) {
       if (notifyDepartment) {
         const { data: leadCandidates } = await supabase
           .from("profiles")
-          .select("id, role, lead_departments, department")
-          .eq("role", "lead")
+          .select("id, role, lead_departments, department, is_department_lead")
+          .eq("is_department_lead", true)
 
         const targetLead = (leadCandidates || []).find((p: any) => canAccessDepartment(p, notifyDepartment))
 

@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { createClient } from "@/lib/supabase/client"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
@@ -13,36 +12,20 @@ export function MaintenanceToggle() {
   const [isDeveloper, setIsDeveloper] = useState(false)
 
   useEffect(() => {
-    fetchSettingsAndRole()
+    fetchState()
   }, [])
 
-  async function fetchSettingsAndRole() {
+  async function fetchState() {
     try {
-      const supabase = createClient()
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (user?.id) {
-        const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
-        setIsDeveloper(profile?.role === "developer")
-      }
+      const response = await fetch("/api/dev/maintenance", { cache: "no-store" })
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(payload.error || "Failed to load maintenance settings")
 
-      const { data, error } = await supabase
-        .from("system_settings")
-        .select("value, updated_by")
-        .eq("key", "maintenance_mode")
-        .single()
-
-      if (error) {
-        if (error.code !== "PGRST116") {
-          // Not found is ok
-          console.error("Error loading maintenance settings:", error)
-        }
-      } else if (data?.value) {
-        const raw = data.value as any
-        const parsedEnabled = typeof raw === "boolean" ? raw : Boolean(raw?.enabled)
-        setEnabled(parsedEnabled)
-      }
+      setIsDeveloper(Boolean(payload.can_toggle))
+      setEnabled(Boolean(payload.data?.enabled))
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to load maintenance settings"
+      toast.error(message)
     } finally {
       setLoading(false)
     }
@@ -54,39 +37,28 @@ export function MaintenanceToggle() {
 
     setUpdating(true)
     try {
-      const supabase = createClient()
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-
       if (!isDeveloper) {
         toast.error("Only developer can change maintenance mode")
         return
       }
 
-      const newValue = {
-        enabled: checked,
-        message: "System is under maintenance. Please check back later.",
-      }
-
-      const { error } = await supabase.from("system_settings").upsert({
-        key: "maintenance_mode",
-        value: newValue,
-        updated_by: user?.id ?? null,
+      const response = await fetch("/api/dev/maintenance", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          enabled: checked,
+          message: "System is under maintenance. Please check back later.",
+        }),
       })
 
-      if (error) {
-        toast.error("Failed to update maintenance mode")
-        console.error(error)
-        // Revert state
-        setEnabled(!checked)
-      } else {
-        setEnabled(checked)
-        toast.success(checked ? "Maintenance mode enabled" : "Maintenance mode disabled")
-      }
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(payload.error || "Failed to update maintenance mode")
+
+      setEnabled(Boolean(payload.data?.enabled))
+      toast.success(payload.message || (checked ? "Maintenance mode enabled" : "Maintenance mode disabled"))
     } catch (error) {
       console.error("Error toggling maintenance mode:", error)
-      toast.error("Failed to update maintenance mode")
+      toast.error(error instanceof Error ? error.message : "Failed to update maintenance mode")
       // Revert state
       setEnabled(!checked)
     } finally {

@@ -105,6 +105,7 @@ export interface employeeMember {
 
 export interface UserProfile {
   role: string
+  is_department_lead?: boolean
   lead_departments?: string[]
   managed_departments?: string[]
 }
@@ -808,7 +809,7 @@ export function AdminAuditLogsContent({
 
     // Filter by department - for leads, always filter by their departments
     let matchesDepartment = true
-    if (userProfile?.role === "lead") {
+    if (userProfile?.is_department_lead) {
       // Leads: logs are already filtered, but ensure they match lead's departments
       if (scopedDepartments.length > 0) {
         const userDept = employee.find((s) => s.id === log.user_id)?.department
@@ -1699,7 +1700,7 @@ export function AdminAuditLogsContent({
 
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               {/* Department filter - hidden for leads */}
-              {userProfile?.role !== "lead" && (
+              {!userProfile?.is_department_lead && (
                 <SearchableSelect
                   value={departmentFilter}
                   onValueChange={setDepartmentFilter}
@@ -1720,7 +1721,7 @@ export function AdminAuditLogsContent({
                 value={employeeFilter}
                 onValueChange={setemployeeFilter}
                 placeholder={
-                  userProfile?.role === "lead" && scopedDepartments.length > 0
+                  userProfile?.is_department_lead && scopedDepartments.length > 0
                     ? `All ${scopedDepartments.length === 1 ? scopedDepartments[0] : "Department"} employee`
                     : "All employee"
                 }
@@ -1730,7 +1731,7 @@ export function AdminAuditLogsContent({
                   {
                     value: "all",
                     label:
-                      userProfile?.role === "lead" && scopedDepartments.length > 0
+                      userProfile?.is_department_lead && scopedDepartments.length > 0
                         ? `All ${scopedDepartments.length === 1 ? scopedDepartments[0] : "Department"} employee`
                         : "All employee",
                   },

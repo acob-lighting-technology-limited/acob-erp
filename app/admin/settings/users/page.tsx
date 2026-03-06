@@ -15,17 +15,7 @@ import Link from "next/link"
 import { toast } from "sonner"
 
 // Allowlist of valid roles for validation
-const ALLOWED_ROLES = [
-  "developer",
-  "super_admin",
-  "admin",
-  "manager",
-  "employee",
-  "user",
-  "employee",
-  "lead",
-  "visitor",
-] as const
+const ALLOWED_ROLES = ["developer", "super_admin", "admin", "employee", "visitor"] as const
 type AllowedRole = (typeof ALLOWED_ROLES)[number]
 
 function isValidRole(role: string): role is AllowedRole {
@@ -49,9 +39,8 @@ const roleColors: Record<string, string> = {
   developer: "destructive",
   super_admin: "destructive",
   admin: "default",
-  manager: "default",
   employee: "secondary",
-  lead: "default",
+  visitor: "secondary",
 }
 
 import { useSearchParams } from "next/navigation"
@@ -400,10 +389,8 @@ export default function UsersPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="user">User</SelectItem>
+                    <SelectItem value="visitor">Visitor</SelectItem>
                     <SelectItem value="employee">Employee</SelectItem>
-                    {/* Manager removed */}
-                    <SelectItem value="lead">Lead</SelectItem>
                     <SelectItem value="admin">Admin</SelectItem>
                     <SelectItem value="super_admin">Super Admin</SelectItem>
                     {currentUserRole === "developer" && <SelectItem value="developer">Developer</SelectItem>}

@@ -10,7 +10,14 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
 import { PageHeader, PageWrapper } from "@/components/layout"
 import { Headset, Plus } from "lucide-react"
 
@@ -27,6 +34,19 @@ interface HelpDeskTicket {
   created_at: string
   resolved_at: string | null
   csat_rating: number | null
+  handling_mode?: string | null
+  support_mode?: string | null
+  requester_department?: string | null
+}
+
+interface HelpDeskCategory {
+  id: string
+  service_department: string
+  request_type: "support" | "procurement"
+  code: string
+  name: string
+  description: string | null
+  support_mode: "open_queue" | "lead_review_required" | null
 }
 
 interface HelpDeskContentProps {
@@ -34,13 +54,12 @@ interface HelpDeskContentProps {
   initialTickets: HelpDeskTicket[]
 }
 
-const departments = ["IT and Communications", "Operations", "Admin & HR", "Accounts"]
-
 export function HelpDeskContent({ userId, initialTickets }: HelpDeskContentProps) {
   const [tickets, setTickets] = useState<HelpDeskTicket[]>(initialTickets)
   const [isSaving, setIsSaving] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
   const [pendingApprovals, setPendingApprovals] = useState<HelpDeskTicket[]>([])
+  const [categories, setCategories] = useState<HelpDeskCategory[]>([])
   const pendingRef = useRef<HTMLDivElement | null>(null)
   const [form, setForm] = useState({
     title: "",
@@ -48,6 +67,7 @@ export function HelpDeskContent({ userId, initialTickets }: HelpDeskContentProps
     service_department: "IT and Communications",
     priority: "medium",
     request_type: "support",
+    category_id: "",
   })
 
   const myOpenTickets = useMemo(
@@ -57,18 +77,61 @@ export function HelpDeskContent({ userId, initialTickets }: HelpDeskContentProps
   const pendingReviewCount = pendingApprovals.length
 
   useEffect(() => {
-    const loadPendingApprovals = async () => {
-      const res = await fetch("/api/help-desk/tickets?scope=department&status=pending_approval", { cache: "no-store" })
-      if (!res.ok) {
+    const loadSupportData = async () => {
+      const [pendingRes, categoriesRes] = await Promise.all([
+        fetch("/api/help-desk/tickets?scope=department&status=pending_approval", { cache: "no-store" }),
+        fetch("/api/help-desk/categories", { cache: "no-store" }),
+      ])
+
+      if (pendingRes.ok) {
+        const pendingJson = await pendingRes.json()
+        setPendingApprovals(pendingJson.data || [])
+      } else {
         setPendingApprovals([])
-        return
       }
-      const json = await res.json()
-      setPendingApprovals(json.data || [])
+
+      if (categoriesRes.ok) {
+        const categoriesJson = await categoriesRes.json()
+        setCategories(categoriesJson.data || [])
+      } else {
+        setCategories([])
+      }
     }
 
-    loadPendingApprovals().catch(() => setPendingApprovals([]))
+    loadSupportData().catch(() => {
+      setPendingApprovals([])
+      setCategories([])
+    })
   }, [])
+
+  const departmentOptions = useMemo(
+    () => Array.from(new Set(categories.map((category) => category.service_department))).filter(Boolean),
+    [categories]
+  )
+
+  const filteredCategories = useMemo(
+    () =>
+      categories.filter(
+        (category) =>
+          category.service_department === form.service_department && category.request_type === form.request_type
+      ),
+    [categories, form.request_type, form.service_department]
+  )
+
+  const selectedCategory = useMemo(
+    () => filteredCategories.find((category) => category.id === form.category_id) || null,
+    [filteredCategories, form.category_id]
+  )
+
+  useEffect(() => {
+    if (filteredCategories.length === 0) {
+      setForm((prev) => ({ ...prev, category_id: "" }))
+      return
+    }
+    if (!filteredCategories.some((category) => category.id === form.category_id)) {
+      setForm((prev) => ({ ...prev, category_id: filteredCategories[0]?.id || "" }))
+    }
+  }, [filteredCategories, form.category_id])
 
   async function refreshTickets() {
     const res = await fetch("/api/help-desk/tickets?scope=mine", { cache: "no-store" })
@@ -105,6 +168,7 @@ export function HelpDeskContent({ userId, initialTickets }: HelpDeskContentProps
         service_department: "IT and Communications",
         priority: "medium",
         request_type: "support",
+        category_id: "",
       })
       await refreshTickets()
     } catch (error: any) {
@@ -204,13 +268,15 @@ export function HelpDeskContent({ userId, initialTickets }: HelpDeskContentProps
                     <Label>Department</Label>
                     <Select
                       value={form.service_department}
-                      onValueChange={(value) => setForm((prev) => ({ ...prev, service_department: value }))}
+                      onValueChange={(value) =>
+                        setForm((prev) => ({ ...prev, service_department: value, category_id: "" }))
+                      }
                     >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {departments.map((d) => (
+                        {departmentOptions.map((d) => (
                           <SelectItem key={d} value={d}>
                             {d}
                           </SelectItem>
@@ -220,7 +286,10 @@ export function HelpDeskContent({ userId, initialTickets }: HelpDeskContentProps
                   </div>
                   <div className="space-y-2">
                     <Label>Priority</Label>
-                    <Select value={form.priority} onValueChange={(value) => setForm((prev) => ({ ...prev, priority: value }))}>
+                    <Select
+                      value={form.priority}
+                      onValueChange={(value) => setForm((prev) => ({ ...prev, priority: value }))}
+                    >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
@@ -236,7 +305,7 @@ export function HelpDeskContent({ userId, initialTickets }: HelpDeskContentProps
                     <Label>Type</Label>
                     <Select
                       value={form.request_type}
-                      onValueChange={(value) => setForm((prev) => ({ ...prev, request_type: value }))}
+                      onValueChange={(value) => setForm((prev) => ({ ...prev, request_type: value, category_id: "" }))}
                     >
                       <SelectTrigger>
                         <SelectValue />
@@ -246,6 +315,34 @@ export function HelpDeskContent({ userId, initialTickets }: HelpDeskContentProps
                         <SelectItem value="procurement">Procurement</SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <Label>Category</Label>
+                    <Select
+                      value={form.category_id}
+                      onValueChange={(value) => setForm((prev) => ({ ...prev, category_id: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {filteredCategories.map((category) => (
+                          <SelectItem key={category.id} value={category.id}>
+                            {category.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {selectedCategory?.description && (
+                      <p className="text-muted-foreground text-xs">{selectedCategory.description}</p>
+                    )}
+                    {form.request_type === "support" && selectedCategory?.support_mode && (
+                      <p className="text-muted-foreground text-xs">
+                        {selectedCategory.support_mode === "lead_review_required"
+                          ? "This category goes to the service department lead first."
+                          : "This category goes straight to the department queue."}
+                      </p>
+                    )}
                   </div>
                   <div className="md:col-span-2">
                     <Button type="submit" disabled={isSaving}>

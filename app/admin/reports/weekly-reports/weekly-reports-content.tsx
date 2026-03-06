@@ -75,6 +75,7 @@ interface WeeklyReportsContentProps {
     id: string
     role: string
     department: string | null
+    is_department_lead: boolean
   }
 }
 
@@ -106,7 +107,7 @@ export function WeeklyReportsContent({
   const [isFilteredWeekLocked, setIsFilteredWeekLocked] = useState(false)
 
   const supabase = createClient()
-  const isLead = currentUser.role === "lead"
+  const isLead = currentUser.is_department_lead
   const isAdminRole = ["developer", "admin", "super_admin"].includes(currentUser.role)
   const canMutateReport = (report: WeeklyReport) => !isLead || report.user_id === currentUser.id
 

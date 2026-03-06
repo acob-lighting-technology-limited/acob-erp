@@ -74,6 +74,7 @@ export interface Employee {
   department: string
   company_role: string | null
   role: UserRole
+  admin_domains?: string[] | null
   phone_number: string | null
   additional_phone: string | null
   residential_address: string | null
@@ -93,6 +94,7 @@ export interface Employee {
 
 export interface UserProfile {
   role: UserRole
+  is_department_lead?: boolean
   managed_departments?: string[]
 }
 
@@ -186,6 +188,8 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
   // Form states
   const [editForm, setEditForm] = useState({
     role: "employee" as UserRole,
+    admin_domains: [] as string[],
+    is_department_lead: false,
     department: "",
     office_location: "",
     company_role: "",
@@ -211,7 +215,8 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
   const [showMoreOptions, setShowMoreOptions] = useState(false)
 
   const supabase = createClient()
-  const isHrGlobalLead = userProfile?.role === "lead" && (userProfile?.managed_departments || []).includes("Admin & HR")
+  const isHrGlobalLead =
+    userProfile?.is_department_lead && (userProfile?.managed_departments || []).includes("Admin & HR")
   const canManageUsers = ["developer", "super_admin", "admin"].includes(userProfile?.role || "") || isHrGlobalLead
 
   // Handle userId from search params (for edit dialog)
@@ -259,6 +264,8 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
       if (fullProfile) {
         setEditForm({
           role: fullProfile.role || "employee",
+          admin_domains: Array.isArray(fullProfile.admin_domains) ? fullProfile.admin_domains : [],
+          is_department_lead: Boolean(fullProfile.is_department_lead),
           department: fullProfile.department || "",
           office_location: fullProfile.office_location || "",
           company_role: fullProfile.company_role || "",
@@ -285,6 +292,8 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         // Fallback to basic fields if full profile not found
         setEditForm({
           role: employee.role,
+          admin_domains: Array.isArray(employee.admin_domains) ? employee.admin_domains : [],
+          is_department_lead: Boolean(employee.is_department_lead),
           department: employee.department,
           office_location: employee.office_location || "",
           company_role: employee.company_role || "",
@@ -363,26 +372,26 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
             // Department assets (if user has department)
             profileData.department
               ? supabase
-                .from("assets")
-                .select(
-                  "id, asset_name, asset_type, asset_model, serial_number, unique_code, status, assignment_type, department, created_at"
-                )
-                .eq("assignment_type", "department")
-                .eq("department", profileData.department)
-                .eq("status", "assigned")
-                .limit(10)
+                  .from("assets")
+                  .select(
+                    "id, asset_name, asset_type, asset_model, serial_number, unique_code, status, assignment_type, department, created_at"
+                  )
+                  .eq("assignment_type", "department")
+                  .eq("department", profileData.department)
+                  .eq("status", "assigned")
+                  .limit(10)
               : Promise.resolve({ data: [] }),
             // Office location assets (if user has office_location)
             profileData.office_location
               ? supabase
-                .from("assets")
-                .select(
-                  "id, asset_name, asset_type, asset_model, serial_number, unique_code, status, assignment_type, office_location, created_at"
-                )
-                .eq("assignment_type", "office")
-                .eq("office_location", profileData.office_location)
-                .eq("status", "assigned")
-                .limit(10)
+                  .from("assets")
+                  .select(
+                    "id, asset_name, asset_type, asset_model, serial_number, unique_code, status, assignment_type, office_location, created_at"
+                  )
+                  .eq("assignment_type", "office")
+                  .eq("office_location", profileData.office_location)
+                  .eq("status", "assigned")
+                  .limit(10)
               : Promise.resolve({ data: [] }),
             supabase
               .from("user_documentation")
@@ -635,19 +644,25 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         return
       }
 
-      // Validate: If role is lead, at least one department must be selected
-      if (editForm.role === "lead" && editForm.lead_departments.length === 0) {
-        toast.error("Please select at least one department for this lead")
+      if (editForm.is_department_lead && editForm.lead_departments.length !== 1) {
+        toast.error("A department lead must have exactly one lead department")
         setIsSaving(false)
         return
       }
 
-      // If role is lead, automatically set is_department_lead to true
-      const isLead = editForm.role === "lead"
+      if (editForm.is_department_lead && editForm.lead_departments[0] !== editForm.department) {
+        toast.error("A department lead can only lead their own department")
+        setIsSaving(false)
+        return
+      }
+
+      const isLead = editForm.is_department_lead
 
       // Build update object with all fields
       const updateData: any = {
         role: editForm.role,
+        admin_domains:
+          editForm.role === "admin" ? (editForm.admin_domains.length > 0 ? editForm.admin_domains : null) : null,
         department: editForm.department,
         office_location: editForm.office_location || null,
         company_role: editForm.company_role || null,
@@ -802,12 +817,12 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
 
   const departments = Array.from(new Set(employee.map((s) => s.department).filter(Boolean))) as string[]
 
-  const roles: UserRole[] = ["visitor", "employee", "lead", "admin", "super_admin", "developer"]
+  const roles: UserRole[] = ["visitor", "employee", "admin", "super_admin", "developer"]
 
   const stats = {
     total: employee.length,
     admins: employee.filter((s) => ["developer", "super_admin", "admin"].includes(s.role)).length,
-    leads: employee.filter((s) => s.role === "lead").length,
+    leads: employee.filter((s) => s.is_department_lead).length,
     employee: employee.filter((s) => s.role === "employee").length,
   }
 
@@ -1106,11 +1121,11 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
     if (!userProfile) return []
 
     if (userProfile.role === "developer") {
-      return ["visitor", "employee", "lead", "admin", "super_admin", "developer"]
+      return ["visitor", "employee", "admin", "super_admin", "developer"]
     } else if (userProfile.role === "super_admin") {
-      return ["visitor", "employee", "lead", "admin", "super_admin"]
+      return ["visitor", "employee", "admin", "super_admin"]
     } else if (userProfile.role === "admin") {
-      return ["visitor", "employee", "lead"]
+      return ["visitor", "employee"]
     }
 
     return []
@@ -1386,12 +1401,14 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
                           <Badge className={getRoleBadgeColor(member.role)}>{getRoleDisplayName(member.role)}</Badge>
-                          {member.role === "lead" && member.lead_departments && member.lead_departments.length > 0 && (
-                            <Badge variant="outline" className="text-xs">
-                              {member.lead_departments.length} Dept
-                              {member.lead_departments.length > 1 ? "s" : ""}
-                            </Badge>
-                          )}
+                          {member.is_department_lead &&
+                            member.lead_departments &&
+                            member.lead_departments.length > 0 && (
+                              <Badge variant="outline" className="text-xs">
+                                {member.lead_departments.length} Dept
+                                {member.lead_departments.length > 1 ? "s" : ""}
+                              </Badge>
+                            )}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -1465,12 +1482,14 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                         </CardTitle>
                         <div className="mt-2 flex flex-wrap gap-2">
                           <Badge className={getRoleBadgeColor(member.role)}>{getRoleDisplayName(member.role)}</Badge>
-                          {member.role === "lead" && member.lead_departments && member.lead_departments.length > 0 && (
-                            <Badge variant="outline" className="text-xs">
-                              {member.lead_departments.length} Dept
-                              {member.lead_departments.length > 1 ? "s" : ""}
-                            </Badge>
-                          )}
+                          {member.is_department_lead &&
+                            member.lead_departments &&
+                            member.lead_departments.length > 0 && (
+                              <Badge variant="outline" className="text-xs">
+                                {member.lead_departments.length} Dept
+                                {member.lead_departments.length > 1 ? "s" : ""}
+                              </Badge>
+                            )}
                         </div>
                       </div>
                     </Link>
@@ -1776,15 +1795,11 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                 <Select
                   value={editForm.role}
                   onValueChange={(value: UserRole) => {
-                    setEditForm({ ...editForm, role: value })
-                    // Clear lead departments when role is not lead
-                    if (value !== "lead") {
-                      setEditForm((prev) => ({
-                        ...prev,
-                        role: value,
-                        lead_departments: [],
-                      }))
-                    }
+                    setEditForm((prev) => ({
+                      ...prev,
+                      role: value,
+                      admin_domains: value === "admin" ? prev.admin_domains : [],
+                    }))
                   }}
                 >
                   <SelectTrigger>
@@ -1803,10 +1818,47 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                     ? "As Admin, you can assign: Visitor and Employee roles"
                     : "As Super Admin, you can assign any role"}
                 </p>
-                {editForm.role === "lead" && (
+                <div className="mt-3 flex items-center gap-2">
+                  <Checkbox
+                    id="is_department_lead"
+                    checked={editForm.is_department_lead}
+                    onCheckedChange={(checked) =>
+                      setEditForm((prev) => ({
+                        ...prev,
+                        is_department_lead: checked === true,
+                        lead_departments: checked === true ? [prev.department].filter(Boolean) : [],
+                      }))
+                    }
+                  />
+                  <Label htmlFor="is_department_lead">Department Lead</Label>
+                </div>
+                {editForm.is_department_lead && (
                   <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
-                    ⚠️ Lead role requires selecting at least one department below
+                    A person can belong to only one department, so the lead department must match the selected
+                    department.
                   </p>
+                )}
+                {editForm.role === "admin" && (
+                  <div className="mt-3 space-y-2">
+                    <Label>Admin Domains (Optional)</Label>
+                    <SearchableMultiSelect
+                      label="Admin Domains"
+                      values={editForm.admin_domains}
+                      onChange={(values) => setEditForm((prev) => ({ ...prev, admin_domains: values }))}
+                      options={[
+                        { value: "hr", label: "HR" },
+                        { value: "finance", label: "Finance" },
+                        { value: "assets", label: "Assets" },
+                        { value: "reports", label: "Reports" },
+                        { value: "tasks", label: "Tasks" },
+                        { value: "projects", label: "Projects" },
+                        { value: "employees", label: "Employees" },
+                        { value: "communications", label: "Communications" },
+                      ]}
+                      placeholder="Leave empty for global admin access"
+                    />
+                    <p className="text-muted-foreground text-xs">Empty means this admin can access all domains.</p>
+                  </div>
                 )}
               </div>
 
@@ -1819,6 +1871,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                     setEditForm({
                       ...editForm,
                       department: value,
+                      lead_departments: editForm.is_department_lead ? [value] : editForm.lead_departments,
                       department_changed_at: isOriginal
                         ? null
                         : editForm.department_changed_at || new Date().toISOString().split("T")[0],
@@ -1899,17 +1952,17 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                 />
               </div>
 
-              {editForm.role === "lead" && (
+              {editForm.is_department_lead && (
                 <div className="space-y-2">
                   <div className="bg-primary/10 border-primary/20 rounded-lg border p-3">
-                    <p className="text-primary mb-2 text-sm font-medium">Lead Department Selection Required</p>
+                    <p className="text-primary mb-2 text-sm font-medium">Lead Department Is Locked To Department</p>
                     <p className="text-muted-foreground text-xs">
-                      Select at least one department that this person will lead
+                      This person can only lead the department assigned above.
                     </p>
                   </div>
 
                   <div>
-                    <Label>Lead Departments *</Label>
+                    <Label>Lead Department *</Label>
                     <div className="mt-2 grid grid-cols-2 gap-2">
                       {DEPARTMENTS.map((dept) => (
                         <div key={dept} className="flex items-center gap-2">
@@ -1921,7 +1974,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                               if (e.target.checked) {
                                 setEditForm({
                                   ...editForm,
-                                  lead_departments: [...editForm.lead_departments, dept],
+                                  lead_departments: [dept],
                                 })
                               } else {
                                 setEditForm({
@@ -1931,6 +1984,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                               }
                             }}
                             className="rounded"
+                            disabled={dept !== editForm.department}
                           />
                           <Label htmlFor={`dept-${dept}`} className="text-sm">
                             {dept}
@@ -1939,7 +1993,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                       ))}
                     </div>
                     {editForm.lead_departments.length === 0 && (
-                      <p className="text-destructive mt-2 text-xs">Please select at least one department</p>
+                      <p className="text-destructive mt-2 text-xs">Select the same department shown above</p>
                     )}
                   </div>
                 </div>
@@ -2221,7 +2275,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                             <Badge className={getRoleBadgeColor(viewEmployeeProfile.role as UserRole)}>
                               {getRoleDisplayName(viewEmployeeProfile.role as UserRole)}
                             </Badge>
-                            {viewEmployeeProfile.role === "lead" &&
+                            {viewEmployeeProfile.is_department_lead &&
                               viewEmployeeProfile.lead_departments &&
                               viewEmployeeProfile.lead_departments.length > 0 && (
                                 <Badge variant="outline">
@@ -2787,8 +2841,9 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
               {Object.keys(selectedColumns).map((column) => (
                 <div
                   key={column}
-                  className={`group hover:bg-muted/80 flex items-center space-x-3 rounded-md px-3 py-2.5 transition-colors ${selectedColumns[column] ? "bg-primary/5 hover:bg-primary/10" : ""
-                    }`}
+                  className={`group hover:bg-muted/80 flex items-center space-x-3 rounded-md px-3 py-2.5 transition-colors ${
+                    selectedColumns[column] ? "bg-primary/5 hover:bg-primary/10" : ""
+                  }`}
                 >
                   <Checkbox
                     id={column}
@@ -2803,10 +2858,11 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                   />
                   <Label
                     htmlFor={column}
-                    className={`flex-1 cursor-pointer text-sm font-medium transition-colors ${selectedColumns[column]
+                    className={`flex-1 cursor-pointer text-sm font-medium transition-colors ${
+                      selectedColumns[column]
                         ? "text-foreground"
                         : "text-muted-foreground group-hover:text-foreground dark:group-hover:text-foreground"
-                      }`}
+                    }`}
                   >
                     {column}
                   </Label>

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { createClient as createAdminClient } from "@supabase/supabase-js"
 import {
   areRequiredDocumentsVerified,
   getLeavePolicy,
@@ -14,11 +15,14 @@ function normalizeAction(body: { action?: string; status?: string }) {
   return null
 }
 
-function inferLegacyStageCode(leaveRequest: any) {
-  if (leaveRequest.approval_stage === "reliever_pending") return stageCodeForRole("reliever")
-  if (leaveRequest.approval_stage === "supervisor_pending") return stageCodeForRole("department_lead")
-  if (leaveRequest.approval_stage === "hr_pending") return stageCodeForRole("admin_hr_lead")
+function inferCurrentStageCode(leaveRequest: any) {
   return leaveRequest.current_stage_code || leaveRequest.approval_stage
+}
+
+function toWorkflowRejectionStage(stageCode: string) {
+  if (stageCode === stageCodeForRole("reliever")) return "reliever"
+  if (stageCode === stageCodeForRole("department_lead")) return "supervisor"
+  return "hr"
 }
 
 export async function POST(request: NextRequest) {
@@ -30,6 +34,13 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+    const supabaseAdmin =
+      process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
+        ? createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
+            auth: { autoRefreshToken: false, persistSession: false },
+          })
+        : supabase
 
     const body = await request.json()
     const { leave_request_id, comments, override_evidence } = body
@@ -60,7 +71,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Only active requests can be processed" }, { status: 400 })
     }
 
-    const stageCode = inferLegacyStageCode(leaveRequest)
+    const stageCode = inferCurrentStageCode(leaveRequest)
     const snapshot = Array.isArray(leaveRequest.route_snapshot) ? leaveRequest.route_snapshot : []
 
     const currentStageOrder = Number(leaveRequest.current_stage_order || 1)
@@ -82,14 +93,14 @@ export async function POST(request: NextRequest) {
     const now = new Date().toISOString()
 
     if (action === "rejected") {
-      const { error: updateError } = await supabase
+      const { error: updateError } = await supabaseAdmin
         .from("leave_requests")
         .update({
           status: "rejected",
           approval_stage: "rejected",
           current_stage_code: "rejected",
           rejected_reason: comments,
-          workflow_rejection_stage: stageCode,
+          workflow_rejection_stage: toWorkflowRejectionStage(stageCode),
           reliever_decision_at: stageCode === stageCodeForRole("reliever") ? now : leaveRequest.reliever_decision_at,
           supervisor_decision_at:
             stageCode === stageCodeForRole("department_lead") ? now : leaveRequest.supervisor_decision_at,
@@ -100,21 +111,33 @@ export async function POST(request: NextRequest) {
         })
         .eq("id", leave_request_id)
 
-      if (updateError) return NextResponse.json({ error: "Failed to reject leave request" }, { status: 500 })
+      if (updateError) {
+        return NextResponse.json({ error: `Failed to reject leave request: ${updateError.message}` }, { status: 500 })
+      }
 
-      await supabase.from("leave_approvals").insert({
-        leave_request_id,
-        approver_id: user.id,
-        approval_level: currentStageOrder,
-        status: action,
-        comments: comments || null,
-        approved_at: now,
-        stage_code: stageCode,
-        stage_order: currentStageOrder,
-        reliever_revision: leaveRequest.reliever_revision || 1,
-      })
+      const { error: rejectionAuditError } = await supabaseAdmin.from("leave_approvals").upsert(
+        {
+          leave_request_id,
+          approver_id: user.id,
+          approval_level: currentStageOrder,
+          status: action,
+          comments: comments || null,
+          approved_at: now,
+          stage_code: stageCode,
+          stage_order: currentStageOrder,
+          reliever_revision: leaveRequest.reliever_revision || 1,
+          superseded: false,
+        },
+        { onConflict: "leave_request_id,approver_id,approval_level" }
+      )
+      if (rejectionAuditError) {
+        return NextResponse.json(
+          { error: `Failed to record rejection audit: ${rejectionAuditError.message}` },
+          { status: 500 }
+        )
+      }
 
-      await notifyUsers(supabase, {
+      await notifyUsers(supabaseAdmin, {
         userIds: [leaveRequest.user_id],
         title: "Leave request rejected",
         message: `Your leave request was rejected at ${stageCode.replaceAll("_", " ")}. Reason: ${comments}`,
@@ -127,17 +150,27 @@ export async function POST(request: NextRequest) {
     }
 
     // Approval history row
-    await supabase.from("leave_approvals").insert({
-      leave_request_id,
-      approver_id: user.id,
-      approval_level: currentStageOrder,
-      status: action,
-      comments: comments || null,
-      approved_at: now,
-      stage_code: stageCode,
-      stage_order: currentStageOrder,
-      reliever_revision: leaveRequest.reliever_revision || 1,
-    })
+    const { error: approvalAuditError } = await supabaseAdmin.from("leave_approvals").upsert(
+      {
+        leave_request_id,
+        approver_id: user.id,
+        approval_level: currentStageOrder,
+        status: action,
+        comments: comments || null,
+        approved_at: now,
+        stage_code: stageCode,
+        stage_order: currentStageOrder,
+        reliever_revision: leaveRequest.reliever_revision || 1,
+        superseded: false,
+      },
+      { onConflict: "leave_request_id,approver_id,approval_level" }
+    )
+    if (approvalAuditError) {
+      return NextResponse.json(
+        { error: `Failed to record approval audit: ${approvalAuditError.message}` },
+        { status: 500 }
+      )
+    }
 
     const nextStageOrder = currentStageOrder + 1
     const nextStage = getRouteStageByOrder(snapshot, nextStageOrder)
@@ -167,7 +200,7 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      const { error: updateError } = await supabase
+      const { error: updateError } = await supabaseAdmin
         .from("leave_requests")
         .update({
           status: "approved",
@@ -181,23 +214,25 @@ export async function POST(request: NextRequest) {
         })
         .eq("id", leave_request_id)
 
-      if (updateError) return NextResponse.json({ error: "Failed to approve leave request" }, { status: 500 })
+      if (updateError) {
+        return NextResponse.json({ error: `Failed to approve leave request: ${updateError.message}` }, { status: 500 })
+      }
 
-      await supabase.rpc("update_leave_balance", {
+      await supabaseAdmin.rpc("update_leave_balance", {
         p_user_id: leaveRequest.user_id,
         p_leave_type_id: leaveRequest.leave_type_id,
         p_days: leaveRequest.days_count,
       })
 
       await syncAttendanceForApprovedLeave(
-        supabase,
+        supabaseAdmin,
         leaveRequest.user_id,
         leaveRequest.start_date,
         leaveRequest.end_date,
         "set"
       )
 
-      await notifyUsers(supabase, {
+      await notifyUsers(supabaseAdmin, {
         userIds: [leaveRequest.user_id],
         title: "Leave approved - proceed on leave",
         message: `Your leave has been approved. Start: ${leaveRequest.start_date}, Resume: ${leaveRequest.resume_date}.`,
@@ -207,6 +242,10 @@ export async function POST(request: NextRequest) {
       })
 
       return NextResponse.json({ message: "Final approval recorded and leave approved" })
+    }
+
+    if (!nextStage.approver_user_id) {
+      return NextResponse.json({ error: "LEAVE_APPROVER_NOT_CONFIGURED:next_stage_approver" }, { status: 400 })
     }
 
     const transitionUpdates: Record<string, unknown> = {
@@ -233,13 +272,15 @@ export async function POST(request: NextRequest) {
       transitionUpdates.hr_comment = comments || null
     }
 
-    const { error: updateError } = await supabase
+    const { error: updateError } = await supabaseAdmin
       .from("leave_requests")
       .update(transitionUpdates)
       .eq("id", leave_request_id)
-    if (updateError) return NextResponse.json({ error: "Failed to advance leave request" }, { status: 500 })
+    if (updateError) {
+      return NextResponse.json({ error: `Failed to advance leave request: ${updateError.message}` }, { status: 500 })
+    }
 
-    await notifyUsers(supabase, {
+    await notifyUsers(supabaseAdmin, {
       userIds: [nextStage.approver_user_id],
       title: "Leave request awaiting your approval",
       message: `A leave request is now waiting at ${nextStage.stage_code.replaceAll("_", " ")}.`,

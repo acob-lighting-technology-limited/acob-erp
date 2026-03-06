@@ -48,8 +48,7 @@ export async function getSeparationBlockers(
     ])
 
   const leadDepartments = Array.isArray(profileRes.data?.lead_departments) ? profileRes.data.lead_departments : []
-  const hasLeadRole =
-    profileRes.data?.role === "lead" || profileRes.data?.is_department_lead === true || leadDepartments.length > 0
+  const hasLeadRole = profileRes.data?.is_department_lead === true || leadDepartments.length > 0
 
   const blockers: SeparationBlockers = {
     assets: assetsRes.count || 0,

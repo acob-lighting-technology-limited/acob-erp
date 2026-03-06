@@ -82,7 +82,7 @@ export default function DepartmentsPage() {
       if (user) {
         const { data: profile } = await supabase
           .from("profiles")
-          .select("role, department, lead_departments")
+          .select("role, department, is_department_lead, lead_departments")
           .eq("id", user.id)
           .single()
 
@@ -91,7 +91,7 @@ export default function DepartmentsPage() {
           : profile?.department
             ? [profile.department]
             : []
-        const isHrGlobalLead = profile?.role === "lead" && leadDepartments.includes("Admin & HR")
+        const isHrGlobalLead = profile?.is_department_lead && leadDepartments.includes("Admin & HR")
         const canManageDepartments =
           ["developer", "super_admin"].includes(profile?.role || "") || profile?.role === "admin" || isHrGlobalLead
 

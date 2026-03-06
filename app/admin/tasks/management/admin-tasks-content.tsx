@@ -91,6 +91,7 @@ export interface employee {
 
 export interface UserProfile {
   role: string
+  is_department_lead?: boolean
   lead_departments?: string[]
   managed_departments?: string[]
 }
@@ -162,7 +163,7 @@ export function AdminTasksContent({
         .neq("category", "weekly_action")
         .order("created_at", { ascending: false })
 
-      if (userProfile?.role === "lead" && scopedDepartments.length > 0) {
+      if (userProfile?.is_department_lead && scopedDepartments.length > 0) {
         tasksQuery = tasksQuery.in("department", scopedDepartments)
       }
 
@@ -215,7 +216,7 @@ export function AdminTasksContent({
       )
 
       let filteredTasks = tasksWithUsers || []
-      if (userProfile?.role === "lead" && scopedDepartments.length > 0) {
+      if (userProfile?.is_department_lead && scopedDepartments.length > 0) {
         filteredTasks = filteredTasks.filter((task: any) => {
           if (task.department && scopedDepartments.includes(task.department)) return true
           if (task.assigned_to_user?.department && scopedDepartments.includes(task.assigned_to_user.department))
@@ -498,7 +499,7 @@ export function AdminTasksContent({
     const matchesPriority = priorityFilter === "all" || task.priority === priorityFilter
 
     let matchesDepartment = true
-    if (userProfile?.role === "lead") {
+    if (userProfile?.is_department_lead) {
       if (scopedDepartments.length > 0) {
         const leadDepartments = scopedDepartments
         matchesDepartment =
@@ -696,7 +697,7 @@ export function AdminTasksContent({
                   <SelectItem value="low">Low</SelectItem>
                 </SelectContent>
               </Select>
-              {userProfile?.role !== "lead" && (
+              {!userProfile?.is_department_lead && (
                 <SearchableSelect
                   value={departmentFilter}
                   onValueChange={setDepartmentFilter}
@@ -718,7 +719,7 @@ export function AdminTasksContent({
                 value={employeeFilter}
                 onValueChange={setemployeeFilter}
                 placeholder={
-                  userProfile?.role === "lead" && departments.length > 0
+                  userProfile?.is_department_lead && departments.length > 0
                     ? `All ${departments.length === 1 ? departments[0] : "Department"} employee`
                     : "All employee"
                 }
@@ -729,7 +730,7 @@ export function AdminTasksContent({
                   {
                     value: "all",
                     label:
-                      userProfile?.role === "lead" && departments.length > 0
+                      userProfile?.is_department_lead && departments.length > 0
                         ? `All ${departments.length === 1 ? departments[0] : "Department"} employee`
                         : "All employee",
                   },

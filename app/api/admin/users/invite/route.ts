@@ -3,7 +3,7 @@ import { createClient as createAdminClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
 
 // Allowlist of valid roles
-const ALLOWED_ROLES = ["admin", "manager", "employee", "user", "employee", "lead", "visitor", "developer"] as const
+const ALLOWED_ROLES = ["admin", "employee", "visitor", "developer"] as const
 const SUPER_ADMIN_ROLE = "super_admin"
 
 type AllowedRole = (typeof ALLOWED_ROLES)[number] | typeof SUPER_ADMIN_ROLE
@@ -15,7 +15,7 @@ function isValidRole(role: string): role is AllowedRole {
 function canAssignRole(assignerRole: string, targetRole: string): boolean {
   if (assignerRole === "developer") return true
   if (assignerRole === "super_admin") return targetRole !== "developer"
-  if (assignerRole === "admin") return !["super_admin", "developer"].includes(targetRole)
+  if (assignerRole === "admin") return ["visitor", "employee"].includes(targetRole)
   return false
 }
 
@@ -158,8 +158,7 @@ export async function POST(request: Request) {
     if (roleToApply) {
       profilePayload.role = roleToApply
       profilePayload.is_admin = ["developer", "super_admin", "admin"].includes(roleToApply)
-      profilePayload.is_department_lead = roleToApply === "lead"
-      profilePayload.lead_departments = roleToApply === "lead" && department ? [department] : []
+      // Role changes do NOT affect department lead status
     }
     if (first_name !== undefined) profilePayload.first_name = first_name
     if (last_name !== undefined) profilePayload.last_name = last_name
