@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label"
 import { ArrowLeft, Users, Search, Filter, Shield, Pencil, UserPlus } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
+import { getAssignableRolesForActor } from "@/lib/role-management"
 
 // Allowlist of valid roles for validation
 const ALLOWED_ROLES = ["developer", "super_admin", "admin", "employee", "visitor"] as const
@@ -20,6 +21,10 @@ type AllowedRole = (typeof ALLOWED_ROLES)[number]
 
 function isValidRole(role: string): role is AllowedRole {
   return ALLOWED_ROLES.includes(role as AllowedRole)
+}
+
+function getRoleOptions(currentUserRole: string): AllowedRole[] {
+  return getAssignableRolesForActor(currentUserRole).filter((role): role is AllowedRole => isValidRole(role))
 }
 
 interface User {
@@ -389,11 +394,11 @@ export default function UsersPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="visitor">Visitor</SelectItem>
-                    <SelectItem value="employee">Employee</SelectItem>
-                    <SelectItem value="admin">Admin</SelectItem>
-                    <SelectItem value="super_admin">Super Admin</SelectItem>
-                    {currentUserRole === "developer" && <SelectItem value="developer">Developer</SelectItem>}
+                    {getRoleOptions(currentUserRole).map((role) => (
+                      <SelectItem key={role} value={role}>
+                        {role === "super_admin" ? "Super Admin" : role.charAt(0).toUpperCase() + role.slice(1)}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

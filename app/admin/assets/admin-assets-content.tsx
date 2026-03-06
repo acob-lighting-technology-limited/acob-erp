@@ -91,6 +91,9 @@ export interface Asset {
   }
   issues?: AssetIssue[]
   unresolved_issues_count?: number
+  deleted_at?: string | null
+  deleted_by?: string | null
+  delete_reason?: string | null
 }
 
 interface AssetIssue {
@@ -401,100 +404,19 @@ export function AdminAssetsContent({
   const loadData = async () => {
     setIsLoading(true)
     try {
-      // Fetch assets
-      const { data: AssetsData, error: AssetsError } = await supabase
-        .from("assets")
-        .select("*")
-        .order("created_at", { ascending: false })
-
-      if (AssetsError) throw AssetsError
-
-      // Fetch current assignments for all assets
-      const { data: assignmentsData } = await supabase
-        .from("asset_assignments")
-        .select("asset_id, assigned_to, department, office_location")
-        .eq("is_current", true)
-
-      // Efficiently fetch user details for all assignments
-      const userIds = Array.from(new Set((assignmentsData || []).map((a: any) => a.assigned_to).filter(Boolean)))
-
-      let usersMap = new Map()
-      if (userIds.length > 0) {
-        const { data: usersData } = await supabase
-          .from("profiles")
-          .select("id, first_name, last_name, department")
-          .in("id", userIds)
-
-        if (usersData) {
-          usersMap = new Map(usersData.map((u: any) => [u.id, u]))
-        }
-      }
-
-      // Attach users to assignments
-      const assignmentsWithUsers = (assignmentsData || []).map((assignment: any) => ({
-        ...assignment,
-        user: assignment.assigned_to ? usersMap.get(assignment.assigned_to) : null,
-      }))
-
-      // Fetch unresolved issue counts
-      const { data: issuesData } = await supabase.from("asset_issues").select("asset_id, resolved")
-
-      // Count unresolved issues per asset
-      const issueCountsByAsset: Record<string, number> = {}
-      ;(issuesData || []).forEach((issue: any) => {
-        if (!issue.resolved) {
-          issueCountsByAsset[issue.asset_id] = (issueCountsByAsset[issue.asset_id] || 0) + 1
-        }
+      const response = await fetch("/api/admin/assets/snapshot", {
+        method: "GET",
+        credentials: "include",
+        cache: "no-store",
       })
 
-      // Combine assets with their assignments and issue counts
-      let assetsWithAssignments = (AssetsData || []).map((asset) => {
-        const assignment = assignmentsWithUsers.find((a: any) => a.asset_id === asset.id)
-        return {
-          ...asset,
-          current_assignment: assignment
-            ? {
-                assigned_to: assignment.assigned_to,
-                department: assignment.department,
-                office_location: assignment.office_location,
-                user: assignment.user || null,
-              }
-            : undefined,
-          unresolved_issues_count: issueCountsByAsset[asset.id] || 0,
-        }
-      })
-
-      // Fetch updated employees
-      let employeeQuery = supabase
-        .from("profiles")
-        .select("id, first_name, last_name, company_email, department, employment_status")
-        .eq("employment_status", "active")
-        .order("last_name", { ascending: true })
-
-      if (userProfile.is_department_lead) {
-        employeeQuery =
-          scopedDepartments.length > 0
-            ? employeeQuery.in("department", scopedDepartments)
-            : employeeQuery.eq("id", "__none__")
+      if (!response.ok) {
+        throw new Error(`Failed to refresh assets (${response.status})`)
       }
 
-      const { data: employeeData } = await employeeQuery
-      const scopedEmployees = employeeData || []
-
-      if (userProfile.is_department_lead) {
-        const deptUserIds = new Set(scopedEmployees.map((member) => member.id))
-        assetsWithAssignments = assetsWithAssignments.filter((asset: any) => {
-          const assignment = asset.current_assignment
-          if (!assignment) return false
-          if (assignment.assigned_to && deptUserIds.has(assignment.assigned_to)) return true
-          if (assignment.department && scopedDepartments.includes(assignment.department)) return true
-          if (assignment.office_location && scopedOffices.includes(assignment.office_location)) return true
-          return false
-        })
-      }
-
-      setAssets(assetsWithAssignments)
-      setEmployees(scopedEmployees)
+      const payload = (await response.json()) as { assets: Asset[]; employees: Employee[] }
+      setAssets(payload.assets || [])
+      setEmployees(payload.employees || [])
     } catch (error: any) {
       console.error("Error loading data:", error)
       toast.error("Failed to refresh data")
@@ -1203,6 +1125,13 @@ export function AdminAssetsContent({
         return
       }
 
+      const isArchived = Boolean(assetToDelete.deleted_at)
+      if (isArchived) {
+        toast.error("Asset is already archived")
+        setIsDeleting(false)
+        return
+      }
+
       // Only check for active assignments if the asset status is "assigned"
       if (assetToDelete.status === "assigned") {
         const { data: assignments } = await supabase
@@ -1212,67 +1141,57 @@ export function AdminAssetsContent({
           .eq("is_current", true)
 
         if (assignments && assignments.length > 0) {
-          toast.error("Cannot delete asset with active assignments. Please change the status first.")
+          toast.error("Cannot archive asset with active assignments. Please return or reassign first.")
           setIsDeleting(false)
           return
         }
       }
 
-      // Check for sequential numbering - cannot delete if higher-numbered asset exists
-      // Extract serial number from unique_code (e.g., "014" from "ACOB/HQ/CHAIR/2023/014")
-      // Year doesn't matter - only asset type and serial number
-      const uniqueCodeParts = assetToDelete.unique_code?.split("/")
-      if (uniqueCodeParts && uniqueCodeParts.length >= 5) {
-        const currentSerialNumber = parseInt(uniqueCodeParts[4], 10)
-        const assetType = assetToDelete.asset_type
-
-        if (!isNaN(currentSerialNumber)) {
-          // Check if any asset with same type (regardless of year) has a higher serial number
-          const { data: allAssetsOfType, error: checkError } = await supabase
-            .from("assets")
-            .select("id, unique_code")
-            .eq("asset_type", assetType)
-            .neq("id", assetToDelete.id)
-
-          if (checkError) throw checkError
-
-          // Check each asset to see if it has a higher serial number
-          const hasHigherNumber = allAssetsOfType?.some((asset) => {
-            const parts = asset.unique_code?.split("/")
-            if (parts && parts.length >= 5) {
-              const serialNum = parseInt(parts[4], 10)
-              return !isNaN(serialNum) && serialNum > currentSerialNumber
-            }
-            return false
-          })
-
-          if (hasHigherNumber) {
-            const assetTypeName = ASSET_TYPE_MAP[assetType]?.label || assetType
-            toast.error(
-              `Cannot delete ${assetToDelete.unique_code}. ` +
-                `Higher-numbered ${assetTypeName} assets exist (serial number ${currentSerialNumber + 1} or higher). ` +
-                `Delete assets in reverse order (highest number first) to maintain sequential numbering.`
-            )
-            setIsDeleting(false)
-            return
-          }
-        }
-      }
-
-      const { error } = await supabase.from("assets").delete().eq("id", assetToDelete.id)
+      const { error } = await supabase
+        .from("assets")
+        .update({
+          deleted_at: new Date().toISOString(),
+          deleted_by: user.id,
+          delete_reason: "Archived from Admin Assets",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", assetToDelete.id)
 
       if (error) throw error
 
-      // Note: Audit logging is handled by database trigger (audit_log_changes)
-
-      toast.success("Asset deleted successfully")
+      toast.success("Asset archived. You can restore it later.")
       setIsDeleteDialogOpen(false)
       setAssetToDelete(null)
       loadData()
     } catch (error: any) {
-      console.error("Error deleting asset:", error)
-      const errorMessage = error?.message || error?.toString() || "Failed to delete asset"
-      toast.error(`Failed to delete asset: ${errorMessage}`)
+      console.error("Error archiving asset:", error)
+      const errorMessage = error?.message || error?.toString() || "Failed to archive asset"
+      toast.error(`Failed to archive asset: ${errorMessage}`)
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  const handleRestoreAsset = async (asset: Asset) => {
+    if (isDeleting) return
+    setIsDeleting(true)
+    try {
+      const { error } = await supabase
+        .from("assets")
+        .update({
+          deleted_at: null,
+          deleted_by: null,
+          delete_reason: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", asset.id)
+
+      if (error) throw error
+      toast.success("Asset restored successfully")
+      await loadData()
+    } catch (error: any) {
+      console.error("Error restoring asset:", error)
+      toast.error(`Failed to restore asset: ${error?.message || "Unknown error"}`)
     } finally {
       setIsDeleting(false)
     }
@@ -2039,6 +1958,7 @@ export function AdminAssetsContent({
   }
 
   const filteredAssets = assets.filter((asset) => {
+    const computedStatus = asset.deleted_at ? "archived" : asset.status
     const assetTypeLabel = ASSET_TYPE_MAP[asset.asset_type]?.label || asset.asset_type
 
     // Enhanced search - now searches across all relevant fields
@@ -2050,7 +1970,7 @@ export function AdminAssetsContent({
         asset.asset_model,
         asset.serial_number,
         asset.acquisition_year?.toString(),
-        asset.status,
+        computedStatus,
         asset.notes,
         asset.department,
         asset.office_location,
@@ -2060,7 +1980,7 @@ export function AdminAssetsContent({
         asset.current_assignment?.department,
       ].some((field) => field?.toLowerCase().includes(searchQuery.toLowerCase()))
 
-    const matchesStatus = statusFilter.length === 0 || statusFilter.includes(asset.status)
+    const matchesStatus = statusFilter.length === 0 ? !asset.deleted_at : statusFilter.includes(computedStatus)
     const matchesYear = yearFilter.length === 0 || yearFilter.includes(asset.acquisition_year?.toString() || "")
     const matchesAssetType = assetTypeFilter.length === 0 || assetTypeFilter.includes(asset.asset_type)
     const matchesOfficeLocation =
@@ -2112,11 +2032,14 @@ export function AdminAssetsContent({
   })
 
   const stats = {
-    total: assets.length,
-    available: assets.filter((d) => d.status === "available").length,
-    assigned: assets.filter((d) => d.status === "assigned").length,
-    maintenance: assets.filter((d) => d.status === "maintenance").length,
-    unresolvedIssues: assets.reduce((sum, asset) => sum + (asset.unresolved_issues_count || 0), 0),
+    total: assets.filter((d) => !d.deleted_at).length,
+    available: assets.filter((d) => !d.deleted_at && d.status === "available").length,
+    assigned: assets.filter((d) => !d.deleted_at && d.status === "assigned").length,
+    maintenance: assets.filter((d) => !d.deleted_at && d.status === "maintenance").length,
+    archived: assets.filter((d) => !!d.deleted_at).length,
+    unresolvedIssues: assets
+      .filter((d) => !d.deleted_at)
+      .reduce((sum, asset) => sum + (asset.unresolved_issues_count || 0), 0),
   }
 
   const formatDate = (dateString?: string | null) => {
@@ -2142,6 +2065,8 @@ export function AdminAssetsContent({
         return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
       case "retired":
         return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
+      case "archived":
+        return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300"
       default:
         return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
     }
@@ -2414,6 +2339,7 @@ export function AdminAssetsContent({
                       { value: "assigned", label: "Assigned" },
                       { value: "maintenance", label: "Maintenance" },
                       { value: "retired", label: "Retired" },
+                      { value: "archived", label: "Archived" },
                     ]}
                     onChange={setStatusFilter}
                     placeholder="All Status"
@@ -2654,7 +2580,9 @@ export function AdminAssetsContent({
                         <span className="text-foreground text-sm">{asset.acquisition_year}</span>
                       </TableCell>
                       <TableCell>
-                        <Badge className={getStatusColor(asset.status)}>{asset.status}</Badge>
+                        <Badge className={getStatusColor(asset.deleted_at ? "archived" : asset.status)}>
+                          {asset.deleted_at ? "archived" : asset.status}
+                        </Badge>
                       </TableCell>
                       <TableCell>
                         {asset.status === "assigned" || asset.status === "retired" || asset.status === "maintenance" ? (
@@ -2715,10 +2643,13 @@ export function AdminAssetsContent({
                               variant="outline"
                               size="sm"
                               onClick={() => handleOpenAssetDialog(asset)}
+                              disabled={Boolean(asset.deleted_at)}
                               title={
-                                asset.status === "assigned" && asset.current_assignment
-                                  ? "Edit or Reassign Asset"
-                                  : "Edit Asset"
+                                asset.deleted_at
+                                  ? "Archived asset cannot be edited until restored"
+                                  : asset.status === "assigned" && asset.current_assignment
+                                    ? "Edit or Reassign Asset"
+                                    : "Edit Asset"
                               }
                               className="h-8 w-8 p-0"
                             >
@@ -2743,7 +2674,18 @@ export function AdminAssetsContent({
                           >
                             <Eye className="h-3 w-3" />
                           </Button>
-                          {!userProfile?.is_department_lead && (
+                          {!userProfile?.is_department_lead && asset.deleted_at ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleRestoreAsset(asset)}
+                              title="Restore asset"
+                              className="h-8 w-8 p-0 text-green-700 hover:text-green-800"
+                              loading={isDeleting}
+                            >
+                              <CheckCircle2 className="h-3 w-3" />
+                            </Button>
+                          ) : !userProfile?.is_department_lead ? (
                             <Button
                               variant="outline"
                               size="sm"
@@ -2751,12 +2693,12 @@ export function AdminAssetsContent({
                                 setAssetToDelete(asset)
                                 setIsDeleteDialogOpen(true)
                               }}
-                              title="Delete asset"
+                              title="Archive asset"
                               className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
                             >
                               <Trash2 className="h-3 w-3" />
                             </Button>
-                          )}
+                          ) : null}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -2798,7 +2740,9 @@ export function AdminAssetsContent({
                 <CardContent className="space-y-3 p-4">
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground text-sm">Status:</span>
-                    <Badge className={getStatusColor(asset.status)}>{asset.status}</Badge>
+                    <Badge className={getStatusColor(asset.deleted_at ? "archived" : asset.status)}>
+                      {asset.deleted_at ? "archived" : asset.status}
+                    </Badge>
                   </div>
 
                   <div className="flex items-center justify-between">
@@ -2881,10 +2825,13 @@ export function AdminAssetsContent({
                         variant="outline"
                         size="sm"
                         onClick={() => handleOpenAssetDialog(asset)}
+                        disabled={Boolean(asset.deleted_at)}
                         title={
-                          asset.status === "assigned" && asset.current_assignment
-                            ? "Edit or Reassign Asset"
-                            : "Edit Asset"
+                          asset.deleted_at
+                            ? "Archived asset cannot be edited until restored"
+                            : asset.status === "assigned" && asset.current_assignment
+                              ? "Edit or Reassign Asset"
+                              : "Edit Asset"
                         }
                         className="flex-1 gap-2"
                       >
@@ -2892,6 +2839,31 @@ export function AdminAssetsContent({
                         Edit
                       </Button>
                     )}
+                    {!userProfile?.is_department_lead && asset.deleted_at ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleRestoreAsset(asset)}
+                        title="Restore Asset"
+                        className="text-green-700 hover:text-green-800"
+                        loading={isDeleting}
+                      >
+                        <CheckCircle2 className="h-3 w-3" />
+                      </Button>
+                    ) : !userProfile?.is_department_lead ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setAssetToDelete(asset)
+                          setIsDeleteDialogOpen(true)
+                        }}
+                        title="Archive Asset"
+                        className="text-red-600 hover:text-red-700"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    ) : null}
                     <Button
                       variant="outline"
                       size="sm"
@@ -2909,20 +2881,6 @@ export function AdminAssetsContent({
                     >
                       <Eye className="h-3 w-3" />
                     </Button>
-                    {!userProfile?.is_department_lead && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setAssetToDelete(asset)
-                          setIsDeleteDialogOpen(true)
-                        }}
-                        title="Delete Asset"
-                        className="text-red-600 hover:text-red-700"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -3430,8 +3388,8 @@ export function AdminAssetsContent({
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete "{assetToDelete?.unique_code}" (
-              {ASSET_TYPE_MAP[assetToDelete?.asset_type || ""]?.label}). This action cannot be undone.
+              This will archive "{assetToDelete?.unique_code}" ({ASSET_TYPE_MAP[assetToDelete?.asset_type || ""]?.label}
+              ). Archived assets are recoverable and not permanently deleted.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -3439,7 +3397,7 @@ export function AdminAssetsContent({
               Cancel
             </AlertDialogCancel>
             <Button onClick={handleDeleteAsset} loading={isDeleting} className="bg-red-600 text-white hover:bg-red-700">
-              Delete
+              Archive
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -168,13 +168,6 @@ const adminNavigation = [
   },
   {
     section: "dev",
-    name: "Maintenance",
-    href: "/admin/dev/maintenance",
-    icon: Wrench,
-    roles: ["developer"],
-  },
-  {
-    section: "dev",
     name: "Role Escalations",
     href: "/admin/dev/role-escalations",
     icon: ShieldEllipsis,

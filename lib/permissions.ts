@@ -1,4 +1,5 @@
 import type { UserRole, Profile } from "@/types/database"
+import { canAssignRole as canAssignManagedRole } from "@/lib/role-management"
 
 /**
  * Role Hierarchy (from highest to lowest):
@@ -135,19 +136,7 @@ export function canManageProjectMembers(
 }
 
 export function canAssignRoles(assignerRole: UserRole, targetRole: UserRole): boolean {
-  // developer can assign any role
-  if (assignerRole === "developer") return true
-
-  // super_admin can assign any role except developer
-  if (assignerRole === "super_admin") return targetRole !== "developer"
-
-  // admin can assign visitor and employee (not admin, super_admin, or developer)
-  if (assignerRole === "admin") {
-    return ["visitor", "employee"].includes(targetRole)
-  }
-
-  // Others cannot assign roles
-  return false
+  return canAssignManagedRole(assignerRole, targetRole)
 }
 
 export function getRoleDisplayName(role: UserRole): string {

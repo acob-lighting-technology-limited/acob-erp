@@ -1,33 +1,24 @@
-import { redirect } from "next/navigation"
+import { NextResponse } from "next/server"
 import { createClient as createAdminClient } from "@supabase/supabase-js"
 import { createClient } from "@/lib/supabase/server"
-import { AdminAssetsContent, type Asset, type Employee, type UserProfile } from "./admin-assets-content"
 import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
 
-async function getAdminAssetsData() {
+export async function GET() {
   const supabase = await createClient()
-
   const {
     data: { user },
     error: userError,
   } = await supabase.auth.getUser()
 
   if (userError || !user) {
-    return { redirect: "/auth/login" as const }
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
   const scope = await resolveAdminScope(supabase as any, user.id)
   if (!scope) {
-    return { redirect: "/dashboard" as const }
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
 
-  const userProfile: UserProfile = {
-    role: scope.role,
-    is_department_lead: scope.isDepartmentLead,
-    lead_departments: scope.leadDepartments,
-    managed_departments: scope.managedDepartments,
-    managed_offices: scope.managedOffices,
-  }
   const departmentScope = getDepartmentScope(scope, "general")
 
   const dataClient =
@@ -37,37 +28,32 @@ async function getAdminAssetsData() {
         })
       : supabase
 
-  // Fetch assets
   const { data: assetsData, error: assetsError } = await dataClient
     .from("assets")
     .select("*")
     .order("created_at", { ascending: false })
 
   if (assetsError) {
-    console.error("Error loading assets:", assetsError)
-    return { assets: [], employees: [], departments: [], userProfile }
+    return NextResponse.json({ error: assetsError.message }, { status: 500 })
   }
 
-  // Fetch current assignments for all assets
   const { data: assignmentsData } = await dataClient
     .from("asset_assignments")
     .select("asset_id, assigned_to, department, office_location")
     .eq("is_current", true)
 
-  // Fetch user details for assignments
   const assignedUserIds = (assignmentsData || []).map((a: any) => a.assigned_to).filter(Boolean)
 
-  let assignmentUsersMap = new Map()
+  let assignmentUsersMap = new Map<string, any>()
   if (assignedUserIds.length > 0) {
     const { data: usersData } = await dataClient
       .from("profiles")
       .select("id, first_name, last_name, department")
       .in("id", assignedUserIds)
 
-    assignmentUsersMap = new Map(usersData?.map((u) => [u.id, u]))
+    assignmentUsersMap = new Map((usersData || []).map((u) => [u.id, u]))
   }
 
-  // Fetch employees - leads can only see employees in their departments
   let employeeQuery = dataClient
     .from("profiles")
     .select("id, first_name, last_name, company_email, department, employment_status")
@@ -80,9 +66,8 @@ async function getAdminAssetsData() {
   }
 
   const { data: employeeData } = await employeeQuery
-  const employees = (employeeData || []) as Employee[]
+  const employees = employeeData || []
 
-  // Fetch unresolved issue counts
   const { data: issuesData } = await dataClient.from("asset_issues").select("asset_id, resolved")
 
   const issueCountsByAsset: Record<string, number> = {}
@@ -92,11 +77,10 @@ async function getAdminAssetsData() {
     }
   })
 
-  // Filter assets for leads
   let filteredAssets = assetsData || []
   if (departmentScope) {
-    const deptUserIds = employees.map((s) => s.id)
-    filteredAssets = filteredAssets.filter((asset) => {
+    const deptUserIds = employees.map((s: any) => s.id)
+    filteredAssets = filteredAssets.filter((asset: any) => {
       const assignment = (assignmentsData || []).find((a: any) => a.asset_id === asset.id)
       if (!assignment) return false
 
@@ -107,8 +91,7 @@ async function getAdminAssetsData() {
     })
   }
 
-  // Combine assets with assignments and issue counts
-  const assets: Asset[] = filteredAssets.map((asset) => {
+  const assets = filteredAssets.map((asset: any) => {
     const assignment = (assignmentsData || []).find((a: any) => a.asset_id === asset.id)
     return {
       ...asset,
@@ -124,34 +107,5 @@ async function getAdminAssetsData() {
     }
   })
 
-  // Get departments list
-  const departments = departmentScope
-    ? departmentScope
-    : Array.from(new Set(employees.map((s) => s.department).filter(Boolean)))
-
-  return { assets, employees, departments, userProfile }
-}
-
-export default async function AdminAssetsPage() {
-  const data = await getAdminAssetsData()
-
-  if ("redirect" in data && data.redirect) {
-    redirect(data.redirect)
-  }
-
-  const pageData = data as {
-    assets: Asset[]
-    employees: Employee[]
-    departments: string[]
-    userProfile: UserProfile
-  }
-
-  return (
-    <AdminAssetsContent
-      initialAssets={pageData.assets}
-      initialEmployees={pageData.employees}
-      initialDepartments={pageData.departments}
-      userProfile={pageData.userProfile}
-    />
-  )
+  return NextResponse.json({ assets, employees })
 }

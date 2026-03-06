@@ -379,6 +379,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                   .eq("assignment_type", "department")
                   .eq("department", profileData.department)
                   .eq("status", "assigned")
+                  .is("deleted_at", null)
                   .limit(10)
               : Promise.resolve({ data: [] }),
             // Office location assets (if user has office_location)
@@ -391,6 +392,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                   .eq("assignment_type", "office")
                   .eq("office_location", profileData.office_location)
                   .eq("status", "assigned")
+                  .is("deleted_at", null)
                   .limit(10)
               : Promise.resolve({ data: [] }),
             supabase
@@ -413,6 +415,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
               .from("assets")
               .select("id, asset_name, asset_type, asset_model, serial_number, unique_code, status")
               .eq("id", assignment.asset_id)
+              .is("deleted_at", null)
               .single()
 
             return {
@@ -524,102 +527,14 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
   }
 
   const handleDeleteEmployee = async (employee: Employee) => {
-    if (!canManageUsers) {
-      toast.error("You can view users but cannot delete them")
-      return
-    }
-
-    try {
-      setSelectedEmployee(employee)
-      const assigned = await checkAssignedItems(employee)
-
-      if (!assigned) {
-        return
-      }
-
-      // Check if user has any assigned items
-      const hasAssignments =
-        assigned.tasks.length > 0 ||
-        assigned.taskAssignments.length > 0 ||
-        assigned.assets.length > 0 ||
-        assigned.projects.length > 0 ||
-        assigned.projectMemberships.length > 0 ||
-        assigned.feedback.length > 0 ||
-        assigned.documentation.length > 0
-
-      if (hasAssignments) {
-        setIsDeleteDialogOpen(true)
-        return
-      }
-
-      // If no assignments, proceed with deletion confirmation
-      setIsDeleteDialogOpen(true)
-    } catch (error: any) {
-      console.error("Error preparing delete:", error)
-      toast.error("Failed to prepare deletion")
-    }
+    setSelectedEmployee(employee)
+    toast.error("User deletion is disabled. Suspend or deactivate the employee instead.")
   }
 
   const confirmDeleteEmployee = async () => {
-    if (isDeleting || !selectedEmployee) return
-
-    setIsDeleting(true)
-    try {
-      if (!canManageUsers) {
-        toast.error("You don't have permission to delete users")
-        setIsDeleting(false)
-        return
-      }
-
-      // Double-check for assignments before deleting
-      const assigned = await checkAssignedItems(selectedEmployee)
-      if (!assigned) {
-        setIsDeleting(false)
-        return
-      }
-
-      const hasAssignments =
-        assigned.tasks.length > 0 ||
-        assigned.taskAssignments.length > 0 ||
-        assigned.assets.length > 0 ||
-        assigned.projects.length > 0 ||
-        assigned.projectMemberships.length > 0 ||
-        assigned.feedback.length > 0 ||
-        assigned.documentation.length > 0
-
-      if (hasAssignments) {
-        toast.error("Cannot delete user with assigned items. Please reassign items first.")
-        setIsDeleting(false)
-        return
-      }
-
-      // Try to delete from profiles first (this is safer and will cascade)
-      // Note: Deleting from auth.users requires admin API which may not be available
-      const { error: profileError } = await supabase.from("profiles").delete().eq("id", selectedEmployee.id)
-
-      if (profileError) {
-        // If that fails, try using admin API (if available)
-        try {
-          const { error: authError } = await supabase.auth.admin.deleteUser(selectedEmployee.id)
-          if (authError) {
-            throw authError
-          }
-        } catch (adminError: any) {
-          // Admin API might not be available, throw the original error
-          throw profileError
-        }
-      }
-
-      toast.success("Employee deleted successfully")
-      setIsDeleteDialogOpen(false)
-      setSelectedEmployee(null)
-      loadData()
-    } catch (error: any) {
-      console.error("Error deleting employee:", error)
-      toast.error(error.message || "Failed to delete employee")
-    } finally {
-      setIsDeleting(false)
-    }
+    if (!selectedEmployee) return
+    toast.error("User deletion is disabled. Suspend or deactivate the employee instead.")
+    setIsDeleteDialogOpen(false)
   }
 
   const handleSaveEmployee = async () => {
@@ -1450,7 +1365,8 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                               size="sm"
                               className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 w-8 p-0 sm:h-auto sm:w-auto sm:p-2"
                               onClick={() => handleDeleteEmployee(member)}
-                              title="Delete Employee"
+                              disabled
+                              title="Deletion disabled"
                             >
                               <Trash2 className="h-3 w-3" />
                             </Button>
@@ -1584,8 +1500,9 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                         variant="outline"
                         size="sm"
                         onClick={() => handleDeleteEmployee(member)}
+                        disabled
                         className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                        title="Delete Employee"
+                        title="Deletion disabled"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -2534,18 +2451,18 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         </DialogContent>
       </Dialog>
 
-      {/* Delete Employee Confirmation Dialog */}
+      {/* Deletion Disabled Dialog */}
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle className="text-destructive flex items-center gap-2">
               <AlertTriangle className="h-5 w-5" />
-              Delete Employee Member
+              Deletion Disabled
             </DialogTitle>
             <DialogDescription>
               {selectedEmployee
-                ? `Are you sure you want to delete ${formatName(selectedEmployee.first_name)} ${formatName(selectedEmployee.last_name)}?`
-                : "Are you sure you want to delete this employee member?"}
+                ? `${formatName(selectedEmployee.first_name)} ${formatName(selectedEmployee.last_name)} cannot be deleted.`
+                : "Employee deletion is disabled."}
             </DialogDescription>
           </DialogHeader>
 
@@ -2567,10 +2484,10 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                     <div className="flex items-start gap-3">
                       <AlertTriangle className="text-destructive mt-0.5 h-5 w-5 shrink-0" />
                       <div className="flex-1">
-                        <h4 className="text-destructive mb-2 font-semibold">Cannot Delete Employee Member</h4>
+                        <h4 className="text-destructive mb-2 font-semibold">Deletion Is Disabled</h4>
                         <p className="text-muted-foreground mb-4 text-sm">
-                          This employee member has items assigned to them. Please reassign or remove all items before
-                          deleting.
+                          This employee has items assigned to them. Use reassignment, suspension, or deactivation
+                          instead of deletion.
                         </p>
 
                         <div className="space-y-3">
@@ -2782,12 +2699,12 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                   {isDeleting ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Deleting...
+                      Disabled...
                     </>
                   ) : (
                     <>
                       <Trash2 className="mr-2 h-4 w-4" />
-                      Delete Employee Member
+                      Deletion Disabled
                     </>
                   )}
                 </Button>

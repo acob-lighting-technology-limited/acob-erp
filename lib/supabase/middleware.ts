@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
+import { canManageMaintenanceMode, parseMaintenanceMode } from "@/lib/maintenance"
 import type { EmploymentStatus } from "@/types/database"
 
 export async function updateSession(request: NextRequest) {
@@ -39,8 +40,7 @@ export async function updateSession(request: NextRequest) {
     .select("value")
     .eq("key", "maintenance_mode")
     .single()
-  const rawMaintenance = settings?.value as any
-  const isMaintenanceMode = typeof rawMaintenance === "boolean" ? rawMaintenance : Boolean(rawMaintenance?.enabled)
+  const { enabled: isMaintenanceMode } = parseMaintenanceMode(settings?.value)
 
   // If maintenance is on, and not already on maintenance page or statics
   if (
@@ -65,9 +65,9 @@ export async function updateSession(request: NextRequest) {
         .eq("id", user.id)
         .single()
 
-      const isDeveloper = profile?.role === "developer"
+      const canBypassMaintenance = canManageMaintenanceMode(profile?.role)
 
-      if (!isDeveloper) {
+      if (!canBypassMaintenance) {
         const url = request.nextUrl.clone()
         url.pathname = "/maintenance"
         return NextResponse.redirect(url)
@@ -102,7 +102,7 @@ export async function updateSession(request: NextRequest) {
         }
       }
 
-      // Maintenance is enabled and the current user is developer.
+      // Maintenance is enabled and the current user can manage maintenance mode.
     }
   }
 

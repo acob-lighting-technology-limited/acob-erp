@@ -7,6 +7,7 @@ import { Settings, Users, Building2, Shield } from "lucide-react"
 import Link from "next/link"
 import { PageHeader, PageWrapper } from "@/components/layout"
 import { resolveAdminScope } from "@/lib/admin/rbac"
+import { canManageMaintenanceMode } from "@/lib/maintenance"
 
 export default async function AdminSettingsPage() {
   const supabase = await createClient()
@@ -90,6 +91,23 @@ export default async function AdminSettingsPage() {
           </CardContent>
         </Card>
 
+        {canManageMaintenanceMode(scope.role) && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Settings className="h-5 w-5" />
+                Maintenance Control
+              </CardTitle>
+              <CardDescription>Toggle maintenance mode and review its current state.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Link href="/admin/settings/maintenance" className={cn(buttonVariants({ variant: "default" }), "w-full")}>
+                Open Maintenance
+              </Link>
+            </CardContent>
+          </Card>
+        )}
+
         {scope.role === "developer" && (
           <Card>
             <CardHeader>
@@ -97,7 +115,7 @@ export default async function AdminSettingsPage() {
                 <Settings className="h-5 w-5" />
                 Developer Control Plane
               </CardTitle>
-              <CardDescription>Maintenance and deep security controls are now under DEV.</CardDescription>
+              <CardDescription>Developer-only diagnostics, security, and test tooling.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <Link href="/admin/dev" className={cn(buttonVariants({ variant: "default" }), "w-full")}>

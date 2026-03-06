@@ -2,16 +2,15 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { createClient as createServerClient } from "@/lib/supabase/server"
 import { resolveAdminScope } from "@/lib/admin/rbac"
+import {
+  ASSIGNABLE_ROLES,
+  canAssignRole,
+  canManageDeveloperAccounts,
+  canManageSuperAdminAccounts,
+} from "@/lib/role-management"
 import { formValidation } from "@/lib/validation"
 
 export const dynamic = "force-dynamic"
-
-function canAssignRole(assignerRole: string, targetRole: string): boolean {
-  if (assignerRole === "developer") return true
-  if (assignerRole === "super_admin") return targetRole !== "developer"
-  if (assignerRole === "admin") return ["visitor", "employee"].includes(targetRole)
-  return false
-}
 
 export async function POST(request: NextRequest) {
   // First, verify the caller is authenticated and has user-management privileges
@@ -51,7 +50,7 @@ export async function POST(request: NextRequest) {
     const { firstName, lastName, otherNames, email, department, companyRole, phoneNumber, role, employeeNumber } = body
 
     // Validate role if provided
-    const allowedRoles = ["visitor", "employee", "admin", "super_admin", "developer"]
+    const allowedRoles = [...ASSIGNABLE_ROLES]
     if (role && !allowedRoles.includes(role)) {
       return NextResponse.json(
         {
@@ -62,13 +61,16 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (role === "developer" && scope?.role !== "developer") {
-      return NextResponse.json({ success: false, error: "Only developer can assign developer role" }, { status: 403 })
+    if (role === "developer" && !canManageDeveloperAccounts(scope?.role || "")) {
+      return NextResponse.json(
+        { success: false, error: "Only super admin or developer can assign developer role" },
+        { status: 403 }
+      )
     }
 
-    if (role === "super_admin" && !["developer", "super_admin"].includes(scope?.role || "")) {
+    if (role === "super_admin" && !canManageSuperAdminAccounts(scope?.role || "")) {
       return NextResponse.json(
-        { success: false, error: "Only super admin or developer can assign super admin role" },
+        { success: false, error: "Only super admin can assign super admin role" },
         { status: 403 }
       )
     }

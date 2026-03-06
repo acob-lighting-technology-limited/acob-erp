@@ -192,7 +192,7 @@ export default function UserDetailPage() {
 
       if (assetAssignments && assetAssignments.length > 0) {
         const assetIds = assetAssignments.map((aa) => aa.asset_id)
-        const { data: assetsData } = await supabase.from("assets").select("*").in("id", assetIds)
+        const { data: assetsData } = await supabase.from("assets").select("*").in("id", assetIds).is("deleted_at", null)
 
         if (assetsData) {
           const assetsWithAssignment = assetsData.map((asset) => {

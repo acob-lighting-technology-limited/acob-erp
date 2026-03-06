@@ -1,15 +1,12 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-
-const ADMIN_LIKE = ["developer", "super_admin", "admin"] as const
-const ASSIGNABLE_ROLES = ["visitor", "employee", "admin", "super_admin", "developer"] as const
-
-function canAssignRole(assignerRole: string, targetRole: string): boolean {
-  if (assignerRole === "developer") return true
-  if (assignerRole === "super_admin") return targetRole !== "developer"
-  if (assignerRole === "admin") return ["visitor", "employee"].includes(targetRole)
-  return false
-}
+import {
+  ADMIN_LIKE_ROLES,
+  ASSIGNABLE_ROLES,
+  canAssignRole,
+  canManageDeveloperAccounts,
+  canManageSuperAdminAccounts,
+} from "@/lib/role-management"
 
 export async function POST(request: Request) {
   try {
@@ -42,7 +39,7 @@ export async function POST(request: Request) {
     const { data: actorProfile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
     const actorRole = actorProfile?.role || ""
 
-    if (!ADMIN_LIKE.includes(actorRole as (typeof ADMIN_LIKE)[number])) {
+    if (!ADMIN_LIKE_ROLES.includes(actorRole as (typeof ADMIN_LIKE_ROLES)[number])) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
@@ -60,8 +57,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "You do not have permission to assign this role." }, { status: 403 })
     }
 
-    if (targetProfile.role === "developer" && actorRole !== "developer") {
-      return NextResponse.json({ error: "Only developer can modify developer accounts." }, { status: 403 })
+    if (targetProfile.role === "developer" && !canManageDeveloperAccounts(actorRole)) {
+      return NextResponse.json(
+        { error: "Only super admin or developer can modify developer accounts." },
+        { status: 403 }
+      )
     }
 
     if (targetProfile.role === "developer" && targetRole !== "developer") {
@@ -72,6 +72,35 @@ export async function POST(request: Request) {
 
       if ((count || 0) <= 1) {
         return NextResponse.json({ error: "Cannot downgrade the last developer account." }, { status: 400 })
+      }
+    }
+
+    if (targetRole === "developer" && !canManageDeveloperAccounts(actorRole)) {
+      return NextResponse.json(
+        { error: "Only super admin or developer can assign the developer role." },
+        { status: 403 }
+      )
+    }
+
+    if (
+      (targetProfile.role === "super_admin" || targetRole === "super_admin") &&
+      !canManageSuperAdminAccounts(actorRole)
+    ) {
+      return NextResponse.json({ error: "Only super admin can manage super admin accounts." }, { status: 403 })
+    }
+
+    if (targetProfile.role === "super_admin" && targetRole !== "super_admin") {
+      const { count, error: superAdminCountError } = await supabase
+        .from("profiles")
+        .select("id", { count: "exact", head: true })
+        .eq("role", "super_admin")
+
+      if (superAdminCountError) {
+        return NextResponse.json({ error: superAdminCountError.message }, { status: 400 })
+      }
+
+      if ((count || 0) <= 1) {
+        return NextResponse.json({ error: "Cannot downgrade the last super admin account." }, { status: 400 })
       }
     }
 

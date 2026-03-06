@@ -21,6 +21,7 @@ import {
   ClipboardList,
   Ticket,
   Route,
+  Package,
 } from "lucide-react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
@@ -86,6 +87,22 @@ type TaskDiagnosticsResult = {
   results: TaskDiagRow[]
   broken_count: number
   total: number
+}
+
+type AssetMailRoutingRow = {
+  employee_id: string
+  employee_name: string
+  department: string
+  routing_class: "employee" | "department_lead" | "hcs" | "md"
+  recipients: string[]
+}
+
+type AssetMailRoutingResult = {
+  rows: AssetMailRoutingRow[]
+  total: number
+  hcs: { id: string; name: string } | null
+  md: { id: string; name: string } | null
+  mail_types: string[]
 }
 
 // ── Shared Step Renderer ──────────────────────────────────────────────────────
@@ -519,6 +536,85 @@ function TaskRouteDiagnosticsPanel() {
   )
 }
 
+function AssetMailRoutingPanel() {
+  const [loading, setLoading] = useState(false)
+  const [result, setResult] = useState<AssetMailRoutingResult | null>(null)
+
+  const run = async () => {
+    setLoading(true)
+    try {
+      const res = await fetch("/api/dev/asset-mail-routing")
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Failed to load asset mail routing")
+      setResult(data as AssetMailRoutingResult)
+      toast.success("Asset mail routing loaded")
+    } catch (e: any) {
+      toast.error(e.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Package className="h-4 w-4" />
+          Asset Mail Routing
+        </CardTitle>
+        <CardDescription>
+          Shows the live employee-to-recipient mapping used for the five asset mail types.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex items-center gap-4">
+          <Button variant="outline" size="sm" onClick={run} disabled={loading} className="gap-2">
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldAlert className="h-4 w-4" />}
+            {loading ? "Loading…" : "Load Live Matrix"}
+          </Button>
+          {result && (
+            <span className="text-sm font-medium text-green-600">
+              {result.total} active employees | HCS: {result.hcs?.name || "Not found"} | MD:{" "}
+              {result.md?.name || "Not found"}
+            </span>
+          )}
+        </div>
+
+        {result && (
+          <div className="space-y-3">
+            <div className="text-muted-foreground text-xs">
+              Asset mails covered: Asset Officially Assigned, Asset Transfer Initiated, Asset Transfer Received, Asset
+              Officially Returned, Asset Status Alert
+            </div>
+            <div className="overflow-x-auto rounded-md border">
+              <table className="w-full min-w-[980px] border-collapse text-sm">
+                <thead className="bg-muted/40">
+                  <tr>
+                    <th className="border px-3 py-2 text-left">Employee</th>
+                    <th className="border px-3 py-2 text-left">Department</th>
+                    <th className="border px-3 py-2 text-left">Routing Class</th>
+                    <th className="border px-3 py-2 text-left">Recipients For All 5 Asset Mails</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {result.rows.map((row) => (
+                    <tr key={row.employee_id} className="odd:bg-background even:bg-muted/20">
+                      <td className="border px-3 py-2">{row.employee_name}</td>
+                      <td className="border px-3 py-2">{row.department}</td>
+                      <td className="border px-3 py-2">{row.routing_class}</td>
+                      <td className="border px-3 py-2">{row.recipients.join(", ")}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
 // ── Leave Tab ─────────────────────────────────────────────────────────────────
 function LeaveTab({
   employees,
@@ -874,6 +970,14 @@ function TaskTab({ employees }: { employees: { value: string; label: string }[] 
   )
 }
 
+function AssetTab() {
+  return (
+    <div className="space-y-4">
+      <AssetMailRoutingPanel />
+    </div>
+  )
+}
+
 // ── Root Content Component ────────────────────────────────────────────────────
 export function DevTestsContent() {
   const supabase = createClient()
@@ -910,7 +1014,7 @@ export function DevTestsContent() {
     <PageWrapper maxWidth="full" background="gradient">
       <PageHeader
         title="Developer Tests"
-        description="End-to-end flow tests for leave, help desk, and task management — no account switching required"
+        description="End-to-end flow tests for leave, help desk, task management, and asset routing"
         icon={FlaskConical}
         backLink={{ href: "/admin/dev", label: "Back to DEV" }}
       />
@@ -929,6 +1033,10 @@ export function DevTestsContent() {
             <ClipboardList className="h-4 w-4" />
             Tasks
           </TabsTrigger>
+          <TabsTrigger value="assets" className="gap-2">
+            <Package className="h-4 w-4" />
+            Assets
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="leave">
@@ -941,6 +1049,10 @@ export function DevTestsContent() {
 
         <TabsContent value="tasks">
           <TaskTab employees={employees} />
+        </TabsContent>
+
+        <TabsContent value="assets">
+          <AssetTab />
         </TabsContent>
       </Tabs>
     </PageWrapper>
