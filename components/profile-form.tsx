@@ -34,7 +34,7 @@ export function ProfileForm({ user, profile }: ProfileFormProps) {
     phoneNumber: profile?.phone_number || "",
     additionalPhone: profile?.additional_phone || "",
     residentialAddress: profile?.residential_address || "",
-    currentWorkLocation: profile?.current_work_location || "",
+    officeLocation: profile?.office_location || "",
     bankName: profile?.bank_name || "",
     bankAccountNumber: profile?.bank_account_number || "",
     bankAccountName: profile?.bank_account_name || "",
@@ -77,7 +77,7 @@ export function ProfileForm({ user, profile }: ProfileFormProps) {
           phone_number: phoneNumber,
           additional_phone: additionalPhone,
           residential_address: formData.residentialAddress,
-          current_work_location: formData.currentWorkLocation,
+          office_location: formData.officeLocation,
           bank_name: formData.bankName,
           bank_account_number: formData.bankAccountNumber,
           bank_account_name: formData.bankAccountName,
@@ -219,16 +219,16 @@ export function ProfileForm({ user, profile }: ProfileFormProps) {
               </div>
             </div>
 
-            {/* Work Location */}
+            {/* Office Location */}
             <div className="space-y-4 border-t pt-6">
-              <h3 className="font-semibold">Work Location</h3>
+              <h3 className="font-semibold">Office Location</h3>
               <div className="space-y-2">
-                <Label htmlFor="currentWorkLocation">Current Work Location</Label>
+                <Label htmlFor="officeLocation">Office Location</Label>
                 <Select
-                  value={formData.currentWorkLocation}
-                  onValueChange={(value) => handleInputChange("currentWorkLocation", value)}
+                  value={formData.officeLocation}
+                  onValueChange={(value) => handleInputChange("officeLocation", value)}
                 >
-                  <SelectTrigger id="currentWorkLocation">
+                  <SelectTrigger id="officeLocation">
                     <SelectValue placeholder="Select location" />
                   </SelectTrigger>
                   <SelectContent>

@@ -25,7 +25,7 @@ export async function POST(request: Request) {
       phone_number: body.phone_number ?? null,
       additional_phone: body.additional_phone ?? null,
       residential_address: body.residential_address ?? null,
-      current_work_location: body.current_work_location ?? null,
+      office_location: body.office_location ?? null,
       bank_name: body.bank_name ?? null,
       bank_account_number: body.bank_account_number ?? null,
       bank_account_name: body.bank_account_name ?? null,

@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server"
 import { AdminAuditLogsContent, type AuditLog, type employeeMember, type UserProfile } from "./admin-audit-logs-content"
 import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
 import { normalizeAuditAction } from "@/lib/audit/core"
+import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -33,6 +34,7 @@ async function getAuditLogsData(): Promise<AuditLogsData> {
   if (!scope) {
     return { kind: "redirect", redirect: "/dashboard" }
   }
+  const dataClient = getServiceRoleClientOrFallback(supabase as any)
   const departmentScope = getDepartmentScope(scope, "general")
 
   const userProfile: UserProfile = {
@@ -42,7 +44,7 @@ async function getAuditLogsData(): Promise<AuditLogsData> {
   }
 
   // Fetch audit logs - Filter out internal system logs to prevent them from eclipsing user actions
-  let logsQuery = supabase
+  let logsQuery = dataClient
     .from("audit_logs")
     .select("*")
     .not("action", "in", '("sync","migrate","update_schema","migration")')
@@ -59,7 +61,7 @@ async function getAuditLogsData(): Promise<AuditLogsData> {
     return { kind: "data", logs: [], totalCount: 0, employee: [], departments: [], userProfile }
   }
 
-  let countQuery = supabase
+  let countQuery = dataClient
     .from("audit_logs")
     .select("id", { count: "exact", head: true })
     .not("action", "in", '("sync","migrate","update_schema","migration")')
@@ -154,7 +156,7 @@ async function getAuditLogsData(): Promise<AuditLogsData> {
     // 3. Fetch current asset assignments
     const assetAssignmentsMap = new Map()
     if (assetIds.size > 0) {
-      const { data: assignments, error: assignmentsError } = await supabase
+      const { data: assignments, error: assignmentsError } = await dataClient
         .from("asset_assignments")
         .select("asset_id, assigned_to, assignment_type")
         .in("asset_id", Array.from(assetIds))
@@ -175,7 +177,7 @@ async function getAuditLogsData(): Promise<AuditLogsData> {
     let usersData: any[] = []
 
     if (allUserIds.length > 0) {
-      let usersQuery = supabase
+      let usersQuery = dataClient
         .from("profiles")
         .select("id, first_name, last_name, company_email, employee_number, department")
         .in("id", allUserIds)
@@ -293,7 +295,7 @@ async function getAuditLogsData(): Promise<AuditLogsData> {
   }
 
   // Load employee for filter
-  let employeeQuery = supabase
+  let employeeQuery = dataClient
     .from("profiles")
     .select("id, first_name, last_name, department")
     .order("last_name", { ascending: true })

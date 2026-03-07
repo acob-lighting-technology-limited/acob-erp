@@ -19,12 +19,14 @@ import {
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
-import { ChevronDown, ChevronUp, Mail, Pencil, Plus, Trash2, Users, Building } from "lucide-react"
+import { ChevronDown, ChevronUp, Mail, Pencil, Plus, Users, Building } from "lucide-react"
 import { toast } from "sonner"
 import { PageHeader, PageWrapper } from "@/components/layout"
 import { StatCard } from "@/components/ui/stat-card"
 import { EmptyState } from "@/components/ui/empty-state"
 import { Skeleton } from "@/components/ui/skeleton"
+import Link from "next/link"
+import { cn } from "@/lib/utils"
 
 interface Department {
   id: string
@@ -86,14 +88,7 @@ export default function DepartmentsPage() {
           .eq("id", user.id)
           .single()
 
-        const leadDepartments = Array.isArray(profile?.lead_departments)
-          ? profile.lead_departments
-          : profile?.department
-            ? [profile.department]
-            : []
-        const isHrGlobalLead = profile?.is_department_lead && leadDepartments.includes("Admin & HR")
-        const canManageDepartments =
-          ["developer", "super_admin"].includes(profile?.role || "") || profile?.role === "admin" || isHrGlobalLead
+        const canManageDepartments = ["developer", "super_admin", "admin"].includes(profile?.role || "")
 
         setCurrentUserAccess({
           canManageDepartments,
@@ -178,31 +173,6 @@ export default function DepartmentsPage() {
     } catch (error: any) {
       console.error("Error saving department:", error)
       toast.error(error.message || "Failed to save department")
-    }
-  }
-
-  async function handleDelete(dept: Department) {
-    if (!currentUserAccess.canManageDepartments) {
-      toast.error("You can view departments but cannot delete them")
-      return
-    }
-
-    if (!confirm(`Are you sure you want to delete "${dept.name}"? This cannot be undone.`)) {
-      return
-    }
-
-    try {
-      const supabase = createClient()
-
-      const { error } = await supabase.from("departments").delete().eq("id", dept.id)
-
-      if (error) throw error
-
-      toast.success("Department deleted successfully")
-      fetchDepartments()
-    } catch (error: any) {
-      console.error("Error deleting department:", error)
-      toast.error(error.message || "Failed to delete department")
     }
   }
 
@@ -311,7 +281,7 @@ export default function DepartmentsPage() {
       />
 
       {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 md:gap-4">
         <StatCard title="Total Departments" value={departments.length} icon={Building} />
         <StatCard
           title="Active"
@@ -377,13 +347,20 @@ export default function DepartmentsPage() {
 
                   return (
                     <Fragment key={dept.id}>
-                      <TableRow key={dept.id}>
+                      <TableRow
+                        key={dept.id}
+                        className={cn("hover:bg-muted/30 cursor-pointer transition-colors", isExpanded && "bg-muted/50")}
+                        onClick={() => toggleDepartmentRow(dept.id)}
+                      >
                         <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
                         <TableCell>
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => toggleDepartmentRow(dept.id)}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              toggleDepartmentRow(dept.id)
+                            }}
                             className="h-7 w-7"
                             aria-label={isExpanded ? `Collapse ${dept.name}` : `Expand ${dept.name}`}
                           >
@@ -402,66 +379,88 @@ export default function DepartmentsPage() {
                             {dept.is_active ? "Active" : "Inactive"}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                           <div className="flex justify-end gap-2">
                             {currentUserAccess.canManageDepartments && (
-                              <>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => openEditDialog(dept)}
-                                  aria-label={`Edit department: ${dept.name}`}
-                                  title={`Edit department: ${dept.name}`}
-                                >
-                                  <Pencil className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleDelete(dept)}
-                                  disabled={(dept.employee_count ?? 0) > 0}
-                                  aria-label={`Delete department: ${dept.name}`}
-                                  title={
-                                    (dept.employee_count ?? 0) > 0
-                                      ? "Cannot delete department with employees"
-                                      : `Delete department: ${dept.name}`
-                                  }
-                                >
-                                  <Trash2 className="text-destructive h-4 w-4" />
-                                </Button>
-                              </>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => openEditDialog(dept)}
+                                aria-label={`Edit department: ${dept.name}`}
+                                title={`Edit department: ${dept.name}`}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
                             )}
                           </div>
                         </TableCell>
                       </TableRow>
                       {isExpanded && (
-                        <TableRow key={`${dept.id}-members`}>
-                          <TableCell colSpan={7} className="bg-muted/20 py-3">
+                        <TableRow key={`${dept.id}-members`} className="bg-muted/10 hover:bg-muted/10 border-t-0">
+                          <TableCell colSpan={7} className="p-0">
                             {members.length === 0 ? (
-                              <p className="text-muted-foreground px-3 text-sm">No employees in this department.</p>
+                              <p className="text-muted-foreground px-6 py-3 text-sm">No employees in this department.</p>
                             ) : (
-                              <div className="space-y-2 px-2">
-                                {members.map((member) => (
-                                  <div
-                                    key={member.id}
-                                    className="bg-background flex items-center justify-between rounded-md border px-3 py-2"
-                                  >
-                                    <div className="min-w-0">
-                                      <p className="truncate text-sm font-medium">
-                                        {[member.first_name, member.last_name].filter(Boolean).join(" ") || "Unknown"}
-                                      </p>
-                                      <div className="text-muted-foreground flex items-center gap-2 text-xs">
-                                        <Mail className="h-3 w-3" />
-                                        <span className="truncate">
-                                          {[member.company_email, member.additional_email].filter(Boolean).join(" | ")}
-                                        </span>
-                                      </div>
-                                    </div>
-                                    <Badge variant="outline" className="text-xs">
-                                      {member.company_role || "Employee"}
-                                    </Badge>
-                                  </div>
-                                ))}
+                              <div className="animate-in slide-in-from-top-2 p-6 pt-2 duration-200">
+                                <div className="bg-background overflow-hidden rounded-lg border shadow-sm">
+                                  <Table>
+                                    <TableHeader className="bg-muted/30">
+                                      <TableRow>
+                                        <TableHead className="text-muted-foreground w-[70px] text-[10px] font-black tracking-widest uppercase">
+                                          S/N
+                                        </TableHead>
+                                        <TableHead className="text-muted-foreground text-[10px] font-black tracking-widest uppercase">
+                                          Employee
+                                        </TableHead>
+                                        <TableHead className="text-muted-foreground text-[10px] font-black tracking-widest uppercase">
+                                          Contact
+                                        </TableHead>
+                                        <TableHead className="text-muted-foreground w-[180px] text-[10px] font-black tracking-widest uppercase">
+                                          Role
+                                        </TableHead>
+                                        <TableHead className="w-[80px] text-right"></TableHead>
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {members.map((member, memberIndex) => (
+                                        <TableRow key={member.id} className="hover:bg-muted/5">
+                                          <TableCell className="text-muted-foreground text-xs font-semibold">
+                                            {memberIndex + 1}
+                                          </TableCell>
+                                          <TableCell className="text-sm font-semibold">
+                                            {[member.first_name, member.last_name].filter(Boolean).join(" ") || "Unknown"}
+                                          </TableCell>
+                                          <TableCell className="text-muted-foreground text-xs">
+                                            <div className="flex items-center gap-2">
+                                              <Mail className="h-3 w-3" />
+                                              <span className="truncate">
+                                                {[member.company_email, member.additional_email].filter(Boolean).join(" | ")}
+                                              </span>
+                                            </div>
+                                          </TableCell>
+                                          <TableCell>
+                                            <Badge variant="outline" className="text-xs">
+                                              {member.company_role || "Employee"}
+                                            </Badge>
+                                          </TableCell>
+                                          <TableCell className="text-right">
+                                            <Link href={`/admin/hr/employees?userId=${member.id}`}>
+                                              <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-8 w-8"
+                                                aria-label="Edit employee department"
+                                                title="Edit employee department"
+                                              >
+                                                <Pencil className="h-4 w-4" />
+                                              </Button>
+                                            </Link>
+                                          </TableCell>
+                                        </TableRow>
+                                      ))}
+                                    </TableBody>
+                                  </Table>
+                                </div>
                               </div>
                             )}
                           </TableCell>
@@ -478,3 +477,4 @@ export default function DepartmentsPage() {
     </PageWrapper>
   )
 }
+

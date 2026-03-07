@@ -10,7 +10,6 @@ export type AdminDomain =
   | "reports"
   | "tasks"
   | "projects"
-  | "employees"
   | "communications"
 export type AdminSection =
   | "dev"
@@ -43,8 +42,6 @@ export interface AdminScope {
   managedDepartments: string[]
   managedOffices: string[]
   isAdminLike: boolean
-  isFinanceGlobalLead: boolean
-  isHrGlobalLead: boolean
   adminDomains: AdminDomain[] | null
 }
 
@@ -57,7 +54,6 @@ interface ProfileShape {
   lead_departments: string[] | null
 }
 
-const FINANCE_DEPARTMENT_ALIASES = ["Accounts", "Finance"]
 const ADMIN_DOMAINS: AdminDomain[] = [
   "hr",
   "finance",
@@ -65,9 +61,14 @@ const ADMIN_DOMAINS: AdminDomain[] = [
   "reports",
   "tasks",
   "projects",
-  "employees",
   "communications",
 ]
+
+function normalizeRoleValue(role: string | null | undefined): string | null {
+  if (!role) return null
+  const normalized = role.trim().toLowerCase()
+  return normalized.length > 0 ? normalized : null
+}
 const SECTION_TO_DOMAIN: Partial<Record<AdminSection, AdminDomain>> = {
   hr: "hr",
   "job-descriptions": "hr",
@@ -80,7 +81,7 @@ const SECTION_TO_DOMAIN: Partial<Record<AdminSection, AdminDomain>> = {
   "audit-logs": "reports",
   tasks: "tasks",
   projects: "projects",
-  employees: "employees",
+  employees: "hr",
   documentation: "communications",
   feedback: "communications",
   notification: "communications",
@@ -107,24 +108,23 @@ function normalizeDepartmentList(values: string[]): string[] {
   return unique(values.map(normalizeDepartmentName))
 }
 
-function hasDepartmentAlias(departments: string[], aliases: string[]): boolean {
-  const normalized = new Set(normalizeDepartmentList(departments).map((v) => v.toLowerCase()))
-  return aliases.some((alias) => normalized.has(normalizeDepartmentName(alias).toLowerCase()))
-}
-
 export function isAdminLikeRole(role: string | null | undefined): boolean {
-  return role === "developer" || role === "admin" || role === "super_admin"
+  const normalized = normalizeRoleValue(role)
+  return normalized === "developer" || normalized === "admin" || normalized === "super_admin"
 }
 
 export function roleCanEnterAdmin(role: string | null | undefined, isDepartmentLead = false): boolean {
-  return role === "developer" || role === "super_admin" || role === "admin" || isDepartmentLead
+  const normalized = normalizeRoleValue(role)
+  return normalized === "developer" || normalized === "super_admin" || normalized === "admin" || isDepartmentLead
 }
 
 export function canAccessAdminSection(scope: AdminScope, section: AdminSection): boolean {
-  if (section === "dev") return scope.role === "developer"
-  if (scope.role === "developer" || scope.role === "super_admin") return true
-  if (scope.role === "admin") {
-    if (!scope.adminDomains || scope.adminDomains.length === 0) return true
+  const role = normalizeRoleValue(scope.role)
+  if (section === "dev") return role === "developer"
+  if (role === "developer" || role === "super_admin") return true
+  if (role === "admin") {
+    if (scope.adminDomains === null) return true
+    if (scope.adminDomains.length === 0) return false
     if (section === "admin") return true
     const mapped = SECTION_TO_DOMAIN[section]
     return mapped ? scope.adminDomains.includes(mapped) : false
@@ -186,9 +186,12 @@ export async function resolveAdminScope(supabase: SupabaseClient, userId: string
     .eq("id", userId)
     .single<ProfileShape>()
 
-  if (!profile?.role || !roleCanEnterAdmin(profile.role, profile.is_department_lead)) return null
+  if (!profile) return null
 
-  const isAdminLike = isAdminLikeRole(profile.role)
+  const normalizedRole = normalizeRoleValue(profile?.role)
+  if (!normalizedRole || !roleCanEnterAdmin(normalizedRole, profile.is_department_lead)) return null
+
+  const isAdminLike = isAdminLikeRole(normalizedRole)
   const managedDepartments = isAdminLike ? [] : scopeDepartments(profile)
   const managedOffices = isAdminLike
     ? []
@@ -196,12 +199,10 @@ export async function resolveAdminScope(supabase: SupabaseClient, userId: string
 
   const isDepartmentLead = Boolean(profile.is_department_lead)
   const adminDomains = normalizeAdminDomains(profile.admin_domains)
-  const isFinanceGlobalLead = isDepartmentLead && hasDepartmentAlias(managedDepartments, FINANCE_DEPARTMENT_ALIASES)
-  const isHrGlobalLead = isDepartmentLead && managedDepartments.includes("Admin & HR")
 
   return {
     userId,
-    role: profile.role,
+    role: normalizedRole,
     department: profile.department ?? null,
     officeLocation: profile.office_location ?? null,
     isDepartmentLead,
@@ -209,8 +210,6 @@ export async function resolveAdminScope(supabase: SupabaseClient, userId: string
     managedDepartments,
     managedOffices,
     isAdminLike,
-    isFinanceGlobalLead,
-    isHrGlobalLead,
     adminDomains,
   }
 }
@@ -218,8 +217,6 @@ export async function resolveAdminScope(supabase: SupabaseClient, userId: string
 export function getDepartmentScope(scope: AdminScope, domain: "finance" | "hr" | "general"): string[] | null {
   if (scope.isAdminLike) return null
   if (!scope.isDepartmentLead) return []
-  if (domain === "finance" && scope.isFinanceGlobalLead) return null
-  if (domain === "hr" && scope.isHrGlobalLead) return null
   return scope.managedDepartments
 }
 

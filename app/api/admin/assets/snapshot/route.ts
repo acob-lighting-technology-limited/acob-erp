@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
-import { createClient as createAdminClient } from "@supabase/supabase-js"
 import { createClient } from "@/lib/supabase/server"
+import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
 
 export async function GET() {
@@ -21,17 +21,18 @@ export async function GET() {
 
   const departmentScope = getDepartmentScope(scope, "general")
 
-  const dataClient =
-    process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
-      ? createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
-          auth: { autoRefreshToken: false, persistSession: false },
-        })
-      : supabase
+  const dataClient = getServiceRoleClientOrFallback(supabase as any)
 
-  const { data: assetsData, error: assetsError } = await dataClient
+  let { data: assetsData, error: assetsError } = await dataClient
     .from("assets")
     .select("*")
     .order("created_at", { ascending: false })
+
+  if (assetsError && dataClient !== supabase) {
+    const fallback = await supabase.from("assets").select("*").order("created_at", { ascending: false })
+    assetsData = fallback.data
+    assetsError = fallback.error
+  }
 
   if (assetsError) {
     return NextResponse.json({ error: assetsError.message }, { status: 500 })

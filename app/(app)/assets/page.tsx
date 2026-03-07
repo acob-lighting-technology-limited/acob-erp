@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
+import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { AssetsContent } from "./assets-content"
 
 export interface Asset {
@@ -30,6 +31,7 @@ export interface AssetAssignment {
 
 async function getAssetsData() {
   const supabase = await createClient()
+  const dataClient = getServiceRoleClientOrFallback(supabase as any)
 
   const {
     data: { user },
@@ -41,14 +43,29 @@ async function getAssetsData() {
   }
 
   // Get user's department and office location
-  const { data: profile } = await supabase
+  const { data: profile } = await dataClient
     .from("profiles")
-    .select("department, office_location")
+    .select("department, department_id, office_location")
     .eq("id", user.id)
     .single()
 
+  let profileDepartment = (profile as any)?.department || null
+  if ((profile as any)?.department_id) {
+    const { data: deptById } = await dataClient
+      .from("departments")
+      .select("name")
+      .eq("id", (profile as any).department_id)
+      .maybeSingle()
+    if (deptById?.name) profileDepartment = deptById.name
+  }
+  if (String(profileDepartment || "").toLowerCase() === "finance") {
+    profileDepartment = "Accounts"
+  }
+
+  let loadError: string | null = null
+
   // Fetch individual assignments
-  const { data: individualAssignments, error: individualError } = await supabase
+  const { data: individualAssignments, error: individualError } = await dataClient
     .from("asset_assignments")
     .select(
       `
@@ -66,36 +83,75 @@ async function getAssetsData() {
 
   if (individualError) {
     console.error("Error loading individual assignments:", individualError)
+    loadError = "Failed to load some asset data"
   }
 
   // Fetch department and office assignments if user has a department or office
   let departmentAndOfficeAssets: any[] = []
-  if (profile?.department || profile?.office_location) {
-    const { data: sharedAssets, error: sharedError } = await supabase
-      .from("assets")
-      .select(
-        `
-        id,
-        unique_code,
-        asset_type,
-        asset_model,
-        serial_number,
-        status,
-        acquisition_year,
-        assignment_type,
-        department,
-        office_location,
-        created_at
-      `
-      )
-      .eq("status", "assigned")
-      .is("deleted_at", null)
-      .or(
-        `and(assignment_type.eq.department,department.eq.${profile.department}),and(assignment_type.eq.office,office_location.eq.${profile.office_location})`
-      )
+  if (profileDepartment || profile?.office_location) {
+    const [departmentAssetsRes, officeAssetsRes] = await Promise.all([
+      profileDepartment
+        ? dataClient
+            .from("assets")
+            .select(
+              `
+              id,
+              unique_code,
+              asset_type,
+              asset_model,
+              serial_number,
+              status,
+              acquisition_year,
+              assignment_type,
+              department,
+              office_location,
+              created_at
+            `
+            )
+            .eq("status", "assigned")
+            .is("deleted_at", null)
+            .eq("assignment_type", "department")
+            .eq("department", profileDepartment)
+        : Promise.resolve({ data: [], error: null } as any),
+      profile?.office_location
+        ? dataClient
+            .from("assets")
+            .select(
+              `
+              id,
+              unique_code,
+              asset_type,
+              asset_model,
+              serial_number,
+              status,
+              acquisition_year,
+              assignment_type,
+              department,
+              office_location,
+              created_at
+            `
+            )
+            .eq("status", "assigned")
+            .is("deleted_at", null)
+            .eq("assignment_type", "office")
+            .eq("office_location", profile.office_location)
+        : Promise.resolve({ data: [], error: null } as any),
+    ])
 
-    if (!sharedError && sharedAssets) {
-      departmentAndOfficeAssets = sharedAssets.map((asset) => ({
+    if (departmentAssetsRes.error || officeAssetsRes.error) {
+      console.error("Error loading shared asset assignments:", departmentAssetsRes.error || officeAssetsRes.error)
+      loadError = loadError || "Failed to load some asset data"
+    }
+
+    const sharedAssets = [...(departmentAssetsRes.data || []), ...(officeAssetsRes.data || [])]
+    const seen = new Set<string>()
+    departmentAndOfficeAssets = sharedAssets
+      .filter((asset) => {
+        if (!asset?.id || seen.has(asset.id)) return false
+        seen.add(asset.id)
+        return true
+      })
+      .map((asset) => ({
         id: `shared-${asset.id}`,
         assigned_at: asset.created_at,
         assignment_notes:
@@ -105,10 +161,9 @@ async function getAssetsData() {
         assigned_by: null,
         asset_id: asset.id,
         department: asset.department,
-        asset: asset,
+        asset,
         assigner: null,
       }))
-    }
   }
 
   // Combine both assignment types
@@ -122,14 +177,14 @@ async function getAssetsData() {
       }
 
       const [assetResult, assignerResult] = await Promise.all([
-        supabase
+        dataClient
           .from("assets")
           .select("id, unique_code, asset_type, asset_model, serial_number, status, acquisition_year")
           .eq("id", assignment.asset_id)
           .is("deleted_at", null)
           .single(),
         assignment.assigned_by
-          ? supabase.from("profiles").select("first_name, last_name").eq("id", assignment.assigned_by).single()
+          ? dataClient.from("profiles").select("first_name, last_name").eq("id", assignment.assigned_by).single()
           : Promise.resolve({ data: null }),
       ])
 
@@ -143,6 +198,7 @@ async function getAssetsData() {
 
   return {
     assignments: assignmentsWithDetails.filter((entry) => Boolean((entry as any).asset)) as AssetAssignment[],
+    loadError,
   }
 }
 
@@ -153,7 +209,7 @@ export default async function AssetsPage() {
     redirect(data.redirect)
   }
 
-  const assetsData = data as { assignments: AssetAssignment[] }
+  const assetsData = data as { assignments: AssetAssignment[]; loadError?: string | null }
 
-  return <AssetsContent initialAssignments={assetsData.assignments} />
+  return <AssetsContent initialAssignments={assetsData.assignments} initialError={assetsData.loadError} />
 }

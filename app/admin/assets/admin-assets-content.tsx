@@ -164,6 +164,7 @@ interface AdminAssetsContentProps {
   initialEmployees: Employee[]
   initialDepartments: string[]
   userProfile: UserProfile
+  initialError?: string | null
 }
 
 export function AdminAssetsContent({
@@ -171,6 +172,7 @@ export function AdminAssetsContent({
   initialEmployees,
   initialDepartments,
   userProfile,
+  initialError,
 }: AdminAssetsContentProps) {
   const router = useRouter()
   const [assets, setAssets] = useState<Asset[]>(initialAssets)
@@ -322,6 +324,12 @@ export function AdminAssetsContent({
   useEffect(() => {
     loadAssetTypes()
   }, [])
+
+  useEffect(() => {
+    if (initialError) {
+      toast.error(initialError)
+    }
+  }, [initialError])
 
   const loadAssetTypes = async () => {
     try {

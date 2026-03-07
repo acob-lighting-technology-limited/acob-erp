@@ -178,13 +178,13 @@ export function AdminCorrespondenceContent({
 
   return (
     <div className="space-y-6 p-6">
-      <div className="grid gap-4 md:grid-cols-5">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-4 md:grid-cols-5">
         <Card>
           <CardHeader>
             <CardTitle className="text-sm">Total</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">{stats.total}</p>
+            <p className="text-lg font-bold sm:text-2xl">{stats.total}</p>
           </CardContent>
         </Card>
         <Card>
@@ -192,7 +192,7 @@ export function AdminCorrespondenceContent({
             <CardTitle className="text-sm">Under Review</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">{stats.underReview}</p>
+            <p className="text-lg font-bold sm:text-2xl">{stats.underReview}</p>
           </CardContent>
         </Card>
         <Card>
@@ -200,7 +200,7 @@ export function AdminCorrespondenceContent({
             <CardTitle className="text-sm">Assigned Action</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">{stats.awaitingAction}</p>
+            <p className="text-lg font-bold sm:text-2xl">{stats.awaitingAction}</p>
           </CardContent>
         </Card>
         <Card>
@@ -208,7 +208,7 @@ export function AdminCorrespondenceContent({
             <CardTitle className="text-sm">Approved</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">{stats.approved}</p>
+            <p className="text-lg font-bold sm:text-2xl">{stats.approved}</p>
           </CardContent>
         </Card>
         <Card>
@@ -216,7 +216,7 @@ export function AdminCorrespondenceContent({
             <CardTitle className="text-sm">Finalized</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">{stats.finalized}</p>
+            <p className="text-lg font-bold sm:text-2xl">{stats.finalized}</p>
           </CardContent>
         </Card>
       </div>
@@ -428,3 +428,4 @@ export function AdminCorrespondenceContent({
     </div>
   )
 }
+

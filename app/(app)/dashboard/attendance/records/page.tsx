@@ -88,31 +88,31 @@ export default function AttendanceRecordsPage() {
       </div>
 
       {/* Summary Cards */}
-      <div className="mb-6 grid gap-4 md:grid-cols-3">
+      <div className="mb-6 grid grid-cols-2 gap-2 sm:gap-3 md:gap-4 md:grid-cols-3">
         <Card>
-          <CardHeader className="pb-2">
+          <CardHeader className="pb-1 px-3 pt-3 sm:px-6 sm:pt-6 sm:pb-2">
             <CardTitle className="text-sm font-medium">Total Days</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{records.length}</div>
+            <div className="text-lg font-bold sm:text-2xl">{records.length}</div>
             <p className="text-muted-foreground text-xs">Days recorded</p>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-2">
+          <CardHeader className="pb-1 px-3 pt-3 sm:px-6 sm:pt-6 sm:pb-2">
             <CardTitle className="text-sm font-medium">Present Days</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{presentDays}</div>
+            <div className="text-lg font-bold sm:text-2xl">{presentDays}</div>
             <p className="text-muted-foreground text-xs">Full attendance</p>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-2">
+          <CardHeader className="pb-1 px-3 pt-3 sm:px-6 sm:pt-6 sm:pb-2">
             <CardTitle className="text-sm font-medium">Total Hours</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalHours.toFixed(1)}</div>
+            <div className="text-lg font-bold sm:text-2xl">{totalHours.toFixed(1)}</div>
             <p className="text-muted-foreground text-xs">Hours worked</p>
           </CardContent>
         </Card>
@@ -164,3 +164,4 @@ export default function AttendanceRecordsPage() {
     </div>
   )
 }
+

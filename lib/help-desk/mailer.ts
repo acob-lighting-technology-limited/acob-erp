@@ -11,7 +11,7 @@ interface HelpDeskMailPayload {
 }
 
 function buildEmailHtml(payload: HelpDeskMailPayload) {
-  const ctaUrl = `${process.env.NEXT_PUBLIC_SITE_URL || "https://erp.acoblighting.com"}${payload.ctaPath || "/portal/help-desk"}`
+  const ctaUrl = `${process.env.NEXT_PUBLIC_SITE_URL || "https://erp.acoblighting.com"}${payload.ctaPath || "/dashboard/help-desk"}`
 
   return `
   <div style="font-family:Arial,sans-serif;max-width:620px;margin:0 auto;padding:24px;border:1px solid #e5e7eb;border-radius:10px;">
@@ -24,6 +24,9 @@ function buildEmailHtml(payload: HelpDeskMailPayload) {
 }
 
 export async function sendHelpDeskMail(payload: HelpDeskMailPayload) {
+  // Temporarily disabled during ERP stabilization/testing.
+  if (process.env.HELP_DESK_EMAIL_ENABLED !== "true") return
+
   const apiKey = process.env.RESEND_API_KEY
   if (!apiKey) return
 

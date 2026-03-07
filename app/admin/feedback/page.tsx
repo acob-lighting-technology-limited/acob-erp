@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
+import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { FeedbackViewerClient } from "@/components/feedback-viewer-client"
 import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
 import { MessageSquare, AlertCircle, Clock, CheckCircle, XCircle } from "lucide-react"
@@ -8,6 +9,7 @@ import { PageHeader, PageWrapper } from "@/components/layout"
 
 export default async function AdminFeedbackPage() {
   const supabase = await createClient()
+  const dataClient = getServiceRoleClientOrFallback(supabase as any)
 
   const { data, error } = await supabase.auth.getUser()
   if (error || !data?.user) {
@@ -20,11 +22,11 @@ export default async function AdminFeedbackPage() {
   }
   const departmentScope = getDepartmentScope(scope, "general")
 
-  let feedbackQuery = supabase.from("feedback").select("*").order("created_at", { ascending: false })
+  let feedbackQuery = dataClient.from("feedback").select("*").order("created_at", { ascending: false })
   if (departmentScope) {
     const { data: scopedUsers } =
       departmentScope.length > 0
-        ? await supabase.from("profiles").select("id").in("department", departmentScope)
+        ? await dataClient.from("profiles").select("id").in("department", departmentScope)
         : { data: [] as { id: string }[] }
     const scopedUserIds = (scopedUsers || []).map((row) => row.id)
     feedbackQuery =
@@ -43,7 +45,7 @@ export default async function AdminFeedbackPage() {
     const userIds = Array.from(new Set(feedbackData.map((f) => f.user_id).filter(Boolean)))
 
     if (userIds.length > 0) {
-      let profilesQuery = supabase
+      let profilesQuery = dataClient
         .from("profiles")
         .select("id, first_name, last_name, company_email, department")
         .in("id", userIds)
@@ -86,13 +88,13 @@ export default async function AdminFeedbackPage() {
       />
 
       {/* Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-5">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-4 md:grid-cols-5">
         <Card className="border-2">
-          <CardContent className="p-4">
+          <CardContent className="p-3 sm:p-4">
             <div className="flex items-center justify-between">
               <div className="min-w-0 flex-1">
                 <p className="text-muted-foreground text-sm font-medium">Total</p>
-                <p className="text-foreground mt-1 text-2xl font-bold">{stats.total}</p>
+                <p className="text-foreground mt-1 text-lg font-bold sm:text-2xl">{stats.total}</p>
               </div>
               <div className="ml-2 shrink-0 rounded-lg bg-blue-100 p-2.5 dark:bg-blue-900/30">
                 <MessageSquare className="h-5 w-5 text-blue-600 dark:text-blue-400" />
@@ -102,11 +104,11 @@ export default async function AdminFeedbackPage() {
         </Card>
 
         <Card className="border-2">
-          <CardContent className="p-4">
+          <CardContent className="p-3 sm:p-4">
             <div className="flex items-center justify-between">
               <div className="min-w-0 flex-1">
                 <p className="text-muted-foreground text-sm font-medium">Open</p>
-                <p className="text-foreground mt-1 text-2xl font-bold">{stats.open}</p>
+                <p className="text-foreground mt-1 text-lg font-bold sm:text-2xl">{stats.open}</p>
               </div>
               <div className="ml-2 flex-shrink-0 rounded-lg bg-green-100 p-2.5 dark:bg-green-900/30">
                 <AlertCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
@@ -116,11 +118,11 @@ export default async function AdminFeedbackPage() {
         </Card>
 
         <Card className="border-2">
-          <CardContent className="p-4">
+          <CardContent className="p-3 sm:p-4">
             <div className="flex items-center justify-between">
               <div className="min-w-0 flex-1">
                 <p className="text-muted-foreground text-sm font-medium">In Progress</p>
-                <p className="text-foreground mt-1 text-2xl font-bold">{stats.inProgress}</p>
+                <p className="text-foreground mt-1 text-lg font-bold sm:text-2xl">{stats.inProgress}</p>
               </div>
               <div className="ml-2 flex-shrink-0 rounded-lg bg-blue-100 p-2.5 dark:bg-blue-900/30">
                 <Clock className="h-5 w-5 text-blue-600 dark:text-blue-400" />
@@ -130,11 +132,11 @@ export default async function AdminFeedbackPage() {
         </Card>
 
         <Card className="border-2">
-          <CardContent className="p-4">
+          <CardContent className="p-3 sm:p-4">
             <div className="flex items-center justify-between">
               <div className="min-w-0 flex-1">
                 <p className="text-muted-foreground text-sm font-medium">Resolved</p>
-                <p className="text-foreground mt-1 text-2xl font-bold">{stats.resolved}</p>
+                <p className="text-foreground mt-1 text-lg font-bold sm:text-2xl">{stats.resolved}</p>
               </div>
               <div className="ml-2 flex-shrink-0 rounded-lg bg-purple-100 p-2.5 dark:bg-purple-900/30">
                 <CheckCircle className="h-5 w-5 text-purple-600 dark:text-purple-400" />
@@ -144,11 +146,11 @@ export default async function AdminFeedbackPage() {
         </Card>
 
         <Card className="border-2">
-          <CardContent className="p-4">
+          <CardContent className="p-3 sm:p-4">
             <div className="flex items-center justify-between">
               <div className="min-w-0 flex-1">
                 <p className="text-muted-foreground text-sm font-medium">Closed</p>
-                <p className="text-foreground mt-1 text-2xl font-bold">{stats.closed}</p>
+                <p className="text-foreground mt-1 text-lg font-bold sm:text-2xl">{stats.closed}</p>
               </div>
               <div className="ml-2 flex-shrink-0 rounded-lg bg-gray-100 p-2.5 dark:bg-gray-900/30">
                 <XCircle className="h-5 w-5 text-gray-600 dark:text-gray-400" />
@@ -163,3 +165,4 @@ export default async function AdminFeedbackPage() {
     </PageWrapper>
   )
 }
+

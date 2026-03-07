@@ -2,6 +2,7 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { PaymentsTable } from "@/components/payments/payments-table"
 import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
+import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 
 interface Payment {
   id: string
@@ -60,9 +61,10 @@ async function getPaymentsData() {
   if (!scope) {
     return { redirect: "/dashboard" as const }
   }
+  const dataClient = getServiceRoleClientOrFallback(supabase as any)
   const departmentScope = getDepartmentScope(scope, "finance")
 
-  let paymentsQuery = supabase
+  let paymentsQuery = dataClient
     .from("department_payments")
     .select(
       `
@@ -74,7 +76,7 @@ async function getPaymentsData() {
     .order("created_at", { ascending: false })
 
   if (departmentScope) {
-    const { data: scopedDepartments } = await supabase.from("departments").select("id").in("name", departmentScope)
+    const { data: scopedDepartments } = await dataClient.from("departments").select("id").in("name", departmentScope)
     const departmentIds = (scopedDepartments || []).map((dept) => dept.id)
     paymentsQuery =
       departmentIds.length > 0 ? paymentsQuery.in("department_id", departmentIds) : paymentsQuery.eq("id", "__none__")
@@ -86,7 +88,7 @@ async function getPaymentsData() {
     console.error("Error loading payments:", paymentsError)
   }
 
-  let departmentsQuery = supabase.from("departments").select("id, name").order("name")
+  let departmentsQuery = dataClient.from("departments").select("id, name").order("name")
   if (departmentScope) {
     departmentsQuery =
       departmentScope.length > 0 ? departmentsQuery.in("name", departmentScope) : departmentsQuery.eq("id", "__none__")
@@ -94,7 +96,7 @@ async function getPaymentsData() {
   const { data: departments } = await departmentsQuery
 
   // Fetch categories
-  const { data: categories } = await supabase.from("payment_categories").select("id, name").order("name")
+  const { data: categories } = await dataClient.from("payment_categories").select("id, name").order("name")
 
   return {
     payments: (payments || []) as Payment[],

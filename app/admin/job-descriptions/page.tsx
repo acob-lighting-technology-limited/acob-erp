@@ -206,13 +206,13 @@ export default function AdminJobDescriptionsPage() {
         </div>
       }
       stats={
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-4 md:grid-cols-4">
           <Card className="border-2">
-            <CardContent className="p-6">
+            <CardContent className="p-3 sm:p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-muted-foreground text-sm font-medium">Total employee</p>
-                  <p className="text-foreground mt-2 text-3xl font-bold">{stats.total}</p>
+                  <p className="text-foreground mt-1 text-lg font-bold sm:mt-2 sm:text-3xl">{stats.total}</p>
                 </div>
                 <div className="rounded-lg bg-blue-100 p-3 dark:bg-blue-900/30">
                   <User className="h-6 w-6 text-blue-600 dark:text-blue-400" />
@@ -222,11 +222,11 @@ export default function AdminJobDescriptionsPage() {
           </Card>
 
           <Card className="border-2">
-            <CardContent className="p-6">
+            <CardContent className="p-3 sm:p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-muted-foreground text-sm font-medium">Completed</p>
-                  <p className="text-foreground mt-2 text-3xl font-bold">{stats.completed}</p>
+                  <p className="text-foreground mt-1 text-lg font-bold sm:mt-2 sm:text-3xl">{stats.completed}</p>
                 </div>
                 <div className="rounded-lg bg-green-100 p-3 dark:bg-green-900/30">
                   <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
@@ -236,11 +236,11 @@ export default function AdminJobDescriptionsPage() {
           </Card>
 
           <Card className="border-2">
-            <CardContent className="p-6">
+            <CardContent className="p-3 sm:p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-muted-foreground text-sm font-medium">Pending</p>
-                  <p className="text-foreground mt-2 text-3xl font-bold">{stats.pending}</p>
+                  <p className="text-foreground mt-1 text-lg font-bold sm:mt-2 sm:text-3xl">{stats.pending}</p>
                 </div>
                 <div className="rounded-lg bg-orange-100 p-3 dark:bg-orange-900/30">
                   <XCircle className="h-6 w-6 text-orange-600 dark:text-orange-400" />
@@ -250,11 +250,11 @@ export default function AdminJobDescriptionsPage() {
           </Card>
 
           <Card className="border-2">
-            <CardContent className="p-6">
+            <CardContent className="p-3 sm:p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-muted-foreground text-sm font-medium">Updated This Month</p>
-                  <p className="text-foreground mt-2 text-3xl font-bold">{stats.thisMonth}</p>
+                  <p className="text-foreground mt-1 text-lg font-bold sm:mt-2 sm:text-3xl">{stats.thisMonth}</p>
                 </div>
                 <div className="rounded-lg bg-purple-100 p-3 dark:bg-purple-900/30">
                   <Calendar className="h-6 w-6 text-purple-600 dark:text-purple-400" />
@@ -266,7 +266,7 @@ export default function AdminJobDescriptionsPage() {
       }
       filters={
         <Card className="border-2">
-          <CardContent className="p-6">
+          <CardContent className="p-3 sm:p-6">
             <div className="flex flex-col gap-4 md:flex-row">
               <div className="relative flex-1">
                 <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform" />
@@ -329,7 +329,7 @@ export default function AdminJobDescriptionsPage() {
       {filteredProfiles.length > 0 ? (
         viewMode === "list" ? (
           <Card className="border-2">
-            <CardContent className="p-6">
+            <CardContent className="p-3 sm:p-6">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -552,3 +552,4 @@ export default function AdminJobDescriptionsPage() {
     </AdminTablePage>
   )
 }
+

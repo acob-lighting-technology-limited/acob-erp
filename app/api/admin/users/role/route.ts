@@ -22,7 +22,19 @@ export async function POST(request: Request) {
     const body = await request.json()
     const targetUserId = String(body?.targetUserId || "")
     const targetRole = String(body?.role || "")
+    const adminDomains = Array.isArray(body?.admin_domains)
+      ? body.admin_domains.map((value: unknown) => String(value || "").trim().toLowerCase()).filter(Boolean)
+      : []
     const employmentStatus = body?.employment_status ? String(body.employment_status) : null
+    const allowedAdminDomains = [
+      "hr",
+      "finance",
+      "assets",
+      "reports",
+      "tasks",
+      "projects",
+      "communications",
+    ]
 
     if (!targetUserId || !targetRole) {
       return NextResponse.json({ error: "Missing targetUserId or role" }, { status: 400 })
@@ -30,6 +42,14 @@ export async function POST(request: Request) {
 
     if (!ASSIGNABLE_ROLES.includes(targetRole as (typeof ASSIGNABLE_ROLES)[number])) {
       return NextResponse.json({ error: "Invalid role supplied" }, { status: 400 })
+    }
+    if (targetRole === "admin") {
+      if (adminDomains.length === 0) {
+        return NextResponse.json({ error: "Admin role requires at least one admin domain." }, { status: 400 })
+      }
+      if (adminDomains.some((value: string) => !allowedAdminDomains.includes(value))) {
+        return NextResponse.json({ error: "Invalid admin domain supplied." }, { status: 400 })
+      }
     }
 
     if (targetUserId === user.id) {
@@ -110,6 +130,7 @@ export async function POST(request: Request) {
     const payload: Record<string, unknown> = {
       role: targetRole,
       is_admin: isAdmin,
+      admin_domains: targetRole === "admin" ? adminDomains : null,
     }
 
     if (employmentStatus) {

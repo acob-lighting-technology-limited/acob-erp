@@ -132,14 +132,14 @@ export default function FinanceReportsPage() {
       ) : (
         <>
           {/* Summary Cards */}
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-4 md:grid-cols-3">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
                 <TrendingUp className="h-4 w-4 text-green-500" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-green-600">{formatCurrency(data.totalRevenue)}</div>
+                <div className="text-lg font-bold sm:text-2xl text-green-600">{formatCurrency(data.totalRevenue)}</div>
                 <p className="text-muted-foreground text-xs">From invoices</p>
               </CardContent>
             </Card>
@@ -149,7 +149,7 @@ export default function FinanceReportsPage() {
                 <TrendingDown className="h-4 w-4 text-red-500" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-red-600">{formatCurrency(data.totalExpenses)}</div>
+                <div className="text-lg font-bold sm:text-2xl text-red-600">{formatCurrency(data.totalExpenses)}</div>
                 <p className="text-muted-foreground text-xs">From payments & bills</p>
               </CardContent>
             </Card>
@@ -159,7 +159,7 @@ export default function FinanceReportsPage() {
                 <DollarSign className="text-muted-foreground h-4 w-4" />
               </CardHeader>
               <CardContent>
-                <div className={`text-2xl font-bold ${data.netIncome >= 0 ? "text-green-600" : "text-red-600"}`}>
+                <div className={`text-lg font-bold sm:text-2xl ${data.netIncome >= 0 ? "text-green-600" : "text-red-600"}`}>
                   {formatCurrency(data.netIncome)}
                 </div>
                 <p className="text-muted-foreground text-xs">Revenue - Expenses</p>
@@ -238,3 +238,4 @@ export default function FinanceReportsPage() {
     </div>
   )
 }
+

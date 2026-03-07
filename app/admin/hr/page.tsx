@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Calendar, Clock, TrendingUp, Users, CheckCircle, AlertCircle, FileText, Building } from "lucide-react"
+import { Calendar, Clock, TrendingUp, Users, CheckCircle, AlertCircle, FileText, Building, MapPin } from "lucide-react"
 import Link from "next/link"
 import { PageWrapper, PageHeader, Section } from "@/components/layout"
 import { StatCard } from "@/components/ui/stat-card"
@@ -15,6 +15,7 @@ interface DashboardStats {
   upcomingReviews: number
   totalEmployees: number
   totalDepartments: number
+  totalOfficeLocations: number
 }
 
 export default function HRAdminDashboard() {
@@ -24,6 +25,7 @@ export default function HRAdminDashboard() {
     upcomingReviews: 0,
     totalEmployees: 0,
     totalDepartments: 0,
+    totalOfficeLocations: 0,
   })
   const [loading, setLoading] = useState(true)
 
@@ -35,8 +37,17 @@ export default function HRAdminDashboard() {
     try {
       const supabase = createClient()
 
-      // Fetch pending leave requests
-      const { data: leaveRequests } = await supabase.from("leave_requests").select("id").eq("status", "pending")
+      // Fetch pending leave requests scoped to this approver, matching /admin/hr/leave/approve queue.
+      let pendingLeaveCount = 0
+      try {
+        const queueRes = await fetch("/api/hr/leave/queue")
+        const queuePayload = await queueRes.json()
+        if (queueRes.ok) {
+          pendingLeaveCount = Array.isArray(queuePayload.data) ? queuePayload.data.length : 0
+        }
+      } catch {
+        pendingLeaveCount = 0
+      }
 
       // Fetch today's attendance
       const today = new Date().toISOString().split("T")[0]
@@ -48,13 +59,19 @@ export default function HRAdminDashboard() {
       // Fetch total employees
       const { count: employeeCount } = await supabase.from("profiles").select("*", { count: "exact", head: true })
       const { count: departmentCount } = await supabase.from("departments").select("*", { count: "exact", head: true })
+      const { data: locations } = await supabase
+        .from("profiles")
+        .select("office_location")
+        .eq("employment_status", "active")
 
       setStats({
-        pendingLeaveRequests: leaveRequests?.length || 0,
+        pendingLeaveRequests: pendingLeaveCount,
         todayAttendance: attendance?.length || 0,
         upcomingReviews: reviews?.length || 0,
         totalEmployees: employeeCount || 0,
         totalDepartments: departmentCount || 0,
+        totalOfficeLocations: new Set((locations || []).map((l: any) => (l.office_location || "").trim()).filter(Boolean))
+          .size,
       })
     } catch (error) {
       console.error("Error fetching dashboard data:", error)
@@ -73,7 +90,7 @@ export default function HRAdminDashboard() {
       />
 
       {/* Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-2 lg:grid-cols-5 md:gap-4">
         <StatCard
           title="Pending Leave"
           value={stats.pendingLeaveRequests}
@@ -108,7 +125,7 @@ export default function HRAdminDashboard() {
 
       {/* Admin Actions */}
       <Section title="HR Management">
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-2 lg:grid-cols-3 md:gap-4">
           {/* Employees Management */}
           <Card>
             <CardHeader>
@@ -137,6 +154,22 @@ export default function HRAdminDashboard() {
             <CardContent>
               <Link href="/admin/hr/departments">
                 <Button className="w-full">Manage Departments ({stats.totalDepartments})</Button>
+              </Link>
+            </CardContent>
+          </Card>
+
+          {/* Office Locations */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <MapPin className="h-5 w-5" />
+                Office Locations
+              </CardTitle>
+              <CardDescription>View locations and assigned employees</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Link href="/admin/hr/office-location">
+                <Button className="w-full">Manage Locations ({stats.totalOfficeLocations})</Button>
               </Link>
             </CardContent>
           </Card>
@@ -245,3 +278,4 @@ export default function HRAdminDashboard() {
     </PageWrapper>
   )
 }
+

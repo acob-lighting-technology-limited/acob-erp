@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { headers } from "next/headers"
 import { createClient } from "@/lib/supabase/server"
 import { notifyUsers } from "@/lib/hr/leave-workflow"
 
@@ -13,16 +14,25 @@ const LEGACY_SLA_STAGE_MAP: Record<string, string> = {
 export async function POST() {
   try {
     const supabase = await createClient()
+    const cronSecret = process.env.CRON_SECRET
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    // Allow secure scheduled execution (e.g. Vercel Cron) via CRON secret.
+    // If no valid cron token is provided, fall back to authenticated RBAC checks.
+    const requestHeaders = headers()
+    const bearerToken = requestHeaders.get("authorization")?.replace(/^Bearer\s+/i, "").trim()
+    const isAuthorizedCron = Boolean(cronSecret && bearerToken && bearerToken === cronSecret)
 
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    if (!isAuthorizedCron) {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
 
-    const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
-    if (!["developer", "admin", "super_admin"].includes(profile?.role)) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+      if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+      const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
+      if (!["developer", "admin", "super_admin"].includes(profile?.role)) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+      }
     }
 
     const { data: slaPolicies } = await supabase
@@ -34,15 +44,51 @@ export async function POST() {
 
     const { data: pendingRequests, error } = await supabase
       .from("leave_requests")
-      .select("id, current_stage_code, current_approver_user_id, created_at")
-      .eq("status", "pending")
+      .select("id, user_id, status, start_date, current_stage_code, current_approver_user_id, created_at")
+      .in("status", ["pending", "pending_evidence"])
 
     if (error) return NextResponse.json({ error: "Failed to fetch pending leave requests" }, { status: 500 })
 
     const now = Date.now()
+    const today = new Date().toISOString().slice(0, 10)
     let remindersSent = 0
 
     for (const request of pendingRequests || []) {
+      // Industry-standard lapse behavior: unresolved requests are expired/cancelled
+      // once leave start date is reached.
+      if (request.start_date && request.start_date <= today) {
+        const expiryReason = `Auto-lapsed: no final approval before leave start date (${request.start_date}).`
+
+        const { error: expireError } = await supabase
+          .from("leave_requests")
+          .update({
+            status: "cancelled",
+            approval_stage: "cancelled",
+            current_stage_code: "cancelled",
+            rejected_reason: expiryReason,
+            current_approver_user_id: null,
+          })
+          .eq("id", request.id)
+          .in("status", ["pending", "pending_evidence"])
+
+        if (!expireError) {
+          const recipientIds = [request.user_id, request.current_approver_user_id].filter(Boolean) as string[]
+          if (recipientIds.length > 0) {
+            const uniqueRecipients = Array.from(new Set(recipientIds))
+            await notifyUsers(supabase, {
+              userIds: uniqueRecipients,
+              title: "Leave request lapsed",
+              message: `Leave request ${request.id} was automatically lapsed because it was not fully approved before start date.`,
+              linkUrl: "/dashboard/leave",
+              entityId: request.id,
+            })
+            remindersSent += uniqueRecipients.length
+          }
+        }
+
+        continue
+      }
+
       if (!request.current_approver_user_id) continue
 
       const slaStage = LEGACY_SLA_STAGE_MAP[request.current_stage_code || ""] || "reliever_pending"

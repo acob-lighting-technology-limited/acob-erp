@@ -11,6 +11,27 @@ import {
 } from "@/lib/help-desk/server"
 import { sendHelpDeskMail } from "@/lib/help-desk/mailer"
 
+function describeError(error: unknown): string {
+  if (error instanceof Error) return error.message
+  if (typeof error === "string") return error
+  if (error && typeof error === "object") {
+    const maybe = error as Record<string, unknown>
+    const parts = [
+      typeof maybe.message === "string" ? maybe.message : "",
+      typeof maybe.details === "string" ? maybe.details : "",
+      typeof maybe.hint === "string" ? maybe.hint : "",
+      typeof maybe.code === "string" ? `code=${maybe.code}` : "",
+    ].filter(Boolean)
+    if (parts.length > 0) return parts.join(" | ")
+    try {
+      return JSON.stringify(maybe)
+    } catch {
+      return "Unserializable error object"
+    }
+  }
+  return "Unknown error"
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { supabase, user, profile } = await getAuthContext()
@@ -30,7 +51,7 @@ export async function GET(request: NextRequest) {
       : []
 
     if (scope === "mine") {
-      query = query.or(`requester_id.eq.${user.id},assigned_to.eq.${user.id}`)
+      query = query.or(`requester_id.eq.${user.id},assigned_to.eq.${user.id},created_by.eq.${user.id}`)
     } else if (scope === "department") {
       if (!isAdminRole(profile.role) && !profile.is_department_lead) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 })
@@ -64,7 +85,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ data: rows })
   } catch (error) {
     console.error("Error in GET /api/help-desk/tickets:", error)
-    return NextResponse.json({ error: "Failed to fetch tickets" }, { status: 500 })
+    return NextResponse.json({ error: `Failed to fetch tickets: ${describeError(error)}` }, { status: 500 })
   }
 }
 
@@ -127,7 +148,20 @@ export async function POST(request: NextRequest) {
       selectedCategory = categoryRow
       supportMode = requestType === "support" ? categoryRow.support_mode || "open_queue" : null
     } else if (requestType === "support") {
-      return NextResponse.json({ error: "Support category is required" }, { status: 400 })
+      // Backward-compatible fallback: if no support categories exist for this department yet,
+      // allow creating the ticket with a default open queue mode.
+      const { count: availableSupportCategories } = await supabase
+        .from("help_desk_categories")
+        .select("id", { count: "exact", head: true })
+        .eq("is_active", true)
+        .eq("service_department", serviceDepartment)
+        .eq("request_type", "support")
+
+      if ((availableSupportCategories || 0) > 0) {
+        return NextResponse.json({ error: "Support category is required" }, { status: 400 })
+      }
+
+      supportMode = "open_queue"
     }
 
     const initialStatus = approvalRequired
@@ -137,30 +171,66 @@ export async function POST(request: NextRequest) {
         : "department_queue"
     const initialHandlingMode = approvalRequired ? "individual" : "queue"
 
-    const { data: created, error: createError } = await supabase
+    const commonCategoryValue =
+      category || selectedCategory?.name || (requestType === "support" && !selectedCategory ? "General Support" : null)
+
+    const modernInsertPayload = {
+      title,
+      description: description || null,
+      service_department: serviceDepartment,
+      request_type: requestType,
+      category: commonCategoryValue,
+      category_id: selectedCategory?.id || null,
+      priority,
+      status: initialStatus,
+      requester_id: user.id,
+      created_by: user.id,
+      requester_department: profile.department || null,
+      support_mode: supportMode,
+      handling_mode: initialHandlingMode,
+      approval_required: approvalRequired,
+      submitted_at: submittedAt.toISOString(),
+      sla_target_at: slaTarget.toISOString(),
+      paused_at: approvalRequired ? submittedAt.toISOString() : null,
+      current_approval_stage: approvalRequired ? "requester_department_lead" : null,
+    }
+
+    const legacyInsertPayload = {
+      title,
+      description: description || null,
+      service_department: serviceDepartment,
+      request_type: requestType,
+      category: commonCategoryValue,
+      priority,
+      status: approvalRequired ? "pending_approval" : "new",
+      requester_id: user.id,
+      created_by: user.id,
+      approval_required: approvalRequired,
+      submitted_at: submittedAt.toISOString(),
+      sla_target_at: slaTarget.toISOString(),
+      paused_at: approvalRequired ? submittedAt.toISOString() : null,
+    }
+
+    let { data: created, error: createError } = await supabase
       .from("help_desk_tickets")
-      .insert({
-        title,
-        description: description || null,
-        service_department: serviceDepartment,
-        request_type: requestType,
-        category: category || selectedCategory?.name || null,
-        category_id: selectedCategory?.id || null,
-        priority,
-        status: initialStatus,
-        requester_id: user.id,
-        created_by: user.id,
-        requester_department: profile.department || null,
-        support_mode: supportMode,
-        handling_mode: initialHandlingMode,
-        approval_required: approvalRequired,
-        submitted_at: submittedAt.toISOString(),
-        sla_target_at: slaTarget.toISOString(),
-        paused_at: approvalRequired ? submittedAt.toISOString() : null,
-        current_approval_stage: approvalRequired ? "requester_department_lead" : null,
-      })
+      .insert(modernInsertPayload)
       .select("*")
       .single()
+
+    const schemaDriftError =
+      !!createError &&
+      typeof createError.message === "string" &&
+      (createError.message.includes("column") ||
+        createError.message.includes("violates check constraint") ||
+        createError.message.includes("invalid input value"))
+
+    if (schemaDriftError) {
+      ;({ data: created, error: createError } = await supabase
+        .from("help_desk_tickets")
+        .insert(legacyInsertPayload)
+        .select("*")
+        .single())
+    }
 
     if (createError) throw createError
 
@@ -173,12 +243,21 @@ export async function POST(request: NextRequest) {
     const serviceLead = resolveLeadForDepartment(leadCandidates || [], serviceDepartment)
 
     if (approvalRequired) {
-      await supabase.from("help_desk_approvals").insert([
+      const modernApprovals = [
         { ticket_id: created.id, approval_stage: "requester_department_lead", status: "pending" },
         { ticket_id: created.id, approval_stage: "service_department_lead", status: "pending" },
         { ticket_id: created.id, approval_stage: "head_corporate_services", status: "pending" },
         { ticket_id: created.id, approval_stage: "managing_director", status: "pending" },
-      ])
+      ]
+      const legacyApprovals = [
+        { ticket_id: created.id, approval_stage: "department_lead", status: "pending" },
+        { ticket_id: created.id, approval_stage: "head_corporate_services", status: "pending" },
+        { ticket_id: created.id, approval_stage: "managing_director", status: "pending" },
+      ]
+      const { error: approvalsError } = await supabase.from("help_desk_approvals").insert(modernApprovals)
+      if (approvalsError) {
+        await supabase.from("help_desk_approvals").insert(legacyApprovals)
+      }
     }
 
     await appendHelpDeskEvent({
@@ -247,7 +326,7 @@ export async function POST(request: NextRequest) {
         title: "New Help Desk Ticket Submitted",
         message: `${created.title} (${created.service_department}) has been submitted with ${created.priority} priority.`,
         ticketNumber: created.ticket_number,
-        ctaPath: approvalRequired ? "/admin/help-desk" : "/portal/help-desk",
+        ctaPath: approvalRequired ? "/admin/help-desk" : "/dashboard/help-desk",
       })
     } catch (mailError) {
       console.error("Help desk mail error (create):", mailError)
@@ -256,6 +335,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ data: created }, { status: 201 })
   } catch (error) {
     console.error("Error in POST /api/help-desk/tickets:", error)
-    return NextResponse.json({ error: "Failed to create ticket" }, { status: 500 })
+    return NextResponse.json({ error: `Failed to create ticket: ${describeError(error)}` }, { status: 500 })
   }
 }

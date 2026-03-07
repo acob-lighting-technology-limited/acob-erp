@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -31,6 +32,7 @@ import type { UserRole } from "@/types/database"
 import Link from "next/link"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import type { UserProfile, Task, Asset, Documentation, Feedback } from "./page"
+import { toast } from "sonner"
 
 interface ProfileContentProps {
   profile: UserProfile | null
@@ -38,10 +40,17 @@ interface ProfileContentProps {
   assets: Asset[]
   documentation: Documentation[]
   feedback: Feedback[]
+  initialError?: string | null
 }
 
-export function ProfileContent({ profile, tasks, assets, documentation, feedback }: ProfileContentProps) {
+export function ProfileContent({ profile, tasks, assets, documentation, feedback, initialError }: ProfileContentProps) {
   const router = useRouter()
+
+  useEffect(() => {
+    if (initialError) {
+      toast.error(initialError)
+    }
+  }, [initialError])
 
   const getStatusColor = (status: string) => {
     switch (status?.toLowerCase()) {
@@ -236,8 +245,8 @@ export function ProfileContent({ profile, tasks, assets, documentation, feedback
             <div className="bg-muted/50 flex items-center gap-3 rounded-lg p-3">
               <MapPin className="text-muted-foreground h-5 w-5 shrink-0" />
               <div className="min-w-0">
-                <p className="text-muted-foreground text-xs">Work Location</p>
-                <p className="truncate text-sm font-medium">{profile?.current_work_location || "Not set"}</p>
+                <p className="text-muted-foreground text-xs">Office Location</p>
+                <p className="truncate text-sm font-medium">{profile?.office_location || "Not set"}</p>
               </div>
             </div>
 
@@ -449,7 +458,7 @@ export function ProfileContent({ profile, tasks, assets, documentation, feedback
                           <TableCell>{new Date(doc.created_at).toLocaleDateString()}</TableCell>
                           <TableCell className="text-right">
                             <Link
-                              href={`/documentation?docId=${doc.id}`}
+                              href={`/documentation/internal?docId=${doc.id}`}
                               className={buttonVariants({ variant: "ghost", size: "sm" })}
                             >
                               View

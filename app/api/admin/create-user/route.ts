@@ -24,8 +24,7 @@ export async function POST(request: NextRequest) {
   }
 
   const scope = await resolveAdminScope(supabase as any, user.id)
-  const canManageUsers =
-    !!scope && (scope.isAdminLike || (scope.isDepartmentLead && scope.managedDepartments.includes("Admin & HR")))
+  const canManageUsers = !!scope && scope.isAdminLike
   if (!canManageUsers) {
     return NextResponse.json({ success: false, error: "Forbidden: Insufficient privileges" }, { status: 403 })
   }
@@ -48,6 +47,18 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const { firstName, lastName, otherNames, email, department, companyRole, phoneNumber, role, employeeNumber } = body
+    const adminDomains = Array.isArray(body?.admin_domains)
+      ? body.admin_domains.map((value: unknown) => String(value || "").trim().toLowerCase()).filter(Boolean)
+      : []
+    const allowedAdminDomains = [
+      "hr",
+      "finance",
+      "assets",
+      "reports",
+      "tasks",
+      "projects",
+      "communications",
+    ]
 
     // Validate role if provided
     const allowedRoles = [...ASSIGNABLE_ROLES]
@@ -84,6 +95,26 @@ export async function POST(request: NextRequest) {
         },
         { status: 403 }
       )
+    }
+    if (targetRole === "admin") {
+      if (adminDomains.length === 0) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Admin role requires at least one admin domain.",
+          },
+          { status: 400 }
+        )
+      }
+      if (adminDomains.some((value: string) => !allowedAdminDomains.includes(value))) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Invalid admin domain supplied.",
+          },
+          { status: 400 }
+        )
+      }
     }
 
     // Validate required fields (department is optional for executives like MD)
@@ -183,6 +214,7 @@ export async function POST(request: NextRequest) {
         company_role: companyRole || null,
         phone_number: phoneNumber || null,
         role: targetRole,
+        admin_domains: targetRole === "admin" ? adminDomains : null,
         is_admin: ["developer", "super_admin", "admin"].includes(targetRole),
         is_department_lead: false,
         lead_departments: [],

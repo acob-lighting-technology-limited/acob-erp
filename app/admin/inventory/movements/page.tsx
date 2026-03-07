@@ -112,14 +112,14 @@ export default function MovementsPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Movements</CardTitle>
             <ArrowUpDown className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.total}</div>
+            <div className="text-lg font-bold sm:text-2xl">{stats.total}</div>
           </CardContent>
         </Card>
         <Card>
@@ -128,7 +128,7 @@ export default function MovementsPage() {
             <ArrowDown className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">+{stats.in}</div>
+            <div className="text-lg font-bold sm:text-2xl text-green-600">+{stats.in}</div>
           </CardContent>
         </Card>
         <Card>
@@ -137,7 +137,7 @@ export default function MovementsPage() {
             <ArrowUp className="h-4 w-4 text-red-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">-{stats.out}</div>
+            <div className="text-lg font-bold sm:text-2xl text-red-600">-{stats.out}</div>
           </CardContent>
         </Card>
       </div>
@@ -219,3 +219,4 @@ export default function MovementsPage() {
     </div>
   )
 }
+

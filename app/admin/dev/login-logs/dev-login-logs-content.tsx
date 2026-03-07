@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -41,7 +40,6 @@ function toCsv(rows: DevLoginLogRow[]) {
 }
 
 export function DevLoginLogsContent() {
-  const supabase = createClient()
   const [loading, setLoading] = useState(true)
   const [rows, setRows] = useState<DevLoginLogRow[]>([])
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -56,19 +54,24 @@ export function DevLoginLogsContent() {
   const load = async () => {
     setLoading(true)
     setErrorMessage(null)
-    const { data, error } = await supabase
-      .from("dev_login_logs")
-      .select("id, email, full_name, role, ip_address, user_agent, auth_method, login_at")
-      .order("login_at", { ascending: false })
-      .limit(2000)
+    try {
+      const response = await fetch("/api/admin/dev/login-logs", {
+        method: "GET",
+        credentials: "include",
+        cache: "no-store",
+      })
+      const payload = await response.json()
 
-    if (error) {
+      if (!response.ok) {
+        throw new Error(payload?.error || `Failed to load logs (${response.status})`)
+      }
+
+      setRows((payload?.data || []) as DevLoginLogRow[])
+    } catch (error: any) {
       console.error(error)
       toast.error("Failed to load developer login logs")
-      setErrorMessage(error.message || "Unknown error while loading dev login logs.")
+      setErrorMessage(error?.message || "Unknown error while loading dev login logs.")
       setRows([])
-    } else {
-      setRows((data || []) as DevLoginLogRow[])
     }
     setLoading(false)
   }

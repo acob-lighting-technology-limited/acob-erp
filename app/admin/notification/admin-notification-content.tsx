@@ -270,7 +270,7 @@ export function AdminNotificationContent({ initialNotifications }: AdminNotifica
             title: "Pending Leave Requests",
             message: `${pendingLeaveCount} leave request${pendingLeaveCount > 1 ? "s" : ""} awaiting approval`,
             timestamp,
-            link: "/admin/hr/leave",
+            link: "/admin/hr/leave/approve",
             linkText: "Review Requests",
             read: readIds.has("pending-leave"),
             priority: "high",
@@ -422,52 +422,52 @@ export function AdminNotificationContent({ initialNotifications }: AdminNotifica
       />
 
       {/* Stats */}
-      <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-8">
+      <div className="mb-6 grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3 md:gap-4 lg:grid-cols-8">
         <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold">{categoryCounts.all}</div>
+          <CardContent className="p-3 sm:p-4">
+            <div className="text-lg font-bold sm:text-2xl">{categoryCounts.all}</div>
             <div className="text-muted-foreground text-xs">Total</div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-blue-600">{categoryCounts.unread}</div>
+          <CardContent className="p-3 sm:p-4">
+            <div className="text-lg font-bold sm:text-2xl text-blue-600">{categoryCounts.unread}</div>
             <div className="text-muted-foreground text-xs">Unread</div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-orange-600">{categoryCounts.users}</div>
+          <CardContent className="p-3 sm:p-4">
+            <div className="text-lg font-bold sm:text-2xl text-orange-600">{categoryCounts.users}</div>
             <div className="text-muted-foreground text-xs">Users</div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-green-600">{categoryCounts.tasks}</div>
+          <CardContent className="p-3 sm:p-4">
+            <div className="text-lg font-bold sm:text-2xl text-green-600">{categoryCounts.tasks}</div>
             <div className="text-muted-foreground text-xs">Tasks</div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-red-600">{categoryCounts.payments}</div>
+          <CardContent className="p-3 sm:p-4">
+            <div className="text-lg font-bold sm:text-2xl text-red-600">{categoryCounts.payments}</div>
             <div className="text-muted-foreground text-xs">Payments</div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-purple-600">{categoryCounts.leave}</div>
+          <CardContent className="p-3 sm:p-4">
+            <div className="text-lg font-bold sm:text-2xl text-purple-600">{categoryCounts.leave}</div>
             <div className="text-muted-foreground text-xs">Leave</div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-indigo-600">{categoryCounts.assets}</div>
+          <CardContent className="p-3 sm:p-4">
+            <div className="text-lg font-bold sm:text-2xl text-indigo-600">{categoryCounts.assets}</div>
             <div className="text-muted-foreground text-xs">Assets</div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-teal-600">{categoryCounts.feedback}</div>
+          <CardContent className="p-3 sm:p-4">
+            <div className="text-lg font-bold sm:text-2xl text-teal-600">{categoryCounts.feedback}</div>
             <div className="text-muted-foreground text-xs">Feedback</div>
           </CardContent>
         </Card>
@@ -691,3 +691,4 @@ export function AdminNotificationContent({ initialNotifications }: AdminNotifica
     </PageWrapper>
   )
 }
+

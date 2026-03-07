@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { buttonVariants } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { PageHeader, PageWrapper } from "@/components/layout"
-import { Code2, ScrollText, ShieldEllipsis, ShieldAlert, FlaskConical } from "lucide-react"
+import { Code2, ScrollText, ShieldEllipsis, ShieldAlert, FlaskConical, Bug } from "lucide-react"
 
 const sections = [
   {
@@ -23,6 +23,12 @@ const sections = [
     description: "Inspect suspicious or high-risk security-related audit events.",
     href: "/admin/dev/security-events",
     icon: ShieldAlert,
+  },
+  {
+    title: "UI Error Monitor",
+    description: "Track runtime frontend errors captured globally across all pages.",
+    href: "/admin/dev/ui-errors",
+    icon: Bug,
   },
   {
     title: "Tests",

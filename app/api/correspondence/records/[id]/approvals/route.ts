@@ -143,7 +143,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         p_title: `Correspondence ${decision}`,
         p_message: `${record.reference_number} was marked ${decision}`,
         p_priority: decision === "rejected" ? "high" : "normal",
-        p_link_url: "/portal/correspondence",
+        p_link_url: "/dashboard/correspondence",
         p_actor_id: user.id,
         p_entity_type: "correspondence_record",
         p_entity_id: record.id,

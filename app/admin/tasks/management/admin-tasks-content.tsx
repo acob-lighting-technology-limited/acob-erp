@@ -47,6 +47,7 @@ import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { Checkbox } from "@/components/ui/checkbox"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { dateValidation } from "@/lib/validation"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 export interface Task {
   id: string
@@ -87,10 +88,14 @@ export interface employee {
   company_email: string
   department: string
   employment_status?: string | null
+  is_department_lead?: boolean
+  lead_departments?: string[] | null
 }
 
 export interface UserProfile {
+  id: string
   role: string
+  department?: string | null
   is_department_lead?: boolean
   lead_departments?: string[]
   managed_departments?: string[]
@@ -532,6 +537,56 @@ export function AdminTasksContent({
     completed: tasks.filter((t) => t.status === "completed").length,
   }
 
+  const finalTaskStatuses = new Set(["completed", "cancelled", "archived", "closed"])
+  const allPendingWorkflowTasks = tasks.filter((task) => !finalTaskStatuses.has(String(task.status || "").toLowerCase()))
+  const taskHistory = tasks.filter((task) => finalTaskStatuses.has(String(task.status || "").toLowerCase()))
+
+  const managedDeptSet = new Set(scopedDepartments)
+  const departmentLeadMap = new Map<string, employee[]>()
+  for (const member of activeEmployees) {
+    const managed = new Set<string>()
+    if (member.department) managed.add(member.department)
+    for (const dept of member.lead_departments || []) {
+      if (dept) managed.add(dept)
+    }
+    if (!member.is_department_lead) continue
+    for (const dept of Array.from(managed)) {
+      const rows = departmentLeadMap.get(dept) || []
+      rows.push(member)
+      departmentLeadMap.set(dept, rows)
+    }
+  }
+
+  const myTaskActionQueue = allPendingWorkflowTasks.filter((task) => {
+    if (task.assignment_type === "multiple" && task.assigned_users) {
+      return task.assigned_users.some((member) => member.id === userProfile.id && !member.completed)
+    }
+    if (task.assignment_type === "department") {
+      if (!task.department) return false
+      if (managedDeptSet.size > 0) return managedDeptSet.has(task.department)
+      return Boolean(userProfile.department && task.department === userProfile.department)
+    }
+    return task.assigned_to === userProfile.id
+  })
+
+  const workflowOwnerLabel = (task: Task) => {
+    if (task.assignment_type === "multiple" && task.assigned_users) {
+      const names = task.assigned_users
+        .map((member) => `${formatName(member.first_name)} ${formatName(member.last_name)}`.trim())
+        .filter(Boolean)
+      return names.length > 0 ? names.join(", ") : "Unassigned"
+    }
+    if (task.assignment_type === "department") {
+      const dept = task.department || ""
+      if (!dept) return "Department"
+      const leads = departmentLeadMap.get(dept) || []
+      if (leads.length === 0) return `${dept} Lead (Unassigned)`
+      return leads.map((lead) => `${formatName(lead.first_name)} ${formatName(lead.last_name)}`.trim()).join(", ")
+    }
+    if (task.assigned_to_user) return `${formatName(task.assigned_to_user.first_name)} ${formatName(task.assigned_to_user.last_name)}`
+    return "Unassigned"
+  }
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case "completed":
@@ -603,13 +658,13 @@ export function AdminTasksContent({
         </div>
       }
       stats={
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-4 md:grid-cols-4">
           <Card className="border-2">
-            <CardContent className="p-6">
+            <CardContent className="p-3 sm:p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-muted-foreground text-sm font-medium">Total Tasks</p>
-                  <p className="text-foreground mt-2 text-3xl font-bold">{stats.total}</p>
+                  <p className="text-foreground mt-1 text-lg font-bold sm:mt-2 sm:text-3xl">{stats.total}</p>
                 </div>
                 <div className="rounded-lg bg-blue-100 p-3 dark:bg-blue-900/30">
                   <ClipboardList className="h-6 w-6 text-blue-600 dark:text-blue-400" />
@@ -619,11 +674,11 @@ export function AdminTasksContent({
           </Card>
 
           <Card className="border-2">
-            <CardContent className="p-6">
+            <CardContent className="p-3 sm:p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-muted-foreground text-sm font-medium">Pending</p>
-                  <p className="text-foreground mt-2 text-3xl font-bold">{stats.pending}</p>
+                  <p className="text-foreground mt-1 text-lg font-bold sm:mt-2 sm:text-3xl">{stats.pending}</p>
                 </div>
                 <div className="rounded-lg bg-yellow-100 p-3 dark:bg-yellow-900/30">
                   <ClipboardList className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
@@ -633,11 +688,11 @@ export function AdminTasksContent({
           </Card>
 
           <Card className="border-2">
-            <CardContent className="p-6">
+            <CardContent className="p-3 sm:p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-muted-foreground text-sm font-medium">In Progress</p>
-                  <p className="text-foreground mt-2 text-3xl font-bold">{stats.in_progress}</p>
+                  <p className="text-foreground mt-1 text-lg font-bold sm:mt-2 sm:text-3xl">{stats.in_progress}</p>
                 </div>
                 <div className="rounded-lg bg-blue-100 p-3 dark:bg-blue-900/30">
                   <ClipboardList className="h-6 w-6 text-blue-600 dark:text-blue-400" />
@@ -647,11 +702,11 @@ export function AdminTasksContent({
           </Card>
 
           <Card className="border-2">
-            <CardContent className="p-6">
+            <CardContent className="p-3 sm:p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-muted-foreground text-sm font-medium">Completed</p>
-                  <p className="text-foreground mt-2 text-3xl font-bold">{stats.completed}</p>
+                  <p className="text-foreground mt-1 text-lg font-bold sm:mt-2 sm:text-3xl">{stats.completed}</p>
                 </div>
                 <div className="rounded-lg bg-green-100 p-3 dark:bg-green-900/30">
                   <ClipboardList className="h-6 w-6 text-green-600 dark:text-green-400" />
@@ -663,7 +718,7 @@ export function AdminTasksContent({
       }
       filters={
         <Card className="border-2">
-          <CardContent className="p-6">
+          <CardContent className="p-3 sm:p-6">
             <div className="flex flex-col gap-4 md:flex-row">
               <div className="relative flex-1">
                 <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform" />
@@ -747,6 +802,123 @@ export function AdminTasksContent({
       }
       filtersInCard={false}
     >
+      <Tabs defaultValue="pending" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="pending">Pending Queue ({allPendingWorkflowTasks.length})</TabsTrigger>
+          <TabsTrigger value="history">History ({taskHistory.length})</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="pending" className="space-y-4">
+          <Card className="border-2">
+            <CardHeader>
+              <CardTitle>All Pending Task Workflow</CardTitle>
+            </CardHeader>
+            <CardContent className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-12">S/N</TableHead>
+                    <TableHead>Task</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Priority</TableHead>
+                    <TableHead>Current Owner</TableHead>
+                    <TableHead>Due Date</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {allPendingWorkflowTasks.map((task, index) => (
+                    <TableRow key={task.id}>
+                      <TableCell>{index + 1}</TableCell>
+                      <TableCell className="font-medium">{task.title}</TableCell>
+                      <TableCell>
+                        <Badge className={getStatusColor(task.status)}>{task.status.replace("_", " ")}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={getPriorityColor(task.priority)}>{task.priority}</Badge>
+                      </TableCell>
+                      <TableCell>{workflowOwnerLabel(task)}</TableCell>
+                      <TableCell>{task.due_date ? formatDate(task.due_date) : "-"}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+
+          <Card className="border-2">
+            <CardHeader>
+              <CardTitle>My Action Queue</CardTitle>
+            </CardHeader>
+            <CardContent className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-12">S/N</TableHead>
+                    <TableHead>Task</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Priority</TableHead>
+                    <TableHead>Due Date</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {myTaskActionQueue.map((task, index) => (
+                    <TableRow key={task.id}>
+                      <TableCell>{index + 1}</TableCell>
+                      <TableCell className="font-medium">{task.title}</TableCell>
+                      <TableCell>
+                        <Badge className={getStatusColor(task.status)}>{task.status.replace("_", " ")}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={getPriorityColor(task.priority)}>{task.priority}</Badge>
+                      </TableCell>
+                      <TableCell>{task.due_date ? formatDate(task.due_date) : "-"}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="history">
+          <Card className="border-2">
+            <CardHeader>
+              <CardTitle>Task History</CardTitle>
+            </CardHeader>
+            <CardContent className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-12">S/N</TableHead>
+                    <TableHead>Task</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Priority</TableHead>
+                    <TableHead>Current Owner</TableHead>
+                    <TableHead>Due Date</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {taskHistory.map((task, index) => (
+                    <TableRow key={task.id}>
+                      <TableCell>{index + 1}</TableCell>
+                      <TableCell className="font-medium">{task.title}</TableCell>
+                      <TableCell>
+                        <Badge className={getStatusColor(task.status)}>{task.status.replace("_", " ")}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={getPriorityColor(task.priority)}>{task.priority}</Badge>
+                      </TableCell>
+                      <TableCell>{workflowOwnerLabel(task)}</TableCell>
+                      <TableCell>{task.due_date ? formatDate(task.due_date) : "-"}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
       {/* Tasks List */}
       {filteredTasks.length > 0 ? (
         viewMode === "list" ? (
@@ -1254,3 +1426,4 @@ export function AdminTasksContent({
     </AdminTablePage>
   )
 }
+

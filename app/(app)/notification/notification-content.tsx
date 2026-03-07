@@ -231,28 +231,28 @@ export function NotificationContent({ initialNotifications, userId }: Notificati
       />
 
       {/* Stats */}
-      <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className="mb-6 grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3 md:gap-4">
         <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold">{categoryCounts.all}</div>
+          <CardContent className="p-3 sm:p-4">
+            <div className="text-lg font-bold sm:text-2xl">{categoryCounts.all}</div>
             <div className="text-muted-foreground text-xs">Total</div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-blue-600">{categoryCounts.unread}</div>
+          <CardContent className="p-3 sm:p-4">
+            <div className="text-lg font-bold sm:text-2xl text-blue-600">{categoryCounts.unread}</div>
             <div className="text-muted-foreground text-xs">Unread</div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-green-600">{categoryCounts.tasks}</div>
+          <CardContent className="p-3 sm:p-4">
+            <div className="text-lg font-bold sm:text-2xl text-green-600">{categoryCounts.tasks}</div>
             <div className="text-muted-foreground text-xs">Tasks</div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-purple-600">{categoryCounts.assets}</div>
+          <CardContent className="p-3 sm:p-4">
+            <div className="text-lg font-bold sm:text-2xl text-purple-600">{categoryCounts.assets}</div>
             <div className="text-muted-foreground text-xs">Assets</div>
           </CardContent>
         </Card>
@@ -473,3 +473,4 @@ export function NotificationContent({ initialNotifications, userId }: Notificati
     </PageWrapper>
   )
 }
+

@@ -7,6 +7,7 @@ import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 interface LeaveItem {
@@ -21,9 +22,11 @@ interface LeaveItem {
   approval_stage: string
   current_stage_code?: string
   current_stage_order?: number
+  current_approver_user_id?: string
   created_at: string
   user?: { full_name: string; company_email: string }
   leave_type?: { name: string }
+  current_approver?: { id: string; full_name: string; company_email: string; role?: string | null } | null
   evidence?: Array<{
     id: string
     document_type: string
@@ -52,7 +55,8 @@ const STAGE_LABELS: Record<string, string> = {
 
 export default function LeaveApprovePage() {
   const [loading, setLoading] = useState(true)
-  const [pendingQueue, setPendingQueue] = useState<LeaveItem[]>([])
+  const [myQueue, setMyQueue] = useState<LeaveItem[]>([])
+  const [allPendingQueue, setAllPendingQueue] = useState<LeaveItem[]>([])
   const [history, setHistory] = useState<LeaveItem[]>([])
 
   useEffect(() => {
@@ -62,15 +66,21 @@ export default function LeaveApprovePage() {
   async function loadData() {
     setLoading(true)
     try {
-      const [queueRes, requestsRes] = await Promise.all([
+      const [myQueueRes, allQueueRes, requestsRes] = await Promise.all([
         fetch("/api/hr/leave/queue"),
+        fetch("/api/hr/leave/queue?all=true"),
         fetch("/api/hr/leave/requests?all=true"),
       ])
-      const queuePayload = await queueRes.json()
+      const myQueuePayload = await myQueueRes.json()
+      const allQueuePayload = await allQueueRes.json()
       const requestPayload = await requestsRes.json()
 
-      setPendingQueue(queuePayload.data || [])
-      setHistory(requestPayload.data || [])
+      setMyQueue(myQueuePayload.data || [])
+      setAllPendingQueue(allQueuePayload.data || [])
+      const allRequests = (requestPayload.data || []) as LeaveItem[]
+      setHistory(
+        allRequests.filter((item) => !["pending", "pending_evidence"].includes(String(item.status || "").toLowerCase()))
+      )
     } catch {
       toast.error("Failed to load leave data")
     } finally {
@@ -79,7 +89,7 @@ export default function LeaveApprovePage() {
   }
 
   async function handleAction(id: string, action: "approve" | "reject") {
-    const target = pendingQueue.find((item) => item.id === id) || history.find((item) => item.id === id)
+    const target = myQueue.find((item) => item.id === id) || history.find((item) => item.id === id)
     const needsOverride = action === "approve" && target && target.evidence_complete === false
 
     let comments = action === "reject" ? window.prompt("Rejection reason") || "" : ""
@@ -119,6 +129,22 @@ export default function LeaveApprovePage() {
     }
   }
 
+  function expectedApproverLabel(item: LeaveItem) {
+    if (item.current_approver?.full_name) return item.current_approver.full_name
+    const stage = item.current_stage_code || item.approval_stage
+    const expectedByStage: Record<string, string> = {
+      pending_reliever: "Assigned Reliever",
+      reliever_pending: "Assigned Reliever",
+      pending_department_lead: "Department Lead",
+      supervisor_pending: "Department Lead",
+      pending_admin_hr_lead: "Admin & HR Lead",
+      hr_pending: "Admin & HR Lead",
+      pending_md: "Managing Director (MD)",
+      pending_hcs: "Head, Corporate Services (HCS)",
+    }
+    return expectedByStage[stage] || "Pending approver"
+  }
+
   return (
     <div className="container mx-auto p-6">
       <div className="mb-4">
@@ -135,7 +161,7 @@ export default function LeaveApprovePage() {
       <Tabs defaultValue="pending">
         <TabsList className="mb-4">
           <TabsTrigger value="pending" className="gap-2">
-            <Clock className="h-4 w-4" /> Pending Queue ({pendingQueue.length})
+            <Clock className="h-4 w-4" /> Pending Queue ({allPendingQueue.length})
           </TabsTrigger>
           <TabsTrigger value="history" className="gap-2">
             <History className="h-4 w-4" /> History ({history.length})
@@ -143,106 +169,183 @@ export default function LeaveApprovePage() {
         </TabsList>
 
         <TabsContent value="pending">
-          <Card>
-            <CardHeader>
-              <CardTitle>Pending HR Actions</CardTitle>
-              <CardDescription>Only requests that reached HR stage appear here.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {loading && <p>Loading...</p>}
-              {!loading && pendingQueue.length === 0 && (
-                <p className="text-muted-foreground text-sm">No pending requests.</p>
-              )}
-              {pendingQueue.map((item) => (
-                <div key={item.id} className="rounded border p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="font-medium">{item.user?.full_name || "Employee"}</p>
-                    <Badge variant="outline">
-                      {STAGE_LABELS[item.current_stage_code || item.approval_stage] ||
-                        item.current_stage_code ||
-                        item.approval_stage}
-                    </Badge>
-                  </div>
-                  <p className="text-muted-foreground mt-1 text-sm">
-                    {item.start_date} to {item.end_date} | Resume {item.resume_date} | {item.days_count} day(s)
-                  </p>
-                  <p className="mt-2 text-sm">{item.reason}</p>
-                  <div className="mt-2 space-y-1 text-xs">
-                    <p>
-                      Evidence:{" "}
-                      <span className={item.evidence_complete ? "text-green-600" : "text-amber-600"}>
-                        {item.evidence_complete ? "Complete" : "Incomplete"}
-                      </span>
-                    </p>
-                    {(item.required_documents || []).length > 0 && (
-                      <p>Required docs: {(item.required_documents || []).join(", ")}</p>
-                    )}
-                    {(item.missing_documents || []).length > 0 && (
-                      <p className="text-amber-600">Missing docs: {(item.missing_documents || []).join(", ")}</p>
-                    )}
-                    {(item.evidence || []).length > 0 && (
-                      <div className="space-y-1">
-                        {(item.evidence || []).map((doc) => (
-                          <p key={doc.id}>
-                            - {doc.document_type} ({doc.status}){" "}
-                            <a href={doc.file_url} target="_blank" className="text-blue-600 underline" rel="noreferrer">
-                              view
-                            </a>
-                          </p>
+          <div className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>All Pending Leave Workflow</CardTitle>
+                <CardDescription>
+                  Every pending leave request is listed with current stage and the exact approver responsible for the next step.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {loading && <p>Loading...</p>}
+                {!loading && allPendingQueue.length === 0 && (
+                  <p className="text-muted-foreground text-sm">No pending requests.</p>
+                )}
+                {!loading && allPendingQueue.length > 0 && (
+                  <div className="overflow-x-auto rounded border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[64px]">S/N</TableHead>
+                          <TableHead>Employee</TableHead>
+                          <TableHead>Leave Type</TableHead>
+                          <TableHead>Period</TableHead>
+                          <TableHead>Current Stage</TableHead>
+                          <TableHead>Current Approver</TableHead>
+                          <TableHead>Evidence</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {allPendingQueue.map((item, index) => (
+                          <TableRow key={item.id}>
+                            <TableCell>{index + 1}</TableCell>
+                            <TableCell className="font-medium">{item.user?.full_name || "Employee"}</TableCell>
+                            <TableCell>{item.leave_type?.name || "Leave Request"}</TableCell>
+                            <TableCell className="text-xs">
+                              {item.start_date} to {item.end_date}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline">
+                                {STAGE_LABELS[item.current_stage_code || item.approval_stage] ||
+                                  item.current_stage_code ||
+                                  item.approval_stage}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-sm">{expectedApproverLabel(item)}</TableCell>
+                            <TableCell>
+                              <Badge variant={item.evidence_complete ? "default" : "secondary"}>
+                                {item.evidence_complete ? "Complete" : "Incomplete"}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
                         ))}
-                      </div>
-                    )}
+                      </TableBody>
+                    </Table>
                   </div>
-                  <div className="mt-3 flex gap-2">
-                    <Button size="sm" onClick={() => handleAction(item.id, "approve")}>
-                      Endorse
-                    </Button>
-                    <Button size="sm" variant="destructive" onClick={() => handleAction(item.id, "reject")}>
-                      Reject
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </TabsContent>
+                )}
+              </CardContent>
+            </Card>
 
-        <TabsContent value="history">
-          <Card>
-            <CardHeader>
-              <CardTitle>All Leave Requests</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {loading && <p>Loading...</p>}
-              {!loading && history.length === 0 && <p className="text-muted-foreground text-sm">No history found.</p>}
-              {history.map((item) => (
-                <div key={item.id} className="rounded border p-3">
-                  <div className="flex items-center justify-between">
-                    <p className="font-medium">{item.user?.full_name || "Employee"}</p>
-                    <div className="flex gap-2">
-                      <Badge
-                        variant={
-                          item.status === "approved"
-                            ? "default"
-                            : item.status === "rejected"
-                              ? "destructive"
-                              : "secondary"
-                        }
-                      >
-                        {item.status}
-                      </Badge>
+            <Card>
+              <CardHeader>
+                <CardTitle>My Action Queue</CardTitle>
+                <CardDescription>Only requests assigned to you can be endorsed or rejected here.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {loading && <p>Loading...</p>}
+                {!loading && myQueue.length === 0 && <p className="text-muted-foreground text-sm">No actions assigned to you.</p>}
+                {myQueue.map((item) => (
+                  <div key={item.id} className="rounded border p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="font-medium">{item.user?.full_name || "Employee"}</p>
                       <Badge variant="outline">
                         {STAGE_LABELS[item.current_stage_code || item.approval_stage] ||
                           item.current_stage_code ||
                           item.approval_stage}
                       </Badge>
                     </div>
+                    <p className="text-muted-foreground mt-1 text-sm">
+                      {item.start_date} to {item.end_date} | Resume {item.resume_date} | {item.days_count} day(s)
+                    </p>
+                    <p className="mt-2 text-sm">{item.reason}</p>
+                    <div className="mt-2 space-y-1 text-xs">
+                      <p>
+                        Evidence:{" "}
+                        <span className={item.evidence_complete ? "text-green-600" : "text-amber-600"}>
+                          {item.evidence_complete ? "Complete" : "Incomplete"}
+                        </span>
+                      </p>
+                      {(item.required_documents || []).length > 0 && (
+                        <p>Required docs: {(item.required_documents || []).join(", ")}</p>
+                      )}
+                      {(item.missing_documents || []).length > 0 && (
+                        <p className="text-amber-600">Missing docs: {(item.missing_documents || []).join(", ")}</p>
+                      )}
+                      {(item.evidence || []).length > 0 && (
+                        <div className="space-y-1">
+                          {(item.evidence || []).map((doc) => (
+                            <p key={doc.id}>
+                              - {doc.document_type} ({doc.status}){" "}
+                              <a href={doc.file_url} target="_blank" className="text-blue-600 underline" rel="noreferrer">
+                                view
+                              </a>
+                            </p>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div className="mt-3 flex gap-2">
+                      <Button size="sm" onClick={() => handleAction(item.id, "approve")}>
+                        Endorse
+                      </Button>
+                      <Button size="sm" variant="destructive" onClick={() => handleAction(item.id, "reject")}>
+                        Reject
+                      </Button>
+                    </div>
                   </div>
-                  <p className="text-muted-foreground text-sm">
-                    {item.start_date} to {item.end_date} | Resume {item.resume_date}
-                  </p>
+                ))}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="history">
+          <Card>
+            <CardHeader>
+              <CardTitle>Leave History</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {loading && <p>Loading...</p>}
+              {!loading && history.length === 0 && <p className="text-muted-foreground text-sm">No history found.</p>}
+              {!loading && history.length > 0 && (
+                <div className="overflow-x-auto rounded border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[64px]">S/N</TableHead>
+                        <TableHead>Employee</TableHead>
+                        <TableHead>Leave Type</TableHead>
+                        <TableHead>Period</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Stage</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {history.map((item, index) => (
+                        <TableRow key={item.id}>
+                          <TableCell>{index + 1}</TableCell>
+                          <TableCell className="font-medium">{item.user?.full_name || "Employee"}</TableCell>
+                          <TableCell>{item.leave_type?.name || "Leave Request"}</TableCell>
+                          <TableCell className="text-xs">
+                            {item.start_date} to {item.end_date} | Resume {item.resume_date}
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={
+                                item.status === "approved"
+                                  ? "default"
+                                  : item.status === "rejected"
+                                    ? "destructive"
+                                    : "secondary"
+                              }
+                            >
+                              {item.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline">
+                              {STAGE_LABELS[item.current_stage_code || item.approval_stage] ||
+                                item.current_stage_code ||
+                                item.approval_stage}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 </div>
-              ))}
+              )}
             </CardContent>
           </Card>
         </TabsContent>

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
+import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { ProfileContent } from "./profile-content"
 
 export interface UserProfile {
@@ -14,7 +15,7 @@ export interface UserProfile {
   phone_number: string | null
   additional_phone: string | null
   residential_address: string | null
-  current_work_location: string | null
+  office_location: string | null
   is_admin: boolean
   is_department_lead: boolean
   lead_departments: string[]
@@ -67,6 +68,8 @@ export interface Feedback {
 
 async function getProfileData() {
   const supabase = await createClient()
+  const dataClient = getServiceRoleClientOrFallback(supabase as any)
+  const loadErrors: string[] = []
 
   // Get current user
   const {
@@ -81,7 +84,7 @@ async function getProfileData() {
   const userId = user.id
 
   // Load profile
-  const { data: profileData, error: profileError } = await supabase
+  const { data: profileData, error: profileError } = await dataClient
     .from("profiles")
     .select("*")
     .eq("id", userId)
@@ -91,40 +94,60 @@ async function getProfileData() {
     return { profile: null, tasks: [], assets: [], documentation: [], feedback: [] }
   }
 
+  let resolvedDepartment = (profileData as any).department || null
+  if ((profileData as any).department_id) {
+    const { data: deptById } = await dataClient
+      .from("departments")
+      .select("name")
+      .eq("id", (profileData as any).department_id)
+      .maybeSingle()
+    if (deptById?.name) resolvedDepartment = deptById.name
+  }
+  if (String(resolvedDepartment || "").toLowerCase() === "finance") {
+    resolvedDepartment = "Accounts"
+  }
+
   // Load tasks assigned to user (individual, multiple-user, and department tasks)
-  const { data: individualTasks } = await supabase
+  const { data: individualTasks, error: individualTasksError } = await dataClient
     .from("tasks")
     .select("*")
     .eq("assigned_to", userId)
     .order("created_at", { ascending: false })
+  if (individualTasksError) loadErrors.push("tasks")
 
   // Load multiple-user tasks
-  const { data: taskAssignments } = await supabase.from("task_assignments").select("task_id").eq("user_id", userId)
+  const { data: taskAssignments, error: taskAssignmentsError } = await dataClient
+    .from("task_assignments")
+    .select("task_id")
+    .eq("user_id", userId)
+  if (taskAssignmentsError) loadErrors.push("tasks")
 
   let multipleUserTasks: Task[] = []
   if (taskAssignments && taskAssignments.length > 0) {
     const taskIds = taskAssignments.map((ta: any) => ta.task_id)
-    const { data: tasksData } = await supabase
+    const { data: tasksData, error: tasksDataError } = await dataClient
       .from("tasks")
       .select("*")
       .in("id", taskIds)
       .eq("assignment_type", "multiple")
       .order("created_at", { ascending: false })
     if (tasksData) multipleUserTasks = tasksData
+    if (tasksDataError) loadErrors.push("tasks")
   }
 
   // Load department tasks
-  const { data: departmentTasks } = await supabase
+  const { data: departmentTasks, error: departmentTasksError } = await dataClient
     .from("tasks")
     .select("*")
-    .eq("department", profileData.department)
+    .eq("department", resolvedDepartment)
     .eq("assignment_type", "department")
     .order("created_at", { ascending: false })
+  if (departmentTasksError) loadErrors.push("tasks")
 
   const allTasks = [...(individualTasks || []), ...multipleUserTasks, ...(departmentTasks || [])]
 
   // Load assets assigned to user (individual)
-  const { data: individualAssignments } = await supabase
+  const { data: individualAssignments, error: individualAssignmentsError } = await dataClient
     .from("asset_assignments")
     .select(
       `
@@ -143,16 +166,31 @@ async function getProfileData() {
     )
     .eq("assigned_to", userId)
     .eq("is_current", true)
+  if (individualAssignmentsError) loadErrors.push("assets")
 
-  // Load department and office assets
-  const { data: sharedAssets } = await supabase
-    .from("assets")
-    .select("*")
-    .eq("status", "assigned")
-    .is("deleted_at", null)
-    .or(
-      `and(assignment_type.eq.department,department.eq.${profileData.department}),and(assignment_type.eq.office,office_location.eq.${profileData.current_work_location})`
-    )
+  // Load department and office assets (separate queries to avoid filter parsing issues with commas in names)
+  const [departmentAssetsRes, officeAssetsRes] = await Promise.all([
+    resolvedDepartment
+      ? dataClient
+          .from("assets")
+          .select("*")
+          .eq("status", "assigned")
+          .is("deleted_at", null)
+          .eq("assignment_type", "department")
+          .eq("department", resolvedDepartment)
+      : Promise.resolve({ data: [] } as any),
+    profileData.office_location
+      ? dataClient
+          .from("assets")
+          .select("*")
+          .eq("status", "assigned")
+          .is("deleted_at", null)
+          .eq("assignment_type", "office")
+          .eq("office_location", profileData.office_location)
+      : Promise.resolve({ data: [] } as any),
+  ])
+  if (departmentAssetsRes.error || officeAssetsRes.error) loadErrors.push("assets")
+  const sharedAssets = [...(departmentAssetsRes.data || []), ...(officeAssetsRes.data || [])]
 
   let allAssets: Asset[] = []
 
@@ -179,18 +217,22 @@ async function getProfileData() {
   }
 
   // Load documentation created by user
-  const { data: docsData } = await supabase
+  const { data: docsData, error: docsError } = await dataClient
     .from("user_documentation")
     .select("id, title, category, created_at")
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
+  if (docsError) loadErrors.push("documentation")
 
   // Load feedback submitted by user
-  const { data: feedbackData } = await supabase
+  const { data: feedbackData, error: feedbackError } = await dataClient
     .from("feedback")
     .select("*")
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
+  if (feedbackError) loadErrors.push("feedback")
+
+  const loadError = loadErrors.length > 0 ? "Some profile sections failed to load. Please refresh." : null
 
   return {
     profile: profileData as UserProfile,
@@ -198,6 +240,7 @@ async function getProfileData() {
     assets: allAssets as Asset[],
     documentation: (docsData || []) as Documentation[],
     feedback: (feedbackData || []) as Feedback[],
+    loadError,
   }
 }
 
@@ -215,6 +258,7 @@ export default async function ProfilePage() {
     assets: Asset[]
     documentation: Documentation[]
     feedback: Feedback[]
+    loadError?: string | null
   }
 
   return (
@@ -224,6 +268,7 @@ export default async function ProfilePage() {
       assets={profileData.assets}
       documentation={profileData.documentation}
       feedback={profileData.feedback}
+      initialError={profileData.loadError}
     />
   )
 }

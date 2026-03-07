@@ -197,29 +197,29 @@ export function GoalsContent({ initialGoals, userId }: GoalsContentProps) {
       />
 
       {/* Summary */}
-      <div className="mb-6 grid gap-4 md:grid-cols-3">
+      <div className="mb-6 grid grid-cols-2 gap-2 sm:gap-3 md:gap-4 md:grid-cols-3">
         <Card>
-          <CardHeader className="pb-2">
+          <CardHeader className="pb-1 px-3 pt-3 sm:px-6 sm:pt-6 sm:pb-2">
             <CardTitle className="text-sm font-medium">Total Goals</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{goals.length}</div>
+            <div className="text-lg font-bold sm:text-2xl">{goals.length}</div>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-2">
+          <CardHeader className="pb-1 px-3 pt-3 sm:px-6 sm:pt-6 sm:pb-2">
             <CardTitle className="text-sm font-medium">In Progress</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{inProgress}</div>
+            <div className="text-lg font-bold sm:text-2xl text-blue-600">{inProgress}</div>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-2">
+          <CardHeader className="pb-1 px-3 pt-3 sm:px-6 sm:pt-6 sm:pb-2">
             <CardTitle className="text-sm font-medium">Completed</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{completed}</div>
+            <div className="text-lg font-bold sm:text-2xl text-green-600">{completed}</div>
           </CardContent>
         </Card>
       </div>
@@ -298,3 +298,4 @@ export function GoalsContent({ initialGoals, userId }: GoalsContentProps) {
     </PageWrapper>
   )
 }
+

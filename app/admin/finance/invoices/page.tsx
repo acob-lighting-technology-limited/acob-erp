@@ -127,7 +127,7 @@ export default function InvoicesPage() {
       />
 
       {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4 md:gap-4">
         <StatCard title="Total Invoices" value={stats.total} icon={FileText} description={`${stats.draft} drafts`} />
         <StatCard title="Total Amount" value={formatCurrency(stats.totalAmount)} icon={FileText} />
         <StatCard
@@ -277,3 +277,4 @@ export default function InvoicesPage() {
     </PageWrapper>
   )
 }
+

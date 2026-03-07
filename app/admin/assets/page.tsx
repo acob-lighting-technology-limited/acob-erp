@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation"
-import { createClient as createAdminClient } from "@supabase/supabase-js"
 import { createClient } from "@/lib/supabase/server"
+import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { AdminAssetsContent, type Asset, type Employee, type UserProfile } from "./admin-assets-content"
 import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
 
@@ -30,22 +30,24 @@ async function getAdminAssetsData() {
   }
   const departmentScope = getDepartmentScope(scope, "general")
 
-  const dataClient =
-    process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
-      ? createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
-          auth: { autoRefreshToken: false, persistSession: false },
-        })
-      : supabase
+  const dataClient = getServiceRoleClientOrFallback(supabase as any)
 
   // Fetch assets
-  const { data: assetsData, error: assetsError } = await dataClient
+  let { data: assetsData, error: assetsError } = await dataClient
     .from("assets")
     .select("*")
     .order("created_at", { ascending: false })
 
+  if (assetsError && dataClient !== supabase) {
+    // Fall back to user-scoped client if service-role query fails due env/config drift.
+    const fallback = await supabase.from("assets").select("*").order("created_at", { ascending: false })
+    assetsData = fallback.data
+    assetsError = fallback.error
+  }
+
   if (assetsError) {
     console.error("Error loading assets:", assetsError)
-    return { assets: [], employees: [], departments: [], userProfile }
+    return { assets: [], employees: [], departments: [], userProfile, loadError: "Failed to load admin assets" }
   }
 
   // Fetch current assignments for all assets
@@ -129,7 +131,7 @@ async function getAdminAssetsData() {
     ? departmentScope
     : Array.from(new Set(employees.map((s) => s.department).filter(Boolean)))
 
-  return { assets, employees, departments, userProfile }
+  return { assets, employees, departments, userProfile, loadError: null }
 }
 
 export default async function AdminAssetsPage() {
@@ -144,6 +146,7 @@ export default async function AdminAssetsPage() {
     employees: Employee[]
     departments: string[]
     userProfile: UserProfile
+    loadError?: string | null
   }
 
   return (
@@ -152,6 +155,7 @@ export default async function AdminAssetsPage() {
       initialEmployees={pageData.employees}
       initialDepartments={pageData.departments}
       userProfile={pageData.userProfile}
+      initialError={pageData.loadError}
     />
   )
 }

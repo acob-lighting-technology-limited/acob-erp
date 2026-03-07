@@ -47,6 +47,20 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: `Failed to fetch approval queue: ${error.message}` }, { status: 500 })
     }
 
+    const approverIds = Array.from(
+      new Set((requests || []).map((row: any) => row.current_approver_user_id).filter(Boolean))
+    ) as string[]
+    const approverMap = new Map<string, any>()
+    if (approverIds.length > 0) {
+      const { data: approverRows } = await supabase
+        .from("profiles")
+        .select("id, full_name, company_email, role")
+        .in("id", approverIds)
+      for (const approver of approverRows || []) {
+        approverMap.set(approver.id, approver)
+      }
+    }
+
     const { data: slaRows } = await supabase
       .from("approval_sla_policies")
       .select("stage, due_hours, reminder_hours_before")
@@ -78,6 +92,9 @@ export async function GET(request: NextRequest) {
 
           return {
             ...item,
+            current_approver: item.current_approver_user_id
+              ? approverMap.get(item.current_approver_user_id) || null
+              : null,
             required_documents: requiredDocs,
             evidence_complete: evidenceStatus.complete,
             missing_documents: evidenceStatus.missing,
@@ -91,6 +108,9 @@ export async function GET(request: NextRequest) {
           // Never hide actionable queue items because enrichment failed for one row.
           return {
             ...item,
+            current_approver: item.current_approver_user_id
+              ? approverMap.get(item.current_approver_user_id) || null
+              : null,
             required_documents: [],
             evidence_complete: true,
             missing_documents: [],

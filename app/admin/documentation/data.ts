@@ -1,0 +1,114 @@
+import { createClient } from "@/lib/supabase/server"
+import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
+import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
+import { resolveOneDriveAccessScope } from "@/lib/onedrive/access"
+import type { Documentation, UserProfile, employeeMember } from "./admin-documentation-content"
+
+export async function getAdminDocumentationData() {
+  const supabase = await createClient()
+  const dataClient = getServiceRoleClientOrFallback(supabase as any)
+
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser()
+
+  if (userError || !user) {
+    return { redirect: "/auth/login" as const }
+  }
+
+  const scope = await resolveAdminScope(supabase as any, user.id)
+  if (!scope) {
+    return { redirect: "/dashboard" as const }
+  }
+  const departmentScope = getDepartmentScope(scope, "general")
+
+  const userProfile: UserProfile = {
+    role: scope.role as any,
+    lead_departments: scope.leadDepartments,
+    managed_departments: scope.managedDepartments,
+  }
+
+  let documentation: Documentation[] = []
+  let employee: employeeMember[] = []
+
+  let docsQuery = dataClient.from("user_documentation").select("*").order("created_at", { ascending: false })
+
+  if (departmentScope) {
+    const { data: deptUsers } =
+      departmentScope.length > 0
+        ? await dataClient.from("profiles").select("id").in("department", departmentScope)
+        : { data: [] as { id: string }[] }
+
+    const userIds = deptUsers?.map((u) => u.id) || []
+    if (userIds.length > 0) {
+      docsQuery = docsQuery.in("user_id", userIds)
+    } else {
+      return {
+        documentation: [],
+        employee: [],
+        userProfile,
+        departmentDocs: { initialPath: "/Projects", rootLabel: "Projects", enabled: false },
+      }
+    }
+  }
+
+  const { data: docsData, error: docsError } = await docsQuery
+
+  if (docsError) {
+    console.error("Documentation error:", docsError)
+    return {
+      documentation: [],
+      employee: [],
+      userProfile,
+      departmentDocs: { initialPath: "/Projects", rootLabel: "Projects", enabled: false },
+    }
+  }
+
+  if (docsData && docsData.length > 0) {
+    const userIdsSet = new Set(docsData.map((doc) => doc.user_id).filter(Boolean))
+    const uniqueUserIds = Array.from(userIdsSet)
+
+    const { data: usersData } = await dataClient
+      .from("profiles")
+      .select("id, first_name, last_name, company_email, department, role")
+      .in("id", uniqueUserIds)
+
+    const usersMap = new Map(usersData?.map((profile) => [profile.id, profile]))
+
+    documentation = docsData.map((doc) => ({
+      ...doc,
+      user: doc.user_id ? usersMap.get(doc.user_id) : undefined,
+    })) as Documentation[]
+  }
+
+  let employeeQuery = dataClient
+    .from("profiles")
+    .select("id, first_name, last_name, department")
+    .order("last_name", { ascending: true })
+  if (departmentScope) {
+    employeeQuery =
+      departmentScope.length > 0 ? employeeQuery.in("department", departmentScope) : employeeQuery.eq("id", "__none__")
+  }
+  const { data: employeeData } = await employeeQuery
+
+  employee = employeeData || []
+  const oneDriveScope = await resolveOneDriveAccessScope(supabase as any, user.id)
+
+  return {
+    documentation,
+    employee,
+    userProfile,
+    departmentDocs: oneDriveScope
+      ? {
+          initialPath: oneDriveScope.defaultPath,
+          rootLabel: oneDriveScope.rootLabel,
+          enabled: true,
+        }
+      : {
+          initialPath: "/Projects",
+          rootLabel: "Projects",
+          enabled: false,
+        },
+  }
+}
