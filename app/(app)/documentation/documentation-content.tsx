@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useSearchParams } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -20,6 +21,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -32,6 +34,7 @@ import {
 import type { Documentation } from "./page"
 import { AppTablePage } from "@/components/app/app-table-page"
 import { MarkdownContent } from "@/components/ui/markdown-content"
+import { DepartmentDocumentsBrowser } from "@/components/documentation/department-documents-browser"
 
 const CATEGORIES = [
   "Project Documentation",
@@ -46,9 +49,33 @@ const CATEGORIES = [
 interface DocumentationContentProps {
   initialDocs: Documentation[]
   userId: string
+  departmentDocs: {
+    initialPath: string
+    rootLabel: string
+    enabled: boolean
+  }
+  defaultTab?: "knowledge-docs" | "department-documents"
+  hideTabList?: boolean
+  backLinkHref?: string
+  backLinkLabel?: string
 }
 
-export function DocumentationContent({ initialDocs, userId }: DocumentationContentProps) {
+export function DocumentationContent({
+  initialDocs,
+  userId,
+  departmentDocs,
+  defaultTab,
+  hideTabList = false,
+  backLinkHref = "/profile",
+  backLinkLabel = "Back to Dashboard",
+}: DocumentationContentProps) {
+  const searchParams = useSearchParams()
+  const tabFromUrl = searchParams.get("tab")
+  const initialTab =
+    defaultTab || (tabFromUrl === "department-documents" ? "department-documents" : "knowledge-docs")
+  const [activeTab, setActiveTab] = useState<"knowledge-docs" | "department-documents">(
+    initialTab as "knowledge-docs" | "department-documents"
+  )
   const [docs, setDocs] = useState<Documentation[]>(initialDocs)
   const [filteredDocs, setFilteredDocs] = useState<Documentation[]>(initialDocs)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -292,10 +319,23 @@ export function DocumentationContent({ initialDocs, userId }: DocumentationConte
       : "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
 
   return (
-    <AppTablePage
+    <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "knowledge-docs" | "department-documents")}>
+      {!hideTabList && (
+        <div className="mb-4">
+          <TabsList className="grid w-full max-w-lg grid-cols-2">
+            <TabsTrigger value="knowledge-docs">Internal Documentation</TabsTrigger>
+            <TabsTrigger value="department-documents">Department Documents</TabsTrigger>
+          </TabsList>
+        </div>
+      )}
+
+      <TabsContent value="knowledge-docs" className="space-y-4">
+        <AppTablePage
       title="My Documentation"
       description="Create and manage your work documentation"
       icon={FileText}
+      backLinkHref={backLinkHref}
+      backLinkLabel={backLinkLabel}
       actions={
         <div className="flex items-center gap-2">
           <div className="flex items-center rounded-lg border p-1">
@@ -325,37 +365,47 @@ export function DocumentationContent({ initialDocs, userId }: DocumentationConte
         </div>
       }
       stats={
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 md:gap-4">
           <Card className="border-2">
-            <CardContent className="p-6">
+            <CardContent className="p-3 sm:p-4 md:p-6">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-muted-foreground text-sm font-medium">Total Documents</p>
-                  <p className="text-foreground mt-2 text-3xl font-bold">{stats.total}</p>
+                <div className="min-w-0 flex-1">
+                  <p className="text-muted-foreground truncate text-[10px] font-medium sm:text-xs md:text-sm">
+                    Total Documents
+                  </p>
+                  <p className="text-foreground mt-1 text-lg font-bold sm:text-xl md:mt-2 md:text-3xl">
+                    {stats.total}
+                  </p>
                 </div>
-                <FileText className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+                <FileText className="h-5 w-5 shrink-0 text-blue-600 sm:h-6 sm:w-6 md:h-8 md:w-8 dark:text-blue-400" />
               </div>
             </CardContent>
           </Card>
           <Card className="border-2">
-            <CardContent className="p-6">
+            <CardContent className="p-3 sm:p-4 md:p-6">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-muted-foreground text-sm font-medium">Published</p>
-                  <p className="text-foreground mt-2 text-3xl font-bold">{stats.published}</p>
+                <div className="min-w-0 flex-1">
+                  <p className="text-muted-foreground truncate text-[10px] font-medium sm:text-xs md:text-sm">
+                    Published
+                  </p>
+                  <p className="text-foreground mt-1 text-lg font-bold sm:text-xl md:mt-2 md:text-3xl">
+                    {stats.published}
+                  </p>
                 </div>
-                <Eye className="h-8 w-8 text-green-600 dark:text-green-400" />
+                <Eye className="h-5 w-5 shrink-0 text-green-600 sm:h-6 sm:w-6 md:h-8 md:w-8 dark:text-green-400" />
               </div>
             </CardContent>
           </Card>
           <Card className="border-2">
-            <CardContent className="p-6">
+            <CardContent className="p-3 sm:p-4 md:p-6">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-muted-foreground text-sm font-medium">Drafts</p>
-                  <p className="text-foreground mt-2 text-3xl font-bold">{stats.draft}</p>
+                <div className="min-w-0 flex-1">
+                  <p className="text-muted-foreground truncate text-[10px] font-medium sm:text-xs md:text-sm">Drafts</p>
+                  <p className="text-foreground mt-1 text-lg font-bold sm:text-xl md:mt-2 md:text-3xl">
+                    {stats.draft}
+                  </p>
                 </div>
-                <EyeOff className="h-8 w-8 text-yellow-600 dark:text-yellow-400" />
+                <EyeOff className="h-5 w-5 shrink-0 text-yellow-600 sm:h-6 sm:w-6 md:h-8 md:w-8 dark:text-yellow-400" />
               </div>
             </CardContent>
           </Card>
@@ -670,23 +720,40 @@ export function DocumentationContent({ initialDocs, userId }: DocumentationConte
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete "{selectedDoc?.title}". This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isSaving}>Cancel</AlertDialogCancel>
-            <Button onClick={handleDelete} disabled={isSaving} className="bg-red-600 text-white hover:bg-red-700">
-              Delete
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </AppTablePage>
+          {/* Delete Confirmation Dialog */}
+          <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will permanently delete "{selectedDoc?.title}". This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={isSaving}>Cancel</AlertDialogCancel>
+                <Button onClick={handleDelete} disabled={isSaving} className="bg-red-600 text-white hover:bg-red-700">
+                  Delete
+                </Button>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </AppTablePage>
+      </TabsContent>
+
+      <TabsContent value="department-documents" className="space-y-4">
+        {departmentDocs.enabled ? (
+          <DepartmentDocumentsBrowser initialPath={departmentDocs.initialPath} rootLabel={departmentDocs.rootLabel} />
+        ) : (
+          <Card className="border-2">
+            <CardContent className="p-12 text-center">
+              <h3 className="text-foreground mb-2 text-xl font-semibold">Department Documents Not Available</h3>
+              <p className="text-muted-foreground">
+                Your account is not assigned to a department yet. Contact HR or an administrator.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+      </TabsContent>
+    </Tabs>
   )
 }

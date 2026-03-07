@@ -112,7 +112,7 @@ export default function PurchaseOrdersPage() {
       />
 
       {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4 md:gap-4">
         <StatCard title="Total Orders" value={stats.total} icon={ShoppingCart} />
         <StatCard
           title="Pending"
@@ -231,3 +231,4 @@ export default function PurchaseOrdersPage() {
     </PageWrapper>
   )
 }
+

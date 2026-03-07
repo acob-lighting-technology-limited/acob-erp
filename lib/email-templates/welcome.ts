@@ -7,7 +7,6 @@ export interface PendingUser {
   company_role: string
   company_email: string
   personal_email: string
-  current_work_location: string
   office_location?: string
 }
 
@@ -24,8 +23,7 @@ export function renderWelcomeEmail({ pendingUser, employeeId, tempPassword, port
   const dept = escapeHtml(pendingUser.department)
   const role = escapeHtml(pendingUser.company_role)
   const email = escapeHtml(pendingUser.company_email)
-  const workLoc = escapeHtml(pendingUser.current_work_location)
-  const officeLoc = pendingUser.office_location ? escapeHtml(pendingUser.office_location) : ""
+  const officeLoc = pendingUser.office_location ? escapeHtml(pendingUser.office_location) : "N/A"
   const empId = escapeHtml(employeeId)
   const safeTempPassword = escapeHtml(tempPassword)
   const safePortalUrl = escapeHtml(portalUrl)
@@ -94,11 +92,8 @@ export function renderWelcomeEmail({ pendingUser, employeeId, tempPassword, port
                     <td class="value">${role}</td>
                 </tr>
                 <tr>
-                    <td class="label">Work Location</td>
-                    <td class="value">
-                        ${workLoc}
-                        ${officeLoc && officeLoc !== workLoc ? `(${officeLoc})` : ""}
-                    </td>
+                    <td class="label">Office Location</td>
+                    <td class="value">${officeLoc}</td>
                 </tr>
             </table>
         </div>

@@ -1,12 +1,10 @@
 import type { Metadata } from "next"
-import { requireAdminSectionAccess } from "@/lib/admin/rbac"
 
 export const metadata: Metadata = {
-  title: "Admin OneDrive | ACOB Lighting Technology Limited",
-  description: "Manage OneDrive in the admin dashboard.",
+  title: "Admin OneDrive (Deprecated) | ACOB Lighting Technology Limited",
+  description: "OneDrive has moved to admin documentation.",
 }
 
 export default async function Layout({ children }: { children: React.ReactNode }) {
-  await requireAdminSectionAccess("onedrive")
   return children
 }

@@ -27,22 +27,9 @@ const formSchema = z
     phone_number: z.string().regex(/^0[789][01]\d{8}$/, "Must be a valid Nigerian phone number (e.g., 08012345678)"),
     additional_phone_number: z.string().optional(),
     residential_address: z.string().min(5, "Address is required"),
-    current_work_location: z.enum(["Office", "Site"]),
-    office_location: z.string().optional(),
+    office_location: z.string().min(1, "Office location is required"),
     honeypot: z.string().optional(),
   })
-  .refine(
-    (data) => {
-      if (data.current_work_location === "Site" && (!data.office_location || data.office_location.trim() === "")) {
-        return false
-      }
-      return true
-    },
-    {
-      message: "Site location is required for Site Based employees",
-      path: ["office_location"],
-    }
-  )
 
 type FormValues = z.infer<typeof formSchema>
 
@@ -76,7 +63,6 @@ export default function EmployeeOnboardingForm() {
   } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      current_work_location: "Office",
       other_names: "",
       additional_phone_number: "",
       other_department: "",
@@ -88,7 +74,6 @@ export default function EmployeeOnboardingForm() {
   const firstName = watch("first_name")
   const lastName = watch("last_name")
   const selectedDepartment = watch("department")
-  const workLocation = watch("current_work_location")
 
   const sanitize = (s: string) =>
     s
@@ -123,8 +108,7 @@ export default function EmployeeOnboardingForm() {
         phone_number: data.phone_number,
         additional_phone_number: data.additional_phone_number || null,
         residential_address: data.residential_address,
-        current_work_location: data.current_work_location,
-        office_location: data.current_work_location === "Site" ? data.office_location : "Office",
+        office_location: data.office_location,
         status: "pending",
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -352,45 +336,18 @@ export default function EmployeeOnboardingForm() {
 
               <div className="space-y-6 pt-4">
                 <h3 className="text-foreground border-border flex items-center gap-2 border-b pb-2 text-lg font-semibold">
-                  <MapPin className="text-muted-foreground h-5 w-5" /> Work Location
+                  <MapPin className="text-muted-foreground h-5 w-5" /> Office Location
                 </h3>
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <label className="text-foreground text-sm font-medium">
-                      Current Work Base <span className="text-destructive">*</span>
+                      Office Location <span className="text-destructive">*</span>
                     </label>
-                    <Select
-                      onValueChange={(val) => setValue("current_work_location", val as "Office" | "Site")}
-                      defaultValue={workLocation}
-                    >
-                      <SelectTrigger className="h-11">
-                        <SelectValue placeholder="Select Location Type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Office">Office Based</SelectItem>
-                        <SelectItem value="Site">Site Based</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <Input className="h-11" placeholder="e.g. Head Office / Lekki Site" {...register("office_location")} />
+                    {errors.office_location && (
+                      <p className="text-destructive mt-1 text-sm">{errors.office_location.message}</p>
+                    )}
                   </div>
-                  {workLocation === "Site" ? (
-                    <div className="animate-in fade-in slide-in-from-top-2 space-y-2">
-                      <label className="text-foreground text-sm font-medium">
-                        Site Location / Name <span className="text-destructive">*</span>
-                      </label>
-                      <Input
-                        className="h-11"
-                        placeholder="e.g. Dangote Refinery Site"
-                        {...register("office_location")}
-                      />
-                      {errors.office_location && (
-                        <p className="text-destructive mt-1 text-sm">{errors.office_location.message}</p>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="bg-muted/50 border-border text-muted-foreground flex items-center gap-2 rounded-lg border p-4 text-sm">
-                      <Building2 className="h-4 w-4" /> Default Allocation: <strong>Office</strong>
-                    </div>
-                  )}
                 </div>
               </div>
 

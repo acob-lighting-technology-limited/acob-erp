@@ -44,7 +44,7 @@ interface UserProfile {
   phone_number: string | null
   additional_phone: string | null
   residential_address: string | null
-  current_work_location: string | null
+  office_location: string | null
   is_admin: boolean
   is_department_lead: boolean
   lead_departments: string[]
@@ -389,12 +389,12 @@ export default function UserDetailPage() {
               </div>
             )}
 
-            {profile.current_work_location && (
+            {profile.office_location && (
               <div className="flex items-center gap-3">
                 <MapPin className="text-muted-foreground h-5 w-5" />
                 <div>
-                  <p className="text-muted-foreground text-sm">Work Location</p>
-                  <p className="font-medium">{profile.current_work_location}</p>
+                  <p className="text-muted-foreground text-sm">Office Location</p>
+                  <p className="font-medium">{profile.office_location}</p>
                 </div>
               </div>
             )}
@@ -632,7 +632,7 @@ export default function UserDetailPage() {
                         <TableCell>{new Date(doc.created_at).toLocaleDateString()}</TableCell>
                         <TableCell>
                           <Link
-                            href={`/admin/documentation?docId=${doc.id}`}
+                            href={`/admin/documentation/internal?docId=${doc.id}`}
                             className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
                           >
                             View

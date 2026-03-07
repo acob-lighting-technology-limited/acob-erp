@@ -287,14 +287,14 @@ export function AdminProjectsContent({ initialProjects, initialemployee }: Admin
         </Button>
       }
       stats={
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-4 md:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Projects</CardTitle>
               <FolderKanban className="text-muted-foreground h-4 w-4" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.total}</div>
+              <div className="text-lg font-bold sm:text-2xl">{stats.total}</div>
             </CardContent>
           </Card>
 
@@ -304,7 +304,7 @@ export function AdminProjectsContent({ initialProjects, initialemployee }: Admin
               <Clock className="h-4 w-4 text-gray-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.planning}</div>
+              <div className="text-lg font-bold sm:text-2xl">{stats.planning}</div>
             </CardContent>
           </Card>
 
@@ -314,7 +314,7 @@ export function AdminProjectsContent({ initialProjects, initialemployee }: Admin
               <CheckCircle2 className="h-4 w-4 text-green-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.active}</div>
+              <div className="text-lg font-bold sm:text-2xl">{stats.active}</div>
             </CardContent>
           </Card>
 
@@ -324,7 +324,7 @@ export function AdminProjectsContent({ initialProjects, initialemployee }: Admin
               <CheckCircle2 className="h-4 w-4 text-blue-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.completed}</div>
+              <div className="text-lg font-bold sm:text-2xl">{stats.completed}</div>
             </CardContent>
           </Card>
         </div>
@@ -649,3 +649,4 @@ export function AdminProjectsContent({ initialProjects, initialemployee }: Admin
     </AdminTablePage>
   )
 }
+

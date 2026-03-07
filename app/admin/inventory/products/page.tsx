@@ -121,7 +121,7 @@ export default function ProductsPage() {
       />
 
       {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4 md:gap-4">
         <StatCard title="Total Products" value={stats.total} icon={Package} />
         <StatCard
           title="Active"
@@ -258,3 +258,4 @@ export default function ProductsPage() {
     </PageWrapper>
   )
 }
+

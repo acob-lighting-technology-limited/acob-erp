@@ -21,6 +21,9 @@ function buildEmailHtml(payload: Omit<LeaveWorkflowEmailPayload, "to" | "subject
 }
 
 export async function sendLeaveWorkflowEmail(payload: LeaveWorkflowEmailPayload) {
+  const emailEnabled = process.env.LEAVE_EMAIL_NOTIFICATIONS_ENABLED === "true"
+  if (!emailEnabled) return
+
   const apiKey = process.env.RESEND_API_KEY
   if (!apiKey) return
 

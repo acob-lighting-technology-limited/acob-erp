@@ -1563,13 +1563,13 @@ export function AdminAuditLogsContent({
         </div>
       }
       stats={
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-4 md:grid-cols-4">
           <Card className="border-2">
-            <CardContent className="p-6">
+            <CardContent className="p-3 sm:p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-muted-foreground text-sm font-medium">Total Actions</p>
-                  <p className="text-foreground mt-2 text-3xl font-bold">{stats.total}</p>
+                  <p className="text-foreground mt-1 text-lg font-bold sm:mt-2 sm:text-3xl">{stats.total}</p>
                 </div>
                 <div className="rounded-lg bg-blue-100 p-3 dark:bg-blue-900/30">
                   <ScrollText className="h-6 w-6 text-blue-600 dark:text-blue-400" />
@@ -1579,11 +1579,11 @@ export function AdminAuditLogsContent({
           </Card>
 
           <Card className="border-2">
-            <CardContent className="p-6">
+            <CardContent className="p-3 sm:p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-muted-foreground text-sm font-medium">Creates</p>
-                  <p className="text-foreground mt-2 text-3xl font-bold">{stats.creates}</p>
+                  <p className="text-foreground mt-1 text-lg font-bold sm:mt-2 sm:text-3xl">{stats.creates}</p>
                 </div>
                 <div className="rounded-lg bg-green-100 p-3 dark:bg-green-900/30">
                   <FileText className="h-6 w-6 text-green-600 dark:text-green-400" />
@@ -1593,11 +1593,11 @@ export function AdminAuditLogsContent({
           </Card>
 
           <Card className="border-2">
-            <CardContent className="p-6">
+            <CardContent className="p-3 sm:p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-muted-foreground text-sm font-medium">Updates</p>
-                  <p className="text-foreground mt-2 text-3xl font-bold">{stats.updates}</p>
+                  <p className="text-foreground mt-1 text-lg font-bold sm:mt-2 sm:text-3xl">{stats.updates}</p>
                 </div>
                 <div className="rounded-lg bg-blue-100 p-3 dark:bg-blue-900/30">
                   <FileText className="h-6 w-6 text-blue-600 dark:text-blue-400" />
@@ -1607,11 +1607,11 @@ export function AdminAuditLogsContent({
           </Card>
 
           <Card className="border-2">
-            <CardContent className="p-6">
+            <CardContent className="p-3 sm:p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-muted-foreground text-sm font-medium">Deletes</p>
-                  <p className="text-foreground mt-2 text-3xl font-bold">{stats.deletes}</p>
+                  <p className="text-foreground mt-1 text-lg font-bold sm:mt-2 sm:text-3xl">{stats.deletes}</p>
                 </div>
                 <div className="rounded-lg bg-red-100 p-3 dark:bg-red-900/30">
                   <FileText className="h-6 w-6 text-red-600 dark:text-red-400" />
@@ -1623,7 +1623,7 @@ export function AdminAuditLogsContent({
       }
       filters={
         <Card className="border-2">
-          <CardContent className="p-6">
+          <CardContent className="p-3 sm:p-6">
             <div className="grid gap-4 md:grid-cols-4">
               <div className="relative">
                 <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform" />
@@ -2110,3 +2110,4 @@ export function AdminAuditLogsContent({
     </AdminTablePage>
   )
 }
+

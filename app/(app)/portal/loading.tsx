@@ -1,5 +1,3 @@
-import { TablePageSkeleton } from "@/components/skeletons/table-page-skeleton"
-
-export default function Loading() {
-  return <TablePageSkeleton showStats={false} />
+export default function PortalLoading() {
+  return null
 }

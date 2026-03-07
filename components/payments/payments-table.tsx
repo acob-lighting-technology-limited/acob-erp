@@ -116,6 +116,7 @@ interface PaymentsTableProps {
   initialPayments?: Payment[]
   initialDepartments?: Department[]
   initialCategories?: Category[]
+  initialError?: string | null
   currentUser: {
     id: string
     department_id: string | null
@@ -129,6 +130,7 @@ export function PaymentsTable({
   initialPayments = [],
   initialDepartments = [],
   initialCategories = [],
+  initialError = null,
   currentUser,
   basePath = currentUser.is_admin ? "/admin/payments" : "/payments",
 }: PaymentsTableProps) {
@@ -198,6 +200,12 @@ export function PaymentsTable({
   })
 
   useEffect(() => {
+    if (initialError) {
+      toast.error(initialError)
+    }
+  }, [initialError])
+
+  useEffect(() => {
     if (initialPayments.length === 0) {
       fetchData()
     }
@@ -212,6 +220,8 @@ export function PaymentsTable({
       const data = await response.json()
       if (response.ok) {
         setPayments(data.data || [])
+      } else {
+        toast.error(data?.error || "Failed to fetch payments")
       }
     } catch (error) {
       toast.error("Failed to fetch payments")

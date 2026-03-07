@@ -62,7 +62,7 @@ export async function GET() {
   }
 }
 
-// POST /api/departments - Create a new department (admin/super_admin/hr_global_lead)
+// POST /api/departments - Create a new department (admin-like only)
 export async function POST(request: Request) {
   try {
     const supabase = createClient()
@@ -76,8 +76,7 @@ export async function POST(request: Request) {
     }
 
     const scope = await resolveAdminScope(supabase as any, user.id)
-    const canManageDepartments =
-      !!scope && (scope.isAdminLike || (scope.isDepartmentLead && scope.managedDepartments.includes("Admin & HR")))
+    const canManageDepartments = !!scope && scope.isAdminLike
     if (!canManageDepartments) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }

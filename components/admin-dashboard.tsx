@@ -99,7 +99,7 @@ export function AdminDashboard({ users, currentUserId, feedbackByUserId = {} }: 
   }
 
   const exportToCSV = () => {
-    const headers = ["First Name", "Last Name", "Department", "Company Role", "Email", "Phone", "Work Location"]
+    const headers = ["First Name", "Last Name", "Department", "Company Role", "Email", "Phone", "Office Location"]
     const rows = filteredUsers.map((user) => [
       user.first_name,
       user.last_name,
@@ -108,7 +108,7 @@ export function AdminDashboard({ users, currentUserId, feedbackByUserId = {} }: 
       user.company_email,
       user.phone_number,
 
-      user.current_work_location,
+      user.office_location,
     ])
 
     const csv = [headers, ...rows].map((row) => row.map((cell) => `"${cell || ""}"`).join(",")).join("\n")
@@ -145,7 +145,7 @@ export function AdminDashboard({ users, currentUserId, feedbackByUserId = {} }: 
           Email: user.company_email,
           Phone: user.phone_number,
 
-          "Work Location": user.current_work_location,
+          "Office Location": user.office_location,
         }))
       )
       const workbook = utils.book_new()
@@ -520,8 +520,8 @@ export function AdminDashboard({ users, currentUserId, feedbackByUserId = {} }: 
                     <div className="mt-1">{properCase(detailsUser.residential_address)}</div>
                   </div>
                   <div>
-                    <Label>Work Location</Label>
-                    <div className="mt-1">{properCase(detailsUser.current_work_location)}</div>
+                    <Label>Office Location</Label>
+                    <div className="mt-1">{properCase(detailsUser.office_location)}</div>
                   </div>
                   <div>
                     <Label>Bank</Label>
@@ -578,7 +578,7 @@ export function AdminDashboard({ users, currentUserId, feedbackByUserId = {} }: 
                       `Phone: ${detailsUser.phone_number || ""}`,
 
                       `Address: ${properCase(detailsUser.residential_address)}`,
-                      `Work Location: ${properCase(detailsUser.current_work_location)}`,
+                      `Office Location: ${properCase(detailsUser.office_location)}`,
                       `Bank: ${properCase(detailsUser.bank_name)} ${detailsUser.bank_account_number || ""}`,
                       `Account Name: ${properCase(detailsUser.bank_account_name)}`,
                       `DOB: ${detailsUser.date_of_birth || ""}`,

@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/hr/leave/sla/reminders",
+      "schedule": "0 * * * *"
+    }
+  ]
+}

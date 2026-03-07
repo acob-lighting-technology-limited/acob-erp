@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import { PortalCorrespondenceContent } from "../../portal/correspondence/portal-correspondence-content"
+import { PortalCorrespondenceContent } from "../../dashboard/correspondence/portal-correspondence-content"
 
 async function getData() {
   const supabase = await createClient()

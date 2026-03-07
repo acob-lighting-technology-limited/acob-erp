@@ -1,10 +1,12 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
+import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { AdminCorrespondenceContent } from "../../correspondence/admin-correspondence-content"
 import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
 
 async function getData() {
   const supabase = await createClient()
+  const dataClient = getServiceRoleClientOrFallback(supabase as any)
 
   const {
     data: { user },
@@ -21,9 +23,9 @@ async function getData() {
 
   const departmentScope = getDepartmentScope(scope, "general")
 
-  const recordsQuery = supabase.from("correspondence_records").select("*").order("created_at", { ascending: false })
+  const recordsQuery = dataClient.from("correspondence_records").select("*").order("created_at", { ascending: false })
 
-  let employeesQuery = supabase
+  let employeesQuery = dataClient
     .from("profiles")
     .select("id, first_name, last_name, department, role")
     .order("last_name", { ascending: true })
@@ -38,7 +40,7 @@ async function getData() {
   const [{ data: records }, { data: employees }, { data: departmentCodes }] = await Promise.all([
     recordsQuery,
     employeesQuery,
-    supabase
+    dataClient
       .from("correspondence_department_codes")
       .select("department_name, department_code, is_active")
       .order("department_name", { ascending: true }),

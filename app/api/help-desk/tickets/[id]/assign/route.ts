@@ -2,11 +2,19 @@ import { NextRequest, NextResponse } from "next/server"
 import {
   appendAuditLog,
   appendHelpDeskEvent,
-  canLeadDepartment,
   getAuthContext,
-  isAdminRole,
 } from "@/lib/help-desk/server"
 import { sendHelpDeskMail } from "@/lib/help-desk/mailer"
+
+function managesDepartmentStrict(profile: any, department: string | null | undefined) {
+  if (!profile?.is_department_lead || !department) return false
+  const managedDepartments = Array.isArray(profile?.managed_departments)
+    ? profile.managed_departments
+    : Array.isArray(profile?.lead_departments)
+      ? profile.lead_departments
+      : []
+  return managedDepartments.includes(department) || profile?.department === department
+}
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -29,9 +37,19 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       return NextResponse.json({ error: "Ticket not found" }, { status: 404 })
     }
 
-    const canAssign = isAdminRole(profile.role) || canLeadDepartment(profile, ticket.service_department)
+    const canAssign = managesDepartmentStrict(profile, ticket.service_department)
     if (!canAssign) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+      return NextResponse.json(
+        { error: "Only the service department lead can assign this ticket." },
+        { status: 403 }
+      )
+    }
+
+    if (ticket.status === "pending_approval") {
+      return NextResponse.json({ error: "Cannot assign while ticket is pending approval." }, { status: 400 })
+    }
+    if (!["new", "pending_lead_review", "department_queue", "department_assigned"].includes(ticket.status)) {
+      return NextResponse.json({ error: "Ticket is not assignable at its current stage." }, { status: 400 })
     }
 
     const now = new Date().toISOString()
@@ -70,6 +88,20 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     } else {
       if (!assigned_to) {
         return NextResponse.json({ error: "assigned_to is required" }, { status: 400 })
+      }
+      const { data: assignee, error: assigneeError } = await supabase
+        .from("profiles")
+        .select("id, department, employment_status")
+        .eq("id", assigned_to)
+        .maybeSingle()
+      if (assigneeError || !assignee) {
+        return NextResponse.json({ error: "Selected assignee not found" }, { status: 400 })
+      }
+      if (!(assignee.employment_status === "active" || assignee.employment_status == null)) {
+        return NextResponse.json({ error: "Selected assignee is not active" }, { status: 400 })
+      }
+      if (assignee.department !== ticket.service_department) {
+        return NextResponse.json({ error: "Selected assignee must belong to the service department" }, { status: 400 })
       }
       updates = {
         assigned_to,
@@ -125,7 +157,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         p_title: "Help desk ticket assigned",
         p_message: `${ticket.ticket_number} - ${ticket.title}`,
         p_priority: ticket.priority === "urgent" ? "urgent" : ticket.priority === "high" ? "high" : "normal",
-        p_link_url: "/portal/help-desk",
+        p_link_url: "/dashboard/help-desk",
         p_actor_id: user.id,
         p_entity_type: "help_desk_ticket",
         p_entity_id: ticket.id,

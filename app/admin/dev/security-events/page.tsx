@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
+import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { PageHeader, PageWrapper } from "@/components/layout"
 import { ShieldAlert } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -36,7 +37,8 @@ export const dynamic = "force-dynamic"
 
 export default async function DevSecurityEventsPage() {
   const supabase = await createClient()
-  const { data, error } = await supabase
+  const dataClient = getServiceRoleClientOrFallback(supabase as any)
+  const { data, error } = await dataClient
     .from("audit_logs")
     .select(
       "id, action, operation, entity_type, entity_id, user_id, status, metadata, old_values, new_values, created_at"

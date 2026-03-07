@@ -60,7 +60,7 @@ export default function EditProfilePage() {
             phone_number: "",
             additional_phone: "",
             residential_address: "",
-            current_work_location: "",
+            office_location: "",
             is_admin: false,
           })
           .select()

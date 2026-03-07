@@ -92,7 +92,6 @@ export interface Employee {
   phone_number: string | null
   additional_phone: string | null
   residential_address: string | null
-  current_work_location: string | null
   office_location: string | null
   bank_name: string | null
   bank_account_number: string | null
@@ -175,7 +174,6 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
     Position: true,
     "Phone Number": true,
     "Residential Address": true,
-    "Work Location": true,
     "Office Location": true,
     "Employment Date": true,
     "Lead Departments": true,
@@ -198,6 +196,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
     companyRole: "",
     phoneNumber: "",
     role: "employee" as UserRole,
+    admin_domains: [] as string[],
     employeeNumber: "",
   })
 
@@ -220,7 +219,6 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
     phone_number: "",
     additional_phone: "",
     residential_address: "",
-    current_work_location: "",
     bank_name: "",
     bank_account_number: "",
     bank_account_name: "",
@@ -231,9 +229,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
   const [showMoreOptions, setShowMoreOptions] = useState(false)
 
   const supabase = createClient()
-  const isHrGlobalLead =
-    userProfile?.is_department_lead && (userProfile?.managed_departments || []).includes("Admin & HR")
-  const canManageUsers = ["developer", "super_admin", "admin"].includes(userProfile?.role || "") || isHrGlobalLead
+  const canManageUsers = ["developer", "super_admin", "admin"].includes(userProfile?.role || "")
 
   // Handle userId from search params (for edit dialog)
   useEffect(() => {
@@ -296,7 +292,6 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
           phone_number: fullProfile.phone_number || "",
           additional_phone: fullProfile.additional_phone || "",
           residential_address: fullProfile.residential_address || "",
-          current_work_location: fullProfile.current_work_location || "",
           bank_name: fullProfile.bank_name || "",
           bank_account_number: fullProfile.bank_account_number || "",
           bank_account_name: fullProfile.bank_account_name || "",
@@ -323,7 +318,6 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
           phone_number: employee.phone_number || "",
           additional_phone: "",
           residential_address: employee.residential_address || "",
-          current_work_location: employee.current_work_location || "",
           bank_name: "",
           bank_account_number: "",
           bank_account_name: "",
@@ -587,7 +581,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
       }
 
       // Check if user can assign this role
-      if (userProfile && !isHrGlobalLead && !canAssignRoles(userProfile.role, editForm.role)) {
+      if (userProfile && !canAssignRoles(userProfile.role, editForm.role)) {
         toast.error("You don't have permission to assign this role")
         setIsSaving(false)
         return
@@ -644,12 +638,6 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         }
       }
 
-      // Validate email domain
-      if (editForm.company_email && !formValidation.isCompanyEmail(editForm.company_email)) {
-        toast.error("Only @acoblighting.com and @org.acoblighting.com emails are allowed")
-        setIsSaving(false)
-        return
-      }
       const trimmedAdditionalEmail = editForm.additional_email.trim()
       if (trimmedAdditionalEmail && !formValidation.isEmail(trimmedAdditionalEmail)) {
         toast.error("Additional email must be a valid email address")
@@ -668,14 +656,18 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         setIsSaving(false)
         return
       }
+      if (editForm.role === "admin" && editForm.admin_domains.length === 0) {
+        toast.error("Admin role requires at least one admin domain")
+        setIsSaving(false)
+        return
+      }
 
       const isLead = editForm.is_department_lead
 
       // Build update object with all fields
       const updateData: any = {
         role: editForm.role,
-        admin_domains:
-          editForm.role === "admin" ? (editForm.admin_domains.length > 0 ? editForm.admin_domains : null) : null,
+        admin_domains: editForm.role === "admin" ? editForm.admin_domains : null,
         department: editForm.department,
         office_location: editForm.office_location || null,
         company_role: editForm.company_role || null,
@@ -687,12 +679,10 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         first_name: editForm.first_name || null,
         last_name: editForm.last_name || null,
         other_names: editForm.other_names || null,
-        company_email: editForm.company_email || null,
         additional_email: trimmedAdditionalEmail || null,
         phone_number: editForm.phone_number || null,
         additional_phone: editForm.additional_phone || null,
         residential_address: editForm.residential_address || null,
-        current_work_location: editForm.current_work_location || null,
         bank_name: editForm.bank_name || null,
         bank_account_number: editForm.bank_account_number || null,
         bank_account_name: editForm.bank_account_name || null,
@@ -772,8 +762,13 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
       }
 
       // Check if user can assign this role
-      if (userProfile && !isHrGlobalLead && !canAssignRoles(userProfile.role, createUserForm.role)) {
+      if (userProfile && !canAssignRoles(userProfile.role, createUserForm.role)) {
         toast.error("You don't have permission to assign this role")
+        setIsCreatingUser(false)
+        return
+      }
+      if (createUserForm.role === "admin" && createUserForm.admin_domains.length === 0) {
+        toast.error("Admin role requires at least one admin domain")
         setIsCreatingUser(false)
         return
       }
@@ -803,6 +798,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         companyRole: "",
         phoneNumber: "",
         role: "employee",
+        admin_domains: [],
         employeeNumber: "",
       })
       loadData()
@@ -880,7 +876,6 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
       if (selectedColumns["Phone Number"]) row["Phone Number"] = member.phone_number || "-"
       if (selectedColumns["Additional Phone"]) row["Additional Phone"] = member.additional_phone || "-"
       if (selectedColumns["Residential Address"]) row["Residential Address"] = member.residential_address || "-"
-      if (selectedColumns["Work Location"]) row["Work Location"] = member.current_work_location || "-"
       if (selectedColumns["Office Location"]) row["Office Location"] = member.office_location || "-"
       if (selectedColumns["Bank Name"]) row["Bank Name"] = member.bank_name || "-"
       if (selectedColumns["Bank Account Number"]) row["Bank Account Number"] = member.bank_account_number || "-"
@@ -1009,10 +1004,6 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         if (selectedColumns["Residential Address"]) {
           row.push(member.residential_address || "-")
           headers.push("Residential Address")
-        }
-        if (selectedColumns["Work Location"]) {
-          row.push(member.current_work_location || "-")
-          headers.push("Work Location")
         }
         if (selectedColumns["Office Location"]) {
           row.push(member.office_location || "-")
@@ -1194,7 +1185,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
             <Link href="/admin/hr">
               <Button variant="outline" className="gap-2" size="sm">
                 <ArrowLeft className="h-4 w-4" />
-                <span className="hidden sm:inline">Back to HR</span>
+                Back to HR
               </Button>
             </Link>
             {canManageUsers && <PendingApplicationsModal onEmployeeCreated={loadData} />}
@@ -1342,17 +1333,17 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
             <div className="space-y-4">
               {/* Search Bar */}
               <div className="relative w-full">
-                <Search className="text-muted-foreground absolute top-1/2 left-3 h-5 w-5 -translate-y-1/2 transform" />
+                <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform" />
                 <Input
                   placeholder="Search employees by name, email, or position..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="h-12 pl-11 text-base"
+                  className="pl-10"
                 />
               </div>
 
               {/* Filter Buttons */}
-              <div className="flex gap-3 overflow-hidden">
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
                 <SearchableMultiSelect
                   label="Departments"
                   icon={<Building2 className="h-4 w-4" />}
@@ -1623,10 +1614,10 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                       </div>
                     )}
 
-                    {member.current_work_location && (
+                    {member.office_location && (
                       <div className="text-muted-foreground flex items-center gap-2 text-sm">
                         <MapPin className="h-4 w-4" />
-                        <span>{member.current_work_location}</span>
+                        <span>{member.office_location}</span>
                       </div>
                     )}
 
@@ -1798,7 +1789,13 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                 <Label htmlFor="create_role">Role</Label>
                 <Select
                   value={createUserForm.role}
-                  onValueChange={(value: UserRole) => setCreateUserForm({ ...createUserForm, role: value })}
+                  onValueChange={(value: UserRole) =>
+                    setCreateUserForm({
+                      ...createUserForm,
+                      role: value,
+                      admin_domains: value === "admin" ? createUserForm.admin_domains : [],
+                    })
+                  }
                 >
                   <SelectTrigger className="mt-1.5">
                     <SelectValue />
@@ -1813,6 +1810,27 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                 </Select>
               </div>
             </div>
+            {createUserForm.role === "admin" && (
+              <div>
+                <Label>Admin Domains *</Label>
+                <SearchableMultiSelect
+                  label="Admin Domains"
+                  values={createUserForm.admin_domains}
+                  onChange={(values) => setCreateUserForm({ ...createUserForm, admin_domains: values })}
+                  options={[
+                    { value: "hr", label: "HR" },
+                    { value: "finance", label: "Finance" },
+                    { value: "assets", label: "Assets" },
+                    { value: "reports", label: "Reports" },
+                    { value: "tasks", label: "Tasks" },
+                    { value: "projects", label: "Projects" },
+                    { value: "communications", label: "Communications" },
+                  ]}
+                  placeholder="Select at least one admin domain"
+                />
+                <p className="text-muted-foreground mt-1 text-xs">Admin must have one or more domains.</p>
+              </div>
+            )}
 
             <div>
               <Label htmlFor="create_company_role">Position/Title</Label>
@@ -1979,12 +1997,12 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                         </div>
                       )}
 
-                      {viewEmployeeProfile.current_work_location && (
+                      {viewEmployeeProfile.office_location && (
                         <div className="flex items-center gap-3">
                           <MapPin className="text-muted-foreground h-5 w-5" />
                           <div>
-                            <p className="text-muted-foreground text-sm">Work Location</p>
-                            <p className="font-medium">{viewEmployeeProfile.current_work_location}</p>
+                            <p className="text-muted-foreground text-sm">Office Location</p>
+                            <p className="font-medium">{viewEmployeeProfile.office_location}</p>
                           </div>
                         </div>
                       )}
@@ -2351,7 +2369,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                   </div>
                   {editForm.role === "admin" && (
                     <div className="mt-3 space-y-2">
-                      <Label>Admin Domains (Optional)</Label>
+                      <Label>Admin Domains *</Label>
                       <SearchableMultiSelect
                         label="Admin Domains"
                         values={editForm.admin_domains}
@@ -2363,12 +2381,11 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                           { value: "reports", label: "Reports" },
                           { value: "tasks", label: "Tasks" },
                           { value: "projects", label: "Projects" },
-                          { value: "employees", label: "Employees" },
                           { value: "communications", label: "Communications" },
                         ]}
-                        placeholder="Leave empty for global admin access"
+                        placeholder="Select at least one admin domain"
                       />
-                      <p className="text-muted-foreground text-xs">Empty means this admin can access all domains.</p>
+                      <p className="text-muted-foreground text-xs">Admin must have one or more domains.</p>
                     </div>
                   )}
                 </div>
@@ -2527,7 +2544,8 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                               id="edit_company_email"
                               type="email"
                               value={editForm.company_email}
-                              onChange={(e) => setEditForm({ ...editForm, company_email: e.target.value })}
+                              readOnly
+                              disabled
                               placeholder="email@company.com"
                             />
                           </div>
@@ -2597,15 +2615,6 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                             onChange={(e) => setEditForm({ ...editForm, residential_address: e.target.value })}
                             placeholder="Full residential address"
                             rows={2}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="edit_current_work_location">Current Work Location</Label>
-                          <Input
-                            id="edit_current_work_location"
-                            value={editForm.current_work_location}
-                            onChange={(e) => setEditForm({ ...editForm, current_work_location: e.target.value })}
-                            placeholder="Office location or site"
                           />
                         </div>
                       </div>

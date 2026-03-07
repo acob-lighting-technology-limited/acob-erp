@@ -67,7 +67,7 @@ export default function PurchasingDashboard() {
       />
 
       {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-2 lg:grid-cols-4 md:gap-4">
         <StatCard title="Suppliers" value={stats.totalSuppliers} icon={Users} description="Registered vendors" />
         <StatCard
           title="Active Orders"
@@ -93,7 +93,7 @@ export default function PurchasingDashboard() {
 
       {/* Module Cards */}
       <Section title="Purchasing Management">
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-2 lg:grid-cols-3 md:gap-4">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -171,3 +171,4 @@ export default function PurchasingDashboard() {
     </PageWrapper>
   )
 }
+

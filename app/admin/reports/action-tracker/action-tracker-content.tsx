@@ -264,12 +264,12 @@ export function ActionTrackerContent({ initialDepartments, scopedDepartments = [
         ) : null
       }
       stats={
-        <div className="grid gap-4 md:grid-cols-5">
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-4 md:grid-cols-5">
           <Card>
             <CardContent className="flex items-center justify-between p-4">
               <div>
                 <p className="text-muted-foreground text-sm font-medium">Total Actions</p>
-                <p className="text-2xl font-bold">{stats.total}</p>
+                <p className="text-lg font-bold sm:text-2xl">{stats.total}</p>
               </div>
               <FileSpreadsheet className="h-8 w-8 text-blue-500 opacity-20" />
             </CardContent>
@@ -278,7 +278,7 @@ export function ActionTrackerContent({ initialDepartments, scopedDepartments = [
             <CardContent className="flex items-center justify-between p-4">
               <div>
                 <p className="text-muted-foreground text-sm font-medium">Completed</p>
-                <p className="text-2xl font-bold text-green-600">{stats.completed}</p>
+                <p className="text-lg font-bold sm:text-2xl text-green-600">{stats.completed}</p>
               </div>
               <CheckCircle2 className="h-8 w-8 text-green-500 opacity-20" />
             </CardContent>
@@ -287,7 +287,7 @@ export function ActionTrackerContent({ initialDepartments, scopedDepartments = [
             <CardContent className="flex items-center justify-between p-4">
               <div>
                 <p className="text-muted-foreground text-sm font-medium">Pending</p>
-                <p className="text-2xl font-bold text-orange-600">{stats.pending}</p>
+                <p className="text-lg font-bold sm:text-2xl text-orange-600">{stats.pending}</p>
               </div>
               <Clock className="h-8 w-8 text-orange-500 opacity-20" />
             </CardContent>
@@ -296,7 +296,7 @@ export function ActionTrackerContent({ initialDepartments, scopedDepartments = [
             <CardContent className="flex items-center justify-between p-4">
               <div>
                 <p className="text-muted-foreground text-sm font-medium">Not Started</p>
-                <p className="text-2xl font-bold text-amber-600">{stats.notStarted}</p>
+                <p className="text-lg font-bold sm:text-2xl text-amber-600">{stats.notStarted}</p>
               </div>
               <Clock className="h-8 w-8 text-amber-500 opacity-20" />
             </CardContent>
@@ -305,7 +305,7 @@ export function ActionTrackerContent({ initialDepartments, scopedDepartments = [
             <CardContent className="flex items-center justify-between p-4">
               <div>
                 <p className="text-muted-foreground text-sm font-medium">In Progress</p>
-                <p className="text-2xl font-bold text-blue-600">{stats.inProgress}</p>
+                <p className="text-lg font-bold sm:text-2xl text-blue-600">{stats.inProgress}</p>
               </div>
               <RefreshCw className="h-8 w-8 text-blue-500 opacity-20" />
             </CardContent>
@@ -595,3 +595,4 @@ export function ActionTrackerContent({ initialDepartments, scopedDepartments = [
     </AdminTablePage>
   )
 }
+

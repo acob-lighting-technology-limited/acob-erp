@@ -11,8 +11,7 @@ export function renderInternalNotificationEmail({ pendingUser, employeeId }: Int
   const lastName = escapeHtml(pendingUser.last_name)
   const dept = escapeHtml(pendingUser.department)
   const email = escapeHtml(pendingUser.company_email)
-  const workLoc = escapeHtml(pendingUser.current_work_location)
-  const officeLoc = pendingUser.office_location ? escapeHtml(pendingUser.office_location) : ""
+  const officeLoc = pendingUser.office_location ? escapeHtml(pendingUser.office_location) : "N/A"
   const empId = escapeHtml(employeeId)
 
   return `
@@ -71,11 +70,8 @@ export function renderInternalNotificationEmail({ pendingUser, employeeId }: Int
                     <td class="value">${email}</td>
                 </tr>
                 <tr>
-                    <td class="label">Work Location</td>
-                    <td class="value">
-                        ${workLoc}
-                        ${officeLoc && officeLoc !== workLoc ? `(${officeLoc})` : ""}
-                    </td>
+                    <td class="label">Office Location</td>
+                    <td class="value">${officeLoc}</td>
                 </tr>
                 <tr>
                     <td class="label">Approved Date</td>

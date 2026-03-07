@@ -301,7 +301,7 @@ export function NotificationBell({ isAdmin = false }: NotificationBellProps) {
               message: `${pendingLeaveCount} leave request${pendingLeaveCount > 1 ? "s" : ""} awaiting approval`,
               timestamp: formatRelativeTime(now.toISOString()),
               createdAt: now.toISOString(),
-              link: "/admin/hr/leave",
+              link: "/admin/hr/leave/approve",
               linkText: "Review Requests",
               read: readIds.has("pending-leave"),
             })
@@ -452,7 +452,7 @@ export function NotificationBell({ isAdmin = false }: NotificationBellProps) {
               message: `${myPendingLeave} leave request${myPendingLeave > 1 ? "s" : ""} awaiting approval`,
               timestamp: formatRelativeTime(now.toISOString()),
               createdAt: now.toISOString(),
-              link: "/hr/leave",
+              link: "/dashboard/leave",
               linkText: "View Requests",
               read: readIds.has("my-pending-leave"),
             })
@@ -480,7 +480,7 @@ export function NotificationBell({ isAdmin = false }: NotificationBellProps) {
               message: `${approvedLeave} leave request${approvedLeave > 1 ? "s" : ""} recently approved`,
               timestamp: formatRelativeTime(now.toISOString()),
               createdAt: now.toISOString(),
-              link: "/hr/leave",
+              link: "/dashboard/leave",
               linkText: "View Details",
               read: readIds.has("approved-leave"),
             })

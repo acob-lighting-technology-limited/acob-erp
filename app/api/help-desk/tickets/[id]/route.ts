@@ -165,7 +165,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
         p_title: "Ticket resolved",
         p_message: `${ticket.ticket_number} has been resolved. Please review and rate the service.`,
         p_priority: "normal",
-        p_link_url: "/portal/help-desk",
+        p_link_url: "/dashboard/help-desk",
         p_actor_id: user.id,
         p_entity_type: "help_desk_ticket",
         p_entity_id: ticket.id,

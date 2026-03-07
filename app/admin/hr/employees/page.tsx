@@ -1,10 +1,12 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
+import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { AdminEmployeeContent, type Employee, type UserProfile } from "./admin-employee-content"
 import { resolveAdminScope } from "@/lib/admin/rbac"
 
 async function getAdminEmployeeData() {
   const supabase = await createClient()
+  const dataClient = getServiceRoleClientOrFallback(supabase as any)
 
   const {
     data: { user },
@@ -25,7 +27,7 @@ async function getAdminEmployeeData() {
   }
 
   // Fetch employees - all leads can view users; mutation is restricted in the UI and backend.
-  let query = supabase.from("profiles").select("*").order("last_name", { ascending: true })
+  let query = dataClient.from("profiles").select("*").order("last_name", { ascending: true })
 
   const { data: employeeData, error: employeeError } = await query
 

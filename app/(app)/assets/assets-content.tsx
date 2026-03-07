@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -10,14 +10,22 @@ import { Package, Calendar, User, FileText, Building2, LayoutGrid, List, Hash } 
 import { ASSET_TYPE_MAP } from "@/lib/asset-types"
 import type { Asset, AssetAssignment } from "./page"
 import { AppTablePage } from "@/components/app/app-table-page"
+import { toast } from "sonner"
 
 interface AssetsContentProps {
   initialAssignments: AssetAssignment[]
+  initialError?: string | null
 }
 
-export function AssetsContent({ initialAssignments }: AssetsContentProps) {
+export function AssetsContent({ initialAssignments, initialError }: AssetsContentProps) {
   const [assignments] = useState<AssetAssignment[]>(initialAssignments)
   const [viewMode, setViewMode] = useState<"list" | "card">("list")
+
+  useEffect(() => {
+    if (initialError) {
+      toast.error(initialError)
+    }
+  }, [initialError])
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-US", {

@@ -76,6 +76,8 @@ interface WeeklyReportsContentProps {
     role: string
     department: string | null
     is_department_lead: boolean
+    lead_departments?: string[]
+    admin_domains?: string[] | null
   }
 }
 
@@ -109,7 +111,20 @@ export function WeeklyReportsContent({
   const supabase = createClient()
   const isLead = currentUser.is_department_lead
   const isAdminRole = ["developer", "admin", "super_admin"].includes(currentUser.role)
-  const canMutateReport = (report: WeeklyReport) => !isLead || report.user_id === currentUser.id
+  const normalizedRole = (currentUser.role || "").trim().toLowerCase()
+  const isGlobalReportsEditor =
+    normalizedRole === "developer" ||
+    normalizedRole === "super_admin" ||
+    (normalizedRole === "admin" &&
+      (currentUser.admin_domains == null || currentUser.admin_domains.includes("reports")))
+
+  const managedDepartments = [currentUser.department, ...(currentUser.lead_departments || [])].filter(Boolean) as string[]
+
+  const canMutateReport = (report: WeeklyReport) => {
+    if (isGlobalReportsEditor) return true
+    if (report.user_id === currentUser.id) return true
+    return managedDepartments.includes(report.department)
+  }
 
   const loadReports = async () => {
     setLoading(true)

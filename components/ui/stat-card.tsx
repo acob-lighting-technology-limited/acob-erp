@@ -10,47 +10,17 @@ interface Trend {
 }
 
 interface StatCardProps {
-  /** Stat title/label */
   title: string
-  /** The stat value to display */
   value: string | number
-  /** Optional icon */
   icon?: LucideIcon
-  /** Tailwind color class for the icon background */
   iconBgColor?: string
-  /** Tailwind color class for the icon itself */
   iconColor?: string
-  /** Optional trend indicator */
   trend?: Trend
-  /** Card size variant */
   variant?: Variant
-  /** Additional description text */
   description?: string
-  /** Additional classes */
   className?: string
 }
 
-/**
- * StatCard component for displaying statistics in a consistent format.
- *
- * @example
- * // Basic usage
- * <StatCard title="Total employee" value={120} icon={Users} />
- *
- * @example
- * // With custom colors
- * <StatCard
- *   title="Active Tasks"
- *   value={45}
- *   icon={ClipboardList}
- *   iconBgColor="bg-green-100 dark:bg-green-900/30"
- *   iconColor="text-green-600 dark:text-green-400"
- * />
- *
- * @example
- * // Compact variant for dense layouts
- * <StatCard title="Assets" value={89} variant="compact" />
- */
 export function StatCard({
   title,
   value,
@@ -91,20 +61,21 @@ export function StatCard({
   if (variant === "large") {
     return (
       <Card className={cn("border", className)}>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">{title}</CardTitle>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 px-3 pt-3 pb-1.5 sm:px-6 sm:pt-6 sm:pb-2">
+          <CardTitle className="text-muted-foreground truncate text-[10px] font-medium sm:text-sm">{title}</CardTitle>
           {Icon && (
-            <div className={cn("rounded-lg p-2", iconBgColor)}>
-              <Icon className={cn("h-5 w-5", iconColor)} />
+            <div className={cn("rounded-lg p-1.5 sm:p-2", iconBgColor)}>
+              <Icon className={cn("h-4 w-4 sm:h-5 sm:w-5", iconColor)} />
             </div>
           )}
         </CardHeader>
-        <CardContent>
-          <div className="text-3xl font-bold">{value}</div>
-          {description && <p className="text-muted-foreground mt-1 text-sm">{description}</p>}
+        <CardContent className="px-3 pb-3 sm:px-6 sm:pb-6">
+          <div className="text-lg font-bold sm:text-3xl">{value}</div>
+          {description && <p className="text-muted-foreground mt-1 line-clamp-1 text-[10px] sm:text-sm">{description}</p>}
           {trend && (
-            <p className={cn("mt-2 text-sm", trend.value >= 0 ? "text-green-600" : "text-red-600")}>
-              {trend.value >= 0 ? "↑" : "↓"} {Math.abs(trend.value)}% {trend.label}
+            <p className={cn("mt-1 text-[10px] sm:mt-2 sm:text-sm", trend.value >= 0 ? "text-green-600" : "text-red-600")}>
+              {trend.value >= 0 ? "+" : ""}
+              {trend.value}% {trend.label}
             </p>
           )}
         </CardContent>
@@ -112,22 +83,21 @@ export function StatCard({
     )
   }
 
-  // Default variant
   return (
     <Card className={cn("border", className)}>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 px-3 pt-3 pb-1.5 sm:px-6 sm:pt-6 sm:pb-2">
+        <CardTitle className="text-muted-foreground truncate text-[10px] font-medium sm:text-sm">{title}</CardTitle>
         {Icon && (
-          <div className={cn("rounded-lg p-1.5", iconBgColor)}>
-            <Icon className={cn("h-4 w-4", iconColor)} />
+          <div className={cn("rounded-lg p-1 sm:p-1.5", iconBgColor)}>
+            <Icon className={cn("h-3.5 w-3.5 sm:h-4 sm:w-4", iconColor)} />
           </div>
         )}
       </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold">{value}</div>
-        {description && <p className="text-muted-foreground mt-1 text-xs">{description}</p>}
+      <CardContent className="px-3 pb-3 sm:px-6 sm:pb-6">
+        <div className="text-lg font-bold sm:text-2xl">{value}</div>
+        {description && <p className="text-muted-foreground mt-1 line-clamp-1 text-[10px] sm:text-xs">{description}</p>}
         {trend && (
-          <p className={cn("mt-1 text-xs", trend.value >= 0 ? "text-green-600" : "text-red-600")}>
+          <p className={cn("mt-1 text-[10px] sm:text-xs", trend.value >= 0 ? "text-green-600" : "text-red-600")}>
             {trend.value >= 0 ? "+" : ""}
             {trend.value}% {trend.label}
           </p>

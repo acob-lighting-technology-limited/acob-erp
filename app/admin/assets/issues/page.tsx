@@ -241,14 +241,14 @@ export default function AssetIssuesPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Issues</CardTitle>
             <AlertCircle className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.total}</div>
+            <div className="text-lg font-bold sm:text-2xl">{stats.total}</div>
             <p className="text-muted-foreground text-xs">All tracked issues</p>
           </CardContent>
         </Card>
@@ -259,7 +259,7 @@ export default function AssetIssuesPage() {
             <AlertCircle className="h-4 w-4 text-orange-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-600">{stats.unresolved}</div>
+            <div className="text-lg font-bold sm:text-2xl text-orange-600">{stats.unresolved}</div>
             <p className="text-muted-foreground text-xs">Requiring attention</p>
           </CardContent>
         </Card>
@@ -270,7 +270,7 @@ export default function AssetIssuesPage() {
             <CheckCircle2 className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{stats.resolved}</div>
+            <div className="text-lg font-bold sm:text-2xl text-green-600">{stats.resolved}</div>
             <p className="text-muted-foreground text-xs">Successfully fixed</p>
           </CardContent>
         </Card>
@@ -498,3 +498,4 @@ export default function AssetIssuesPage() {
     </div>
   )
 }
+

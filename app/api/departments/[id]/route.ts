@@ -63,7 +63,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
   }
 }
 
-// PUT /api/departments/[id] - Update a department (admin/super_admin/hr_global_lead)
+// PUT /api/departments/[id] - Update a department (admin-like only)
 export async function PUT(request: Request, { params }: { params: { id: string } }) {
   try {
     const supabase = createClient()
@@ -77,8 +77,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
     }
 
     const scope = await resolveAdminScope(supabase as any, user.id)
-    const canManageDepartments =
-      !!scope && (scope.isAdminLike || (scope.isDepartmentLead && scope.managedDepartments.includes("Admin & HR")))
+    const canManageDepartments = !!scope && scope.isAdminLike
     if (!canManageDepartments) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
@@ -110,7 +109,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
   }
 }
 
-// DELETE /api/departments/[id] - Delete a department (admin/super_admin/hr_global_lead)
+// DELETE /api/departments/[id] - Soft delete a department (admin-like only)
 export async function DELETE(request: Request, { params }: { params: { id: string } }) {
   try {
     const supabase = createClient()
@@ -124,19 +123,44 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
     }
 
     const scope = await resolveAdminScope(supabase as any, user.id)
-    const canManageDepartments =
-      !!scope && (scope.isAdminLike || (scope.isDepartmentLead && scope.managedDepartments.includes("Admin & HR")))
+    const canManageDepartments = !!scope && scope.isAdminLike
     if (!canManageDepartments) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
-    const { error } = await supabase.from("departments").delete().eq("id", params.id)
+    const { data: existingDepartment, error: fetchDepartmentError } = await supabase
+      .from("departments")
+      .select("id, name, is_active")
+      .eq("id", params.id)
+      .single()
+
+    if (fetchDepartmentError || !existingDepartment) {
+      return NextResponse.json({ error: "Department not found" }, { status: 404 })
+    }
+
+    const { count: assignedProfilesCount, error: countError } = await supabase
+      .from("profiles")
+      .select("id", { count: "exact", head: true })
+      .eq("department", existingDepartment.name)
+
+    if (countError) throw countError
+    if ((assignedProfilesCount || 0) > 0) {
+      return NextResponse.json(
+        { error: "Cannot deactivate department while users are assigned to it" },
+        { status: 409 }
+      )
+    }
+
+    const { error } = await supabase
+      .from("departments")
+      .update({ is_active: false, updated_at: new Date().toISOString() })
+      .eq("id", params.id)
 
     if (error) throw error
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ success: true, soft_deleted: true })
   } catch (error) {
-    console.error("Error deleting department:", error)
-    return NextResponse.json({ error: "Failed to delete department" }, { status: 500 })
+    console.error("Error soft deleting department:", error)
+    return NextResponse.json({ error: "Failed to deactivate department" }, { status: 500 })
   }
 }

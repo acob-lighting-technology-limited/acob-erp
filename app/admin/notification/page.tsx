@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
+import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { AdminNotificationContent, type DynamicNotification } from "./admin-notification-content"
 import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
 
@@ -27,6 +28,7 @@ async function formatRelativeTime(dateString: string): Promise<string> {
 
 async function getAdminNotificationsData() {
   const supabase = await createClient()
+  const dataClient = getServiceRoleClientOrFallback(supabase as any)
 
   const {
     data: { user },
@@ -44,7 +46,7 @@ async function getAdminNotificationsData() {
   const departmentScope = getDepartmentScope(scope, "general")
   const profileIdsInScope = departmentScope
     ? (departmentScope.length > 0
-        ? await supabase.from("profiles").select("id").in("department", departmentScope)
+        ? await dataClient.from("profiles").select("id").in("department", departmentScope)
         : ({ data: [] as { id: string }[] } as any)
       ).data || []
     : null
@@ -57,7 +59,7 @@ async function getAdminNotificationsData() {
 
   // Pending user approvals
   try {
-    const { count: pendingUsersCount } = await supabase
+    const { count: pendingUsersCount } = await dataClient
       .from("pending_users")
       .select("*", { count: "exact", head: true })
       .eq("status", "pending")
@@ -80,7 +82,7 @@ async function getAdminNotificationsData() {
 
   // Open feedback
   try {
-    let openFeedbackQuery = supabase.from("feedback").select("*", { count: "exact", head: true }).eq("status", "open")
+    let openFeedbackQuery = dataClient.from("feedback").select("*", { count: "exact", head: true }).eq("status", "open")
     if (departmentScope) {
       openFeedbackQuery =
         scopedUserIds.length > 0
@@ -107,7 +109,7 @@ async function getAdminNotificationsData() {
 
   // Urgent tasks
   try {
-    let urgentTasksQuery = supabase
+    let urgentTasksQuery = dataClient
       .from("tasks")
       .select("*", { count: "exact", head: true })
       .eq("priority", "urgent")
@@ -138,7 +140,7 @@ async function getAdminNotificationsData() {
 
   // Overdue tasks
   try {
-    let overdueTasksQuery = supabase
+    let overdueTasksQuery = dataClient
       .from("tasks")
       .select("id")
       .lt("due_date", today)
@@ -169,7 +171,7 @@ async function getAdminNotificationsData() {
 
   // Overdue payments
   try {
-    const { data: overduePayments } = await supabase
+    const { data: overduePayments } = await dataClient
       .from("department_payments")
       .select("id")
       .lt("next_payment_due", now.toISOString())
@@ -195,7 +197,7 @@ async function getAdminNotificationsData() {
   try {
     const sevenDaysFromNow = new Date()
     sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7)
-    const { data: dueSoonPayments } = await supabase
+    const { data: dueSoonPayments } = await dataClient
       .from("department_payments")
       .select("id")
       .gte("next_payment_due", now.toISOString())
@@ -220,7 +222,7 @@ async function getAdminNotificationsData() {
 
   // Pending leave requests
   try {
-    let pendingLeaveQuery = supabase
+    let pendingLeaveQuery = dataClient
       .from("leave_requests")
       .select("*", { count: "exact", head: true })
       .eq("status", "pending")
@@ -240,7 +242,7 @@ async function getAdminNotificationsData() {
         title: "Pending Leave Requests",
         message: `${pendingLeaveCount} leave request${pendingLeaveCount > 1 ? "s" : ""} awaiting approval`,
         timestamp,
-        link: "/admin/hr/leave",
+        link: "/admin/hr/leave/approve",
         linkText: "Review Requests",
         read: false,
         priority: "high",
@@ -250,7 +252,7 @@ async function getAdminNotificationsData() {
 
   // Unresolved asset issues
   try {
-    const { count: assetIssuesCount } = await supabase
+    const { count: assetIssuesCount } = await dataClient
       .from("asset_issues")
       .select("*", { count: "exact", head: true })
       .in("status", ["open", "in_progress"])
@@ -273,7 +275,7 @@ async function getAdminNotificationsData() {
 
   // Assets in maintenance
   try {
-    let maintenanceQuery = supabase
+    let maintenanceQuery = dataClient
       .from("assets")
       .select("*", { count: "exact", head: true })
       .eq("status", "maintenance")

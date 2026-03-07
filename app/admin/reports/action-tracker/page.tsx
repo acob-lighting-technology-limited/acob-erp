@@ -1,11 +1,13 @@
 import { Suspense } from "react"
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
+import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { ActionTrackerContent } from "./action-tracker-content"
-import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
+import { resolveAdminScope } from "@/lib/admin/rbac"
 
 export default async function ActionTrackerPage() {
   const supabase = await createClient()
+  const dataClient = getServiceRoleClientOrFallback(supabase as any)
 
   const {
     data: { user },
@@ -20,22 +22,16 @@ export default async function ActionTrackerPage() {
   if (!scope) {
     redirect("/dashboard")
   }
-  const departmentScope = getDepartmentScope(scope, "general")
 
   // Fetch departments for filtering
-  let employeeQuery = supabase.from("profiles").select("department").not("department", "is", null)
-  if (departmentScope) {
-    employeeQuery =
-      departmentScope.length > 0 ? employeeQuery.in("department", departmentScope) : employeeQuery.eq("id", "__none__")
-  }
-  const { data: employeeData } = await employeeQuery
+  const { data: employeeData } = await dataClient.from("profiles").select("department").not("department", "is", null)
 
   const departments = Array.from(new Set(employeeData?.map((s: any) => s.department).filter(Boolean))) as string[]
   departments.sort()
 
   return (
     <Suspense fallback={<div className="flex justify-center py-20">Loading Tracker...</div>}>
-      <ActionTrackerContent initialDepartments={departments} scopedDepartments={departmentScope ?? []} />
+      <ActionTrackerContent initialDepartments={departments} scopedDepartments={scope.managedDepartments || []} />
     </Suspense>
   )
 }

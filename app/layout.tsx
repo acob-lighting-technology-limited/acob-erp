@@ -11,6 +11,7 @@ import { SidebarProvider } from "@/components/sidebar-context"
 import { createClient } from "@/lib/supabase/server"
 import { NProgressProvider } from "@/components/nprogress-provider"
 import { NProgressHandler } from "@/components/nprogress-handler"
+import { ClientErrorMonitor } from "@/components/telemetry/client-error-monitor"
 import "./globals.css"
 
 export const metadata: Metadata = {
@@ -67,6 +68,7 @@ export default function RootLayout({
             <SidebarProvider>
               <NProgressProvider />
               <NProgressHandler />
+              <ClientErrorMonitor />
               <HeaderWrapperWithData />
               {children}
               <Toaster />

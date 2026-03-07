@@ -203,7 +203,6 @@ export async function POST(req: Request) {
           phone_number: pendingUser.phone_number,
           additional_phone: pendingUser.additional_phone_number,
           residential_address: pendingUser.residential_address,
-          current_work_location: pendingUser.current_work_location,
           office_location: pendingUser.office_location,
           employment_date: hireDate || new Date().toISOString(),
           updated_at: new Date().toISOString(),

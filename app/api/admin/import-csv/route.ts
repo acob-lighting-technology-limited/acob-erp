@@ -180,10 +180,11 @@ export async function POST(request: Request) {
         const company_role = get(record, ["Company Role"]) || ""
         const phone_number = get(record, ["Phone number", "Phone Number"]) || ""
         const residential_address = get(record, ["Residential Address"]) || ""
-        const current_work_location =
+        const office_location =
           get(record, [
             "Current Work Location (Office or Site – indicate site name & state if Site)",
             "Current Work Location",
+            "Office Location",
           ]) || ""
         const device_allocated = get(record, ["Device allocated", "Device allocated "]) || ""
         const device_type = get(record, ["Desktop/ Laptop", "Desktop / Laptop", "Desktop", "Laptop"]) || ""
@@ -203,7 +204,7 @@ export async function POST(request: Request) {
           maybeSet("company_role", company_role)
           maybeSet("phone_number", phone_number)
           maybeSet("residential_address", residential_address)
-          maybeSet("current_work_location", current_work_location)
+          maybeSet("office_location", office_location)
           maybeSet("device_allocated", device_allocated)
           maybeSet("device_type", device_type)
 
@@ -250,7 +251,7 @@ export async function POST(request: Request) {
           company_role,
           phone_number,
           residential_address,
-          current_work_location,
+          office_location,
           device_allocated,
           device_type,
           is_admin: false,

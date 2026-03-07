@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
+import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 
 export const dynamic = "force-dynamic"
 
@@ -48,12 +49,13 @@ export async function GET(request: Request) {
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("role, department, is_admin")
+      .select("role, department, department_id, is_admin")
       .eq("id", user.id)
       .single()
     const scope = await resolveAdminScope(supabase as any, user.id)
+    const dataClient = getServiceRoleClientOrFallback(supabase as any)
 
-    let query = supabase
+    let query = dataClient
       .from("department_payments")
       .select(
         `
@@ -67,7 +69,7 @@ export async function GET(request: Request) {
     if (scope) {
       const scopedDepartments = getDepartmentScope(scope, "finance")
       if (scopedDepartments && scopedDepartments.length > 0) {
-        const { data: deptRows } = await supabase.from("departments").select("id").in("name", scopedDepartments)
+        const { data: deptRows } = await dataClient.from("departments").select("id").in("name", scopedDepartments)
         const deptIds = (deptRows || []).map((row) => row.id)
         query = deptIds.length > 0 ? query.in("department_id", deptIds) : query.eq("department_id", "__none__")
       } else if (scopedDepartments && scopedDepartments.length === 0) {
@@ -76,12 +78,20 @@ export async function GET(request: Request) {
         query = query.eq("department_id", departmentId)
       }
     } else if (!profile?.is_admin) {
-      const { data: userDept } = await supabase
-        .from("departments")
-        .select("id")
-        .eq("name", profile?.department)
-        .single()
-      query = userDept ? query.eq("department_id", userDept.id) : query.eq("department_id", "__none__")
+      const deptId = (profile as any)?.department_id || null
+      if (deptId) {
+        query = query.eq("department_id", deptId)
+      } else {
+        const rawDept = String((profile as any)?.department || "").trim()
+        const deptCandidates = rawDept.toLowerCase() === "finance" ? ["Accounts", rawDept] : [rawDept]
+        const { data: userDept } = await dataClient
+          .from("departments")
+          .select("id")
+          .in("name", deptCandidates.filter(Boolean))
+          .limit(1)
+          .maybeSingle()
+        query = userDept ? query.eq("department_id", userDept.id) : query.eq("department_id", "__none__")
+      }
     } else if (departmentId) {
       // Admin can filter by specific department
       query = query.eq("department_id", departmentId)
@@ -170,15 +180,16 @@ export async function POST(request: Request) {
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("role, is_admin, department")
+      .select("role, is_admin, department, department_id")
       .eq("id", user.id)
       .single()
     const scope = await resolveAdminScope(supabase as any, user.id)
+    const dataClient = getServiceRoleClientOrFallback(supabase as any)
 
     if (scope) {
       const scopedDepartments = getDepartmentScope(scope, "finance")
       if (scopedDepartments) {
-        const { data: targetDepartment } = await supabase
+        const { data: targetDepartment } = await dataClient
           .from("departments")
           .select("name")
           .eq("id", department_id)
@@ -191,18 +202,25 @@ export async function POST(request: Request) {
         }
       }
     } else if (!profile?.is_admin) {
-      const { data: userDept } = await supabase
-        .from("departments")
-        .select("id")
-        .eq("name", profile?.department)
-        .single()
-      if (!userDept || userDept.id !== department_id) {
+      let userDepartmentId = (profile as any)?.department_id || null
+      if (!userDepartmentId) {
+        const rawDept = String((profile as any)?.department || "").trim()
+        const deptCandidates = rawDept.toLowerCase() === "finance" ? ["Accounts", rawDept] : [rawDept]
+        const { data: userDept } = await dataClient
+          .from("departments")
+          .select("id")
+          .in("name", deptCandidates.filter(Boolean))
+          .limit(1)
+          .maybeSingle()
+        userDepartmentId = userDept?.id || null
+      }
+      if (!userDepartmentId || userDepartmentId !== department_id) {
         return NextResponse.json({ error: "You can only create payments in your own department" }, { status: 403 })
       }
     }
 
     // Create payment
-    const { data: payment, error } = await supabase
+    const { data: payment, error } = await dataClient
       .from("department_payments")
       .insert({
         department_id,

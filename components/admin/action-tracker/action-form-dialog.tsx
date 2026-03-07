@@ -177,7 +177,7 @@ export function ActionFormDialog({
                   title: title,
                   message: message,
                   priority: "normal",
-                  linkUrl: `/portal/reports/action-tracker?dept=${dept}`,
+                  linkUrl: `/dashboard/reports/action-tracker?dept=${dept}`,
                   actorId: user.id,
                   entityType: "task_batch",
                 })

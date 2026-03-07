@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
+import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
 import {
   AdminTasksContent,
@@ -11,6 +12,7 @@ import {
 
 async function getAdminTasksData() {
   const supabase = await createClient()
+  const dataClient = getServiceRoleClientOrFallback(supabase as any)
 
   const {
     data: { user },
@@ -28,22 +30,24 @@ async function getAdminTasksData() {
   const departmentScope = getDepartmentScope(scope, "general")
 
   const userProfile: UserProfile = {
+    id: user.id,
     role: scope.role,
+    department: scope.department,
     lead_departments: scope.leadDepartments,
     managed_departments: scope.managedDepartments,
   }
 
   // Build query based on role - exclude weekly action tracker items
-  let tasksQuery = supabase
+  let tasksQuery = dataClient
     .from("tasks")
     .select("*")
     .neq("category", "weekly_action")
     .order("created_at", { ascending: false })
 
   // Fetch employee - leads can only see employee in their departments
-  let employeeQuery = supabase
+  let employeeQuery = dataClient
     .from("profiles")
-    .select("id, first_name, last_name, company_email, department, employment_status")
+    .select("id, first_name, last_name, company_email, department, employment_status, is_department_lead, lead_departments")
     .eq("employment_status", "active")
     .order("last_name", { ascending: true })
 
@@ -55,7 +59,7 @@ async function getAdminTasksData() {
   const [tasksResult, employeeResult, projectsResult] = await Promise.all([
     tasksQuery,
     employeeQuery,
-    supabase.from("projects").select("id, project_name").order("project_name", { ascending: true }),
+    dataClient.from("projects").select("id, project_name").order("project_name", { ascending: true }),
   ])
 
   if (tasksResult.error || employeeResult.error || projectsResult.error) {
@@ -76,7 +80,7 @@ async function getAdminTasksData() {
   // 2. Fetch profiles for individual assignments
   const { data: indivProfiles } =
     allIndivUserIds.length > 0
-      ? await supabase.from("profiles").select("id, first_name, last_name, department").in("id", allIndivUserIds)
+      ? await dataClient.from("profiles").select("id, first_name, last_name, department").in("id", allIndivUserIds)
       : { data: [] }
   const indivProfileMap = new Map(indivProfiles?.map((p: any) => [p.id, p]))
 
@@ -84,21 +88,21 @@ async function getAdminTasksData() {
   const multTaskIds = tasksResult.data?.filter((t: any) => t.assignment_type === "multiple").map((t: any) => t.id) || []
   const { data: allTaskAssignments } =
     multTaskIds.length > 0
-      ? await supabase.from("task_assignments").select("task_id, user_id").in("task_id", multTaskIds)
+      ? await dataClient.from("task_assignments").select("task_id, user_id").in("task_id", multTaskIds)
       : { data: [] }
 
   // 4. Fetch profiles for multiple assigned users
   const multUserIds = Array.from(new Set(allTaskAssignments?.map((a: any) => a.user_id) || []))
   const { data: multProfiles } =
     multUserIds.length > 0
-      ? await supabase.from("profiles").select("id, first_name, last_name, department").in("id", multUserIds)
+      ? await dataClient.from("profiles").select("id, first_name, last_name, department").in("id", multUserIds)
       : { data: [] }
   const multProfileMap = new Map(multProfiles?.map((p: any) => [p.id, p]))
 
   // 5. Fetch all completions
   const { data: allCompletions } =
     allTaskIds.length > 0
-      ? await supabase.from("task_user_completion").select("task_id, user_id").in("task_id", allTaskIds)
+      ? await dataClient.from("task_user_completion").select("task_id, user_id").in("task_id", allTaskIds)
       : { data: [] }
 
   // Grouping logic

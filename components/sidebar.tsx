@@ -58,17 +58,17 @@ interface SidebarProps {
 }
 
 const navigation = [
-  { name: "Home", href: "/profile", icon: LayoutDashboard },
+  { name: "Home", href: "/dashboard/profile", icon: LayoutDashboard },
   { name: "Job Description", href: "/job-description", icon: Briefcase },
   { name: "Projects", href: "/projects", icon: FolderKanban },
-  { name: "Tasks", href: "/portal/tasks", icon: ClipboardList },
-  { name: "Help Desk", href: "/portal/help-desk", icon: ClipboardList },
-  { name: "Reports", href: "/portal/reports", icon: FileBarChart },
-  { name: "Assets", href: "/assets", icon: Package },
-  { name: "Payments", href: "/payments", icon: CreditCard },
-  { name: "Documentation", href: "/documentation", icon: FileText },
-  { name: "Feedback", href: "/feedback", icon: MessageSquare },
-  { name: "Tools", href: "/tools", icon: Wrench },
+  { name: "Tasks", href: "/dashboard/tasks", icon: ClipboardList },
+  { name: "Help Desk", href: "/dashboard/help-desk", icon: ClipboardList },
+  { name: "Reports", href: "/dashboard/reports", icon: FileBarChart },
+  { name: "Assets", href: "/dashboard/assets", icon: Package },
+  { name: "Payments", href: "/dashboard/payments", icon: CreditCard },
+  { name: "Documentation", href: "/dashboard/documentation", icon: FileText },
+  { name: "Feedback", href: "/dashboard/feedback", icon: MessageSquare },
+  { name: "Tools", href: "/dashboard/tools", icon: Wrench },
 ]
 
 const hrNavigation = [

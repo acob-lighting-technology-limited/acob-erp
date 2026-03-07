@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
+import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
@@ -327,27 +328,34 @@ function actionVerb(value: string): string {
 
 export default async function AdminDashboardPage() {
   const supabase = await createClient()
+  const dataClient = getServiceRoleClientOrFallback(supabase as any)
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
   // Fetch user profile with role
-  const { data: profile } = await supabase.from("profiles").select("*").eq("id", user?.id).single()
+  const { data: profile } = await dataClient.from("profiles").select("*").eq("id", user?.id).single()
 
   // Fetch stats
-  const [
-    { count: employeeCount },
-    { count: assetCount },
-    { count: taskCount },
-    { count: docCount },
-    { count: feedbackCount },
-  ] = await Promise.all([
-    supabase.from("profiles").select("*", { count: "exact", head: true }),
-    supabase.from("assets").select("*", { count: "exact", head: true }).is("deleted_at", null),
-    supabase.from("tasks").select("*", { count: "exact", head: true }),
-    supabase.from("user_documentation").select("*", { count: "exact", head: true }),
-    supabase.from("feedback").select("*", { count: "exact", head: true }),
+  const [employeeStats, assetStats, taskStats, docStats, feedbackStats] = await Promise.all([
+    dataClient.from("profiles").select("*", { count: "exact", head: true }),
+    dataClient.from("assets").select("*", { count: "exact", head: true }).is("deleted_at", null),
+    dataClient.from("tasks").select("*", { count: "exact", head: true }),
+    dataClient.from("user_documentation").select("*", { count: "exact", head: true }),
+    dataClient.from("feedback").select("*", { count: "exact", head: true }),
   ])
+
+  if (employeeStats.error) console.error("Admin dashboard stats: profiles count failed", employeeStats.error)
+  if (assetStats.error) console.error("Admin dashboard stats: assets count failed", assetStats.error)
+  if (taskStats.error) console.error("Admin dashboard stats: tasks count failed", taskStats.error)
+  if (docStats.error) console.error("Admin dashboard stats: user_documentation count failed", docStats.error)
+  if (feedbackStats.error) console.error("Admin dashboard stats: feedback count failed", feedbackStats.error)
+
+  const employeeCount = employeeStats.count || 0
+  const assetCount = assetStats.count || 0
+  const taskCount = taskStats.count || 0
+  const docCount = docStats.count || 0
+  const feedbackCount = feedbackStats.count || 0
 
   // Recent cross-module activity from audit logs
   const { data: rawRecentActivity } = await supabase
@@ -587,7 +595,7 @@ export default async function AdminDashboardPage() {
       </Section>
 
       <Section title="Core KPIs" description="Current operational totals across core business areas.">
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-5 md:gap-4">
           <StatCard
             title="Total Employees"
             value={employeeCount || 0}
@@ -729,3 +737,4 @@ export default async function AdminDashboardPage() {
     </PageWrapper>
   )
 }
+

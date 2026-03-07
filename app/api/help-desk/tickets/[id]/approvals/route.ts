@@ -2,9 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import {
   appendAuditLog,
   appendHelpDeskEvent,
-  canLeadDepartment,
   getAuthContext,
-  isAdminRole,
   resolveLeadForDepartment,
 } from "@/lib/help-desk/server"
 import { sendHelpDeskMail } from "@/lib/help-desk/mailer"
@@ -20,6 +18,28 @@ function nextStage(currentStage: string) {
   const idx = STAGE_ORDER.indexOf(currentStage as (typeof STAGE_ORDER)[number])
   if (idx < 0 || idx === STAGE_ORDER.length - 1) return null
   return STAGE_ORDER[idx + 1]
+}
+
+function managesDepartmentStrict(profile: any, department: string | null | undefined) {
+  if (!profile?.is_department_lead || !department) return false
+  const managedDepartments = Array.isArray(profile?.managed_departments)
+    ? profile.managed_departments
+    : Array.isArray(profile?.lead_departments)
+      ? profile.lead_departments
+      : []
+  return managedDepartments.includes(department) || profile?.department === department
+}
+
+function normalizeApprovalStage(stage: string | null | undefined) {
+  if (!stage) return ""
+  if (stage === "department_lead") return "service_department_lead"
+  return stage
+}
+
+function stageRank(stage: string) {
+  const normalized = normalizeApprovalStage(stage)
+  const rank = STAGE_ORDER.indexOf(normalized as (typeof STAGE_ORDER)[number])
+  return rank >= 0 ? rank : Number.MAX_SAFE_INTEGER
 }
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
@@ -55,24 +75,24 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     if (approvalsError) throw approvalsError
 
-    const pendingApproval = (approvals || []).find((a: any) => a.status === "pending")
+    const pendingApproval =
+      (approvals || [])
+        .filter((a: any) => a.status === "pending")
+        .sort((a: any, b: any) => stageRank(a.approval_stage) - stageRank(b.approval_stage))[0] || null
     if (!pendingApproval) {
       return NextResponse.json({ error: "No pending approval for this ticket" }, { status: 400 })
     }
+    const approvalStage = normalizeApprovalStage(pendingApproval.approval_stage)
 
     const canApproveStage =
-      isAdminRole(profile.role) ||
-      (pendingApproval.approval_stage === "requester_department_lead" &&
-        canLeadDepartment(profile, ticket.requester_department)) ||
-      (pendingApproval.approval_stage === "service_department_lead" &&
-        canLeadDepartment(profile, ticket.service_department)) ||
-      (pendingApproval.approval_stage === "head_corporate_services" &&
-        (isAdminRole(profile.role) || profile.is_department_lead) &&
-        (profile.department === "Corporate Services" ||
-          (profile.lead_departments || []).includes("Corporate Services"))) ||
-      (pendingApproval.approval_stage === "managing_director" &&
-        ["developer", "super_admin", "admin"].includes(profile.role) &&
-        (profile.department === "Executive Management" || ["developer", "super_admin"].includes(profile.role)))
+      (approvalStage === "requester_department_lead" &&
+        managesDepartmentStrict(profile, ticket.requester_department)) ||
+      (approvalStage === "service_department_lead" &&
+        managesDepartmentStrict(profile, ticket.service_department)) ||
+      (approvalStage === "head_corporate_services" &&
+        managesDepartmentStrict(profile, "Corporate Services")) ||
+      (approvalStage === "managing_director" &&
+        managesDepartmentStrict(profile, "Executive Management"))
 
     if (!canApproveStage) {
       return NextResponse.json({ error: "You are not authorized to decide this approval stage" }, { status: 403 })
@@ -106,13 +126,13 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         p_type: "approval_rejected",
         p_category: "approvals",
         p_title: "Procurement request rejected",
-        p_message: `${ticket.ticket_number} was rejected at ${pendingApproval.approval_stage}`,
+        p_message: `${ticket.ticket_number} was rejected at ${approvalStage}`,
         p_priority: "high",
-        p_link_url: "/portal/help-desk",
+        p_link_url: "/dashboard/help-desk",
         p_actor_id: user.id,
         p_entity_type: "help_desk_ticket",
         p_entity_id: ticket.id,
-        p_rich_content: { approval_stage: pendingApproval.approval_stage, comments: comments || null },
+        p_rich_content: { approval_stage: approvalStage, comments: comments || null },
       })
 
       try {
@@ -120,14 +140,14 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
           userIds: [ticket.requester_id, ticket.assigned_to].filter(Boolean) as string[],
           subject: `Procurement Rejected: ${ticket.ticket_number}`,
           title: "Ticket Procurement Request Rejected",
-          message: `${ticket.title} was rejected at ${pendingApproval.approval_stage}. Review and update the request.`,
+          message: `${ticket.title} was rejected at ${approvalStage}. Review and update the request.`,
           ticketNumber: ticket.ticket_number,
         })
       } catch (mailError) {
         console.error("Help desk mail error (rejected):", mailError)
       }
     } else {
-      const upcomingStage = nextStage(pendingApproval.approval_stage)
+      const upcomingStage = nextStage(approvalStage)
 
       if (!upcomingStage) {
         finalStatus = "approved_for_procurement"
@@ -150,11 +170,11 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
             p_title: "Procurement approved",
             p_message: `${ticket.ticket_number} has completed all approval stages`,
             p_priority: "normal",
-            p_link_url: "/portal/help-desk",
+            p_link_url: "/dashboard/help-desk",
             p_actor_id: user.id,
             p_entity_type: "help_desk_ticket",
             p_entity_id: ticket.id,
-            p_rich_content: { final_stage: pendingApproval.approval_stage },
+            p_rich_content: { final_stage: approvalStage },
           })
         }
 
@@ -175,7 +195,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         const { data: potentialApprovers } = await supabase
           .from("profiles")
           .select("id, full_name, role, department, is_department_lead, lead_departments")
-          .eq("employment_status", "active")
+          .or("employment_status.eq.active,employment_status.is.null")
 
         const nextApprover = ((): any | null => {
           const rows = potentialApprovers || []
@@ -188,19 +208,13 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
           if (upcomingStage === "head_corporate_services") {
             return (
               rows.find((p: any) => {
-                return (
-                  (isAdminRole(p.role) || p.is_department_lead) &&
-                  (p.department === "Corporate Services" || (p.lead_departments || []).includes("Corporate Services"))
-                )
+                return p.is_department_lead && (p.department === "Corporate Services" || (p.lead_departments || []).includes("Corporate Services"))
               }) || null
             )
           }
           return (
             rows.find((p: any) => {
-              return (
-                ["developer", "super_admin", "admin"].includes(p.role) &&
-                (p.department === "Executive Management" || ["developer", "super_admin"].includes(p.role))
-              )
+              return p.is_department_lead && (p.department === "Executive Management" || (p.lead_departments || []).includes("Executive Management"))
             }) || null
           )
         })()
@@ -245,7 +259,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       oldStatus: ticket.status,
       newStatus: finalStatus,
       details: {
-        stage: pendingApproval.approval_stage,
+        stage: approvalStage,
         decision: normalizedDecision,
         comments: comments || null,
       },
@@ -259,7 +273,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       route: "/api/help-desk/tickets/[id]/approvals",
       critical: true,
       newValues: {
-        approval_stage: pendingApproval.approval_stage,
+        approval_stage: approvalStage,
         decision: normalizedDecision,
         status: finalStatus,
       },
@@ -268,7 +282,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     return NextResponse.json({
       data: {
         ticket_id: ticket.id,
-        approval_stage: pendingApproval.approval_stage,
+        approval_stage: approvalStage,
         decision: normalizedDecision,
         status: finalStatus,
       },

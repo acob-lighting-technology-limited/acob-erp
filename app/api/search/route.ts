@@ -136,7 +136,7 @@ export async function GET(request: NextRequest) {
               title: doc.title || "Documentation",
               subtitle: `Created by ${name}`,
               description: doc.category || undefined,
-              href: `/admin/documentation?docId=${doc.id}`,
+              href: `/admin/documentation/internal?docId=${doc.id}`,
               metadata: { ...doc, related_user: profile.id },
             })
           })
@@ -208,7 +208,7 @@ export async function GET(request: NextRequest) {
           title: doc.title || "Documentation",
           subtitle: doc.category || undefined,
           description: doc.content ? doc.content.substring(0, 100).replace(/[#*`]/g, "") : undefined,
-          href: `/admin/documentation?docId=${doc.id}`,
+          href: `/admin/documentation/internal?docId=${doc.id}`,
           metadata: doc,
         })
       })
