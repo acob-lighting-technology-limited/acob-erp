@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
   Dialog,
@@ -20,7 +21,6 @@ import {
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Plus, Pencil, Trash2, Shield, Users } from "lucide-react"
-import Link from "next/link"
 import { toast } from "sonner"
 import { DepartmentLeadsManager } from "@/components/admin/department-leads-manager"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
@@ -74,6 +74,11 @@ export default function RolesPage() {
   const [selectedRoleName, setSelectedRoleName] = useState<string>("")
   const [roleUsers, setRoleUsers] = useState<RoleMember[]>([])
   const [roleUsersLoading, setRoleUsersLoading] = useState(false)
+  const [isAddUserInlineOpen, setIsAddUserInlineOpen] = useState(false)
+  const [availableUsers, setAvailableUsers] = useState<RoleMember[]>([])
+  const [selectedUserId, setSelectedUserId] = useState("")
+  const [addUserWarning, setAddUserWarning] = useState<string | null>(null)
+  const [addingUser, setAddingUser] = useState(false)
 
   useEffect(() => {
     fetchRoles()
@@ -278,6 +283,62 @@ export default function RolesPage() {
     }
   }
 
+  async function fetchAllUsersForRoleModal() {
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, first_name, last_name, company_email, department, employment_status, created_at")
+        .order("first_name", { ascending: true })
+
+      if (error) throw error
+      setAvailableUsers((data || []) as RoleMember[])
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to load users")
+    }
+  }
+
+  function handleUserSelect(userId: string) {
+    setSelectedUserId(userId)
+    const user = availableUsers.find((u) => u.id === userId)
+    if (!user) return
+
+    if (roleUsers.some((u) => u.id === userId)) {
+      setAddUserWarning("This user already has this role.")
+      return
+    }
+
+    setAddUserWarning(`User will be assigned to "${selectedRoleName.replace("_", " ")}".`)
+  }
+
+  async function handleAddUserToRole() {
+    if (!selectedRoleName || !selectedUserId) return
+
+    setAddingUser(true)
+    try {
+      const response = await fetch("/api/admin/users/role", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          targetUserId: selectedUserId,
+          role: selectedRoleName,
+        }),
+      })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || "Failed to assign role")
+
+      toast.success("User added to role")
+      setSelectedUserId("")
+      setAddUserWarning(null)
+      setIsAddUserInlineOpen(false)
+      await Promise.all([fetchRoles(), openRoleUsers(selectedRoleName)])
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to add user")
+    } finally {
+      setAddingUser(false)
+    }
+  }
+
   const stats = {
     total: roles.filter((role) => !(role.is_system && !ASSIGNABLE_ROLES.includes(role.name as any))).length,
     system: roles.filter((role) => role.is_system && ASSIGNABLE_ROLES.includes(role.name as any)).length,
@@ -442,9 +503,61 @@ export default function RolesPage() {
       <Dialog open={roleUsersOpen} onOpenChange={setRoleUsersOpen}>
         <DialogContent className="max-h-[90vh] w-[95vw] max-w-3xl overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="capitalize">{selectedRoleName.replace("_", " ")} Users</DialogTitle>
-            <DialogDescription>Users currently assigned this role.</DialogDescription>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <DialogTitle className="capitalize">{selectedRoleName.replace("_", " ")} Users</DialogTitle>
+                <DialogDescription>Users currently assigned this role.</DialogDescription>
+              </div>
+              {selectedRoleName && (
+                <Button
+                  size="sm"
+                  onClick={async () => {
+                    setIsAddUserInlineOpen((prev) => !prev)
+                    if (!availableUsers.length) await fetchAllUsersForRoleModal()
+                  }}
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add User
+                </Button>
+              )}
+            </div>
           </DialogHeader>
+
+          {isAddUserInlineOpen && (
+            <div className="space-y-3 rounded-md border p-3">
+              <Label>Select User</Label>
+              <Select value={selectedUserId} onValueChange={handleUserSelect}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Search or select a user..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableUsers.map((u) => (
+                    <SelectItem key={u.id} value={u.id}>
+                      {u.first_name || u.last_name
+                        ? `${u.first_name || ""} ${u.last_name || ""}`.trim()
+                        : u.company_email || "Unnamed user"}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {addUserWarning && <p className="text-muted-foreground text-xs">{addUserWarning}</p>}
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setIsAddUserInlineOpen(false)
+                    setSelectedUserId("")
+                    setAddUserWarning(null)
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button onClick={handleAddUserToRole} disabled={!selectedUserId || addingUser}>
+                  {addingUser ? "Adding..." : "Confirm"}
+                </Button>
+              </div>
+            </div>
+          )}
 
           {roleUsersLoading ? (
             <div className="flex items-center justify-center py-8">

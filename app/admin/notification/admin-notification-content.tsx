@@ -26,7 +26,6 @@ import {
   Clock,
   ChevronRight,
   Filter,
-  ShieldCheck,
   CreditCard,
   CalendarClock,
   RefreshCw,
@@ -58,10 +57,10 @@ const typeIcons = {
 
 // Type colors
 const typeColors = {
-  info: "border-l-blue-500 bg-blue-50/50 dark:bg-blue-950/10",
-  warning: "border-l-yellow-500 bg-yellow-50/50 dark:bg-yellow-950/10",
-  success: "border-l-green-500 bg-green-50/50 dark:bg-green-950/10",
-  error: "border-l-red-500 bg-red-50/50 dark:bg-red-950/10",
+  info: "bg-blue-50/50 dark:bg-blue-950/10",
+  warning: "bg-yellow-50/50 dark:bg-yellow-950/10",
+  success: "bg-green-50/50 dark:bg-green-950/10",
+  error: "bg-red-50/50 dark:bg-red-950/10",
 }
 
 // Format relative time
@@ -511,12 +510,9 @@ export function AdminNotificationContent({ initialNotifications }: AdminNotifica
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <div className="border-b">
-            <TabsList className="h-auto w-full justify-start overflow-x-auto rounded-none border-b-0 bg-transparent p-0">
-              <TabsTrigger
-                value="all"
-                className="data-[state=active]:border-primary rounded-none border-b-2 border-transparent px-6 py-3 whitespace-nowrap data-[state=active]:bg-transparent"
-              >
+          <div className="border-b px-4 py-3">
+            <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto">
+              <TabsTrigger value="all" className="px-4 py-2 whitespace-nowrap">
                 All
                 {categoryCounts.all > 0 && (
                   <Badge variant="secondary" className="ml-2">
@@ -525,10 +521,7 @@ export function AdminNotificationContent({ initialNotifications }: AdminNotifica
                 )}
               </TabsTrigger>
 
-              <TabsTrigger
-                value="unread"
-                className="data-[state=active]:border-primary rounded-none border-b-2 border-transparent px-6 py-3 whitespace-nowrap data-[state=active]:bg-transparent"
-              >
+              <TabsTrigger value="unread" className="px-4 py-2 whitespace-nowrap">
                 Unread
                 {categoryCounts.unread > 0 && (
                   <Badge variant="destructive" className="ml-2">
@@ -537,10 +530,7 @@ export function AdminNotificationContent({ initialNotifications }: AdminNotifica
                 )}
               </TabsTrigger>
 
-              <TabsTrigger
-                value="payments"
-                className="data-[state=active]:border-primary rounded-none border-b-2 border-transparent px-6 py-3 whitespace-nowrap data-[state=active]:bg-transparent"
-              >
+              <TabsTrigger value="payments" className="px-4 py-2 whitespace-nowrap">
                 <CreditCard className="mr-1 h-4 w-4" />
                 Payments
                 {categoryCounts.payments > 0 && (
@@ -550,10 +540,7 @@ export function AdminNotificationContent({ initialNotifications }: AdminNotifica
                 )}
               </TabsTrigger>
 
-              <TabsTrigger
-                value="leave"
-                className="data-[state=active]:border-primary rounded-none border-b-2 border-transparent px-6 py-3 whitespace-nowrap data-[state=active]:bg-transparent"
-              >
+              <TabsTrigger value="leave" className="px-4 py-2 whitespace-nowrap">
                 <CalendarClock className="mr-1 h-4 w-4" />
                 Leave
                 {categoryCounts.leave > 0 && (
@@ -563,10 +550,7 @@ export function AdminNotificationContent({ initialNotifications }: AdminNotifica
                 )}
               </TabsTrigger>
 
-              <TabsTrigger
-                value="tasks"
-                className="data-[state=active]:border-primary rounded-none border-b-2 border-transparent px-6 py-3 whitespace-nowrap data-[state=active]:bg-transparent"
-              >
+              <TabsTrigger value="tasks" className="px-4 py-2 whitespace-nowrap">
                 <Clock className="mr-1 h-4 w-4" />
                 Tasks
                 {categoryCounts.tasks > 0 && (
@@ -576,10 +560,7 @@ export function AdminNotificationContent({ initialNotifications }: AdminNotifica
                 )}
               </TabsTrigger>
 
-              <TabsTrigger
-                value="assets"
-                className="data-[state=active]:border-primary rounded-none border-b-2 border-transparent px-6 py-3 whitespace-nowrap data-[state=active]:bg-transparent"
-              >
+              <TabsTrigger value="assets" className="px-4 py-2 whitespace-nowrap">
                 <Package className="mr-1 h-4 w-4" />
                 Assets
                 {categoryCounts.assets > 0 && (
@@ -589,10 +570,7 @@ export function AdminNotificationContent({ initialNotifications }: AdminNotifica
                 )}
               </TabsTrigger>
 
-              <TabsTrigger
-                value="users"
-                className="data-[state=active]:border-primary rounded-none border-b-2 border-transparent px-6 py-3 whitespace-nowrap data-[state=active]:bg-transparent"
-              >
+              <TabsTrigger value="users" className="px-4 py-2 whitespace-nowrap">
                 <User className="mr-1 h-4 w-4" />
                 Users
                 {categoryCounts.users > 0 && (
@@ -616,7 +594,7 @@ export function AdminNotificationContent({ initialNotifications }: AdminNotifica
                       <div
                         key={notification.id}
                         className={cn(
-                          "group hover:bg-muted/30 relative flex cursor-pointer items-center gap-3 border-l-2 px-4 py-3 transition-all",
+                          "group hover:bg-muted/30 relative flex cursor-pointer items-center gap-3 px-4 py-3 transition-all",
                           typeColors[notification.type],
                           isRead && "opacity-60"
                         )}

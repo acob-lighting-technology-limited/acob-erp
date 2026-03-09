@@ -298,12 +298,9 @@ export function NotificationContent({ initialNotifications, userId }: Notificati
         </CardHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <div className="border-b">
-            <TabsList className="h-auto w-full justify-start rounded-none border-b-0 bg-transparent p-0">
-              <TabsTrigger
-                value="all"
-                className="data-[state=active]:border-primary rounded-none border-b-2 border-transparent px-6 py-3 data-[state=active]:bg-transparent"
-              >
+          <div className="border-b px-4 py-3">
+            <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto">
+              <TabsTrigger value="all" className="px-4 py-2 whitespace-nowrap">
                 All
                 {categoryCounts.all > 0 && (
                   <Badge variant="secondary" className="ml-2">
@@ -312,10 +309,7 @@ export function NotificationContent({ initialNotifications, userId }: Notificati
                 )}
               </TabsTrigger>
 
-              <TabsTrigger
-                value="unread"
-                className="data-[state=active]:border-primary rounded-none border-b-2 border-transparent px-6 py-3 data-[state=active]:bg-transparent"
-              >
+              <TabsTrigger value="unread" className="px-4 py-2 whitespace-nowrap">
                 Unread
                 {categoryCounts.unread > 0 && (
                   <Badge variant="destructive" className="ml-2">
@@ -324,10 +318,7 @@ export function NotificationContent({ initialNotifications, userId }: Notificati
                 )}
               </TabsTrigger>
 
-              <TabsTrigger
-                value="tasks"
-                className="data-[state=active]:border-primary rounded-none border-b-2 border-transparent px-6 py-3 data-[state=active]:bg-transparent"
-              >
+              <TabsTrigger value="tasks" className="px-4 py-2 whitespace-nowrap">
                 <User className="mr-1 h-4 w-4" />
                 Tasks
                 {categoryCounts.tasks > 0 && (
@@ -337,10 +328,7 @@ export function NotificationContent({ initialNotifications, userId }: Notificati
                 )}
               </TabsTrigger>
 
-              <TabsTrigger
-                value="assets"
-                className="data-[state=active]:border-primary rounded-none border-b-2 border-transparent px-6 py-3 data-[state=active]:bg-transparent"
-              >
+              <TabsTrigger value="assets" className="px-4 py-2 whitespace-nowrap">
                 <Package className="mr-1 h-4 w-4" />
                 Assets
                 {categoryCounts.assets > 0 && (
@@ -368,9 +356,7 @@ export function NotificationContent({ initialNotifications, userId }: Notificati
                         )}
                         onClick={() => handleNotificationClick(notification)}
                       >
-                        {!notification.read && <div className="bg-primary absolute top-0 bottom-0 left-0 w-1" />}
-
-                        <div className="flex gap-4 pl-2">
+                        <div className="flex gap-4">
                           {notification.actor_avatar || notification.actor_name ? (
                             <Avatar className="h-12 w-12 shrink-0">
                               {notification.actor_avatar && (
