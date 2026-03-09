@@ -47,11 +47,11 @@ const nextConfig = {
         ...(config.externals || []),
         ({ request }, callback) => {
           if (/^node:/.test(request)) {
-            return callback(null, '{}');
+            return callback(null, "{}")
           }
-          callback();
+          callback()
         },
-      ];
+      ]
     }
 
     return config

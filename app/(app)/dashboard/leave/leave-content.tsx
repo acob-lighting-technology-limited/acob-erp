@@ -12,7 +12,7 @@ import { SearchableSelect } from "@/components/ui/searchable-select"
 import { Textarea } from "@/components/ui/textarea"
 import { PageHeader, PageWrapper } from "@/components/layout"
 import { toast } from "sonner"
-import { CalendarDays, Clock, Plus, Upload } from "lucide-react"
+import { CalendarDays, ChevronDown, ChevronRight, Clock, Plus, Upload } from "lucide-react"
 import type { LeaveBalance, LeaveRequest, LeaveType } from "./page"
 
 interface LeaveContentProps {
@@ -66,6 +66,14 @@ function prettyDocName(name: string) {
   return name.replaceAll("_", " ")
 }
 
+function getTodayLocalIsoDate() {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, "0")
+  const day = String(now.getDate()).padStart(2, "0")
+  return `${year}-${month}-${day}`
+}
+
 const EMPTY_REQUEST_FORM = {
   leave_type_id: "",
   start_date: "",
@@ -91,13 +99,39 @@ export function LeaveContent({
   const [uploadingEvidenceFor, setUploadingEvidenceFor] = useState<string | null>(null)
   const [editingRequestId, setEditingRequestId] = useState<string | null>(null)
   const [deletingRequestId, setDeletingRequestId] = useState<string | null>(null)
+  const [showLeavePolicy, setShowLeavePolicy] = useState(false)
+  const [requestsTab, setRequestsTab] = useState<"ongoing" | "history">("ongoing")
+  const [historyFilter, setHistoryFilter] = useState<"all" | "approved" | "rejected" | "cancelled">("all")
   const approvalQueueRef = useRef<HTMLDivElement | null>(null)
   const [formData, setFormData] = useState(EMPTY_REQUEST_FORM)
+  const todayIsoDate = useMemo(() => getTodayLocalIsoDate(), [])
 
   const myRequests = useMemo(
     () => requests.filter((request) => request.user_id === currentUserId),
     [requests, currentUserId]
   )
+  const ongoingRequests = useMemo(
+    () =>
+      myRequests.filter((request) => {
+        if (request.status === "rejected" || request.status === "cancelled") return false
+        if (request.status !== "approved") return true
+        return !request.end_date || request.end_date >= todayIsoDate
+      }),
+    [myRequests, todayIsoDate]
+  )
+  const historyRequests = useMemo(
+    () =>
+      myRequests.filter((request) => {
+        if (request.status === "rejected" || request.status === "cancelled") return true
+        if (request.status !== "approved") return false
+        return Boolean(request.end_date && request.end_date < todayIsoDate)
+      }),
+    [myRequests, todayIsoDate]
+  )
+  const filteredHistoryRequests = useMemo(() => {
+    if (historyFilter === "all") return historyRequests
+    return historyRequests.filter((request) => request.status === historyFilter)
+  }, [historyFilter, historyRequests])
 
   const hasPendingRequest = myRequests.some((request) => ["pending", "pending_evidence"].includes(request.status))
   const leaveTypeMap = useMemo(() => new Map(leaveTypes.map((leaveType) => [leaveType.id, leaveType])), [leaveTypes])
@@ -358,40 +392,50 @@ export function LeaveContent({
         }
       />
       <Card>
-        <CardHeader>
-          <CardTitle>Leave Types and Balances</CardTitle>
-          <CardDescription>Professional governance: policy + evidence + transparent eligibility</CardDescription>
+        <CardHeader className="pb-3">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <CardTitle>Leave Types and Balances</CardTitle>
+              <CardDescription>Professional governance: policy + evidence + transparent eligibility</CardDescription>
+            </div>
+            <Button type="button" variant="outline" size="sm" onClick={() => setShowLeavePolicy((prev) => !prev)}>
+              {showLeavePolicy ? <ChevronDown className="mr-1 h-4 w-4" /> : <ChevronRight className="mr-1 h-4 w-4" />}
+              {showLeavePolicy ? "Hide" : "Show"}
+            </Button>
+          </div>
         </CardHeader>
-        <CardContent className="space-y-2">
-          {leaveTypes.map((leaveType) => {
-            const balance = balanceMap.get(leaveType.id)
-            const allocatedDays = balance?.allocated_days ?? leaveType.max_days
-            const usedDays = balance?.used_days ?? 0
-            const leftDays = balance?.balance_days ?? leaveType.max_days
+        {showLeavePolicy && (
+          <CardContent className="space-y-2">
+            {leaveTypes.map((leaveType) => {
+              const balance = balanceMap.get(leaveType.id)
+              const allocatedDays = balance?.allocated_days ?? leaveType.max_days
+              const usedDays = balance?.used_days ?? 0
+              const leftDays = balance?.balance_days ?? leaveType.max_days
 
-            return (
-              <div key={leaveType.id} className="space-y-1 rounded-md border px-3 py-2">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="font-medium">{leaveType.name}</p>
-                  <Badge variant={ELIGIBILITY_VARIANT[leaveType.eligibility_status] || "outline"}>
-                    {prettyEligibility(leaveType.eligibility_status)}
-                  </Badge>
-                </div>
-                <p className="text-muted-foreground text-xs">
-                  {usedDays} used / {allocatedDays} allocated | {leftDays} days left
-                </p>
-                {leaveType.eligibility_reason && (
-                  <p className="text-muted-foreground text-xs">{leaveType.eligibility_reason}</p>
-                )}
-                {leaveType.required_documents?.length > 0 && (
+              return (
+                <div key={leaveType.id} className="space-y-1 rounded-md border px-3 py-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="font-medium">{leaveType.name}</p>
+                    <Badge variant={ELIGIBILITY_VARIANT[leaveType.eligibility_status] || "outline"}>
+                      {prettyEligibility(leaveType.eligibility_status)}
+                    </Badge>
+                  </div>
                   <p className="text-muted-foreground text-xs">
-                    Required documents: {leaveType.required_documents.map(prettyDocName).join(", ")}
+                    {usedDays} used / {allocatedDays} allocated | {leftDays} days left
                   </p>
-                )}
-              </div>
-            )
-          })}
-        </CardContent>
+                  {leaveType.eligibility_reason && (
+                    <p className="text-muted-foreground text-xs">{leaveType.eligibility_reason}</p>
+                  )}
+                  {leaveType.required_documents?.length > 0 && (
+                    <p className="text-muted-foreground text-xs">
+                      Required documents: {leaveType.required_documents.map(prettyDocName).join(", ")}
+                    </p>
+                  )}
+                </div>
+              )
+            })}
+          </CardContent>
+        )}
       </Card>
 
       {approverQueue.length > 0 && (
@@ -441,87 +485,151 @@ export function LeaveContent({
       <Card>
         <CardHeader>
           <CardTitle>My Leave Requests</CardTitle>
+          <CardDescription>Track ongoing requests separately from completed history.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-3">
-          {myRequests.map((request) => (
-            <div key={request.id} className="rounded-md border p-3">
-              <div className="flex items-center justify-between gap-2">
-                <p className="font-medium">{request.leave_type?.name || "Leave Request"}</p>
-                <div className="flex gap-2">
-                  <Badge
-                    variant={
-                      request.status === "approved"
-                        ? "default"
-                        : request.status === "rejected"
-                          ? "destructive"
-                          : "secondary"
-                    }
-                  >
-                    {request.status}
-                  </Badge>
-                  <Badge variant="outline">
-                    {STAGE_LABELS[request.current_stage_code || request.approval_stage] ||
-                      request.current_stage_code ||
-                      request.approval_stage ||
-                      "N/A"}
-                  </Badge>
-                </div>
-              </div>
-              <p className="text-muted-foreground mt-2 text-sm">
-                {request.start_date} to {request.end_date} | Resume: {request.resume_date} | {request.days_count} day(s)
-              </p>
-              <p className="mt-2 text-sm">{request.reason}</p>
-              <p className="text-muted-foreground mt-2 text-sm">
-                Reliever: {request.reliever?.full_name || request.reliever?.company_email || "Not set"}
-              </p>
-              {(request.required_documents || []).length > 0 && (
-                <p className="text-muted-foreground mt-2 text-xs">
-                  Required documents: {(request.required_documents || []).map(prettyDocName).join(", ")}
-                </p>
-              )}
-              {(request.missing_documents || []).length > 0 && (
-                <div className="mt-2 rounded-md border border-amber-500/50 bg-amber-50 p-2 text-xs text-amber-700">
-                  <p>Missing evidence: {(request.missing_documents || []).map(prettyDocName).join(", ")}</p>
-                  {request.status === "pending_evidence" && (
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {(request.missing_documents || []).map((doc) => (
-                        <Button
-                          key={`${request.id}-${doc}`}
-                          size="sm"
-                          variant="outline"
-                          disabled={uploadingEvidenceFor === request.id}
-                          onClick={() => handleUploadEvidence(request.id, doc)}
-                        >
-                          <Upload className="mr-1 h-3 w-3" />
-                          Upload {prettyDocName(doc)}
-                        </Button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-              {isRequesterEditable(request) && (
-                <div className="mt-3 flex gap-2">
-                  <Button size="sm" variant="outline" onClick={() => openEditDialog(request)}>
-                    Edit
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    onClick={() => handleDeleteRequest(request)}
-                    disabled={deletingRequestId === request.id}
-                  >
-                    {deletingRequestId === request.id ? "Deleting..." : "Delete"}
-                  </Button>
-                </div>
-              )}
+        <CardContent className="space-y-6">
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant={requestsTab === "ongoing" ? "default" : "outline"}
+              onClick={() => setRequestsTab("ongoing")}
+            >
+              Ongoing ({ongoingRequests.length})
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={requestsTab === "history" ? "default" : "outline"}
+              onClick={() => setRequestsTab("history")}
+            >
+              History ({historyRequests.length})
+            </Button>
+          </div>
+
+          {requestsTab === "history" && (
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant={historyFilter === "all" ? "secondary" : "outline"}
+                onClick={() => setHistoryFilter("all")}
+              >
+                All
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={historyFilter === "approved" ? "secondary" : "outline"}
+                onClick={() => setHistoryFilter("approved")}
+              >
+                Approved
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={historyFilter === "rejected" ? "secondary" : "outline"}
+                onClick={() => setHistoryFilter("rejected")}
+              >
+                Rejected
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={historyFilter === "cancelled" ? "secondary" : "outline"}
+                onClick={() => setHistoryFilter("cancelled")}
+              >
+                Cancelled
+              </Button>
             </div>
-          ))}
+          )}
+
+          {(requestsTab === "ongoing" ? ongoingRequests : filteredHistoryRequests).length === 0 ? (
+            <div className="text-muted-foreground rounded-md border border-dashed p-3 text-sm">
+              {requestsTab === "ongoing" ? "No ongoing requests." : "No history requests for this filter."}
+            </div>
+          ) : (
+            (requestsTab === "ongoing" ? ongoingRequests : filteredHistoryRequests).map((request) => (
+              <div key={request.id} className="rounded-md border p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="font-medium">{request.leave_type?.name || "Leave Request"}</p>
+                  <div className="flex gap-2">
+                    <Badge
+                      variant={
+                        request.status === "approved"
+                          ? "default"
+                          : request.status === "rejected"
+                            ? "destructive"
+                            : "secondary"
+                      }
+                    >
+                      {request.status}
+                    </Badge>
+                    <Badge variant="outline">
+                      {STAGE_LABELS[request.current_stage_code || request.approval_stage] ||
+                        request.current_stage_code ||
+                        request.approval_stage ||
+                        "N/A"}
+                    </Badge>
+                  </div>
+                </div>
+                <p className="text-muted-foreground mt-2 text-sm">
+                  {request.start_date} to {request.end_date} | Resume: {request.resume_date} | {request.days_count}{" "}
+                  day(s)
+                </p>
+                <p className="mt-2 text-sm">{request.reason}</p>
+                <p className="text-muted-foreground mt-2 text-sm">
+                  Reliever: {request.reliever?.full_name || request.reliever?.company_email || "Not set"}
+                </p>
+                {(request.required_documents || []).length > 0 && (
+                  <p className="text-muted-foreground mt-2 text-xs">
+                    Required documents: {(request.required_documents || []).map(prettyDocName).join(", ")}
+                  </p>
+                )}
+                {(request.missing_documents || []).length > 0 && (
+                  <div className="mt-2 rounded-md border border-amber-500/50 bg-amber-50 p-2 text-xs text-amber-700">
+                    <p>Missing evidence: {(request.missing_documents || []).map(prettyDocName).join(", ")}</p>
+                    {request.status === "pending_evidence" && (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {(request.missing_documents || []).map((doc) => (
+                          <Button
+                            key={`${request.id}-${doc}`}
+                            size="sm"
+                            variant="outline"
+                            disabled={uploadingEvidenceFor === request.id}
+                            onClick={() => handleUploadEvidence(request.id, doc)}
+                          >
+                            <Upload className="mr-1 h-3 w-3" />
+                            Upload {prettyDocName(doc)}
+                          </Button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+                {isRequesterEditable(request) && (
+                  <div className="mt-3 flex gap-2">
+                    <Button size="sm" variant="outline" onClick={() => openEditDialog(request)}>
+                      Edit
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => handleDeleteRequest(request)}
+                      disabled={deletingRequestId === request.id}
+                    >
+                      {deletingRequestId === request.id ? "Deleting..." : "Delete"}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            ))
+          )}
         </CardContent>
       </Card>
 
       <Dialog open={open} onOpenChange={handleDialogOpenChange}>
-        <DialogContent className="sm:max-w-[560px]">
+        <DialogContent className="max-h-[90vh] w-[95vw] max-w-[560px] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <CalendarDays className="h-5 w-5" />

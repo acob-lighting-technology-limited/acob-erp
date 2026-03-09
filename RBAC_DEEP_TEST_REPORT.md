@@ -1,6 +1,6 @@
 # RBAC Deep Test Report
 
-Generated: 2026-02-27T19:29:57.470Z
+Generated: 2026-03-08T18:49:23.613Z
 
 ## Summary
 - Static checks: 11
@@ -51,26 +51,3 @@ Generated: 2026-02-27T19:29:57.470Z
 
 ## Live Lead Mapping (Department + Office)
 Skipped in this run.
-
-## Live DB Verification (via Supabase SQL)
-- Role counts: `visitor=3`, `lead=7`, `admin=4`, `super_admin=4`, `employee=35`
-- `finance_global_lead` count: `1`
-- `hr_global_lead` count: `0`
-- Leads with empty `lead_departments`: `2` (fallback to profile.department applies)
-
-### Live Lead Department/Office Mapping
-| Lead | Managed Departments | Managed Offices | Finance Global | HR Global |
-|---|---|---|---|---|
-| Caleb Obiechina | Monitoring and Evaluation | Site | No | No |
-| Emmanuel Ibanga | Operations | Operations | No | No |
-| Joshua Ibe | Accounts | Accounts | Yes | No |
-| Lawrence Adukwu | Technical | Technical, Technical Extension | No | No |
-| Oluwaseun Awotona | Legal, Regulatory and Compliance | Legal, Regulatory and Compliance | No | No |
-| Ugochukwu Aniezue | Project | Site | No | No |
-| Vanessa Lawrence-Ukaegbu | Business, Growth and Innovation | Business, Growth and Innovation | No | No |
-
-## Execution Notes
-- Static deep audit command: `SKIP_DB=1 node scripts/rbac-deep-audit.cjs`
-- API hardening included in this pass:
-  - `/api/admin/create-user`: now allows `hr_global_lead` (Admin & HR lead) in addition to `admin/super_admin`.
-  - `/api/departments` and `/api/departments/[id]`: create/update/delete now allow `hr_global_lead` in addition to `admin/super_admin`.

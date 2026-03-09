@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
+import { listAssignableProfiles } from "@/lib/workforce/assignment-policy"
 
 export async function GET() {
   const supabase = await createClient()
@@ -55,18 +56,11 @@ export async function GET() {
     assignmentUsersMap = new Map((usersData || []).map((u) => [u.id, u]))
   }
 
-  let employeeQuery = dataClient
-    .from("profiles")
-    .select("id, first_name, last_name, company_email, department, employment_status")
-    .eq("employment_status", "active")
-    .order("last_name", { ascending: true })
-
-  if (departmentScope) {
-    employeeQuery =
-      departmentScope.length > 0 ? employeeQuery.in("department", departmentScope) : employeeQuery.eq("id", "__none__")
-  }
-
-  const { data: employeeData } = await employeeQuery
+  const { data: employeeData } = await listAssignableProfiles(dataClient, {
+    select: "id, first_name, last_name, company_email, department, employment_status",
+    departmentScope,
+    allowLegacyNullStatus: false,
+  })
   const employees = employeeData || []
 
   const { data: issuesData } = await dataClient.from("asset_issues").select("asset_id, resolved")

@@ -1,10 +1,11 @@
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
-import { PageHeader, PageWrapper } from "@/components/layout"
+import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { ShieldAlert } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { EmptyState } from "@/components/ui/patterns"
 
 function isSecurityEvent(log: any): boolean {
   const text =
@@ -49,14 +50,13 @@ export default async function DevSecurityEventsPage() {
   const rows = (data || []).filter(isSecurityEvent)
 
   return (
-    <PageWrapper maxWidth="full" background="gradient">
-      <PageHeader
-        title="Security Events"
-        description="Security-meaningful event stream derived from audit metadata"
-        icon={ShieldAlert}
-        backLink={{ href: "/admin/dev", label: "Back to DEV" }}
-      />
-
+    <AdminTablePage
+      title="Security Events"
+      description="Security-meaningful event stream derived from audit metadata"
+      icon={ShieldAlert}
+      backLinkHref="/admin/dev"
+      backLinkLabel="Back to DEV"
+    >
       <Card>
         <CardHeader>
           <CardTitle>Security Events ({rows.length})</CardTitle>
@@ -80,7 +80,14 @@ export default async function DevSecurityEventsPage() {
             <TableBody>
               {rows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5}>No security events found.</TableCell>
+                  <TableCell colSpan={5}>
+                    <EmptyState
+                      title="No security events found"
+                      description="No security-significant events were detected in the current log window."
+                      icon={ShieldAlert}
+                      className="border-0 p-4"
+                    />
+                  </TableCell>
                 </TableRow>
               ) : (
                 rows.map((row: any) => (
@@ -97,6 +104,6 @@ export default async function DevSecurityEventsPage() {
           </Table>
         </CardContent>
       </Card>
-    </PageWrapper>
+    </AdminTablePage>
   )
 }

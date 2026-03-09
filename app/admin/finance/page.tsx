@@ -16,6 +16,7 @@ import {
 import Link from "next/link"
 import { PageWrapper, PageHeader, Section } from "@/components/layout"
 import { StatCard } from "@/components/ui/stat-card"
+import { EmptyState } from "@/components/ui/patterns"
 
 interface FinanceStats {
   totalPayments: number
@@ -89,7 +90,7 @@ export default function FinanceDashboard() {
       />
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-2 lg:grid-cols-4 md:gap-4">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-2 md:gap-4 lg:grid-cols-4">
         <StatCard
           title="Total Amount"
           value={formatCurrency(stats.totalAmount)}
@@ -122,7 +123,7 @@ export default function FinanceDashboard() {
 
       {/* Finance Modules */}
       <Section title="Finance Modules">
-        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-2 lg:grid-cols-3 md:gap-4">
+        <div className="grid grid-cols-1 gap-2 sm:gap-3 md:grid-cols-2 md:gap-4 lg:grid-cols-3">
           {/* Payments Folder */}
           <Card>
             <CardHeader>
@@ -197,7 +198,12 @@ export default function FinanceDashboard() {
                 <div className="border-primary h-8 w-8 animate-spin rounded-full border-4 border-t-transparent"></div>
               </div>
             ) : recentPayments.length === 0 ? (
-              <div className="text-muted-foreground py-8 text-center">No payments found</div>
+              <EmptyState
+                title="No payments found"
+                description="Recent payment activity will appear here once transactions are recorded."
+                icon={CreditCard}
+                className="border-0"
+              />
             ) : (
               <div className="space-y-4">
                 {recentPayments.map((payment) => (
@@ -229,4 +235,3 @@ export default function FinanceDashboard() {
     </PageWrapper>
   )
 }
-

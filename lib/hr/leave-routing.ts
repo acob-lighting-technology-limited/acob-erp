@@ -1,4 +1,5 @@
 import { notifyUsers } from "@/lib/hr/leave-workflow"
+import { applyAssignableStatusFilter } from "@/lib/workforce/assignment-policy"
 
 type SupabaseClient = any
 
@@ -80,12 +81,10 @@ async function resolveDepartmentHeadById(
   if (departmentError) throw new Error("Failed to resolve department lead")
   if (!department?.department_head_id) return null
 
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("id")
-    .eq("id", department.department_head_id)
-    .eq("employment_status", "active")
-    .single()
+  const profileQueryById = supabase.from("profiles").select("id").eq("id", department.department_head_id)
+  const { data: profile, error: profileError } = await applyAssignableStatusFilter(profileQueryById, {
+    allowLegacyNullStatus: false,
+  }).single()
 
   if (profileError || !profile?.id) return null
   return { id: profile.id }
@@ -108,12 +107,10 @@ async function resolveDepartmentHeadByName(
   const departmentHeadId = department[0]?.department_head_id
   if (!departmentHeadId) return null
 
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("id")
-    .eq("id", departmentHeadId)
-    .eq("employment_status", "active")
-    .single()
+  const profileQueryByName = supabase.from("profiles").select("id").eq("id", departmentHeadId)
+  const { data: profile, error: profileError } = await applyAssignableStatusFilter(profileQueryByName, {
+    allowLegacyNullStatus: false,
+  }).single()
 
   if (profileError || !profile?.id) return null
   return { id: profile.id }
@@ -298,5 +295,6 @@ export async function notifyStageApprover(params: {
     actorId: params.actorId,
     entityId: params.entityId,
     linkUrl: params.linkUrl || "/dashboard/leave",
+    emailEvent: "approval_required",
   })
 }

@@ -49,8 +49,51 @@ interface AdminSidebarProps {
     last_name?: string
     department?: string
     role?: UserRole
+    is_department_lead?: boolean
+    admin_domains?: string[] | null
     lead_departments?: string[]
   }
+}
+
+type AdminDomain = "hr" | "finance" | "assets" | "reports" | "tasks" | "projects" | "communications"
+
+const ADMIN_DOMAINS: AdminDomain[] = ["hr", "finance", "assets", "reports", "tasks", "projects", "communications"]
+
+function normalizeAdminDomains(domains: string[] | null | undefined): AdminDomain[] {
+  if (!Array.isArray(domains)) return []
+  const normalized = Array.from(
+    new Set(
+      domains
+        .map((value) =>
+          String(value || "")
+            .trim()
+            .toLowerCase()
+        )
+        .filter(Boolean)
+    )
+  ).filter((value): value is AdminDomain => ADMIN_DOMAINS.includes(value as AdminDomain))
+  return normalized
+}
+
+function getDomainForAdminPath(path: string): AdminDomain | null {
+  if (path.startsWith("/admin/hr")) return "hr"
+  if (path.startsWith("/admin/finance") || path.startsWith("/admin/purchasing") || path.startsWith("/admin/payments"))
+    return "finance"
+  if (path.startsWith("/admin/assets") || path.startsWith("/admin/inventory")) return "assets"
+  if (path.startsWith("/admin/reports") || path.startsWith("/admin/audit-logs")) return "reports"
+  if (path.startsWith("/admin/tasks")) return "tasks"
+  if (path.startsWith("/admin/projects")) return "projects"
+  if (
+    path.startsWith("/admin/documentation") ||
+    path.startsWith("/admin/feedback") ||
+    path.startsWith("/admin/notification") ||
+    path.startsWith("/admin/communications") ||
+    path.startsWith("/admin/tools") ||
+    path.startsWith("/admin/help-desk")
+  ) {
+    return "communications"
+  }
+  return null
 }
 
 const adminNavigation = [
@@ -248,12 +291,21 @@ export function AdminSidebar({ user, profile }: AdminSidebarProps) {
     router.push("/auth/login")
   }
 
-  const canAccessRoute = (requiredRoles: string[]) => {
+  const canAccessRoute = (requiredRoles: string[], href: string) => {
     if (!profile?.role) return false
-    return requiredRoles.includes(profile.role)
+    if (profile.is_department_lead) {
+      return !href.startsWith("/admin/dev")
+    }
+    if (!requiredRoles.includes(profile.role)) return false
+    if (profile.role !== "admin") return true
+
+    const adminDomains = normalizeAdminDomains(profile.admin_domains)
+    if (href === "/admin") return true
+    const mappedDomain = getDomainForAdminPath(href)
+    return Boolean(mappedDomain && adminDomains.includes(mappedDomain))
   }
 
-  const filteredNavigation = adminNavigation.filter((item) => canAccessRoute(item.roles))
+  const filteredNavigation = adminNavigation.filter((item) => canAccessRoute(item.roles, item.href))
   const groupedNavigation = adminSections
     .map((section) => ({
       ...section,

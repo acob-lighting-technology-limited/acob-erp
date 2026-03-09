@@ -6,9 +6,10 @@ import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Pencil, Package } from "lucide-react"
+import { Pencil, Package } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
+import { PageHeader } from "@/components/layout/page-header"
 
 interface Product {
   id: string
@@ -79,23 +80,19 @@ export default function ProductDetailPage() {
 
   return (
     <div className="container mx-auto space-y-6 p-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="mb-1 flex items-center gap-2">
-            <Link href="/admin/inventory/products" className="text-muted-foreground hover:text-foreground">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-            <h1 className="text-3xl font-bold">{product.name}</h1>
-          </div>
-          <p className="text-muted-foreground font-mono">{product.sku}</p>
-        </div>
-        <Link href={`/admin/inventory/products/${product.id}/edit`}>
-          <Button>
-            <Pencil className="mr-2 h-4 w-4" />
-            Edit Product
-          </Button>
-        </Link>
-      </div>
+      <PageHeader
+        title={product.name}
+        description={product.sku}
+        backLink={{ href: "/admin/inventory/products", label: "Back to Products" }}
+        actions={
+          <Link href={`/admin/inventory/products/${product.id}/edit`}>
+            <Button>
+              <Pencil className="mr-2 h-4 w-4" />
+              Edit Product
+            </Button>
+          </Link>
+        }
+      />
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">

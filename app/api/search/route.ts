@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { resolveAdminScope } from "@/lib/admin/rbac"
 
 // Mark this route as dynamic since it uses search params
 export const dynamic = "force-dynamic"
@@ -22,10 +23,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // Check if user is admin
-    const { data: profile } = await supabase.from("profiles").select("role, is_admin").eq("id", user.id).single()
-
-    if (!profile?.is_admin && !["developer", "super_admin", "admin"].includes(profile?.role || "")) {
+    const scope = await resolveAdminScope(supabase as any, user.id)
+    if (!scope) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 

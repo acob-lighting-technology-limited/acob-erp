@@ -60,7 +60,7 @@ async function getPaymentsData() {
   // Fetch user profile with department info
   const { data: profile } = await dataClient
     .from("profiles")
-    .select("department, department_id, is_admin")
+    .select("department, department_id")
     .eq("id", user.id)
     .single()
 
@@ -134,7 +134,7 @@ async function getPaymentsData() {
     currentUser: {
       id: user.id,
       department_id: currentUserDepartmentId,
-      is_admin: false, // Always false for user-facing page - hides admin controls
+      isAdmin: false, // User-facing page - hides admin controls
     },
   }
 }
@@ -151,7 +151,7 @@ export default async function DepartmentPaymentsPage() {
     departments: Department[]
     categories: Category[]
     loadError?: string | null
-    currentUser: { id: string; department_id: string | null; is_admin: boolean }
+    currentUser: { id: string; department_id: string | null; isAdmin: boolean }
   }
 
   return (

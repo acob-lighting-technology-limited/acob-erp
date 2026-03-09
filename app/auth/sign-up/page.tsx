@@ -8,14 +8,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { FormFieldGroup } from "@/components/ui/patterns"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { useDepartments } from "@/hooks/use-departments"
 import { toast } from "sonner"
 import Image from "next/image"
-
-
 
 export default function SignUpPage() {
   const { departments: DEPARTMENTS } = useDepartments()
@@ -108,10 +107,7 @@ export default function SignUpPage() {
                 <div className="flex flex-col gap-5">
                   {/* Name Fields */}
                   <div className="grid gap-5 sm:grid-cols-2">
-                    <div className="grid gap-3">
-                      <Label htmlFor="firstName" className="text-sm font-medium">
-                        First Name *
-                      </Label>
+                    <FormFieldGroup label="First Name *" className="grid gap-3">
                       <Input
                         id="firstName"
                         value={formData.firstName}
@@ -119,7 +115,7 @@ export default function SignUpPage() {
                         required
                         className="h-11 text-base"
                       />
-                    </div>
+                    </FormFieldGroup>
                     <div className="grid gap-3">
                       <Label htmlFor="lastName" className="text-sm font-medium">
                         Last Name *

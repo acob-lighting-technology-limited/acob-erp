@@ -4,7 +4,7 @@ import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { FeedbackViewerClient } from "@/components/feedback-viewer-client"
 import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
 import { MessageSquare, AlertCircle, Clock, CheckCircle, XCircle } from "lucide-react"
-import { Card, CardContent } from "@/components/ui/card"
+import { StatCard } from "@/components/ui/stat-card"
 import { PageHeader, PageWrapper } from "@/components/layout"
 
 export default async function AdminFeedbackPage() {
@@ -88,76 +88,36 @@ export default async function AdminFeedbackPage() {
       />
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-4 md:grid-cols-5">
-        <Card className="border-2">
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex items-center justify-between">
-              <div className="min-w-0 flex-1">
-                <p className="text-muted-foreground text-sm font-medium">Total</p>
-                <p className="text-foreground mt-1 text-lg font-bold sm:text-2xl">{stats.total}</p>
-              </div>
-              <div className="ml-2 shrink-0 rounded-lg bg-blue-100 p-2.5 dark:bg-blue-900/30">
-                <MessageSquare className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-2">
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex items-center justify-between">
-              <div className="min-w-0 flex-1">
-                <p className="text-muted-foreground text-sm font-medium">Open</p>
-                <p className="text-foreground mt-1 text-lg font-bold sm:text-2xl">{stats.open}</p>
-              </div>
-              <div className="ml-2 flex-shrink-0 rounded-lg bg-green-100 p-2.5 dark:bg-green-900/30">
-                <AlertCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-2">
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex items-center justify-between">
-              <div className="min-w-0 flex-1">
-                <p className="text-muted-foreground text-sm font-medium">In Progress</p>
-                <p className="text-foreground mt-1 text-lg font-bold sm:text-2xl">{stats.inProgress}</p>
-              </div>
-              <div className="ml-2 flex-shrink-0 rounded-lg bg-blue-100 p-2.5 dark:bg-blue-900/30">
-                <Clock className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-2">
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex items-center justify-between">
-              <div className="min-w-0 flex-1">
-                <p className="text-muted-foreground text-sm font-medium">Resolved</p>
-                <p className="text-foreground mt-1 text-lg font-bold sm:text-2xl">{stats.resolved}</p>
-              </div>
-              <div className="ml-2 flex-shrink-0 rounded-lg bg-purple-100 p-2.5 dark:bg-purple-900/30">
-                <CheckCircle className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-2">
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex items-center justify-between">
-              <div className="min-w-0 flex-1">
-                <p className="text-muted-foreground text-sm font-medium">Closed</p>
-                <p className="text-foreground mt-1 text-lg font-bold sm:text-2xl">{stats.closed}</p>
-              </div>
-              <div className="ml-2 flex-shrink-0 rounded-lg bg-gray-100 p-2.5 dark:bg-gray-900/30">
-                <XCircle className="h-5 w-5 text-gray-600 dark:text-gray-400" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-5 md:gap-4">
+        <StatCard title="Total" value={stats.total} icon={MessageSquare} />
+        <StatCard
+          title="Open"
+          value={stats.open}
+          icon={AlertCircle}
+          iconBgColor="bg-green-100 dark:bg-green-900/30"
+          iconColor="text-green-600 dark:text-green-400"
+        />
+        <StatCard
+          title="In Progress"
+          value={stats.inProgress}
+          icon={Clock}
+          iconBgColor="bg-blue-100 dark:bg-blue-900/30"
+          iconColor="text-blue-600 dark:text-blue-400"
+        />
+        <StatCard
+          title="Resolved"
+          value={stats.resolved}
+          icon={CheckCircle}
+          iconBgColor="bg-purple-100 dark:bg-purple-900/30"
+          iconColor="text-purple-600 dark:text-purple-400"
+        />
+        <StatCard
+          title="Closed"
+          value={stats.closed}
+          icon={XCircle}
+          iconBgColor="bg-gray-100 dark:bg-gray-900/30"
+          iconColor="text-gray-600 dark:text-gray-400"
+        />
       </div>
 
       {/* Feedback List */}
@@ -165,4 +125,3 @@ export default async function AdminFeedbackPage() {
     </PageWrapper>
   )
 }
-

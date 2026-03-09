@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge"
 import { formatName } from "@/lib/utils"
 import { PageHeader, PageWrapper } from "@/components/layout"
 import { writeAuditLogClient } from "@/lib/audit/client"
+import { EmptyState } from "@/components/ui/patterns"
 
 export default function JobDescriptionPage() {
   const [jobDescription, setJobDescription] = useState("")
@@ -244,17 +245,18 @@ export default function JobDescriptionPage() {
                 {jobDescription ? (
                   <div className="text-foreground whitespace-pre-wrap">{jobDescription}</div>
                 ) : (
-                  <div className="py-12 text-center">
-                    <Briefcase className="text-muted-foreground mx-auto mb-4 h-12 w-12" />
-                    <h3 className="text-foreground mb-2 text-lg font-semibold">No job description yet</h3>
-                    <p className="text-muted-foreground mb-4">
-                      Add your job description to help others understand your role
-                    </p>
-                    <Button onClick={() => setIsEditing(true)} className="gap-2">
-                      <Edit2 className="h-4 w-4" />
-                      Add Job Description
-                    </Button>
-                  </div>
+                  <EmptyState
+                    title="No job description yet"
+                    description="Add your job description to help others understand your role."
+                    icon={Briefcase}
+                    action={
+                      <Button onClick={() => setIsEditing(true)} className="gap-2">
+                        <Edit2 className="h-4 w-4" />
+                        Add Job Description
+                      </Button>
+                    }
+                    className="border-0"
+                  />
                 )}
               </div>
             )}

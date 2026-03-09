@@ -64,11 +64,7 @@ interface HelpDeskCategoriesResponse {
 }
 
 function buildFetchDebugLabel(source: string, status: number, payload: any) {
-  const detail =
-    payload?.error ||
-    payload?.message ||
-    (typeof payload === "string" ? payload : "") ||
-    "Unknown error"
+  const detail = payload?.error || payload?.message || (typeof payload === "string" ? payload : "") || "Unknown error"
   return `${source} failed (${status}): ${detail}`
 }
 
@@ -184,9 +180,6 @@ export function HelpDeskContent({
     if (form.service_department && userDepartment && form.service_department === userDepartment) {
       const fallbackDepartment = departmentOptions.find((department) => department !== userDepartment) || ""
       setForm((prev) => ({ ...prev, service_department: fallbackDepartment, category_id: "" }))
-      if (fallbackDepartment) {
-        toast.error("You cannot submit help desk requests to your own department.")
-      }
       return
     }
 
@@ -316,7 +309,7 @@ export function HelpDeskContent({
                   New Ticket
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-2xl">
+              <DialogContent className="max-h-[90vh] w-[95vw] max-w-2xl overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>Submit Help Desk Ticket</DialogTitle>
                   <DialogDescription>Fill in the details and submit your ticket.</DialogDescription>
@@ -439,7 +432,7 @@ export function HelpDeskContent({
         }
       />
 
-      <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-4 md:grid-cols-3">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 md:gap-4">
         <Card>
           <CardHeader>
             <CardTitle className="text-sm font-medium">My Open Tickets</CardTitle>
@@ -497,66 +490,67 @@ export function HelpDeskContent({
           <CardTitle>My Tickets</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Ticket</TableHead>
-                <TableHead>Department</TableHead>
-                <TableHead>Priority</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {tickets.map((ticket) => (
-                <TableRow key={ticket.id}>
-                  <TableCell>
-                    <div className="font-medium">{ticket.ticket_number}</div>
-                    <div className="text-muted-foreground text-xs">{ticket.title}</div>
-                  </TableCell>
-                  <TableCell>{ticket.service_department}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{ticket.priority}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge>{ticket.status}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-2">
-                      {ticket.assigned_to === userId && ticket.status === "assigned" && (
-                        <Button size="sm" variant="outline" onClick={() => setStatus(ticket.id, "in_progress")}>
-                          Start
-                        </Button>
-                      )}
-                      {ticket.assigned_to === userId && ticket.status === "in_progress" && (
-                        <Button size="sm" variant="outline" onClick={() => setStatus(ticket.id, "resolved")}>
-                          Resolve
-                        </Button>
-                      )}
-                      {ticket.requester_id === userId && ticket.status === "resolved" && (
-                        <div className="flex gap-1">
-                          {[1, 2, 3, 4, 5].map((r) => (
-                            <Button
-                              key={r}
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => rateTicket(ticket.id, r)}
-                              title={`Rate ${r}`}
-                            >
-                              {r}
-                            </Button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </TableCell>
+          <div className="w-full overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Ticket</TableHead>
+                  <TableHead>Department</TableHead>
+                  <TableHead>Priority</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {tickets.map((ticket) => (
+                  <TableRow key={ticket.id}>
+                    <TableCell>
+                      <div className="font-medium">{ticket.ticket_number}</div>
+                      <div className="text-muted-foreground text-xs">{ticket.title}</div>
+                    </TableCell>
+                    <TableCell>{ticket.service_department}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{ticket.priority}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge>{ticket.status}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex min-w-[180px] flex-wrap gap-2">
+                        {ticket.assigned_to === userId && ticket.status === "assigned" && (
+                          <Button size="sm" variant="outline" onClick={() => setStatus(ticket.id, "in_progress")}>
+                            Start
+                          </Button>
+                        )}
+                        {ticket.assigned_to === userId && ticket.status === "in_progress" && (
+                          <Button size="sm" variant="outline" onClick={() => setStatus(ticket.id, "resolved")}>
+                            Resolve
+                          </Button>
+                        )}
+                        {ticket.requester_id === userId && ticket.status === "resolved" && (
+                          <div className="flex gap-1">
+                            {[1, 2, 3, 4, 5].map((r) => (
+                              <Button
+                                key={r}
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => rateTicket(ticket.id, r)}
+                                title={`Rate ${r}`}
+                              >
+                                {r}
+                              </Button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
     </PageWrapper>
   )
 }
-

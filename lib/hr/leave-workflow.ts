@@ -1,4 +1,5 @@
 import { sendLeaveWorkflowEmail } from "@/lib/leave-mailer"
+import { resolveChannelEligibleUserIds } from "@/lib/notifications/delivery-policy"
 
 type SupabaseClient = any
 
@@ -32,6 +33,15 @@ export interface LeaveEligibilityResult {
   requiredDocuments: string[]
   missingDocuments: string[]
 }
+
+export type LeaveEmailEvent =
+  | "approval_required"
+  | "approved"
+  | "rejected"
+  | "ready_for_approval"
+  | "sla_reminder"
+  | "sla_breached"
+  | "lapsed"
 
 const APPROVAL_LEVELS: Record<string, number> = {
   pending_reliever: 1,
@@ -632,6 +642,38 @@ function buildNotificationRows(params: {
   }))
 }
 
+function formatLeaveReference(entityId?: string) {
+  if (!entityId) return null
+  const raw = entityId.replace(/[^a-zA-Z0-9]/g, "").toUpperCase()
+  const compact = raw.slice(0, 8)
+  if (!compact) return null
+  return `LR-${compact}`
+}
+
+function buildLeaveEmailSubject(event: LeaveEmailEvent, entityId?: string) {
+  const ref = formatLeaveReference(entityId)
+  const suffix = ref ? ` - ${ref}` : ""
+
+  switch (event) {
+    case "approval_required":
+      return `Approval Required${suffix}`
+    case "approved":
+      return `Approved${suffix}`
+    case "rejected":
+      return `Rejected${suffix}`
+    case "ready_for_approval":
+      return `Ready for Approval${suffix}`
+    case "sla_reminder":
+      return `Approval SLA Reminder${suffix}`
+    case "sla_breached":
+      return `Approval SLA Breached${suffix}`
+    case "lapsed":
+      return `Request Lapsed${suffix}`
+    default:
+      return `Notification${suffix}`
+  }
+}
+
 export async function notifyUsers(
   supabase: SupabaseClient,
   params: {
@@ -641,6 +683,7 @@ export async function notifyUsers(
     actorId?: string
     linkUrl?: string
     entityId?: string
+    emailEvent?: LeaveEmailEvent
     emailSubject?: string
     emailTitle?: string
     emailMessage?: string
@@ -649,24 +692,41 @@ export async function notifyUsers(
   const uniqueIds = Array.from(new Set(params.userIds.filter(Boolean)))
   if (!uniqueIds.length) return
 
-  const rows = buildNotificationRows({
-    userIds: uniqueIds,
-    title: params.title,
-    message: params.message,
-    actorId: params.actorId,
-    linkUrl: params.linkUrl,
-    entityId: params.entityId,
-  })
+  const [inAppUserIds, emailUserIds] = await Promise.all([
+    resolveChannelEligibleUserIds(supabase, {
+      userIds: uniqueIds,
+      notificationKey: "leave",
+      channel: "in_app",
+    }),
+    resolveChannelEligibleUserIds(supabase, {
+      userIds: uniqueIds,
+      notificationKey: "leave",
+      channel: "email",
+    }),
+  ])
 
-  const { error: notifyError } = await supabase.from("notifications").insert(rows)
-  if (notifyError) {
-    console.error("Failed to create leave notifications:", notifyError)
+  if (inAppUserIds.length > 0) {
+    const rows = buildNotificationRows({
+      userIds: inAppUserIds,
+      title: params.title,
+      message: params.message,
+      actorId: params.actorId,
+      linkUrl: params.linkUrl,
+      entityId: params.entityId,
+    })
+
+    const { error: notifyError } = await supabase.from("notifications").insert(rows)
+    if (notifyError) {
+      console.error("Failed to create leave notifications:", notifyError)
+    }
   }
+
+  if (emailUserIds.length === 0) return
 
   const { data: recipients } = await supabase
     .from("profiles")
     .select("company_email, additional_email")
-    .in("id", uniqueIds)
+    .in("id", emailUserIds)
 
   const emails: string[] = Array.from(
     new Set(
@@ -677,9 +737,13 @@ export async function notifyUsers(
   )
 
   if (emails.length) {
+    const subject =
+      params.emailSubject ||
+      (params.emailEvent ? buildLeaveEmailSubject(params.emailEvent, params.entityId) : params.title)
+
     await sendLeaveWorkflowEmail({
       to: emails,
-      subject: params.emailSubject || params.title,
+      subject,
       title: params.emailTitle || params.title,
       message: params.emailMessage || params.message,
       ctaPath: params.linkUrl,

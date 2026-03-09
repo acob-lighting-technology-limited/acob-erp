@@ -37,7 +37,10 @@ export function renderInternalNotificationEmail({ pendingUser, employeeId }: Int
         .value { color: #0f172a; font-weight: 600; }
         .cta { text-align: center; margin-top: 32px; }
         .button { display: inline-block; background: #16a34a; color: #fff; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-weight: 600; font-size: 13px; }
-        .footer { background: #0f2d1f; padding: 40px 0; text-align: center; font-size: 11px; color: #9ca3af; border-top: 3px solid #16a34a; }
+        .footer { background: #0f2d1f; padding: 20px; text-align: center; font-size: 11px; color: #9ca3af; border-top: 3px solid #16a34a; }
+        .footer strong { color: #fff; }
+        .footer-system { color: #16a34a; font-weight: 600; }
+        .footer-note { color: #9ca3af; font-style: italic; }
     </style>
 </head>
 <body>
@@ -83,11 +86,11 @@ export function renderInternalNotificationEmail({ pendingUser, employeeId }: Int
 
     </div>
     <div class="footer" style="background-color:#0f2d1f;">
-        <strong style="color: #fff;">ACOB Lighting Technology Limited</strong><br>
-        <span style="color: #16a34a; font-weight: 600; font-size: 10px; text-transform: uppercase; letter-spacing: 1px;">ACOB Admin & HR</span>
-        <div style="margin-top: 12px; font-style: italic; font-size: 10px; opacity: 0.7; max-width: 500px; margin-left: auto; margin-right: auto; padding: 0 20px;">
-            This is an automated system notification. Please do not reply directly to this email.
-        </div>
+        <strong>ACOB Lighting Technology Limited</strong><br>
+        Admin & HR Department<br>
+        <span class="footer-system">Employee Management System</span>
+        <br><br>
+        <i class="footer-note">This is an automated system notification. Please do not reply directly to this email.</i>
     </div>
     </div>
 </body>

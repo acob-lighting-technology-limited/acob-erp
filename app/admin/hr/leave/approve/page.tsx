@@ -1,14 +1,16 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import Link from "next/link"
-import { ArrowLeft, Clock, History } from "lucide-react"
+import { Clock, History, CalendarCheck2, CheckCircle2, AlertCircle } from "lucide-react"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { AdminTablePage } from "@/components/admin/admin-table-page"
+import { StatCard } from "@/components/ui/stat-card"
+import { EmptyState } from "@/components/ui/patterns"
 
 interface LeaveItem {
   id: string
@@ -145,19 +147,39 @@ export default function LeaveApprovePage() {
     return expectedByStage[stage] || "Pending approver"
   }
 
+  const stats = {
+    pending: allPendingQueue.length,
+    myQueue: myQueue.length,
+    history: history.length,
+  }
+
   return (
-    <div className="container mx-auto p-6">
-      <div className="mb-4">
-        <Link href="/admin/hr" className="text-muted-foreground inline-flex items-center gap-2 text-sm">
-          <ArrowLeft className="h-4 w-4" /> Back to HR Dashboard
-        </Link>
-      </div>
-
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold">Leave Approvals</h1>
-        <p className="text-muted-foreground">HR final endorsement dashboard with full leave history</p>
-      </div>
-
+    <AdminTablePage
+      title="Leave Approvals"
+      description="HR final endorsement dashboard with full leave history"
+      icon={CalendarCheck2}
+      backLinkHref="/admin/hr"
+      backLinkLabel="Back to HR Dashboard"
+      stats={
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 md:gap-4">
+          <StatCard title="Pending Queue" value={stats.pending} icon={Clock} />
+          <StatCard
+            title="My Actions"
+            value={stats.myQueue}
+            icon={AlertCircle}
+            iconBgColor="bg-orange-100 dark:bg-orange-900/30"
+            iconColor="text-orange-600 dark:text-orange-400"
+          />
+          <StatCard
+            title="History"
+            value={stats.history}
+            icon={CheckCircle2}
+            iconBgColor="bg-green-100 dark:bg-green-900/30"
+            iconColor="text-green-600 dark:text-green-400"
+          />
+        </div>
+      }
+    >
       <Tabs defaultValue="pending">
         <TabsList className="mb-4">
           <TabsTrigger value="pending" className="gap-2">
@@ -174,13 +196,17 @@ export default function LeaveApprovePage() {
               <CardHeader>
                 <CardTitle>All Pending Leave Workflow</CardTitle>
                 <CardDescription>
-                  Every pending leave request is listed with current stage and the exact approver responsible for the next step.
+                  Every pending leave request is listed with current stage and the exact approver responsible for the
+                  next step.
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 {loading && <p>Loading...</p>}
                 {!loading && allPendingQueue.length === 0 && (
-                  <p className="text-muted-foreground text-sm">No pending requests.</p>
+                  <EmptyState
+                    title="No pending requests"
+                    description="There are no leave requests waiting for review."
+                  />
                 )}
                 {!loading && allPendingQueue.length > 0 && (
                   <div className="overflow-x-auto rounded border">
@@ -234,7 +260,12 @@ export default function LeaveApprovePage() {
               </CardHeader>
               <CardContent className="space-y-3">
                 {loading && <p>Loading...</p>}
-                {!loading && myQueue.length === 0 && <p className="text-muted-foreground text-sm">No actions assigned to you.</p>}
+                {!loading && myQueue.length === 0 && (
+                  <EmptyState
+                    title="No actions assigned to you"
+                    description="Your approval queue is currently clear."
+                  />
+                )}
                 {myQueue.map((item) => (
                   <div key={item.id} className="rounded border p-3">
                     <div className="flex items-center justify-between gap-2">
@@ -267,7 +298,12 @@ export default function LeaveApprovePage() {
                           {(item.evidence || []).map((doc) => (
                             <p key={doc.id}>
                               - {doc.document_type} ({doc.status}){" "}
-                              <a href={doc.file_url} target="_blank" className="text-blue-600 underline" rel="noreferrer">
+                              <a
+                                href={doc.file_url}
+                                target="_blank"
+                                className="text-blue-600 underline"
+                                rel="noreferrer"
+                              >
                                 view
                               </a>
                             </p>
@@ -297,7 +333,9 @@ export default function LeaveApprovePage() {
             </CardHeader>
             <CardContent className="space-y-3">
               {loading && <p>Loading...</p>}
-              {!loading && history.length === 0 && <p className="text-muted-foreground text-sm">No history found.</p>}
+              {!loading && history.length === 0 && (
+                <EmptyState title="No history found" description="Completed and rejected requests will appear here." />
+              )}
               {!loading && history.length > 0 && (
                 <div className="overflow-x-auto rounded border">
                   <Table>
@@ -350,6 +388,6 @@ export default function LeaveApprovePage() {
           </Card>
         </TabsContent>
       </Tabs>
-    </div>
+    </AdminTablePage>
   )
 }

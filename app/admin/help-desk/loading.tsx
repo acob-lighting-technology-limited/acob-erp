@@ -1,3 +1,5 @@
+import { TablePageSkeleton } from "@/components/skeletons"
+
 export default function AdminHelpDeskLoading() {
-  return <div className="p-6">Loading help desk dashboard...</div>
+  return <TablePageSkeleton filters={0} columns={7} rows={8} showStats={true} statCards={4} />
 }

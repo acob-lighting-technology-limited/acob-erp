@@ -10,7 +10,14 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
 import { PageHeader, PageWrapper } from "@/components/layout"
 import { FileCode2, Plus } from "lucide-react"
 import type { CorrespondenceRecord } from "@/types/correspondence"
@@ -311,7 +318,10 @@ export function PortalCorrespondenceContent({
 
                   <div className="space-y-2 md:col-span-2">
                     <Label>Subject</Label>
-                    <Input value={form.subject} onChange={(e) => setForm((prev) => ({ ...prev, subject: e.target.value }))} />
+                    <Input
+                      value={form.subject}
+                      onChange={(e) => setForm((prev) => ({ ...prev, subject: e.target.value }))}
+                    />
                   </div>
 
                   <div className="space-y-2">
@@ -414,7 +424,7 @@ export function PortalCorrespondenceContent({
           </>
         }
       />
-      <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4 md:gap-4">
         <Card>
           <CardHeader>
             <CardTitle className="text-sm">Total Records</CardTitle>
@@ -551,4 +561,3 @@ export function PortalCorrespondenceContent({
     </PageWrapper>
   )
 }
-

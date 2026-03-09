@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
-import {
-  appendAuditLog,
-  appendHelpDeskEvent,
-  getAuthContext,
-} from "@/lib/help-desk/server"
+import { appendAuditLog, appendHelpDeskEvent, getAuthContext } from "@/lib/help-desk/server"
 import { sendHelpDeskMail } from "@/lib/help-desk/mailer"
+import { getUnassignableReason } from "@/lib/workforce/assignment-policy"
 
 function managesDepartmentStrict(profile: any, department: string | null | undefined) {
   if (!profile?.is_department_lead || !department) return false
@@ -39,10 +36,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     const canAssign = managesDepartmentStrict(profile, ticket.service_department)
     if (!canAssign) {
-      return NextResponse.json(
-        { error: "Only the service department lead can assign this ticket." },
-        { status: 403 }
-      )
+      return NextResponse.json({ error: "Only the service department lead can assign this ticket." }, { status: 403 })
     }
 
     if (ticket.status === "pending_approval") {
@@ -97,11 +91,12 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       if (assigneeError || !assignee) {
         return NextResponse.json({ error: "Selected assignee not found" }, { status: 400 })
       }
-      if (!(assignee.employment_status === "active" || assignee.employment_status == null)) {
-        return NextResponse.json({ error: "Selected assignee is not active" }, { status: 400 })
-      }
-      if (assignee.department !== ticket.service_department) {
-        return NextResponse.json({ error: "Selected assignee must belong to the service department" }, { status: 400 })
+      const unassignableReason = getUnassignableReason(assignee, {
+        allowLegacyNullStatus: false,
+        requiredDepartment: ticket.service_department,
+      })
+      if (unassignableReason) {
+        return NextResponse.json({ error: unassignableReason }, { status: 400 })
       }
       updates = {
         assigned_to,

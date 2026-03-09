@@ -34,4 +34,3 @@ export async function reportClientError(payload: ClientTelemetryPayload): Promis
     // Never throw from telemetry client helpers.
   }
 }
-

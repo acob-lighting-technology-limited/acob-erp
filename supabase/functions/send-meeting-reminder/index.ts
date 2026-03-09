@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0"
 import { Resend } from "npm:resend@2.0.0"
 import { writeEdgeAuditLog } from "../_shared/audit.ts"
+import { isEdgeSystemEmailEnabled } from "../_shared/notification-gateway.ts"
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")!
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!
@@ -24,6 +25,7 @@ const RESEND_MAX_REQ_PER_SEC = 2
 const SEND_INTERVAL_MS = Math.ceil(1000 / RESEND_MAX_REQ_PER_SEC) + 100 // safety margin
 const MAX_429_RETRIES = 5
 const DEFAULT_TIME_ZONE = "Africa/Lagos"
+const DEFAULT_SENDER = "ACOB Internal Systems <notifications@acoblighting.com>"
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
@@ -35,6 +37,19 @@ function isRateLimitError(error: any): boolean {
   const name = String(error?.name || "").toLowerCase()
   const msg = String(error?.message || "").toLowerCase()
   return statusCode === 429 || name.includes("rate_limit") || msg.includes("too many requests")
+}
+
+function withSubjectPrefix(moduleName: string, subject: string): string {
+  const trimmed = String(subject || "").trim() || "Notification"
+  const bracketPrefix = `[${moduleName}]`
+  const colonPrefix = `${moduleName}:`
+
+  if (trimmed.startsWith(colonPrefix)) return trimmed
+  if (trimmed.startsWith(bracketPrefix)) {
+    const rest = trimmed.slice(bracketPrefix.length).trim()
+    return `${colonPrefix} ${rest || "Notification"}`
+  }
+  return `${colonPrefix} ${trimmed}`
 }
 
 async function sendWithRetry(
@@ -457,6 +472,13 @@ serve(async (req) => {
 
     const resend = new Resend(RESEND_API_KEY)
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+    const meetingsMailEnabled = await isEdgeSystemEmailEnabled(supabase as any, "meetings")
+    if (!meetingsMailEnabled) {
+      return new Response(JSON.stringify({ success: true, skipped: true, reason: "meetings_email_disabled" }), {
+        status: 200,
+      })
+    }
+
     const body = await req.json()
 
     const {
@@ -495,12 +517,12 @@ serve(async (req) => {
 
     let html: string
     let subject: string
-    const from = "ACOB Admin & HR <notifications@acoblighting.com>"
+    const from = DEFAULT_SENDER
 
     if (type === "meeting") {
       const normalizedAgenda = normalizeMeetingAgenda(agenda, knowledgeSharingPresenter, knowledgeSharingDepartment)
 
-      subject = "Reminder for General Weekly Meeting"
+      subject = withSubjectPrefix("Meetings", "Reminder for General Weekly Meeting")
       html = buildMeetingReminderHtml(
         meetingDate,
         meetingTime || "8:30 AM",
@@ -509,7 +531,7 @@ serve(async (req) => {
         meetingPreparedByName
       )
     } else {
-      subject = "Reminder: Knowledge Sharing Session"
+      subject = withSubjectPrefix("Meetings", "Reminder: Knowledge Sharing Session")
       html = buildKnowledgeSharingHtml(sessionDate || "Monday", sessionTime || "8:30am", duration || "30 minutes")
     }
 

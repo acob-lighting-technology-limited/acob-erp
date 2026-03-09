@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ShieldCheck, ClipboardList, FileText, ChevronRight } from "lucide-react"
 import Link from "next/link"
 import { PageWrapper, PageHeader } from "@/components/layout"
+import { PageSection } from "@/components/ui/patterns"
 
 export default function AdminReportsPage() {
   const reportCards = [
@@ -34,8 +35,7 @@ export default function AdminReportsPage() {
         backLink={{ href: "/admin", label: "Back to Admin" }}
       />
 
-      <section className="space-y-4">
-        <h2 className="text-foreground text-lg font-semibold">Reports</h2>
+      <PageSection title="Reports" className="space-y-4">
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {reportCards.map((card) => (
             <Link key={card.title} href={card.href} className="group">
@@ -60,7 +60,7 @@ export default function AdminReportsPage() {
             </Link>
           ))}
         </div>
-      </section>
+      </PageSection>
     </PageWrapper>
   )
 }

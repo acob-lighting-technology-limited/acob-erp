@@ -3,15 +3,16 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
+import { PageHeader, PageWrapper } from "@/components/layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ArrowLeft, Package } from "lucide-react"
-import Link from "next/link"
+import { Package } from "lucide-react"
+import { StatCard } from "@/components/ui/stat-card"
 import { toast } from "sonner"
+import { FormFieldGroup } from "@/components/ui/patterns"
 
 interface Category {
   id: string
@@ -110,20 +111,13 @@ export default function NewProductPage() {
   const marginPercent = formData.unit_cost > 0 ? (margin / formData.unit_cost) * 100 : 0
 
   return (
-    <div className="container mx-auto space-y-6 p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="mb-1 flex items-center gap-2">
-            <Link href="/admin/inventory/products" className="text-muted-foreground hover:text-foreground">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-            <h1 className="text-3xl font-bold">Add Product</h1>
-          </div>
-          <p className="text-muted-foreground">Create a new product in your catalog</p>
-        </div>
-      </div>
-
+    <PageWrapper maxWidth="full" background="gradient">
+      <PageHeader
+        title="Add Product"
+        description="Create a new product in your catalog"
+        icon={Package}
+        backLink={{ href: "/admin/inventory/products", label: "Back to Products" }}
+      />
       <form onSubmit={handleSubmit}>
         <div className="grid gap-6 lg:grid-cols-3">
           <div className="space-y-6 lg:col-span-2">
@@ -134,8 +128,7 @@ export default function NewProductPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="sku">SKU *</Label>
+                  <FormFieldGroup label="SKU *">
                     <Input
                       id="sku"
                       value={formData.sku}
@@ -143,9 +136,8 @@ export default function NewProductPage() {
                       placeholder="e.g., PROD-001"
                       required
                     />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Product Name *</Label>
+                  </FormFieldGroup>
+                  <FormFieldGroup label="Product Name *">
                     <Input
                       id="name"
                       value={formData.name}
@@ -153,10 +145,9 @@ export default function NewProductPage() {
                       placeholder="Product name"
                       required
                     />
-                  </div>
+                  </FormFieldGroup>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
+                <FormFieldGroup label="Description">
                   <Textarea
                     id="description"
                     value={formData.description}
@@ -164,9 +155,8 @@ export default function NewProductPage() {
                     placeholder="Product description..."
                     rows={3}
                   />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="category">Category</Label>
+                </FormFieldGroup>
+                <FormFieldGroup label="Category">
                   <Select
                     value={formData.category_id}
                     onValueChange={(value) => setFormData({ ...formData, category_id: value })}
@@ -182,7 +172,7 @@ export default function NewProductPage() {
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
+                </FormFieldGroup>
               </CardContent>
             </Card>
 
@@ -193,8 +183,7 @@ export default function NewProductPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="unit_cost">Unit Cost (NGN)</Label>
+                  <FormFieldGroup label="Unit Cost (NGN)">
                     <Input
                       id="unit_cost"
                       type="number"
@@ -203,9 +192,8 @@ export default function NewProductPage() {
                       value={formData.unit_cost}
                       onChange={(e) => setFormData({ ...formData, unit_cost: parseFloat(e.target.value) || 0 })}
                     />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="selling_price">Selling Price (NGN)</Label>
+                  </FormFieldGroup>
+                  <FormFieldGroup label="Selling Price (NGN)">
                     <Input
                       id="selling_price"
                       type="number"
@@ -214,7 +202,7 @@ export default function NewProductPage() {
                       value={formData.selling_price}
                       onChange={(e) => setFormData({ ...formData, selling_price: parseFloat(e.target.value) || 0 })}
                     />
-                  </div>
+                  </FormFieldGroup>
                 </div>
                 <div className="bg-muted rounded-lg p-4">
                   <div className="flex justify-between text-sm">
@@ -234,8 +222,7 @@ export default function NewProductPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="quantity_on_hand">Quantity on Hand</Label>
+                  <FormFieldGroup label="Quantity on Hand">
                     <Input
                       id="quantity_on_hand"
                       type="number"
@@ -243,9 +230,8 @@ export default function NewProductPage() {
                       value={formData.quantity_on_hand}
                       onChange={(e) => setFormData({ ...formData, quantity_on_hand: parseInt(e.target.value) || 0 })}
                     />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="reorder_level">Reorder Level</Label>
+                  </FormFieldGroup>
+                  <FormFieldGroup label="Reorder Level" description="Alert when stock falls below this level">
                     <Input
                       id="reorder_level"
                       type="number"
@@ -253,8 +239,7 @@ export default function NewProductPage() {
                       value={formData.reorder_level}
                       onChange={(e) => setFormData({ ...formData, reorder_level: parseInt(e.target.value) || 0 })}
                     />
-                    <p className="text-muted-foreground text-xs">Alert when stock falls below this level</p>
-                  </div>
+                  </FormFieldGroup>
                 </div>
               </CardContent>
             </Card>
@@ -285,6 +270,11 @@ export default function NewProductPage() {
                 <CardTitle>Summary</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3 text-sm">
+                <StatCard
+                  title="Stock Value"
+                  value={formatCurrency(formData.unit_cost * formData.quantity_on_hand)}
+                  icon={Package}
+                />
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">SKU</span>
                   <span className="font-mono">{formData.sku || "—"}</span>
@@ -315,6 +305,6 @@ export default function NewProductPage() {
           </div>
         </div>
       </form>
-    </div>
+    </PageWrapper>
   )
 }

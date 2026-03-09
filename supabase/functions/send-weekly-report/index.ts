@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0"
 import { Resend } from "npm:resend@2.0.0"
 import { PDFDocument, rgb, StandardFonts } from "npm:pdf-lib@1.17.1"
 import { writeEdgeAuditLog } from "../_shared/audit.ts"
+import { isEdgeSystemEmailEnabled } from "../_shared/notification-gateway.ts"
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")!
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!
@@ -24,6 +25,7 @@ const LIGHT = rgb(0.976, 0.984, 0.992)
 const RESEND_MAX_REQ_PER_SEC = 2
 const SEND_INTERVAL_MS = Math.ceil(1000 / RESEND_MAX_REQ_PER_SEC) + 100 // ~0.6s with safety margin
 const MAX_429_RETRIES = 5
+const DEFAULT_SENDER = "ACOB Internal Systems <notifications@acoblighting.com>"
 
 const OFFICE_WEEK_ANCHOR_MONTH_INDEX = 0
 const OFFICE_WEEK_ANCHOR_DAY = 12
@@ -140,6 +142,19 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
+function withSubjectPrefix(moduleName: string, subject: string): string {
+  const trimmed = String(subject || "").trim() || "Notification"
+  const bracketPrefix = `[${moduleName}]`
+  const colonPrefix = `${moduleName}:`
+
+  if (trimmed.startsWith(colonPrefix)) return trimmed
+  if (trimmed.startsWith(bracketPrefix)) {
+    const rest = trimmed.slice(bracketPrefix.length).trim()
+    return `${colonPrefix} ${rest || "Notification"}`
+  }
+  return `${colonPrefix} ${trimmed}`
+}
+
 function isRateLimitError(error: any): boolean {
   if (!error) return false
   const statusCode = Number(error?.statusCode || error?.status || 0)
@@ -165,7 +180,7 @@ async function sendWithRetry(
     if (!isRateLimitError(error) || attempt === MAX_429_RETRIES) return { error }
     const backoffMs = 1000 * (attempt + 1)
     console.warn(
-      `[weekly-summary] Rate limit for ${payload.to}. Retry ${attempt + 1}/${MAX_429_RETRIES} in ${backoffMs}ms`
+      `[weekly-report] Rate limit for ${payload.to}. Retry ${attempt + 1}/${MAX_429_RETRIES} in ${backoffMs}ms`
     )
     await sleep(backoffMs)
     attempt += 1
@@ -731,6 +746,12 @@ serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
     const resend = new Resend(RESEND_API_KEY)
+    const reportsMailEnabled = await isEdgeSystemEmailEnabled(supabase as any, "reports")
+    if (!reportsMailEnabled) {
+      return new Response(JSON.stringify({ success: true, skipped: true, reason: "reports_email_disabled" }), {
+        status: 200,
+      })
+    }
 
     let body: any = {}
     try {
@@ -792,7 +813,7 @@ serve(async (req) => {
     const atYear = meetingYear
 
     console.log(
-      `[weekly-summary] Meeting: W${meetingWeek}/${meetingYear} | ReportData: W${reportDataWeek}/${reportDataYear} | Tracker: W${atWeek}/${atYear}`
+      `[weekly-report] Meeting: W${meetingWeek}/${meetingYear} | ReportData: W${reportDataWeek}/${reportDataYear} | Tracker: W${atWeek}/${atYear}`
     )
 
     let includeWeeklyReport = !bodySkipWeeklyReport
@@ -813,17 +834,17 @@ serve(async (req) => {
     let trackerPdfBase64: string | undefined
 
     if (weeklyReportBase64) {
-      console.log("[weekly-summary] Using client-provided weekly report PDF")
+      console.log("[weekly-report] Using client-provided weekly report PDF")
       reportPdfBase64 = weeklyReportBase64
     }
 
     if (actionTrackerBase64) {
-      console.log("[weekly-summary] Using client-provided action tracker PDF")
+      console.log("[weekly-report] Using client-provided action tracker PDF")
       trackerPdfBase64 = actionTrackerBase64
     }
 
     if ((includeWeeklyReport && !reportPdfBase64) || (includeActionTracker && !trackerPdfBase64)) {
-      console.log("[weekly-summary] Generating PDFs server-side")
+      console.log("[weekly-report] Generating PDFs server-side")
 
       // Fetch reports from the PREVIOUS week (work done data)
       const { data: reports, error: reportsError } = await supabase
@@ -836,7 +857,7 @@ serve(async (req) => {
       if (reportsError) throw reportsError
 
       if (!reports || reports.length === 0) {
-        console.log(`[weekly-summary] No submitted reports for W${reportDataWeek}/${reportDataYear}. Skipping.`)
+        console.log(`[weekly-report] No submitted reports for W${reportDataWeek}/${reportDataYear}. Skipping.`)
         return new Response(
           JSON.stringify({ skipped: true, reason: `No submitted reports for W${reportDataWeek}/${reportDataYear}` }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
@@ -858,7 +879,7 @@ serve(async (req) => {
         fetchLogoBytes(`${STORAGE_BASE}/acob-logo-dark.png`),
       ])
 
-      console.log(`[weekly-summary] Generating PDFs: ${reports.length} reports, ${(actions || []).length} actions`)
+      console.log(`[weekly-report] Generating PDFs: ${reports.length} reports, ${(actions || []).length} actions`)
       const [reportPdfBytes, trackerPdfBytes] = await Promise.all([
         includeWeeklyReport && !reportPdfBase64
           ? buildWeeklyReportPDF(reports, meetingWeek, meetingYear, coverLogoBytes, headerLogoBytes)
@@ -886,7 +907,7 @@ serve(async (req) => {
           : ["i.chibuikem@org.acoblighting.com"]
 
     const meetingDate = getWeekMonday(meetingWeek, meetingYear)
-    const subject = `Minutes and Action Points of the General Meeting - ${meetingDate}`
+    const subject = withSubjectPrefix("Reports", `Minutes and Action Points of the General Meeting - ${meetingDate}`)
     const html = buildEmailHtml(meetingWeek, meetingYear, preparedByName || "ACOB Team")
 
     const attachments: { filename: string; content: string }[] = []
@@ -907,17 +928,17 @@ serve(async (req) => {
     const results = []
     for (const to of recipients) {
       const { data, error } = await sendWithRetry(resend, {
-        from: "ACOB Admin & HR <notifications@acoblighting.com>",
+        from: DEFAULT_SENDER,
         to,
         subject,
         html,
         attachments,
       })
       if (error) {
-        console.error(`[weekly-summary] Failed to send to ${to}:`, JSON.stringify(error))
+        console.error(`[weekly-report] Failed to send to ${to}:`, JSON.stringify(error))
         results.push({ to, success: false, error })
       } else {
-        console.log(`[weekly-summary] Sent to ${to}. ID: ${data?.id}`)
+        console.log(`[weekly-report] Sent to ${to}. ID: ${data?.id}`)
         results.push({ to, success: true, emailId: data?.id })
       }
       await sleep(SEND_INTERVAL_MS)
@@ -928,13 +949,13 @@ serve(async (req) => {
       const failureCount = results.length - successCount
       const auditEntityId = crypto.randomUUID()
       await writeEdgeAuditLog(supabase as any, {
-        action: "weekly_summary_sent",
+        action: "weekly_report_sent",
         entityType: "mail_summary",
         entityId: auditEntityId,
         actorId: requestedByUserId || null,
         department: "Admin & HR",
         source: "edge",
-        route: "/functions/send-weekly-digest",
+        route: "/functions/send-weekly-report",
         metadata: {
           meeting_week: meetingWeek,
           meeting_year: meetingYear,
@@ -950,7 +971,7 @@ serve(async (req) => {
         },
       })
     } catch (auditErr) {
-      console.error("[weekly-summary] Failed to write audit log:", auditErr)
+      console.error("[weekly-report] Failed to write audit log:", auditErr)
     }
 
     return new Response(
@@ -967,7 +988,7 @@ serve(async (req) => {
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
     )
   } catch (err: any) {
-    console.error("[send-weekly-digest] Error:", err)
+    console.error("[send-weekly-report] Error:", err)
     return new Response(JSON.stringify({ error: err.message }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,

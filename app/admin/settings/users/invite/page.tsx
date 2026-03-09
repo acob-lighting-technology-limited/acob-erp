@@ -3,15 +3,15 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
+import { PageHeader, PageWrapper } from "@/components/layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ArrowLeft, UserPlus, Mail } from "lucide-react"
-import Link from "next/link"
+import { UserPlus, Mail } from "lucide-react"
 import { toast } from "sonner"
 import { getAssignableRolesForActor } from "@/lib/role-management"
+import { FormFieldGroup } from "@/components/ui/patterns"
 
 export default function InviteUserPage() {
   const router = useRouter()
@@ -74,17 +74,13 @@ export default function InviteUserPage() {
   }
 
   return (
-    <div className="container mx-auto max-w-2xl space-y-6 p-6">
-      <div>
-        <div className="mb-1 flex items-center gap-2">
-          <Link href="/admin/settings/users" className="text-muted-foreground hover:text-foreground">
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
-          <h1 className="text-3xl font-bold">Invite User</h1>
-        </div>
-        <p className="text-muted-foreground">Send an invitation to a new team member</p>
-      </div>
-
+    <PageWrapper maxWidth="form" background="gradient">
+      <PageHeader
+        title="Invite User"
+        description="Send an invitation to a new team member"
+        icon={UserPlus}
+        backLink={{ href: "/admin/settings/users", label: "Back to Users" }}
+      />
       <form onSubmit={handleSubmit}>
         <Card>
           <CardHeader>
@@ -92,8 +88,7 @@ export default function InviteUserPage() {
             <CardDescription>Enter the new user's information</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email Address *</Label>
+            <FormFieldGroup label="Email Address *">
               <Input
                 id="email"
                 type="email"
@@ -102,32 +97,29 @@ export default function InviteUserPage() {
                 placeholder="user@company.com"
                 required
               />
-            </div>
+            </FormFieldGroup>
 
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="first_name">First Name</Label>
+              <FormFieldGroup label="First Name">
                 <Input
                   id="first_name"
                   value={formData.first_name}
                   onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
                   placeholder="First name"
                 />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="last_name">Last Name</Label>
+              </FormFieldGroup>
+              <FormFieldGroup label="Last Name">
                 <Input
                   id="last_name"
                   value={formData.last_name}
                   onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
                   placeholder="Last name"
                 />
-              </div>
+              </FormFieldGroup>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="role">Role</Label>
+              <FormFieldGroup label="Role">
                 <Select value={formData.role} onValueChange={(v) => setFormData({ ...formData, role: v })}>
                   <SelectTrigger>
                     <SelectValue />
@@ -140,32 +132,29 @@ export default function InviteUserPage() {
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="department">Department</Label>
+              </FormFieldGroup>
+              <FormFieldGroup label="Department">
                 <Input
                   id="department"
                   value={formData.department}
                   onChange={(e) => setFormData({ ...formData, department: e.target.value })}
                   placeholder="e.g., Engineering"
                 />
-              </div>
+              </FormFieldGroup>
             </div>
           </CardContent>
         </Card>
 
         <div className="mt-6 flex justify-end gap-4">
-          <Link href="/admin/settings/users">
-            <Button type="button" variant="outline">
-              Cancel
-            </Button>
-          </Link>
+          <Button type="button" variant="outline" onClick={() => router.push("/admin/settings/users")}>
+            Cancel
+          </Button>
           <Button type="submit" disabled={sending}>
             <Mail className="mr-2 h-4 w-4" />
             Send Invitation
           </Button>
         </div>
       </form>
-    </div>
+    </PageWrapper>
   )
 }

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { FormFieldGroup } from "@/components/ui/patterns"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { useState, useRef, useEffect } from "react"
@@ -275,10 +276,7 @@ export default function LoginPage() {
                   {loginMethod === "password" ? (
                     <form onSubmit={handlePasswordLogin}>
                       <div className="flex flex-col gap-5">
-                        <div className="grid gap-3">
-                          <Label htmlFor="email" className="text-sm font-medium">
-                            Company Email
-                          </Label>
+                        <FormFieldGroup label="Company Email" className="grid gap-3">
                           <Input
                             id="email"
                             name="email"
@@ -290,7 +288,7 @@ export default function LoginPage() {
                             className="h-11 text-base"
                             autoComplete="username"
                           />
-                        </div>
+                        </FormFieldGroup>
                         <div className="grid gap-3">
                           <div className="flex items-center justify-between">
                             <Label htmlFor="password" className="text-sm font-medium">

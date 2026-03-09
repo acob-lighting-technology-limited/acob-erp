@@ -27,6 +27,8 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { PageHeader } from "@/components/layout/page-header"
+import { EmptyState } from "@/components/ui/patterns"
 
 interface Project {
   id: string
@@ -389,24 +391,17 @@ export default function ProjectDetailPage() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 p-6">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <Link href="/projects">
-          <Button variant="ghost" size="icon">
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-        </Link>
-        <div className="flex-1">
-          <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-bold tracking-tight">{project.project_name}</h1>
-            <Badge className={`${getStatusColor(project.status)} flex items-center gap-1`}>
-              {getStatusIcon(project.status)}
-              {project.status.replace("_", " ")}
-            </Badge>
-          </div>
-          {project.description && <p className="text-muted-foreground mt-1">{project.description}</p>}
-        </div>
-      </div>
+      <PageHeader
+        title={project.project_name}
+        description={project.description || "Project details and progress"}
+        backLink={{ href: "/projects", label: "Back to Projects" }}
+        actions={
+          <Badge className={`${getStatusColor(project.status)} flex items-center gap-1`}>
+            {getStatusIcon(project.status)}
+            {project.status.replace("_", " ")}
+          </Badge>
+        }
+      />
 
       {/* Project Overview Cards */}
       <div className="grid gap-4 md:grid-cols-3">
@@ -524,7 +519,12 @@ export default function ProjectDetailPage() {
             </CardHeader>
             <CardContent>
               {members.length === 0 ? (
-                <div className="text-muted-foreground py-8 text-center">No members assigned to this project yet</div>
+                <EmptyState
+                  title="No members assigned to this project yet"
+                  description="Assign members to start collaboration on this project."
+                  icon={Users}
+                  className="border-0"
+                />
               ) : (
                 <div className="space-y-3">
                   {members.map((member) => (
@@ -559,7 +559,12 @@ export default function ProjectDetailPage() {
             </CardHeader>
             <CardContent>
               {items.length === 0 ? (
-                <div className="text-muted-foreground py-8 text-center">No items added to this project yet</div>
+                <EmptyState
+                  title="No items added to this project yet"
+                  description="Project equipment and materials will appear here."
+                  icon={Package}
+                  className="border-0"
+                />
               ) : (
                 <div className="space-y-3">
                   {items.map((item) => (
@@ -597,7 +602,12 @@ export default function ProjectDetailPage() {
             </CardHeader>
             <CardContent>
               {tasks.length === 0 ? (
-                <div className="text-muted-foreground py-8 text-center">No tasks assigned to this project yet</div>
+                <EmptyState
+                  title="No tasks assigned to this project yet"
+                  description="Task assignments linked to this project will appear here."
+                  icon={ClipboardList}
+                  className="border-0"
+                />
               ) : (
                 <div className="space-y-3">
                   {tasks.map((task) => (
@@ -664,9 +674,12 @@ export default function ProjectDetailPage() {
               {/* Activity Timeline */}
               <div className="space-y-4">
                 {updates.length === 0 ? (
-                  <div className="text-muted-foreground py-8 text-center">
-                    No activity yet. Be the first to comment!
-                  </div>
+                  <EmptyState
+                    title="No activity yet"
+                    description="Be the first to post a project comment."
+                    icon={MessageSquare}
+                    className="border-0"
+                  />
                 ) : (
                   updates.map((update) => (
                     <div key={update.id} className="flex gap-3 rounded-lg border p-3">

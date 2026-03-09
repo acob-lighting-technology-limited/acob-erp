@@ -9,11 +9,13 @@ import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Label } from "@/components/ui/label"
-import { ArrowLeft, Users, Search, Filter, Shield, Pencil, UserPlus } from "lucide-react"
+import { Users, Search, Filter, Shield, Pencil, UserPlus } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
 import { getAssignableRolesForActor } from "@/lib/role-management"
+import { AdminTablePage } from "@/components/admin/admin-table-page"
+import { StatCard } from "@/components/ui/stat-card"
+import { EmptyState, FormFieldGroup, ListToolbar } from "@/components/ui/patterns"
 
 // Allowlist of valid roles for validation
 const ALLOWED_ROLES = ["developer", "super_admin", "admin", "employee", "visitor"] as const
@@ -228,17 +230,13 @@ export default function UsersPage() {
   }
 
   return (
-    <div className="container mx-auto space-y-6 p-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="mb-1 flex items-center gap-2">
-            <Link href="/admin/settings" className="text-muted-foreground hover:text-foreground">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-            <h1 className="text-3xl font-bold">User Management</h1>
-          </div>
-          <p className="text-muted-foreground">Manage user accounts and roles</p>
-        </div>
+    <AdminTablePage
+      title="User Management"
+      description="Manage user accounts and roles."
+      icon={Users}
+      backLinkHref="/admin/settings"
+      backLinkLabel="Back to Settings"
+      actions={
         <div className="flex gap-2">
           {roleFilter !== "all" && (
             <Button onClick={openAddUserDialog} variant="secondary">
@@ -253,66 +251,46 @@ export default function UsersPage() {
             </Button>
           </Link>
         </div>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-4 md:grid-cols-3">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Users</CardTitle>
-            <Users className="text-muted-foreground h-4 w-4" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-lg font-bold sm:text-2xl">{stats.total}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active</CardTitle>
-            <Users className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-lg font-bold sm:text-2xl text-green-600">{stats.active}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Admins</CardTitle>
-            <Shield className="text-muted-foreground h-4 w-4" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-lg font-bold sm:text-2xl">{stats.admins}</div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Filters */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-        <div className="relative flex-1">
-          <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-          <Input
-            placeholder="Search by name or email..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
-          />
+      }
+      stats={
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 md:gap-4">
+          <StatCard title="Total Users" value={stats.total} icon={Users} />
+          <StatCard title="Active" value={stats.active} icon={Users} />
+          <StatCard title="Admins" value={stats.admins} icon={Shield} />
         </div>
-        <Select value={roleFilter} onValueChange={setRoleFilter}>
-          <SelectTrigger className="w-[180px]">
-            <Filter className="mr-2 h-4 w-4" />
-            <SelectValue placeholder="Filter by role" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Roles</SelectItem>
-            {roles.map((r) => (
-              <SelectItem key={r} value={r} className="capitalize">
-                {r.replace("_", " ")}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
+      }
+      filters={
+        <ListToolbar
+          search={
+            <div className="relative flex-1">
+              <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+              <Input
+                placeholder="Search by name or email..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+          }
+          filters={
+            <Select value={roleFilter} onValueChange={setRoleFilter}>
+              <SelectTrigger className="w-[180px]">
+                <Filter className="mr-2 h-4 w-4" />
+                <SelectValue placeholder="Filter by role" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Roles</SelectItem>
+                {roles.map((r) => (
+                  <SelectItem key={r} value={r} className="capitalize">
+                    {r.replace("_", " ")}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          }
+        />
+      }
+    >
       <Card>
         <CardHeader>
           <CardTitle>All Users</CardTitle>
@@ -324,10 +302,7 @@ export default function UsersPage() {
               <div className="border-primary h-8 w-8 animate-spin rounded-full border-4 border-t-transparent"></div>
             </div>
           ) : filtered.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <Users className="text-muted-foreground mb-4 h-12 w-12" />
-              <h3 className="font-semibold">No users found</h3>
-            </div>
+            <EmptyState title="No users found" icon={Users} />
           ) : (
             <Table>
               <TableHeader>
@@ -377,18 +352,16 @@ export default function UsersPage() {
 
       {/* Edit Role Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] w-[95vw] max-w-lg overflow-y-auto">
           <form onSubmit={handleUpdateRole}>
             <DialogHeader>
               <DialogTitle>Edit User</DialogTitle>
             </DialogHeader>
             <div className="grid gap-4 py-4">
-              <div className="space-y-2">
-                <Label>User</Label>
+              <FormFieldGroup label="User">
                 <p className="text-muted-foreground text-sm">{editingUser?.email}</p>
-              </div>
-              <div className="space-y-2">
-                <Label>Role</Label>
+              </FormFieldGroup>
+              <FormFieldGroup label="Role">
                 <Select value={formData.role} onValueChange={(v) => setFormData({ ...formData, role: v })}>
                   <SelectTrigger>
                     <SelectValue />
@@ -401,23 +374,24 @@ export default function UsersPage() {
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-              <div className="flex items-center justify-between">
-                <Label>Employment Status</Label>
-                <Select
-                  value={formData.employment_status}
-                  onValueChange={(v) => setFormData({ ...formData, employment_status: v })}
-                >
-                  <SelectTrigger className="w-32">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="suspended">Suspended</SelectItem>
-                    <SelectItem value="separated">Separated</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              </FormFieldGroup>
+              <FormFieldGroup label="Employment Status">
+                <div className="flex justify-end">
+                  <Select
+                    value={formData.employment_status}
+                    onValueChange={(v) => setFormData({ ...formData, employment_status: v })}
+                  >
+                    <SelectTrigger className="w-32">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="suspended">Suspended</SelectItem>
+                      <SelectItem value="separated">Separated</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </FormFieldGroup>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
@@ -431,13 +405,12 @@ export default function UsersPage() {
 
       {/* Add User to Role Dialog */}
       <Dialog open={isAddUserDialogOpen} onOpenChange={setIsAddUserDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] w-[95vw] max-w-lg overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add User to {roleFilter.replace("_", " ")}</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <div className="space-y-2">
-              <Label>Select User</Label>
+            <FormFieldGroup label="Select User">
               <Select value={userToAdd} onValueChange={handleUserSelect}>
                 <SelectTrigger>
                   <SelectValue placeholder="Search or select a user..." />
@@ -450,7 +423,7 @@ export default function UsersPage() {
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+            </FormFieldGroup>
             {addUserWarning && (
               <div className="rounded-md bg-yellow-100 p-3 text-sm text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200">
                 {addUserWarning}
@@ -468,7 +441,6 @@ export default function UsersPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </AdminTablePage>
   )
 }
-

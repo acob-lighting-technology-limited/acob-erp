@@ -6,12 +6,12 @@ import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
-import { ArrowLeft, Save } from "lucide-react"
-import Link from "next/link"
+import { Save } from "lucide-react"
 import { toast } from "sonner"
+import { PageHeader } from "@/components/layout/page-header"
+import { FormFieldGroup } from "@/components/ui/patterns"
 
 export default function EditSupplierPage() {
   const params = useParams()
@@ -92,23 +92,16 @@ export default function EditSupplierPage() {
 
   return (
     <div className="container mx-auto max-w-2xl space-y-6 p-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="mb-1 flex items-center gap-2">
-            <Link
-              href={`/admin/purchasing/suppliers/${params.id}`}
-              className="text-muted-foreground hover:text-foreground"
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-            <h1 className="text-3xl font-bold">Edit Supplier</h1>
-          </div>
-        </div>
-        <Button onClick={handleSubmit} disabled={saving}>
-          <Save className="mr-2 h-4 w-4" />
-          Save Changes
-        </Button>
-      </div>
+      <PageHeader
+        title="Edit Supplier"
+        backLink={{ href: `/admin/purchasing/suppliers/${params.id}`, label: "Back to Supplier" }}
+        actions={
+          <Button onClick={handleSubmit} disabled={saving}>
+            <Save className="mr-2 h-4 w-4" />
+            Save Changes
+          </Button>
+        }
+      />
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <Card>
@@ -117,59 +110,54 @@ export default function EditSupplierPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Name *</Label>
+              <FormFieldGroup label="Name *">
                 <Input
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   required
                 />
-              </div>
-              <div className="space-y-2">
-                <Label>Code *</Label>
+              </FormFieldGroup>
+              <FormFieldGroup label="Code *">
                 <Input
                   value={formData.code}
                   onChange={(e) => setFormData({ ...formData, code: e.target.value })}
                   required
                 />
-              </div>
+              </FormFieldGroup>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Email</Label>
+              <FormFieldGroup label="Email">
                 <Input
                   type="email"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 />
-              </div>
-              <div className="space-y-2">
-                <Label>Phone</Label>
+              </FormFieldGroup>
+              <FormFieldGroup label="Phone">
                 <Input value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} />
-              </div>
+              </FormFieldGroup>
             </div>
-            <div className="space-y-2">
-              <Label>Contact Person</Label>
+            <FormFieldGroup label="Contact Person">
               <Input
                 value={formData.contact_person}
                 onChange={(e) => setFormData({ ...formData, contact_person: e.target.value })}
               />
-            </div>
-            <div className="space-y-2">
-              <Label>Address</Label>
+            </FormFieldGroup>
+            <FormFieldGroup label="Address">
               <Textarea
                 value={formData.address}
                 onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                 rows={2}
               />
-            </div>
-            <div className="flex items-center justify-between pt-2">
-              <Label>Active Status</Label>
-              <Switch
-                checked={formData.is_active}
-                onCheckedChange={(v) => setFormData({ ...formData, is_active: v })}
-              />
-            </div>
+            </FormFieldGroup>
+            <FormFieldGroup label="Active Status" className="pt-2">
+              <div className="flex items-center justify-end">
+                <Switch
+                  checked={formData.is_active}
+                  onCheckedChange={(v) => setFormData({ ...formData, is_active: v })}
+                />
+              </div>
+            </FormFieldGroup>
           </CardContent>
         </Card>
       </form>

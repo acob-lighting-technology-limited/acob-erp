@@ -38,6 +38,7 @@ import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { WeeklyReportDialog } from "@/components/dashboard/reports/weekly-report-dialog"
+import { EmptyState, FormFieldGroup } from "@/components/ui/patterns"
 import {
   exportToPDF,
   exportToDocx,
@@ -260,16 +261,17 @@ export default function WeeklyReportsPortal() {
       filters={
         <div className="mb-6 flex flex-col items-end justify-between gap-4 md:flex-row">
           <div className="w-full max-w-md flex-1">
-            <Label className="mb-1.5 block text-xs font-semibold">Search Content</Label>
-            <div className="relative">
-              <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-              <Input
-                placeholder="Search..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
-              />
-            </div>
+            <FormFieldGroup label="Search Content" className="space-y-1">
+              <div className="relative">
+                <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+                <Input
+                  placeholder="Search..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+            </FormFieldGroup>
           </div>
           <div className="flex w-full flex-wrap items-end gap-3 md:w-auto">
             <div className="w-24">
@@ -335,8 +337,13 @@ export default function WeeklyReportsPortal() {
               </TableRow>
             ) : filteredReports.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-muted-foreground h-32 text-center font-medium">
-                  No reports found for the selected criteria.
+                <TableCell colSpan={6} className="h-32">
+                  <EmptyState
+                    title="No reports found for the selected criteria"
+                    description="Try adjusting the week, year, department, or search filter."
+                    icon={FileSpreadsheet}
+                    className="border-0"
+                  />
                 </TableCell>
               </TableRow>
             ) : (
@@ -515,7 +522,7 @@ export default function WeeklyReportsPortal() {
           if (!open) setPendingPptxExport(null)
         }}
       >
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] w-[95vw] max-w-2xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Select PPTX Mode</DialogTitle>
             <DialogDescription>

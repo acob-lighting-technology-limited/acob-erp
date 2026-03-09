@@ -7,6 +7,7 @@ import {
   resolveAssetMailSpecialRecipients,
   type AssetMailRoutingProfile,
 } from "@/lib/asset-mail-routing"
+import { applyAssignableStatusFilter } from "@/lib/workforce/assignment-policy"
 
 export async function GET() {
   try {
@@ -25,14 +26,16 @@ export async function GET() {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
-    const { data: profiles, error } = await supabase
-      .from("profiles")
-      .select(
-        "id, full_name, first_name, last_name, company_email, department, is_department_lead, lead_departments, employment_status"
-      )
-      .eq("employment_status", "active")
-      .order("department", { ascending: true })
-      .order("full_name", { ascending: true })
+    const { data: profiles, error } = await applyAssignableStatusFilter(
+      supabase
+        .from("profiles")
+        .select(
+          "id, full_name, first_name, last_name, company_email, department, is_department_lead, lead_departments, employment_status"
+        )
+        .order("department", { ascending: true })
+        .order("full_name", { ascending: true }),
+      { allowLegacyNullStatus: false }
+    )
 
     if (error) {
       return NextResponse.json({ error: `Failed to load profiles: ${error.message}` }, { status: 500 })

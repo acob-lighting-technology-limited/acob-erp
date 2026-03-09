@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,7 +12,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Receipt, Search, Filter, Eye, CheckCircle } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
-import { PageWrapper, PageHeader } from "@/components/layout"
 import { StatCard } from "@/components/ui/stat-card"
 import { EmptyState } from "@/components/ui/empty-state"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -108,22 +108,21 @@ export default function BillsPage() {
   }
 
   return (
-    <PageWrapper maxWidth="full" background="gradient">
-      <PageHeader
-        title="Bills"
-        description="Track vendor bills and expenses"
-        icon={Receipt}
-        backLink={{ href: "/admin", label: "Back to Admin" }}
-        actions={
-          <Link href="/admin/finance/bills/new">
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Bill
-            </Button>
-          </Link>
-        }
-      />
-
+    <AdminTablePage
+      title="Bills"
+      description="Track vendor bills and expenses"
+      icon={Receipt}
+      backLinkHref="/admin"
+      backLinkLabel="Back to Admin"
+      actions={
+        <Link href="/admin/finance/bills/new">
+          <Button>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Bill
+          </Button>
+        </Link>
+      }
+    >
       {/* Stats */}
       <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4 md:gap-4">
         <StatCard
@@ -267,7 +266,6 @@ export default function BillsPage() {
           )}
         </CardContent>
       </Card>
-    </PageWrapper>
+    </AdminTablePage>
   )
 }
-

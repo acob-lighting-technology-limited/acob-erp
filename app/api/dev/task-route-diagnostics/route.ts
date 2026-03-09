@@ -11,6 +11,7 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createClient as createAdminClient } from "@supabase/supabase-js"
+import { applyAssignableStatusFilter } from "@/lib/workforce/assignment-policy"
 
 type DiagRow = {
   check_code: "department_lead_coverage" | "department_assignment_target"
@@ -57,10 +58,12 @@ export async function GET() {
 
   const [departmentsRes, profilesRes] = await Promise.all([
     admin.from("departments").select("name").order("name"),
-    admin
-      .from("profiles")
-      .select("id, full_name, department, is_department_lead, lead_departments, employment_status")
-      .eq("employment_status", "active"),
+    applyAssignableStatusFilter(
+      admin
+        .from("profiles")
+        .select("id, full_name, department, is_department_lead, lead_departments, employment_status"),
+      { allowLegacyNullStatus: false }
+    ),
   ])
 
   if (departmentsRes.error) {

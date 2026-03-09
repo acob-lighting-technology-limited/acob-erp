@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
+import { PageWrapper, PageHeader } from "@/components/layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -11,7 +12,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import {
-  ArrowLeft,
   Calendar,
   CreditCard,
   DollarSign,
@@ -63,6 +63,7 @@ import {
   startOfDay,
   isValid,
 } from "date-fns"
+import { EmptyState, FormFieldGroup } from "@/components/ui/patterns"
 
 interface Department {
   id: string
@@ -151,7 +152,16 @@ const ScheduleList = ({
   onMarkPaid?: (d: Date) => void
   onReplace?: (d: Date, t: "invoice" | "receipt", docId: string) => void
 }) => {
-  if (items.length === 0) return <p className="text-muted-foreground text-sm">No items found.</p>
+  if (items.length === 0) {
+    return (
+      <EmptyState
+        title="No schedule items found"
+        description="Expected payment periods will appear here after schedule generation."
+        icon={Calendar}
+        className="border-0 p-3"
+      />
+    )
+  }
 
   return (
     <div className="divide-y rounded-md border">
@@ -804,39 +814,27 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
   }
 
   return (
-    <div className="from-background via-background to-muted/20 min-h-screen bg-gradient-to-br p-4 md:p-6">
-      <div className="mx-auto max-w-5xl space-y-6">
-        {/* Header */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <Link
-              href="/admin/finance/payments"
-              className="text-muted-foreground hover:text-foreground mb-2 inline-flex items-center text-sm"
-            >
-              <ArrowLeft className="mr-1 h-4 w-4" />
-              Back to Payments
-            </Link>
-            <div className="flex flex-wrap items-center gap-3">
-              <h1 className="text-foreground text-2xl font-bold md:text-3xl">{payment.title}</h1>
-              <Badge className={getStatusColor(getRealStatus(payment))}>{getRealStatus(payment)}</Badge>
-              {/* Highlight Next Due Date */}
-              {payment.payment_type === "recurring" && payment.next_payment_due && (
-                <Badge
-                  variant="outline"
-                  className="border-primary/20 text-primary bg-primary/5 border-2 px-2 py-0.5 text-sm font-medium"
-                >
-                  Next Due: {format(parseISO(payment.next_payment_due), "MMM d, yyyy")}
-                </Badge>
-              )}
-            </div>
-            <p className="text-muted-foreground mt-1 flex items-center gap-2 text-sm">
-              <Clock className="h-4 w-4" />
-              {payment.payment_type === "recurring"
-                ? `Repeats ${payment.recurrence_period}`
-                : `One-time payment on ${payment.payment_date ? format(parseISO(payment.payment_date), "PPP") : "N/A"}`}
-            </p>
-          </div>
-          <div className="flex gap-2">
+    <PageWrapper maxWidth="full" background="gradient">
+      <PageHeader
+        title={payment.title}
+        description={
+          payment.payment_type === "recurring"
+            ? `Repeats ${payment.recurrence_period}`
+            : `One-time payment on ${payment.payment_date ? format(parseISO(payment.payment_date), "PPP") : "N/A"}`
+        }
+        icon={CreditCard}
+        backLink={{ href: "/admin/finance/payments", label: "Back to Payments" }}
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge className={getStatusColor(getRealStatus(payment))}>{getRealStatus(payment)}</Badge>
+            {payment.payment_type === "recurring" && payment.next_payment_due && (
+              <Badge
+                variant="outline"
+                className="border-primary/20 text-primary bg-primary/5 border-2 px-2 py-0.5 text-sm font-medium"
+              >
+                Next Due: {format(parseISO(payment.next_payment_due), "MMM d, yyyy")}
+              </Badge>
+            )}
             {/* Show Mark as Paid only when receipt exists for the current due date */}
             {(getRealStatus(payment) === "due" || getRealStatus(payment) === "overdue") &&
               (() => {
@@ -880,8 +878,10 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
-        </div>
+        }
+      />
 
+      <div className="mx-auto max-w-5xl space-y-6">
         <div className="grid gap-6 md:grid-cols-3">
           <div className="space-y-6 md:col-span-2">
             {/* Recurrence Schedule */}
@@ -1024,8 +1024,7 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
           </DialogHeader>
           <form onSubmit={handleUpdate} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="department">Department</Label>
+              <FormFieldGroup label="Department">
                 <Select
                   value={editFormData.department_id}
                   onValueChange={(value) => setEditFormData({ ...editFormData, department_id: value })}
@@ -1041,7 +1040,7 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
+              </FormFieldGroup>
               <div className="space-y-2">
                 <Label htmlFor="category">Category</Label>
                 <Select
@@ -1235,7 +1234,7 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
           if (!open) setReplaceDocumentId(null)
         }}
       >
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] w-[95vw] max-w-md overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {replaceDocumentId ? "Replace" : "Upload"} {uploadType === "invoice" ? "Invoice" : "Receipt"}
@@ -1272,7 +1271,7 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
       </Dialog>
       {/* Print Receipt Dialog */}
       <Dialog open={printDialogOpen} onOpenChange={setPrintDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] w-[95vw] max-w-md overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Select Receipt to Print</DialogTitle>
             <DialogDescription>Choose a receipt from the list below to view and print.</DialogDescription>
@@ -1329,7 +1328,12 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
                   </div>
                 ))
             ) : (
-              <p className="text-muted-foreground py-4 text-center">No receipts available to print.</p>
+              <EmptyState
+                title="No receipts available to print"
+                description="Upload a receipt and it will appear in this list."
+                icon={Receipt}
+                className="border-0 p-3"
+              />
             )}
           </div>
           <DialogFooter>
@@ -1339,6 +1343,6 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </PageWrapper>
   )
 }

@@ -12,6 +12,7 @@ import { CheckCircle, XCircle, Loader2, PlayCircle, FlaskConical, SkipForward, R
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
+import { applyAssignableStatusFilter } from "@/lib/workforce/assignment-policy"
 
 type StepResult = {
   step: string
@@ -71,11 +72,10 @@ export function LeaveFlowTestContent() {
   useEffect(() => {
     async function load() {
       const [profilesRes, typesRes] = await Promise.all([
-        supabase
-          .from("profiles")
-          .select("id, full_name, first_name, last_name, company_email")
-          .eq("employment_status", "active")
-          .order("first_name"),
+        applyAssignableStatusFilter(
+          supabase.from("profiles").select("id, full_name, first_name, last_name, company_email").order("first_name"),
+          { allowLegacyNullStatus: false }
+        ),
         supabase.from("leave_types").select("id, name").order("name"),
       ])
 

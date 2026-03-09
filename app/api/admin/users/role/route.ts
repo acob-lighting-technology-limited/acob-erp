@@ -23,18 +23,16 @@ export async function POST(request: Request) {
     const targetUserId = String(body?.targetUserId || "")
     const targetRole = String(body?.role || "")
     const adminDomains = Array.isArray(body?.admin_domains)
-      ? body.admin_domains.map((value: unknown) => String(value || "").trim().toLowerCase()).filter(Boolean)
+      ? body.admin_domains
+          .map((value: unknown) =>
+            String(value || "")
+              .trim()
+              .toLowerCase()
+          )
+          .filter(Boolean)
       : []
     const employmentStatus = body?.employment_status ? String(body.employment_status) : null
-    const allowedAdminDomains = [
-      "hr",
-      "finance",
-      "assets",
-      "reports",
-      "tasks",
-      "projects",
-      "communications",
-    ]
+    const allowedAdminDomains = ["hr", "finance", "assets", "reports", "tasks", "projects", "communications"]
 
     if (!targetUserId || !targetRole) {
       return NextResponse.json({ error: "Missing targetUserId or role" }, { status: 400 })
@@ -124,12 +122,9 @@ export async function POST(request: Request) {
       }
     }
 
-    const isAdmin = ["developer", "super_admin", "admin"].includes(targetRole)
-
     // Role changes do NOT affect department lead status — those are independent
     const payload: Record<string, unknown> = {
       role: targetRole,
-      is_admin: isAdmin,
       admin_domains: targetRole === "admin" ? adminDomains : null,
     }
 

@@ -22,13 +22,7 @@ function normalizePath(path: string): string {
 }
 
 function uniqueDepartments(values: (string | null | undefined)[]): string[] {
-  return Array.from(
-    new Set(
-      values
-        .map((v) => (typeof v === "string" ? v.trim() : ""))
-        .filter(Boolean)
-    )
-  )
+  return Array.from(new Set(values.map((v) => (typeof v === "string" ? v.trim() : "")).filter(Boolean)))
 }
 
 export async function resolveOneDriveAccessScope(
@@ -77,7 +71,5 @@ export function isPathAllowed(path: string, scope: OneDriveAccessScope): boolean
   if (!normalizedPath.startsWith("/Projects")) return false
   if (scope.isAdminLike) return true
   if (normalizedPath === "/Projects") return true
-  return scope.allowedPrefixes.some(
-    (prefix) => normalizedPath === prefix || normalizedPath.startsWith(`${prefix}/`)
-  )
+  return scope.allowedPrefixes.some((prefix) => normalizedPath === prefix || normalizedPath.startsWith(`${prefix}/`))
 }

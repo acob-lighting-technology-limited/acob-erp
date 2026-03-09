@@ -31,6 +31,7 @@ import {
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { formatName } from "@/lib/utils"
+import { isAssignableProfile } from "@/lib/workforce/assignment-policy"
 import { ASSET_TYPES, ASSET_TYPE_MAP, generateUniqueCodePreview } from "@/lib/asset-types"
 import { OFFICE_LOCATIONS } from "@/lib/permissions"
 import { getDepartmentForOffice } from "@/lib/office-locations"
@@ -65,6 +66,7 @@ import {
 import Link from "next/link"
 import { Checkbox } from "@/components/ui/checkbox"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
+import { StatCard } from "@/components/ui/stat-card"
 
 export interface Asset {
   id: string
@@ -177,9 +179,7 @@ export function AdminAssetsContent({
   const router = useRouter()
   const [assets, setAssets] = useState<Asset[]>(initialAssets)
   const [employees, setEmployees] = useState<Employee[]>(initialEmployees)
-  const activeEmployees = employees.filter(
-    (member) => member.employment_status === "active" || !member.employment_status
-  )
+  const activeEmployees = employees.filter((member) => isAssignableProfile(member, { allowLegacyNullStatus: false }))
   const [departments] = useState<string[]>(initialDepartments)
   const [isLoading, setIsLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
@@ -2136,67 +2136,37 @@ export function AdminAssetsContent({
       }
       stats={
         <div className="grid grid-cols-3 gap-2 sm:gap-3 md:grid-cols-5 md:gap-4">
-          <Card className="border-2">
-            <CardContent className="p-3 sm:p-4 md:p-6">
-              <div className="flex items-center justify-between">
-                <div className="min-w-0 flex-1">
-                  <p className="xs:text-xs text-muted-foreground truncate text-[10px] font-medium">Total assets</p>
-                  <p className="text-foreground mt-1 text-lg font-bold sm:text-xl md:mt-2 md:text-3xl">{stats.total}</p>
-                </div>
-                <div className="ml-1 shrink-0 rounded-lg bg-blue-100 p-1.5 sm:p-2 md:p-3 dark:bg-blue-900/30">
-                  <Package className="h-4 w-4 text-blue-600 sm:h-5 sm:w-5 md:h-6 md:w-6 dark:text-blue-400" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <StatCard
+            title="Total assets"
+            value={stats.total}
+            icon={Package}
+            iconBgColor="bg-blue-100 dark:bg-blue-900/30"
+            iconColor="text-blue-600 dark:text-blue-400"
+          />
 
-          <Card className="border-2">
-            <CardContent className="p-3 sm:p-4 md:p-6">
-              <div className="flex items-center justify-between">
-                <div className="min-w-0 flex-1">
-                  <p className="xs:text-xs text-muted-foreground truncate text-[10px] font-medium">Available</p>
-                  <p className="text-foreground mt-1 text-lg font-bold sm:text-xl md:mt-2 md:text-3xl">
-                    {stats.available}
-                  </p>
-                </div>
-                <div className="ml-1 flex-shrink-0 rounded-lg bg-green-100 p-1.5 sm:p-2 md:p-3 dark:bg-green-900/30">
-                  <Package className="h-4 w-4 text-green-600 sm:h-5 sm:w-5 md:h-6 md:w-6 dark:text-green-400" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <StatCard
+            title="Available"
+            value={stats.available}
+            icon={Package}
+            iconBgColor="bg-green-100 dark:bg-green-900/30"
+            iconColor="text-green-600 dark:text-green-400"
+          />
 
-          <Card className="border-2">
-            <CardContent className="p-3 sm:p-4 md:p-6">
-              <div className="flex items-center justify-between">
-                <div className="min-w-0 flex-1">
-                  <p className="xs:text-xs text-muted-foreground truncate text-[10px] font-medium">Assigned</p>
-                  <p className="text-foreground mt-1 text-lg font-bold sm:text-xl md:mt-2 md:text-3xl">
-                    {stats.assigned}
-                  </p>
-                </div>
-                <div className="ml-1 flex-shrink-0 rounded-lg bg-purple-100 p-1.5 sm:p-2 md:p-3 dark:bg-purple-900/30">
-                  <Package className="h-4 w-4 text-purple-600 sm:h-5 sm:w-5 md:h-6 md:w-6 dark:text-purple-400" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <StatCard
+            title="Assigned"
+            value={stats.assigned}
+            icon={Package}
+            iconBgColor="bg-purple-100 dark:bg-purple-900/30"
+            iconColor="text-purple-600 dark:text-purple-400"
+          />
 
-          <Card className="border-2">
-            <CardContent className="p-3 sm:p-4 md:p-6">
-              <div className="flex items-center justify-between">
-                <div className="min-w-0 flex-1">
-                  <p className="xs:text-xs text-muted-foreground truncate text-[10px] font-medium">Maintenance</p>
-                  <p className="text-foreground mt-1 text-lg font-bold sm:text-xl md:mt-2 md:text-3xl">
-                    {stats.maintenance}
-                  </p>
-                </div>
-                <div className="ml-1 flex-shrink-0 rounded-lg bg-yellow-100 p-1.5 sm:p-2 md:p-3 dark:bg-yellow-900/30">
-                  <Package className="h-4 w-4 text-yellow-600 sm:h-5 sm:w-5 md:h-6 md:w-6 dark:text-yellow-400" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <StatCard
+            title="Maintenance"
+            value={stats.maintenance}
+            icon={Package}
+            iconBgColor="bg-yellow-100 dark:bg-yellow-900/30"
+            iconColor="text-yellow-600 dark:text-yellow-400"
+          />
 
           <Card
             className="cursor-pointer border-2 transition-all hover:border-orange-300 hover:shadow-lg dark:hover:border-orange-700"
@@ -3209,7 +3179,7 @@ export function AdminAssetsContent({
 
       {/* Assign Dialog */}
       <Dialog open={isAssignDialogOpen} onOpenChange={setIsAssignDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] w-[95vw] max-w-2xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{currentAssignment ? "Reassign" : "Assign"} Asset</DialogTitle>
             <DialogDescription>

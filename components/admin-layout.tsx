@@ -2,6 +2,7 @@ import { AdminSidebar } from "@/components/admin-sidebar"
 import { AdminContextRibbon } from "@/components/admin-context-ribbon"
 import { SidebarContent } from "@/components/sidebar-content"
 import { createClient } from "@/lib/supabase/server"
+import { resolveAdminScope } from "@/lib/admin/rbac"
 import { redirect } from "next/navigation"
 
 interface AdminLayoutProps {
@@ -19,10 +20,8 @@ export async function AdminLayout({ children }: AdminLayoutProps) {
   // Fetch user profile with role
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", data.user.id).single()
 
-  // Check if user has admin privileges
-  // Role hierarchy: developer > super_admin > admin > employee > visitor
-  // Department leads also get admin access via is_department_lead
-  if (!profile || (!["developer", "super_admin", "admin"].includes(profile.role) && !profile.is_department_lead)) {
+  const scope = await resolveAdminScope(supabase as any, data.user.id)
+  if (!profile || !scope) {
     redirect("/dashboard")
   }
 

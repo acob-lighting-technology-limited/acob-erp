@@ -3,15 +3,17 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
+import { PageHeader, PageWrapper } from "@/components/layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ArrowLeft, Plus, Trash2, FileText } from "lucide-react"
-import Link from "next/link"
+import { Plus, Trash2, FileText } from "lucide-react"
+import { StatCard } from "@/components/ui/stat-card"
 import { toast } from "sonner"
+import { FormFieldGroup } from "@/components/ui/patterns"
 
 interface InvoiceItem {
   id: string
@@ -172,20 +174,13 @@ export default function NewInvoicePage() {
   const totals = calculateTotals()
 
   return (
-    <div className="container mx-auto space-y-6 p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="mb-1 flex items-center gap-2">
-            <Link href="/admin/finance/invoices" className="text-muted-foreground hover:text-foreground">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-            <h1 className="text-3xl font-bold">Create Invoice</h1>
-          </div>
-          <p className="text-muted-foreground">Create a new invoice for your customer</p>
-        </div>
-      </div>
-
+    <PageWrapper maxWidth="full" background="gradient">
+      <PageHeader
+        title="Create Invoice"
+        description="Create a new invoice for your customer"
+        icon={FileText}
+        backLink={{ href: "/admin/finance/invoices", label: "Back to Invoices" }}
+      />
       <form onSubmit={(e) => handleSubmit(e, "draft")}>
         <div className="grid gap-6 lg:grid-cols-3">
           {/* Main Content */}
@@ -198,8 +193,7 @@ export default function NewInvoicePage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="customer_name">Customer Name *</Label>
+                  <FormFieldGroup label="Customer Name *">
                     <Input
                       id="customer_name"
                       value={formData.customer_name}
@@ -207,7 +201,7 @@ export default function NewInvoicePage() {
                       placeholder="Company or individual name"
                       required
                     />
-                  </div>
+                  </FormFieldGroup>
                   <div className="space-y-2">
                     <Label htmlFor="customer_email">Email</Label>
                     <Input
@@ -385,6 +379,7 @@ export default function NewInvoicePage() {
                 <CardTitle>Summary</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
+                <StatCard title="Invoice Total" value={formatCurrency(totals.total)} icon={FileText} />
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Subtotal</span>
                   <span>{formatCurrency(totals.subtotal)}</span>
@@ -419,6 +414,6 @@ export default function NewInvoicePage() {
           </div>
         </div>
       </form>
-    </div>
+    </PageWrapper>
   )
 }

@@ -2,17 +2,18 @@
 
 import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { StatCard } from "@/components/ui/stat-card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
-import { ArrowLeft, Plus, Pencil, Trash2, Warehouse } from "lucide-react"
-import Link from "next/link"
+import { Plus, Pencil, Trash2, Warehouse } from "lucide-react"
+import { EmptyState, FormFieldGroup } from "@/components/ui/patterns"
 import { toast } from "sonner"
 
 interface WarehouseData {
@@ -66,14 +67,12 @@ export default function WarehousesPage() {
         if (error) throw error
         toast.success("Warehouse updated")
       } else {
-        const { error } = await supabase
-          .from("warehouses")
-          .insert({
-            name: formData.name,
-            code: formData.code,
-            address: formData.address || null,
-            is_active: formData.is_active,
-          })
+        const { error } = await supabase.from("warehouses").insert({
+          name: formData.name,
+          code: formData.code,
+          address: formData.address || null,
+          is_active: formData.is_active,
+        })
         if (error) throw error
         toast.success("Warehouse created")
       }
@@ -111,18 +110,20 @@ export default function WarehousesPage() {
     setIsDialogOpen(true)
   }
 
+  const stats = {
+    total: warehouses.length,
+    active: warehouses.filter((warehouse) => warehouse.is_active).length,
+    inactive: warehouses.filter((warehouse) => !warehouse.is_active).length,
+  }
+
   return (
-    <div className="container mx-auto space-y-6 p-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="mb-1 flex items-center gap-2">
-            <Link href="/admin/inventory" className="text-muted-foreground hover:text-foreground">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-            <h1 className="text-3xl font-bold">Warehouses</h1>
-          </div>
-          <p className="text-muted-foreground">Manage storage locations</p>
-        </div>
+    <AdminTablePage
+      title="Warehouses"
+      description="Manage storage locations"
+      icon={Warehouse}
+      backLinkHref="/admin/inventory"
+      backLinkLabel="Back to Inventory"
+      actions={
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button onClick={openCreate}>
@@ -130,24 +131,22 @@ export default function WarehousesPage() {
               Add Warehouse
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-h-[90vh] w-[95vw] max-w-lg overflow-y-auto">
             <form onSubmit={handleSubmit}>
               <DialogHeader>
                 <DialogTitle>{editing ? "Edit" : "Create"} Warehouse</DialogTitle>
               </DialogHeader>
               <div className="grid gap-4 py-4">
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Name</Label>
+                  <FormFieldGroup label="Name">
                     <Input
                       id="name"
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                       required
                     />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="code">Code</Label>
+                  </FormFieldGroup>
+                  <FormFieldGroup label="Code">
                     <Input
                       id="code"
                       value={formData.code}
@@ -155,25 +154,25 @@ export default function WarehousesPage() {
                       placeholder="e.g., WH-001"
                       required
                     />
-                  </div>
+                  </FormFieldGroup>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="address">Address</Label>
+                <FormFieldGroup label="Address">
                   <Textarea
                     id="address"
                     value={formData.address}
                     onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                     rows={2}
                   />
-                </div>
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="is_active">Active</Label>
-                  <Switch
-                    id="is_active"
-                    checked={formData.is_active}
-                    onCheckedChange={(v) => setFormData({ ...formData, is_active: v })}
-                  />
-                </div>
+                </FormFieldGroup>
+                <FormFieldGroup label="Active">
+                  <div className="flex items-center justify-end">
+                    <Switch
+                      id="is_active"
+                      checked={formData.is_active}
+                      onCheckedChange={(v) => setFormData({ ...formData, is_active: v })}
+                    />
+                  </div>
+                </FormFieldGroup>
               </div>
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
@@ -184,8 +183,15 @@ export default function WarehousesPage() {
             </form>
           </DialogContent>
         </Dialog>
-      </div>
-
+      }
+      stats={
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 md:gap-4">
+          <StatCard title="Warehouses" value={stats.total} icon={Warehouse} />
+          <StatCard title="Active" value={stats.active} icon={Warehouse} />
+          <StatCard title="Inactive" value={stats.inactive} icon={Warehouse} />
+        </div>
+      }
+    >
       <Card>
         <CardHeader>
           <CardTitle>All Warehouses</CardTitle>
@@ -197,49 +203,48 @@ export default function WarehousesPage() {
               <div className="border-primary h-8 w-8 animate-spin rounded-full border-4 border-t-transparent"></div>
             </div>
           ) : warehouses.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <Warehouse className="text-muted-foreground mb-4 h-12 w-12" />
-              <h3 className="font-semibold">No warehouses yet</h3>
-            </div>
+            <EmptyState title="No warehouses yet" icon={Warehouse} description="Add your first warehouse location." />
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Code</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Address</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {warehouses.map((wh) => (
-                  <TableRow key={wh.id}>
-                    <TableCell className="font-mono">{wh.code}</TableCell>
-                    <TableCell className="font-medium">{wh.name}</TableCell>
-                    <TableCell className="text-muted-foreground">{wh.address || "—"}</TableCell>
-                    <TableCell>
-                      <Badge variant={wh.is_active ? "default" : "secondary"}>
-                        {wh.is_active ? "Active" : "Inactive"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button variant="ghost" size="icon" onClick={() => openEdit(wh)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDelete(wh)}>
-                          <Trash2 className="text-destructive h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Code</TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Address</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {warehouses.map((wh) => (
+                    <TableRow key={wh.id}>
+                      <TableCell className="font-mono">{wh.code}</TableCell>
+                      <TableCell className="font-medium">{wh.name}</TableCell>
+                      <TableCell className="text-muted-foreground">{wh.address || "—"}</TableCell>
+                      <TableCell>
+                        <Badge variant={wh.is_active ? "default" : "secondary"}>
+                          {wh.is_active ? "Active" : "Inactive"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button variant="ghost" size="icon" onClick={() => openEdit(wh)}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => handleDelete(wh)}>
+                            <Trash2 className="text-destructive h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>
-    </div>
+    </AdminTablePage>
   )
 }

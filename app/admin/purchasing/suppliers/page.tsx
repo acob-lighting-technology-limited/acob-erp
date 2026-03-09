@@ -5,15 +5,16 @@ import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
-import { ArrowLeft, Plus, Pencil, Trash2, Users, Search, Eye } from "lucide-react"
+import { Plus, Pencil, Trash2, Users, Search, Eye, Building2, CheckCircle2, Ban } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
+import { AdminTablePage } from "@/components/admin/admin-table-page"
+import { StatCard } from "@/components/ui/stat-card"
+import { EmptyState, FormFieldGroup, ListToolbar, StatusBadge } from "@/components/ui/patterns"
 
 interface Supplier {
   id: string
@@ -132,19 +133,20 @@ export default function SuppliersPage() {
       s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       s.code.toLowerCase().includes(searchQuery.toLowerCase())
   )
+  const stats = {
+    total: suppliers.length,
+    active: suppliers.filter((s) => s.is_active).length,
+    inactive: suppliers.filter((s) => !s.is_active).length,
+  }
 
   return (
-    <div className="container mx-auto space-y-6 p-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="mb-1 flex items-center gap-2">
-            <Link href="/admin/purchasing" className="text-muted-foreground hover:text-foreground">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-            <h1 className="text-3xl font-bold">Suppliers</h1>
-          </div>
-          <p className="text-muted-foreground">Manage your vendors and suppliers</p>
-        </div>
+    <AdminTablePage
+      title="Suppliers"
+      description="Manage your vendors and suppliers"
+      icon={Users}
+      backLinkHref="/admin/purchasing"
+      backLinkLabel="Back to Purchasing"
+      actions={
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button onClick={openCreate}>
@@ -152,70 +154,65 @@ export default function SuppliersPage() {
               Add Supplier
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-lg">
+          <DialogContent className="max-h-[90vh] w-[95vw] max-w-lg overflow-y-auto">
             <form onSubmit={handleSubmit}>
               <DialogHeader>
                 <DialogTitle>{editing ? "Edit" : "Add"} Supplier</DialogTitle>
               </DialogHeader>
               <div className="grid gap-4 py-4">
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label>Name *</Label>
+                  <FormFieldGroup label="Name *">
                     <Input
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                       required
                     />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Code *</Label>
+                  </FormFieldGroup>
+                  <FormFieldGroup label="Code *">
                     <Input
                       value={formData.code}
                       onChange={(e) => setFormData({ ...formData, code: e.target.value })}
                       placeholder="e.g., SUP-001"
                       required
                     />
-                  </div>
+                  </FormFieldGroup>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label>Email</Label>
+                  <FormFieldGroup label="Email">
                     <Input
                       type="email"
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Phone</Label>
+                  </FormFieldGroup>
+                  <FormFieldGroup label="Phone">
                     <Input
                       value={formData.phone}
                       onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     />
-                  </div>
+                  </FormFieldGroup>
                 </div>
-                <div className="space-y-2">
-                  <Label>Contact Person</Label>
+                <FormFieldGroup label="Contact Person">
                   <Input
                     value={formData.contact_person}
                     onChange={(e) => setFormData({ ...formData, contact_person: e.target.value })}
                   />
-                </div>
-                <div className="space-y-2">
-                  <Label>Address</Label>
+                </FormFieldGroup>
+                <FormFieldGroup label="Address">
                   <Textarea
                     value={formData.address}
                     onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                     rows={2}
                   />
-                </div>
-                <div className="flex items-center justify-between">
-                  <Label>Active</Label>
-                  <Switch
-                    checked={formData.is_active}
-                    onCheckedChange={(v) => setFormData({ ...formData, is_active: v })}
-                  />
-                </div>
+                </FormFieldGroup>
+                <FormFieldGroup label="Active">
+                  <div className="flex items-center justify-end">
+                    <Switch
+                      checked={formData.is_active}
+                      onCheckedChange={(v) => setFormData({ ...formData, is_active: v })}
+                    />
+                  </div>
+                </FormFieldGroup>
               </div>
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
@@ -226,19 +223,42 @@ export default function SuppliersPage() {
             </form>
           </DialogContent>
         </Dialog>
-      </div>
-
-      {/* Search */}
-      <div className="relative max-w-md">
-        <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-        <Input
-          placeholder="Search suppliers..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-9"
+      }
+      stats={
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 md:gap-4">
+          <StatCard title="Total Suppliers" value={stats.total} icon={Building2} />
+          <StatCard
+            title="Active"
+            value={stats.active}
+            icon={CheckCircle2}
+            iconBgColor="bg-green-100 dark:bg-green-900/30"
+            iconColor="text-green-600 dark:text-green-400"
+          />
+          <StatCard
+            title="Inactive"
+            value={stats.inactive}
+            icon={Ban}
+            iconBgColor="bg-slate-200 dark:bg-slate-800"
+            iconColor="text-slate-700 dark:text-slate-300"
+          />
+        </div>
+      }
+      filters={
+        <ListToolbar
+          search={
+            <div className="relative w-full sm:max-w-md">
+              <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+              <Input
+                placeholder="Search suppliers..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+          }
         />
-      </div>
-
+      }
+    >
       <Card>
         <CardHeader>
           <CardTitle>All Suppliers</CardTitle>
@@ -250,56 +270,57 @@ export default function SuppliersPage() {
               <div className="border-primary h-8 w-8 animate-spin rounded-full border-4 border-t-transparent"></div>
             </div>
           ) : filtered.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <Users className="text-muted-foreground mb-4 h-12 w-12" />
-              <h3 className="font-semibold">No suppliers yet</h3>
-            </div>
+            <EmptyState
+              title="No suppliers yet"
+              description="Add your first supplier to start managing vendors."
+              icon={Users}
+            />
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Code</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Contact</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.map((s) => (
-                  <TableRow key={s.id}>
-                    <TableCell className="font-mono">{s.code}</TableCell>
-                    <TableCell className="font-medium">{s.name}</TableCell>
-                    <TableCell className="text-muted-foreground">{s.contact_person || "—"}</TableCell>
-                    <TableCell className="text-muted-foreground">{s.email || "—"}</TableCell>
-                    <TableCell>
-                      <Badge variant={s.is_active ? "default" : "secondary"}>
-                        {s.is_active ? "Active" : "Inactive"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Link href={`/admin/purchasing/suppliers/${s.id}`}>
-                          <Button variant="ghost" size="icon">
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        </Link>
-                        <Button variant="ghost" size="icon" onClick={() => openEdit(s)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDelete(s)}>
-                          <Trash2 className="text-destructive h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Code</TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Contact</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {filtered.map((s) => (
+                    <TableRow key={s.id}>
+                      <TableCell className="font-mono">{s.code}</TableCell>
+                      <TableCell className="font-medium">{s.name}</TableCell>
+                      <TableCell className="text-muted-foreground">{s.contact_person || "—"}</TableCell>
+                      <TableCell className="text-muted-foreground">{s.email || "—"}</TableCell>
+                      <TableCell>
+                        <StatusBadge status={s.is_active ? "active" : "inactive"} />
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Link href={`/admin/purchasing/suppliers/${s.id}`}>
+                            <Button variant="ghost" size="icon">
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </Link>
+                          <Button variant="ghost" size="icon" onClick={() => openEdit(s)}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => handleDelete(s)}>
+                            <Trash2 className="text-destructive h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>
-    </div>
+    </AdminTablePage>
   )
 }

@@ -178,7 +178,7 @@ export function AdminCorrespondenceContent({
 
   return (
     <div className="space-y-6 p-6">
-      <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-4 md:grid-cols-5">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-5 md:gap-4">
         <Card>
           <CardHeader>
             <CardTitle className="text-sm">Total</CardTitle>
@@ -428,4 +428,3 @@ export function AdminCorrespondenceContent({
     </div>
   )
 }
-

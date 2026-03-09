@@ -4,8 +4,10 @@ import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Clock, Calendar } from "lucide-react"
-import Link from "next/link"
+import { Clock, Calendar } from "lucide-react"
+import { PageHeader } from "@/components/layout/page-header"
+import { StatCard } from "@/components/ui/stat-card"
+import { EmptyState } from "@/components/ui/patterns"
 
 interface AttendanceRecord {
   id: string
@@ -70,52 +72,18 @@ export default function AttendanceRecordsPage() {
 
   return (
     <div className="container mx-auto p-6">
-      <div className="mb-6">
-        <Link
-          href="/dashboard/attendance"
-          className="text-muted-foreground hover:text-foreground flex items-center gap-2"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to Attendance
-        </Link>
-      </div>
-
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">My Attendance Records</h1>
-          <p className="text-muted-foreground">Last 30 days of attendance history</p>
-        </div>
-      </div>
+      <PageHeader
+        title="My Attendance Records"
+        description="Last 30 days of attendance history"
+        backLink={{ href: "/dashboard/attendance", label: "Back to Attendance" }}
+        className="mb-6"
+      />
 
       {/* Summary Cards */}
-      <div className="mb-6 grid grid-cols-2 gap-2 sm:gap-3 md:gap-4 md:grid-cols-3">
-        <Card>
-          <CardHeader className="pb-1 px-3 pt-3 sm:px-6 sm:pt-6 sm:pb-2">
-            <CardTitle className="text-sm font-medium">Total Days</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-lg font-bold sm:text-2xl">{records.length}</div>
-            <p className="text-muted-foreground text-xs">Days recorded</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-1 px-3 pt-3 sm:px-6 sm:pt-6 sm:pb-2">
-            <CardTitle className="text-sm font-medium">Present Days</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-lg font-bold sm:text-2xl">{presentDays}</div>
-            <p className="text-muted-foreground text-xs">Full attendance</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-1 px-3 pt-3 sm:px-6 sm:pt-6 sm:pb-2">
-            <CardTitle className="text-sm font-medium">Total Hours</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-lg font-bold sm:text-2xl">{totalHours.toFixed(1)}</div>
-            <p className="text-muted-foreground text-xs">Hours worked</p>
-          </CardContent>
-        </Card>
+      <div className="mb-6 grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 md:gap-4">
+        <StatCard title="Total Days" value={records.length} description="Days recorded" icon={Calendar} />
+        <StatCard title="Present Days" value={presentDays} description="Full attendance" icon={Calendar} />
+        <StatCard title="Total Hours" value={totalHours.toFixed(1)} description="Hours worked" icon={Clock} />
       </div>
 
       {/* Records List */}
@@ -130,7 +98,12 @@ export default function AttendanceRecordsPage() {
           {loading ? (
             <div className="py-8 text-center">Loading...</div>
           ) : records.length === 0 ? (
-            <div className="text-muted-foreground py-8 text-center">No attendance records found</div>
+            <EmptyState
+              title="No attendance records found"
+              description="Attendance entries for the selected period will appear here."
+              icon={Calendar}
+              className="border-0"
+            />
           ) : (
             <div className="space-y-2">
               <div className="bg-muted grid grid-cols-5 gap-4 rounded-lg px-4 py-2 text-sm font-medium">
@@ -164,4 +137,3 @@ export default function AttendanceRecordsPage() {
     </div>
   )
 }
-

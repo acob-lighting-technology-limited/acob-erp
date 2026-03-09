@@ -12,6 +12,7 @@ import { SearchableSelect } from "@/components/ui/searchable-select"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
+import { StatCard } from "@/components/ui/stat-card"
 import {
   Briefcase,
   Search,
@@ -31,6 +32,7 @@ import {
 import type { UserRole } from "@/types/database"
 import { getRoleDisplayName, getRoleBadgeColor } from "@/lib/permissions"
 import { formatName } from "@/lib/utils"
+import { EmptyState } from "@/components/ui/patterns"
 
 interface Profile {
   id: string
@@ -206,62 +208,29 @@ export default function AdminJobDescriptionsPage() {
         </div>
       }
       stats={
-        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-4 md:grid-cols-4">
-          <Card className="border-2">
-            <CardContent className="p-3 sm:p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-muted-foreground text-sm font-medium">Total employee</p>
-                  <p className="text-foreground mt-1 text-lg font-bold sm:mt-2 sm:text-3xl">{stats.total}</p>
-                </div>
-                <div className="rounded-lg bg-blue-100 p-3 dark:bg-blue-900/30">
-                  <User className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-2">
-            <CardContent className="p-3 sm:p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-muted-foreground text-sm font-medium">Completed</p>
-                  <p className="text-foreground mt-1 text-lg font-bold sm:mt-2 sm:text-3xl">{stats.completed}</p>
-                </div>
-                <div className="rounded-lg bg-green-100 p-3 dark:bg-green-900/30">
-                  <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-2">
-            <CardContent className="p-3 sm:p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-muted-foreground text-sm font-medium">Pending</p>
-                  <p className="text-foreground mt-1 text-lg font-bold sm:mt-2 sm:text-3xl">{stats.pending}</p>
-                </div>
-                <div className="rounded-lg bg-orange-100 p-3 dark:bg-orange-900/30">
-                  <XCircle className="h-6 w-6 text-orange-600 dark:text-orange-400" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-2">
-            <CardContent className="p-3 sm:p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-muted-foreground text-sm font-medium">Updated This Month</p>
-                  <p className="text-foreground mt-1 text-lg font-bold sm:mt-2 sm:text-3xl">{stats.thisMonth}</p>
-                </div>
-                <div className="rounded-lg bg-purple-100 p-3 dark:bg-purple-900/30">
-                  <Calendar className="h-6 w-6 text-purple-600 dark:text-purple-400" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4 md:gap-4">
+          <StatCard title="Total employee" value={stats.total} icon={User} />
+          <StatCard
+            title="Completed"
+            value={stats.completed}
+            icon={CheckCircle}
+            iconBgColor="bg-green-100 dark:bg-green-900/30"
+            iconColor="text-green-600 dark:text-green-400"
+          />
+          <StatCard
+            title="Pending"
+            value={stats.pending}
+            icon={XCircle}
+            iconBgColor="bg-orange-100 dark:bg-orange-900/30"
+            iconColor="text-orange-600 dark:text-orange-400"
+          />
+          <StatCard
+            title="Updated This Month"
+            value={stats.thisMonth}
+            icon={Calendar}
+            iconBgColor="bg-purple-100 dark:bg-purple-900/30"
+            iconColor="text-purple-600 dark:text-purple-400"
+          />
         </div>
       }
       filters={
@@ -457,13 +426,15 @@ export default function AdminJobDescriptionsPage() {
       ) : (
         <Card className="border-2">
           <CardContent className="p-12 text-center">
-            <Briefcase className="text-muted-foreground mx-auto mb-4 h-16 w-16" />
-            <h3 className="text-foreground mb-2 text-xl font-semibold">No employee Found</h3>
-            <p className="text-muted-foreground">
-              {searchQuery || departmentFilter !== "all" || employeeFilter !== "all" || statusFilter !== "all"
-                ? "No employee matches your filters"
-                : "No employee members found"}
-            </p>
+            <EmptyState
+              icon={Briefcase}
+              title="No employee found"
+              description={
+                searchQuery || departmentFilter !== "all" || employeeFilter !== "all" || statusFilter !== "all"
+                  ? "No employee matches your filters."
+                  : "No employee members found."
+              }
+            />
           </CardContent>
         </Card>
       )}
@@ -541,10 +512,12 @@ export default function AdminJobDescriptionsPage() {
                 </div>
               </div>
             ) : (
-              <div className="text-muted-foreground py-12 text-center">
-                <XCircle className="mx-auto mb-4 h-12 w-12" />
-                <p>No job description has been added yet.</p>
-              </div>
+              <EmptyState
+                title="No job description has been added yet"
+                description="This employee has not submitted a role description."
+                icon={XCircle}
+                className="border-0"
+              />
             )}
           </div>
         </DialogContent>
@@ -552,4 +525,3 @@ export default function AdminJobDescriptionsPage() {
     </AdminTablePage>
   )
 }
-

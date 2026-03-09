@@ -1,14 +1,14 @@
 "use client"
 
 import { useState } from "react"
+import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { ArrowLeft, Building2, Save } from "lucide-react"
-import Link from "next/link"
+import { Building2, Save } from "lucide-react"
 import { toast } from "sonner"
+import { FormFieldGroup } from "@/components/ui/patterns"
 
 export default function CompanySettingsPage() {
   const [saving, setSaving] = useState(false)
@@ -27,8 +27,8 @@ export default function CompanySettingsPage() {
     timezone: "Africa/Lagos",
   })
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
+  async function handleSubmit(e?: React.FormEvent | React.MouseEvent) {
+    e?.preventDefault()
     setSaving(true)
 
     try {
@@ -42,23 +42,19 @@ export default function CompanySettingsPage() {
   }
 
   return (
-    <div className="container mx-auto space-y-6 p-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="mb-1 flex items-center gap-2">
-            <Link href="/admin/settings" className="text-muted-foreground hover:text-foreground">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-            <h1 className="text-3xl font-bold">Company Settings</h1>
-          </div>
-          <p className="text-muted-foreground">Manage your organization details</p>
-        </div>
+    <AdminTablePage
+      title="Company Settings"
+      description="Manage your organization details"
+      icon={Building2}
+      backLinkHref="/admin/settings"
+      backLinkLabel="Back to Settings"
+      actions={
         <Button onClick={handleSubmit} disabled={saving}>
           <Save className="mr-2 h-4 w-4" />
           Save Changes
         </Button>
-      </div>
-
+      }
+    >
       <form onSubmit={handleSubmit} className="space-y-6">
         <Card>
           <CardHeader>
@@ -70,38 +66,34 @@ export default function CompanySettingsPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Company Name</Label>
+              <FormFieldGroup label="Company Name">
                 <Input
                   value={formData.company_name}
                   onChange={(e) => setFormData({ ...formData, company_name: e.target.value })}
                 />
-              </div>
-              <div className="space-y-2">
-                <Label>Legal Name</Label>
+              </FormFieldGroup>
+              <FormFieldGroup label="Legal Name">
                 <Input
                   value={formData.legal_name}
                   onChange={(e) => setFormData({ ...formData, legal_name: e.target.value })}
                 />
-              </div>
+              </FormFieldGroup>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Registration Number</Label>
+              <FormFieldGroup label="Registration Number">
                 <Input
                   value={formData.registration_number}
                   onChange={(e) => setFormData({ ...formData, registration_number: e.target.value })}
                   placeholder="Company registration number"
                 />
-              </div>
-              <div className="space-y-2">
-                <Label>Tax ID</Label>
+              </FormFieldGroup>
+              <FormFieldGroup label="Tax ID">
                 <Input
                   value={formData.tax_id}
                   onChange={(e) => setFormData({ ...formData, tax_id: e.target.value })}
                   placeholder="Tax identification number"
                 />
-              </div>
+              </FormFieldGroup>
             </div>
           </CardContent>
         </Card>
@@ -112,47 +104,41 @@ export default function CompanySettingsPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Email</Label>
+              <FormFieldGroup label="Email">
                 <Input
                   type="email"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 />
-              </div>
-              <div className="space-y-2">
-                <Label>Phone</Label>
+              </FormFieldGroup>
+              <FormFieldGroup label="Phone">
                 <Input
                   value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                   placeholder="+234..."
                 />
-              </div>
+              </FormFieldGroup>
             </div>
-            <div className="space-y-2">
-              <Label>Website</Label>
+            <FormFieldGroup label="Website">
               <Input value={formData.website} onChange={(e) => setFormData({ ...formData, website: e.target.value })} />
-            </div>
-            <div className="space-y-2">
-              <Label>Address</Label>
+            </FormFieldGroup>
+            <FormFieldGroup label="Address">
               <Textarea
                 value={formData.address}
                 onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                 rows={2}
               />
-            </div>
+            </FormFieldGroup>
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label>City</Label>
+              <FormFieldGroup label="City">
                 <Input value={formData.city} onChange={(e) => setFormData({ ...formData, city: e.target.value })} />
-              </div>
-              <div className="space-y-2">
-                <Label>Country</Label>
+              </FormFieldGroup>
+              <FormFieldGroup label="Country">
                 <Input
                   value={formData.country}
                   onChange={(e) => setFormData({ ...formData, country: e.target.value })}
                 />
-              </div>
+              </FormFieldGroup>
             </div>
           </CardContent>
         </Card>
@@ -163,24 +149,22 @@ export default function CompanySettingsPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Default Currency</Label>
+              <FormFieldGroup label="Default Currency">
                 <Input
                   value={formData.currency}
                   onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
                 />
-              </div>
-              <div className="space-y-2">
-                <Label>Timezone</Label>
+              </FormFieldGroup>
+              <FormFieldGroup label="Timezone">
                 <Input
                   value={formData.timezone}
                   onChange={(e) => setFormData({ ...formData, timezone: e.target.value })}
                 />
-              </div>
+              </FormFieldGroup>
             </div>
           </CardContent>
         </Card>
       </form>
-    </div>
+    </AdminTablePage>
   )
 }

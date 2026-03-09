@@ -26,6 +26,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { StatCard } from "@/components/ui/stat-card"
+import { EmptyState } from "@/components/ui/patterns"
 
 export interface Task {
   id: string
@@ -796,7 +797,12 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
                         ))}
                       </div>
                     ) : (
-                      <p className="text-muted-foreground py-4 text-center text-sm">No updates yet</p>
+                      <EmptyState
+                        title="No updates yet"
+                        description="Task comments and status updates will appear here."
+                        icon={MessageSquare}
+                        className="border-0 p-4"
+                      />
                     )}
                   </CardContent>
                 </Card>

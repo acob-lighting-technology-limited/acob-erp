@@ -12,6 +12,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createClient as createAdminClient } from "@supabase/supabase-js"
+import { applyAssignableStatusFilter } from "@/lib/workforce/assignment-policy"
 
 type StepResult = {
   step: string
@@ -105,10 +106,10 @@ async function testHelpDesk(admin: any, body: any): Promise<{ ok: boolean; steps
     }
 
     // Step 3: Find department lead
-    const { data: profiles } = await admin
-      .from("profiles")
-      .select("id, full_name, role, is_department_lead, lead_departments, department")
-      .eq("employment_status", "active")
+    const { data: profiles } = await applyAssignableStatusFilter(
+      admin.from("profiles").select("id, full_name, role, is_department_lead, lead_departments, department"),
+      { allowLegacyNullStatus: false }
+    )
 
     const lead = (profiles || []).find((p: any) => {
       const managed = Array.isArray(p.lead_departments) ? p.lead_departments : []

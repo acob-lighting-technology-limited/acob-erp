@@ -7,9 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { ArrowLeft, Printer, CheckCircle, Package } from "lucide-react"
-import Link from "next/link"
+import { Printer, CheckCircle, Package } from "lucide-react"
 import { toast } from "sonner"
+import { PageHeader } from "@/components/layout/page-header"
 
 interface PurchaseOrder {
   id: string
@@ -108,39 +108,35 @@ export default function PurchaseOrderDetailPage() {
 
   return (
     <div className="container mx-auto space-y-6 p-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="mb-1 flex items-center gap-2">
-            <Link href="/admin/purchasing/orders" className="text-muted-foreground hover:text-foreground">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-            <h1 className="text-3xl font-bold">{order.po_number}</h1>
-            <Badge variant={statusColors[order.status] as any} className="ml-2 capitalize">
+      <PageHeader
+        title={order.po_number}
+        description={order.supplier_name || "Purchase order details"}
+        backLink={{ href: "/admin/purchasing/orders", label: "Back to Orders" }}
+        actions={
+          <>
+            <Badge variant={statusColors[order.status] as any} className="capitalize">
               {order.status}
             </Badge>
-          </div>
-          <p className="text-muted-foreground">{order.supplier_name}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          {order.status === "draft" && <Button onClick={() => updateStatus("pending")}>Submit for Approval</Button>}
-          {order.status === "pending" && (
-            <Button onClick={() => updateStatus("approved")}>
-              <CheckCircle className="mr-2 h-4 w-4" />
-              Approve
+            {order.status === "draft" && <Button onClick={() => updateStatus("pending")}>Submit for Approval</Button>}
+            {order.status === "pending" && (
+              <Button onClick={() => updateStatus("approved")}>
+                <CheckCircle className="mr-2 h-4 w-4" />
+                Approve
+              </Button>
+            )}
+            {order.status === "approved" && (
+              <Button onClick={() => updateStatus("received")}>
+                <Package className="mr-2 h-4 w-4" />
+                Mark as Received
+              </Button>
+            )}
+            <Button variant="outline" onClick={() => window.print()}>
+              <Printer className="mr-2 h-4 w-4" />
+              Print
             </Button>
-          )}
-          {order.status === "approved" && (
-            <Button onClick={() => updateStatus("received")}>
-              <Package className="mr-2 h-4 w-4" />
-              Mark as Received
-            </Button>
-          )}
-          <Button variant="outline" onClick={() => window.print()}>
-            <Printer className="mr-2 h-4 w-4" />
-            Print
-          </Button>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">

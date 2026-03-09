@@ -13,23 +13,23 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import Link from "next/link"
+import { PageHeader } from "@/components/layout/page-header"
 
 // Validation Schema
-const formSchema = z
-  .object({
-    first_name: z.string().min(2, "First name must be at least 2 characters"),
-    last_name: z.string().min(2, "Last name must be at least 2 characters"),
-    other_names: z.string().optional(),
-    department: z.string().min(1, "Please select a department"),
-    other_department: z.string().optional(),
-    company_role: z.string().min(2, "Company role is required"),
-    personal_email: z.string().email("Invalid email address"),
-    phone_number: z.string().regex(/^0[789][01]\d{8}$/, "Must be a valid Nigerian phone number (e.g., 08012345678)"),
-    additional_phone_number: z.string().optional(),
-    residential_address: z.string().min(5, "Address is required"),
-    office_location: z.string().min(1, "Office location is required"),
-    honeypot: z.string().optional(),
-  })
+const formSchema = z.object({
+  first_name: z.string().min(2, "First name must be at least 2 characters"),
+  last_name: z.string().min(2, "Last name must be at least 2 characters"),
+  other_names: z.string().optional(),
+  department: z.string().min(1, "Please select a department"),
+  other_department: z.string().optional(),
+  company_role: z.string().min(2, "Company role is required"),
+  personal_email: z.string().email("Invalid email address"),
+  phone_number: z.string().regex(/^0[789][01]\d{8}$/, "Must be a valid Nigerian phone number (e.g., 08012345678)"),
+  additional_phone_number: z.string().optional(),
+  residential_address: z.string().min(5, "Address is required"),
+  office_location: z.string().min(1, "Office location is required"),
+  honeypot: z.string().optional(),
+})
 
 type FormValues = z.infer<typeof formSchema>
 
@@ -175,10 +175,12 @@ export default function EmployeeOnboardingForm() {
               onError={(e) => (e.currentTarget.style.display = "none")}
             />
           </div>
-          <h1 className="text-foreground text-4xl font-extrabold tracking-tight">Employee Onboarding</h1>
-          <p className="text-muted-foreground mx-auto max-w-2xl text-lg">
-            Welcome to the team. Please complete your profile details below to initiate your account setup.
-          </p>
+          <div className="mx-auto max-w-2xl text-left">
+            <PageHeader
+              title="Employee Onboarding"
+              description="Welcome to the team. Please complete your profile details below to initiate your account setup."
+            />
+          </div>
         </div>
 
         <Card className="border-border bg-card overflow-hidden rounded-2xl shadow-2xl">
@@ -343,7 +345,11 @@ export default function EmployeeOnboardingForm() {
                     <label className="text-foreground text-sm font-medium">
                       Office Location <span className="text-destructive">*</span>
                     </label>
-                    <Input className="h-11" placeholder="e.g. Head Office / Lekki Site" {...register("office_location")} />
+                    <Input
+                      className="h-11"
+                      placeholder="e.g. Head Office / Lekki Site"
+                      {...register("office_location")}
+                    />
                     {errors.office_location && (
                       <p className="text-destructive mt-1 text-sm">{errors.office_location.message}</p>
                     )}

@@ -47,6 +47,7 @@ import {
 import { dateValidation } from "@/lib/validation"
 import type { Project, employee } from "./page"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
+import { isAssignableProfile } from "@/lib/workforce/assignment-policy"
 
 interface AdminProjectsContentProps {
   initialProjects: Project[]
@@ -57,9 +58,7 @@ export function AdminProjectsContent({ initialProjects, initialemployee }: Admin
   const router = useRouter()
   const [projects, setProjects] = useState<Project[]>(initialProjects)
   const [employee] = useState<employee[]>(initialemployee)
-  const activeEmployees = employee.filter(
-    (member) => member.employment_status === "active" || !member.employment_status
-  )
+  const activeEmployees = employee.filter((member) => isAssignableProfile(member, { allowLegacyNullStatus: false }))
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
 
@@ -287,7 +286,7 @@ export function AdminProjectsContent({ initialProjects, initialemployee }: Admin
         </Button>
       }
       stats={
-        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-4 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4 md:gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Projects</CardTitle>
@@ -649,4 +648,3 @@ export function AdminProjectsContent({ initialProjects, initialemployee }: Admin
     </AdminTablePage>
   )
 }
-

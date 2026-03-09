@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { AdminHelpDeskContent } from "./management/admin-help-desk-content"
 import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
+import { listAssignableProfiles } from "@/lib/workforce/assignment-policy"
 
 const STAGE_ORDER = [
   "requester_department_lead",
@@ -47,22 +48,14 @@ async function getData() {
     ticketsQuery = ticketsQuery.eq("id", "__none__")
   }
 
-  let employeesQuery = dataClient
-    .from("profiles")
-    .select("id, first_name, last_name, department, employment_status")
-    .order("last_name", { ascending: true })
-  if (departmentScope) {
-    employeesQuery =
-      departmentScope.length > 0
-        ? employeesQuery.in("department", departmentScope)
-        : employeesQuery.eq("id", "__none__")
-  }
-
-  const [{ data: tickets }, { data: employees }] = await Promise.all([ticketsQuery, employeesQuery])
-
-  const activeEmployees = (employees || []).filter(
-    (employee: any) => employee.employment_status === "active" || employee.employment_status == null
-  )
+  const [{ data: tickets }, { data: employees }] = await Promise.all([
+    ticketsQuery,
+    listAssignableProfiles(dataClient, {
+      select: "id, first_name, last_name, department, employment_status",
+      departmentScope,
+      allowLegacyNullStatus: false,
+    }),
+  ])
 
   const requesterIds = Array.from(new Set((tickets || []).map((t: any) => t.requester_id).filter(Boolean)))
   const { data: requesterProfiles } =
@@ -101,22 +94,19 @@ async function getData() {
       normalizeApprovalStage(ticket.current_approval_stage) || pendingStageByTicketId.get(ticket.id) || null,
   }))
 
-  const { data: leadDirectoryRows } = await dataClient
-    .from("profiles")
-    .select("id, full_name, first_name, last_name, role, department, is_department_lead, lead_departments, employment_status")
-    .or("employment_status.eq.active,employment_status.is.null")
-  const leadDirectory = (leadDirectoryRows || [])
-    .filter((profile: any) => profile?.is_department_lead)
-    .map((profile: any) => ({
-      id: profile.id,
-      full_name:
-        profile.full_name ||
-        [profile.first_name, profile.last_name].filter(Boolean).join(" ").trim() ||
-        "Unnamed Lead",
-      role: profile.role || "",
-      department: profile.department || null,
-      lead_departments: Array.isArray(profile.lead_departments) ? profile.lead_departments : [],
-    }))
+  const { data: leadDirectoryRows } = await listAssignableProfiles(dataClient, {
+    select:
+      "id, full_name, first_name, last_name, role, department, is_department_lead, lead_departments, employment_status",
+    leadOnly: true,
+  })
+  const leadDirectory = (leadDirectoryRows || []).map((profile: any) => ({
+    id: profile.id,
+    full_name:
+      profile.full_name || [profile.first_name, profile.last_name].filter(Boolean).join(" ").trim() || "Unnamed Lead",
+    role: profile.role || "",
+    department: profile.department || null,
+    lead_departments: Array.isArray(profile.lead_departments) ? profile.lead_departments : [],
+  }))
 
   const scopedTickets = departmentScope
     ? ticketsWithStage.filter(
@@ -127,7 +117,7 @@ async function getData() {
 
   return {
     tickets: scopedTickets,
-    employees: activeEmployees,
+    employees: employees,
     leadDirectory,
     viewer: {
       id: user.id,

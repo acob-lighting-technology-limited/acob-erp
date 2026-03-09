@@ -1563,7 +1563,7 @@ export function AdminAuditLogsContent({
         </div>
       }
       stats={
-        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-4 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4 md:gap-4">
           <Card className="border-2">
             <CardContent className="p-3 sm:p-6">
               <div className="flex items-center justify-between">
@@ -2110,4 +2110,3 @@ export function AdminAuditLogsContent({
     </AdminTablePage>
   )
 }
-

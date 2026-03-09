@@ -1,5 +1,7 @@
-import { Resend } from "resend"
 import { createClient } from "@/lib/supabase/server"
+import { sendNotificationEmail, DEFAULT_NOTIFICATION_SENDER } from "@/lib/notifications/email-gateway"
+import { withSubjectPrefix } from "@/lib/notifications/subject-policy"
+import { isSystemNotificationChannelEnabled, resolveChannelEligibleUserIds } from "@/lib/notifications/delivery-policy"
 
 interface HelpDeskMailPayload {
   userIds: string[]
@@ -32,11 +34,14 @@ export async function sendHelpDeskMail(payload: HelpDeskMailPayload) {
 
   const overrideRecipient = process.env.HELP_DESK_TEST_RECIPIENT?.trim().toLowerCase()
   if (overrideRecipient) {
-    const resend = new Resend(apiKey)
-    await resend.emails.send({
-      from: "ACOB ERP <notifications@acoblighting.com>",
+    const supabase = await createClient()
+    const systemEnabled = await isSystemNotificationChannelEnabled(supabase, "help_desk", "email")
+    if (!systemEnabled) return
+
+    await sendNotificationEmail({
+      from: DEFAULT_NOTIFICATION_SENDER,
       to: [overrideRecipient],
-      subject: payload.subject,
+      subject: withSubjectPrefix("Help Desk", payload.subject),
       html: buildEmailHtml(payload),
     })
     return
@@ -46,10 +51,17 @@ export async function sendHelpDeskMail(payload: HelpDeskMailPayload) {
   if (!uniqueIds.length) return
 
   const supabase = await createClient()
+  const allowedUserIds = await resolveChannelEligibleUserIds(supabase, {
+    userIds: uniqueIds,
+    notificationKey: "help_desk",
+    channel: "email",
+  })
+  if (!allowedUserIds.length) return
+
   const { data: profiles } = await supabase
     .from("profiles")
     .select("id, company_email, additional_email")
-    .in("id", uniqueIds)
+    .in("id", allowedUserIds)
 
   const recipients = Array.from(
     new Set(
@@ -62,11 +74,10 @@ export async function sendHelpDeskMail(payload: HelpDeskMailPayload) {
 
   if (!recipients.length) return
 
-  const resend = new Resend(apiKey)
-  await resend.emails.send({
-    from: "ACOB ERP <notifications@acoblighting.com>",
+  await sendNotificationEmail({
+    from: DEFAULT_NOTIFICATION_SENDER,
     to: recipients,
-    subject: payload.subject,
+    subject: withSubjectPrefix("Help Desk", payload.subject),
     html: buildEmailHtml(payload),
   })
 }

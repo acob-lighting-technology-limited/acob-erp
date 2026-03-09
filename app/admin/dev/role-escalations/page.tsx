@@ -1,10 +1,11 @@
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
-import { PageHeader, PageWrapper } from "@/components/layout"
+import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { ShieldEllipsis } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { EmptyState } from "@/components/ui/patterns"
 
 function isEscalation(log: any): boolean {
   const text =
@@ -30,14 +31,13 @@ export default async function DevRoleEscalationsPage() {
   const rows = (data || []).filter(isEscalation)
 
   return (
-    <PageWrapper maxWidth="full" background="gradient">
-      <PageHeader
-        title="Role Escalations"
-        description="High-sensitivity role elevation/change stream"
-        icon={ShieldEllipsis}
-        backLink={{ href: "/admin/dev", label: "Back to DEV" }}
-      />
-
+    <AdminTablePage
+      title="Role Escalations"
+      description="High-sensitivity role elevation/change stream"
+      icon={ShieldEllipsis}
+      backLinkHref="/admin/dev"
+      backLinkLabel="Back to DEV"
+    >
       <Card>
         <CardHeader>
           <CardTitle>Escalation Events ({rows.length})</CardTitle>
@@ -62,7 +62,14 @@ export default async function DevRoleEscalationsPage() {
             <TableBody>
               {rows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6}>No role escalations found.</TableCell>
+                  <TableCell colSpan={6}>
+                    <EmptyState
+                      title="No role escalations found"
+                      description="No high-sensitivity role elevation events were detected in the current log window."
+                      icon={ShieldEllipsis}
+                      className="border-0 p-4"
+                    />
+                  </TableCell>
                 </TableRow>
               ) : (
                 rows.map((row: any) => (
@@ -80,6 +87,6 @@ export default async function DevRoleEscalationsPage() {
           </Table>
         </CardContent>
       </Card>
-    </PageWrapper>
+    </AdminTablePage>
   )
 }

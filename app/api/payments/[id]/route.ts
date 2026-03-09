@@ -98,11 +98,11 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     }
 
     const scope = await resolveAdminScope(supabase as any, user.id)
-    const { data: profile } = await supabase.from("profiles").select("is_admin, department").eq("id", user.id).single()
+    const { data: profile } = await supabase.from("profiles").select("department").eq("id", user.id).single()
     const dataClient = getServiceRoleClientOrFallback(supabase as any)
 
-    // Check permissions (admin/lead scope or department member)
-    if (!scope && !profile?.is_admin) {
+    // Check permissions (scoped admin/lead or department member)
+    if (!scope) {
       const { data: payment } = await dataClient
         .from("department_payments")
         .select("department:departments(name), created_by")
@@ -187,7 +187,7 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
     }
 
     const scope = await resolveAdminScope(supabase as any, user.id)
-    const { data: profile } = await supabase.from("profiles").select("is_admin, department").eq("id", user.id).single()
+    const { data: profile } = await supabase.from("profiles").select("department").eq("id", user.id).single()
     const dataClient = getServiceRoleClientOrFallback(supabase as any)
 
     if (scope) {
@@ -201,7 +201,7 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
       if (scopedDepartments && (!paymentDept || !scopedDepartments.includes(paymentDept))) {
         return NextResponse.json({ error: "Forbidden: outside your finance scope" }, { status: 403 })
       }
-    } else if (!profile?.is_admin) {
+    } else {
       const { data: payment } = await dataClient.from("department_payments").select("created_by").eq("id", id).single()
       if (!payment || payment.created_by !== user.id) {
         return NextResponse.json({ error: "Forbidden: You can only delete payments you created" }, { status: 403 })

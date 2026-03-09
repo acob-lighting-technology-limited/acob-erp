@@ -9,6 +9,7 @@ import {
   type Project,
   type UserProfile,
 } from "./management/admin-tasks-content"
+import { listAssignableProfiles } from "@/lib/workforce/assignment-policy"
 
 async function getAdminTasksData() {
   const supabase = await createClient()
@@ -45,20 +46,14 @@ async function getAdminTasksData() {
     .order("created_at", { ascending: false })
 
   // Fetch employee - leads can only see employee in their departments
-  let employeeQuery = dataClient
-    .from("profiles")
-    .select("id, first_name, last_name, company_email, department, employment_status, is_department_lead, lead_departments")
-    .eq("employment_status", "active")
-    .order("last_name", { ascending: true })
-
-  if (departmentScope) {
-    employeeQuery =
-      departmentScope.length > 0 ? employeeQuery.in("department", departmentScope) : employeeQuery.eq("id", "__none__")
-  }
-
   const [tasksResult, employeeResult, projectsResult] = await Promise.all([
     tasksQuery,
-    employeeQuery,
+    listAssignableProfiles(dataClient, {
+      select:
+        "id, first_name, last_name, company_email, department, employment_status, is_department_lead, lead_departments",
+      departmentScope,
+      allowLegacyNullStatus: false,
+    }),
     dataClient.from("projects").select("id, project_name").order("project_name", { ascending: true }),
   ])
 

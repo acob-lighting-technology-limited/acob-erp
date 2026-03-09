@@ -8,12 +8,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Skeleton } from "@/components/ui/skeleton"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { EmptyState } from "@/components/ui/empty-state"
-import { PageHeader, PageWrapper } from "@/components/layout"
+import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { StatCard } from "@/components/ui/stat-card"
 import { ChevronDown, ChevronUp, Mail, MapPin, Pencil, Users } from "lucide-react"
 import { toast } from "sonner"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
+import { applyAssignableStatusFilter } from "@/lib/workforce/assignment-policy"
 
 interface LocationEmployee {
   id: string
@@ -44,10 +45,12 @@ export default function OfficeLocationsPage() {
   async function fetchLocations() {
     try {
       const supabase = createClient()
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("id, first_name, last_name, company_email, additional_email, company_role, office_location")
-        .eq("employment_status", "active")
+      const { data, error } = await applyAssignableStatusFilter(
+        supabase
+          .from("profiles")
+          .select("id, first_name, last_name, company_email, additional_email, company_role, office_location"),
+        { allowLegacyNullStatus: false }
+      )
 
       if (error) throw error
 
@@ -86,17 +89,20 @@ export default function OfficeLocationsPage() {
   }
 
   return (
-    <PageWrapper maxWidth="full" background="gradient">
-      <PageHeader
-        title="Office Locations"
-        description="View office locations and the employees assigned to each location"
-        icon={MapPin}
-        backLink={{ href: "/admin/hr", label: "Back to HR" }}
-      />
-
+    <AdminTablePage
+      title="Office Locations"
+      description="View office locations and the employees assigned to each location"
+      icon={MapPin}
+      backLinkHref="/admin/hr"
+      backLinkLabel="Back to HR"
+    >
       <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-2 md:gap-4">
         <StatCard title="Total Office Locations" value={locations.length} icon={MapPin} />
-        <StatCard title="Total Employees" value={locations.reduce((sum, l) => sum + l.employee_count, 0)} icon={Users} />
+        <StatCard
+          title="Total Employees"
+          value={locations.reduce((sum, l) => sum + l.employee_count, 0)}
+          icon={Users}
+        />
       </div>
 
       <Card>
@@ -116,7 +122,11 @@ export default function OfficeLocationsPage() {
               ))}
             </div>
           ) : locations.length === 0 ? (
-            <EmptyState icon={MapPin} title="No office locations yet" description="No active employees have an office location assigned." />
+            <EmptyState
+              icon={MapPin}
+              title="No office locations yet"
+              description="No active employees have an office location assigned."
+            />
           ) : (
             <Table>
               <TableHeader>
@@ -135,7 +145,10 @@ export default function OfficeLocationsPage() {
                   return (
                     <Fragment key={location.id}>
                       <TableRow
-                        className={cn("hover:bg-muted/30 cursor-pointer transition-colors", isExpanded && "bg-muted/50")}
+                        className={cn(
+                          "hover:bg-muted/30 cursor-pointer transition-colors",
+                          isExpanded && "bg-muted/50"
+                        )}
                         onClick={() => toggleLocationRow(location.id)}
                       >
                         <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
@@ -162,7 +175,9 @@ export default function OfficeLocationsPage() {
                         <TableRow className="bg-muted/10 hover:bg-muted/10 border-t-0">
                           <TableCell colSpan={4} className="p-0">
                             {members.length === 0 ? (
-                              <p className="text-muted-foreground px-6 py-3 text-sm">No employees in this office location.</p>
+                              <p className="text-muted-foreground px-6 py-3 text-sm">
+                                No employees in this office location.
+                              </p>
                             ) : (
                               <div className="animate-in slide-in-from-top-2 p-6 pt-2 duration-200">
                                 <div className="bg-background overflow-hidden rounded-lg border shadow-sm">
@@ -191,13 +206,16 @@ export default function OfficeLocationsPage() {
                                             {memberIndex + 1}
                                           </TableCell>
                                           <TableCell className="text-sm font-semibold">
-                                            {[member.first_name, member.last_name].filter(Boolean).join(" ") || "Unknown"}
+                                            {[member.first_name, member.last_name].filter(Boolean).join(" ") ||
+                                              "Unknown"}
                                           </TableCell>
                                           <TableCell className="text-muted-foreground text-xs">
                                             <div className="flex items-center gap-2">
                                               <Mail className="h-3 w-3" />
                                               <span className="truncate">
-                                                {[member.company_email, member.additional_email].filter(Boolean).join(" | ")}
+                                                {[member.company_email, member.additional_email]
+                                                  .filter(Boolean)
+                                                  .join(" | ")}
                                               </span>
                                             </div>
                                           </TableCell>
@@ -237,7 +255,6 @@ export default function OfficeLocationsPage() {
           )}
         </CardContent>
       </Card>
-    </PageWrapper>
+    </AdminTablePage>
   )
 }
-

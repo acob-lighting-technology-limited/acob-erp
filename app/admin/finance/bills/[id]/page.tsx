@@ -7,9 +7,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { ArrowLeft, Printer, FileText, CheckCircle } from "lucide-react"
-import Link from "next/link"
+import { Printer, FileText, CheckCircle } from "lucide-react"
 import { toast } from "sonner"
+import { PageHeader } from "@/components/layout/page-header"
 
 interface Bill {
   id: string
@@ -98,31 +98,28 @@ export default function BillDetailPage() {
 
   return (
     <div className="container mx-auto space-y-6 p-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="mb-1 flex items-center gap-2">
-            <Link href="/admin/finance/bills" className="text-muted-foreground hover:text-foreground">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-            <h1 className="text-3xl font-bold">Bill {bill.bill_number}</h1>
-            <Badge variant={statusColors[bill.status] as any} className="ml-2 capitalize">
+      <PageHeader
+        title={`Bill ${bill.bill_number}`}
+        description={`Current status: ${bill.status}`}
+        backLink={{ href: "/admin/finance/bills", label: "Back to Bills" }}
+        actions={
+          <>
+            <Badge variant={statusColors[bill.status] as any} className="capitalize">
               {bill.status}
             </Badge>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {bill.status !== "paid" && (
-            <Button onClick={markAsPaid}>
-              <CheckCircle className="mr-2 h-4 w-4" />
-              Mark as Paid
+            {bill.status !== "paid" && (
+              <Button onClick={markAsPaid}>
+                <CheckCircle className="mr-2 h-4 w-4" />
+                Mark as Paid
+              </Button>
+            )}
+            <Button variant="outline" onClick={() => window.print()}>
+              <Printer className="mr-2 h-4 w-4" />
+              Print
             </Button>
-          )}
-          <Button variant="outline" onClick={() => window.print()}>
-            <Printer className="mr-2 h-4 w-4" />
-            Print
-          </Button>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">

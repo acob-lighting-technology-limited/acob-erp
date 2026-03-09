@@ -1,12 +1,13 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { getSeparationBlockers } from "@/lib/hr/separation-blockers"
-import { PageHeader, PageWrapper } from "@/components/layout"
+import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { AlertTriangle } from "lucide-react"
 import { formatName } from "@/lib/utils"
+import { EmptyState } from "@/components/ui/patterns"
 
 export default async function OffboardingConflictsPage() {
   const supabase = await createClient()
@@ -41,13 +42,12 @@ export default async function OffboardingConflictsPage() {
   const conflicts = rows.filter((row) => row.blockers.total > 0)
 
   return (
-    <PageWrapper maxWidth="full" background="gradient">
-      <PageHeader
-        title="Offboarding Conflicts"
-        description="Read-only report of separated users who still have active assignments or lead responsibilities."
-        backLink={{ href: "/admin/hr/employees", label: "Back to Employees" }}
-      />
-
+    <AdminTablePage
+      title="Offboarding Conflicts"
+      description="Read-only report of separated users who still have active assignments or lead responsibilities."
+      backLinkHref="/admin/hr/employees"
+      backLinkLabel="Back to Employees"
+    >
       <Card className="border-2">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -61,9 +61,12 @@ export default async function OffboardingConflictsPage() {
         </CardHeader>
         <CardContent>
           {conflicts.length === 0 ? (
-            <div className="text-muted-foreground rounded-md border p-4 text-sm">
-              No separated users with active assignments were found.
-            </div>
+            <EmptyState
+              title="No offboarding conflicts found"
+              description="No separated users with active assignments were found."
+              icon={AlertTriangle}
+              className="p-4"
+            />
           ) : (
             <div className="overflow-x-auto">
               <Table>
@@ -109,6 +112,6 @@ export default async function OffboardingConflictsPage() {
           )}
         </CardContent>
       </Card>
-    </PageWrapper>
+    </AdminTablePage>
   )
 }

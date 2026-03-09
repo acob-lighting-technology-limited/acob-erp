@@ -116,9 +116,12 @@ export function WeeklyReportsContent({
     normalizedRole === "developer" ||
     normalizedRole === "super_admin" ||
     (normalizedRole === "admin" &&
-      (currentUser.admin_domains == null || currentUser.admin_domains.includes("reports")))
+      Array.isArray(currentUser.admin_domains) &&
+      currentUser.admin_domains.includes("reports"))
 
-  const managedDepartments = [currentUser.department, ...(currentUser.lead_departments || [])].filter(Boolean) as string[]
+  const managedDepartments = [currentUser.department, ...(currentUser.lead_departments || [])].filter(
+    Boolean
+  ) as string[]
 
   const canMutateReport = (report: WeeklyReport) => {
     if (isGlobalReportsEditor) return true
@@ -765,7 +768,7 @@ export function WeeklyReportsContent({
           if (!open) setPendingPptxExport(null)
         }}
       >
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] w-[95vw] max-w-2xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Select PPTX Mode</DialogTitle>
             <DialogDescription>

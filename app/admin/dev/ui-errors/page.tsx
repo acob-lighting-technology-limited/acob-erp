@@ -1,8 +1,9 @@
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { PageHeader, PageWrapper } from "@/components/layout"
-import { Card, CardContent } from "@/components/ui/card"
 import { AlertTriangle, Bug, ShieldAlert } from "lucide-react"
+import { StatCard } from "@/components/ui/stat-card"
+import { EmptyState, ErrorState } from "@/components/ui/patterns"
 import { UiErrorsContent, type UiErrorRow } from "./ui-errors-content"
 
 export default async function DevUiErrorsPage() {
@@ -67,47 +68,29 @@ export default async function DevUiErrorsPage() {
         backLink={{ href: "/admin/dev", label: "Back to DEV" }}
       />
 
-      <div className="mb-6 grid grid-cols-2 gap-2 sm:gap-3 md:gap-4 md:grid-cols-3">
-        <Card>
-          <CardContent className="p-3 sm:p-4">
-            <p className="text-muted-foreground text-xs sm:text-sm">Total Captured</p>
-            <p className="text-lg font-bold sm:text-2xl">{stats.total}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-3 sm:p-4">
-            <p className="text-muted-foreground text-xs sm:text-sm">Last 24h</p>
-            <p className="text-lg font-bold text-orange-600 sm:text-2xl">{stats.last24h}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-3 sm:p-4">
-            <p className="text-muted-foreground text-xs sm:text-sm">Boundary Catches</p>
-            <p className="text-lg font-bold text-red-600 sm:text-2xl">{stats.boundaries}</p>
-          </CardContent>
-        </Card>
+      <div className="mb-6 grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 md:gap-4">
+        <StatCard title="Total Captured" value={stats.total} icon={Bug} />
+        <StatCard title="Last 24h" value={stats.last24h} icon={AlertTriangle} />
+        <StatCard title="Boundary Catches" value={stats.boundaries} icon={ShieldAlert} />
       </div>
 
       {error ? (
-        <Card className="mb-6 border-red-200">
-          <CardContent className="flex items-center gap-2 p-4 text-sm text-red-700">
-            <ShieldAlert className="h-4 w-4" />
-            Failed to load logs from backend storage. Check server logs.
-          </CardContent>
-        </Card>
+        <ErrorState
+          title="Failed to load logs from backend storage"
+          description="Check server logs and verify audit log access configuration."
+          className="mb-6"
+        />
       ) : null}
 
       {rows.length === 0 ? (
-        <Card>
-          <CardContent className="flex items-center gap-2 p-8 text-sm">
-            <AlertTriangle className="h-4 w-4" />
-            No UI errors captured yet.
-          </CardContent>
-        </Card>
+        <EmptyState
+          title="No UI errors captured yet"
+          description="Client runtime errors will appear here once telemetry events are recorded."
+          icon={AlertTriangle}
+        />
       ) : (
         <UiErrorsContent rows={rows} />
       )}
     </PageWrapper>
   )
 }
-

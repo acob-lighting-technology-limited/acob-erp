@@ -3,12 +3,13 @@
 import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
+import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { ArrowLeft, Download, Send, Printer, CheckCircle, Pencil } from "lucide-react"
+import { Download, Send, Printer, CheckCircle, Pencil, FileText } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
 
@@ -169,22 +170,17 @@ export default function InvoiceDetailPage() {
   }
 
   return (
-    <div className="container mx-auto space-y-6 p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="mb-1 flex items-center gap-2">
-            <Link href="/admin/finance/invoices" className="text-muted-foreground hover:text-foreground">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-            <h1 className="text-3xl font-bold">{invoice.invoice_number}</h1>
-            <Badge variant={statusColors[invoice.status] as any} className="ml-2 capitalize">
-              {invoice.status}
-            </Badge>
-          </div>
-          <p className="text-muted-foreground">Created on {formatDate(invoice.created_at)}</p>
-        </div>
-        <div className="flex gap-2">
+    <AdminTablePage
+      title={invoice.invoice_number}
+      description={`Created on ${formatDate(invoice.created_at)}`}
+      icon={FileText}
+      backLinkHref="/admin/finance/invoices"
+      backLinkLabel="Back to Invoices"
+      actions={
+        <div className="flex flex-wrap gap-2">
+          <Badge variant={statusColors[invoice.status] as any} className="capitalize">
+            {invoice.status}
+          </Badge>
           {invoice.status === "draft" && (
             <>
               <Link href={`/admin/finance/invoices/${invoice.id}/edit`}>
@@ -214,8 +210,8 @@ export default function InvoiceDetailPage() {
             Download PDF
           </Button>
         </div>
-      </div>
-
+      }
+    >
       {/* Invoice Preview */}
       <Card>
         <CardContent className="p-8">
@@ -340,6 +336,6 @@ export default function InvoiceDetailPage() {
           )}
         </CardContent>
       </Card>
-    </div>
+    </AdminTablePage>
   )
 }

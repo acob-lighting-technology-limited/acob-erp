@@ -3,15 +3,17 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
+import { PageHeader, PageWrapper } from "@/components/layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ArrowLeft, Plus, Trash2, ShoppingCart } from "lucide-react"
-import Link from "next/link"
+import { Plus, Trash2, ShoppingCart } from "lucide-react"
+import { StatCard } from "@/components/ui/stat-card"
 import { toast } from "sonner"
+import { FormFieldGroup } from "@/components/ui/patterns"
 
 interface Supplier {
   id: string
@@ -168,18 +170,13 @@ export default function NewPurchaseOrderPage() {
   }
 
   return (
-    <div className="container mx-auto space-y-6 p-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="mb-1 flex items-center gap-2">
-            <Link href="/admin/purchasing/orders" className="text-muted-foreground hover:text-foreground">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-            <h1 className="text-3xl font-bold">Create Purchase Order</h1>
-          </div>
-        </div>
-      </div>
-
+    <PageWrapper maxWidth="full" background="gradient">
+      <PageHeader
+        title="Create Purchase Order"
+        description="Create a new supplier purchase order."
+        icon={ShoppingCart}
+        backLink={{ href: "/admin/purchasing/orders", label: "Back to Orders" }}
+      />
       <form onSubmit={handleSubmit}>
         <div className="grid gap-6 lg:grid-cols-3">
           <div className="space-y-6 lg:col-span-2">
@@ -189,8 +186,7 @@ export default function NewPurchaseOrderPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label>Supplier *</Label>
+                  <FormFieldGroup label="Supplier *">
                     <Select
                       value={formData.supplier_id}
                       onValueChange={(v) => setFormData({ ...formData, supplier_id: v })}
@@ -206,7 +202,7 @@ export default function NewPurchaseOrderPage() {
                         ))}
                       </SelectContent>
                     </Select>
-                  </div>
+                  </FormFieldGroup>
                   <div className="space-y-2">
                     <Label>Currency</Label>
                     <Select value={formData.currency} onValueChange={(v) => setFormData({ ...formData, currency: v })}>
@@ -327,6 +323,7 @@ export default function NewPurchaseOrderPage() {
                 <CardTitle>Summary</CardTitle>
               </CardHeader>
               <CardContent>
+                <StatCard title="Order Total" value={formatCurrency(calculateTotal())} icon={ShoppingCart} />
                 <div className="flex justify-between text-lg font-semibold">
                   <span>Total</span>
                   <span>{formatCurrency(calculateTotal())}</span>
@@ -341,6 +338,6 @@ export default function NewPurchaseOrderPage() {
           </div>
         </div>
       </form>
-    </div>
+    </PageWrapper>
   )
 }

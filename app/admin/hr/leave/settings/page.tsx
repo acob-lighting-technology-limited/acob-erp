@@ -2,13 +2,15 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { ArrowLeft, Plus, Trash2 } from "lucide-react"
+import { Plus, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { PageHeader } from "@/components/layout/page-header"
+import { EmptyState, FormFieldGroup } from "@/components/ui/patterns"
 
 interface LeaveType {
   id: string
@@ -259,16 +261,11 @@ export default function LeaveSettingsPage() {
 
   return (
     <div className="container mx-auto space-y-6 p-6">
-      <Link href="/admin/hr" className="text-muted-foreground inline-flex items-center gap-2 text-sm">
-        <ArrowLeft className="h-4 w-4" /> Back to HR Dashboard
-      </Link>
-
-      <div>
-        <h1 className="text-3xl font-bold">Leave Settings</h1>
-        <p className="text-muted-foreground">
-          Manage policies, holidays, SLA windows, data quality, and approval flows
-        </p>
-      </div>
+      <PageHeader
+        title="Leave Settings"
+        description="Manage policies, holidays, SLA windows, data quality, and approval flows"
+        backLink={{ href: "/admin/hr", label: "Back to HR Dashboard" }}
+      />
 
       <Card>
         <CardHeader>
@@ -617,8 +614,7 @@ export default function LeaveSettingsPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            <div className="space-y-2">
-              <Label>Leave Type</Label>
+            <FormFieldGroup label="Leave Type">
               <Select
                 value={policyForm.leave_type_id}
                 onValueChange={(value) => setPolicyForm((prev) => ({ ...prev, leave_type_id: value }))}
@@ -634,7 +630,7 @@ export default function LeaveSettingsPage() {
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+            </FormFieldGroup>
             <div className="space-y-2">
               <Label>Annual Days</Label>
               <Input
@@ -800,7 +796,13 @@ export default function LeaveSettingsPage() {
           <CardDescription>Employees missing required leave-policy profile fields</CardDescription>
         </CardHeader>
         <CardContent className="space-y-2">
-          {dataQuality.length === 0 && <p className="text-sm">No data-quality gaps found.</p>}
+          {dataQuality.length === 0 && (
+            <EmptyState
+              title="No data-quality gaps found"
+              description="All required leave-policy profile fields are populated."
+              className="p-4"
+            />
+          )}
           {dataQuality.map((entry: any) => (
             <div key={entry.id} className="rounded border p-3 text-sm">
               <p className="font-medium">{entry.full_name || entry.company_email || entry.id}</p>

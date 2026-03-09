@@ -53,6 +53,7 @@ export async function POST(request: NextRequest) {
           actorId: user.id,
           linkUrl: "/dashboard/leave",
           entityId: leaveRequest.id,
+          emailEvent: "ready_for_approval",
         })
       }
     }

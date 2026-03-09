@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
 import { createClient as createServiceClient } from "@supabase/supabase-js"
+import { canAccessAdminSection, resolveAdminScope } from "@/lib/admin/rbac"
 
 export async function POST(request: Request) {
   try {
@@ -16,10 +17,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // Verify user is admin
-    const { data: profile } = await supabase.from("profiles").select("is_admin").eq("id", user.id).single()
-
-    if (!profile?.is_admin) {
+    const scope = await resolveAdminScope(supabase as any, user.id)
+    if (!scope || !canAccessAdminSection(scope, "hr")) {
       return NextResponse.json({ error: "Forbidden: Admin access required" }, { status: 403 })
     }
 
@@ -254,7 +253,6 @@ export async function POST(request: Request) {
           office_location,
           device_allocated,
           device_type,
-          is_admin: false,
         })
 
         if (profileError) {

@@ -8,6 +8,7 @@ import { Calendar, Clock, TrendingUp, Users, CheckCircle, AlertCircle, FileText,
 import Link from "next/link"
 import { PageWrapper, PageHeader, Section } from "@/components/layout"
 import { StatCard } from "@/components/ui/stat-card"
+import { applyAssignableStatusFilter } from "@/lib/workforce/assignment-policy"
 
 interface DashboardStats {
   pendingLeaveRequests: number
@@ -59,10 +60,10 @@ export default function HRAdminDashboard() {
       // Fetch total employees
       const { count: employeeCount } = await supabase.from("profiles").select("*", { count: "exact", head: true })
       const { count: departmentCount } = await supabase.from("departments").select("*", { count: "exact", head: true })
-      const { data: locations } = await supabase
-        .from("profiles")
-        .select("office_location")
-        .eq("employment_status", "active")
+      const { data: locations } = await applyAssignableStatusFilter(
+        supabase.from("profiles").select("office_location"),
+        { allowLegacyNullStatus: false }
+      )
 
       setStats({
         pendingLeaveRequests: pendingLeaveCount,
@@ -70,8 +71,9 @@ export default function HRAdminDashboard() {
         upcomingReviews: reviews?.length || 0,
         totalEmployees: employeeCount || 0,
         totalDepartments: departmentCount || 0,
-        totalOfficeLocations: new Set((locations || []).map((l: any) => (l.office_location || "").trim()).filter(Boolean))
-          .size,
+        totalOfficeLocations: new Set(
+          (locations || []).map((l: any) => (l.office_location || "").trim()).filter(Boolean)
+        ).size,
       })
     } catch (error) {
       console.error("Error fetching dashboard data:", error)
@@ -90,7 +92,7 @@ export default function HRAdminDashboard() {
       />
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-2 lg:grid-cols-5 md:gap-4">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-2 md:gap-4 lg:grid-cols-6">
         <StatCard
           title="Pending Leave"
           value={stats.pendingLeaveRequests}
@@ -121,11 +123,17 @@ export default function HRAdminDashboard() {
           icon={Building}
           description="Configured departments"
         />
+        <StatCard
+          title="Office Locations"
+          value={stats.totalOfficeLocations}
+          icon={MapPin}
+          description="Active office locations"
+        />
       </div>
 
       {/* Admin Actions */}
       <Section title="HR Management">
-        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-2 lg:grid-cols-3 md:gap-4">
+        <div className="grid grid-cols-1 gap-2 sm:gap-3 md:grid-cols-2 md:gap-4 lg:grid-cols-3">
           {/* Employees Management */}
           <Card>
             <CardHeader>
@@ -278,4 +286,3 @@ export default function HRAdminDashboard() {
     </PageWrapper>
   )
 }
-

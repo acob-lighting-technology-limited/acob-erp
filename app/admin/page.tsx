@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
+import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
@@ -24,6 +25,7 @@ import { Badge } from "@/components/ui/badge"
 import { cn, formatName } from "@/lib/utils"
 import { PageWrapper, PageHeader, Section } from "@/components/layout"
 import { StatCard } from "@/components/ui/stat-card"
+import { EmptyState } from "@/components/ui/patterns"
 
 type NotificationType = "error" | "warning" | "info"
 
@@ -53,6 +55,46 @@ interface RecentActivityItem {
   moduleLabel: string
   moduleKey: string
   createdAt: string
+}
+
+type AdminDomain = "hr" | "finance" | "assets" | "reports" | "tasks" | "projects" | "communications"
+const ADMIN_DOMAINS: AdminDomain[] = ["hr", "finance", "assets", "reports", "tasks", "projects", "communications"]
+
+function normalizeAdminDomains(domains: string[] | null | undefined): AdminDomain[] {
+  if (!Array.isArray(domains)) return []
+  const normalized = Array.from(
+    new Set(
+      domains
+        .map((value) =>
+          String(value || "")
+            .trim()
+            .toLowerCase()
+        )
+        .filter(Boolean)
+    )
+  ).filter((value): value is AdminDomain => ADMIN_DOMAINS.includes(value as AdminDomain))
+  return normalized
+}
+
+function getDomainForAdminPath(path: string): AdminDomain | null {
+  if (path.startsWith("/admin/hr")) return "hr"
+  if (path.startsWith("/admin/finance") || path.startsWith("/admin/purchasing") || path.startsWith("/admin/payments"))
+    return "finance"
+  if (path.startsWith("/admin/assets") || path.startsWith("/admin/inventory")) return "assets"
+  if (path.startsWith("/admin/reports") || path.startsWith("/admin/audit-logs")) return "reports"
+  if (path.startsWith("/admin/tasks")) return "tasks"
+  if (path.startsWith("/admin/projects")) return "projects"
+  if (
+    path.startsWith("/admin/documentation") ||
+    path.startsWith("/admin/feedback") ||
+    path.startsWith("/admin/notification") ||
+    path.startsWith("/admin/communications") ||
+    path.startsWith("/admin/tools") ||
+    path.startsWith("/admin/help-desk")
+  ) {
+    return "communications"
+  }
+  return null
 }
 
 const notificationPriority: Record<NotificationType, number> = {
@@ -332,6 +374,8 @@ export default async function AdminDashboardPage() {
   const {
     data: { user },
   } = await supabase.auth.getUser()
+  const scope = user ? await resolveAdminScope(supabase as any, user.id) : null
+  const departmentScope = scope ? getDepartmentScope(scope, "general") : null
 
   // Fetch user profile with role
   const { data: profile } = await dataClient.from("profiles").select("*").eq("id", user?.id).single()
@@ -358,25 +402,36 @@ export default async function AdminDashboardPage() {
   const feedbackCount = feedbackStats.count || 0
 
   // Recent cross-module activity from audit logs
-  const { data: rawRecentActivity } = await supabase
+  let recentActivityQuery = dataClient
     .from("audit_logs")
     .select(
       "id, user_id, created_at, action, operation, entity_type, table_name, entity_id, department, metadata, changed_fields, new_values, old_values"
     )
-    .not("action", "in", '("sync","migrate","update_schema","migration")')
     .order("created_at", { ascending: false })
-    .limit(6)
+    .limit(20)
+  if (departmentScope) {
+    recentActivityQuery =
+      departmentScope.length > 0
+        ? recentActivityQuery.in("department", departmentScope)
+        : recentActivityQuery.eq("id", "__none__")
+  }
+  const { data: rawRecentActivity, error: rawRecentActivityError } = await recentActivityQuery
+  if (rawRecentActivityError) {
+    console.error("Admin dashboard recent activity query failed", rawRecentActivityError)
+  }
 
-  const filteredRawActivity = (rawRecentActivity || []).filter((item: any) => {
-    const action = normalizeToken(item.action || item.operation)
-    return !["sync", "migrate", "update_schema", "migration"].includes(action)
-  })
+  const filteredRawActivity = (rawRecentActivity || [])
+    .filter((item: any) => {
+      const action = normalizeToken(item.action || item.operation)
+      return !["sync", "migrate", "update_schema", "migration"].includes(action)
+    })
+    .slice(0, 6)
 
   const actorIds = Array.from(new Set(filteredRawActivity.map((item: any) => item.user_id).filter(Boolean)))
   let actorMap = new Map<string, { first_name?: string; last_name?: string; company_email?: string }>()
 
   if (actorIds.length > 0) {
-    const { data: actorProfiles } = await supabase
+    const { data: actorProfiles } = await dataClient
       .from("profiles")
       .select("id, first_name, last_name, company_email")
       .in("id", actorIds)
@@ -508,12 +563,24 @@ export default async function AdminDashboardPage() {
     })
   }
 
-  const canAccessAction = (requiredRoles: string[]) => {
-    return !!profile?.role && requiredRoles.includes(profile.role)
+  const canAccessAction = (requiredRoles: string[], href: string) => {
+    if ((profile as any)?.is_department_lead) {
+      return !href.startsWith("/admin/dev")
+    }
+    if (!profile?.role || !requiredRoles.includes(profile.role)) return false
+    if (profile.role !== "admin") return true
+
+    const adminDomains = normalizeAdminDomains((profile as any)?.admin_domains)
+    if (href === "/admin") return true
+    const mappedDomain = getDomainForAdminPath(href)
+    return Boolean(mappedDomain && adminDomains.includes(mappedDomain))
   }
 
-  const filteredPrimaryModules = primaryModules.filter((action) => canAccessAction(action.roles))
-  const filteredSecondaryModules = secondaryModules.filter((action) => canAccessAction(action.roles))
+  const filteredPrimaryModules = primaryModules.filter((action) => canAccessAction(action.roles, action.href))
+  const filteredSecondaryModules = secondaryModules.filter((action) => canAccessAction(action.roles, action.href))
+  const canManageEmployees = canAccessAction(["developer", "super_admin", "admin"], "/admin/hr/employees")
+  const canReviewTasks = canAccessAction(["developer", "super_admin", "admin"], "/admin/tasks")
+  const canOpenReports = canAccessAction(["developer", "super_admin", "admin"], "/admin/reports")
   const sortedNotifications = [...notifications].sort(
     (a, b) => notificationPriority[a.type] - notificationPriority[b.type]
   )
@@ -535,15 +602,21 @@ export default async function AdminDashboardPage() {
         icon={Shield}
         actions={
           <>
-            <Button asChild size="sm">
-              <Link href="/admin/hr/employees">Manage Employees</Link>
-            </Button>
-            <Button asChild size="sm" variant="outline">
-              <Link href="/admin/tasks">Review Tasks</Link>
-            </Button>
-            <Button asChild size="sm" variant="outline">
-              <Link href="/admin/reports">Open Reports</Link>
-            </Button>
+            {canManageEmployees && (
+              <Button asChild size="sm">
+                <Link href="/admin/hr/employees">Manage Employees</Link>
+              </Button>
+            )}
+            {canReviewTasks && (
+              <Button asChild size="sm" variant="outline">
+                <Link href="/admin/tasks">Review Tasks</Link>
+              </Button>
+            )}
+            {canOpenReports && (
+              <Button asChild size="sm" variant="outline">
+                <Link href="/admin/reports">Open Reports</Link>
+              </Button>
+            )}
           </>
         }
       />
@@ -588,14 +661,19 @@ export default async function AdminDashboardPage() {
         ) : (
           <Card className="border-dashed">
             <CardContent className="flex items-center justify-center p-8">
-              <p className="text-muted-foreground text-sm">No immediate operational alerts.</p>
+              <EmptyState
+                title="No immediate operational alerts"
+                description="Critical alerts will appear here when detected."
+                icon={Info}
+                className="w-full border-0 p-2"
+              />
             </CardContent>
           </Card>
         )}
       </Section>
 
       <Section title="Core KPIs" description="Current operational totals across core business areas.">
-        <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-5 md:gap-4">
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-4 lg:grid-cols-5">
           <StatCard
             title="Total Employees"
             value={employeeCount || 0}
@@ -729,7 +807,12 @@ export default async function AdminDashboardPage() {
                 ))}
               </div>
             ) : (
-              <p className="text-muted-foreground py-8 text-center text-sm">No recent system activity found.</p>
+              <EmptyState
+                title="No recent system activity found"
+                description="Recent audit activity will appear here as users interact with modules."
+                icon={ScrollText}
+                className="border-0 p-4"
+              />
             )}
           </CardContent>
         </Card>
@@ -737,4 +820,3 @@ export default async function AdminDashboardPage() {
     </PageWrapper>
   )
 }
-

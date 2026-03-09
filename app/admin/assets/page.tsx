@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { AdminAssetsContent, type Asset, type Employee, type UserProfile } from "./admin-assets-content"
 import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
+import { listAssignableProfiles } from "@/lib/workforce/assignment-policy"
 
 async function getAdminAssetsData() {
   const supabase = await createClient()
@@ -70,18 +71,11 @@ async function getAdminAssetsData() {
   }
 
   // Fetch employees - leads can only see employees in their departments
-  let employeeQuery = dataClient
-    .from("profiles")
-    .select("id, first_name, last_name, company_email, department, employment_status")
-    .eq("employment_status", "active")
-    .order("last_name", { ascending: true })
-
-  if (departmentScope) {
-    employeeQuery =
-      departmentScope.length > 0 ? employeeQuery.in("department", departmentScope) : employeeQuery.eq("id", "__none__")
-  }
-
-  const { data: employeeData } = await employeeQuery
+  const { data: employeeData } = await listAssignableProfiles(dataClient, {
+    select: "id, first_name, last_name, company_email, department, employment_status",
+    departmentScope,
+    allowLegacyNullStatus: false,
+  })
   const employees = (employeeData || []) as Employee[]
 
   // Fetch unresolved issue counts

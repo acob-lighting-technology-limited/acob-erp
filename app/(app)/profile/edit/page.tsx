@@ -61,7 +61,6 @@ export default function EditProfilePage() {
             additional_phone: "",
             residential_address: "",
             office_location: "",
-            is_admin: false,
           })
           .select()
           .single()

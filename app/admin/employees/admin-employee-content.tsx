@@ -581,7 +581,6 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         company_role: editForm.company_role || null,
         is_department_lead: isLead,
         lead_departments: isLead ? editForm.lead_departments : [],
-        is_admin: ["developer", "super_admin", "admin"].includes(editForm.role),
         updated_at: new Date().toISOString(),
         // Always include expanded fields if they exist in form state
         first_name: editForm.first_name || null,
@@ -2250,13 +2249,13 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                         </div>
                       )}
 
-                    <div className="flex items-center gap-3">
-                      <Building className="text-muted-foreground h-5 w-5" />
-                      <div>
-                        <p className="text-muted-foreground text-sm">Office Location</p>
-                        <p className="font-medium">{viewEmployeeProfile.office_location}</p>
+                      <div className="flex items-center gap-3">
+                        <Building className="text-muted-foreground h-5 w-5" />
+                        <div>
+                          <p className="text-muted-foreground text-sm">Office Location</p>
+                          <p className="font-medium">{viewEmployeeProfile.office_location}</p>
+                        </div>
                       </div>
-                    </div>
 
                       {viewEmployeeProfile.lead_departments && viewEmployeeProfile.lead_departments.length > 0 && (
                         <div className="flex items-center gap-3">

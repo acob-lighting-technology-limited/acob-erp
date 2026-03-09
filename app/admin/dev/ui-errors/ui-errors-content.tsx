@@ -43,7 +43,12 @@ export function UiErrorsContent({ rows }: UiErrorsContentProps) {
       <CardContent className="space-y-4">
         <div className="relative">
           <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-          <Input placeholder="Search message, route, source, user..." className="pl-9" value={query} onChange={(e) => setQuery(e.target.value)} />
+          <Input
+            placeholder="Search message, route, source, user..."
+            className="pl-9"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
         </div>
 
         <div className="overflow-x-auto rounded-md border">
@@ -67,7 +72,7 @@ export function UiErrorsContent({ rows }: UiErrorsContentProps) {
               ) : (
                 filtered.map((row) => (
                   <TableRow key={row.id}>
-                    <TableCell className="whitespace-nowrap text-xs">
+                    <TableCell className="text-xs whitespace-nowrap">
                       {new Date(row.created_at).toLocaleString()}
                     </TableCell>
                     <TableCell>
@@ -88,4 +93,3 @@ export function UiErrorsContent({ rows }: UiErrorsContentProps) {
     </Card>
   )
 }
-

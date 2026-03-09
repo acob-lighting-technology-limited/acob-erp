@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
+import { StatCard } from "@/components/ui/stat-card"
+import { EmptyState } from "@/components/ui/patterns"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ArrowLeft, ArrowUpDown, ArrowUp, ArrowDown, Filter } from "lucide-react"
-import Link from "next/link"
+import { Badge } from "@/components/ui/badge"
+import { ArrowUpDown, ArrowUp, ArrowDown, Filter, Boxes } from "lucide-react"
 import { toast } from "sonner"
 
 interface StockMovement {
@@ -98,67 +99,49 @@ export default function MovementsPage() {
   }
 
   return (
-    <div className="container mx-auto space-y-6 p-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="mb-1 flex items-center gap-2">
-            <Link href="/admin/inventory" className="text-muted-foreground hover:text-foreground">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-            <h1 className="text-3xl font-bold">Stock Movements</h1>
-          </div>
-          <p className="text-muted-foreground">Track stock in and out</p>
+    <AdminTablePage
+      title="Stock Movements"
+      description="Track stock in and out"
+      icon={Boxes}
+      backLinkHref="/admin/inventory"
+      backLinkLabel="Back to Inventory"
+      stats={
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 md:gap-4">
+          <StatCard title="Total Movements" value={stats.total} icon={ArrowUpDown} />
+          <StatCard
+            title="Stock In"
+            value={`+${stats.in}`}
+            icon={ArrowDown}
+            iconBgColor="bg-green-100 dark:bg-green-900/30"
+            iconColor="text-green-600 dark:text-green-400"
+          />
+          <StatCard
+            title="Stock Out"
+            value={`-${stats.out}`}
+            icon={ArrowUp}
+            iconBgColor="bg-red-100 dark:bg-red-900/30"
+            iconColor="text-red-600 dark:text-red-400"
+          />
         </div>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-4 md:grid-cols-3">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Movements</CardTitle>
-            <ArrowUpDown className="text-muted-foreground h-4 w-4" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-lg font-bold sm:text-2xl">{stats.total}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Stock In</CardTitle>
-            <ArrowDown className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-lg font-bold sm:text-2xl text-green-600">+{stats.in}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Stock Out</CardTitle>
-            <ArrowUp className="h-4 w-4 text-red-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-lg font-bold sm:text-2xl text-red-600">-{stats.out}</div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Filter */}
-      <div className="flex items-center gap-4">
-        <Select value={typeFilter} onValueChange={setTypeFilter}>
-          <SelectTrigger className="w-[180px]">
-            <Filter className="mr-2 h-4 w-4" />
-            <SelectValue placeholder="Filter by type" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Types</SelectItem>
-            <SelectItem value="in">Stock In</SelectItem>
-            <SelectItem value="out">Stock Out</SelectItem>
-            <SelectItem value="adjustment">Adjustment</SelectItem>
-            <SelectItem value="transfer">Transfer</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
+      }
+      filters={
+        <div className="flex items-center gap-4">
+          <Select value={typeFilter} onValueChange={setTypeFilter}>
+            <SelectTrigger className="w-[180px]">
+              <Filter className="mr-2 h-4 w-4" />
+              <SelectValue placeholder="Filter by type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              <SelectItem value="in">Stock In</SelectItem>
+              <SelectItem value="out">Stock Out</SelectItem>
+              <SelectItem value="adjustment">Adjustment</SelectItem>
+              <SelectItem value="transfer">Transfer</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      }
+    >
       <Card>
         <CardHeader>
           <CardTitle>Movement History</CardTitle>
@@ -170,53 +153,50 @@ export default function MovementsPage() {
               <div className="border-primary h-8 w-8 animate-spin rounded-full border-4 border-t-transparent"></div>
             </div>
           ) : filteredMovements.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <ArrowUpDown className="text-muted-foreground mb-4 h-12 w-12" />
-              <h3 className="font-semibold">No movements yet</h3>
-              <p className="text-muted-foreground text-sm">Stock movements will appear here.</p>
-            </div>
+            <EmptyState title="No movements yet" description="Stock movements will appear here." icon={ArrowUpDown} />
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Product</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead className="text-right">Quantity</TableHead>
-                  <TableHead>Reference</TableHead>
-                  <TableHead>By</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredMovements.map((m) => {
-                  const Icon = typeIcons[m.movement_type]
-                  return (
-                    <TableRow key={m.id}>
-                      <TableCell className="text-sm">{formatDate(m.created_at)}</TableCell>
-                      <TableCell className="font-medium">{m.product_name || "—"}</TableCell>
-                      <TableCell>
-                        <Badge variant={typeColors[m.movement_type] as any} className="capitalize">
-                          <Icon className="mr-1 h-3 w-3" />
-                          {m.movement_type}
-                        </Badge>
-                      </TableCell>
-                      <TableCell
-                        className={`text-right font-medium ${m.movement_type === "in" ? "text-green-600" : m.movement_type === "out" ? "text-red-600" : ""}`}
-                      >
-                        {m.movement_type === "in" ? "+" : m.movement_type === "out" ? "-" : ""}
-                        {m.quantity}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">{m.reference_number || "—"}</TableCell>
-                      <TableCell className="text-muted-foreground">{m.created_by_name || "—"}</TableCell>
-                    </TableRow>
-                  )
-                })}
-              </TableBody>
-            </Table>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Product</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead className="text-right">Quantity</TableHead>
+                    <TableHead>Reference</TableHead>
+                    <TableHead>By</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredMovements.map((m) => {
+                    const Icon = typeIcons[m.movement_type]
+                    return (
+                      <TableRow key={m.id}>
+                        <TableCell className="text-sm">{formatDate(m.created_at)}</TableCell>
+                        <TableCell className="font-medium">{m.product_name || "—"}</TableCell>
+                        <TableCell>
+                          <Badge variant={typeColors[m.movement_type] as any} className="capitalize">
+                            <Icon className="mr-1 h-3 w-3" />
+                            {m.movement_type}
+                          </Badge>
+                        </TableCell>
+                        <TableCell
+                          className={`text-right font-medium ${m.movement_type === "in" ? "text-green-600" : m.movement_type === "out" ? "text-red-600" : ""}`}
+                        >
+                          {m.movement_type === "in" ? "+" : m.movement_type === "out" ? "-" : ""}
+                          {m.quantity}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">{m.reference_number || "—"}</TableCell>
+                        <TableCell className="text-muted-foreground">{m.created_by_name || "—"}</TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>
-    </div>
+    </AdminTablePage>
   )
 }
-
