@@ -3,14 +3,7 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 
 export type AdminRole = "developer" | "super_admin" | "admin" | "employee" | "visitor" | string
-export type AdminDomain =
-  | "hr"
-  | "finance"
-  | "assets"
-  | "reports"
-  | "tasks"
-  | "projects"
-  | "communications"
+export type AdminDomain = "hr" | "finance" | "assets" | "reports" | "tasks" | "projects" | "communications"
 export type AdminSection =
   | "dev"
   | "assets"
@@ -54,15 +47,7 @@ interface ProfileShape {
   lead_departments: string[] | null
 }
 
-const ADMIN_DOMAINS: AdminDomain[] = [
-  "hr",
-  "finance",
-  "assets",
-  "reports",
-  "tasks",
-  "projects",
-  "communications",
-]
+const ADMIN_DOMAINS: AdminDomain[] = ["hr", "finance", "assets", "reports", "tasks", "projects", "communications"]
 
 function normalizeRoleValue(role: string | null | undefined): string | null {
   if (!role) return null
@@ -123,11 +108,11 @@ export function canAccessAdminSection(scope: AdminScope, section: AdminSection):
   if (section === "dev") return role === "developer"
   if (role === "developer" || role === "super_admin") return true
   if (role === "admin") {
-    if (scope.adminDomains === null) return true
-    if (scope.adminDomains.length === 0) return false
     if (section === "admin") return true
+    const domains = Array.isArray(scope.adminDomains) ? scope.adminDomains : []
     const mapped = SECTION_TO_DOMAIN[section]
-    return mapped ? scope.adminDomains.includes(mapped) : false
+    if (mapped && domains.includes(mapped)) return true
+    return scope.isDepartmentLead
   }
   if (!scope.isDepartmentLead) return false
 
@@ -199,6 +184,9 @@ export async function resolveAdminScope(supabase: SupabaseClient, userId: string
 
   const isDepartmentLead = Boolean(profile.is_department_lead)
   const adminDomains = normalizeAdminDomains(profile.admin_domains)
+  if (normalizedRole === "admin" && (!adminDomains || adminDomains.length === 0) && !isDepartmentLead) {
+    return null
+  }
 
   return {
     userId,
@@ -215,7 +203,14 @@ export async function resolveAdminScope(supabase: SupabaseClient, userId: string
 }
 
 export function getDepartmentScope(scope: AdminScope, domain: "finance" | "hr" | "general"): string[] | null {
-  if (scope.isAdminLike) return null
+  const role = normalizeRoleValue(scope.role)
+  if (role === "developer" || role === "super_admin") return null
+  if (role === "admin") {
+    const domains = Array.isArray(scope.adminDomains) ? scope.adminDomains : []
+    if (domain === "general" && domains.length > 0) return null
+    const requiredDomain = domain === "hr" ? "hr" : domain === "finance" ? "finance" : null
+    if (requiredDomain && domains.includes(requiredDomain)) return null
+  }
   if (!scope.isDepartmentLead) return []
   return scope.managedDepartments
 }

@@ -1,3 +1,5 @@
+import { isAssignableEmploymentStatus } from "@/lib/workforce/assignment-policy"
+
 export type AssetMailRoutingProfile = {
   id: string
   full_name: string | null
@@ -41,7 +43,9 @@ export function profileLeadsDepartment(
 }
 
 export function resolveAssetMailSpecialRecipients(profiles: AssetMailRoutingProfile[]) {
-  const activeProfiles = profiles.filter((profile) => profile.employment_status !== "separated")
+  const activeProfiles = profiles.filter((profile) =>
+    isAssignableEmploymentStatus(profile.employment_status, { allowLegacyNullStatus: false })
+  )
 
   const hcs = activeProfiles.find(
     (profile) => profileLeadsDepartment(profile, "Corporate Services") || profile.department === "Corporate Services"
@@ -102,7 +106,9 @@ export function resolveAssetMailRecipients(
 }
 
 export function buildAssetMailRoutingRows(profiles: AssetMailRoutingProfile[]): AssetMailRoutingRow[] {
-  const activeProfiles = profiles.filter((profile) => profile.employment_status === "active")
+  const activeProfiles = profiles.filter((profile) =>
+    isAssignableEmploymentStatus(profile.employment_status, { allowLegacyNullStatus: false })
+  )
   const specialRecipients = resolveAssetMailSpecialRecipients(activeProfiles)
 
   return activeProfiles.map((profile) => ({

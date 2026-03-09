@@ -12,6 +12,9 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { AlertCircle, CheckCircle2, Trash2, Search, Package, Calendar, User, Filter } from "lucide-react"
 import { SearchableSelect } from "@/components/ui/searchable-select"
+import { AdminTablePage } from "@/components/admin/admin-table-page"
+import { StatCard } from "@/components/ui/stat-card"
+import { EmptyState, ListToolbar } from "@/components/ui/patterns"
 
 interface AssetIssue {
   id: string
@@ -233,57 +236,35 @@ export default function AssetIssuesPage() {
   }
 
   return (
-    <div className="space-y-6 p-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-foreground text-3xl font-bold">Asset Issues</h1>
-        <p className="text-muted-foreground mt-1">Track and manage all asset issues across the organization</p>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-4 md:grid-cols-3">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Issues</CardTitle>
-            <AlertCircle className="text-muted-foreground h-4 w-4" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-lg font-bold sm:text-2xl">{stats.total}</div>
-            <p className="text-muted-foreground text-xs">All tracked issues</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Unresolved Issues</CardTitle>
-            <AlertCircle className="h-4 w-4 text-orange-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-lg font-bold sm:text-2xl text-orange-600">{stats.unresolved}</div>
-            <p className="text-muted-foreground text-xs">Requiring attention</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Resolved Issues</CardTitle>
-            <CheckCircle2 className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-lg font-bold sm:text-2xl text-green-600">{stats.resolved}</div>
-            <p className="text-muted-foreground text-xs">Successfully fixed</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Filters</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="relative">
+    <AdminTablePage
+      title="Asset Issues"
+      description="Track and manage all asset issues across the organization"
+      icon={AlertCircle}
+      stats={
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 md:gap-4">
+          <StatCard title="Total Issues" value={stats.total} icon={AlertCircle} description="All tracked issues" />
+          <StatCard
+            title="Unresolved Issues"
+            value={stats.unresolved}
+            icon={AlertCircle}
+            iconBgColor="bg-orange-100 dark:bg-orange-900/30"
+            iconColor="text-orange-600 dark:text-orange-400"
+            description="Requiring attention"
+          />
+          <StatCard
+            title="Resolved Issues"
+            value={stats.resolved}
+            icon={CheckCircle2}
+            iconBgColor="bg-green-100 dark:bg-green-900/30"
+            iconColor="text-green-600 dark:text-green-400"
+            description="Successfully fixed"
+          />
+        </div>
+      }
+      filters={
+        <ListToolbar
+          search={
+            <div className="relative w-full min-w-0 flex-1 sm:max-w-md">
               <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform" />
               <Input
                 placeholder="Search issues or asset codes..."
@@ -292,47 +273,48 @@ export default function AssetIssuesPage() {
                 className="pl-10"
               />
             </div>
-
-            <SearchableSelect
-              value={statusFilter}
-              onValueChange={setStatusFilter}
-              placeholder="Filter by status"
-              searchPlaceholder="Search status..."
-              icon={<Filter className="h-4 w-4" />}
-              options={[
-                { value: "all", label: "All Issues" },
-                {
-                  value: "unresolved",
-                  label: "Unresolved",
-                  icon: <AlertCircle className="h-3 w-3 text-orange-500" />,
-                },
-                {
-                  value: "resolved",
-                  label: "Resolved",
-                  icon: <CheckCircle2 className="h-3 w-3 text-green-500" />,
-                },
-              ]}
-            />
-
-            <SearchableSelect
-              value={assetTypeFilter}
-              onValueChange={setAssetTypeFilter}
-              placeholder="All Asset Types"
-              searchPlaceholder="Search asset types..."
-              icon={<Package className="h-4 w-4" />}
-              options={[
-                { value: "all", label: "All Asset Types" },
-                ...Object.entries(ASSET_TYPE_MAP).map(([key, value]) => ({
-                  value: key,
-                  label: value.label,
-                })),
-              ]}
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Issues Table */}
+          }
+          filters={
+            <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2">
+              <SearchableSelect
+                value={statusFilter}
+                onValueChange={setStatusFilter}
+                placeholder="Filter by status"
+                searchPlaceholder="Search status..."
+                icon={<Filter className="h-4 w-4" />}
+                options={[
+                  { value: "all", label: "All Issues" },
+                  {
+                    value: "unresolved",
+                    label: "Unresolved",
+                    icon: <AlertCircle className="h-3 w-3 text-orange-500" />,
+                  },
+                  {
+                    value: "resolved",
+                    label: "Resolved",
+                    icon: <CheckCircle2 className="h-3 w-3 text-green-500" />,
+                  },
+                ]}
+              />
+              <SearchableSelect
+                value={assetTypeFilter}
+                onValueChange={setAssetTypeFilter}
+                placeholder="All Asset Types"
+                searchPlaceholder="Search asset types..."
+                icon={<Package className="h-4 w-4" />}
+                options={[
+                  { value: "all", label: "All Asset Types" },
+                  ...Object.entries(ASSET_TYPE_MAP).map(([key, value]) => ({
+                    value: key,
+                    label: value.label,
+                  })),
+                ]}
+              />
+            </div>
+          }
+        />
+      }
+    >
       <Card>
         <CardHeader>
           <CardTitle>Issues List ({filteredIssues.length})</CardTitle>
@@ -351,14 +333,15 @@ export default function AssetIssuesPage() {
               <p className="text-muted-foreground mt-4">Loading issues...</p>
             </div>
           ) : filteredIssues.length === 0 ? (
-            <div className="py-12 text-center">
-              <AlertCircle className="text-muted-foreground mx-auto mb-4 h-12 w-12" />
-              <p className="text-muted-foreground">
-                {searchQuery || statusFilter !== "all" || assetTypeFilter !== "all"
-                  ? "No issues match your filters"
-                  : "No issues tracked yet"}
-              </p>
-            </div>
+            <EmptyState
+              icon={AlertCircle}
+              title="No issues found"
+              description={
+                searchQuery || statusFilter !== "all" || assetTypeFilter !== "all"
+                  ? "No issues match your filters."
+                  : "No issues tracked yet."
+              }
+            />
           ) : (
             <div className="overflow-x-auto">
               <Table>
@@ -495,7 +478,6 @@ export default function AssetIssuesPage() {
           )}
         </CardContent>
       </Card>
-    </div>
+    </AdminTablePage>
   )
 }
-

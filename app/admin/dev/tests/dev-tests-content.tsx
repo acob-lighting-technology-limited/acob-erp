@@ -27,6 +27,7 @@ import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 import { PageHeader, PageWrapper } from "@/components/layout"
+import { applyAssignableStatusFilter } from "@/lib/workforce/assignment-policy"
 
 // ── Shared Types ──────────────────────────────────────────────────────────────
 type StepResult = {
@@ -987,11 +988,10 @@ export function DevTestsContent() {
 
   const load = useCallback(async () => {
     const [profilesRes, typesRes, deptRes] = await Promise.all([
-      supabase
-        .from("profiles")
-        .select("id, full_name, first_name, last_name, company_email")
-        .eq("employment_status", "active")
-        .order("first_name"),
+      applyAssignableStatusFilter(
+        supabase.from("profiles").select("id, full_name, first_name, last_name, company_email").order("first_name"),
+        { allowLegacyNullStatus: false }
+      ),
       supabase.from("leave_types").select("id, name").order("name"),
       supabase.from("departments").select("name").order("name"),
     ])

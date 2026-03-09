@@ -3,15 +3,16 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
+import { PageWrapper, PageHeader } from "@/components/layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ArrowLeft, Plus, Trash2, Receipt } from "lucide-react"
-import Link from "next/link"
+import { Plus, Trash2, Receipt } from "lucide-react"
 import { toast } from "sonner"
+import { FormFieldGroup } from "@/components/ui/patterns"
 
 interface BillItem {
   id: string
@@ -149,21 +150,15 @@ export default function NewBillPage() {
   const totals = calculateTotals()
 
   return (
-    <div className="container mx-auto space-y-6 p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="mb-1 flex items-center gap-2">
-            <Link href="/admin/finance/bills" className="text-muted-foreground hover:text-foreground">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-            <h1 className="text-3xl font-bold">Add Bill</h1>
-          </div>
-          <p className="text-muted-foreground">Record a new vendor bill</p>
-        </div>
-      </div>
+    <PageWrapper maxWidth="full" background="gradient">
+      <PageHeader
+        title="Add Bill"
+        description="Record a new vendor bill"
+        icon={Receipt}
+        backLink={{ href: "/admin/finance/bills", label: "Back to Bills" }}
+      />
 
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid gap-6 lg:grid-cols-3">
           <div className="space-y-6 lg:col-span-2">
             {/* Supplier Details */}
@@ -173,8 +168,7 @@ export default function NewBillPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="supplier_name">Supplier Name *</Label>
+                  <FormFieldGroup label="Supplier Name *">
                     <Input
                       id="supplier_name"
                       value={formData.supplier_name}
@@ -182,7 +176,7 @@ export default function NewBillPage() {
                       placeholder="Supplier or vendor name"
                       required
                     />
-                  </div>
+                  </FormFieldGroup>
                   <div className="space-y-2">
                     <Label htmlFor="supplier_email">Email</Label>
                     <Input
@@ -337,6 +331,6 @@ export default function NewBillPage() {
           </div>
         </div>
       </form>
-    </div>
+    </PageWrapper>
   )
 }

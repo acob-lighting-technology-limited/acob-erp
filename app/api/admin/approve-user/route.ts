@@ -1,9 +1,11 @@
 import { createClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
-import { Resend } from "resend"
 import { createClient as createServerClient } from "@/lib/supabase/server"
 import { renderWelcomeEmail } from "@/lib/email-templates/welcome"
 import { renderInternalNotificationEmail } from "@/lib/email-templates/internal-notification"
+import { resolveActiveLeadRecipients, sendNotificationEmail } from "@/lib/notifications/email-gateway"
+import { isSystemNotificationChannelEnabled, resolveChannelEligibleUserIds } from "@/lib/notifications/delivery-policy"
+import { withSubjectPrefix } from "@/lib/notifications/subject-policy"
 
 export async function POST(req: Request) {
   // 1. Verify Caller is an Admin
@@ -23,7 +25,6 @@ export async function POST(req: Request) {
 
   console.log("--- Starting Approval Process ---")
   try {
-    const resendApiKey = process.env.RESEND_API_KEY
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
@@ -32,12 +33,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "System configuration error: Missing database keys" }, { status: 500 })
     }
 
-    if (!resendApiKey) {
-      console.error("ERROR: Missing RESEND_API_KEY environment variable")
-      return NextResponse.json({ error: "Email configuration error: Missing API key" }, { status: 500 })
-    }
-
-    const resend = new Resend(resendApiKey)
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     })
@@ -251,30 +246,42 @@ export async function POST(req: Request) {
 
     // 6. Send Welcome Email
     try {
-      await resend.emails.send({
-        from: "ACOB Admin & HR <notifications@acoblighting.com>",
-        to: [pendingUser.personal_email],
-        subject: "Welcome to ACOB - Login Credentials",
-        html: renderWelcomeEmail({ pendingUser, employeeId, tempPassword, portalUrl }),
-      })
+      const onboardingMailEnabled = await isSystemNotificationChannelEnabled(supabaseAdmin, "onboarding", "email")
+      if (onboardingMailEnabled) {
+        await sendNotificationEmail({
+          to: [pendingUser.personal_email],
+          subject: withSubjectPrefix("Onboarding", "Welcome to ACOB - Login Credentials"),
+          html: renderWelcomeEmail({ pendingUser, employeeId, tempPassword, portalUrl }),
+        })
+      }
     } catch (emailError) {
       console.error("Failed to send welcome email:", emailError)
     }
 
-    // 7. Send Internal Confirmation Email to Stakeholders
+    // 7. Send Internal Confirmation Email to Department Leads
     try {
-      const stakeholderEmails = (process.env.STAKEHOLDER_EMAILS || "")
-        .split(",")
-        .map((e: string) => e.trim())
-        .filter((e: string) => e.includes("@"))
-
-      if (stakeholderEmails.length > 0) {
-        await resend.emails.send({
-          from: "ACOB Admin & HR <notifications@acoblighting.com>",
-          to: stakeholderEmails,
-          subject: `New Employee Onboarded - ${pendingUser.first_name.replace(/[\r\n]/g, "")} ${pendingUser.last_name.replace(/[\r\n]/g, "")}`,
-          html: renderInternalNotificationEmail({ pendingUser, employeeId }),
+      const onboardingMailEnabled = await isSystemNotificationChannelEnabled(supabaseAdmin, "onboarding", "email")
+      if (onboardingMailEnabled) {
+        const leadRecipients = await resolveActiveLeadRecipients(supabaseAdmin)
+        const leadIds = leadRecipients.map((lead) => lead.id)
+        const allowedLeadIds = await resolveChannelEligibleUserIds(supabaseAdmin, {
+          userIds: leadIds,
+          notificationKey: "onboarding",
+          channel: "email",
         })
+        const allowedIdSet = new Set(allowedLeadIds)
+        const leadEmails = leadRecipients.filter((lead) => allowedIdSet.has(lead.id)).flatMap((lead) => lead.emails)
+
+        if (leadEmails.length > 0) {
+          await sendNotificationEmail({
+            to: leadEmails,
+            subject: withSubjectPrefix(
+              "Onboarding",
+              `New Employee Onboarded - ${pendingUser.first_name.replace(/[\r\n]/g, "")} ${pendingUser.last_name.replace(/[\r\n]/g, "")}`
+            ),
+            html: renderInternalNotificationEmail({ pendingUser, employeeId }),
+          })
+        }
       }
     } catch (emailError) {
       console.error("Failed to send stakeholder notification emails:", emailError)

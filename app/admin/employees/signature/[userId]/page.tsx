@@ -5,6 +5,7 @@ import { buttonVariants } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { ArrowLeft } from "lucide-react"
 import Link from "next/link"
+import { resolveAdminScope } from "@/lib/admin/rbac"
 
 export default async function AdminemployeeSignaturePage({ params }: { params: { userId: string } }) {
   const supabase = await createClient()
@@ -14,9 +15,8 @@ export default async function AdminemployeeSignaturePage({ params }: { params: {
     redirect("/auth/login")
   }
 
-  // Check if user is admin
-  const { data: me } = await supabase.from("profiles").select("is_admin, role").eq("id", data.user.id).single()
-  if (!me?.is_admin && !["developer", "super_admin", "admin"].includes(me?.role || "")) {
+  const scope = await resolveAdminScope(supabase as any, data.user.id)
+  if (!scope) {
     redirect("/dashboard")
   }
 

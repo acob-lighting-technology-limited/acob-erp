@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import Link from "next/link"
+import { ErrorState } from "@/components/ui/patterns"
 
 export default function AuthErrorPage() {
   return (
@@ -12,9 +13,11 @@ export default function AuthErrorPage() {
             <CardDescription>Something went wrong during authentication</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <p className="text-muted-foreground text-sm">
-              There was an issue with your authentication. Please try again or contact support if the problem persists.
-            </p>
+            <ErrorState
+              title="Something went wrong during authentication"
+              description="Please try again. If the problem persists, contact support."
+              className="border-0 bg-transparent p-0"
+            />
             <div className="flex gap-2">
               <Link href="/auth/login" className="flex-1">
                 <Button className="w-full">Back to Login</Button>

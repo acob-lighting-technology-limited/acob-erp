@@ -11,10 +11,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { ArrowLeft, Plus, Pencil, Trash2, Shield, Users } from "lucide-react"
+import { Plus, Pencil, Trash2, Shield, Users } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
 import { DepartmentLeadsManager } from "@/components/admin/department-leads-manager"
+import { AdminTablePage } from "@/components/admin/admin-table-page"
+import { StatCard } from "@/components/ui/stat-card"
+import { EmptyState } from "@/components/ui/patterns"
 
 interface Role {
   id: string
@@ -246,18 +249,27 @@ export default function RolesPage() {
     }))
   }
 
+  const stats = {
+    total: roles.length,
+    system: roles.filter((role) => role.is_system).length,
+    custom: roles.filter((role) => !role.is_system).length,
+  }
+
   return (
-    <div className="container mx-auto space-y-6 p-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="mb-1 flex items-center gap-2">
-            <Link href="/admin/settings" className="text-muted-foreground hover:text-foreground">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-            <h1 className="text-3xl font-bold">Roles & Permissions</h1>
-          </div>
-          <p className="text-muted-foreground">Configure access control for your organization</p>
+    <AdminTablePage
+      title="Roles & Permissions"
+      description="Configure access control for your organization."
+      icon={Shield}
+      backLinkHref="/admin/settings"
+      backLinkLabel="Back to Settings"
+      stats={
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 md:gap-4">
+          <StatCard title="Total Roles" value={stats.total} icon={Shield} />
+          <StatCard title="System Roles" value={stats.system} icon={Shield} />
+          <StatCard title="Custom Roles" value={stats.custom} icon={Users} />
         </div>
+      }
+      actions={
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button onClick={openCreate}>
@@ -265,7 +277,7 @@ export default function RolesPage() {
               Create Role
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-lg">
+          <DialogContent className="max-h-[90vh] w-[95vw] max-w-lg overflow-y-auto">
             <form onSubmit={handleSubmit}>
               <DialogHeader>
                 <DialogTitle>{editingRole ? "Edit" : "Create"} Role</DialogTitle>
@@ -291,7 +303,7 @@ export default function RolesPage() {
                 </div>
                 <div className="space-y-2">
                   <Label>Permissions</Label>
-                  <div className="grid max-h-48 grid-cols-2 gap-2 overflow-y-auto rounded-md border p-3">
+                  <div className="grid max-h-48 grid-cols-1 gap-2 overflow-y-auto rounded-md border p-3 sm:grid-cols-2">
                     {defaultPermissions.map((perm) => (
                       <div key={perm.key} className="flex items-center space-x-2">
                         <Checkbox
@@ -316,8 +328,8 @@ export default function RolesPage() {
             </form>
           </DialogContent>
         </Dialog>
-      </div>
-
+      }
+    >
       <Card>
         <CardHeader>
           <CardTitle>All Roles</CardTitle>
@@ -329,10 +341,7 @@ export default function RolesPage() {
               <div className="border-primary h-8 w-8 animate-spin rounded-full border-4 border-t-transparent"></div>
             </div>
           ) : roles.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <Shield className="text-muted-foreground mb-4 h-12 w-12" />
-              <h3 className="font-semibold">No roles defined</h3>
-            </div>
+            <EmptyState title="No roles defined" icon={Shield} />
           ) : (
             <Table>
               <TableHeader>
@@ -395,6 +404,6 @@ export default function RolesPage() {
       </Card>
 
       <DepartmentLeadsManager />
-    </div>
+    </AdminTablePage>
   )
 }

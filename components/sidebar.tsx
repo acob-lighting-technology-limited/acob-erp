@@ -50,7 +50,6 @@ interface SidebarProps {
     first_name?: string
     last_name?: string
     department?: string
-    is_admin?: boolean
     role?: UserRole
     lead_departments?: string[]
   }
@@ -58,7 +57,7 @@ interface SidebarProps {
 }
 
 const navigation = [
-  { name: "Home", href: "/dashboard/profile", icon: LayoutDashboard },
+  { name: "Home", href: "/profile", icon: LayoutDashboard },
   { name: "Job Description", href: "/job-description", icon: Briefcase },
   { name: "Projects", href: "/projects", icon: FolderKanban },
   { name: "Tasks", href: "/dashboard/tasks", icon: ClipboardList },
@@ -216,7 +215,10 @@ export function Sidebar({ user, profile, canAccessAdmin }: SidebarProps) {
       <nav className="scrollbar-custom flex-1 space-y-0.5 overflow-y-auto px-2.5 py-3">
         {/* Regular Navigation */}
         {navigation.map((item) => {
-          const isActive = pathname === item.href
+          const isHomeItem = item.href === "/profile"
+          const isActive = isHomeItem
+            ? pathname === "/profile" || pathname === "/dashboard/profile"
+            : pathname === item.href
           return (
             <Link
               key={item.name}
@@ -298,7 +300,7 @@ export function Sidebar({ user, profile, canAccessAdmin }: SidebarProps) {
       {/* Footer - Admin & Logout */}
       <div className="space-y-1.5 border-t px-2.5 py-2.5">
         {/* Go to Admin - Only for admins/leads */}
-        {(canAccessAdmin || profile?.role === "admin" || profile?.role === "super_admin") && (
+        {canAccessAdmin && (
           <Link href="/admin" className="block">
             <Button
               variant="outline"

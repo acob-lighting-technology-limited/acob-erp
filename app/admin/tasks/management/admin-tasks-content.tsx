@@ -48,6 +48,8 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { dateValidation } from "@/lib/validation"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { EmptyState } from "@/components/ui/patterns"
+import { isAssignableProfile } from "@/lib/workforce/assignment-policy"
 
 export interface Task {
   id: string
@@ -123,9 +125,7 @@ export function AdminTasksContent({
 }: AdminTasksContentProps) {
   const [tasks, setTasks] = useState<Task[]>(initialTasks)
   const [employee] = useState<employee[]>(initialemployee)
-  const activeEmployees = employee.filter(
-    (member) => member.employment_status === "active" || !member.employment_status
-  )
+  const activeEmployees = employee.filter((member) => isAssignableProfile(member, { allowLegacyNullStatus: false }))
   const [departments] = useState<string[]>(initialDepartments)
   const [projects] = useState<Project[]>(initialProjects)
   const [searchQuery, setSearchQuery] = useState("")
@@ -538,7 +538,9 @@ export function AdminTasksContent({
   }
 
   const finalTaskStatuses = new Set(["completed", "cancelled", "archived", "closed"])
-  const allPendingWorkflowTasks = tasks.filter((task) => !finalTaskStatuses.has(String(task.status || "").toLowerCase()))
+  const allPendingWorkflowTasks = tasks.filter(
+    (task) => !finalTaskStatuses.has(String(task.status || "").toLowerCase())
+  )
   const taskHistory = tasks.filter((task) => finalTaskStatuses.has(String(task.status || "").toLowerCase()))
 
   const managedDeptSet = new Set(scopedDepartments)
@@ -583,7 +585,8 @@ export function AdminTasksContent({
       if (leads.length === 0) return `${dept} Lead (Unassigned)`
       return leads.map((lead) => `${formatName(lead.first_name)} ${formatName(lead.last_name)}`.trim()).join(", ")
     }
-    if (task.assigned_to_user) return `${formatName(task.assigned_to_user.first_name)} ${formatName(task.assigned_to_user.last_name)}`
+    if (task.assigned_to_user)
+      return `${formatName(task.assigned_to_user.first_name)} ${formatName(task.assigned_to_user.last_name)}`
     return "Unassigned"
   }
 
@@ -658,7 +661,7 @@ export function AdminTasksContent({
         </div>
       }
       stats={
-        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-4 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4 md:gap-4">
           <Card className="border-2">
             <CardContent className="p-3 sm:p-6">
               <div className="flex items-center justify-between">
@@ -1108,13 +1111,15 @@ export function AdminTasksContent({
       ) : (
         <Card className="border-2">
           <CardContent className="p-12 text-center">
-            <ClipboardList className="text-muted-foreground mx-auto mb-4 h-16 w-16" />
-            <h3 className="text-foreground mb-2 text-xl font-semibold">No Tasks Found</h3>
-            <p className="text-muted-foreground">
-              {searchQuery || statusFilter !== "all" || priorityFilter !== "all"
-                ? "No tasks match your filters"
-                : "Get started by creating your first task"}
-            </p>
+            <EmptyState
+              icon={ClipboardList}
+              title="No Tasks Found"
+              description={
+                searchQuery || statusFilter !== "all" || priorityFilter !== "all"
+                  ? "No tasks match your filters."
+                  : "Get started by creating your first task."
+              }
+            />
           </CardContent>
         </Card>
       )}
@@ -1255,7 +1260,11 @@ export function AdminTasksContent({
                   <ScrollArea className="h-[200px]">
                     <CardContent className="space-y-2 p-4">
                       {activeEmployees.length === 0 ? (
-                        <p className="text-muted-foreground py-4 text-center text-sm">No employee members found</p>
+                        <EmptyState
+                          title="No employee members found"
+                          description="Activate employee records to assign this task to multiple users."
+                          className="p-4"
+                        />
                       ) : (
                         activeEmployees.map((member) => (
                           <div key={member.id} className="hover:bg-muted flex items-center space-x-2 rounded-md p-2">
@@ -1312,7 +1321,9 @@ export function AdminTasksContent({
                   </SelectTrigger>
                   <SelectContent>
                     {departments.length === 0 ? (
-                      <div className="text-muted-foreground p-4 text-center text-sm">No departments found</div>
+                      <SelectItem value="__none__" disabled>
+                        No departments found
+                      </SelectItem>
                     ) : (
                       departments.map((dept) => (
                         <SelectItem key={dept} value={dept}>
@@ -1426,4 +1437,3 @@ export function AdminTasksContent({
     </AdminTablePage>
   )
 }
-

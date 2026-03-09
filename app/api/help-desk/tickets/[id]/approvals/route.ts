@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
-import {
-  appendAuditLog,
-  appendHelpDeskEvent,
-  getAuthContext,
-  resolveLeadForDepartment,
-} from "@/lib/help-desk/server"
+import { appendAuditLog, appendHelpDeskEvent, getAuthContext, resolveLeadForDepartment } from "@/lib/help-desk/server"
 import { sendHelpDeskMail } from "@/lib/help-desk/mailer"
+import { applyAssignableStatusFilter } from "@/lib/workforce/assignment-policy"
 
 const STAGE_ORDER = [
   "requester_department_lead",
@@ -87,12 +83,9 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     const canApproveStage =
       (approvalStage === "requester_department_lead" &&
         managesDepartmentStrict(profile, ticket.requester_department)) ||
-      (approvalStage === "service_department_lead" &&
-        managesDepartmentStrict(profile, ticket.service_department)) ||
-      (approvalStage === "head_corporate_services" &&
-        managesDepartmentStrict(profile, "Corporate Services")) ||
-      (approvalStage === "managing_director" &&
-        managesDepartmentStrict(profile, "Executive Management"))
+      (approvalStage === "service_department_lead" && managesDepartmentStrict(profile, ticket.service_department)) ||
+      (approvalStage === "head_corporate_services" && managesDepartmentStrict(profile, "Corporate Services")) ||
+      (approvalStage === "managing_director" && managesDepartmentStrict(profile, "Executive Management"))
 
     if (!canApproveStage) {
       return NextResponse.json({ error: "You are not authorized to decide this approval stage" }, { status: 403 })
@@ -192,10 +185,10 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       } else {
         finalStatus = "pending_approval"
 
-        const { data: potentialApprovers } = await supabase
-          .from("profiles")
-          .select("id, full_name, role, department, is_department_lead, lead_departments")
-          .or("employment_status.eq.active,employment_status.is.null")
+        const { data: potentialApprovers } = await applyAssignableStatusFilter(
+          supabase.from("profiles").select("id, full_name, role, department, is_department_lead, lead_departments"),
+          { allowLegacyNullStatus: false }
+        )
 
         const nextApprover = ((): any | null => {
           const rows = potentialApprovers || []
@@ -208,13 +201,19 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
           if (upcomingStage === "head_corporate_services") {
             return (
               rows.find((p: any) => {
-                return p.is_department_lead && (p.department === "Corporate Services" || (p.lead_departments || []).includes("Corporate Services"))
+                return (
+                  p.is_department_lead &&
+                  (p.department === "Corporate Services" || (p.lead_departments || []).includes("Corporate Services"))
+                )
               }) || null
             )
           }
           return (
             rows.find((p: any) => {
-              return p.is_department_lead && (p.department === "Executive Management" || (p.lead_departments || []).includes("Executive Management"))
+              return (
+                p.is_department_lead &&
+                (p.department === "Executive Management" || (p.lead_departments || []).includes("Executive Management"))
+              )
             }) || null
           )
         })()

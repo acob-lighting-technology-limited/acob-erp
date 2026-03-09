@@ -1,6 +1,8 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0"
 import { Resend } from "npm:resend@2.0.0"
+import { canEdgeUserReceiveEmail, sendEdgeNotificationEmail } from "../_shared/notification-gateway.ts"
+import { normalizeAssetMailEventType, resolveAssetMailRecipientContext } from "../_shared/asset-mail-resolver.ts"
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")
@@ -51,33 +53,22 @@ serve(async (req) => {
     const notificationPayload = notificationData as any
     const assetCode = notificationPayload.asset_code || notificationPayload.unique_code
 
-    // 1. Fetch User (Recipient)
-    const { data: recipientUser, error: userError } = await supabase.auth.admin.getUserById(record.user_id)
-    if (userError || !recipientUser?.user) return new Response("User not found", { status: 200 })
-
-    const { data: recipientProfile } = await supabase
-      .from("profiles")
-      .select("full_name, department, additional_email, employment_status")
-      .eq("id", record.user_id)
-      .single()
-
-    if (recipientProfile?.employment_status !== "active") {
+    // 1. Resolve recipient context from a single resolver
+    const recipientContext = await resolveAssetMailRecipientContext(supabase as any, record.user_id)
+    if (!recipientContext) {
       console.log(`[INFO] Skipping notification for inactive recipient ${record.user_id}`)
       return new Response("Recipient is not active", { status: 200 })
     }
 
-    const recipientEmails = Array.from(
-      new Set(
-        [recipientUser.user.email, recipientProfile?.additional_email]
-          .filter((v): v is string => Boolean(v))
-          .map((v) => v.toLowerCase())
-      )
-    )
+    const { recipientEmails, recipientName, recipientFirstName, recipientDept } = recipientContext
     if (recipientEmails.length === 0) return new Response("User has no recipient email", { status: 200 })
 
-    const recipientName = recipientProfile?.full_name || "Staff Member"
-    const recipientFirstName = recipientName.split(" ")[0]
-    const recipientDept = recipientProfile?.department || "Unassigned"
+    const canReceiveEmail = await canEdgeUserReceiveEmail(supabase as any, record.user_id, "assets")
+    if (!canReceiveEmail) {
+      console.log(`[INFO] Asset email disabled by policy/preferences for recipient ${record.user_id}`)
+      return new Response("Recipient email disabled by preference/policy", { status: 200 })
+    }
+
     const mailAudience = notificationPayload.mail_audience === "oversight" ? "oversight" : "assignee"
     const oversightTargetRole = notificationPayload.oversight_target_role || "Oversight Recipient"
     const assignedEmployeeName = notificationPayload.assigned_employee_name || recipientName
@@ -88,7 +79,6 @@ serve(async (req) => {
     let assetType = "Asset"
     let assetModel = "Unknown"
     let serialNumber = "N/A"
-    let assetName = "Asset"
     let assignedByName = "System Admin"
     let assignedDate = new Date().toLocaleDateString("en-GB")
 
@@ -100,7 +90,6 @@ serve(async (req) => {
         .single()
 
       if (assetData) {
-        assetName = assetData.asset_name || assetData.asset_model || "Asset"
         // Get Friendly Label for Type
         const { data: typeData } = await supabase
           .from("asset_types")
@@ -131,8 +120,22 @@ serve(async (req) => {
     }
 
     // 3. Configure Email Content based on Type
-    const emailType = record.type || "asset_assigned"
-    console.log(`Processing ${emailType} for ${recipientEmails.join(", ")}. Assigner: ${assignedByName}`)
+    const rawEmailType = String(record.type || "asset_assigned")
+    const emailType = normalizeAssetMailEventType(rawEmailType)
+    if (!emailType) {
+      console.log(`[INFO] Skipping unsupported asset event type: ${rawEmailType}`)
+      return new Response("Unsupported asset event type", { status: 200 })
+    }
+    const statusAction = String(notificationPayload.status_action || "").toLowerCase()
+    const statusIsResolved =
+      rawEmailType === "asset_status_fixed" ||
+      rawEmailType === "system_restored" ||
+      statusAction.includes("resolved") ||
+      statusAction.includes("restored")
+
+    console.log(
+      `Processing ${emailType} (${rawEmailType}) for ${recipientEmails.join(", ")}. Assigner: ${assignedByName}`
+    )
 
     let subject = "Asset Notification"
     let title = "Asset Notification"
@@ -145,19 +148,19 @@ serve(async (req) => {
     if (mailAudience === "oversight") {
       switch (emailType) {
         case "asset_status_alert":
-          subject = `Asset Status Alert Notice - ${assetCode}`
-          title = "Asset Status Alert Notice"
-          introText = `This is to notify you that an asset assigned to <strong>${assignedEmployeeName}</strong> has a reported issue. You are receiving this copy as ${oversightTargetRole}.`
-          headerText = "Status Alert Oversight Details"
-          headerColorClass = "status-header-alert"
-          break
-        case "asset_status_fixed":
-        case "system_restored":
-          subject = `Asset Status Restored Notice - ${assetCode}`
-          title = "Asset Status Restored Notice"
-          introText = `This is to notify you that an asset assigned to <strong>${assignedEmployeeName}</strong> has been restored to operational status. You are receiving this copy as ${oversightTargetRole}.`
-          headerText = "Status Restored Oversight Details"
-          headerColorClass = "status-header-success"
+          if (statusIsResolved) {
+            subject = `Asset Status Restored Notice - ${assetCode}`
+            title = "Asset Status Restored Notice"
+            introText = `This is to notify you that an asset assigned to <strong>${assignedEmployeeName}</strong> has been restored to operational status. You are receiving this copy as ${oversightTargetRole}.`
+            headerText = "Status Restored Oversight Details"
+            headerColorClass = "status-header-success"
+          } else {
+            subject = `Asset Status Alert Notice - ${assetCode}`
+            title = "Asset Status Alert Notice"
+            introText = `This is to notify you that an asset assigned to <strong>${assignedEmployeeName}</strong> has a reported issue. You are receiving this copy as ${oversightTargetRole}.`
+            headerText = "Status Alert Oversight Details"
+            headerColorClass = "status-header-alert"
+          }
           break
         case "asset_returned":
           subject = `Asset Return Notice - ${assetCode}`
@@ -191,7 +194,6 @@ serve(async (req) => {
     } else {
       switch (emailType) {
         case "asset_assigned":
-        case "asset_assignment":
           subject = `Asset Officially Assigned - ${assetCode}`
           title = "Asset Officially Assigned"
           introText =
@@ -226,31 +228,30 @@ serve(async (req) => {
           break
 
         case "asset_status_alert":
-          subject = `Asset Status Alert - ${assetCode}`
-          title = "Asset Status Alert"
-          introText = `The status of the following asset has been updated to <strong>${(notificationPayload.status_action || "REPORTED").toUpperCase()}</strong>.`
-          headerText = "Status Change: Alert"
-          headerColorClass = "status-header-alert"
-          break
-
-        case "asset_status_fixed":
-        case "system_restored":
-          subject = `Asset Status Restored - ${assetCode}`
-          title = "Asset Status Restored"
-          introText = "The following asset has been repaired and is now fully <strong>OPERATIONAL</strong>."
-          headerText = "Status Change: Operational"
-          headerColorClass = "status-header-success"
+          if (statusIsResolved) {
+            subject = `Asset Status Restored - ${assetCode}`
+            title = "Asset Status Restored"
+            introText = "The following asset has been repaired and is now fully <strong>OPERATIONAL</strong>."
+            headerText = "Status Change: Operational"
+            headerColorClass = "status-header-success"
+          } else {
+            subject = `Asset Status Alert - ${assetCode}`
+            title = "Asset Status Alert"
+            introText = `The status of the following asset has been updated to <strong>${(notificationPayload.status_action || "REPORTED").toUpperCase()}</strong>.`
+            headerText = "Status Change: Alert"
+            headerColorClass = "status-header-alert"
+          }
           break
       }
     }
 
     // 4. Construct HTML
-    const row = (label: string, value: string, isCode = false, isMono = false) => {
+    const row = (label: string, value: string, isCode = false) => {
       const displayValue = isCode ? `<span class="asset-code">${value}</span>` : value
       return `
         <tr>
             <td class="label">${label}</td>
-            <td class="value"${isMono ? ' style="font-family:monospace;"' : ""}>
+            <td class="value">
                 ${displayValue}
             </td>
         </tr>`
@@ -267,13 +268,13 @@ serve(async (req) => {
         ${row("Asset Code", assetCode || "N/A", true)}
         ${row("Asset Type", assetType)}
         ${row("Model", assetModel)}
-        ${row("Serial Number", serialNumber, false, true)}
+        ${row("Serial Number", serialNumber)}
     `
         : `
         ${row("Asset Code", assetCode || "N/A", true)}
         ${row("Asset Type", assetType)}
         ${row("Model", assetModel)}
-        ${row("Serial Number", serialNumber, false, true)}
+        ${row("Serial Number", serialNumber)}
         ${row("Assigned To", recipientName)}
         ${row("Department", recipientDept)}
     `
@@ -291,16 +292,15 @@ serve(async (req) => {
       tableRows += row("Authorized By", notificationPayload.authorized_by || assignedByName)
       tableRows += row("Return Date", assignedDate)
     } else if (emailType === "asset_status_alert") {
-      tableRows += row(
-        "Status Note",
-        notificationPayload.status_description || notificationPayload.status_action || "Updated",
-        false,
-        false
-      )
-      tableRows += row("Reported By", notificationPayload.reported_by || assignedByName)
-      tableRows += row("Date", assignedDate)
-    } else if (emailType === "asset_status_fixed") {
-      tableRows += row("Resolution Note", notificationPayload.resolution_note || "Issue Resolved", false, false)
+      if (statusIsResolved) {
+        tableRows += row("Resolution Note", notificationPayload.resolution_note || "Issue Resolved")
+      } else {
+        tableRows += row(
+          "Status Note",
+          notificationPayload.status_description || notificationPayload.status_action || "Updated"
+        )
+        tableRows += row("Reported By", notificationPayload.reported_by || assignedByName)
+      }
       tableRows += row("Date", assignedDate)
     } else {
       // Default: Initial Assignment
@@ -332,7 +332,7 @@ serve(async (req) => {
         tr:last-child td { border-bottom: none; }
         .label { width: 40%; color: #4b5563; font-weight: 500; border-right: 1px solid #d1d5db; }
         .value { color: #111827; font-weight: 600; }
-        .asset-code { background: #000; color: #fff; font-family: monospace; padding: 4px 8px; border-radius: 4px; font-size: 12px; letter-spacing: .5px; }
+        .asset-code { background: #000; color: #fff; font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif; padding: 4px 8px; border-radius: 4px; font-size: 12px; letter-spacing: .5px; }
         .cta { text-align: center; margin-top: 32px; }
         .button { display: inline-block; background: #000; color: #fff; text-decoration: none; padding: 14px 32px; border-radius: 6px; font-weight: 600; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; }
         .support { text-align: center; font-size: 14px; color: #4b5563; margin-top: 24px; line-height: 1.5; }
@@ -349,7 +349,7 @@ serve(async (req) => {
         <img src="https://erp.acoblighting.com/images/acob-logo-dark.png" height="40" alt="ACOB Lighting">
     </div>
     <div class="wrapper">
-        <div class="title" style="${emailType === "asset_status_alert" ? "color: #991b1b;" : emailType === "asset_status_fixed" || emailType === "asset_transfer_incoming" ? "color: #166534;" : ""}">
+        <div class="title" style="${emailType === "asset_status_alert" ? (statusIsResolved ? "color: #166534;" : "color: #991b1b;") : emailType === "asset_transfer_incoming" ? "color: #166534;" : ""}">
             ${title}
         </div>
         <p class="text">Dear ${recipientFirstName},</p>
@@ -374,17 +374,13 @@ serve(async (req) => {
 </body>
 </html>`
 
-    const { error } = await resend.emails.send({
-      from: "ACOB Internal Systems <notifications@acoblighting.com>",
+    await sendEdgeNotificationEmail({
+      resend,
       to: recipientEmails,
-      subject: subject,
+      subject,
       html: emailHtml,
+      moduleName: "Assets",
     })
-
-    if (error) {
-      console.error(`[Resend Error] Failed to send email to user ${record.user_id}:`, JSON.stringify(error))
-      return new Response(JSON.stringify(error), { status: 400 })
-    }
 
     return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

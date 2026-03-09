@@ -19,7 +19,10 @@ export async function POST() {
     // Allow secure scheduled execution (e.g. Vercel Cron) via CRON secret.
     // If no valid cron token is provided, fall back to authenticated RBAC checks.
     const requestHeaders = headers()
-    const bearerToken = requestHeaders.get("authorization")?.replace(/^Bearer\s+/i, "").trim()
+    const bearerToken = requestHeaders
+      .get("authorization")
+      ?.replace(/^Bearer\s+/i, "")
+      .trim()
     const isAuthorizedCron = Boolean(cronSecret && bearerToken && bearerToken === cronSecret)
 
     if (!isAuthorizedCron) {
@@ -81,6 +84,7 @@ export async function POST() {
               message: `Leave request ${request.id} was automatically lapsed because it was not fully approved before start date.`,
               linkUrl: "/dashboard/leave",
               entityId: request.id,
+              emailEvent: "lapsed",
             })
             remindersSent += uniqueRecipients.length
           }
@@ -106,6 +110,7 @@ export async function POST() {
           message: `Leave request ${request.id} is due soon. Please review before SLA breach.`,
           linkUrl: "/dashboard/leave",
           entityId: request.id,
+          emailEvent: "sla_reminder",
         })
         remindersSent += 1
       }
@@ -124,6 +129,7 @@ export async function POST() {
             message: `Leave request ${request.id} has breached SLA at ${request.current_stage_code}.`,
             linkUrl: "/admin/hr/leave/approve",
             entityId: request.id,
+            emailEvent: "sla_breached",
           })
           remindersSent += escalateRecipients.length
         }

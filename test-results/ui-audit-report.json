@@ -1,0 +1,26 @@
+{
+  "generatedAt": "2026-03-08T23:19:42.154Z",
+  "summary": {
+    "totalPages": 156,
+    "missingLoading": 0,
+    "headerViolations": 0,
+    "tableViolations": 0,
+    "statsViolations": 0,
+    "modalViolations": 0,
+    "adHocEmptyStatePages": 0,
+    "adHocErrorStatePages": 0,
+    "adHocSectionPages": 0,
+    "adHocFormFieldPages": 0
+  },
+  "violations": {
+    "missingLoading": [],
+    "header": [],
+    "table": [],
+    "stats": [],
+    "modal": [],
+    "adHocEmptyStatePages": [],
+    "adHocErrorStatePages": [],
+    "adHocSectionPages": [],
+    "adHocFormFieldPages": []
+  }
+}

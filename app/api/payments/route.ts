@@ -49,7 +49,7 @@ export async function GET(request: Request) {
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("role, department, department_id, is_admin")
+      .select("role, department, department_id")
       .eq("id", user.id)
       .single()
     const scope = await resolveAdminScope(supabase as any, user.id)
@@ -77,7 +77,7 @@ export async function GET(request: Request) {
       } else if (departmentId) {
         query = query.eq("department_id", departmentId)
       }
-    } else if (!profile?.is_admin) {
+    } else {
       const deptId = (profile as any)?.department_id || null
       if (deptId) {
         query = query.eq("department_id", deptId)
@@ -92,9 +92,6 @@ export async function GET(request: Request) {
           .maybeSingle()
         query = userDept ? query.eq("department_id", userDept.id) : query.eq("department_id", "__none__")
       }
-    } else if (departmentId) {
-      // Admin can filter by specific department
-      query = query.eq("department_id", departmentId)
     }
 
     // Apply filters
@@ -180,7 +177,7 @@ export async function POST(request: Request) {
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("role, is_admin, department, department_id")
+      .select("role, department, department_id")
       .eq("id", user.id)
       .single()
     const scope = await resolveAdminScope(supabase as any, user.id)
@@ -201,7 +198,7 @@ export async function POST(request: Request) {
           )
         }
       }
-    } else if (!profile?.is_admin) {
+    } else {
       let userDepartmentId = (profile as any)?.department_id || null
       if (!userDepartmentId) {
         const rawDept = String((profile as any)?.department || "").trim()

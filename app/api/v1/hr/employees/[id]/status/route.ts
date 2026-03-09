@@ -3,6 +3,7 @@ import { writeAuditLog } from "@/lib/audit/write-audit"
 import { NextRequest, NextResponse } from "next/server"
 import type { EmploymentStatus } from "@/types/database"
 import { getSeparationBlockers } from "@/lib/hr/separation-blockers"
+import { canAccessAdminSection, resolveAdminScope } from "@/lib/admin/rbac"
 
 // Force dynamic rendering to allow cookies/auth
 export const dynamic = "force-dynamic"
@@ -31,14 +32,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // Check if current user has admin-level access.
-    // Accept developer and legacy superadmin naming; fallback to is_admin to reduce false 403s.
-    const { data: currentUserProfile } = await supabase.from("profiles").select("role, is_admin").eq("id", user.id).single()
-    const actorRole = (currentUserProfile?.role || "").toLowerCase()
-    const hasAdminAccess =
-      ["developer", "super_admin", "superadmin", "admin"].includes(actorRole) || currentUserProfile?.is_admin === true
-
-    if (!currentUserProfile || !hasAdminAccess) {
+    const scope = await resolveAdminScope(supabase as any, user.id)
+    if (!scope || !canAccessAdminSection(scope, "hr")) {
       return NextResponse.json({ error: "Forbidden - Admin access required" }, { status: 403 })
     }
 
@@ -108,7 +103,6 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       // CRITICAL: Downgrade permissions and remove roles upon separation
       updateData.role = "visitor"
       updateData.company_role = null
-      updateData.is_admin = false
       updateData.is_department_lead = false
       updateData.lead_departments = []
     } else {

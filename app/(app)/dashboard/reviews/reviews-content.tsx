@@ -56,9 +56,9 @@ export function ReviewsContent({ initialReviews }: ReviewsContentProps) {
       </div>
 
       {/* Summary */}
-      <div className="mb-6 grid grid-cols-2 gap-2 sm:gap-3 md:gap-4 md:grid-cols-3">
+      <div className="mb-6 grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 md:gap-4">
         <Card>
-          <CardHeader className="pb-1 px-3 pt-3 sm:px-6 sm:pt-6 sm:pb-2">
+          <CardHeader className="px-3 pt-3 pb-1 sm:px-6 sm:pt-6 sm:pb-2">
             <CardTitle className="text-sm font-medium">Total Reviews</CardTitle>
           </CardHeader>
           <CardContent>
@@ -66,7 +66,7 @@ export function ReviewsContent({ initialReviews }: ReviewsContentProps) {
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-1 px-3 pt-3 sm:px-6 sm:pt-6 sm:pb-2">
+          <CardHeader className="px-3 pt-3 pb-1 sm:px-6 sm:pt-6 sm:pb-2">
             <CardTitle className="text-sm font-medium">Average Rating</CardTitle>
           </CardHeader>
           <CardContent>
@@ -77,11 +77,11 @@ export function ReviewsContent({ initialReviews }: ReviewsContentProps) {
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-1 px-3 pt-3 sm:px-6 sm:pt-6 sm:pb-2">
+          <CardHeader className="px-3 pt-3 pb-1 sm:px-6 sm:pt-6 sm:pb-2">
             <CardTitle className="text-sm font-medium">Completed</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-lg font-bold sm:text-2xl text-green-600">
+            <div className="text-lg font-bold text-green-600 sm:text-2xl">
               {reviews.filter((r) => r.status === "completed").length}
             </div>
           </CardContent>
@@ -170,4 +170,3 @@ export function ReviewsContent({ initialReviews }: ReviewsContentProps) {
     </div>
   )
 }
-

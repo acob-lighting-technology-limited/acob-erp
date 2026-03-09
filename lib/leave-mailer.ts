@@ -1,4 +1,5 @@
-import { Resend } from "resend"
+import { DEFAULT_NOTIFICATION_SENDER, sendNotificationEmail } from "@/lib/notifications/email-gateway"
+import { withSubjectPrefix } from "@/lib/notifications/subject-policy"
 
 export interface LeaveWorkflowEmailPayload {
   to: string[]
@@ -24,18 +25,13 @@ export async function sendLeaveWorkflowEmail(payload: LeaveWorkflowEmailPayload)
   const emailEnabled = process.env.LEAVE_EMAIL_NOTIFICATIONS_ENABLED === "true"
   if (!emailEnabled) return
 
-  const apiKey = process.env.RESEND_API_KEY
-  if (!apiKey) return
-
   const recipients = Array.from(new Set(payload.to.map((email) => email.trim().toLowerCase()).filter(Boolean)))
   if (!recipients.length) return
 
-  const resend = new Resend(apiKey)
-
-  await resend.emails.send({
-    from: "ACOB ERP <notifications@acoblighting.com>",
+  await sendNotificationEmail({
+    from: DEFAULT_NOTIFICATION_SENDER,
     to: recipients,
-    subject: payload.subject,
+    subject: withSubjectPrefix("Leave", payload.subject),
     html: buildEmailHtml({ title: payload.title, message: payload.message, ctaPath: payload.ctaPath }),
   })
 }

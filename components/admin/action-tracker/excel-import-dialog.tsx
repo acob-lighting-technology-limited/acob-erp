@@ -127,7 +127,7 @@ export function ExcelImportDialog({ isOpen, onClose, onComplete, departments }: 
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-width-[425px]">
+      <DialogContent className="max-h-[90vh] w-[95vw] overflow-y-auto sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileSpreadsheet className="h-5 w-5 text-green-600" />

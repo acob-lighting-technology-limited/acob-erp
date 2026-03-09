@@ -144,6 +144,7 @@ export async function POST(request: NextRequest) {
         actorId: user.id,
         linkUrl: "/dashboard/leave",
         entityId: leave_request_id,
+        emailEvent: "rejected",
       })
 
       return NextResponse.json({ message: "Leave request rejected" })
@@ -239,6 +240,7 @@ export async function POST(request: NextRequest) {
         actorId: user.id,
         linkUrl: "/dashboard/leave",
         entityId: leave_request_id,
+        emailEvent: "approved",
       })
 
       return NextResponse.json({ message: "Final approval recorded and leave approved" })
@@ -287,6 +289,7 @@ export async function POST(request: NextRequest) {
       actorId: user.id,
       linkUrl: "/dashboard/leave",
       entityId: leave_request_id,
+      emailEvent: "approval_required",
     })
 
     return NextResponse.json({ message: "Approval recorded" })

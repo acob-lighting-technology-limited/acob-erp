@@ -14,6 +14,7 @@ import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { PageHeader, PageWrapper } from "@/components/layout"
+import Link from "next/link"
 import {
   Bell,
   AlertCircle,
@@ -221,12 +222,20 @@ export function NotificationContent({ initialNotifications, userId }: Notificati
         icon={Bell}
         backLink={{ href: "/profile", label: "Back to Dashboard" }}
         actions={
-          unreadCount > 0 ? (
-            <Button onClick={markAllAsRead} variant="outline" className="gap-2">
-              <CheckCheck className="h-4 w-4" />
-              Mark all read
-            </Button>
-          ) : null
+          <div className="flex items-center gap-2">
+            <Link href="/notification/settings">
+              <Button variant="outline" className="gap-2">
+                <Settings className="h-4 w-4" />
+                Notification Settings
+              </Button>
+            </Link>
+            {unreadCount > 0 ? (
+              <Button onClick={markAllAsRead} variant="outline" className="gap-2">
+                <CheckCheck className="h-4 w-4" />
+                Mark all read
+              </Button>
+            ) : null}
+          </div>
         }
       />
 
@@ -240,19 +249,19 @@ export function NotificationContent({ initialNotifications, userId }: Notificati
         </Card>
         <Card>
           <CardContent className="p-3 sm:p-4">
-            <div className="text-lg font-bold sm:text-2xl text-blue-600">{categoryCounts.unread}</div>
+            <div className="text-lg font-bold text-blue-600 sm:text-2xl">{categoryCounts.unread}</div>
             <div className="text-muted-foreground text-xs">Unread</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-3 sm:p-4">
-            <div className="text-lg font-bold sm:text-2xl text-green-600">{categoryCounts.tasks}</div>
+            <div className="text-lg font-bold text-green-600 sm:text-2xl">{categoryCounts.tasks}</div>
             <div className="text-muted-foreground text-xs">Tasks</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-3 sm:p-4">
-            <div className="text-lg font-bold sm:text-2xl text-purple-600">{categoryCounts.assets}</div>
+            <div className="text-lg font-bold text-purple-600 sm:text-2xl">{categoryCounts.assets}</div>
             <div className="text-muted-foreground text-xs">Assets</div>
           </CardContent>
         </Card>
@@ -473,4 +482,3 @@ export function NotificationContent({ initialNotifications, userId }: Notificati
     </PageWrapper>
   )
 }
-

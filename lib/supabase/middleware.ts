@@ -42,6 +42,19 @@ export async function updateSession(request: NextRequest) {
     .single()
   const { enabled: isMaintenanceMode } = parseMaintenanceMode(settings?.value)
 
+  // If maintenance has been disabled, users should not remain stuck on /maintenance.
+  if (!isMaintenanceMode && pathname.startsWith("/maintenance")) {
+    const url = request.nextUrl.clone()
+    if (!user) {
+      url.pathname = "/auth/login"
+      return NextResponse.redirect(url)
+    }
+
+    const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
+    url.pathname = canManageMaintenanceMode(profile?.role) ? "/admin" : "/profile"
+    return NextResponse.redirect(url)
+  }
+
   // If maintenance is on, and not already on maintenance page or statics
   if (
     isMaintenanceMode &&

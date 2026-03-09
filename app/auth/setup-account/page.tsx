@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { FormFieldGroup } from "@/components/ui/patterns"
 import Link from "next/link"
 import { useState, useEffect, useRef, useCallback, Suspense } from "react"
 
@@ -425,10 +426,11 @@ function SetupAccountContent() {
               ) : (
                 <form onSubmit={handleSetupAccount}>
                   <div className="flex flex-col gap-5">
-                    <div className="grid gap-3">
-                      <Label htmlFor="email" className="text-sm font-medium">
-                        Company Email
-                      </Label>
+                    <FormFieldGroup
+                      label="Company Email"
+                      description="Use the email address your administrator registered you with"
+                      className="grid gap-3"
+                    >
                       <Input
                         id="email"
                         type="email"
@@ -439,10 +441,7 @@ function SetupAccountContent() {
                         className="h-11 text-base"
                         autoFocus
                       />
-                      <p className="text-muted-foreground text-xs">
-                        Use the email address your administrator registered you with
-                      </p>
-                    </div>
+                    </FormFieldGroup>
 
                     <Button type="submit" className="h-11 w-full text-base font-semibold" loading={isLoading}>
                       Send Setup Link

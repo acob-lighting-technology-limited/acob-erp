@@ -108,6 +108,90 @@ export function Navbar({ user, canAccessAdmin = false, isAdminMode = false }: Na
     return localPart.substring(0, 2).toUpperCase()
   }
 
+  const accountMenu = (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" className="relative h-10 w-10 rounded-full p-0 lg:h-11 lg:w-11">
+          <Avatar className="h-10 w-10 lg:h-11 lg:w-11">
+            <AvatarFallback className="bg-primary text-primary-foreground text-sm font-semibold lg:text-base">
+              {getInitials(user?.email)}
+            </AvatarFallback>
+          </Avatar>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="w-56" align="end" forceMount>
+        <DropdownMenuLabel className="font-normal">
+          <div className="flex flex-col space-y-1">
+            <p className="text-sm leading-none font-medium">Account</p>
+            <p className="text-muted-foreground text-xs leading-none">{user?.email}</p>
+          </div>
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        {!isMaintenancePage && (
+          <>
+            <DropdownMenuItem asChild>
+              <Link href={dashboardHref} className="cursor-pointer">
+                <LayoutDashboard className="mr-2 h-4 w-4" />
+                {dashboardLabel}
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/profile" className="cursor-pointer">
+                <User className="mr-2 h-4 w-4" />
+                Profile
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/feedback" className="cursor-pointer">
+                <MessageSquare className="mr-2 h-4 w-4" />
+                Feedback
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/signature" className="cursor-pointer">
+                <FileSignature className="mr-2 h-4 w-4" />
+                Signature
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/watermark" className="cursor-pointer">
+                <Droplet className="mr-2 h-4 w-4" />
+                Watermark
+              </Link>
+            </DropdownMenuItem>
+            {canAccessAdmin && !isAdminMode && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href="/admin" className="flex cursor-pointer items-center">
+                    <ShieldCheck className="mr-2 h-4 w-4" />
+                    Admin
+                  </Link>
+                </DropdownMenuItem>
+              </>
+            )}
+            {isAdminMode && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href="/dashboard" className="flex cursor-pointer items-center">
+                    <LayoutDashboard className="mr-2 h-4 w-4" />
+                    User Dashboard
+                  </Link>
+                </DropdownMenuItem>
+              </>
+            )}
+          </>
+        )}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
+          <LogOut className="mr-2 h-4 w-4" />
+          Logout
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+
   return (
     <nav
       className={cn(
@@ -170,87 +254,13 @@ export function Navbar({ user, canAccessAdmin = false, isAdminMode = false }: Na
           <div className="hidden items-center gap-4 overflow-visible md:flex">
             {!isMaintenancePage && <ProfessionalNotificationBell isAdmin={isAdminMode} />}
             <ThemeToggle />
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-10 w-10 rounded-full p-0 lg:h-11 lg:w-11">
-                  <Avatar className="h-10 w-10 lg:h-11 lg:w-11">
-                    <AvatarFallback className="bg-primary text-primary-foreground text-sm font-semibold lg:text-base">
-                      {getInitials(user?.email)}
-                    </AvatarFallback>
-                  </Avatar>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-56" align="end" forceMount>
-                <DropdownMenuLabel className="font-normal">
-                  <div className="flex flex-col space-y-1">
-                    <p className="text-sm leading-none font-medium">Account</p>
-                    <p className="text-muted-foreground text-xs leading-none">{user?.email}</p>
-                  </div>
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {!isMaintenancePage && (
-                  <>
-                    <DropdownMenuItem asChild>
-                      <Link href={dashboardHref} className="cursor-pointer">
-                        <LayoutDashboard className="mr-2 h-4 w-4" />
-                        {dashboardLabel}
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                      <Link href="/profile" className="cursor-pointer">
-                        <User className="mr-2 h-4 w-4" />
-                        Profile
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                      <Link href="/feedback" className="cursor-pointer">
-                        <MessageSquare className="mr-2 h-4 w-4" />
-                        Feedback
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                      <Link href="/signature" className="cursor-pointer">
-                        <FileSignature className="mr-2 h-4 w-4" />
-                        Signature
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                      <Link href="/watermark" className="cursor-pointer">
-                        <Droplet className="mr-2 h-4 w-4" />
-                        Watermark
-                      </Link>
-                    </DropdownMenuItem>
-                    {canAccessAdmin && !isAdminMode && (
-                      <>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem asChild>
-                          <Link href="/admin" className="flex cursor-pointer items-center">
-                            <ShieldCheck className="mr-2 h-4 w-4" />
-                            Admin
-                          </Link>
-                        </DropdownMenuItem>
-                      </>
-                    )}
-                    {isAdminMode && (
-                      <>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem asChild>
-                          <Link href="/dashboard" className="flex cursor-pointer items-center">
-                            <LayoutDashboard className="mr-2 h-4 w-4" />
-                            User Dashboard
-                          </Link>
-                        </DropdownMenuItem>
-                      </>
-                    )}
-                  </>
-                )}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
-                  <LogOut className="mr-2 h-4 w-4" />
-                  Logout
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {accountMenu}
+          </div>
+
+          <div className="flex items-center gap-2 overflow-visible md:hidden">
+            {!isMaintenancePage && <ProfessionalNotificationBell isAdmin={isAdminMode} />}
+            <ThemeToggle />
+            {accountMenu}
           </div>
 
           {/* Mobile menu button */}

@@ -431,43 +431,43 @@ export function AdminNotificationContent({ initialNotifications }: AdminNotifica
         </Card>
         <Card>
           <CardContent className="p-3 sm:p-4">
-            <div className="text-lg font-bold sm:text-2xl text-blue-600">{categoryCounts.unread}</div>
+            <div className="text-lg font-bold text-blue-600 sm:text-2xl">{categoryCounts.unread}</div>
             <div className="text-muted-foreground text-xs">Unread</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-3 sm:p-4">
-            <div className="text-lg font-bold sm:text-2xl text-orange-600">{categoryCounts.users}</div>
+            <div className="text-lg font-bold text-orange-600 sm:text-2xl">{categoryCounts.users}</div>
             <div className="text-muted-foreground text-xs">Users</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-3 sm:p-4">
-            <div className="text-lg font-bold sm:text-2xl text-green-600">{categoryCounts.tasks}</div>
+            <div className="text-lg font-bold text-green-600 sm:text-2xl">{categoryCounts.tasks}</div>
             <div className="text-muted-foreground text-xs">Tasks</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-3 sm:p-4">
-            <div className="text-lg font-bold sm:text-2xl text-red-600">{categoryCounts.payments}</div>
+            <div className="text-lg font-bold text-red-600 sm:text-2xl">{categoryCounts.payments}</div>
             <div className="text-muted-foreground text-xs">Payments</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-3 sm:p-4">
-            <div className="text-lg font-bold sm:text-2xl text-purple-600">{categoryCounts.leave}</div>
+            <div className="text-lg font-bold text-purple-600 sm:text-2xl">{categoryCounts.leave}</div>
             <div className="text-muted-foreground text-xs">Leave</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-3 sm:p-4">
-            <div className="text-lg font-bold sm:text-2xl text-indigo-600">{categoryCounts.assets}</div>
+            <div className="text-lg font-bold text-indigo-600 sm:text-2xl">{categoryCounts.assets}</div>
             <div className="text-muted-foreground text-xs">Assets</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-3 sm:p-4">
-            <div className="text-lg font-bold sm:text-2xl text-teal-600">{categoryCounts.feedback}</div>
+            <div className="text-lg font-bold text-teal-600 sm:text-2xl">{categoryCounts.feedback}</div>
             <div className="text-muted-foreground text-xs">Feedback</div>
           </CardContent>
         </Card>
@@ -691,4 +691,3 @@ export function AdminNotificationContent({ initialNotifications }: AdminNotifica
     </PageWrapper>
   )
 }
-

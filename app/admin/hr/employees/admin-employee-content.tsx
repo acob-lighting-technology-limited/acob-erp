@@ -673,7 +673,6 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         company_role: editForm.company_role || null,
         is_department_lead: isLead,
         lead_departments: isLead ? editForm.lead_departments : [],
-        is_admin: ["developer", "super_admin", "admin"].includes(editForm.role),
         updated_at: new Date().toISOString(),
         // Always include expanded fields if they exist in form state
         first_name: editForm.first_name || null,

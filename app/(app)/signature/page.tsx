@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server"
 import { SignatureCreator } from "@/components/signature-creator"
 import { PageHeader, PageWrapper } from "@/components/layout"
 import { FileSignature } from "lucide-react"
+import { resolveAdminScope } from "@/lib/admin/rbac"
 
 export default async function SignaturePage({ searchParams }: { searchParams: { userId?: string } }) {
   const supabase = await createClient()
@@ -15,8 +16,8 @@ export default async function SignaturePage({ searchParams }: { searchParams: { 
   // If admin and userId specified, allow viewing that user's signature
   let targetUserId = data.user.id
   if (searchParams?.userId) {
-    const { data: me } = await supabase.from("profiles").select("is_admin").eq("id", data.user.id).single()
-    if (me?.is_admin) {
+    const scope = await resolveAdminScope(supabase as any, data.user.id)
+    if (scope) {
       targetUserId = searchParams.userId
     }
   }

@@ -6,12 +6,12 @@ import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ArrowLeft, Save } from "lucide-react"
-import Link from "next/link"
+import { Save } from "lucide-react"
 import { toast } from "sonner"
+import { PageHeader } from "@/components/layout/page-header"
+import { FormFieldGroup } from "@/components/ui/patterns"
 
 interface Category {
   id: string
@@ -110,23 +110,16 @@ export default function EditProductPage() {
 
   return (
     <div className="container mx-auto space-y-6 p-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="mb-1 flex items-center gap-2">
-            <Link
-              href={`/admin/inventory/products/${params.id}`}
-              className="text-muted-foreground hover:text-foreground"
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-            <h1 className="text-3xl font-bold">Edit Product</h1>
-          </div>
-        </div>
-        <Button onClick={handleSubmit} disabled={saving}>
-          <Save className="mr-2 h-4 w-4" />
-          Save Changes
-        </Button>
-      </div>
+      <PageHeader
+        title="Edit Product"
+        backLink={{ href: `/admin/inventory/products/${params.id}`, label: "Back to Product" }}
+        actions={
+          <Button onClick={handleSubmit} disabled={saving}>
+            <Save className="mr-2 h-4 w-4" />
+            Save Changes
+          </Button>
+        }
+      />
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <Card>
@@ -135,34 +128,30 @@ export default function EditProductPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label>SKU *</Label>
+              <FormFieldGroup label="SKU *">
                 <Input
                   value={formData.sku}
                   onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
                   required
                 />
-              </div>
-              <div className="space-y-2">
-                <Label>Name *</Label>
+              </FormFieldGroup>
+              <FormFieldGroup label="Name *">
                 <Input
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   required
                 />
-              </div>
+              </FormFieldGroup>
             </div>
-            <div className="space-y-2">
-              <Label>Description</Label>
+            <FormFieldGroup label="Description">
               <Textarea
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 rows={3}
               />
-            </div>
+            </FormFieldGroup>
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Category</Label>
+              <FormFieldGroup label="Category">
                 <Select
                   value={formData.category_id}
                   onValueChange={(v) => setFormData({ ...formData, category_id: v })}
@@ -178,9 +167,8 @@ export default function EditProductPage() {
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Status</Label>
+              </FormFieldGroup>
+              <FormFieldGroup label="Status">
                 <Select value={formData.status} onValueChange={(v) => setFormData({ ...formData, status: v })}>
                   <SelectTrigger>
                     <SelectValue />
@@ -190,7 +178,7 @@ export default function EditProductPage() {
                     <SelectItem value="inactive">Inactive</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
+              </FormFieldGroup>
             </div>
           </CardContent>
         </Card>
@@ -201,8 +189,7 @@ export default function EditProductPage() {
           </CardHeader>
           <CardContent>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="space-y-2">
-                <Label>Unit Cost</Label>
+              <FormFieldGroup label="Unit Cost">
                 <Input
                   type="number"
                   min="0"
@@ -210,9 +197,8 @@ export default function EditProductPage() {
                   value={formData.unit_cost}
                   onChange={(e) => setFormData({ ...formData, unit_cost: parseFloat(e.target.value) || 0 })}
                 />
-              </div>
-              <div className="space-two">
-                <Label>Selling Price</Label>
+              </FormFieldGroup>
+              <FormFieldGroup label="Selling Price">
                 <Input
                   type="number"
                   min="0"
@@ -220,25 +206,23 @@ export default function EditProductPage() {
                   value={formData.selling_price}
                   onChange={(e) => setFormData({ ...formData, selling_price: parseFloat(e.target.value) || 0 })}
                 />
-              </div>
-              <div className="space-y-2">
-                <Label>Quantity on Hand</Label>
+              </FormFieldGroup>
+              <FormFieldGroup label="Quantity on Hand">
                 <Input
                   type="number"
                   min="0"
                   value={formData.quantity_on_hand}
                   onChange={(e) => setFormData({ ...formData, quantity_on_hand: parseInt(e.target.value) || 0 })}
                 />
-              </div>
-              <div className="space-y-2">
-                <Label>Reorder Level</Label>
+              </FormFieldGroup>
+              <FormFieldGroup label="Reorder Level">
                 <Input
                   type="number"
                   min="0"
                   value={formData.reorder_level}
                   onChange={(e) => setFormData({ ...formData, reorder_level: parseInt(e.target.value) || 0 })}
                 />
-              </div>
+              </FormFieldGroup>
             </div>
           </CardContent>
         </Card>

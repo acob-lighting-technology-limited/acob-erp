@@ -10,6 +10,8 @@ import { Briefcase, Save, Edit2, Clock, Printer } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { formatName } from "@/lib/utils"
 import { writeAuditLogClient } from "@/lib/audit/client"
+import { PageHeader } from "@/components/layout"
+import { EmptyState } from "@/components/ui/patterns"
 
 export default function JobDescriptionPage() {
   const [jobDescription, setJobDescription] = useState("")
@@ -143,26 +145,27 @@ export default function JobDescriptionPage() {
       <div className="from-background via-background to-muted/20 min-h-screen bg-gradient-to-br p-4 md:p-8 print:p-4">
         <div className="mx-auto max-w-4xl space-y-6">
           {/* Header */}
-          <div className="no-print flex items-center justify-between">
-            <div>
-              <h1 className="text-foreground flex items-center gap-3 text-3xl font-bold">
-                <Briefcase className="text-primary h-8 w-8" />
-                My Job Description
-              </h1>
-              <p className="text-muted-foreground mt-2">Define and manage your role responsibilities</p>
-            </div>
-            {!isEditing && jobDescription && (
-              <div className="flex gap-2">
-                <Button onClick={handlePrint} variant="outline" className="gap-2">
-                  <Printer className="h-4 w-4" />
-                  Print
-                </Button>
-                <Button onClick={() => setIsEditing(true)} variant="outline" className="gap-2">
-                  <Edit2 className="h-4 w-4" />
-                  Edit
-                </Button>
-              </div>
-            )}
+          <div className="no-print space-y-4">
+            <PageHeader
+              title="My Job Description"
+              description="Define and manage your role responsibilities"
+              icon={Briefcase}
+              backLink={{ href: "/tools", label: "Back to Tools" }}
+              actions={
+                !isEditing && jobDescription ? (
+                  <div className="flex gap-2">
+                    <Button onClick={handlePrint} variant="outline" className="gap-2">
+                      <Printer className="h-4 w-4" />
+                      Print
+                    </Button>
+                    <Button onClick={() => setIsEditing(true)} variant="outline" className="gap-2">
+                      <Edit2 className="h-4 w-4" />
+                      Edit
+                    </Button>
+                  </div>
+                ) : null
+              }
+            />
           </div>
 
           {/* Last Updated Info */}
@@ -247,17 +250,18 @@ export default function JobDescriptionPage() {
                   {jobDescription ? (
                     <div className="text-foreground whitespace-pre-wrap">{jobDescription}</div>
                   ) : (
-                    <div className="py-12 text-center">
-                      <Briefcase className="text-muted-foreground mx-auto mb-4 h-12 w-12" />
-                      <h3 className="text-foreground mb-2 text-lg font-semibold">No job description yet</h3>
-                      <p className="text-muted-foreground mb-4">
-                        Add your job description to help others understand your role
-                      </p>
-                      <Button onClick={() => setIsEditing(true)} className="gap-2">
-                        <Edit2 className="h-4 w-4" />
-                        Add Job Description
-                      </Button>
-                    </div>
+                    <EmptyState
+                      title="No job description yet"
+                      description="Add your job description to help others understand your role."
+                      icon={Briefcase}
+                      action={
+                        <Button onClick={() => setIsEditing(true)} className="gap-2">
+                          <Edit2 className="h-4 w-4" />
+                          Add Job Description
+                        </Button>
+                      }
+                      className="border-0"
+                    />
                   )}
                 </div>
               )}

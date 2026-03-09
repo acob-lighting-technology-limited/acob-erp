@@ -32,7 +32,6 @@ export async function POST(request: Request) {
       additional_phone: "",
       residential_address: "",
       office_location: "",
-      is_admin: false,
     })
 
     if (insertError) {

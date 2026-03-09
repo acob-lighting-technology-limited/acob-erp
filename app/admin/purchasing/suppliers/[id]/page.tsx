@@ -7,9 +7,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { ArrowLeft, Pencil, Phone, Mail, MapPin, ShoppingCart } from "lucide-react"
+import { Pencil, Phone, Mail, MapPin, ShoppingCart } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
+import { PageHeader } from "@/components/layout/page-header"
+import { EmptyState } from "@/components/ui/patterns"
 
 interface Supplier {
   id: string
@@ -89,26 +91,24 @@ export default function SupplierDetailPage() {
 
   return (
     <div className="container mx-auto space-y-6 p-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="mb-1 flex items-center gap-2">
-            <Link href="/admin/purchasing/suppliers" className="text-muted-foreground hover:text-foreground">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-            <h1 className="text-3xl font-bold">{supplier.name}</h1>
-            <Badge variant={supplier.is_active ? "default" : "secondary"} className="ml-2">
+      <PageHeader
+        title={supplier.name}
+        description={supplier.code}
+        backLink={{ href: "/admin/purchasing/suppliers", label: "Back to Suppliers" }}
+        actions={
+          <>
+            <Badge variant={supplier.is_active ? "default" : "secondary"}>
               {supplier.is_active ? "Active" : "Inactive"}
             </Badge>
-          </div>
-          <p className="text-muted-foreground font-mono">{supplier.code}</p>
-        </div>
-        <Link href={`/admin/purchasing/suppliers/${supplier.id}/edit`}>
-          <Button>
-            <Pencil className="mr-2 h-4 w-4" />
-            Edit Supplier
-          </Button>
-        </Link>
-      </div>
+            <Link href={`/admin/purchasing/suppliers/${supplier.id}/edit`}>
+              <Button>
+                <Pencil className="mr-2 h-4 w-4" />
+                Edit Supplier
+              </Button>
+            </Link>
+          </>
+        }
+      />
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
@@ -157,10 +157,12 @@ export default function SupplierDetailPage() {
             </CardHeader>
             <CardContent>
               {orders.length === 0 ? (
-                <div className="flex flex-col items-center py-8 text-center">
-                  <ShoppingCart className="text-muted-foreground mb-2 h-8 w-8" />
-                  <p className="text-muted-foreground">No orders yet</p>
-                </div>
+                <EmptyState
+                  title="No orders yet"
+                  description="Recent purchase orders for this supplier will appear here."
+                  icon={ShoppingCart}
+                  className="border-0"
+                />
               ) : (
                 <Table>
                   <TableHeader>

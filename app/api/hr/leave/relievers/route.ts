@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { listAssignableProfiles } from "@/lib/workforce/assignment-policy"
 
 export async function GET() {
   try {
@@ -10,12 +11,12 @@ export async function GET() {
 
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("id, full_name, first_name, last_name, employment_status")
-      .eq("employment_status", "active")
-      .neq("id", user.id)
-      .order("first_name", { ascending: true })
+    const { data, error } = await listAssignableProfiles(supabase, {
+      select: "id, full_name, first_name, last_name, employment_status",
+      allowLegacyNullStatus: false,
+      excludeUserId: user.id,
+      orderBy: "first_name",
+    })
 
     if (error) return NextResponse.json({ error: "Failed to fetch relievers" }, { status: 500 })
 

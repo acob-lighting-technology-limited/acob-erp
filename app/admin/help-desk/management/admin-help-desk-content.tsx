@@ -8,6 +8,11 @@ import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { AdminTablePage } from "@/components/admin/admin-table-page"
+import { StatCard } from "@/components/ui/stat-card"
+import { EmptyState } from "@/components/ui/patterns"
+import { Headset, Clock, AlertCircle, CheckCircle2 } from "lucide-react"
+import { isAssignableProfile } from "@/lib/workforce/assignment-policy"
 
 interface HelpDeskTicket {
   id: string
@@ -66,7 +71,10 @@ function stageLabel(stage: string | null) {
   return stage.replaceAll("_", " ")
 }
 
-function managesDepartment(member: { department: string | null; lead_departments: string[] }, department: string | null) {
+function managesDepartment(
+  member: { department: string | null; lead_departments: string[] },
+  department: string | null
+) {
   if (!department) return false
   return member.department === department || member.lead_departments.includes(department)
 }
@@ -315,7 +323,8 @@ export function AdminHelpDeskContent({ initialTickets, employees, leadDirectory,
               <div className="font-medium">{ticket.ticket_number}</div>
               <div className="text-muted-foreground text-xs">{ticket.title}</div>
               <div className="text-muted-foreground mt-1 text-[11px]">
-                {ticket.request_type} | requester: {ticket.requester_department || "-"} | service: {ticket.service_department}
+                {ticket.request_type} | requester: {ticket.requester_department || "-"} | service:{" "}
+                {ticket.service_department}
               </div>
             </TableCell>
             <TableCell>{ticket.service_department}</TableCell>
@@ -344,7 +353,7 @@ export function AdminHelpDeskContent({ initialTickets, employees, leadDirectory,
                         {employees
                           .filter(
                             (employee) =>
-                              (employee.employment_status === "active" || employee.employment_status == null) &&
+                              isAssignableProfile(employee, { allowLegacyNullStatus: false }) &&
                               (!employee.department || employee.department === ticket.service_department)
                           )
                           .map((employee) => (
@@ -424,16 +433,17 @@ export function AdminHelpDeskContent({ initialTickets, employees, leadDirectory,
                       Reopen Queue
                     </Button>
                   )}
-                  {(ticket.status === "in_progress" || ticket.status === "assigned") && ticket.assigned_to === viewer.id && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => pivot(ticket.id)}
-                      disabled={loadingTicketId === ticket.id}
-                    >
-                      Pivot
-                    </Button>
-                  )}
+                  {(ticket.status === "in_progress" || ticket.status === "assigned") &&
+                    ticket.assigned_to === viewer.id && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => pivot(ticket.id)}
+                        disabled={loadingTicketId === ticket.id}
+                      >
+                        Pivot
+                      </Button>
+                    )}
                   {ticket.status === "pending_approval" && myActionQueue.some((row) => row.id === ticket.id) && (
                     <>
                       <Button
@@ -464,42 +474,33 @@ export function AdminHelpDeskContent({ initialTickets, employees, leadDirectory,
   )
 
   return (
-    <div className="space-y-6 p-6">
-      <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">Total Tickets</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-lg font-bold sm:text-2xl">{stats.total}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">In Progress</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-lg font-bold sm:text-2xl">{stats.inProgress}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">Pending Approvals</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-lg font-bold sm:text-2xl">{stats.pendingApproval}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">SLA Breached</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-lg font-bold sm:text-2xl">{stats.breached}</p>
-          </CardContent>
-        </Card>
-      </div>
-
+    <AdminTablePage
+      title="Help Desk Workflow"
+      description="Manage ticket routing, approvals, and escalations."
+      icon={Headset}
+      backLinkHref="/admin"
+      backLinkLabel="Back to Admin"
+      stats={
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4 md:gap-4">
+          <StatCard title="Total Tickets" value={stats.total} icon={Headset} />
+          <StatCard title="In Progress" value={stats.inProgress} icon={Clock} />
+          <StatCard
+            title="Pending Approvals"
+            value={stats.pendingApproval}
+            icon={AlertCircle}
+            iconBgColor="bg-orange-100 dark:bg-orange-900/30"
+            iconColor="text-orange-600 dark:text-orange-400"
+          />
+          <StatCard
+            title="SLA Breached"
+            value={stats.breached}
+            icon={CheckCircle2}
+            iconBgColor="bg-red-100 dark:bg-red-900/30"
+            iconColor="text-red-600 dark:text-red-400"
+          />
+        </div>
+      }
+    >
       <Tabs defaultValue="pending">
         <TabsList>
           <TabsTrigger value="pending">Pending Queue ({allPendingTickets.length})</TabsTrigger>
@@ -511,13 +512,28 @@ export function AdminHelpDeskContent({ initialTickets, employees, leadDirectory,
             <CardHeader>
               <CardTitle>All Pending Help Desk Workflow</CardTitle>
             </CardHeader>
-            <CardContent className="overflow-x-auto">{renderQueueTable(allPendingTickets, false)}</CardContent>
+            <CardContent className="overflow-x-auto">
+              {allPendingTickets.length === 0 ? (
+                <EmptyState title="No pending tickets" description="New pending workflow tickets will appear here." />
+              ) : (
+                renderQueueTable(allPendingTickets, false)
+              )}
+            </CardContent>
           </Card>
           <Card>
             <CardHeader>
               <CardTitle>My Action Queue</CardTitle>
             </CardHeader>
-            <CardContent className="overflow-x-auto">{renderQueueTable(myActionQueue, true)}</CardContent>
+            <CardContent className="overflow-x-auto">
+              {myActionQueue.length === 0 ? (
+                <EmptyState
+                  title="No tickets assigned to you"
+                  description="Your actionable queue is currently empty."
+                />
+              ) : (
+                renderQueueTable(myActionQueue, true)
+              )}
+            </CardContent>
           </Card>
         </TabsContent>
 
@@ -526,11 +542,16 @@ export function AdminHelpDeskContent({ initialTickets, employees, leadDirectory,
             <CardHeader>
               <CardTitle>Help Desk History</CardTitle>
             </CardHeader>
-            <CardContent className="overflow-x-auto">{renderQueueTable(historyTickets, false)}</CardContent>
+            <CardContent className="overflow-x-auto">
+              {historyTickets.length === 0 ? (
+                <EmptyState title="No history tickets" description="Resolved and closed tickets will appear here." />
+              ) : (
+                renderQueueTable(historyTickets, false)
+              )}
+            </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
-    </div>
+    </AdminTablePage>
   )
 }
-

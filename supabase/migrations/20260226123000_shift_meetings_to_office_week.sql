@@ -99,7 +99,7 @@ set
 where ai.year = 2026;
 
 -- One-time schedules only
-update public.digest_schedules ds
+update public.weekly_report_schedules ds
 set
   meeting_week = case
     when ds.meeting_week - 2 >= 1 then ds.meeting_week - 2

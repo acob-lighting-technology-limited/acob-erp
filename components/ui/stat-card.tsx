@@ -71,9 +71,16 @@ export function StatCard({
         </CardHeader>
         <CardContent className="px-3 pb-3 sm:px-6 sm:pb-6">
           <div className="text-lg font-bold sm:text-3xl">{value}</div>
-          {description && <p className="text-muted-foreground mt-1 line-clamp-1 text-[10px] sm:text-sm">{description}</p>}
+          {description && (
+            <p className="text-muted-foreground mt-1 line-clamp-1 text-[10px] sm:text-sm">{description}</p>
+          )}
           {trend && (
-            <p className={cn("mt-1 text-[10px] sm:mt-2 sm:text-sm", trend.value >= 0 ? "text-green-600" : "text-red-600")}>
+            <p
+              className={cn(
+                "mt-1 text-[10px] sm:mt-2 sm:text-sm",
+                trend.value >= 0 ? "text-green-600" : "text-red-600"
+              )}
+            >
               {trend.value >= 0 ? "+" : ""}
               {trend.value}% {trend.label}
             </p>

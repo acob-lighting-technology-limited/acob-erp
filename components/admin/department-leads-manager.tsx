@@ -19,6 +19,7 @@ import { Label } from "@/components/ui/label"
 import { SearchableSelect } from "@/components/ui/searchable-select"
 import { toast } from "sonner"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { applyAssignableStatusFilter } from "@/lib/workforce/assignment-policy"
 
 interface Department {
   id: string
@@ -109,12 +110,12 @@ export function DepartmentLeadsManager() {
     // Fetch potential leads from active users (excluding visitors).
     try {
       const supabase = createClient()
-      const { data, error } = await supabase
+      const baseQuery = supabase
         .from("profiles")
         .select("id, first_name, last_name, company_email, role, department, is_department_lead")
-        .eq("employment_status", "active")
         .neq("role", "visitor") // Exclude visitors
         .order("first_name")
+      const { data, error } = await applyAssignableStatusFilter(baseQuery, { allowLegacyNullStatus: false })
 
       if (error) {
         console.error("Error fetching potential leads:", error)
@@ -224,7 +225,7 @@ export function DepartmentLeadsManager() {
         )}
 
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent>
+          <DialogContent className="max-h-[90vh] w-[95vw] max-w-lg overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Assign Lead - {selectedDept?.name}</DialogTitle>
               <DialogDescription>Select a user to mark as the lead for this department.</DialogDescription>

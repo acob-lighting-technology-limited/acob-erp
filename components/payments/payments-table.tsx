@@ -120,7 +120,7 @@ interface PaymentsTableProps {
   currentUser: {
     id: string
     department_id: string | null
-    is_admin: boolean
+    isAdmin: boolean
   }
   /** Base path for detail pages - default "/admin/payments" for admin, "/payments" for users */
   basePath?: string
@@ -132,7 +132,7 @@ export function PaymentsTable({
   initialCategories = [],
   initialError = null,
   currentUser,
-  basePath = currentUser.is_admin ? "/admin/payments" : "/payments",
+  basePath = currentUser.isAdmin ? "/admin/payments" : "/payments",
 }: PaymentsTableProps) {
   const router = useRouter()
   const [payments, setPayments] = useState<Payment[]>(initialPayments)
@@ -770,7 +770,7 @@ export function PaymentsTable({
   }
 
   // Get departments list for filter (if admin, show all; otherwise just user's dept)
-  const filterableDepartments = currentUser.is_admin
+  const filterableDepartments = currentUser.isAdmin
     ? departments
     : departments.filter((d) => d.id === currentUser.department_id)
 
@@ -878,7 +878,7 @@ export function PaymentsTable({
             />
           </div>
           <div className="flex gap-2">
-            {currentUser.is_admin && (
+            {currentUser.isAdmin && (
               <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
                 <SelectTrigger className="flex-1 sm:w-[180px]">
                   <SelectValue placeholder="Department" />
@@ -1082,7 +1082,7 @@ export function PaymentsTable({
                     <SelectValue placeholder="Select Department" />
                   </SelectTrigger>
                   <SelectContent>
-                    {(currentUser.is_admin ? departments : filterableDepartments).map((dept) => (
+                    {(currentUser.isAdmin ? departments : filterableDepartments).map((dept) => (
                       <SelectItem key={dept.id} value={dept.id}>
                         {dept.name}
                       </SelectItem>
@@ -1303,7 +1303,7 @@ export function PaymentsTable({
 
       {/* Receipt Selection Dialog */}
       <Dialog open={receiptDialogOpen} onOpenChange={setReceiptDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] w-[95vw] max-w-md overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Select Receipt to Print</DialogTitle>
             <DialogDescription>Choose which receipt you want to print for this payment.</DialogDescription>

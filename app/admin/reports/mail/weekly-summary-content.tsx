@@ -119,7 +119,7 @@ export function WeeklySummaryContent({ employees, currentUser }: Props) {
           { failOpen: true }
         )
       } catch (error) {
-        console.error("[weekly-summary] Failed to write audit log", error)
+        console.error("[weekly-report] Failed to write audit log", error)
       }
     },
     [currentUser?.department, currentUser?.id, supabase]
@@ -130,7 +130,7 @@ export function WeeklySummaryContent({ employees, currentUser }: Props) {
     setLoadingSchedules(true)
     try {
       const { data, error } = await supabase
-        .from("digest_schedules")
+        .from("weekly_report_schedules")
         .select("*")
         .eq("is_active", true)
         .order("created_at", { ascending: false })
@@ -316,7 +316,7 @@ export function WeeklySummaryContent({ employees, currentUser }: Props) {
         return
       }
 
-      const { error } = await supabase.from("digest_schedules").insert({
+      const { error } = await supabase.from("weekly_report_schedules").insert({
         schedule_type: "one_time",
         meeting_week: weekNumber,
         meeting_year: yearNumber,
@@ -359,7 +359,7 @@ export function WeeklySummaryContent({ employees, currentUser }: Props) {
       nextRun.setDate(now.getDate() + daysUntil)
       nextRun.setHours(parseInt(h, 10), parseInt(m, 10), 0, 0)
 
-      const { error } = await supabase.from("digest_schedules").insert({
+      const { error } = await supabase.from("weekly_report_schedules").insert({
         schedule_type: "recurring",
         recipients: resolvedRecipients,
         content_choice: "both", // Recurring always sends both reports
@@ -385,7 +385,7 @@ export function WeeklySummaryContent({ employees, currentUser }: Props) {
   const doSend = async () => {
     setIsSending(true)
     setSendResult(null)
-    const toastId = toast.loading(`Sending weekly summary to ${resolvedRecipients.length} recipient(s)...`)
+    const toastId = toast.loading(`Sending weekly report to ${resolvedRecipients.length} recipient(s)...`)
 
     try {
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -410,7 +410,7 @@ export function WeeklySummaryContent({ employees, currentUser }: Props) {
         payload.actionTrackerFilename = manualActionTracker.file?.name || undefined
       }
 
-      const res = await fetch(`${supabaseUrl}/functions/v1/send-weekly-digest`, {
+      const res = await fetch(`${supabaseUrl}/functions/v1/send-weekly-report`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -420,20 +420,20 @@ export function WeeklySummaryContent({ employees, currentUser }: Props) {
       })
 
       const result = await res.json()
-      if (!res.ok) throw new Error(result.error || "Failed to send weekly summary")
+      if (!res.ok) throw new Error(result.error || "Failed to send weekly report")
 
       setSendResult(result)
       const successCount = result.results?.filter((r: any) => r.success).length || 0
       const failCount = result.results?.filter((r: any) => !r.success).length || 0
 
       if (failCount === 0) {
-        toast.success(`✅ Weekly summary sent to ${successCount} recipient(s)`, { id: toastId })
+        toast.success(`✅ Weekly report sent to ${successCount} recipient(s)`, { id: toastId })
       } else {
         toast.warning(`Sent to ${successCount}, failed for ${failCount}`, { id: toastId })
       }
 
       await logMailAudit({
-        action: "weekly_summary_sent",
+        action: "weekly_report_sent",
         entityId: crypto.randomUUID(),
         metadata: {
           meeting_week: weekNumber,
@@ -446,15 +446,15 @@ export function WeeklySummaryContent({ employees, currentUser }: Props) {
         },
       })
     } catch (err: any) {
-      console.error("[Weekly Summary Error]", err)
-      toast.error(err.message || "Failed to send weekly summary", { id: toastId })
+      console.error("[Weekly Report Error]", err)
+      toast.error(err.message || "Failed to send weekly report", { id: toastId })
     } finally {
       setIsSending(false)
     }
   }
 
   const deactivateSchedule = async (id: string) => {
-    const { error } = await supabase.from("digest_schedules").update({ is_active: false }).eq("id", id)
+    const { error } = await supabase.from("weekly_report_schedules").update({ is_active: false }).eq("id", id)
     if (error) {
       toast.error("Failed to deactivate schedule")
     } else {
@@ -471,7 +471,7 @@ export function WeeklySummaryContent({ employees, currentUser }: Props) {
     <PageWrapper maxWidth="full" background="gradient">
       <PageHeader
         title="Weekly Summary Mailings"
-        description="Send weekly summary packs (weekly reports + action points) to selected recipients."
+        description="Send weekly report packs (weekly reports + action points) to selected recipients."
         icon={Mail}
         backLink={{ href: "/admin/reports", label: "Back to Reports" }}
       />
@@ -784,7 +784,7 @@ export function WeeklySummaryContent({ employees, currentUser }: Props) {
 
               {recipientMode === "all" && (
                 <p className="text-muted-foreground text-sm">
-                  The weekly summary will be sent to all <strong>{employees.length}</strong> active employees.
+                  The weekly report will be sent to all <strong>{employees.length}</strong> active employees.
                 </p>
               )}
             </CardContent>

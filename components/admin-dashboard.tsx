@@ -15,8 +15,6 @@ import Link from "next/link"
 import { AdminUserModal } from "./admin-user-modal"
 import { formatName } from "@/lib/utils"
 
-
-
 interface AdminDashboardProps {
   users: any[]
   currentUserId: string

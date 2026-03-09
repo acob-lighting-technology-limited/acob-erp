@@ -105,7 +105,7 @@ async function getPaymentsData() {
     currentUser: {
       id: user.id,
       department_id: null, // Admin doesn't have a specific department filter
-      is_admin: true,
+      isAdmin: true,
     },
   }
 }
@@ -121,7 +121,7 @@ export default async function AdminPaymentsPage() {
     payments: Payment[]
     departments: Department[]
     categories: Category[]
-    currentUser: { id: string; department_id: string | null; is_admin: boolean }
+    currentUser: { id: string; department_id: string | null; isAdmin: boolean }
   }
 
   return (

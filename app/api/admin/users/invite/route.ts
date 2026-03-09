@@ -179,7 +179,6 @@ export async function POST(request: Request) {
 
     if (roleToApply) {
       profilePayload.role = roleToApply
-      profilePayload.is_admin = ["developer", "super_admin", "admin"].includes(roleToApply)
       // Role changes do NOT affect department lead status
     }
     if (first_name !== undefined) profilePayload.first_name = first_name

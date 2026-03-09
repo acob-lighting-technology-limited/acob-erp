@@ -25,4 +25,3 @@ export default function RootError({ error, reset }: { error: Error & { digest?: 
     </div>
   )
 }
-

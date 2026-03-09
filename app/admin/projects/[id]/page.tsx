@@ -32,6 +32,8 @@ import { toast } from "sonner"
 import { ArrowLeft, Plus, Edit, Trash2, Users, Package, User, UserPlus, X } from "lucide-react"
 import Link from "next/link"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { PageHeader } from "@/components/layout/page-header"
+import { EmptyState, FormFieldGroup } from "@/components/ui/patterns"
 
 interface Project {
   id: string
@@ -427,18 +429,11 @@ export default function AdminProjectDetailPage() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 p-6">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <Link href="/admin/projects">
-          <Button variant="ghost" size="icon">
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-        </Link>
-        <div className="flex-1">
-          <h1 className="text-3xl font-bold tracking-tight">{project.project_name}</h1>
-          <p className="text-muted-foreground mt-1">Manage project members and items</p>
-        </div>
-      </div>
+      <PageHeader
+        title={project.project_name}
+        description="Manage project members and items"
+        backLink={{ href: "/admin/projects", label: "Back to Projects" }}
+      />
 
       {/* Tabs */}
       <Tabs defaultValue="members" className="space-y-4">
@@ -468,9 +463,12 @@ export default function AdminProjectDetailPage() {
             </CardHeader>
             <CardContent>
               {members.length === 0 ? (
-                <div className="text-muted-foreground py-8 text-center">
-                  No members assigned yet. Click "Add Member" to get started.
-                </div>
+                <EmptyState
+                  title="No members assigned yet"
+                  description='Click "Add Member" to get started.'
+                  icon={Users}
+                  className="border-0"
+                />
               ) : (
                 <div className="space-y-3">
                   {members.map((member) => (
@@ -516,9 +514,12 @@ export default function AdminProjectDetailPage() {
             </CardHeader>
             <CardContent>
               {items.length === 0 ? (
-                <div className="text-muted-foreground py-8 text-center">
-                  No items added yet. Click "Add Item" to get started.
-                </div>
+                <EmptyState
+                  title="No items added yet"
+                  description='Click "Add Item" to get started.'
+                  icon={Package}
+                  className="border-0"
+                />
               ) : (
                 <div className="space-y-3">
                   {items.map((item) => (
@@ -558,7 +559,7 @@ export default function AdminProjectDetailPage() {
 
       {/* Add Member Dialog */}
       <Dialog open={isMemberDialogOpen} onOpenChange={setIsMemberDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] w-[95vw] max-w-xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add Project Member</DialogTitle>
             <DialogDescription>Assign a employee member to this project</DialogDescription>
@@ -580,8 +581,7 @@ export default function AdminProjectDetailPage() {
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="role">Role</Label>
+            <FormFieldGroup label="Role">
               <Select value={memberForm.role} onValueChange={(value) => setMemberForm({ ...memberForm, role: value })}>
                 <SelectTrigger>
                   <SelectValue />
@@ -592,7 +592,7 @@ export default function AdminProjectDetailPage() {
                   <SelectItem value="manager">Manager</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
+            </FormFieldGroup>
           </div>
 
           <DialogFooter>
@@ -608,7 +608,7 @@ export default function AdminProjectDetailPage() {
 
       {/* Add/Edit Item Dialog */}
       <Dialog open={isItemDialogOpen} onOpenChange={setIsItemDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] w-[95vw] max-w-xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{selectedItem ? "Edit Item" : "Add Item"}</DialogTitle>
             <DialogDescription>

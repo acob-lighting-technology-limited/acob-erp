@@ -71,8 +71,7 @@ export function DocumentationContent({
 }: DocumentationContentProps) {
   const searchParams = useSearchParams()
   const tabFromUrl = searchParams.get("tab")
-  const initialTab =
-    defaultTab || (tabFromUrl === "department-documents" ? "department-documents" : "knowledge-docs")
+  const initialTab = defaultTab || (tabFromUrl === "department-documents" ? "department-documents" : "knowledge-docs")
   const [activeTab, setActiveTab] = useState<"knowledge-docs" | "department-documents">(
     initialTab as "knowledge-docs" | "department-documents"
   )
@@ -331,394 +330,405 @@ export function DocumentationContent({
 
       <TabsContent value="knowledge-docs" className="space-y-4">
         <AppTablePage
-      title="My Documentation"
-      description="Create and manage your work documentation"
-      icon={FileText}
-      backLinkHref={backLinkHref}
-      backLinkLabel={backLinkLabel}
-      actions={
-        <div className="flex items-center gap-2">
-          <div className="flex items-center rounded-lg border p-1">
-            <Button
-              variant={viewMode === "list" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setViewMode("list")}
-              className="gap-1 sm:gap-2"
-            >
-              <List className="h-4 w-4" />
-              <span className="hidden sm:inline">List</span>
-            </Button>
-            <Button
-              variant={viewMode === "card" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setViewMode("card")}
-              className="gap-1 sm:gap-2"
-            >
-              <LayoutGrid className="h-4 w-4" />
-              <span className="hidden sm:inline">Card</span>
-            </Button>
-          </div>
-          <Button onClick={openCreateDialog} className="gap-2">
-            <Plus className="h-4 w-4" />
-            New Document
-          </Button>
-        </div>
-      }
-      stats={
-        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 md:gap-4">
-          <Card className="border-2">
-            <CardContent className="p-3 sm:p-4 md:p-6">
-              <div className="flex items-center justify-between">
-                <div className="min-w-0 flex-1">
-                  <p className="text-muted-foreground truncate text-[10px] font-medium sm:text-xs md:text-sm">
-                    Total Documents
-                  </p>
-                  <p className="text-foreground mt-1 text-lg font-bold sm:text-xl md:mt-2 md:text-3xl">
-                    {stats.total}
-                  </p>
-                </div>
-                <FileText className="h-5 w-5 shrink-0 text-blue-600 sm:h-6 sm:w-6 md:h-8 md:w-8 dark:text-blue-400" />
+          title="My Documentation"
+          description="Create and manage your work documentation"
+          icon={FileText}
+          backLinkHref={backLinkHref}
+          backLinkLabel={backLinkLabel}
+          actions={
+            <div className="flex items-center gap-2">
+              <div className="flex items-center rounded-lg border p-1">
+                <Button
+                  variant={viewMode === "list" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setViewMode("list")}
+                  className="gap-1 sm:gap-2"
+                >
+                  <List className="h-4 w-4" />
+                  <span className="hidden sm:inline">List</span>
+                </Button>
+                <Button
+                  variant={viewMode === "card" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setViewMode("card")}
+                  className="gap-1 sm:gap-2"
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                  <span className="hidden sm:inline">Card</span>
+                </Button>
               </div>
-            </CardContent>
-          </Card>
-          <Card className="border-2">
-            <CardContent className="p-3 sm:p-4 md:p-6">
-              <div className="flex items-center justify-between">
-                <div className="min-w-0 flex-1">
-                  <p className="text-muted-foreground truncate text-[10px] font-medium sm:text-xs md:text-sm">
-                    Published
-                  </p>
-                  <p className="text-foreground mt-1 text-lg font-bold sm:text-xl md:mt-2 md:text-3xl">
-                    {stats.published}
-                  </p>
-                </div>
-                <Eye className="h-5 w-5 shrink-0 text-green-600 sm:h-6 sm:w-6 md:h-8 md:w-8 dark:text-green-400" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="border-2">
-            <CardContent className="p-3 sm:p-4 md:p-6">
-              <div className="flex items-center justify-between">
-                <div className="min-w-0 flex-1">
-                  <p className="text-muted-foreground truncate text-[10px] font-medium sm:text-xs md:text-sm">Drafts</p>
-                  <p className="text-foreground mt-1 text-lg font-bold sm:text-xl md:mt-2 md:text-3xl">
-                    {stats.draft}
-                  </p>
-                </div>
-                <EyeOff className="h-5 w-5 shrink-0 text-yellow-600 sm:h-6 sm:w-6 md:h-8 md:w-8 dark:text-yellow-400" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      }
-      filters={
-        <div className="flex flex-wrap gap-4">
-          <div className="min-w-[200px] flex-1">
-            <div className="relative">
-              <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform" />
-              <Input
-                placeholder="Search documentation..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
+              <Button onClick={openCreateDialog} className="gap-2">
+                <Plus className="h-4 w-4" />
+                New Document
+              </Button>
             </div>
-          </div>
-          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="Filter by category" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Documents</SelectItem>
-              <SelectItem value="published">Published</SelectItem>
-              <SelectItem value="draft">Drafts</SelectItem>
-              {CATEGORIES.map((cat) => (
-                <SelectItem key={cat} value={cat}>
-                  {cat}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      }
-    >
-      {/* Documentation List */}
-      {filteredDocs.length > 0 ? (
-        viewMode === "list" ? (
-          <Card className="border-2">
-            <CardContent className="p-6">
-              <div className="table-responsive">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-12">#</TableHead>
-                      <TableHead>Title</TableHead>
-                      <TableHead>Category</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Updated</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredDocs.map((doc, index) => (
-                      <TableRow key={doc.id}>
-                        <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
-                        <TableCell className="font-medium">{doc.title}</TableCell>
-                        <TableCell>
-                          {doc.category ? (
-                            <Badge variant="outline" className="text-xs">
-                              {doc.category}
-                            </Badge>
-                          ) : (
-                            "-"
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={getStatusColor(doc.is_draft)}>{doc.is_draft ? "Draft" : "Published"}</Badge>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground text-sm">{formatDate(doc.updated_at)}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleViewDocument(doc)}
-                              className="h-8 w-8 gap-1 p-0 sm:h-auto sm:w-auto sm:gap-2 sm:p-2"
-                              title="View document"
-                            >
-                              <Eye className="h-3 w-3 sm:h-4 sm:w-4" />
-                              <span className="hidden sm:inline">View</span>
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => openEditDialog(doc)}
-                              className="h-8 w-8 gap-1 p-0 sm:h-auto sm:w-auto sm:gap-2 sm:p-2"
-                              title="Edit document"
-                            >
-                              <Edit2 className="h-3 w-3 sm:h-4 sm:w-4" />
-                              <span className="hidden sm:inline">Edit</span>
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                setSelectedDoc(doc)
-                                setIsDeleteDialogOpen(true)
-                              }}
-                              className="h-8 w-8 gap-1 p-0 text-red-600 hover:text-red-700 sm:h-auto sm:w-auto sm:gap-2 sm:p-2"
-                              title="Delete document"
-                            >
-                              <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
-                              <span className="hidden sm:inline">Delete</span>
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-4 md:grid-cols-2">
-            {filteredDocs.map((doc) => (
-              <Card key={doc.id} className="border-2 shadow-md transition-all hover:shadow-lg">
-                <CardHeader className="from-primary/5 to-background border-b bg-gradient-to-r">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1">
-                      <CardTitle className="flex items-center gap-2 text-lg">
-                        {doc.title}
-                        {doc.is_draft && (
-                          <Badge variant="outline" className="bg-yellow-50 text-yellow-700 dark:bg-yellow-900/30">
-                            Draft
-                          </Badge>
-                        )}
-                      </CardTitle>
-                      {doc.category && <CardDescription className="mt-1">{doc.category}</CardDescription>}
+          }
+          stats={
+            <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 md:gap-4">
+              <Card className="border-2">
+                <CardContent className="p-3 sm:p-4 md:p-6">
+                  <div className="flex items-center justify-between">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-muted-foreground truncate text-[10px] font-medium sm:text-xs md:text-sm">
+                        Total Documents
+                      </p>
+                      <p className="text-foreground mt-1 text-lg font-bold sm:text-xl md:mt-2 md:text-3xl">
+                        {stats.total}
+                      </p>
                     </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4 p-6">
-                  <div className="max-h-48 overflow-auto rounded-md border p-3">
-                    <MarkdownContent content={doc.content} />
-                  </div>
-
-                  {doc.tags && doc.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-2">
-                      {doc.tags.map((tag, i) => (
-                        <Badge key={i} variant="outline" className="gap-1">
-                          <Tag className="h-3 w-3" />
-                          {tag}
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
-
-                  <div className="text-muted-foreground text-xs">Last updated: {formatDate(doc.updated_at)}</div>
-
-                  <div className="flex gap-2 pt-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleViewDocument(doc)}
-                      className="flex-1 gap-2"
-                    >
-                      <Eye className="h-4 w-4" />
-                      View
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => openEditDialog(doc)} className="flex-1 gap-2">
-                      <Edit2 className="h-4 w-4" />
-                      Edit
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        setSelectedDoc(doc)
-                        setIsDeleteDialogOpen(true)
-                      }}
-                      className="gap-2 text-red-600 hover:text-red-700"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      Delete
-                    </Button>
+                    <FileText className="h-5 w-5 shrink-0 text-blue-600 sm:h-6 sm:w-6 md:h-8 md:w-8 dark:text-blue-400" />
                   </div>
                 </CardContent>
               </Card>
-            ))}
-          </div>
-        )
-      ) : (
-        <Card className="border-2">
-          <CardContent className="p-12 text-center">
-            <FileText className="text-muted-foreground mx-auto mb-4 h-16 w-16" />
-            <h3 className="text-foreground mb-2 text-xl font-semibold">
-              {searchQuery || categoryFilter !== "all" ? "No documents found" : "No documentation yet"}
-            </h3>
-            <p className="text-muted-foreground mb-4">
-              {searchQuery || categoryFilter !== "all"
-                ? "Try adjusting your filters or search query"
-                : "Create your first document to get started"}
-            </p>
-            {!searchQuery && categoryFilter === "all" && (
-              <Button onClick={openCreateDialog} className="gap-2">
-                <Plus className="h-4 w-4" />
-                Create Document
-              </Button>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-        <DialogContent className="max-h-[80vh] max-w-3xl overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-2xl">{selectedDoc?.title}</DialogTitle>
-            <DialogDescription>
-              <div className="mt-2 flex flex-wrap items-center gap-3">
-                <Badge className={getStatusColor(selectedDoc?.is_draft || false)}>
-                  {selectedDoc?.is_draft ? "Draft" : "Published"}
-                </Badge>
-                {selectedDoc?.category && <span className="text-sm">Category: {selectedDoc.category}</span>}
-                <span className="text-sm">{selectedDoc?.updated_at && formatDate(selectedDoc.updated_at)}</span>
+              <Card className="border-2">
+                <CardContent className="p-3 sm:p-4 md:p-6">
+                  <div className="flex items-center justify-between">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-muted-foreground truncate text-[10px] font-medium sm:text-xs md:text-sm">
+                        Published
+                      </p>
+                      <p className="text-foreground mt-1 text-lg font-bold sm:text-xl md:mt-2 md:text-3xl">
+                        {stats.published}
+                      </p>
+                    </div>
+                    <Eye className="h-5 w-5 shrink-0 text-green-600 sm:h-6 sm:w-6 md:h-8 md:w-8 dark:text-green-400" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="border-2">
+                <CardContent className="p-3 sm:p-4 md:p-6">
+                  <div className="flex items-center justify-between">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-muted-foreground truncate text-[10px] font-medium sm:text-xs md:text-sm">
+                        Drafts
+                      </p>
+                      <p className="text-foreground mt-1 text-lg font-bold sm:text-xl md:mt-2 md:text-3xl">
+                        {stats.draft}
+                      </p>
+                    </div>
+                    <EyeOff className="h-5 w-5 shrink-0 text-yellow-600 sm:h-6 sm:w-6 md:h-8 md:w-8 dark:text-yellow-400" />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          }
+          filters={
+            <div className="flex flex-wrap gap-4">
+              <div className="min-w-[200px] flex-1">
+                <div className="relative">
+                  <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform" />
+                  <Input
+                    placeholder="Search documentation..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
               </div>
-            </DialogDescription>
-          </DialogHeader>
-          <div className="mt-4">
-            {selectedDoc?.tags && selectedDoc.tags.length > 0 && (
-              <div className="mb-4 flex flex-wrap gap-2">
-                {selectedDoc.tags.map((tag, index) => (
-                  <Badge key={index} variant="secondary">
-                    {tag}
-                  </Badge>
+              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Filter by category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Documents</SelectItem>
+                  <SelectItem value="published">Published</SelectItem>
+                  <SelectItem value="draft">Drafts</SelectItem>
+                  {CATEGORIES.map((cat) => (
+                    <SelectItem key={cat} value={cat}>
+                      {cat}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          }
+        >
+          {/* Documentation List */}
+          {filteredDocs.length > 0 ? (
+            viewMode === "list" ? (
+              <Card className="border-2">
+                <CardContent className="p-6">
+                  <div className="table-responsive">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-12">#</TableHead>
+                          <TableHead>Title</TableHead>
+                          <TableHead>Category</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Updated</TableHead>
+                          <TableHead>Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredDocs.map((doc, index) => (
+                          <TableRow key={doc.id}>
+                            <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
+                            <TableCell className="font-medium">{doc.title}</TableCell>
+                            <TableCell>
+                              {doc.category ? (
+                                <Badge variant="outline" className="text-xs">
+                                  {doc.category}
+                                </Badge>
+                              ) : (
+                                "-"
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <Badge className={getStatusColor(doc.is_draft)}>
+                                {doc.is_draft ? "Draft" : "Published"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-muted-foreground text-sm">
+                              {formatDate(doc.updated_at)}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleViewDocument(doc)}
+                                  className="h-8 w-8 gap-1 p-0 sm:h-auto sm:w-auto sm:gap-2 sm:p-2"
+                                  title="View document"
+                                >
+                                  <Eye className="h-3 w-3 sm:h-4 sm:w-4" />
+                                  <span className="hidden sm:inline">View</span>
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => openEditDialog(doc)}
+                                  className="h-8 w-8 gap-1 p-0 sm:h-auto sm:w-auto sm:gap-2 sm:p-2"
+                                  title="Edit document"
+                                >
+                                  <Edit2 className="h-3 w-3 sm:h-4 sm:w-4" />
+                                  <span className="hidden sm:inline">Edit</span>
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedDoc(doc)
+                                    setIsDeleteDialogOpen(true)
+                                  }}
+                                  className="h-8 w-8 gap-1 p-0 text-red-600 hover:text-red-700 sm:h-auto sm:w-auto sm:gap-2 sm:p-2"
+                                  title="Delete document"
+                                >
+                                  <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
+                                  <span className="hidden sm:inline">Delete</span>
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2">
+                {filteredDocs.map((doc) => (
+                  <Card key={doc.id} className="border-2 shadow-md transition-all hover:shadow-lg">
+                    <CardHeader className="from-primary/5 to-background border-b bg-gradient-to-r">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1">
+                          <CardTitle className="flex items-center gap-2 text-lg">
+                            {doc.title}
+                            {doc.is_draft && (
+                              <Badge variant="outline" className="bg-yellow-50 text-yellow-700 dark:bg-yellow-900/30">
+                                Draft
+                              </Badge>
+                            )}
+                          </CardTitle>
+                          {doc.category && <CardDescription className="mt-1">{doc.category}</CardDescription>}
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4 p-6">
+                      <div className="max-h-48 overflow-auto rounded-md border p-3">
+                        <MarkdownContent content={doc.content} />
+                      </div>
+
+                      {doc.tags && doc.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {doc.tags.map((tag, i) => (
+                            <Badge key={i} variant="outline" className="gap-1">
+                              <Tag className="h-3 w-3" />
+                              {tag}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="text-muted-foreground text-xs">Last updated: {formatDate(doc.updated_at)}</div>
+
+                      <div className="flex gap-2 pt-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleViewDocument(doc)}
+                          className="flex-1 gap-2"
+                        >
+                          <Eye className="h-4 w-4" />
+                          View
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => openEditDialog(doc)}
+                          className="flex-1 gap-2"
+                        >
+                          <Edit2 className="h-4 w-4" />
+                          Edit
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setSelectedDoc(doc)
+                            setIsDeleteDialogOpen(true)
+                          }}
+                          className="gap-2 text-red-600 hover:text-red-700"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          Delete
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
                 ))}
               </div>
-            )}
-            <div className="bg-muted/50 rounded-lg p-4">
-              <MarkdownContent content={selectedDoc?.content || ""} />
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+            )
+          ) : (
+            <Card className="border-2">
+              <CardContent className="p-12 text-center">
+                <FileText className="text-muted-foreground mx-auto mb-4 h-16 w-16" />
+                <h3 className="text-foreground mb-2 text-xl font-semibold">
+                  {searchQuery || categoryFilter !== "all" ? "No documents found" : "No documentation yet"}
+                </h3>
+                <p className="text-muted-foreground mb-4">
+                  {searchQuery || categoryFilter !== "all"
+                    ? "Try adjusting your filters or search query"
+                    : "Create your first document to get started"}
+                </p>
+                {!searchQuery && categoryFilter === "all" && (
+                  <Button onClick={openCreateDialog} className="gap-2">
+                    <Plus className="h-4 w-4" />
+                    Create Document
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
-      {/* Create/Edit Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{selectedDoc ? "Edit Document" : "Create New Document"}</DialogTitle>
-            <DialogDescription>
-              {selectedDoc ? "Update your documentation" : "Create a new work document"}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="mt-4 space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Title *</label>
-              <Input
-                value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                placeholder="Document title..."
-              />
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Category</label>
-                <Select
-                  value={formData.category}
-                  onValueChange={(value) => setFormData({ ...formData, category: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {CATEGORIES.map((cat) => (
-                      <SelectItem key={cat} value={cat}>
-                        {cat}
-                      </SelectItem>
+          <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+            <DialogContent className="max-h-[80vh] max-w-3xl overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="text-2xl">{selectedDoc?.title}</DialogTitle>
+                <DialogDescription>
+                  <div className="mt-2 flex flex-wrap items-center gap-3">
+                    <Badge className={getStatusColor(selectedDoc?.is_draft || false)}>
+                      {selectedDoc?.is_draft ? "Draft" : "Published"}
+                    </Badge>
+                    {selectedDoc?.category && <span className="text-sm">Category: {selectedDoc.category}</span>}
+                    <span className="text-sm">{selectedDoc?.updated_at && formatDate(selectedDoc.updated_at)}</span>
+                  </div>
+                </DialogDescription>
+              </DialogHeader>
+              <div className="mt-4">
+                {selectedDoc?.tags && selectedDoc.tags.length > 0 && (
+                  <div className="mb-4 flex flex-wrap gap-2">
+                    {selectedDoc.tags.map((tag, index) => (
+                      <Badge key={index} variant="secondary">
+                        {tag}
+                      </Badge>
                     ))}
-                  </SelectContent>
-                </Select>
+                  </div>
+                )}
+                <div className="bg-muted/50 rounded-lg p-4">
+                  <MarkdownContent content={selectedDoc?.content || ""} />
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Create/Edit Dialog */}
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>{selectedDoc ? "Edit Document" : "Create New Document"}</DialogTitle>
+                <DialogDescription>
+                  {selectedDoc ? "Update your documentation" : "Create a new work document"}
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="mt-4 space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Title *</label>
+                  <Input
+                    value={formData.title}
+                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                    placeholder="Document title..."
+                  />
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Category</label>
+                    <Select
+                      value={formData.category}
+                      onValueChange={(value) => setFormData({ ...formData, category: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {CATEGORIES.map((cat) => (
+                          <SelectItem key={cat} value={cat}>
+                            {cat}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Tags (comma separated)</label>
+                    <Input
+                      value={formData.tags}
+                      onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
+                      placeholder="tag1, tag2, tag3"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Content *</label>
+                  <Textarea
+                    value={formData.content}
+                    onChange={(e) => setFormData({ ...formData, content: e.target.value })}
+                    placeholder="Write your documentation here..."
+                    className="min-h-[300px] text-base"
+                  />
+                </div>
               </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Tags (comma separated)</label>
-                <Input
-                  value={formData.tags}
-                  onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
-                  placeholder="tag1, tag2, tag3"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Content *</label>
-              <Textarea
-                value={formData.content}
-                onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                placeholder="Write your documentation here..."
-                className="min-h-[300px] text-base"
-              />
-            </div>
-          </div>
-
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={isSaving}>
-              Cancel
-            </Button>
-            <Button variant="outline" onClick={() => handleSave(true)} disabled={isSaving} className="gap-2">
-              <EyeOff className="h-4 w-4" />
-              Save as Draft
-            </Button>
-            <Button onClick={() => handleSave(false)} disabled={isSaving} className="gap-2">
-              <Save className="h-4 w-4" />
-              Publish
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+              <DialogFooter className="gap-2">
+                <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={isSaving}>
+                  Cancel
+                </Button>
+                <Button variant="outline" onClick={() => handleSave(true)} disabled={isSaving} className="gap-2">
+                  <EyeOff className="h-4 w-4" />
+                  Save as Draft
+                </Button>
+                <Button onClick={() => handleSave(false)} disabled={isSaving} className="gap-2">
+                  <Save className="h-4 w-4" />
+                  Publish
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           {/* Delete Confirmation Dialog */}
           <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>

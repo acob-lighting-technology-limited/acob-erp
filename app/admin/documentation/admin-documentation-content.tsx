@@ -79,8 +79,7 @@ export function AdminDocumentationContent({
 }: AdminDocumentationContentProps) {
   const searchParams = useSearchParams()
   const tabFromUrl = searchParams.get("tab")
-  const initialTab =
-    defaultTab || (tabFromUrl === "department-documents" ? "department-documents" : "knowledge-docs")
+  const initialTab = defaultTab || (tabFromUrl === "department-documents" ? "department-documents" : "knowledge-docs")
   const [activeTab, setActiveTab] = useState<"knowledge-docs" | "department-documents">(
     initialTab as "knowledge-docs" | "department-documents"
   )
@@ -322,8 +321,8 @@ export function AdminDocumentationContent({
                     onValueChange={setemployeeFilter}
                     placeholder={
                       userProfile?.is_department_lead &&
-                        userProfile.lead_departments &&
-                        userProfile.lead_departments.length > 0
+                      userProfile.lead_departments &&
+                      userProfile.lead_departments.length > 0
                         ? `All ${userProfile.lead_departments.length === 1 ? userProfile.lead_departments[0] : "Department"} employee`
                         : "All employee"
                     }
@@ -335,8 +334,8 @@ export function AdminDocumentationContent({
                         value: "all",
                         label:
                           userProfile?.is_department_lead &&
-                            userProfile.lead_departments &&
-                            userProfile.lead_departments.length > 0
+                          userProfile.lead_departments &&
+                          userProfile.lead_departments.length > 0
                             ? `All ${userProfile.lead_departments.length === 1 ? userProfile.lead_departments[0] : "Department"} employee`
                             : "All employee",
                       },
@@ -405,9 +404,13 @@ export function AdminDocumentationContent({
                               )}
                             </TableCell>
                             <TableCell>
-                              <Badge className={getStatusColor(doc.is_draft)}>{doc.is_draft ? "Draft" : "Published"}</Badge>
+                              <Badge className={getStatusColor(doc.is_draft)}>
+                                {doc.is_draft ? "Draft" : "Published"}
+                              </Badge>
                             </TableCell>
-                            <TableCell className="text-muted-foreground text-sm">{formatDate(doc.created_at)}</TableCell>
+                            <TableCell className="text-muted-foreground text-sm">
+                              {formatDate(doc.created_at)}
+                            </TableCell>
                             <TableCell>
                               <Button
                                 variant="ghost"
@@ -440,7 +443,9 @@ export function AdminDocumentationContent({
                           <div className="min-w-0 flex-1">
                             <CardTitle className="line-clamp-2 text-lg">{doc.title}</CardTitle>
                             <div className="mt-2 flex items-center gap-2">
-                              <Badge className={getStatusColor(doc.is_draft)}>{doc.is_draft ? "Draft" : "Published"}</Badge>
+                              <Badge className={getStatusColor(doc.is_draft)}>
+                                {doc.is_draft ? "Draft" : "Published"}
+                              </Badge>
                               {doc.category && (
                                 <Badge variant="outline" className="text-xs">
                                   {doc.category}
@@ -479,13 +484,20 @@ export function AdminDocumentationContent({
                               </span>
                             ))}
                             {doc.tags.length > 3 && (
-                              <span className="text-muted-foreground px-2 py-1 text-xs">+{doc.tags.length - 3} more</span>
+                              <span className="text-muted-foreground px-2 py-1 text-xs">
+                                +{doc.tags.length - 3} more
+                              </span>
                             )}
                           </div>
                         </div>
                       )}
 
-                      <Button variant="outline" size="sm" onClick={() => handleViewDocument(doc)} className="w-full gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleViewDocument(doc)}
+                        className="w-full gap-2"
+                      >
                         <Eye className="h-4 w-4" />
                         View Document
                       </Button>
@@ -501,10 +513,10 @@ export function AdminDocumentationContent({
                 <h3 className="text-foreground mb-2 text-xl font-semibold">No Documentation Found</h3>
                 <p className="text-muted-foreground">
                   {searchQuery ||
-                    categoryFilter !== "all" ||
-                    statusFilter !== "all" ||
-                    departmentFilter !== "all" ||
-                    employeeFilter !== "all"
+                  categoryFilter !== "all" ||
+                  statusFilter !== "all" ||
+                  departmentFilter !== "all" ||
+                  employeeFilter !== "all"
                     ? "No documentation matches your filters"
                     : "No documentation has been created yet"}
                 </p>
@@ -555,9 +567,7 @@ export function AdminDocumentationContent({
           <Card className="border-2">
             <CardContent className="p-12 text-center">
               <h3 className="text-foreground mb-2 text-xl font-semibold">Department Documents Not Available</h3>
-              <p className="text-muted-foreground">
-                No managed department folder is assigned to this account yet.
-              </p>
+              <p className="text-muted-foreground">No managed department folder is assigned to this account yet.</p>
             </CardContent>
           </Card>
         )}

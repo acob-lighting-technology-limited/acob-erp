@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { CommunicationsComposer } from "@/app/admin/communications/_components/communications-composer"
+import { applyAssignableStatusFilter } from "@/lib/workforce/assignment-policy"
 
 export default async function CommunicationsMeetingsRemindersPage() {
   const supabase = await createClient()
@@ -24,12 +25,14 @@ export default async function CommunicationsMeetingsRemindersPage() {
     redirect("/dashboard")
   }
 
-  const { data: employees } = await supabase
-    .from("profiles")
-    .select("id, full_name, company_email, additional_email, department, employment_status")
-    .eq("employment_status", "active")
-    .or("company_email.not.is.null,additional_email.not.is.null")
-    .order("full_name")
+  const { data: employees } = await applyAssignableStatusFilter(
+    supabase
+      .from("profiles")
+      .select("id, full_name, company_email, additional_email, department, employment_status")
+      .or("company_email.not.is.null,additional_email.not.is.null")
+      .order("full_name"),
+    { allowLegacyNullStatus: false }
+  )
 
   return (
     <CommunicationsComposer

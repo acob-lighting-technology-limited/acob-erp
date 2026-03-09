@@ -138,7 +138,7 @@ export function GoalsContent({ initialGoals, userId }: GoalsContentProps) {
                 Add Goal
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-h-[90vh] w-[95vw] max-w-lg overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Create New Goal</DialogTitle>
                 <DialogDescription>Set a new performance goal to track</DialogDescription>
@@ -197,9 +197,9 @@ export function GoalsContent({ initialGoals, userId }: GoalsContentProps) {
       />
 
       {/* Summary */}
-      <div className="mb-6 grid grid-cols-2 gap-2 sm:gap-3 md:gap-4 md:grid-cols-3">
+      <div className="mb-6 grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 md:gap-4">
         <Card>
-          <CardHeader className="pb-1 px-3 pt-3 sm:px-6 sm:pt-6 sm:pb-2">
+          <CardHeader className="px-3 pt-3 pb-1 sm:px-6 sm:pt-6 sm:pb-2">
             <CardTitle className="text-sm font-medium">Total Goals</CardTitle>
           </CardHeader>
           <CardContent>
@@ -207,19 +207,19 @@ export function GoalsContent({ initialGoals, userId }: GoalsContentProps) {
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-1 px-3 pt-3 sm:px-6 sm:pt-6 sm:pb-2">
+          <CardHeader className="px-3 pt-3 pb-1 sm:px-6 sm:pt-6 sm:pb-2">
             <CardTitle className="text-sm font-medium">In Progress</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-lg font-bold sm:text-2xl text-blue-600">{inProgress}</div>
+            <div className="text-lg font-bold text-blue-600 sm:text-2xl">{inProgress}</div>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-1 px-3 pt-3 sm:px-6 sm:pt-6 sm:pb-2">
+          <CardHeader className="px-3 pt-3 pb-1 sm:px-6 sm:pt-6 sm:pb-2">
             <CardTitle className="text-sm font-medium">Completed</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-lg font-bold sm:text-2xl text-green-600">{completed}</div>
+            <div className="text-lg font-bold text-green-600 sm:text-2xl">{completed}</div>
           </CardContent>
         </Card>
       </div>
@@ -298,4 +298,3 @@ export function GoalsContent({ initialGoals, userId }: GoalsContentProps) {
     </PageWrapper>
   )
 }
-

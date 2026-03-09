@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, ShoppingCart, Search, Filter, Eye } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
-import { PageWrapper, PageHeader } from "@/components/layout"
+import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { StatCard } from "@/components/ui/stat-card"
 import { EmptyState } from "@/components/ui/empty-state"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -95,22 +95,21 @@ export default function PurchaseOrdersPage() {
   }
 
   return (
-    <PageWrapper maxWidth="full" background="gradient">
-      <PageHeader
-        title="Purchase Orders"
-        description="Manage purchase orders"
-        icon={ShoppingCart}
-        backLink={{ href: "/admin", label: "Back to Admin" }}
-        actions={
-          <Link href="/admin/purchasing/orders/new">
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Create PO
-            </Button>
-          </Link>
-        }
-      />
-
+    <AdminTablePage
+      title="Purchase Orders"
+      description="Manage purchase orders"
+      icon={ShoppingCart}
+      backLinkHref="/admin"
+      backLinkLabel="Back to Admin"
+      actions={
+        <Link href="/admin/purchasing/orders/new">
+          <Button>
+            <Plus className="mr-2 h-4 w-4" />
+            Create PO
+          </Button>
+        </Link>
+      }
+    >
       {/* Stats */}
       <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4 md:gap-4">
         <StatCard title="Total Orders" value={stats.total} icon={ShoppingCart} />
@@ -228,7 +227,6 @@ export default function PurchaseOrdersPage() {
           )}
         </CardContent>
       </Card>
-    </PageWrapper>
+    </AdminTablePage>
   )
 }
-

@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+import { StatCard } from "@/components/ui/stat-card"
+import { EmptyState } from "@/components/ui/patterns"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ArrowLeft, TrendingUp, TrendingDown, DollarSign, Calendar } from "lucide-react"
-import Link from "next/link"
+import { TrendingUp, TrendingDown, DollarSign, Calendar, BarChart3 } from "lucide-react"
 
 interface ReportData {
   totalRevenue: number
@@ -99,18 +100,13 @@ export default function FinanceReportsPage() {
   }
 
   return (
-    <div className="container mx-auto space-y-6 p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="mb-1 flex items-center gap-2">
-            <Link href="/admin/finance" className="text-muted-foreground hover:text-foreground">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-            <h1 className="text-3xl font-bold">Financial Reports</h1>
-          </div>
-          <p className="text-muted-foreground">Analytics and insights for your finances</p>
-        </div>
+    <AdminTablePage
+      title="Financial Reports"
+      description="Analytics and insights for your finances"
+      icon={BarChart3}
+      backLinkHref="/admin/finance"
+      backLinkLabel="Back to Finance"
+      actions={
         <Select value={period} onValueChange={setPeriod}>
           <SelectTrigger className="w-[180px]">
             <Calendar className="mr-2 h-4 w-4" />
@@ -123,50 +119,42 @@ export default function FinanceReportsPage() {
             <SelectItem value="all">All Time</SelectItem>
           </SelectContent>
         </Select>
-      </div>
-
+      }
+      stats={
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 md:gap-4">
+          <StatCard
+            title="Total Revenue"
+            value={formatCurrency(data.totalRevenue)}
+            icon={TrendingUp}
+            iconBgColor="bg-green-100 dark:bg-green-900/30"
+            iconColor="text-green-600 dark:text-green-400"
+            description="From invoices"
+          />
+          <StatCard
+            title="Total Expenses"
+            value={formatCurrency(data.totalExpenses)}
+            icon={TrendingDown}
+            iconBgColor="bg-red-100 dark:bg-red-900/30"
+            iconColor="text-red-600 dark:text-red-400"
+            description="From payments & bills"
+          />
+          <StatCard
+            title="Net Income"
+            value={formatCurrency(data.netIncome)}
+            icon={DollarSign}
+            iconBgColor={data.netIncome >= 0 ? "bg-green-100 dark:bg-green-900/30" : "bg-red-100 dark:bg-red-900/30"}
+            iconColor={data.netIncome >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}
+            description="Revenue - Expenses"
+          />
+        </div>
+      }
+    >
       {loading ? (
         <div className="flex items-center justify-center py-12">
           <div className="border-primary h-8 w-8 animate-spin rounded-full border-4 border-t-transparent"></div>
         </div>
       ) : (
         <>
-          {/* Summary Cards */}
-          <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-4 md:grid-cols-3">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-                <TrendingUp className="h-4 w-4 text-green-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-lg font-bold sm:text-2xl text-green-600">{formatCurrency(data.totalRevenue)}</div>
-                <p className="text-muted-foreground text-xs">From invoices</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
-                <TrendingDown className="h-4 w-4 text-red-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-lg font-bold sm:text-2xl text-red-600">{formatCurrency(data.totalExpenses)}</div>
-                <p className="text-muted-foreground text-xs">From payments & bills</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Net Income</CardTitle>
-                <DollarSign className="text-muted-foreground h-4 w-4" />
-              </CardHeader>
-              <CardContent>
-                <div className={`text-lg font-bold sm:text-2xl ${data.netIncome >= 0 ? "text-green-600" : "text-red-600"}`}>
-                  {formatCurrency(data.netIncome)}
-                </div>
-                <p className="text-muted-foreground text-xs">Revenue - Expenses</p>
-              </CardContent>
-            </Card>
-          </div>
-
           {/* Charts/Tables */}
           <div className="grid gap-6 lg:grid-cols-2">
             {/* Expenses by Month */}
@@ -177,7 +165,10 @@ export default function FinanceReportsPage() {
               </CardHeader>
               <CardContent>
                 {data.paymentsByMonth.length === 0 ? (
-                  <p className="text-muted-foreground py-8 text-center">No data available</p>
+                  <EmptyState
+                    title="No data available"
+                    description="No monthly expense data was found for this period."
+                  />
                 ) : (
                   <div className="space-y-4">
                     {data.paymentsByMonth.map((item) => (
@@ -209,7 +200,10 @@ export default function FinanceReportsPage() {
               </CardHeader>
               <CardContent>
                 {data.paymentsByCategory.length === 0 ? (
-                  <p className="text-muted-foreground py-8 text-center">No data available</p>
+                  <EmptyState
+                    title="No data available"
+                    description="No category expense data was found for this period."
+                  />
                 ) : (
                   <div className="space-y-4">
                     {data.paymentsByCategory.map((item) => (
@@ -235,7 +229,6 @@ export default function FinanceReportsPage() {
           </div>
         </>
       )}
-    </div>
+    </AdminTablePage>
   )
 }
-

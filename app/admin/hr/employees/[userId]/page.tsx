@@ -11,7 +11,6 @@ import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { cn, formatName } from "@/lib/utils"
 import {
-  ArrowLeft,
   User,
   Mail,
   Phone,
@@ -31,6 +30,8 @@ import { getRoleDisplayName, getRoleBadgeColor } from "@/lib/permissions"
 import type { UserRole } from "@/types/database"
 import Link from "next/link"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { PageHeader } from "@/components/layout/page-header"
+import { EmptyState } from "@/components/ui/patterns"
 
 interface UserProfile {
   id: string
@@ -291,22 +292,17 @@ export default function UserDetailPage() {
 
   return (
     <div className="container mx-auto space-y-6 p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => router.push("/admin/hr/employees")}>
-            <ArrowLeft className="h-5 w-5" />
+      <PageHeader
+        title={fullName}
+        description={profile.company_email}
+        backLink={{ href: "/admin/hr/employees", label: "Back to Employees" }}
+        actions={
+          <Button onClick={() => router.push(`/admin/hr/employees?userId=${userId}`)}>
+            <Edit className="mr-2 h-4 w-4" />
+            Edit Profile
           </Button>
-          <div>
-            <h1 className="text-3xl font-bold">{fullName}</h1>
-            <p className="text-muted-foreground">{profile.company_email}</p>
-          </div>
-        </div>
-        <Button onClick={() => router.push(`/admin/hr/employees?userId=${userId}`)}>
-          <Edit className="mr-2 h-4 w-4" />
-          Edit Profile
-        </Button>
-      </div>
+        }
+      />
 
       {/* Profile Card */}
       <Card>
@@ -737,7 +733,12 @@ export default function UserDetailPage() {
                   </TableBody>
                 </Table>
               ) : (
-                <p className="text-muted-foreground py-8 text-center">No audit logs found for this user</p>
+                <EmptyState
+                  title="No audit logs found for this user"
+                  description="Audit activity entries for this employee will appear here."
+                  icon={ScrollText}
+                  className="border-0"
+                />
               )}
             </CardContent>
           </Card>

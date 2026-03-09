@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Package, Search, Filter, Eye, Pencil } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
-import { PageHeader, PageWrapper } from "@/components/layout"
+import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { StatCard } from "@/components/ui/stat-card"
 import { EmptyState } from "@/components/ui/empty-state"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -104,22 +104,21 @@ export default function ProductsPage() {
   }
 
   return (
-    <PageWrapper maxWidth="full" background="gradient">
-      <PageHeader
-        title="Products"
-        description="Manage your product catalog"
-        icon={Package}
-        backLink={{ href: "/admin", label: "Back to Admin" }}
-        actions={
-          <Link href="/admin/inventory/products/new">
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Product
-            </Button>
-          </Link>
-        }
-      />
-
+    <AdminTablePage
+      title="Products"
+      description="Manage your product catalog"
+      icon={Package}
+      backLinkHref="/admin"
+      backLinkLabel="Back to Admin"
+      actions={
+        <Link href="/admin/inventory/products/new">
+          <Button>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Product
+          </Button>
+        </Link>
+      }
+    >
       {/* Stats */}
       <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4 md:gap-4">
         <StatCard title="Total Products" value={stats.total} icon={Package} />
@@ -255,7 +254,6 @@ export default function ProductsPage() {
           )}
         </CardContent>
       </Card>
-    </PageWrapper>
+    </AdminTablePage>
   )
 }
-

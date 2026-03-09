@@ -36,6 +36,8 @@ import {
   exportActionTrackerToXLSX,
   type ActionItem,
 } from "@/lib/export-utils"
+import { StatCard } from "@/components/ui/stat-card"
+import { EmptyState } from "@/components/ui/patterns"
 
 interface ActionTask {
   id: string
@@ -243,52 +245,12 @@ export default function ActionTrackerPortal() {
         ) : null
       }
       stats={
-        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-4 md:grid-cols-5">
-          <Card>
-            <CardContent className="flex items-center justify-between p-4">
-              <div>
-                <p className="text-muted-foreground text-sm font-medium">Total Actions</p>
-                <p className="text-lg font-bold sm:text-2xl">{stats.total}</p>
-              </div>
-              <FileSpreadsheet className="h-8 w-8 text-blue-500 opacity-20" />
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="flex items-center justify-between p-4">
-              <div>
-                <p className="text-muted-foreground text-sm font-medium">Completed</p>
-                <p className="text-lg font-bold sm:text-2xl text-green-600">{stats.completed}</p>
-              </div>
-              <CheckCircle2 className="h-8 w-8 text-green-500 opacity-20" />
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="flex items-center justify-between p-4">
-              <div>
-                <p className="text-muted-foreground text-sm font-medium">Pending</p>
-                <p className="text-lg font-bold sm:text-2xl text-orange-600">{stats.pending}</p>
-              </div>
-              <Clock className="h-8 w-8 text-orange-500 opacity-20" />
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="flex items-center justify-between p-4">
-              <div>
-                <p className="text-muted-foreground text-sm font-medium">Not Started</p>
-                <p className="text-lg font-bold sm:text-2xl text-amber-600">{stats.notStarted}</p>
-              </div>
-              <Clock className="h-8 w-8 text-amber-500 opacity-20" />
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="flex items-center justify-between p-4">
-              <div>
-                <p className="text-muted-foreground text-sm font-medium">In Progress</p>
-                <p className="text-lg font-bold sm:text-2xl text-blue-600">{stats.inProgress}</p>
-              </div>
-              <RefreshCw className="h-8 w-8 text-blue-500 opacity-20" />
-            </CardContent>
-          </Card>
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-5 md:gap-4">
+          <StatCard title="Total Actions" value={stats.total} icon={FileSpreadsheet} />
+          <StatCard title="Completed" value={stats.completed} icon={CheckCircle2} />
+          <StatCard title="Pending" value={stats.pending} icon={Clock} />
+          <StatCard title="Not Started" value={stats.notStarted} icon={Clock} />
+          <StatCard title="In Progress" value={stats.inProgress} icon={RefreshCw} />
         </div>
       }
       filters={
@@ -355,8 +317,13 @@ export default function ActionTrackerPortal() {
               </TableRow>
             ) : deptsPresent.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-muted-foreground h-32 text-center font-medium">
-                  No actions found.
+                <TableCell colSpan={5} className="h-32">
+                  <EmptyState
+                    title="No actions found"
+                    description="No departmental actions match the selected filters."
+                    icon={FileSpreadsheet}
+                    className="border-0"
+                  />
                 </TableCell>
               </TableRow>
             ) : (
@@ -528,4 +495,3 @@ export default function ActionTrackerPortal() {
     </AdminTablePage>
   )
 }
-

@@ -8,6 +8,7 @@ import {
   resolveLeadForDepartment,
 } from "@/lib/help-desk/server"
 import { sendHelpDeskMail } from "@/lib/help-desk/mailer"
+import { applyAssignableStatusFilter } from "@/lib/workforce/assignment-policy"
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -72,12 +73,12 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       ])
     }
 
-    const { data: profiles } = await supabase
-      .from("profiles")
-      .select("id, full_name, role, department, is_department_lead, lead_departments")
-      .eq("employment_status", "active")
+    const { data: profiles } = await applyAssignableStatusFilter(
+      supabase.from("profiles").select("id, full_name, role, department, is_department_lead, lead_departments"),
+      { allowLegacyNullStatus: false }
+    )
 
-    const requesterLead = resolveLeadForDepartment(profiles || [], ticket.requester_department)
+    const requesterLead = resolveLeadForDepartment((profiles || []) as any[], ticket.requester_department) as any
 
     try {
       await sendHelpDeskMail({

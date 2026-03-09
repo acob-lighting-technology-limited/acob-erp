@@ -16,8 +16,6 @@ import { X } from "lucide-react"
 
 import { Switch } from "@/components/ui/switch"
 
-
-
 interface ProfileFormProps {
   user: any
   profile: any

@@ -11,6 +11,8 @@ import { ASSET_TYPE_MAP } from "@/lib/asset-types"
 import type { Asset, AssetAssignment } from "./page"
 import { AppTablePage } from "@/components/app/app-table-page"
 import { toast } from "sonner"
+import { StatCard } from "@/components/ui/stat-card"
+import { EmptyState } from "@/components/ui/patterns"
 
 interface AssetsContentProps {
   initialAssignments: AssetAssignment[]
@@ -106,20 +108,14 @@ export function AssetsContent({ initialAssignments, initialError }: AssetsConten
         </div>
       }
       stats={
-        <div className="grid gap-4 md:grid-cols-3">
-          <Card className="border-2">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-muted-foreground text-sm font-medium">Active Assets</p>
-                  <p className="text-foreground mt-2 text-3xl font-bold">{assignments.length}</p>
-                </div>
-                <div className="rounded-lg bg-blue-100 p-3 dark:bg-blue-900/30">
-                  <Package className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard
+            title="Active Assets"
+            value={assignments.length}
+            icon={Package}
+            iconBgColor="bg-blue-100 dark:bg-blue-900/30"
+            iconColor="text-blue-600 dark:text-blue-400"
+          />
         </div>
       }
     >
@@ -276,13 +272,11 @@ export function AssetsContent({ initialAssignments, initialError }: AssetsConten
           </div>
         )
       ) : (
-        <Card className="border-2">
-          <CardContent className="p-12 text-center">
-            <Package className="text-muted-foreground mx-auto mb-4 h-16 w-16" />
-            <h3 className="text-foreground mb-2 text-xl font-semibold">No Assets Assigned</h3>
-            <p className="text-muted-foreground">You don't have any assets assigned to you at the moment.</p>
-          </CardContent>
-        </Card>
+        <EmptyState
+          title="No Assets Assigned"
+          description="You don't have any assets assigned to you at the moment."
+          icon={Package}
+        />
       )}
     </AppTablePage>
   )

@@ -9,6 +9,7 @@ import { Suspense } from "react"
 import { HeaderWrapper } from "@/components/header-wrapper"
 import { SidebarProvider } from "@/components/sidebar-context"
 import { createClient } from "@/lib/supabase/server"
+import { resolveAdminScope } from "@/lib/admin/rbac"
 import { NProgressProvider } from "@/components/nprogress-provider"
 import { NProgressHandler } from "@/components/nprogress-handler"
 import { ClientErrorMonitor } from "@/components/telemetry/client-error-monitor"
@@ -35,15 +36,7 @@ async function HeaderWrapperWithData() {
     return null
   }
 
-  // Use role-based access to keep header behavior aligned with admin route guard rules.
-  let canAccessAdmin = false
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role, is_department_lead")
-    .eq("id", data.user.id)
-    .single()
-  canAccessAdmin =
-    !!profile?.role && (["developer", "super_admin", "admin"].includes(profile.role) || profile.is_department_lead)
+  const canAccessAdmin = Boolean(await resolveAdminScope(supabase as any, data.user.id))
 
   // Serialize only the necessary user data to avoid hydration issues
   const userData = {

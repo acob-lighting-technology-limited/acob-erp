@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { ArrowLeft, Package } from "lucide-react"
-import Link from "next/link"
+import { Package } from "lucide-react"
+import { StatCard } from "@/components/ui/stat-card"
+import { EmptyState } from "@/components/ui/patterns"
 import { toast } from "sonner"
 
 interface Receipt {
@@ -56,20 +58,25 @@ export default function ReceiptsPage() {
     return new Date(date).toLocaleDateString("en-NG", { year: "numeric", month: "short", day: "numeric" })
   }
 
-  return (
-    <div className="container mx-auto space-y-6 p-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="mb-1 flex items-center gap-2">
-            <Link href="/admin/purchasing" className="text-muted-foreground hover:text-foreground">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-            <h1 className="text-3xl font-bold">Goods Receipts</h1>
-          </div>
-          <p className="text-muted-foreground">Record of goods received from suppliers</p>
-        </div>
-      </div>
+  const stats = {
+    total: receipts.length,
+    items: receipts.reduce((acc, receipt) => acc + (receipt.total_items || 0), 0),
+  }
 
+  return (
+    <AdminTablePage
+      title="Goods Receipts"
+      description="Record of goods received from suppliers"
+      icon={Package}
+      backLinkHref="/admin/purchasing"
+      backLinkLabel="Back to Purchasing"
+      stats={
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 md:gap-4">
+          <StatCard title="Receipts" value={stats.total} icon={Package} />
+          <StatCard title="Total Items" value={stats.items} icon={Package} />
+        </div>
+      }
+    >
       <Card>
         <CardHeader>
           <CardTitle>All Receipts</CardTitle>
@@ -81,39 +88,41 @@ export default function ReceiptsPage() {
               <div className="border-primary h-8 w-8 animate-spin rounded-full border-4 border-t-transparent"></div>
             </div>
           ) : receipts.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <Package className="text-muted-foreground mb-4 h-12 w-12" />
-              <h3 className="font-semibold">No receipts yet</h3>
-              <p className="text-muted-foreground text-sm">Receipts are created when orders are received.</p>
-            </div>
+            <EmptyState
+              title="No receipts yet"
+              description="Receipts are created when orders are received."
+              icon={Package}
+            />
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Receipt #</TableHead>
-                  <TableHead>PO #</TableHead>
-                  <TableHead>Supplier</TableHead>
-                  <TableHead>Received Date</TableHead>
-                  <TableHead className="text-right">Items</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {receipts.map((r) => (
-                  <TableRow key={r.id}>
-                    <TableCell className="font-mono">{r.receipt_number}</TableCell>
-                    <TableCell className="font-mono">{r.po_number || "—"}</TableCell>
-                    <TableCell>{r.supplier_name || "—"}</TableCell>
-                    <TableCell>{formatDate(r.received_date)}</TableCell>
-                    <TableCell className="text-right">
-                      <Badge variant="secondary">{r.total_items}</Badge>
-                    </TableCell>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Receipt #</TableHead>
+                    <TableHead>PO #</TableHead>
+                    <TableHead>Supplier</TableHead>
+                    <TableHead>Received Date</TableHead>
+                    <TableHead className="text-right">Items</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {receipts.map((r) => (
+                    <TableRow key={r.id}>
+                      <TableCell className="font-mono">{r.receipt_number}</TableCell>
+                      <TableCell className="font-mono">{r.po_number || "—"}</TableCell>
+                      <TableCell>{r.supplier_name || "—"}</TableCell>
+                      <TableCell>{formatDate(r.received_date)}</TableCell>
+                      <TableCell className="text-right">
+                        <Badge variant="secondary">{r.total_items}</Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>
-    </div>
+    </AdminTablePage>
   )
 }

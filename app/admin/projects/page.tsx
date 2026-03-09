@@ -1,6 +1,9 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
+import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { AdminProjectsContent } from "./admin-projects-content"
+import { canAccessAdminSection, getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
+import { listAssignableProfiles } from "@/lib/workforce/assignment-policy"
 
 export interface Project {
   id: string
@@ -35,6 +38,7 @@ export interface employee {
 
 async function getAdminProjectsData() {
   const supabase = await createClient()
+  const dataClient = getServiceRoleClientOrFallback(supabase as any)
 
   const {
     data: { user },
@@ -45,16 +49,15 @@ async function getAdminProjectsData() {
     return { redirect: "/auth/login" as const }
   }
 
-  // Check if user is admin
-  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
-
-  if (!profile || !["developer", "super_admin", "admin"].includes(profile.role)) {
+  const scope = await resolveAdminScope(supabase as any, user.id)
+  if (!scope || !canAccessAdminSection(scope, "projects")) {
     return { redirect: "/dashboard" as const }
   }
+  const departmentScope = getDepartmentScope(scope, "general")
 
   // Fetch projects and employee in parallel
   const [projectsResult, employeeResult] = await Promise.all([
-    supabase
+    dataClient
       .from("projects")
       .select(
         `
@@ -70,11 +73,11 @@ async function getAdminProjectsData() {
       `
       )
       .order("created_at", { ascending: false }),
-    supabase
-      .from("profiles")
-      .select("id, first_name, last_name, company_email, department, employment_status")
-      .eq("employment_status", "active")
-      .order("last_name", { ascending: true }),
+    listAssignableProfiles(dataClient, {
+      select: "id, first_name, last_name, company_email, department, employment_status",
+      departmentScope,
+      allowLegacyNullStatus: false,
+    }),
   ])
 
   return {

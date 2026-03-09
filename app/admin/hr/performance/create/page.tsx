@@ -5,13 +5,13 @@ import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ArrowLeft, Star, FileText } from "lucide-react"
-import Link from "next/link"
+import { Star, FileText } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
+import { PageHeader } from "@/components/layout/page-header"
+import { FormFieldGroup } from "@/components/ui/patterns"
 
 interface User {
   id: string
@@ -140,26 +140,25 @@ export default function CreateReviewPage() {
 
   return (
     <div className="container mx-auto max-w-2xl p-6">
-      <div className="mb-6">
-        <Link href="/admin/hr" className="text-muted-foreground hover:text-foreground flex items-center gap-2">
-          <ArrowLeft className="h-4 w-4" />
-          Back to HR Dashboard
-        </Link>
-      </div>
+      <PageHeader
+        title="Create Performance Review"
+        description="Evaluate an employee's performance"
+        backLink={{ href: "/admin/hr", label: "Back to HR Dashboard" }}
+        className="mb-6"
+      />
 
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
-            Create Performance Review
+            Review Form
           </CardTitle>
-          <CardDescription>Evaluate an employee's performance</CardDescription>
+          <CardDescription>Complete review details and submit for records.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Employee Selection */}
-            <div className="space-y-2">
-              <Label>Employee</Label>
+            <FormFieldGroup label="Employee">
               <Select value={formData.user_id} onValueChange={(value) => setFormData({ ...formData, user_id: value })}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select employee" />
@@ -172,11 +171,10 @@ export default function CreateReviewPage() {
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+            </FormFieldGroup>
 
             {/* Review Cycle */}
-            <div className="space-y-2">
-              <Label>Review Cycle</Label>
+            <FormFieldGroup label="Review Cycle">
               <Select
                 value={formData.review_cycle_id}
                 onValueChange={(value) => setFormData({ ...formData, review_cycle_id: value })}
@@ -192,71 +190,65 @@ export default function CreateReviewPage() {
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+            </FormFieldGroup>
 
             {/* Overall Rating */}
-            <div className="space-y-2">
-              <Label>Overall Rating</Label>
+            <FormFieldGroup label="Overall Rating">
               {renderRatingSelector()}
               <p className="text-muted-foreground text-sm">
                 {formData.overall_rating === 0 ? "Click to rate" : `${formData.overall_rating} out of 5`}
               </p>
-            </div>
+            </FormFieldGroup>
 
             {/* Goals */}
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Goals Achieved</Label>
+              <FormFieldGroup label="Goals Achieved">
                 <Input
                   type="number"
                   min="0"
                   value={formData.goals_achieved}
                   onChange={(e) => setFormData({ ...formData, goals_achieved: parseInt(e.target.value) || 0 })}
                 />
-              </div>
-              <div className="space-y-2">
-                <Label>Total Goals</Label>
+              </FormFieldGroup>
+              <FormFieldGroup label="Total Goals">
                 <Input
                   type="number"
                   min="0"
                   value={formData.goals_total}
                   onChange={(e) => setFormData({ ...formData, goals_total: parseInt(e.target.value) || 0 })}
                 />
-              </div>
+              </FormFieldGroup>
             </div>
 
             {/* Strengths */}
-            <div className="space-y-2">
-              <Label>Strengths</Label>
+            <FormFieldGroup label="Strengths">
               <Textarea
                 value={formData.strengths}
                 onChange={(e) => setFormData({ ...formData, strengths: e.target.value })}
                 placeholder="What does this employee do well?"
                 rows={3}
               />
-            </div>
+            </FormFieldGroup>
 
             {/* Areas for Improvement */}
-            <div className="space-y-2">
-              <Label>Areas for Improvement</Label>
+            <FormFieldGroup label="Areas for Improvement">
               <Textarea
                 value={formData.areas_for_improvement}
                 onChange={(e) => setFormData({ ...formData, areas_for_improvement: e.target.value })}
                 placeholder="What areas need development?"
                 rows={3}
               />
-            </div>
+            </FormFieldGroup>
 
             {/* Manager Comments */}
-            <div className="space-y-2">
-              <Label>Additional Comments</Label>
+            <FormFieldGroup label="Additional Comments">
               <Textarea
                 value={formData.manager_comments}
                 onChange={(e) => setFormData({ ...formData, manager_comments: e.target.value })}
                 placeholder="Any other feedback or notes..."
                 rows={3}
               />
-            </div>
+            </FormFieldGroup>
 
             <Button type="submit" className="w-full" disabled={saving || !formData.user_id || !formData.overall_rating}>
               {saving ? "Saving..." : "Submit Review"}

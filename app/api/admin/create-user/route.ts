@@ -24,7 +24,8 @@ export async function POST(request: NextRequest) {
   }
 
   const scope = await resolveAdminScope(supabase as any, user.id)
-  const canManageUsers = !!scope && scope.isAdminLike
+  const managedDepartments = scope?.managedDepartments || []
+  const canManageUsers = !!scope && (scope.isAdminLike || managedDepartments.includes("Admin & HR"))
   if (!canManageUsers) {
     return NextResponse.json({ success: false, error: "Forbidden: Insufficient privileges" }, { status: 403 })
   }
@@ -48,17 +49,15 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { firstName, lastName, otherNames, email, department, companyRole, phoneNumber, role, employeeNumber } = body
     const adminDomains = Array.isArray(body?.admin_domains)
-      ? body.admin_domains.map((value: unknown) => String(value || "").trim().toLowerCase()).filter(Boolean)
+      ? body.admin_domains
+          .map((value: unknown) =>
+            String(value || "")
+              .trim()
+              .toLowerCase()
+          )
+          .filter(Boolean)
       : []
-    const allowedAdminDomains = [
-      "hr",
-      "finance",
-      "assets",
-      "reports",
-      "tasks",
-      "projects",
-      "communications",
-    ]
+    const allowedAdminDomains = ["hr", "finance", "assets", "reports", "tasks", "projects", "communications"]
 
     // Validate role if provided
     const allowedRoles = [...ASSIGNABLE_ROLES]
@@ -215,7 +214,6 @@ export async function POST(request: NextRequest) {
         phone_number: phoneNumber || null,
         role: targetRole,
         admin_domains: targetRole === "admin" ? adminDomains : null,
-        is_admin: ["developer", "super_admin", "admin"].includes(targetRole),
         is_department_lead: false,
         lead_departments: [],
         employment_status: "active", // Explicitly set employment status

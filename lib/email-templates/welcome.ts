@@ -126,7 +126,7 @@ export function renderWelcomeEmail({ pendingUser, employeeId, tempPassword, port
     </div>
     <div class="footer" style="background-color:#0f2d1f;">
         <strong>ACOB Lighting Technology Limited</strong><br>
-        ACOB Internal Systems – Admin & HR Department<br>
+        Admin & HR Department<br>
         <span class="footer-system">Employee Management System</span>
         <br><br>
         <i class="footer-note">This is an automated system notification. Please do not reply directly to this email.</i>
