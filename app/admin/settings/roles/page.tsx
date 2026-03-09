@@ -8,7 +8,15 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Plus, Pencil, Trash2, Shield, Users } from "lucide-react"
@@ -18,6 +26,7 @@ import { DepartmentLeadsManager } from "@/components/admin/department-leads-mana
 import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { StatCard } from "@/components/ui/stat-card"
 import { EmptyState } from "@/components/ui/patterns"
+import { ASSIGNABLE_ROLES } from "@/lib/role-management"
 
 interface Role {
   id: string
@@ -26,6 +35,16 @@ interface Role {
   permissions: string[]
   user_count?: number
   is_system: boolean
+  created_at: string
+}
+
+interface RoleMember {
+  id: string
+  first_name: string | null
+  last_name: string | null
+  company_email: string | null
+  department: string | null
+  employment_status: string | null
   created_at: string
 }
 
@@ -51,6 +70,10 @@ export default function RolesPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingRole, setEditingRole] = useState<Role | null>(null)
   const [formData, setFormData] = useState({ name: "", description: "", permissions: [] as string[] })
+  const [roleUsersOpen, setRoleUsersOpen] = useState(false)
+  const [selectedRoleName, setSelectedRoleName] = useState<string>("")
+  const [roleUsers, setRoleUsers] = useState<RoleMember[]>([])
+  const [roleUsersLoading, setRoleUsersLoading] = useState(false)
 
   useEffect(() => {
     fetchRoles()
@@ -91,14 +114,6 @@ export default function RolesPage() {
             },
             {
               id: "4",
-              name: "manager",
-              description: "Department manager access",
-              permissions: ["hr.view", "finance.view", "inventory.view", "reports.view"],
-              is_system: true,
-              created_at: new Date().toISOString(),
-            },
-            {
-              id: "5",
               name: "employee",
               description: "Standard employee access",
               permissions: ["hr.view"],
@@ -155,14 +170,6 @@ export default function RolesPage() {
           },
           {
             id: "4",
-            name: "manager",
-            description: "Department manager access",
-            permissions: ["hr.view", "finance.view", "inventory.view", "reports.view"],
-            is_system: true,
-            created_at: new Date().toISOString(),
-          },
-          {
-            id: "5",
             name: "employee",
             description: "Standard employee access",
             permissions: ["hr.view"],
@@ -249,11 +256,39 @@ export default function RolesPage() {
     }))
   }
 
+  async function openRoleUsers(roleName: string) {
+    setSelectedRoleName(roleName)
+    setRoleUsers([])
+    setRoleUsersOpen(true)
+    setRoleUsersLoading(true)
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, first_name, last_name, company_email, department, employment_status, created_at")
+        .eq("role", roleName)
+        .order("first_name", { ascending: true })
+
+      if (error) throw error
+      setRoleUsers((data || []) as RoleMember[])
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to load role users")
+    } finally {
+      setRoleUsersLoading(false)
+    }
+  }
+
   const stats = {
-    total: roles.length,
-    system: roles.filter((role) => role.is_system).length,
+    total: roles.filter((role) => !(role.is_system && !ASSIGNABLE_ROLES.includes(role.name as any))).length,
+    system: roles.filter((role) => role.is_system && ASSIGNABLE_ROLES.includes(role.name as any)).length,
     custom: roles.filter((role) => !role.is_system).length,
   }
+
+  const visibleRoles = roles.filter((role) => {
+    // Hide legacy removed system roles (e.g. old "lead") while keeping all custom roles.
+    if (role.is_system && !ASSIGNABLE_ROLES.includes(role.name as any)) return false
+    return role.name !== "manager"
+  })
 
   return (
     <AdminTablePage
@@ -333,19 +368,20 @@ export default function RolesPage() {
       <Card>
         <CardHeader>
           <CardTitle>All Roles</CardTitle>
-          <CardDescription>{roles.length} roles defined</CardDescription>
+          <CardDescription>{visibleRoles.length} roles defined</CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? (
             <div className="flex items-center justify-center py-8">
               <div className="border-primary h-8 w-8 animate-spin rounded-full border-4 border-t-transparent"></div>
             </div>
-          ) : roles.length === 0 ? (
+          ) : visibleRoles.length === 0 ? (
             <EmptyState title="No roles defined" icon={Shield} />
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-14">S/N</TableHead>
                   <TableHead>Role</TableHead>
                   <TableHead>Description</TableHead>
                   <TableHead>Permissions</TableHead>
@@ -355,48 +391,46 @@ export default function RolesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {roles
-                  .filter((role) => role.name !== "manager") // Hide manager role as requested
-                  .map((role) => (
-                    <TableRow key={role.id}>
-                      <TableCell className="font-medium capitalize">{role.name.replace("_", " ")}</TableCell>
-                      <TableCell className="text-muted-foreground max-w-xs truncate">
-                        {role.description || "—"}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">{role.permissions?.length || 0}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <a
-                          href={`/admin/settings/users?role=${role.name}`}
-                          className="flex items-center gap-1 hover:underline"
+                {visibleRoles.map((role, index) => (
+                  <TableRow key={role.id}>
+                    <TableCell className="text-muted-foreground">{index + 1}</TableCell>
+                    <TableCell className="font-medium capitalize">{role.name.replace("_", " ")}</TableCell>
+                    <TableCell className="text-muted-foreground max-w-xs truncate">{role.description || "—"}</TableCell>
+                    <TableCell>
+                      <Badge variant="secondary">{role.permissions?.length || 0}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <button
+                        type="button"
+                        className="flex items-center gap-1 hover:underline"
+                        onClick={() => openRoleUsers(role.name)}
+                      >
+                        <Users className="text-muted-foreground h-4 w-4" />
+                        {role.user_count || 0}
+                      </button>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={role.is_system ? "destructive" : "secondary"}>
+                        {role.is_system ? "System" : "Custom"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <Button variant="ghost" size="icon" onClick={() => openEdit(role)}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDelete(role)}
+                          disabled={role.is_system}
                         >
-                          <Users className="text-muted-foreground h-4 w-4" />
-                          {role.user_count || 0}
-                        </a>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={role.is_system ? "destructive" : "secondary"}>
-                          {role.is_system ? "System" : "Custom"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button variant="ghost" size="icon" onClick={() => openEdit(role)}>
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDelete(role)}
-                            disabled={role.is_system}
-                          >
-                            <Trash2 className="text-destructive h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                          <Trash2 className="text-destructive h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           )}
@@ -404,6 +438,58 @@ export default function RolesPage() {
       </Card>
 
       <DepartmentLeadsManager />
+
+      <Dialog open={roleUsersOpen} onOpenChange={setRoleUsersOpen}>
+        <DialogContent className="max-h-[90vh] w-[95vw] max-w-3xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="capitalize">{selectedRoleName.replace("_", " ")} Users</DialogTitle>
+            <DialogDescription>Users currently assigned this role.</DialogDescription>
+          </DialogHeader>
+
+          {roleUsersLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="border-primary h-8 w-8 animate-spin rounded-full border-4 border-t-transparent"></div>
+            </div>
+          ) : roleUsers.length === 0 ? (
+            <EmptyState title="No users in this role" icon={Users} />
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-14">S/N</TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Department</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Joined</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {roleUsers.map((member, index) => (
+                    <TableRow key={member.id}>
+                      <TableCell className="text-muted-foreground">{index + 1}</TableCell>
+                      <TableCell className="font-medium">
+                        {member.first_name || member.last_name
+                          ? `${member.first_name || ""} ${member.last_name || ""}`.trim()
+                          : "—"}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">{member.company_email || "—"}</TableCell>
+                      <TableCell>{member.department || "—"}</TableCell>
+                      <TableCell>
+                        <Badge variant={member.employment_status === "active" ? "default" : "secondary"}>
+                          {member.employment_status || "unknown"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{new Date(member.created_at).toLocaleDateString("en-NG")}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </AdminTablePage>
   )
 }

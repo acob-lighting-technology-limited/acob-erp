@@ -191,6 +191,7 @@ export function DepartmentLeadsManager() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-14">S/N</TableHead>
                 <TableHead>Department</TableHead>
                 <TableHead>Assigned Lead</TableHead>
                 <TableHead>Email</TableHead>
@@ -198,8 +199,9 @@ export function DepartmentLeadsManager() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {departments.map((dept) => (
+              {departments.map((dept, index) => (
                 <TableRow key={dept.id}>
+                  <TableCell className="text-muted-foreground">{index + 1}</TableCell>
                   <TableCell className="font-medium">{dept.name}</TableCell>
                   <TableCell>
                     {dept.lead_name ? (

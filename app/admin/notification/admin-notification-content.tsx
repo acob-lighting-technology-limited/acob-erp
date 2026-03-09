@@ -32,6 +32,7 @@ import {
   RefreshCw,
   Mail,
   Megaphone,
+  Settings,
 } from "lucide-react"
 
 export interface DynamicNotification {
@@ -396,6 +397,12 @@ export function AdminNotificationContent({ initialNotifications }: AdminNotifica
         backLink={{ href: "/admin", label: "Back to Admin" }}
         actions={
           <div className="flex items-center gap-2">
+            <Link href="/admin/settings/mail">
+              <Button variant="outline" className="gap-2">
+                <Settings className="h-4 w-4" />
+                Notification Settings
+              </Button>
+            </Link>
             <Link href="/admin/communications/meetings">
               <Button variant="outline" className="gap-2">
                 <Mail className="h-4 w-4" />

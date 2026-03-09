@@ -370,114 +370,24 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
       setSelectedEmployee(employee)
       setModalViewMode("profile") // Always reset to profile when opening fresh
       setIsViewDialogOpen(true)
+      setViewEmployeeData({ tasks: [], assets: [], documentation: [] })
 
-      // Load full profile data
-      const { data: profileData } = await supabase.from("profiles").select("*").eq("id", employee.id).single()
-
-      if (profileData) {
-        setViewEmployeeProfile(profileData)
-
-        // Load related data
-        const [tasksResult, assetAssignmentsResult, deptAssetsResult, officeAssetsResult, docsResult] =
-          await Promise.all([
-            supabase
-              .from("tasks")
-              .select("*")
-              .eq("assigned_to", employee.id)
-              .order("created_at", { ascending: false })
-              .limit(10),
-            // Individual asset assignments
-            supabase
-              .from("asset_assignments")
-              .select("id, asset_id, assigned_at, is_current, assignment_type")
-              .eq("assigned_to", employee.id)
-              .eq("is_current", true)
-              .limit(10),
-            // Department assets (if user has department)
-            profileData.department
-              ? supabase
-                  .from("assets")
-                  .select(
-                    "id, asset_name, asset_type, asset_model, serial_number, unique_code, status, assignment_type, department, created_at"
-                  )
-                  .eq("assignment_type", "department")
-                  .eq("department", profileData.department)
-                  .eq("status", "assigned")
-                  .is("deleted_at", null)
-                  .limit(10)
-              : Promise.resolve({ data: [] }),
-            // Office location assets (if user has office_location)
-            profileData.office_location
-              ? supabase
-                  .from("assets")
-                  .select(
-                    "id, asset_name, asset_type, asset_model, serial_number, unique_code, status, assignment_type, office_location, created_at"
-                  )
-                  .eq("assignment_type", "office")
-                  .eq("office_location", profileData.office_location)
-                  .eq("status", "assigned")
-                  .is("deleted_at", null)
-                  .limit(10)
-              : Promise.resolve({ data: [] }),
-            supabase
-              .from("user_documentation")
-              .select("*")
-              .eq("user_id", employee.id)
-              .order("created_at", { ascending: false })
-              .limit(10),
-          ])
-
-        // Fetch asset details separately for individual assignments
-        const individualAssetsWithDetails = await Promise.all(
-          (assetAssignmentsResult.data || []).map(async (assignment: any) => {
-            const { data: assetData } = await supabase
-              .from("assets")
-              .select("id, asset_name, asset_type, asset_model, serial_number, unique_code, status")
-              .eq("id", assignment.asset_id)
-              .is("deleted_at", null)
-              .single()
-
-            return {
-              ...assignment,
-              Asset: assetData,
-              assignmentType: "individual" as const,
-            }
-          })
-        )
-
-        // Convert department assets to assignment format
-        const deptAssetsWithDetails = (deptAssetsResult.data || []).map((asset: any) => ({
-          id: `dept-${asset.id}`,
-          asset_id: asset.id,
-          assigned_at: asset.created_at, // Use the asset's creation date
-          is_current: true,
-          assignment_type: "department",
-          Asset: asset,
-          assignmentType: "department" as const,
-          department: asset.department,
-        }))
-
-        // Convert office assets to assignment format
-        const officeAssetsWithDetails = (officeAssetsResult.data || []).map((asset: any) => ({
-          id: `office-${asset.id}`,
-          asset_id: asset.id,
-          assigned_at: asset.created_at, // Use the asset's creation date
-          is_current: true,
-          assignment_type: "office",
-          Asset: asset,
-          assignmentType: "office" as const,
-          officeLocation: asset.office_location || profileData.office_location,
-        }))
-
-        // Combine all types of assignments
-        const allAssets = [...individualAssetsWithDetails, ...deptAssetsWithDetails, ...officeAssetsWithDetails]
-
-        setViewEmployeeData({
-          tasks: tasksResult.data || [],
-          assets: allAssets || [],
-          documentation: docsResult.data || [],
-        })
+      const response = await fetch(`/api/admin/hr/employees/${employee.id}/overview`, { cache: "no-store" })
+      const payload = (await response.json().catch(() => ({}))) as {
+        error?: string
+        profile?: any
+        related?: { tasks?: any[]; assets?: any[]; documentation?: any[] }
       }
+
+      if (!response.ok) throw new Error(payload.error || "Failed to load employee details")
+      if (!payload.profile) throw new Error("Employee profile not found")
+
+      setViewEmployeeProfile(payload.profile)
+      setViewEmployeeData({
+        tasks: payload.related?.tasks || [],
+        assets: payload.related?.assets || [],
+        documentation: payload.related?.documentation || [],
+      })
     } catch (error: any) {
       console.error("Error loading employees details:", error)
       toast.error("Failed to load employees details")
@@ -1469,7 +1379,10 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                     {filteredEmployees.map((member, index) => (
                       <TableRow
                         key={member.id}
-                        className={member.employment_status === "separated" ? "opacity-60" : ""}
+                        className={cn(
+                          member.employment_status === "separated" && "opacity-60",
+                          member.is_department_lead && "border-l-2 border-l-amber-500/70"
+                        )}
                       >
                         <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
                         <TableCell>
@@ -1487,6 +1400,12 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                             >
                               {formatName(member.last_name)}, {formatName(member.first_name)}
                             </span>
+                            {member.is_department_lead && (
+                              <div className="mt-0.5 flex items-center gap-1 text-xs text-amber-700 dark:text-amber-400">
+                                <Shield className="h-3 w-3" />
+                                <span>Dept Lead</span>
+                              </div>
+                            )}
                           </div>
                         </TableCell>
                         <TableCell>
@@ -1510,14 +1429,6 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                         <TableCell>
                           <div className="flex flex-wrap gap-1">
                             <Badge className={getRoleBadgeColor(member.role)}>{getRoleDisplayName(member.role)}</Badge>
-                            {member.is_department_lead &&
-                              member.lead_departments &&
-                              member.lead_departments.length > 0 && (
-                                <Badge variant="outline" className="text-xs">
-                                  {member.lead_departments.length} Dept
-                                  {member.lead_departments.length > 1 ? "s" : ""}
-                                </Badge>
-                              )}
                           </div>
                         </TableCell>
                         <TableCell>
@@ -1872,816 +1783,849 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
 
       {/* View Details Dialog */}
       <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-        <DialogContent className="max-h-[90vh] max-w-6xl">
-          <DialogHeader>
-            <DialogTitle>
-              {modalViewMode === "edit"
-                ? "Edit Employee Profile"
-                : modalViewMode === "signature"
-                  ? "Email Signature"
-                  : modalViewMode === "status"
-                    ? "Change Employment Status"
-                    : viewEmployeeProfile
-                      ? `${formatName(viewEmployeeProfile.first_name)} ${formatName(viewEmployeeProfile.last_name)}`
-                      : "Employee Details"}
+        <DialogContent className="flex h-[92vh] max-h-[92vh] max-w-7xl flex-col gap-0 overflow-hidden p-0">
+          <DialogHeader className="border-b px-5 py-4 sm:px-6">
+            <DialogTitle className="flex flex-wrap items-center gap-2">
+              <span>
+                {modalViewMode === "edit"
+                  ? "Edit Employee Profile"
+                  : modalViewMode === "signature"
+                    ? "Email Signature"
+                    : modalViewMode === "status"
+                      ? "Change Employment Status"
+                      : viewEmployeeProfile
+                        ? `${formatName(viewEmployeeProfile.first_name)} ${formatName(viewEmployeeProfile.last_name)}`
+                        : "Employee Details"}
+              </span>
+              {viewEmployeeProfile?.role && (
+                <Badge className={getRoleBadgeColor(viewEmployeeProfile.role as UserRole)}>
+                  {getRoleDisplayName(viewEmployeeProfile.role as UserRole)}
+                </Badge>
+              )}
+              {viewEmployeeProfile?.employment_status && (
+                <EmployeeStatusBadge status={(viewEmployeeProfile.employment_status as EmploymentStatus) || "active"} />
+              )}
             </DialogTitle>
             <DialogDescription>
               {modalViewMode === "edit"
-                ? "Update employees member's role, department, and permissions"
+                ? "Update role, department, permissions, and profile information."
                 : modalViewMode === "signature"
-                  ? "View and manage email signature"
+                  ? "Manage branded signature details for this employee."
                   : modalViewMode === "status"
-                    ? "Update employment status and handle offboarding"
-                    : "View complete profile and related information"}
+                    ? "Update employment status and offboarding details."
+                    : "Review profile, assets, tasks, and employment details."}
             </DialogDescription>
           </DialogHeader>
-          {viewEmployeeProfile && modalViewMode === "profile" && (
-            <ScrollArea className="max-h-[70vh] pr-4">
-              <div className="space-y-4">
-                {/* Profile Information */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <UserIcon className="h-5 w-5" />
-                      Profile Information
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-                      <div className="flex items-center gap-3">
-                        <Avatar className="h-12 w-12">
-                          <AvatarFallback className="bg-primary text-primary-foreground">
-                            {formatName(viewEmployeeProfile.first_name)?.[0]}
-                            {formatName(viewEmployeeProfile.last_name)?.[0]}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="text-muted-foreground text-sm">Full Name</p>
-                          <p className="font-medium">
-                            {formatName(viewEmployeeProfile.first_name)} {formatName(viewEmployeeProfile.last_name)}
-                          </p>
-                          {viewEmployeeProfile.other_names && (
-                            <p className="text-muted-foreground text-xs">({viewEmployeeProfile.other_names})</p>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        <Mail className="text-muted-foreground h-5 w-5" />
-                        <div>
-                          <p className="text-muted-foreground text-sm">Email</p>
-                          <p className="font-medium">{viewEmployeeProfile.company_email}</p>
-                          {viewEmployeeProfile.additional_email && (
-                            <p className="text-muted-foreground text-xs">{viewEmployeeProfile.additional_email}</p>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        <Building2 className="text-muted-foreground h-5 w-5" />
-                        <div>
-                          <p className="text-muted-foreground text-sm">Department</p>
-                          <p className="font-medium">{viewEmployeeProfile.department || "N/A"}</p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        <Shield className="text-muted-foreground h-5 w-5" />
-                        <div>
-                          <p className="text-muted-foreground text-sm">Role</p>
-                          <div className="mt-1 flex gap-2">
-                            <Badge className={getRoleBadgeColor(viewEmployeeProfile.role as UserRole)}>
-                              {getRoleDisplayName(viewEmployeeProfile.role as UserRole)}
-                            </Badge>
-                            {viewEmployeeProfile.is_department_lead &&
-                              viewEmployeeProfile.lead_departments &&
-                              viewEmployeeProfile.lead_departments.length > 0 && (
-                                <Badge variant="outline">
-                                  Leading {viewEmployeeProfile.lead_departments.length} Dept
-                                  {viewEmployeeProfile.lead_departments.length > 1 ? "s" : ""}
-                                </Badge>
-                              )}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        <UserIcon className="text-muted-foreground h-5 w-5" />
-                        <div>
-                          <p className="text-muted-foreground text-sm">Position</p>
-                          <p className="font-medium">{viewEmployeeProfile.company_role || "N/A"}</p>
-                        </div>
-                      </div>
-
-                      {viewEmployeeProfile.phone_number && (
+          <div className="min-h-0 flex-1 overflow-hidden px-5 py-4 sm:px-6">
+            {viewEmployeeProfile && modalViewMode === "profile" && (
+              <ScrollArea className="h-full pr-4">
+                <div className="space-y-4">
+                  {/* Profile Information */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <UserIcon className="h-5 w-5" />
+                        Profile Information
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
                         <div className="flex items-center gap-3">
-                          <Phone className="text-muted-foreground h-5 w-5" />
+                          <Avatar className="h-12 w-12">
+                            <AvatarFallback className="bg-primary text-primary-foreground">
+                              {formatName(viewEmployeeProfile.first_name)?.[0]}
+                              {formatName(viewEmployeeProfile.last_name)?.[0]}
+                            </AvatarFallback>
+                          </Avatar>
                           <div>
-                            <p className="text-muted-foreground text-sm">Phone</p>
-                            <p className="font-medium">{viewEmployeeProfile.phone_number}</p>
-                            {viewEmployeeProfile.additional_phone && (
-                              <p className="text-muted-foreground text-xs">{viewEmployeeProfile.additional_phone}</p>
+                            <p className="text-muted-foreground text-sm">Full Name</p>
+                            <p className="font-medium">
+                              {formatName(viewEmployeeProfile.first_name)} {formatName(viewEmployeeProfile.last_name)}
+                            </p>
+                            {viewEmployeeProfile.other_names && (
+                              <p className="text-muted-foreground text-xs">({viewEmployeeProfile.other_names})</p>
                             )}
                           </div>
                         </div>
-                      )}
 
-                      {viewEmployeeProfile.residential_address && (
                         <div className="flex items-center gap-3">
-                          <MapPin className="text-muted-foreground h-5 w-5" />
+                          <Mail className="text-muted-foreground h-5 w-5" />
                           <div>
-                            <p className="text-muted-foreground text-sm">Address</p>
-                            <p className="font-medium">{viewEmployeeProfile.residential_address}</p>
+                            <p className="text-muted-foreground text-sm">Email</p>
+                            <p className="font-medium">{viewEmployeeProfile.company_email}</p>
+                            {viewEmployeeProfile.additional_email && (
+                              <p className="text-muted-foreground text-xs">{viewEmployeeProfile.additional_email}</p>
+                            )}
                           </div>
                         </div>
-                      )}
 
-                      {viewEmployeeProfile.office_location && (
-                        <div className="flex items-center gap-3">
-                          <MapPin className="text-muted-foreground h-5 w-5" />
-                          <div>
-                            <p className="text-muted-foreground text-sm">Office Location</p>
-                            <p className="font-medium">{viewEmployeeProfile.office_location}</p>
-                          </div>
-                        </div>
-                      )}
-
-                      {viewEmployeeProfile.lead_departments && viewEmployeeProfile.lead_departments.length > 0 && (
                         <div className="flex items-center gap-3">
                           <Building2 className="text-muted-foreground h-5 w-5" />
                           <div>
-                            <p className="text-muted-foreground text-sm">Leading Departments</p>
-                            <div className="mt-1 flex flex-wrap gap-1">
-                              {viewEmployeeProfile.lead_departments.map((dept: string) => (
-                                <Badge key={dept} variant="outline">
-                                  {dept}
-                                </Badge>
-                              ))}
+                            <p className="text-muted-foreground text-sm">Department</p>
+                            <p className="font-medium">{viewEmployeeProfile.department || "N/A"}</p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <Shield className="text-muted-foreground h-5 w-5" />
+                          <div>
+                            <p className="text-muted-foreground text-sm">Role</p>
+                            <div className="mt-1 flex gap-2">
+                              <Badge className={getRoleBadgeColor(viewEmployeeProfile.role as UserRole)}>
+                                {getRoleDisplayName(viewEmployeeProfile.role as UserRole)}
+                              </Badge>
+                              {viewEmployeeProfile.is_department_lead &&
+                                viewEmployeeProfile.lead_departments &&
+                                viewEmployeeProfile.lead_departments.length > 0 && (
+                                  <Badge variant="outline">
+                                    Leading {viewEmployeeProfile.lead_departments.length} Dept
+                                    {viewEmployeeProfile.lead_departments.length > 1 ? "s" : ""}
+                                  </Badge>
+                                )}
                             </div>
                           </div>
                         </div>
-                      )}
 
-                      <div className="flex items-center gap-3">
-                        <Calendar className="text-muted-foreground h-5 w-5" />
-                        <div>
-                          <p className="text-muted-foreground text-sm">Hire Date</p>
-                          <p className="font-medium">
-                            {viewEmployeeProfile.employment_date
-                              ? format(new Date(viewEmployeeProfile.employment_date), "PPP")
-                              : "Not recorded"}
-                          </p>
+                        <div className="flex items-center gap-3">
+                          <UserIcon className="text-muted-foreground h-5 w-5" />
+                          <div>
+                            <p className="text-muted-foreground text-sm">Position</p>
+                            <p className="font-medium">{viewEmployeeProfile.company_role || "N/A"}</p>
+                          </div>
                         </div>
-                      </div>
 
-                      {viewEmployeeProfile.employment_date && (
-                        <>
+                        {viewEmployeeProfile.phone_number && (
                           <div className="flex items-center gap-3">
-                            <CheckCircle2 className="text-muted-foreground h-5 w-5" />
+                            <Phone className="text-muted-foreground h-5 w-5" />
                             <div>
-                              <p className="text-muted-foreground text-sm">Joined ACOB</p>
-                              <p className="font-medium">
-                                {format(new Date(viewEmployeeProfile.employment_date), "MMM d, yyyy")}
-                              </p>
+                              <p className="text-muted-foreground text-sm">Phone</p>
+                              <p className="font-medium">{viewEmployeeProfile.phone_number}</p>
+                              {viewEmployeeProfile.additional_phone && (
+                                <p className="text-muted-foreground text-xs">{viewEmployeeProfile.additional_phone}</p>
+                              )}
                             </div>
                           </div>
-
-                          <div className="flex items-center gap-3">
-                            <Clock className="text-muted-foreground h-5 w-5" />
-                            <div>
-                              <p className="text-muted-foreground text-sm">Days at ACOB</p>
-                              <p className="font-medium text-blue-600 dark:text-blue-400">
-                                {differenceInDays(new Date(), new Date(viewEmployeeProfile.employment_date))} Days
-                              </p>
-                            </div>
-                          </div>
-                        </>
-                      )}
-
-                      <div className="flex items-center gap-3">
-                        <Calendar className="text-muted-foreground h-5 w-5" />
-                        <div>
-                          <p className="text-muted-foreground text-sm">Account Created</p>
-                          <p className="font-medium">{format(new Date(viewEmployeeProfile.created_at), "PPP")}</p>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Related Data Tabs */}
-                <Tabs defaultValue="assets" className="space-y-4">
-                  <TabsList>
-                    <TabsTrigger value="assets">Assets ({viewEmployeeData.assets.length})</TabsTrigger>
-                    <TabsTrigger value="tasks">Tasks ({viewEmployeeData.tasks.length})</TabsTrigger>
-                    <TabsTrigger value="documentation">
-                      Documentation ({viewEmployeeData.documentation.length})
-                    </TabsTrigger>
-                  </TabsList>
-
-                  <TabsContent value="assets">
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>Assigned Assets</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        {viewEmployeeData.assets.length > 0 ? (
-                          <div className="space-y-3">
-                            {viewEmployeeData.assets.map((assignment: any) => {
-                              const asset = assignment.Asset
-                              const assetTypeLabel = asset?.asset_type
-                                ? ASSET_TYPE_MAP[asset.asset_type]?.label || asset.asset_type
-                                : "Unknown"
-                              const isOfficeAssignment = assignment.assignmentType === "office"
-
-                              return (
-                                <div key={assignment.id} className="rounded-lg border p-4">
-                                  <div className="mb-3 flex items-start justify-between">
-                                    <div className="flex items-center gap-2">
-                                      <p className="text-base font-semibold">{assetTypeLabel}</p>
-                                      {isOfficeAssignment ? (
-                                        <Badge
-                                          variant="outline"
-                                          className="bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
-                                        >
-                                          Office:{" "}
-                                          {assignment.officeLocation ||
-                                            viewEmployeeProfile?.office_location ||
-                                            "Office"}
-                                        </Badge>
-                                      ) : (
-                                        <Badge
-                                          variant="outline"
-                                          className="bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300"
-                                        >
-                                          Personal Assignment
-                                        </Badge>
-                                      )}
-                                    </div>
-                                    {asset?.status && (
-                                      <Badge variant={asset.status === "assigned" ? "default" : "secondary"}>
-                                        {asset.status}
-                                      </Badge>
-                                    )}
-                                  </div>
-                                  <div className="space-y-2 text-sm">
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-muted-foreground min-w-[120px] font-medium">
-                                        Unique Code:
-                                      </span>
-                                      <span className="font-mono">{asset?.unique_code || "-"}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-muted-foreground min-w-[120px] font-medium">
-                                        Model Number:
-                                      </span>
-                                      <span>{asset?.asset_model || "-"}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-muted-foreground min-w-[120px] font-medium">
-                                        Serial Number:
-                                      </span>
-                                      <span className="font-mono">{asset?.serial_number || "-"}</span>
-                                    </div>
-                                  </div>
-                                </div>
-                              )
-                            })}
-                          </div>
-                        ) : (
-                          <p className="text-muted-foreground text-sm">No assets assigned</p>
                         )}
-                      </CardContent>
-                    </Card>
-                  </TabsContent>
 
-                  <TabsContent value="tasks">
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>Assigned Tasks</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        {viewEmployeeData.tasks.length > 0 ? (
-                          <div className="space-y-2">
-                            {viewEmployeeData.tasks.map((task: any) => (
-                              <div key={task.id} className="rounded-lg border p-3">
-                                <p className="font-medium">{task.title}</p>
-                                <p className="text-muted-foreground text-sm">{task.status}</p>
+                        {viewEmployeeProfile.residential_address && (
+                          <div className="flex items-center gap-3">
+                            <MapPin className="text-muted-foreground h-5 w-5" />
+                            <div>
+                              <p className="text-muted-foreground text-sm">Address</p>
+                              <p className="font-medium">{viewEmployeeProfile.residential_address}</p>
+                            </div>
+                          </div>
+                        )}
+
+                        {viewEmployeeProfile.office_location && (
+                          <div className="flex items-center gap-3">
+                            <MapPin className="text-muted-foreground h-5 w-5" />
+                            <div>
+                              <p className="text-muted-foreground text-sm">Office Location</p>
+                              <p className="font-medium">{viewEmployeeProfile.office_location}</p>
+                            </div>
+                          </div>
+                        )}
+
+                        {viewEmployeeProfile.lead_departments && viewEmployeeProfile.lead_departments.length > 0 && (
+                          <div className="flex items-center gap-3">
+                            <Building2 className="text-muted-foreground h-5 w-5" />
+                            <div>
+                              <p className="text-muted-foreground text-sm">Leading Departments</p>
+                              <div className="mt-1 flex flex-wrap gap-1">
+                                {viewEmployeeProfile.lead_departments.map((dept: string) => (
+                                  <Badge key={dept} variant="outline">
+                                    {dept}
+                                  </Badge>
+                                ))}
                               </div>
-                            ))}
+                            </div>
                           </div>
-                        ) : (
-                          <p className="text-muted-foreground text-sm">No tasks assigned</p>
                         )}
-                      </CardContent>
-                    </Card>
-                  </TabsContent>
 
-                  <TabsContent value="documentation">
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>Documentation</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        {viewEmployeeData.documentation.length > 0 ? (
-                          <div className="space-y-2">
-                            {viewEmployeeData.documentation.map((doc: any) => (
-                              <div key={doc.id} className="rounded-lg border p-3">
-                                <p className="font-medium">{doc.title || "Untitled"}</p>
-                                <p className="text-muted-foreground text-sm">
-                                  {new Date(doc.created_at).toLocaleDateString()}
+                        <div className="flex items-center gap-3">
+                          <Calendar className="text-muted-foreground h-5 w-5" />
+                          <div>
+                            <p className="text-muted-foreground text-sm">Hire Date</p>
+                            <p className="font-medium">
+                              {viewEmployeeProfile.employment_date
+                                ? format(new Date(viewEmployeeProfile.employment_date), "PPP")
+                                : "Not recorded"}
+                            </p>
+                          </div>
+                        </div>
+
+                        {viewEmployeeProfile.employment_date && (
+                          <>
+                            <div className="flex items-center gap-3">
+                              <CheckCircle2 className="text-muted-foreground h-5 w-5" />
+                              <div>
+                                <p className="text-muted-foreground text-sm">Joined ACOB</p>
+                                <p className="font-medium">
+                                  {format(new Date(viewEmployeeProfile.employment_date), "MMM d, yyyy")}
                                 </p>
                               </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-muted-foreground text-sm">No documentation</p>
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                              <Clock className="text-muted-foreground h-5 w-5" />
+                              <div>
+                                <p className="text-muted-foreground text-sm">Days at ACOB</p>
+                                <p className="font-medium text-blue-600 dark:text-blue-400">
+                                  {differenceInDays(new Date(), new Date(viewEmployeeProfile.employment_date))} Days
+                                </p>
+                              </div>
+                            </div>
+                          </>
                         )}
-                      </CardContent>
-                    </Card>
-                  </TabsContent>
-                </Tabs>
-              </div>
-            </ScrollArea>
-          )}
 
-          {viewEmployeeProfile && modalViewMode === "employment" && (
-            <div className="space-y-6 pt-4">
-              <Card className="border-2">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <UserCircle className="h-5 w-5" />
-                    Employment Details
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                    <div className="space-y-1">
-                      <p className="text-muted-foreground text-sm font-medium">Current Status</p>
-                      <EmployeeStatusBadge status={viewEmployeeProfile.employment_status || "active"} size="lg" />
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-muted-foreground text-sm font-medium">Hire Date</p>
-                      <div className="text-foreground flex items-center gap-2">
-                        <Calendar className="h-4 w-4" />
-                        <span className="font-medium">
-                          {viewEmployeeProfile.employment_date
-                            ? new Date(viewEmployeeProfile.employment_date).toLocaleDateString("en-GB", {
-                                day: "numeric",
-                                month: "long",
-                                year: "numeric",
-                              })
-                            : "Not recorded"}
-                        </span>
+                        <div className="flex items-center gap-3">
+                          <Calendar className="text-muted-foreground h-5 w-5" />
+                          <div>
+                            <p className="text-muted-foreground text-sm">Account Created</p>
+                            <p className="font-medium">{format(new Date(viewEmployeeProfile.created_at), "PPP")}</p>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
+                    </CardContent>
+                  </Card>
 
-                  {viewEmployeeProfile.employment_status === "separated" && (
-                    <div className="rounded-lg border border-red-100 bg-red-50 p-4 dark:border-red-900/30 dark:bg-red-950/20">
+                  {/* Related Data Tabs */}
+                  <Tabs defaultValue="assets" className="space-y-4">
+                    <TabsList>
+                      <TabsTrigger value="assets">Assets ({viewEmployeeData.assets.length})</TabsTrigger>
+                      <TabsTrigger value="tasks">Tasks ({viewEmployeeData.tasks.length})</TabsTrigger>
+                      <TabsTrigger value="documentation">
+                        Documentation ({viewEmployeeData.documentation.length})
+                      </TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="assets">
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>Assigned Assets</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          {viewEmployeeData.assets.length > 0 ? (
+                            <div className="overflow-x-auto">
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead className="w-14">S/N</TableHead>
+                                    <TableHead>Type</TableHead>
+                                    <TableHead>Assignment</TableHead>
+                                    <TableHead>Unique Code</TableHead>
+                                    <TableHead>Model</TableHead>
+                                    <TableHead>Serial Number</TableHead>
+                                    <TableHead>Status</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {viewEmployeeData.assets.map((assignment: any, index: number) => {
+                                    const asset = assignment.Asset
+                                    const assetTypeLabel = asset?.asset_type
+                                      ? ASSET_TYPE_MAP[asset.asset_type]?.label || asset.asset_type
+                                      : "Unknown"
+                                    const isOfficeAssignment = assignment.assignmentType === "office"
+
+                                    return (
+                                      <TableRow key={assignment.id}>
+                                        <TableCell className="text-muted-foreground">{index + 1}</TableCell>
+                                        <TableCell className="font-medium">{assetTypeLabel}</TableCell>
+                                        <TableCell>
+                                          {isOfficeAssignment ? (
+                                            <Badge
+                                              variant="outline"
+                                              className="bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
+                                            >
+                                              Office:{" "}
+                                              {assignment.officeLocation ||
+                                                viewEmployeeProfile?.office_location ||
+                                                "Office"}
+                                            </Badge>
+                                          ) : (
+                                            <Badge
+                                              variant="outline"
+                                              className="bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300"
+                                            >
+                                              Personal
+                                            </Badge>
+                                          )}
+                                        </TableCell>
+                                        <TableCell className="font-mono">{asset?.unique_code || "-"}</TableCell>
+                                        <TableCell>{asset?.asset_model || "-"}</TableCell>
+                                        <TableCell className="font-mono">{asset?.serial_number || "-"}</TableCell>
+                                        <TableCell>
+                                          <Badge variant={asset?.status === "assigned" ? "default" : "secondary"}>
+                                            {asset?.status || "unknown"}
+                                          </Badge>
+                                        </TableCell>
+                                      </TableRow>
+                                    )
+                                  })}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          ) : (
+                            <p className="text-muted-foreground text-sm">No assets assigned</p>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </TabsContent>
+
+                    <TabsContent value="tasks">
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>Assigned Tasks</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          {viewEmployeeData.tasks.length > 0 ? (
+                            <div className="overflow-x-auto">
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead className="w-14">S/N</TableHead>
+                                    <TableHead>Title</TableHead>
+                                    <TableHead>Status</TableHead>
+                                    <TableHead>Created</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {viewEmployeeData.tasks.map((task: any, index: number) => (
+                                    <TableRow key={task.id}>
+                                      <TableCell className="text-muted-foreground">{index + 1}</TableCell>
+                                      <TableCell className="font-medium">{task.title || "Untitled Task"}</TableCell>
+                                      <TableCell>
+                                        <Badge variant="outline">{task.status || "unknown"}</Badge>
+                                      </TableCell>
+                                      <TableCell>
+                                        {task.created_at ? new Date(task.created_at).toLocaleDateString() : "—"}
+                                      </TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          ) : (
+                            <p className="text-muted-foreground text-sm">No tasks assigned</p>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </TabsContent>
+
+                    <TabsContent value="documentation">
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>Documentation</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          {viewEmployeeData.documentation.length > 0 ? (
+                            <div className="overflow-x-auto">
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead className="w-14">S/N</TableHead>
+                                    <TableHead>Title</TableHead>
+                                    <TableHead>Created</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {viewEmployeeData.documentation.map((doc: any, index: number) => (
+                                    <TableRow key={doc.id}>
+                                      <TableCell className="text-muted-foreground">{index + 1}</TableCell>
+                                      <TableCell className="font-medium">{doc.title || "Untitled"}</TableCell>
+                                      <TableCell>
+                                        {doc.created_at ? new Date(doc.created_at).toLocaleDateString() : "—"}
+                                      </TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          ) : (
+                            <p className="text-muted-foreground text-sm">No documentation</p>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </TabsContent>
+                  </Tabs>
+                </div>
+              </ScrollArea>
+            )}
+
+            {viewEmployeeProfile && modalViewMode === "employment" && (
+              <ScrollArea className="h-full pr-4">
+                <div className="space-y-6 pt-4">
+                  <Card className="border-2">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <UserCircle className="h-5 w-5" />
+                        Employment Details
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
                       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                         <div className="space-y-1">
-                          <p className="text-sm font-semibold text-red-700 dark:text-red-400">Separation Date</p>
-                          <p className="text-foreground font-medium">
-                            {viewEmployeeProfile.separation_date
-                              ? new Date(viewEmployeeProfile.separation_date).toLocaleDateString("en-GB", {
-                                  day: "numeric",
-                                  month: "long",
-                                  year: "numeric",
-                                })
-                              : "Not recorded"}
-                          </p>
+                          <p className="text-muted-foreground text-sm font-medium">Current Status</p>
+                          <EmployeeStatusBadge status={viewEmployeeProfile.employment_status || "active"} size="lg" />
                         </div>
                         <div className="space-y-1">
-                          <p className="text-sm font-semibold text-red-700 dark:text-red-400">Separation Reason</p>
-                          <p className="text-foreground font-medium italic">
-                            {viewEmployeeProfile.separation_reason || "No reason specified"}
-                          </p>
+                          <p className="text-muted-foreground text-sm font-medium">Hire Date</p>
+                          <div className="text-foreground flex items-center gap-2">
+                            <Calendar className="h-4 w-4" />
+                            <span className="font-medium">
+                              {viewEmployeeProfile.employment_date
+                                ? new Date(viewEmployeeProfile.employment_date).toLocaleDateString("en-GB", {
+                                    day: "numeric",
+                                    month: "long",
+                                    year: "numeric",
+                                  })
+                                : "Not recorded"}
+                            </span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
 
-                  {viewEmployeeProfile.employment_status === "suspended" && (
-                    <div className="rounded-lg border border-amber-100 bg-amber-50 p-4 dark:border-amber-900/30 dark:bg-amber-950/20">
-                      <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">Suspension Note</p>
-                      <p className="text-foreground mt-1 text-sm italic">
-                        Contact IT / Admin for active suspension period details.
-                      </p>
-                    </div>
-                  )}
+                      {viewEmployeeProfile.employment_status === "separated" && (
+                        <div className="rounded-lg border border-red-100 bg-red-50 p-4 dark:border-red-900/30 dark:bg-red-950/20">
+                          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                            <div className="space-y-1">
+                              <p className="text-sm font-semibold text-red-700 dark:text-red-400">Separation Date</p>
+                              <p className="text-foreground font-medium">
+                                {viewEmployeeProfile.separation_date
+                                  ? new Date(viewEmployeeProfile.separation_date).toLocaleDateString("en-GB", {
+                                      day: "numeric",
+                                      month: "long",
+                                      year: "numeric",
+                                    })
+                                  : "Not recorded"}
+                              </p>
+                            </div>
+                            <div className="space-y-1">
+                              <p className="text-sm font-semibold text-red-700 dark:text-red-400">Separation Reason</p>
+                              <p className="text-foreground font-medium italic">
+                                {viewEmployeeProfile.separation_reason || "No reason specified"}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
 
-                  <div className="flex justify-end pt-4">
-                    <Button onClick={() => setModalViewMode("status")} className="gap-2">
-                      <UserCircle className="h-4 w-4" />
-                      Edit Employment Status
-                    </Button>
+                      {viewEmployeeProfile.employment_status === "suspended" && (
+                        <div className="rounded-lg border border-amber-100 bg-amber-50 p-4 dark:border-amber-900/30 dark:bg-amber-950/20">
+                          <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">Suspension Note</p>
+                          <p className="text-foreground mt-1 text-sm italic">
+                            Contact IT / Admin for active suspension period details.
+                          </p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  <div className="bg-muted/30 rounded-lg p-4">
+                    <p className="text-muted-foreground text-xs leading-relaxed">
+                      Note: Changes to employment status are logged for audit purposes. Terminating an employee will
+                      automatically revoke their system access and clear their assigned roles.
+                    </p>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </ScrollArea>
+            )}
 
-              <div className="bg-muted/30 rounded-lg p-4">
-                <p className="text-muted-foreground text-xs leading-relaxed">
-                  Note: Changes to employment status are logged for audit purposes. Terminating an employee will
-                  automatically revoke their system access and clear their assigned roles.
-                </p>
+            {viewEmployeeProfile && modalViewMode === "signature" && (
+              <ScrollArea className="h-full pr-4">
+                <div className="mt-4">
+                  <SignatureCreator profile={viewEmployeeProfile as any} />
+                </div>
+              </ScrollArea>
+            )}
+
+            {viewEmployeeProfile && modalViewMode === "status" && (
+              <div className="mx-auto max-w-md">
+                <ChangeStatusContent
+                  employee={{
+                    id: viewEmployeeProfile.id,
+                    first_name: viewEmployeeProfile.first_name,
+                    last_name: viewEmployeeProfile.last_name,
+                    employment_status: (viewEmployeeProfile.employment_status as any) || "active",
+                  }}
+                  onSuccess={() => {
+                    setModalViewMode("profile")
+                    loadData()
+                    // Refresh profile data
+                    supabase
+                      .from("profiles")
+                      .select("*")
+                      .eq("id", viewEmployeeProfile.id)
+                      .single()
+                      .then(({ data }) => {
+                        if (data) setViewEmployeeProfile(data as any)
+                      })
+                  }}
+                />
               </div>
-            </div>
-          )}
+            )}
 
-          {viewEmployeeProfile && modalViewMode === "signature" && (
-            <div className="mt-4">
-              <SignatureCreator profile={viewEmployeeProfile as any} />
-            </div>
-          )}
-
-          {viewEmployeeProfile && modalViewMode === "status" && (
-            <div className="mx-auto max-w-md">
-              <ChangeStatusContent
-                employee={{
-                  id: viewEmployeeProfile.id,
-                  first_name: viewEmployeeProfile.first_name,
-                  last_name: viewEmployeeProfile.last_name,
-                  employment_status: (viewEmployeeProfile.employment_status as any) || "active",
-                }}
-                onSuccess={() => {
-                  setModalViewMode("profile")
-                  loadData()
-                  // Refresh profile data
-                  supabase
-                    .from("profiles")
-                    .select("*")
-                    .eq("id", viewEmployeeProfile.id)
-                    .single()
-                    .then(({ data }) => {
-                      if (data) setViewEmployeeProfile(data as any)
-                    })
-                }}
-              />
-            </div>
-          )}
-
-          {viewEmployeeProfile && modalViewMode === "edit" && (
-            <ScrollArea className="max-h-[70vh] pr-4">
-              <div className="space-y-4 py-4">
-                <div>
-                  <Label htmlFor="role">Role *</Label>
-                  <Select
-                    value={editForm.role}
-                    onValueChange={(value: UserRole) => {
-                      setEditForm((prev) => ({
-                        ...prev,
-                        role: value,
-                        admin_domains: value === "admin" ? prev.admin_domains : [],
-                      }))
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {getAvailableRoles().map((role) => (
-                        <SelectItem key={role} value={role}>
-                          {getRoleDisplayName(role)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-muted-foreground mt-1 text-xs">
-                    {userProfile?.role === "admin"
-                      ? "As Admin, you can assign: Visitor and Employee roles"
-                      : "As Super Admin, you can assign any role"}
-                  </p>
-                  <div className="mt-3 flex items-center gap-2">
-                    <Checkbox
-                      id="is_department_lead"
-                      checked={editForm.is_department_lead}
-                      onCheckedChange={(checked) =>
+            {viewEmployeeProfile && modalViewMode === "edit" && (
+              <ScrollArea className="h-full pr-4">
+                <div className="space-y-4 py-4">
+                  <div>
+                    <Label htmlFor="role">Role *</Label>
+                    <Select
+                      value={editForm.role}
+                      onValueChange={(value: UserRole) => {
                         setEditForm((prev) => ({
                           ...prev,
-                          is_department_lead: checked === true,
-                          lead_departments: checked === true ? [prev.department].filter(Boolean) : [],
+                          role: value,
+                          admin_domains: value === "admin" ? prev.admin_domains : [],
                         }))
-                      }
-                    />
-                    <Label htmlFor="is_department_lead">Department Lead</Label>
-                  </div>
-                  {editForm.role === "admin" && (
-                    <div className="mt-3 space-y-2">
-                      <Label>Admin Domains *</Label>
-                      <SearchableMultiSelect
-                        label="Admin Domains"
-                        values={editForm.admin_domains}
-                        onChange={(values) => setEditForm((prev) => ({ ...prev, admin_domains: values }))}
-                        options={[
-                          { value: "hr", label: "HR" },
-                          { value: "finance", label: "Finance" },
-                          { value: "assets", label: "Assets" },
-                          { value: "reports", label: "Reports" },
-                          { value: "tasks", label: "Tasks" },
-                          { value: "projects", label: "Projects" },
-                          { value: "communications", label: "Communications" },
-                        ]}
-                        placeholder="Select at least one admin domain"
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {getAvailableRoles().map((role) => (
+                          <SelectItem key={role} value={role}>
+                            {getRoleDisplayName(role)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-muted-foreground mt-1 text-xs">
+                      {userProfile?.role === "admin"
+                        ? "As Admin, you can assign: Visitor and Employee roles"
+                        : "As Super Admin, you can assign any role"}
+                    </p>
+                    <div className="mt-3 flex items-center gap-2">
+                      <Checkbox
+                        id="is_department_lead"
+                        checked={editForm.is_department_lead}
+                        onCheckedChange={(checked) =>
+                          setEditForm((prev) => ({
+                            ...prev,
+                            is_department_lead: checked === true,
+                            lead_departments: checked === true ? [prev.department].filter(Boolean) : [],
+                          }))
+                        }
                       />
-                      <p className="text-muted-foreground text-xs">Admin must have one or more domains.</p>
+                      <Label htmlFor="is_department_lead">Department Lead</Label>
+                    </div>
+                    {editForm.role === "admin" && (
+                      <div className="mt-3 space-y-2">
+                        <Label>Admin Domains *</Label>
+                        <SearchableMultiSelect
+                          label="Admin Domains"
+                          values={editForm.admin_domains}
+                          onChange={(values) => setEditForm((prev) => ({ ...prev, admin_domains: values }))}
+                          options={[
+                            { value: "hr", label: "HR" },
+                            { value: "finance", label: "Finance" },
+                            { value: "assets", label: "Assets" },
+                            { value: "reports", label: "Reports" },
+                            { value: "tasks", label: "Tasks" },
+                            { value: "projects", label: "Projects" },
+                            { value: "communications", label: "Communications" },
+                          ]}
+                          placeholder="Select at least one admin domain"
+                        />
+                        <p className="text-muted-foreground text-xs">Admin must have one or more domains.</p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <Label htmlFor="department">Department *</Label>
+                    <Select
+                      value={editForm.department}
+                      onValueChange={(value) =>
+                        setEditForm({
+                          ...editForm,
+                          department: value,
+                          lead_departments: editForm.is_department_lead ? [value] : editForm.lead_departments,
+                        })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select department" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {DEPARTMENTS.map((dept) => (
+                          <SelectItem key={dept} value={dept}>
+                            {dept}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="office_location">Office Location</Label>
+                    <SearchableSelect
+                      value={editForm.office_location}
+                      onValueChange={(value) => setEditForm({ ...editForm, office_location: value })}
+                      placeholder="Select office location"
+                      options={OFFICE_LOCATIONS.map((location) => ({
+                        value: location,
+                        label: location,
+                      }))}
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="company_role">Position/Title</Label>
+                    <Input
+                      id="company_role"
+                      value={editForm.company_role}
+                      onChange={(e) => setEditForm({ ...editForm, company_role: e.target.value })}
+                      placeholder="e.g., Senior Developer"
+                    />
+                  </div>
+
+                  {editForm.is_department_lead && (
+                    <div className="space-y-2">
+                      <p className="text-xs text-amber-600 dark:text-amber-400">
+                        A person can belong to only one department, so the lead department must match the selected
+                        department.
+                      </p>
+                      <Label>Lead Department *</Label>
+                      <div className="mt-2 grid grid-cols-2 gap-2">
+                        {DEPARTMENTS.map((dept) => (
+                          <div key={dept} className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              id={`dept-edit-${dept}`}
+                              checked={editForm.lead_departments.includes(dept)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setEditForm({
+                                    ...editForm,
+                                    lead_departments: [dept],
+                                  })
+                                } else {
+                                  setEditForm({
+                                    ...editForm,
+                                    lead_departments: editForm.lead_departments.filter((d) => d !== dept),
+                                  })
+                                }
+                              }}
+                              className="rounded"
+                              disabled={dept !== editForm.department}
+                            />
+                            <Label htmlFor={`dept-edit-${dept}`} className="text-sm">
+                              {dept}
+                            </Label>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
-                </div>
 
-                <div>
-                  <Label htmlFor="department">Department *</Label>
-                  <Select
-                    value={editForm.department}
-                    onValueChange={(value) =>
-                      setEditForm({
-                        ...editForm,
-                        department: value,
-                        lead_departments: editForm.is_department_lead ? [value] : editForm.lead_departments,
-                      })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select department" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {DEPARTMENTS.map((dept) => (
-                        <SelectItem key={dept} value={dept}>
-                          {dept}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                  {/* More Options */}
+                  <div className="border-t pt-4">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => setShowMoreOptions(!showMoreOptions)}
+                      className="w-full justify-between"
+                    >
+                      <span className="font-medium">More Personal Options</span>
+                      {showMoreOptions ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    </Button>
 
-                <div>
-                  <Label htmlFor="office_location">Office Location</Label>
-                  <SearchableSelect
-                    value={editForm.office_location}
-                    onValueChange={(value) => setEditForm({ ...editForm, office_location: value })}
-                    placeholder="Select office location"
-                    options={OFFICE_LOCATIONS.map((location) => ({
-                      value: location,
-                      label: location,
-                    }))}
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="company_role">Position/Title</Label>
-                  <Input
-                    id="company_role"
-                    value={editForm.company_role}
-                    onChange={(e) => setEditForm({ ...editForm, company_role: e.target.value })}
-                    placeholder="e.g., Senior Developer"
-                  />
-                </div>
-
-                {editForm.is_department_lead && (
-                  <div className="space-y-2">
-                    <p className="text-xs text-amber-600 dark:text-amber-400">
-                      A person can belong to only one department, so the lead department must match the selected
-                      department.
-                    </p>
-                    <Label>Lead Department *</Label>
-                    <div className="mt-2 grid grid-cols-2 gap-2">
-                      {DEPARTMENTS.map((dept) => (
-                        <div key={dept} className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            id={`dept-edit-${dept}`}
-                            checked={editForm.lead_departments.includes(dept)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setEditForm({
-                                  ...editForm,
-                                  lead_departments: [dept],
-                                })
-                              } else {
-                                setEditForm({
-                                  ...editForm,
-                                  lead_departments: editForm.lead_departments.filter((d) => d !== dept),
-                                })
-                              }
-                            }}
-                            className="rounded"
-                            disabled={dept !== editForm.department}
-                          />
-                          <Label htmlFor={`dept-edit-${dept}`} className="text-sm">
-                            {dept}
-                          </Label>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* More Options */}
-                <div className="border-t pt-4">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={() => setShowMoreOptions(!showMoreOptions)}
-                    className="w-full justify-between"
-                  >
-                    <span className="font-medium">More Personal Options</span>
-                    {showMoreOptions ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                  </Button>
-
-                  {showMoreOptions && (
-                    <div className="animate-in slide-in-from-top-2 mt-4 space-y-4">
-                      {/* Personal Information */}
-                      <div className="space-y-4">
-                        <h4 className="text-foreground text-sm font-semibold">Personal Information</h4>
-                        <div>
-                          <Label htmlFor="edit_employee_number">Employee Number</Label>
-                          <Input
-                            id="edit_employee_number"
-                            value={editForm.employee_number}
-                            placeholder="e.g., ACOB/2026/058"
-                            className="font-mono"
-                            readOnly
-                            disabled
-                          />
-                          <p className="text-muted-foreground mt-1 text-xs">
-                            Employee number is locked after creation.
-                          </p>
-                        </div>
-                        <div className="grid gap-4 md:grid-cols-2">
+                    {showMoreOptions && (
+                      <div className="animate-in slide-in-from-top-2 mt-4 space-y-4">
+                        {/* Personal Information */}
+                        <div className="space-y-4">
+                          <h4 className="text-foreground text-sm font-semibold">Personal Information</h4>
                           <div>
-                            <Label htmlFor="edit_first_name">First Name</Label>
+                            <Label htmlFor="edit_employee_number">Employee Number</Label>
                             <Input
-                              id="edit_first_name"
-                              value={editForm.first_name}
-                              onChange={(e) => setEditForm({ ...editForm, first_name: e.target.value })}
-                              placeholder="First name"
-                            />
-                          </div>
-                          <div>
-                            <Label htmlFor="edit_last_name">Last Name</Label>
-                            <Input
-                              id="edit_last_name"
-                              value={editForm.last_name}
-                              onChange={(e) => setEditForm({ ...editForm, last_name: e.target.value })}
-                              placeholder="Last name"
-                            />
-                          </div>
-                        </div>
-                        <div>
-                          <Label htmlFor="edit_other_names">Other Names</Label>
-                          <Input
-                            id="edit_other_names"
-                            value={editForm.other_names}
-                            onChange={(e) => setEditForm({ ...editForm, other_names: e.target.value })}
-                            placeholder="Middle name or other names"
-                          />
-                        </div>
-                        <div className="grid gap-4 md:grid-cols-2">
-                          <div>
-                            <Label htmlFor="edit_company_email">Company Email</Label>
-                            <Input
-                              id="edit_company_email"
-                              type="email"
-                              value={editForm.company_email}
+                              id="edit_employee_number"
+                              value={editForm.employee_number}
+                              placeholder="e.g., ACOB/2026/058"
+                              className="font-mono"
                               readOnly
                               disabled
-                              placeholder="email@company.com"
                             />
+                            <p className="text-muted-foreground mt-1 text-xs">
+                              Employee number is locked after creation.
+                            </p>
+                          </div>
+                          <div className="grid gap-4 md:grid-cols-2">
+                            <div>
+                              <Label htmlFor="edit_first_name">First Name</Label>
+                              <Input
+                                id="edit_first_name"
+                                value={editForm.first_name}
+                                onChange={(e) => setEditForm({ ...editForm, first_name: e.target.value })}
+                                placeholder="First name"
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="edit_last_name">Last Name</Label>
+                              <Input
+                                id="edit_last_name"
+                                value={editForm.last_name}
+                                onChange={(e) => setEditForm({ ...editForm, last_name: e.target.value })}
+                                placeholder="Last name"
+                              />
+                            </div>
                           </div>
                           <div>
-                            <Label htmlFor="edit_additional_email">Additional Email</Label>
+                            <Label htmlFor="edit_other_names">Other Names</Label>
                             <Input
-                              id="edit_additional_email"
-                              type="email"
-                              value={editForm.additional_email}
-                              onChange={(e) => setEditForm({ ...editForm, additional_email: e.target.value })}
-                              placeholder="email@example.com"
+                              id="edit_other_names"
+                              value={editForm.other_names}
+                              onChange={(e) => setEditForm({ ...editForm, other_names: e.target.value })}
+                              placeholder="Middle name or other names"
                             />
                           </div>
-                        </div>
-                        <div className="grid gap-4 md:grid-cols-2">
+                          <div className="grid gap-4 md:grid-cols-2">
+                            <div>
+                              <Label htmlFor="edit_company_email">Company Email</Label>
+                              <Input
+                                id="edit_company_email"
+                                type="email"
+                                value={editForm.company_email}
+                                readOnly
+                                disabled
+                                placeholder="email@company.com"
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="edit_additional_email">Additional Email</Label>
+                              <Input
+                                id="edit_additional_email"
+                                type="email"
+                                value={editForm.additional_email}
+                                onChange={(e) => setEditForm({ ...editForm, additional_email: e.target.value })}
+                                placeholder="email@example.com"
+                              />
+                            </div>
+                          </div>
+                          <div className="grid gap-4 md:grid-cols-2">
+                            <div>
+                              <Label htmlFor="edit_phone_number">Phone Number</Label>
+                              <Input
+                                id="edit_phone_number"
+                                type="tel"
+                                value={editForm.phone_number}
+                                onChange={(e) => setEditForm({ ...editForm, phone_number: e.target.value })}
+                                placeholder="+234 800 000 0000"
+                              />
+                            </div>
+                          </div>
                           <div>
-                            <Label htmlFor="edit_phone_number">Phone Number</Label>
+                            <Label htmlFor="edit_additional_phone">Additional Phone</Label>
                             <Input
-                              id="edit_phone_number"
+                              id="edit_additional_phone"
                               type="tel"
-                              value={editForm.phone_number}
-                              onChange={(e) => setEditForm({ ...editForm, phone_number: e.target.value })}
-                              placeholder="+234 800 000 0000"
+                              value={editForm.additional_phone}
+                              onChange={(e) => setEditForm({ ...editForm, additional_phone: e.target.value })}
+                              placeholder="Alternative phone number"
                             />
                           </div>
-                        </div>
-                        <div>
-                          <Label htmlFor="edit_additional_phone">Additional Phone</Label>
-                          <Input
-                            id="edit_additional_phone"
-                            type="tel"
-                            value={editForm.additional_phone}
-                            onChange={(e) => setEditForm({ ...editForm, additional_phone: e.target.value })}
-                            placeholder="Alternative phone number"
-                          />
-                        </div>
-                        <div className="grid gap-4 md:grid-cols-2">
-                          <div>
-                            <Label htmlFor="edit_date_of_birth">Date of Birth</Label>
-                            <Input
-                              id="edit_date_of_birth"
-                              type="date"
-                              value={editForm.date_of_birth}
-                              onChange={(e) => setEditForm({ ...editForm, date_of_birth: e.target.value })}
-                            />
-                          </div>
-                          <div>
-                            <Label htmlFor="edit_employment_date">Employment Date</Label>
-                            <Input
-                              id="edit_employment_date"
-                              type="date"
-                              value={editForm.employment_date}
-                              onChange={(e) => setEditForm({ ...editForm, employment_date: e.target.value })}
-                            />
+                          <div className="grid gap-4 md:grid-cols-2">
+                            <div>
+                              <Label htmlFor="edit_date_of_birth">Date of Birth</Label>
+                              <Input
+                                id="edit_date_of_birth"
+                                type="date"
+                                value={editForm.date_of_birth}
+                                onChange={(e) => setEditForm({ ...editForm, date_of_birth: e.target.value })}
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="edit_employment_date">Employment Date</Label>
+                              <Input
+                                id="edit_employment_date"
+                                type="date"
+                                value={editForm.employment_date}
+                                onChange={(e) => setEditForm({ ...editForm, employment_date: e.target.value })}
+                              />
+                            </div>
                           </div>
                         </div>
-                      </div>
 
-                      {/* Address Information */}
-                      <div className="space-y-4 border-t pt-4">
-                        <h4 className="text-foreground text-sm font-semibold">Address Information</h4>
-                        <div>
-                          <Label htmlFor="edit_residential_address">Residential Address</Label>
-                          <Textarea
-                            id="edit_residential_address"
-                            value={editForm.residential_address}
-                            onChange={(e) => setEditForm({ ...editForm, residential_address: e.target.value })}
-                            placeholder="Full residential address"
-                            rows={2}
-                          />
-                        </div>
-                      </div>
-
-                      {/* Banking Information */}
-                      <div className="space-y-4 border-t pt-4">
-                        <h4 className="text-foreground text-sm font-semibold">Banking Information</h4>
-                        <div>
-                          <Label htmlFor="edit_bank_name">Bank Name</Label>
-                          <Input
-                            id="edit_bank_name"
-                            value={editForm.bank_name}
-                            onChange={(e) => setEditForm({ ...editForm, bank_name: e.target.value })}
-                            placeholder="Bank name"
-                          />
-                        </div>
-                        <div className="grid gap-4 md:grid-cols-2">
+                        {/* Address Information */}
+                        <div className="space-y-4 border-t pt-4">
+                          <h4 className="text-foreground text-sm font-semibold">Address Information</h4>
                           <div>
-                            <Label htmlFor="edit_bank_account_number">Account Number</Label>
-                            <Input
-                              id="edit_bank_account_number"
-                              value={editForm.bank_account_number}
-                              onChange={(e) => setEditForm({ ...editForm, bank_account_number: e.target.value })}
-                              placeholder="Account number"
-                            />
-                          </div>
-                          <div>
-                            <Label htmlFor="edit_bank_account_name">Account Name</Label>
-                            <Input
-                              id="edit_bank_account_name"
-                              value={editForm.bank_account_name}
-                              onChange={(e) => setEditForm({ ...editForm, bank_account_name: e.target.value })}
-                              placeholder="Account holder name"
+                            <Label htmlFor="edit_residential_address">Residential Address</Label>
+                            <Textarea
+                              id="edit_residential_address"
+                              value={editForm.residential_address}
+                              onChange={(e) => setEditForm({ ...editForm, residential_address: e.target.value })}
+                              placeholder="Full residential address"
+                              rows={2}
                             />
                           </div>
                         </div>
-                      </div>
 
-                      {/* Job Description */}
-                      <div className="space-y-4 border-t pt-4">
-                        <h4 className="text-foreground text-sm font-semibold">Job Information</h4>
-                        <div>
-                          <Label htmlFor="edit_job_description">Job Description</Label>
-                          <Textarea
-                            id="edit_job_description"
-                            value={editForm.job_description}
-                            onChange={(e) => setEditForm({ ...editForm, job_description: e.target.value })}
-                            placeholder="Job description or responsibilities"
-                            rows={4}
-                          />
+                        {/* Banking Information */}
+                        <div className="space-y-4 border-t pt-4">
+                          <h4 className="text-foreground text-sm font-semibold">Banking Information</h4>
+                          <div>
+                            <Label htmlFor="edit_bank_name">Bank Name</Label>
+                            <Input
+                              id="edit_bank_name"
+                              value={editForm.bank_name}
+                              onChange={(e) => setEditForm({ ...editForm, bank_name: e.target.value })}
+                              placeholder="Bank name"
+                            />
+                          </div>
+                          <div className="grid gap-4 md:grid-cols-2">
+                            <div>
+                              <Label htmlFor="edit_bank_account_number">Account Number</Label>
+                              <Input
+                                id="edit_bank_account_number"
+                                value={editForm.bank_account_number}
+                                onChange={(e) => setEditForm({ ...editForm, bank_account_number: e.target.value })}
+                                placeholder="Account number"
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="edit_bank_account_name">Account Name</Label>
+                              <Input
+                                id="edit_bank_account_name"
+                                value={editForm.bank_account_name}
+                                onChange={(e) => setEditForm({ ...editForm, bank_account_name: e.target.value })}
+                                placeholder="Account holder name"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Job Description */}
+                        <div className="space-y-4 border-t pt-4">
+                          <h4 className="text-foreground text-sm font-semibold">Job Information</h4>
+                          <div>
+                            <Label htmlFor="edit_job_description">Job Description</Label>
+                            <Textarea
+                              id="edit_job_description"
+                              value={editForm.job_description}
+                              onChange={(e) => setEditForm({ ...editForm, job_description: e.target.value })}
+                              placeholder="Job description or responsibilities"
+                              rows={4}
+                            />
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
-              </div>
-            </ScrollArea>
-          )}
+              </ScrollArea>
+            )}
+          </div>
 
-          <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:justify-between sm:gap-0">
-            <div className="flex flex-wrap gap-2">
+          <DialogFooter className="bg-background/95 flex w-full flex-col gap-3 border-t px-5 py-3 backdrop-blur sm:flex-row sm:items-center sm:justify-between sm:px-6">
+            <div className="flex flex-wrap items-center gap-2">
               {modalViewMode === "edit" ? (
                 <>
                   <Button variant="outline" onClick={() => setModalViewMode("profile")} disabled={isSaving}>
                     Back to Profile
-                  </Button>
-                  <Button onClick={handleSaveEmployee} loading={isSaving}>
-                    Save Changes
                   </Button>
                 </>
               ) : modalViewMode === "signature" || modalViewMode === "status" ? (
@@ -2690,6 +2634,13 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                 </Button>
               ) : (
                 <>
+                  <Button
+                    variant={modalViewMode === "profile" ? "secondary" : "outline"}
+                    onClick={() => setModalViewMode("profile")}
+                    className="gap-2"
+                  >
+                    Overview
+                  </Button>
                   <Button
                     variant="outline"
                     onClick={() => handleViewEmployeeSignature(viewEmployeeProfile as any)}
@@ -2706,9 +2657,19 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                     <UserCircle className="h-4 w-4" />
                     Employment
                   </Button>
-                  {canManageUsers && (
+                </>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {modalViewMode === "edit" ? (
+                <Button onClick={handleSaveEmployee} loading={isSaving}>
+                  Save Changes
+                </Button>
+              ) : (
+                <>
+                  {canManageUsers && modalViewMode === "profile" && (
                     <Button
-                      variant="outline"
+                      variant="default"
                       onClick={() => handleEditEmployee(viewEmployeeProfile as any)}
                       className="gap-2"
                     >
@@ -2716,33 +2677,25 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                       Edit Profile
                     </Button>
                   )}
-                  {canManageUsers && (
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        handleDeleteEmployee(viewEmployeeProfile as any)
-                        setIsViewDialogOpen(false)
-                      }}
-                      disabled
-                      className="text-destructive hover:text-destructive hover:bg-destructive/10 gap-2"
-                      title="Deletion disabled"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      Deletion Disabled
+                  {canManageUsers && modalViewMode === "employment" && (
+                    <Button variant="default" onClick={() => setModalViewMode("status")} className="gap-2">
+                      <UserCircle className="h-4 w-4" />
+                      Change Status
                     </Button>
                   )}
                 </>
               )}
+
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setIsViewDialogOpen(false)
+                  setModalViewMode("profile")
+                }}
+              >
+                Close
+              </Button>
             </div>
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setIsViewDialogOpen(false)
-                setModalViewMode("profile")
-              }}
-            >
-              Close
-            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
