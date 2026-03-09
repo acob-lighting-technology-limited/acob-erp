@@ -564,7 +564,7 @@ export default async function AdminDashboardPage() {
   }
 
   const canAccessAction = (requiredRoles: string[], href: string) => {
-    if ((profile as any)?.is_department_lead) {
+    if ((profile as any)?.is_department_lead && profile?.role !== "admin") {
       return !href.startsWith("/admin/dev")
     }
     if (!profile?.role || !requiredRoles.includes(profile.role)) return false

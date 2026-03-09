@@ -35,6 +35,7 @@ interface User {
   first_name: string | null
   last_name: string | null
   role: string
+  admin_domains?: string[] | null
   department: string | null
   is_active: boolean
   employment_status: string
@@ -60,8 +61,9 @@ export default function UsersPage() {
   const [roleFilter, setRoleFilter] = useState<string>("all")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
-  const [formData, setFormData] = useState({ role: "", employment_status: "active" })
+  const [formData, setFormData] = useState({ role: "", employment_status: "active", admin_domains: [] as string[] })
   const [currentUserRole, setCurrentUserRole] = useState<string>("")
+  const ADMIN_DOMAIN_OPTIONS = ["hr", "finance", "assets", "reports", "tasks", "projects", "communications"] as const
 
   useEffect(() => {
     const roleParam = searchParams.get("role")
@@ -80,7 +82,9 @@ export default function UsersPage() {
       const supabase = createClient()
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, company_email, first_name, last_name, role, department, employment_status, created_at")
+        .select(
+          "id, company_email, first_name, last_name, role, admin_domains, department, employment_status, created_at"
+        )
         .order("created_at", { ascending: false })
 
       if (error) throw error
@@ -115,6 +119,10 @@ export default function UsersPage() {
     if (!editingUser) return
 
     try {
+      if (formData.role === "admin" && formData.admin_domains.length === 0) {
+        throw new Error("Admin role requires at least one domain")
+      }
+
       const response = await fetch("/api/admin/users/role", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -122,6 +130,7 @@ export default function UsersPage() {
           targetUserId: editingUser.id,
           role: formData.role,
           employment_status: formData.employment_status,
+          admin_domains: formData.role === "admin" ? formData.admin_domains : [],
         }),
       })
       const result = await response.json()
@@ -141,8 +150,18 @@ export default function UsersPage() {
     setFormData({
       role: user.role,
       employment_status: user.employment_status || (user.is_active ? "active" : "suspended"),
+      admin_domains: Array.isArray(user.admin_domains) ? user.admin_domains : [],
     })
     setIsDialogOpen(true)
+  }
+
+  function toggleAdminDomain(domain: string, checked: boolean) {
+    setFormData((prev) => ({
+      ...prev,
+      admin_domains: checked
+        ? Array.from(new Set([...prev.admin_domains, domain]))
+        : prev.admin_domains.filter((d) => d !== domain),
+    }))
   }
 
   function formatDate(date: string) {
@@ -362,7 +381,16 @@ export default function UsersPage() {
                 <p className="text-muted-foreground text-sm">{editingUser?.email}</p>
               </FormFieldGroup>
               <FormFieldGroup label="Role">
-                <Select value={formData.role} onValueChange={(v) => setFormData({ ...formData, role: v })}>
+                <Select
+                  value={formData.role}
+                  onValueChange={(v) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      role: v,
+                      admin_domains: v === "admin" ? prev.admin_domains : [],
+                    }))
+                  }
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -375,6 +403,29 @@ export default function UsersPage() {
                   </SelectContent>
                 </Select>
               </FormFieldGroup>
+              {formData.role === "admin" && (
+                <FormFieldGroup label="Admin Domains">
+                  <div className="grid grid-cols-2 gap-2">
+                    {ADMIN_DOMAIN_OPTIONS.map((domain) => {
+                      const checked = formData.admin_domains.includes(domain)
+                      return (
+                        <label
+                          key={domain}
+                          className="flex cursor-pointer items-center gap-2 rounded-md border p-2 text-sm capitalize"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(e) => toggleAdminDomain(domain, e.target.checked)}
+                          />
+                          {domain}
+                        </label>
+                      )
+                    })}
+                  </div>
+                  <p className="text-muted-foreground text-xs">At least one domain is required for admin users.</p>
+                </FormFieldGroup>
+              )}
               <FormFieldGroup label="Employment Status">
                 <div className="flex justify-end">
                   <Select

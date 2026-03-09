@@ -111,8 +111,7 @@ export function canAccessAdminSection(scope: AdminScope, section: AdminSection):
     if (section === "admin") return true
     const domains = Array.isArray(scope.adminDomains) ? scope.adminDomains : []
     const mapped = SECTION_TO_DOMAIN[section]
-    if (mapped && domains.includes(mapped)) return true
-    return scope.isDepartmentLead
+    return Boolean(mapped && domains.includes(mapped))
   }
   if (!scope.isDepartmentLead) return false
 

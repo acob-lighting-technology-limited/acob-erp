@@ -45,6 +45,13 @@ interface Project {
   technology_type?: string
   description?: string
   status: string
+  project_manager_id?: string | null
+  project_manager?: {
+    id: string
+    first_name: string
+    last_name: string
+    company_email?: string | null
+  } | null
 }
 
 interface employee {
@@ -152,7 +159,21 @@ export default function AdminProjectDetailPage() {
 
   const loadProject = async () => {
     console.log("📋 Loading project details...")
-    const { data, error } = await supabase.from("projects").select("*").eq("id", projectId).single()
+    const { data, error } = await supabase
+      .from("projects")
+      .select(
+        `
+        *,
+        project_manager:profiles!projects_project_manager_id_fkey (
+          id,
+          first_name,
+          last_name,
+          company_email
+        )
+      `
+      )
+      .eq("id", projectId)
+      .single()
 
     console.log("Project result:", { data, error })
     if (error) throw error
@@ -435,6 +456,31 @@ export default function AdminProjectDetailPage() {
         backLink={{ href: "/admin/projects", label: "Back to Projects" }}
       />
 
+      <Card>
+        <CardHeader>
+          <CardTitle>Project Summary</CardTitle>
+          <CardDescription>Canonical manager is controlled by Project Manager field from project edit.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div>
+            <p className="text-muted-foreground text-xs uppercase">Manager</p>
+            <p className="font-medium">
+              {project.project_manager
+                ? `${project.project_manager.first_name} ${project.project_manager.last_name}`
+                : "Unassigned"}
+            </p>
+          </div>
+          <div>
+            <p className="text-muted-foreground text-xs uppercase">Status</p>
+            <p className="font-medium capitalize">{project.status.replace("_", " ")}</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground text-xs uppercase">Location</p>
+            <p className="font-medium">{project.location || "—"}</p>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Tabs */}
       <Tabs defaultValue="members" className="space-y-4">
         <TabsList>
@@ -486,7 +532,11 @@ export default function AdminProjectDetailPage() {
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Badge variant="outline">{member.role}</Badge>
+                        {member.user_id === project.project_manager_id ? (
+                          <Badge>Project Manager</Badge>
+                        ) : (
+                          <Badge variant="outline">{member.role === "manager" ? "member" : member.role}</Badge>
+                        )}
                         <Button variant="outline" size="icon" onClick={() => setMemberToDelete(member)}>
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -589,7 +639,6 @@ export default function AdminProjectDetailPage() {
                 <SelectContent>
                   <SelectItem value="member">Member</SelectItem>
                   <SelectItem value="lead">Lead</SelectItem>
-                  <SelectItem value="manager">Manager</SelectItem>
                 </SelectContent>
               </Select>
             </FormFieldGroup>

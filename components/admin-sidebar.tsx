@@ -293,7 +293,7 @@ export function AdminSidebar({ user, profile }: AdminSidebarProps) {
 
   const canAccessRoute = (requiredRoles: string[], href: string) => {
     if (!profile?.role) return false
-    if (profile.is_department_lead) {
+    if (profile.is_department_lead && profile.role !== "admin") {
       return !href.startsWith("/admin/dev")
     }
     if (!requiredRoles.includes(profile.role)) return false

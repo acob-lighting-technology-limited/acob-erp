@@ -27,6 +27,7 @@ import {
   Target,
   Wrench,
   FileBarChart,
+  Bell,
 } from "lucide-react"
 import Image from "next/image"
 import { useState, useEffect } from "react"
@@ -58,6 +59,7 @@ interface SidebarProps {
 
 const navigation = [
   { name: "Home", href: "/profile", icon: LayoutDashboard },
+  { name: "Notifications", href: "/notification", icon: Bell },
   { name: "Job Description", href: "/job-description", icon: Briefcase },
   { name: "Projects", href: "/projects", icon: FolderKanban },
   { name: "Tasks", href: "/dashboard/tasks", icon: ClipboardList },
