@@ -17,7 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner"
 import { Loader2, Plus, Save, Trash2, X } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
-import { getCurrentISOWeek } from "@/lib/utils"
+import { getCurrentOfficeWeek } from "@/lib/meeting-week"
 
 interface ActionFormDialogProps {
   isOpen: boolean
@@ -40,10 +40,11 @@ export function ActionFormDialog({
   defaultWeek,
   defaultYear,
 }: ActionFormDialogProps) {
+  const currentOfficeWeek = getCurrentOfficeWeek()
   const [isSaving, setIsSaving] = useState(false)
   const [dept, setDept] = useState("")
-  const [week, setWeek] = useState(getCurrentISOWeek())
-  const [year, setYear] = useState(new Date().getFullYear())
+  const [week, setWeek] = useState(currentOfficeWeek.week)
+  const [year, setYear] = useState(currentOfficeWeek.year)
 
   // For Bulk Entry
   const [actionItems, setActionItems] = useState<string[]>([])
@@ -74,10 +75,19 @@ export function ActionFormDialog({
       setDept(defaultDept || departments[0] || "")
       setActionItems([])
       setNewItem("")
-      setWeek(defaultWeek || getCurrentISOWeek())
-      setYear(defaultYear || new Date().getFullYear())
+      setWeek(defaultWeek || currentOfficeWeek.week)
+      setYear(defaultYear || currentOfficeWeek.year)
     }
-  }, [editingAction, isOpen, defaultDept, departments, defaultWeek, defaultYear])
+  }, [
+    editingAction,
+    isOpen,
+    defaultDept,
+    departments,
+    defaultWeek,
+    defaultYear,
+    currentOfficeWeek.week,
+    currentOfficeWeek.year,
+  ])
 
   const addActionItem = () => {
     if (!newItem.trim()) return

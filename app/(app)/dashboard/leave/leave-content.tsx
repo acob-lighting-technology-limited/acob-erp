@@ -12,14 +12,20 @@ import { SearchableSelect } from "@/components/ui/searchable-select"
 import { Textarea } from "@/components/ui/textarea"
 import { PageHeader, PageWrapper } from "@/components/layout"
 import { toast } from "sonner"
-import { CalendarDays, ChevronDown, ChevronRight, Clock, Plus, Upload } from "lucide-react"
-import type { LeaveBalance, LeaveRequest, LeaveType } from "./page"
+import { CalendarDays, ChevronDown, ChevronRight, Clock, Eye, Plus, Upload } from "lucide-react"
+import type { LeaveApprovalAudit, LeaveBalance, LeaveRequest, LeaveType } from "./page"
 
 interface LeaveContentProps {
   currentUserId: string
+  currentUserRole: string
   initialRequests: LeaveRequest[]
   initialBalances: LeaveBalance[]
   initialLeaveTypes: LeaveType[]
+}
+
+interface ApprovalHistoryItem extends LeaveApprovalAudit {
+  leave_request_id: string
+  request?: LeaveRequest | null
 }
 
 const STAGE_LABELS: Record<string, string> = {
@@ -41,6 +47,8 @@ const ELIGIBILITY_VARIANT: Record<string, "default" | "destructive" | "secondary
   missing_evidence: "secondary",
   not_eligible: "destructive",
 }
+
+const ADMIN_LIKE_ROLES = ["developer", "admin", "super_admin"]
 
 function addDays(startDate: string, days: number) {
   if (!startDate || days <= 0) return { endDate: "", resumeDate: "" }
@@ -66,6 +74,59 @@ function prettyDocName(name: string) {
   return name.replaceAll("_", " ")
 }
 
+function clampDays(nextValue: number, maxDays?: number | null) {
+  const normalized = Number.isFinite(nextValue) && nextValue > 0 ? Math.floor(nextValue) : 1
+  if (maxDays && maxDays > 0) {
+    return Math.min(normalized, maxDays)
+  }
+  return normalized
+}
+
+function formatStage(stage?: string | null) {
+  if (!stage) return "Unknown Stage"
+  return STAGE_LABELS[stage] || stage.replaceAll("_", " ")
+}
+
+function formatApprovalStatus(status?: string | null) {
+  if (!status) return "Unknown"
+  return status.charAt(0).toUpperCase() + status.slice(1)
+}
+
+function formatDateLabel(isoDate?: string | null) {
+  if (!isoDate) return "-"
+  const dt = new Date(`${isoDate}T00:00:00`)
+  if (Number.isNaN(dt.getTime())) return isoDate
+  return dt.toLocaleDateString()
+}
+
+function calculateInclusiveDays(start?: string | null, end?: string | null, fallback = 0) {
+  if (!start || !end) return fallback
+  const startMs = new Date(`${start}T00:00:00.000Z`).getTime()
+  const endMs = new Date(`${end}T00:00:00.000Z`).getTime()
+  if (Number.isNaN(startMs) || Number.isNaN(endMs) || endMs < startMs) return fallback
+  return Math.floor((endMs - startMs) / (24 * 60 * 60 * 1000)) + 1
+}
+
+function daysUntil(isoDate?: string | null) {
+  if (!isoDate) return null
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+  const targetDate = new Date(`${isoDate}T00:00:00`).getTime()
+  if (Number.isNaN(targetDate)) return null
+  return Math.ceil((targetDate - today) / (24 * 60 * 60 * 1000))
+}
+
+function sortApprovals(approvals?: LeaveApprovalAudit[]) {
+  return [...(approvals || [])].sort((left, right) => {
+    const leftOrder = left.stage_order ?? left.approval_level ?? Number.MAX_SAFE_INTEGER
+    const rightOrder = right.stage_order ?? right.approval_level ?? Number.MAX_SAFE_INTEGER
+    if (leftOrder !== rightOrder) return leftOrder - rightOrder
+    const leftTime = left.approved_at ? new Date(left.approved_at).getTime() : 0
+    const rightTime = right.approved_at ? new Date(right.approved_at).getTime() : 0
+    return leftTime - rightTime
+  })
+}
+
 function getTodayLocalIsoDate() {
   const now = new Date()
   const year = now.getFullYear()
@@ -85,6 +146,7 @@ const EMPTY_REQUEST_FORM = {
 
 export function LeaveContent({
   currentUserId,
+  currentUserRole,
   initialRequests,
   initialBalances,
   initialLeaveTypes,
@@ -93,6 +155,8 @@ export function LeaveContent({
   const [balances, setBalances] = useState<LeaveBalance[]>(initialBalances)
   const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>(initialLeaveTypes)
   const [approverQueue, setApproverQueue] = useState<LeaveRequest[]>([])
+  const [relieverCommitments, setRelieverCommitments] = useState<LeaveRequest[]>([])
+  const [approvalHistory, setApprovalHistory] = useState<ApprovalHistoryItem[]>([])
   const [relieverOptions, setRelieverOptions] = useState<{ value: string; label: string }[]>([])
   const [open, setOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -102,9 +166,11 @@ export function LeaveContent({
   const [showLeavePolicy, setShowLeavePolicy] = useState(false)
   const [requestsTab, setRequestsTab] = useState<"ongoing" | "history">("ongoing")
   const [historyFilter, setHistoryFilter] = useState<"all" | "approved" | "rejected" | "cancelled">("all")
+  const [detailRequest, setDetailRequest] = useState<LeaveRequest | null>(null)
   const approvalQueueRef = useRef<HTMLDivElement | null>(null)
   const [formData, setFormData] = useState(EMPTY_REQUEST_FORM)
   const todayIsoDate = useMemo(() => getTodayLocalIsoDate(), [])
+  const isAdminLikeViewer = useMemo(() => ADMIN_LIKE_ROLES.includes(currentUserRole || ""), [currentUserRole])
 
   const myRequests = useMemo(
     () => requests.filter((request) => request.user_id === currentUserId),
@@ -134,6 +200,18 @@ export function LeaveContent({
   }, [historyFilter, historyRequests])
 
   const hasPendingRequest = myRequests.some((request) => ["pending", "pending_evidence"].includes(request.status))
+  const activeApprovedRequest = myRequests.find(
+    (request) => request.status === "approved" && (!request.end_date || request.end_date >= todayIsoDate)
+  )
+  const hasBlockingRequest = hasPendingRequest || Boolean(activeApprovedRequest)
+  const activeRelieverCommitments = useMemo(
+    () =>
+      relieverCommitments.filter((request) => {
+        if (request.status === "rejected" || request.status === "cancelled") return false
+        return !request.end_date || request.end_date >= todayIsoDate
+      }),
+    [relieverCommitments, todayIsoDate]
+  )
   const leaveTypeMap = useMemo(() => new Map(leaveTypes.map((leaveType) => [leaveType.id, leaveType])), [leaveTypes])
   const balanceMap = useMemo(() => new Map(balances.map((balance) => [balance.leave_type_id, balance])), [balances])
 
@@ -147,7 +225,8 @@ export function LeaveContent({
     [leaveTypeMap, formData.leave_type_id]
   )
   const selectedBalance = useMemo(() => balanceMap.get(formData.leave_type_id), [balanceMap, formData.leave_type_id])
-  const availableDays = selectedBalance?.balance_days ?? selectedLeaveType?.max_days ?? 0
+  const availableDays = Math.max(1, selectedBalance?.balance_days ?? selectedLeaveType?.max_days ?? 1)
+  const detailApprovals = useMemo(() => sortApprovals(detailRequest?.approvals), [detailRequest])
 
   const canSubmit =
     formData.leave_type_id &&
@@ -159,6 +238,41 @@ export function LeaveContent({
     selectedLeaveType?.eligibility_status !== "not_eligible" &&
     Number(formData.days_count) <= availableDays
   const pendingMyReviews = useMemo(() => approverQueue.length, [approverQueue])
+  const relieverApprovalHistory = useMemo(
+    () =>
+      approvalHistory.filter((item) =>
+        ["pending_reliever", "reliever_pending"].includes(String(item.stage_code || ""))
+      ),
+    [approvalHistory]
+  )
+  const nonRelieverApprovalHistory = useMemo(
+    () =>
+      approvalHistory.filter(
+        (item) => !["pending_reliever", "reliever_pending"].includes(String(item.stage_code || ""))
+      ),
+    [approvalHistory]
+  )
+  const departmentApprovalHistory = useMemo(
+    () =>
+      nonRelieverApprovalHistory.filter((item) =>
+        ["pending_department_lead", "supervisor_pending"].includes(String(item.stage_code || ""))
+      ),
+    [nonRelieverApprovalHistory]
+  )
+  const globalLeadApprovalHistory = useMemo(
+    () =>
+      nonRelieverApprovalHistory.filter(
+        (item) => !["pending_department_lead", "supervisor_pending"].includes(String(item.stage_code || ""))
+      ),
+    [nonRelieverApprovalHistory]
+  )
+
+  useEffect(() => {
+    setFormData((prev) => ({
+      ...prev,
+      days_count: clampDays(Number(prev.days_count), availableDays),
+    }))
+  }, [availableDays, selectedLeaveType?.id, selectedBalance?.balance_days])
 
   function isRequesterEditable(request: LeaveRequest) {
     if (request.user_id !== currentUserId) return false
@@ -188,7 +302,10 @@ export function LeaveContent({
     setFormData({
       leave_type_id: request.leave_type_id,
       start_date: request.start_date,
-      days_count: Number(request.days_count) || 1,
+      days_count: clampDays(
+        Number(request.days_count) || 1,
+        balanceMap.get(request.leave_type_id)?.balance_days ?? leaveTypeMap.get(request.leave_type_id)?.max_days
+      ),
       reason: request.reason || "",
       reliever_identifier: request.reliever_id || "",
       handover_note: request.handover_note || "",
@@ -196,17 +313,11 @@ export function LeaveContent({
     setOpen(true)
   }
 
-  async function fetchRelieverOptions() {
-    const response = await fetch("/api/hr/leave/relievers")
-    const payload = await response.json()
-    if (!response.ok) throw new Error(payload.error || "Failed to load relievers")
-    setRelieverOptions(payload.data || [])
-  }
-
   async function refreshData() {
+    const queueUrl = isAdminLikeViewer ? "/api/hr/leave/queue?all=true" : "/api/hr/leave/queue"
     const [requestRes, queueRes, typesRes, relieversRes] = await Promise.all([
       fetch("/api/hr/leave/requests"),
-      fetch("/api/hr/leave/queue"),
+      fetch(queueUrl),
       fetch("/api/hr/leave/types"),
       fetch("/api/hr/leave/relievers"),
     ])
@@ -224,12 +335,14 @@ export function LeaveContent({
       const ownedRequests = (requestPayload.data || []).filter((row: LeaveRequest) => row.user_id === currentUserId)
       setRequests(ownedRequests)
       setBalances(requestPayload.balances || [])
+      setRelieverCommitments(requestPayload.reliever_commitments || [])
     } else {
       errors.push(`requests: ${requestPayload.error || requestRes.statusText}`)
     }
 
     if (queueRes.ok) {
       setApproverQueue(queuePayload.data || [])
+      setApprovalHistory(queuePayload.history || [])
     } else {
       errors.push(`queue: ${queuePayload.error || queueRes.statusText}`)
     }
@@ -255,7 +368,7 @@ export function LeaveContent({
     refreshData().catch((error) => {
       toast.error(error instanceof Error ? error.message : "Failed to load leave data")
     })
-  }, [])
+  }, [isAdminLikeViewer])
 
   async function handleSubmitRequest(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -384,7 +497,7 @@ export function LeaveContent({
                 Pending Reviews ({pendingMyReviews})
               </Button>
             )}
-            <Button onClick={openCreateDialog} disabled={hasPendingRequest}>
+            <Button onClick={openCreateDialog} disabled={hasBlockingRequest}>
               <Plus className="mr-2 h-4 w-4" />
               New Request
             </Button>
@@ -438,19 +551,33 @@ export function LeaveContent({
         )}
       </Card>
 
-      {approverQueue.length > 0 && (
-        <Card ref={approvalQueueRef}>
-          <CardHeader>
-            <CardTitle>My Approval Queue</CardTitle>
-            <CardDescription>Requests awaiting your action</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {approverQueue.map((item) => (
-              <div key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-md border p-3">
+      <Card ref={approvalQueueRef}>
+        <CardHeader>
+          <CardTitle>{isAdminLikeViewer ? "Active Leave Workflow Queue" : "My Approval Queue"}</CardTitle>
+          <CardDescription>
+            {isAdminLikeViewer
+              ? "Showing all active leave approvals in the system so you can monitor test flows."
+              : "Requests awaiting your action"}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {approverQueue.length === 0 ? (
+            <div className="text-muted-foreground rounded-md border border-dashed p-3 text-sm">
+              No leave requests are currently waiting in this queue.
+            </div>
+          ) : (
+            approverQueue.map((item) => (
+              <div key={item.id} className="flex flex-wrap items-start justify-between gap-3 rounded-md border p-3">
                 <div className="space-y-1">
-                  <p className="font-medium">{item.leave_type?.name || "Leave Request"}</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-medium">{item.leave_type?.name || "Leave Request"}</p>
+                    <Badge variant="outline">{formatStage(item.current_stage_code || item.approval_stage)}</Badge>
+                    {item.current_approver?.full_name && isAdminLikeViewer && (
+                      <Badge variant="secondary">Assigned to {item.current_approver.full_name}</Badge>
+                    )}
+                  </div>
                   <p className="text-muted-foreground text-sm">
-                    {item.start_date} to {item.end_date} ({item.days_count} days)
+                    {formatDateLabel(item.start_date)} to {formatDateLabel(item.end_date)} ({item.days_count} days)
                   </p>
                   <p className="text-muted-foreground text-sm">
                     Requester: {item.user?.full_name || item.user?.company_email || "Unknown"}
@@ -462,13 +589,12 @@ export function LeaveContent({
                   {item.handover_note && (
                     <p className="text-muted-foreground text-sm">Handover: {item.handover_note}</p>
                   )}
-                  <Badge variant="outline">
-                    {STAGE_LABELS[item.current_stage_code || item.approval_stage] ||
-                      item.current_stage_code ||
-                      item.approval_stage}
-                  </Badge>
                 </div>
                 <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={() => setDetailRequest(item)}>
+                    <Eye className="mr-1 h-4 w-4" />
+                    View
+                  </Button>
                   <Button size="sm" onClick={() => handleAction(item.id, "approve")}>
                     Approve
                   </Button>
@@ -477,15 +603,158 @@ export function LeaveContent({
                   </Button>
                 </div>
               </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
+            ))
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>My Approval Activity</CardTitle>
+          <CardDescription>
+            Keep a visible trail of approvals, clearly separated by reliever actions and normal approver actions.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {approvalHistory.length === 0 ? (
+            <div className="text-muted-foreground rounded-md border border-dashed p-3 text-sm">
+              You have not acted on any leave requests yet.
+            </div>
+          ) : (
+            <>
+              <div className="space-y-3">
+                <div className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                  Approved as Reliever ({relieverApprovalHistory.length})
+                </div>
+                {relieverApprovalHistory.length === 0 ? (
+                  <div className="text-muted-foreground rounded-md border border-dashed p-3 text-sm">
+                    No reliever approvals yet.
+                  </div>
+                ) : (
+                  relieverApprovalHistory.map((item) => (
+                    <div
+                      key={item.id}
+                      className="flex flex-wrap items-start justify-between gap-3 rounded-md border p-3"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-medium">{item.request?.leave_type?.name || "Leave Request"}</p>
+                          <Badge variant={item.status === "approved" ? "default" : "destructive"}>
+                            {formatApprovalStatus(item.status)}
+                          </Badge>
+                          <Badge variant="secondary">Reliever Decision</Badge>
+                        </div>
+                        <p className="text-muted-foreground text-sm">
+                          {item.request?.user?.full_name || item.request?.user?.company_email || "Requester unknown"}
+                        </p>
+                        <p className="text-muted-foreground text-sm">Stage: {formatStage(item.stage_code)}</p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => item.request && setDetailRequest(item.request)}
+                        disabled={!item.request}
+                      >
+                        <Eye className="mr-1 h-4 w-4" />
+                        View
+                      </Button>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div className="space-y-3 pt-2">
+                <div className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                  Approved as Department Lead ({departmentApprovalHistory.length})
+                </div>
+                {departmentApprovalHistory.length === 0 ? (
+                  <div className="text-muted-foreground rounded-md border border-dashed p-3 text-sm">
+                    No department-level approvals yet.
+                  </div>
+                ) : (
+                  departmentApprovalHistory.map((item) => (
+                    <div
+                      key={item.id}
+                      className="flex flex-wrap items-start justify-between gap-3 rounded-md border p-3"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-medium">{item.request?.leave_type?.name || "Leave Request"}</p>
+                          <Badge variant={item.status === "approved" ? "default" : "destructive"}>
+                            {formatApprovalStatus(item.status)}
+                          </Badge>
+                          <Badge variant="outline">Department Approval</Badge>
+                        </div>
+                        <p className="text-muted-foreground text-sm">
+                          {item.request?.user?.full_name || item.request?.user?.company_email || "Requester unknown"}
+                        </p>
+                        <p className="text-muted-foreground text-sm">Stage: {formatStage(item.stage_code)}</p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => item.request && setDetailRequest(item.request)}
+                        disabled={!item.request}
+                      >
+                        <Eye className="mr-1 h-4 w-4" />
+                        View
+                      </Button>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div className="space-y-3 pt-2">
+                <div className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                  Approved as Global Lead ({globalLeadApprovalHistory.length})
+                </div>
+                {globalLeadApprovalHistory.length === 0 ? (
+                  <div className="text-muted-foreground rounded-md border border-dashed p-3 text-sm">
+                    No global-lead approvals yet.
+                  </div>
+                ) : (
+                  globalLeadApprovalHistory.map((item) => (
+                    <div
+                      key={item.id}
+                      className="flex flex-wrap items-start justify-between gap-3 rounded-md border p-3"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-medium">{item.request?.leave_type?.name || "Leave Request"}</p>
+                          <Badge variant={item.status === "approved" ? "default" : "destructive"}>
+                            {formatApprovalStatus(item.status)}
+                          </Badge>
+                          <Badge variant="outline">Global Approval</Badge>
+                        </div>
+                        <p className="text-muted-foreground text-sm">
+                          {item.request?.user?.full_name || item.request?.user?.company_email || "Requester unknown"}
+                        </p>
+                        <p className="text-muted-foreground text-sm">Stage: {formatStage(item.stage_code)}</p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => item.request && setDetailRequest(item.request)}
+                        disabled={!item.request}
+                      >
+                        <Eye className="mr-1 h-4 w-4" />
+                        View
+                      </Button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
           <CardTitle>My Leave Requests</CardTitle>
-          <CardDescription>Track ongoing requests separately from completed history.</CardDescription>
+          <CardDescription>
+            Only leave requests you personally submitted, with ongoing and history views.
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="flex flex-wrap gap-2">
@@ -549,84 +818,269 @@ export function LeaveContent({
               {requestsTab === "ongoing" ? "No ongoing requests." : "No history requests for this filter."}
             </div>
           ) : (
-            (requestsTab === "ongoing" ? ongoingRequests : filteredHistoryRequests).map((request) => (
-              <div key={request.id} className="rounded-md border p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="font-medium">{request.leave_type?.name || "Leave Request"}</p>
-                  <div className="flex gap-2">
-                    <Badge
-                      variant={
-                        request.status === "approved"
-                          ? "default"
-                          : request.status === "rejected"
-                            ? "destructive"
-                            : "secondary"
-                      }
-                    >
-                      {request.status}
-                    </Badge>
-                    <Badge variant="outline">
-                      {STAGE_LABELS[request.current_stage_code || request.approval_stage] ||
-                        request.current_stage_code ||
-                        request.approval_stage ||
-                        "N/A"}
-                    </Badge>
+            (requestsTab === "ongoing" ? ongoingRequests : filteredHistoryRequests).map((request) => {
+              const durationDays = calculateInclusiveDays(
+                request.start_date,
+                request.end_date,
+                Number(request.days_count) || 0
+              )
+              const returnInDays = request.status === "approved" ? daysUntil(request.resume_date) : null
+              return (
+                <div key={request.id} className="rounded-md border p-3">
+                  {request.status === "approved" && (
+                    <div className="bg-muted/30 mb-2 rounded-md border px-2 py-1 text-xs">
+                      Leave window: {formatDateLabel(request.start_date)} to {formatDateLabel(request.end_date)} (
+                      {durationDays} day(s))
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-medium">{request.leave_type?.name || "Leave Request"}</p>
+                    <div className="flex gap-2">
+                      <Badge
+                        variant={
+                          request.status === "approved"
+                            ? "default"
+                            : request.status === "rejected"
+                              ? "destructive"
+                              : "secondary"
+                        }
+                      >
+                        {request.status}
+                      </Badge>
+                      <Badge variant="outline">
+                        {formatStage(request.current_stage_code || request.approval_stage)}
+                      </Badge>
+                    </div>
                   </div>
-                </div>
-                <p className="text-muted-foreground mt-2 text-sm">
-                  {request.start_date} to {request.end_date} | Resume: {request.resume_date} | {request.days_count}{" "}
-                  day(s)
-                </p>
-                <p className="mt-2 text-sm">{request.reason}</p>
-                <p className="text-muted-foreground mt-2 text-sm">
-                  Reliever: {request.reliever?.full_name || request.reliever?.company_email || "Not set"}
-                </p>
-                {(request.required_documents || []).length > 0 && (
-                  <p className="text-muted-foreground mt-2 text-xs">
-                    Required documents: {(request.required_documents || []).map(prettyDocName).join(", ")}
+                  <p className="text-muted-foreground mt-2 text-sm">
+                    {formatDateLabel(request.start_date)} to {formatDateLabel(request.end_date)} | Resume:{" "}
+                    {formatDateLabel(request.resume_date)} | {request.days_count} day(s)
                   </p>
-                )}
-                {(request.missing_documents || []).length > 0 && (
-                  <div className="mt-2 rounded-md border border-amber-500/50 bg-amber-50 p-2 text-xs text-amber-700">
-                    <p>Missing evidence: {(request.missing_documents || []).map(prettyDocName).join(", ")}</p>
-                    {request.status === "pending_evidence" && (
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {(request.missing_documents || []).map((doc) => (
-                          <Button
-                            key={`${request.id}-${doc}`}
-                            size="sm"
-                            variant="outline"
-                            disabled={uploadingEvidenceFor === request.id}
-                            onClick={() => handleUploadEvidence(request.id, doc)}
-                          >
-                            <Upload className="mr-1 h-3 w-3" />
-                            Upload {prettyDocName(doc)}
-                          </Button>
-                        ))}
-                      </div>
+                  {request.status === "approved" && returnInDays !== null && (
+                    <p className="text-muted-foreground mt-1 text-xs">
+                      {returnInDays > 0
+                        ? `${returnInDays} day(s) until resume date`
+                        : returnInDays === 0
+                          ? "Resumes today"
+                          : "Resume date has passed"}
+                    </p>
+                  )}
+                  <p className="mt-2 text-sm">{request.reason}</p>
+                  <p className="text-muted-foreground mt-2 text-sm">
+                    Reliever: {request.reliever?.full_name || request.reliever?.company_email || "Not set"}
+                  </p>
+                  {(request.required_documents || []).length > 0 && (
+                    <p className="text-muted-foreground mt-2 text-xs">
+                      Required documents: {(request.required_documents || []).map(prettyDocName).join(", ")}
+                    </p>
+                  )}
+                  {request.approvals?.length ? (
+                    <p className="text-muted-foreground mt-2 text-xs">
+                      Approval history: {request.approvals.length} recorded update
+                      {request.approvals.length > 1 ? "s" : ""}
+                    </p>
+                  ) : null}
+                  {(request.missing_documents || []).length > 0 && (
+                    <div className="mt-2 rounded-md border border-amber-500/50 bg-amber-50 p-2 text-xs text-amber-700">
+                      <p>Missing evidence: {(request.missing_documents || []).map(prettyDocName).join(", ")}</p>
+                      {request.status === "pending_evidence" && (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {(request.missing_documents || []).map((doc) => (
+                            <Button
+                              key={`${request.id}-${doc}`}
+                              size="sm"
+                              variant="outline"
+                              disabled={uploadingEvidenceFor === request.id}
+                              onClick={() => handleUploadEvidence(request.id, doc)}
+                            >
+                              <Upload className="mr-1 h-3 w-3" />
+                              Upload {prettyDocName(doc)}
+                            </Button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Button size="sm" variant="outline" onClick={() => setDetailRequest(request)}>
+                      <Eye className="mr-1 h-4 w-4" />
+                      View Details
+                    </Button>
+                    {isRequesterEditable(request) && (
+                      <>
+                        <Button size="sm" variant="outline" onClick={() => openEditDialog(request)}>
+                          Edit
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => handleDeleteRequest(request)}
+                          disabled={deletingRequestId === request.id}
+                        >
+                          {deletingRequestId === request.id ? "Deleting..." : "Delete"}
+                        </Button>
+                      </>
                     )}
                   </div>
-                )}
-                {isRequesterEditable(request) && (
-                  <div className="mt-3 flex gap-2">
-                    <Button size="sm" variant="outline" onClick={() => openEditDialog(request)}>
-                      Edit
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      onClick={() => handleDeleteRequest(request)}
-                      disabled={deletingRequestId === request.id}
-                    >
-                      {deletingRequestId === request.id ? "Deleting..." : "Delete"}
-                    </Button>
-                  </div>
-                )}
+                </div>
+              )
+            })
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>My Reliever Commitments</CardTitle>
+          <CardDescription>
+            Leave requests where you are assigned as reliever. Overlapping personal leave requests are blocked for these
+            periods.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {activeRelieverCommitments.length === 0 ? (
+            <div className="text-muted-foreground rounded-md border border-dashed p-3 text-sm">
+              No active reliever commitments right now.
+            </div>
+          ) : (
+            activeRelieverCommitments.map((request) => (
+              <div key={`reliever-${request.id}`} className="rounded-md border p-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="font-medium">{request.leave_type?.name || "Leave Request"}</p>
+                  <Badge variant={request.status === "approved" ? "default" : "secondary"}>{request.status}</Badge>
+                </div>
+                <p className="text-muted-foreground mt-1 text-sm">
+                  Requester: {request.user?.full_name || request.user?.company_email || "Unknown"}
+                </p>
+                <p className="text-muted-foreground text-sm">
+                  Commitment window: {formatDateLabel(request.start_date)} to {formatDateLabel(request.end_date)}
+                </p>
               </div>
             ))
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={Boolean(detailRequest)} onOpenChange={(nextOpen) => !nextOpen && setDetailRequest(null)}>
+        <DialogContent className="max-h-[90vh] w-[95vw] max-w-[720px] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Eye className="h-5 w-5" />
+              Leave Request Details
+            </DialogTitle>
+            <DialogDescription>
+              Full workflow view with requester details, handover, evidence requirements, and approval timeline.
+            </DialogDescription>
+          </DialogHeader>
+
+          {detailRequest && (
+            <div className="space-y-4 text-sm">
+              <div className="rounded-md border p-3">
+                <p className="font-medium">{detailRequest.leave_type?.name || "Leave Request"}</p>
+                <p className="text-muted-foreground mt-1">
+                  {formatDateLabel(detailRequest.start_date)} to {formatDateLabel(detailRequest.end_date)} | Resume:{" "}
+                  {formatDateLabel(detailRequest.resume_date)}
+                </p>
+                <p className="text-muted-foreground">
+                  Duration:{" "}
+                  {calculateInclusiveDays(
+                    detailRequest.start_date,
+                    detailRequest.end_date,
+                    Number(detailRequest.days_count) || 0
+                  )}{" "}
+                  day(s)
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <Badge
+                    variant={
+                      detailRequest.status === "approved"
+                        ? "default"
+                        : detailRequest.status === "rejected"
+                          ? "destructive"
+                          : "secondary"
+                    }
+                  >
+                    {detailRequest.status}
+                  </Badge>
+                  <Badge variant="outline">
+                    {formatStage(detailRequest.current_stage_code || detailRequest.approval_stage)}
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="rounded-md border p-3">
+                <p className="font-medium">People</p>
+                <p className="text-muted-foreground mt-1">
+                  Requester: {detailRequest.user?.full_name || detailRequest.user?.company_email || "Unknown"}
+                </p>
+                <p className="text-muted-foreground">
+                  Reliever: {detailRequest.reliever?.full_name || detailRequest.reliever?.company_email || "Not set"}
+                </p>
+                <p className="text-muted-foreground">
+                  Current approver:{" "}
+                  {detailRequest.current_approver?.full_name ||
+                    detailRequest.current_approver?.company_email ||
+                    "Not assigned"}
+                </p>
+              </div>
+
+              <div className="rounded-md border p-3">
+                <p className="font-medium">Reason</p>
+                <p className="text-muted-foreground mt-1">{detailRequest.reason || "No reason provided"}</p>
+                <p className="mt-3 font-medium">Handover Note</p>
+                <p className="text-muted-foreground mt-1">
+                  {detailRequest.handover_note || "No handover note provided"}
+                </p>
+              </div>
+
+              {(detailRequest.required_documents || []).length > 0 && (
+                <div className="rounded-md border p-3">
+                  <p className="font-medium">Evidence Requirements</p>
+                  <p className="text-muted-foreground mt-1">
+                    Required: {(detailRequest.required_documents || []).map(prettyDocName).join(", ")}
+                  </p>
+                  {(detailRequest.missing_documents || []).length > 0 ? (
+                    <p className="mt-1 text-amber-700">
+                      Missing: {(detailRequest.missing_documents || []).map(prettyDocName).join(", ")}
+                    </p>
+                  ) : (
+                    <p className="mt-1 text-emerald-700">All required evidence is complete.</p>
+                  )}
+                </div>
+              )}
+
+              <div className="rounded-md border p-3">
+                <p className="font-medium">Approval Timeline</p>
+                {detailApprovals.length === 0 ? (
+                  <p className="text-muted-foreground mt-1">No approval updates yet.</p>
+                ) : (
+                  <div className="mt-2 space-y-2">
+                    {detailApprovals.map((approval) => (
+                      <div key={approval.id} className="rounded-md border px-2 py-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge variant={approval.status === "approved" ? "default" : "destructive"}>
+                            {formatApprovalStatus(approval.status)}
+                          </Badge>
+                          <Badge variant="outline">{formatStage(approval.stage_code)}</Badge>
+                          <span className="text-muted-foreground text-xs">
+                            {approval.approver?.full_name || approval.approver?.company_email || "Unknown approver"}
+                          </span>
+                        </div>
+                        {approval.approved_at ? (
+                          <p className="text-muted-foreground mt-1 text-xs">
+                            {new Date(approval.approved_at).toLocaleString()}
+                          </p>
+                        ) : null}
+                        {approval.comments ? <p className="mt-1 text-xs">Comment: {approval.comments}</p> : null}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={open} onOpenChange={handleDialogOpenChange}>
         <DialogContent className="max-h-[90vh] w-[95vw] max-w-[560px] overflow-y-auto">
@@ -645,7 +1099,16 @@ export function LeaveContent({
               <Label>Leave Type</Label>
               <Select
                 value={formData.leave_type_id}
-                onValueChange={(value) => setFormData((prev) => ({ ...prev, leave_type_id: value }))}
+                onValueChange={(value) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    leave_type_id: value,
+                    days_count: clampDays(
+                      Number(prev.days_count),
+                      balanceMap.get(value)?.balance_days ?? leaveTypeMap.get(value)?.max_days
+                    ),
+                  }))
+                }
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select leave type" />
@@ -663,6 +1126,9 @@ export function LeaveContent({
                 </SelectContent>
               </Select>
               <p className="text-muted-foreground text-xs">Available balance: {availableDays} days</p>
+              <p className="text-muted-foreground text-xs">
+                You cannot request more than this leave balance or policy limit.
+              </p>
               {selectedLeaveType?.eligibility_reason && (
                 <p className="text-muted-foreground text-xs">{selectedLeaveType.eligibility_reason}</p>
               )}
@@ -688,11 +1154,16 @@ export function LeaveContent({
                 <Input
                   type="number"
                   min={1}
+                  max={availableDays}
                   value={formData.days_count}
                   onChange={(event) =>
-                    setFormData((prev) => ({ ...prev, days_count: Number(event.target.value || 1) }))
+                    setFormData((prev) => ({
+                      ...prev,
+                      days_count: clampDays(Number(event.target.value || 1), availableDays),
+                    }))
                   }
                 />
+                <p className="text-muted-foreground text-xs">Maximum allowed: {availableDays} day(s)</p>
               </div>
             </div>
 
@@ -758,6 +1229,13 @@ export function LeaveContent({
         <div className="text-muted-foreground flex items-center gap-2 text-sm">
           <Clock className="h-4 w-4" />
           You currently have an active leave request in workflow.
+        </div>
+      )}
+      {!hasPendingRequest && activeApprovedRequest && (
+        <div className="text-muted-foreground flex items-center gap-2 text-sm">
+          <Clock className="h-4 w-4" />
+          You already have an approved leave running until {formatDateLabel(activeApprovedRequest.end_date)}. You can
+          request another leave after it ends.
         </div>
       )}
     </PageWrapper>

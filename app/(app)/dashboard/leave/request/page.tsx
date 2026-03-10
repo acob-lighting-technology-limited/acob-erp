@@ -20,6 +20,14 @@ type LeaveTypeOption = {
   eligibility_reason?: string | null
 }
 
+function clampDays(nextValue: number, maxDays?: number | null) {
+  const normalized = Number.isFinite(nextValue) && nextValue > 0 ? Math.floor(nextValue) : 1
+  if (maxDays && maxDays > 0) {
+    return Math.min(normalized, maxDays)
+  }
+  return normalized
+}
+
 export default function LeaveRequestPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
@@ -39,6 +47,7 @@ export default function LeaveRequestPage() {
     () => leaveTypes.find((leaveType) => leaveType.id === formData.leave_type_id),
     [leaveTypes, formData.leave_type_id]
   )
+  const allowedDays = selectedLeaveType?.max_days || undefined
 
   const previewEnd = (() => {
     if (!formData.start_date || !formData.days_count) return ""
@@ -77,6 +86,13 @@ export default function LeaveRequestPage() {
         setLoadingTypes(false)
       })
   }, [])
+
+  useEffect(() => {
+    setFormData((prev) => ({
+      ...prev,
+      days_count: clampDays(prev.days_count, selectedLeaveType?.max_days),
+    }))
+  }, [selectedLeaveType?.id, selectedLeaveType?.max_days])
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
@@ -119,7 +135,16 @@ export default function LeaveRequestPage() {
             <FormFieldGroup label="Leave Type">
               <Select
                 value={formData.leave_type_id}
-                onValueChange={(value) => setFormData((prev) => ({ ...prev, leave_type_id: value }))}
+                onValueChange={(value) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    leave_type_id: value,
+                    days_count: clampDays(
+                      prev.days_count,
+                      leaveTypes.find((leaveType) => leaveType.id === value)?.max_days
+                    ),
+                  }))
+                }
                 disabled={loadingTypes}
               >
                 <SelectTrigger>
@@ -138,6 +163,11 @@ export default function LeaveRequestPage() {
                   ))}
                 </SelectContent>
               </Select>
+              {selectedLeaveType?.max_days ? (
+                <p className="text-muted-foreground text-xs">
+                  Maximum allowed for this leave: {selectedLeaveType.max_days} day(s)
+                </p>
+              ) : null}
               {selectedLeaveType?.eligibility_reason && (
                 <p className="text-muted-foreground text-xs">{selectedLeaveType.eligibility_reason}</p>
               )}
@@ -155,8 +185,14 @@ export default function LeaveRequestPage() {
                 <Input
                   type="number"
                   min={1}
+                  max={allowedDays}
                   value={formData.days_count}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, days_count: Number(e.target.value || 1) }))}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      days_count: clampDays(Number(e.target.value || 1), allowedDays),
+                    }))
+                  }
                 />
               </FormFieldGroup>
             </div>

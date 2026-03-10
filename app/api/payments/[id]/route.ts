@@ -30,6 +30,19 @@ function getRelatedDepartmentName(payment: any): string | null {
   return relation?.name ?? null
 }
 
+function normalizeDepartment(value: string | null | undefined): string {
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase()
+  if (normalized === "finance") return "accounts"
+  return normalized
+}
+
+function isFinanceDepartment(value: string | null | undefined): boolean {
+  const normalized = normalizeDepartment(value)
+  return normalized === "accounts"
+}
+
 // GET /api/payments/[id] - Get a single payment
 export async function GET(request: Request, { params }: { params: { id: string } }) {
   try {
@@ -68,12 +81,20 @@ export async function GET(request: Request, { params }: { params: { id: string }
       const scopedDepartments = getDepartmentScope(scope, "finance")
       if (scopedDepartments) {
         const paymentDepartmentName = getRelatedDepartmentName(payment)
-        if (!paymentDepartmentName || !scopedDepartments.includes(paymentDepartmentName)) {
+        const isInScope = scopedDepartments.some(
+          (dept) => normalizeDepartment(dept) === normalizeDepartment(paymentDepartmentName)
+        )
+        if (!paymentDepartmentName || !isInScope) {
           return NextResponse.json({ error: "Forbidden: outside your finance scope" }, { status: 403 })
         }
       }
-    } else if (profile?.department && getRelatedDepartmentName(payment) !== profile.department) {
-      return NextResponse.json({ error: "Forbidden: Department mismatch" }, { status: 403 })
+    } else {
+      if (!isFinanceDepartment(profile?.department)) {
+        return NextResponse.json({ error: "Forbidden: finance access required" }, { status: 403 })
+      }
+      if (normalizeDepartment(getRelatedDepartmentName(payment)) !== normalizeDepartment(profile?.department)) {
+        return NextResponse.json({ error: "Forbidden: Department mismatch" }, { status: 403 })
+      }
     }
 
     return NextResponse.json({ data: payment })
@@ -103,6 +124,10 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
     // Check permissions (scoped admin/lead or department member)
     if (!scope) {
+      if (!isFinanceDepartment(profile?.department)) {
+        return NextResponse.json({ error: "Forbidden: finance access required" }, { status: 403 })
+      }
+
       const { data: payment } = await dataClient
         .from("department_payments")
         .select("department:departments(name), created_by")
@@ -112,7 +137,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       const paymentDept = getRelatedDepartmentName(payment)
       const userDept = profile?.department
 
-      if (paymentDept !== userDept) {
+      if (normalizeDepartment(paymentDept) !== normalizeDepartment(userDept)) {
         return NextResponse.json({ error: "Forbidden: Department mismatch" }, { status: 403 })
       }
 
@@ -141,7 +166,10 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
       const scopedDepartments = getDepartmentScope(scope, "finance")
       const paymentDept = getRelatedDepartmentName(payment)
-      if (scopedDepartments && (!paymentDept || !scopedDepartments.includes(paymentDept))) {
+      const isInScope = scopedDepartments
+        ? scopedDepartments.some((dept) => normalizeDepartment(dept) === normalizeDepartment(paymentDept))
+        : false
+      if (scopedDepartments && (!paymentDept || !isInScope)) {
         return NextResponse.json({ error: "Forbidden: outside your finance scope" }, { status: 403 })
       }
     }
@@ -198,10 +226,17 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
         .single()
       const scopedDepartments = getDepartmentScope(scope, "finance")
       const paymentDept = getRelatedDepartmentName(payment)
-      if (scopedDepartments && (!paymentDept || !scopedDepartments.includes(paymentDept))) {
+      const isInScope = scopedDepartments
+        ? scopedDepartments.some((dept) => normalizeDepartment(dept) === normalizeDepartment(paymentDept))
+        : false
+      if (scopedDepartments && (!paymentDept || !isInScope)) {
         return NextResponse.json({ error: "Forbidden: outside your finance scope" }, { status: 403 })
       }
     } else {
+      if (!isFinanceDepartment(profile?.department)) {
+        return NextResponse.json({ error: "Forbidden: finance access required" }, { status: 403 })
+      }
+
       const { data: payment } = await dataClient.from("department_payments").select("created_by").eq("id", id).single()
       if (!payment || payment.created_by !== user.id) {
         return NextResponse.json({ error: "Forbidden: You can only delete payments you created" }, { status: 403 })

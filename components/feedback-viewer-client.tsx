@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { SearchableSelect } from "@/components/ui/searchable-select"
 import { Building2, User } from "lucide-react"
@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
-import { Eye, List, LayoutGrid, MessageSquare, Search, Filter, ArrowUp, ArrowDown } from "lucide-react"
+import { Eye, MessageSquare, Search, ArrowUp, ArrowDown } from "lucide-react"
 import { formatName } from "@/lib/utils"
 import { writeAuditLogClient } from "@/lib/audit/client"
 
@@ -29,7 +29,6 @@ export function FeedbackViewerClient({ feedback }: FeedbackViewerClientProps) {
   const [departmentFilter, setDepartmentFilter] = useState("all")
   const [employeeFilter, setEmployeeFilter] = useState("all")
   const [nameSortOrder, setNameSortOrder] = useState<"asc" | "desc">("asc")
-  const [viewMode, setViewMode] = useState<"list" | "card">("list")
   const [selectedFeedback, setSelectedFeedback] = useState<any | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isUpdating, setIsUpdating] = useState(false)
@@ -251,289 +250,198 @@ export function FeedbackViewerClient({ feedback }: FeedbackViewerClientProps) {
   return (
     <div className="space-y-6">
       {/* Filters and Search */}
-      <Card className="border-2 shadow-lg">
-        <CardHeader className="bg-muted/30 border-b">
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <Filter className="text-primary h-5 w-5" />
-              Filters & Search
-            </CardTitle>
-            <div className="flex items-center rounded-lg border p-1">
-              <Button
-                variant={viewMode === "list" ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setViewMode("list")}
-                className="gap-2"
-              >
-                <List className="h-4 w-4" />
-                List
-              </Button>
-              <Button
-                variant={viewMode === "card" ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setViewMode("card")}
-                className="gap-2"
-              >
-                <LayoutGrid className="h-4 w-4" />
-                Card
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4 p-6">
-          {/* Search Input */}
-          <div className="relative">
-            <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform" />
-            <Input
-              placeholder="Search by title or user name..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
+      <div className="bg-card space-y-4 rounded-lg border p-4">
+        {/* Search Input */}
+        <div className="relative">
+          <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform" />
+          <Input
+            placeholder="Search by title or user name..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+
+        {/* Filter Selects */}
+        <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
+          <div className="space-y-2">
+            <label className="text-foreground text-sm font-medium">Feedback Type</label>
+            <Select value={selectedType} onValueChange={setSelectedType}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="concern">Concern</SelectItem>
+                <SelectItem value="complaint">Complaint</SelectItem>
+                <SelectItem value="suggestion">Suggestion</SelectItem>
+                <SelectItem value="required_item">Required Item</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
-          {/* Filter Selects */}
-          <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
-            <div className="space-y-2">
-              <label className="text-foreground text-sm font-medium">Feedback Type</label>
-              <Select value={selectedType} onValueChange={setSelectedType}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="concern">Concern</SelectItem>
-                  <SelectItem value="complaint">Complaint</SelectItem>
-                  <SelectItem value="suggestion">Suggestion</SelectItem>
-                  <SelectItem value="required_item">Required Item</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="space-y-2">
+            <label className="text-foreground text-sm font-medium">Status</label>
+            <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="open">Open</SelectItem>
+                <SelectItem value="in_progress">In Progress</SelectItem>
+                <SelectItem value="resolved">Resolved</SelectItem>
+                <SelectItem value="closed">Closed</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
+          {/* Department filter - hidden for leads */}
+          {!isDepartmentLead && (
             <div className="space-y-2">
-              <label className="text-foreground text-sm font-medium">Status</label>
-              <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="open">Open</SelectItem>
-                  <SelectItem value="in_progress">In Progress</SelectItem>
-                  <SelectItem value="resolved">Resolved</SelectItem>
-                  <SelectItem value="closed">Closed</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Department filter - hidden for leads */}
-            {!isDepartmentLead && (
-              <div className="space-y-2">
-                <label className="text-foreground text-sm font-medium">Department</label>
-                <SearchableSelect
-                  value={departmentFilter}
-                  onValueChange={setDepartmentFilter}
-                  placeholder="All Departments"
-                  searchPlaceholder="Search departments..."
-                  icon={<Building2 className="h-4 w-4" />}
-                  options={[
-                    { value: "all", label: "All Departments" },
-                    ...departments.map((dept) => ({
-                      value: dept,
-                      label: dept,
-                      icon: <Building2 className="h-3 w-3" />,
-                    })),
-                  ]}
-                />
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <label className="text-foreground text-sm font-medium">
-                {isDepartmentLead && departments.length > 0 ? `employee (${departments.join(", ")})` : "employee"}
-              </label>
+              <label className="text-foreground text-sm font-medium">Department</label>
               <SearchableSelect
-                value={employeeFilter}
-                onValueChange={setEmployeeFilter}
-                placeholder={
-                  isDepartmentLead && departments.length > 0
-                    ? `All ${departments.length === 1 ? departments[0] : "Department"} employee`
-                    : "All employee"
-                }
-                searchPlaceholder="Search employee..."
-                icon={<User className="h-4 w-4" />}
+                value={departmentFilter}
+                onValueChange={setDepartmentFilter}
+                placeholder="All Departments"
+                searchPlaceholder="Search departments..."
+                icon={<Building2 className="h-4 w-4" />}
                 options={[
-                  {
-                    value: "all",
-                    label:
-                      isDepartmentLead && departments.length > 0
-                        ? `All ${departments.length === 1 ? departments[0] : "Department"} employee`
-                        : "All employee",
-                  },
-                  ...employees.map((member) => ({
-                    value: member.id,
-                    label: `${formatName(member.first_name)} ${formatName(member.last_name)} - ${member.department}`,
-                    icon: <User className="h-3 w-3" />,
+                  { value: "all", label: "All Departments" },
+                  ...departments.map((dept) => ({
+                    value: dept,
+                    label: dept,
+                    icon: <Building2 className="h-3 w-3" />,
                   })),
                 ]}
               />
             </div>
+          )}
 
-            <div className="space-y-2">
-              <label className="text-foreground text-sm font-medium">Results</label>
-              <div className="bg-muted rounded-md border px-3 py-2 text-sm font-medium">
-                {filteredFeedback.length} item{filteredFeedback.length !== 1 ? "s" : ""}
-              </div>
+          <div className="space-y-2">
+            <label className="text-foreground text-sm font-medium">
+              {isDepartmentLead && departments.length > 0 ? `employee (${departments.join(", ")})` : "employee"}
+            </label>
+            <SearchableSelect
+              value={employeeFilter}
+              onValueChange={setEmployeeFilter}
+              placeholder={
+                isDepartmentLead && departments.length > 0
+                  ? `All ${departments.length === 1 ? departments[0] : "Department"} employee`
+                  : "All employee"
+              }
+              searchPlaceholder="Search employee..."
+              icon={<User className="h-4 w-4" />}
+              options={[
+                {
+                  value: "all",
+                  label:
+                    isDepartmentLead && departments.length > 0
+                      ? `All ${departments.length === 1 ? departments[0] : "Department"} employee`
+                      : "All employee",
+                },
+                ...employees.map((member) => ({
+                  value: member.id,
+                  label: `${formatName(member.first_name)} ${formatName(member.last_name)} - ${member.department}`,
+                  icon: <User className="h-3 w-3" />,
+                })),
+              ]}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-foreground text-sm font-medium">Results</label>
+            <div className="bg-muted rounded-md border px-3 py-2 text-sm font-medium">
+              {filteredFeedback.length} item{filteredFeedback.length !== 1 ? "s" : ""}
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Feedback List */}
       {filteredFeedback.length > 0 ? (
-        viewMode === "list" ? (
-          <Card className="border-2 shadow-lg">
-            <CardHeader className="bg-muted/30 border-b">
-              <CardTitle className="flex items-center gap-2">
-                <MessageSquare className="text-primary h-5 w-5" />
-                Feedback Items
-              </CardTitle>
-              <CardDescription>Total: {filteredFeedback.length} items</CardDescription>
-            </CardHeader>
-            <CardContent className="p-6">
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-12">#</TableHead>
-                      <TableHead>
-                        <div className="flex items-center gap-2">
-                          <span>User</span>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setNameSortOrder(nameSortOrder === "asc" ? "desc" : "asc")}
-                            className="h-6 w-6 p-0"
-                          >
-                            {nameSortOrder === "asc" ? (
-                              <ArrowUp className="h-3 w-3" />
-                            ) : (
-                              <ArrowDown className="h-3 w-3" />
-                            )}
-                          </Button>
+        <Card className="border">
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-12">#</TableHead>
+                    <TableHead>
+                      <div className="flex items-center gap-2">
+                        <span>User</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setNameSortOrder(nameSortOrder === "asc" ? "desc" : "asc")}
+                          className="h-6 w-6 p-0"
+                        >
+                          {nameSortOrder === "asc" ? (
+                            <ArrowUp className="h-3 w-3" />
+                          ) : (
+                            <ArrowDown className="h-3 w-3" />
+                          )}
+                        </Button>
+                      </div>
+                    </TableHead>
+                    <TableHead>Department</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Title</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredFeedback.map((item, index) => (
+                    <TableRow key={item.id} className="hover:bg-muted/50 cursor-pointer">
+                      <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
+                      <TableCell>
+                        <div className="text-sm">
+                          {item.user_id ? (
+                            <>
+                              <p className="font-medium">
+                                {formatName(item.profiles?.last_name)}, {formatName(item.profiles?.first_name)}
+                              </p>
+                              <p className="text-muted-foreground text-xs">{item.profiles?.company_email}</p>
+                            </>
+                          ) : (
+                            <p className="text-muted-foreground font-medium italic">Anonymous</p>
+                          )}
                         </div>
-                      </TableHead>
-                      <TableHead>Department</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Title</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Actions</TableHead>
+                      </TableCell>
+                      <TableCell className="text-sm">{item.user_id ? item.profiles?.department || "-" : "-"}</TableCell>
+                      <TableCell>
+                        <Badge className={getTypeColor(item.feedback_type)}>{item.feedback_type}</Badge>
+                      </TableCell>
+                      <TableCell className="max-w-xs truncate">{item.title}</TableCell>
+                      <TableCell>
+                        <Badge className={getStatusColor(item.status)}>{item.status}</Badge>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-sm">
+                        {new Date(item.created_at).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleViewDetails(item)
+                          }}
+                          className="gap-2"
+                        >
+                          <Eye className="h-4 w-4" />
+                          View
+                        </Button>
+                      </TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredFeedback.map((item, index) => (
-                      <TableRow key={item.id} className="hover:bg-muted/50 cursor-pointer">
-                        <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
-                        <TableCell>
-                          <div className="text-sm">
-                            {item.user_id ? (
-                              <>
-                                <p className="font-medium">
-                                  {formatName(item.profiles?.last_name)}, {formatName(item.profiles?.first_name)}
-                                </p>
-                                <p className="text-muted-foreground text-xs">{item.profiles?.company_email}</p>
-                              </>
-                            ) : (
-                              <p className="text-muted-foreground font-medium italic">Anonymous</p>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          {item.user_id ? item.profiles?.department || "-" : "-"}
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={getTypeColor(item.feedback_type)}>{item.feedback_type}</Badge>
-                        </TableCell>
-                        <TableCell className="max-w-xs truncate">{item.title}</TableCell>
-                        <TableCell>
-                          <Badge className={getStatusColor(item.status)}>{item.status}</Badge>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground text-sm">
-                          {new Date(item.created_at).toLocaleDateString()}
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleViewDetails(item)
-                            }}
-                            className="gap-2"
-                          >
-                            <Eye className="h-4 w-4" />
-                            View
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {filteredFeedback.map((item) => (
-              <Card key={item.id} className="border-2 transition-shadow hover:shadow-lg">
-                <CardHeader className="from-primary/5 to-background border-b bg-gradient-to-r">
-                  <div className="flex items-start justify-between">
-                    <div className="flex flex-1 items-start gap-3">
-                      <div className="bg-primary/10 rounded-lg p-2">
-                        <MessageSquare className="text-primary h-5 w-5" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <CardTitle className="line-clamp-2 text-lg">{item.title}</CardTitle>
-                        <div className="mt-2 flex flex-wrap items-center gap-2">
-                          <Badge className={getTypeColor(item.feedback_type)}>{item.feedback_type}</Badge>
-                          <Badge className={getStatusColor(item.status)}>{item.status}</Badge>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-3 p-4">
-                  <div className="text-sm">
-                    {item.user_id ? (
-                      <>
-                        <p className="font-medium">
-                          {formatName(item.profiles?.last_name)}, {formatName(item.profiles?.first_name)}
-                        </p>
-                        <p className="text-muted-foreground text-xs">{item.profiles?.company_email}</p>
-                        <p className="text-muted-foreground text-xs">{item.profiles?.department}</p>
-                      </>
-                    ) : (
-                      <p className="text-muted-foreground font-medium italic">Anonymous</p>
-                    )}
-                  </div>
-                  <p className="text-muted-foreground line-clamp-2 text-sm">
-                    {item.description || "No description provided."}
-                  </p>
-                  <div className="flex items-center justify-between pt-2">
-                    <span className="text-muted-foreground text-xs">
-                      {new Date(item.created_at).toLocaleDateString()}
-                    </span>
-                    <Button variant="outline" size="sm" onClick={() => handleViewDetails(item)} className="gap-2">
-                      <Eye className="h-4 w-4" />
-                      View
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
       ) : (
         <Card className="border-2">
           <CardContent className="p-12 text-center">
