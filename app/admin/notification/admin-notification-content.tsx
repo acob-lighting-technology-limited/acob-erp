@@ -268,7 +268,7 @@ export function AdminNotificationContent({ initialNotifications }: AdminNotifica
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <div className="border-b px-4 py-3">
             <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto">
-              <TabsTrigger value="all" className="px-4 py-2 whitespace-nowrap">
+              <TabsTrigger value="all" className="px-3 py-1.5 whitespace-nowrap">
                 All
                 {categoryCounts.all > 0 && (
                   <Badge variant="secondary" className="ml-2">
@@ -277,7 +277,7 @@ export function AdminNotificationContent({ initialNotifications }: AdminNotifica
                 )}
               </TabsTrigger>
 
-              <TabsTrigger value="unread" className="px-4 py-2 whitespace-nowrap">
+              <TabsTrigger value="unread" className="px-3 py-1.5 whitespace-nowrap">
                 Unread
                 {categoryCounts.unread > 0 && (
                   <Badge variant="destructive" className="ml-2">
@@ -286,7 +286,7 @@ export function AdminNotificationContent({ initialNotifications }: AdminNotifica
                 )}
               </TabsTrigger>
 
-              <TabsTrigger value="payments" className="px-4 py-2 whitespace-nowrap">
+              <TabsTrigger value="payments" className="px-3 py-1.5 whitespace-nowrap">
                 <CreditCard className="mr-1 h-4 w-4" />
                 Payments
                 {categoryCounts.payments > 0 && (
@@ -296,7 +296,7 @@ export function AdminNotificationContent({ initialNotifications }: AdminNotifica
                 )}
               </TabsTrigger>
 
-              <TabsTrigger value="leave" className="px-4 py-2 whitespace-nowrap">
+              <TabsTrigger value="leave" className="px-3 py-1.5 whitespace-nowrap">
                 <CalendarClock className="mr-1 h-4 w-4" />
                 Leave
                 {categoryCounts.leave > 0 && (
@@ -306,7 +306,7 @@ export function AdminNotificationContent({ initialNotifications }: AdminNotifica
                 )}
               </TabsTrigger>
 
-              <TabsTrigger value="tasks" className="px-4 py-2 whitespace-nowrap">
+              <TabsTrigger value="tasks" className="px-3 py-1.5 whitespace-nowrap">
                 <Clock className="mr-1 h-4 w-4" />
                 Tasks
                 {categoryCounts.tasks > 0 && (
@@ -316,7 +316,7 @@ export function AdminNotificationContent({ initialNotifications }: AdminNotifica
                 )}
               </TabsTrigger>
 
-              <TabsTrigger value="assets" className="px-4 py-2 whitespace-nowrap">
+              <TabsTrigger value="assets" className="px-3 py-1.5 whitespace-nowrap">
                 <Package className="mr-1 h-4 w-4" />
                 Assets
                 {categoryCounts.assets > 0 && (
@@ -326,7 +326,7 @@ export function AdminNotificationContent({ initialNotifications }: AdminNotifica
                 )}
               </TabsTrigger>
 
-              <TabsTrigger value="users" className="px-4 py-2 whitespace-nowrap">
+              <TabsTrigger value="users" className="px-3 py-1.5 whitespace-nowrap">
                 <User className="mr-1 h-4 w-4" />
                 Users
                 {categoryCounts.users > 0 && (
@@ -350,7 +350,7 @@ export function AdminNotificationContent({ initialNotifications }: AdminNotifica
                       <div
                         key={notification.id}
                         className={cn(
-                          "group hover:bg-muted/30 relative flex cursor-pointer items-center gap-3 px-4 py-3 transition-all",
+                          "group hover:bg-muted/30 relative flex cursor-pointer items-center gap-2.5 px-3 py-2.5 transition-all",
                           typeColors[notification.type],
                           isRead && "opacity-60"
                         )}
@@ -359,7 +359,7 @@ export function AdminNotificationContent({ initialNotifications }: AdminNotifica
                         {/* Icon */}
                         <div
                           className={cn(
-                            "flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
+                            "flex h-7 w-7 shrink-0 items-center justify-center rounded-full",
                             notification.type === "error"
                               ? "bg-red-100 text-red-600 dark:bg-red-950 dark:text-red-400"
                               : notification.type === "warning"
@@ -369,18 +369,18 @@ export function AdminNotificationContent({ initialNotifications }: AdminNotifica
                                   : "bg-blue-100 text-blue-600 dark:bg-blue-950 dark:text-blue-400"
                           )}
                         >
-                          <Icon className="h-4 w-4" />
+                          <Icon className="h-3.5 w-3.5" />
                         </div>
 
                         {/* Content */}
-                        <div className="flex min-w-0 flex-1 items-center gap-3">
+                        <div className="flex min-w-0 flex-1 items-center gap-2.5">
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2">
-                              <span className={cn("truncate text-sm", !isRead && "font-semibold")}>
+                              <span className={cn("truncate text-sm leading-tight", !isRead && "font-semibold")}>
                                 {notification.title}
                               </span>
                               <span className="text-muted-foreground hidden truncate text-xs sm:inline">
-                                — {notification.message}
+                                - {notification.message}
                               </span>
                             </div>
                           </div>

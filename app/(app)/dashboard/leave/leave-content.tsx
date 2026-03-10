@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -9,10 +9,13 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { SearchableSelect } from "@/components/ui/searchable-select"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
+import { ListToolbar } from "@/components/ui/patterns"
 import { PageHeader, PageWrapper } from "@/components/layout"
 import { toast } from "sonner"
-import { CalendarDays, ChevronDown, ChevronRight, Clock, Eye, Plus, Upload } from "lucide-react"
+import { CalendarDays, ChevronDown, ChevronRight, Clock, Edit2, Eye, Plus, Trash2, Upload } from "lucide-react"
 import type { LeaveApprovalAudit, LeaveBalance, LeaveRequest, LeaveType } from "./page"
 
 interface LeaveContentProps {
@@ -23,10 +26,8 @@ interface LeaveContentProps {
   initialLeaveTypes: LeaveType[]
 }
 
-interface ApprovalHistoryItem extends LeaveApprovalAudit {
-  leave_request_id: string
-  request?: LeaveRequest | null
-}
+type LeaveTableTab = "my-requests" | "reliever-commitments"
+type MyRequestStatusTab = "all" | "pending" | "approved" | "rejected" | "cancelled" | "other"
 
 const STAGE_LABELS: Record<string, string> = {
   pending_reliever: "Waiting Reliever",
@@ -47,8 +48,6 @@ const ELIGIBILITY_VARIANT: Record<string, "default" | "destructive" | "secondary
   missing_evidence: "secondary",
   not_eligible: "destructive",
 }
-
-const ADMIN_LIKE_ROLES = ["developer", "admin", "super_admin"]
 
 function addDays(startDate: string, days: number) {
   if (!startDate || days <= 0) return { endDate: "", resumeDate: "" }
@@ -90,6 +89,33 @@ function formatStage(stage?: string | null) {
 function formatApprovalStatus(status?: string | null) {
   if (!status) return "Unknown"
   return status.charAt(0).toUpperCase() + status.slice(1)
+}
+
+function getLeaveStatusBadgeVariant(status?: string | null): "default" | "destructive" | "secondary" | "outline" {
+  if (!status) return "outline"
+  if (status === "approved") return "default"
+  if (status === "rejected" || status === "cancelled") return "destructive"
+  if (status === "pending" || status === "pending_evidence") return "secondary"
+  return "outline"
+}
+
+function getLeaveStageBadgeVariant(stage?: string | null): "default" | "destructive" | "secondary" | "outline" {
+  if (!stage) return "outline"
+  if (["completed"].includes(stage)) return "default"
+  if (["rejected", "cancelled"].includes(stage)) return "destructive"
+  if (
+    [
+      "pending_reliever",
+      "reliever_pending",
+      "pending_department_lead",
+      "supervisor_pending",
+      "pending_admin_hr_lead",
+      "hr_pending",
+    ].includes(stage)
+  ) {
+    return "secondary"
+  }
+  return "outline"
 }
 
 function formatDateLabel(isoDate?: string | null) {
@@ -146,7 +172,7 @@ const EMPTY_REQUEST_FORM = {
 
 export function LeaveContent({
   currentUserId,
-  currentUserRole,
+  currentUserRole: _currentUserRole,
   initialRequests,
   initialBalances,
   initialLeaveTypes,
@@ -154,9 +180,7 @@ export function LeaveContent({
   const [requests, setRequests] = useState<LeaveRequest[]>(initialRequests)
   const [balances, setBalances] = useState<LeaveBalance[]>(initialBalances)
   const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>(initialLeaveTypes)
-  const [approverQueue, setApproverQueue] = useState<LeaveRequest[]>([])
   const [relieverCommitments, setRelieverCommitments] = useState<LeaveRequest[]>([])
-  const [approvalHistory, setApprovalHistory] = useState<ApprovalHistoryItem[]>([])
   const [relieverOptions, setRelieverOptions] = useState<{ value: string; label: string }[]>([])
   const [open, setOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -164,44 +188,26 @@ export function LeaveContent({
   const [editingRequestId, setEditingRequestId] = useState<string | null>(null)
   const [deletingRequestId, setDeletingRequestId] = useState<string | null>(null)
   const [showLeavePolicy, setShowLeavePolicy] = useState(false)
-  const [requestsTab, setRequestsTab] = useState<"ongoing" | "history">("ongoing")
-  const [historyFilter, setHistoryFilter] = useState<"all" | "approved" | "rejected" | "cancelled">("all")
+  const [requestStatusTab, setRequestStatusTab] = useState<MyRequestStatusTab>("all")
+  const [requestStageFilter, setRequestStageFilter] = useState("all")
+  const [requestsSearch, setRequestsSearch] = useState("")
+  const [relieverTab, setRelieverTab] = useState<"active" | "all">("active")
+  const [relieverSearch, setRelieverSearch] = useState("")
+  const [leaveTableTab, setLeaveTableTab] = useState<LeaveTableTab>("my-requests")
   const [detailRequest, setDetailRequest] = useState<LeaveRequest | null>(null)
-  const approvalQueueRef = useRef<HTMLDivElement | null>(null)
   const [formData, setFormData] = useState(EMPTY_REQUEST_FORM)
   const todayIsoDate = useMemo(() => getTodayLocalIsoDate(), [])
-  const isAdminLikeViewer = useMemo(() => ADMIN_LIKE_ROLES.includes(currentUserRole || ""), [currentUserRole])
 
   const myRequests = useMemo(
     () => requests.filter((request) => request.user_id === currentUserId),
     [requests, currentUserId]
   )
-  const ongoingRequests = useMemo(
-    () =>
-      myRequests.filter((request) => {
-        if (request.status === "rejected" || request.status === "cancelled") return false
-        if (request.status !== "approved") return true
-        return !request.end_date || request.end_date >= todayIsoDate
-      }),
-    [myRequests, todayIsoDate]
-  )
-  const historyRequests = useMemo(
-    () =>
-      myRequests.filter((request) => {
-        if (request.status === "rejected" || request.status === "cancelled") return true
-        if (request.status !== "approved") return false
-        return Boolean(request.end_date && request.end_date < todayIsoDate)
-      }),
-    [myRequests, todayIsoDate]
-  )
-  const filteredHistoryRequests = useMemo(() => {
-    if (historyFilter === "all") return historyRequests
-    return historyRequests.filter((request) => request.status === historyFilter)
-  }, [historyFilter, historyRequests])
-
   const hasPendingRequest = myRequests.some((request) => ["pending", "pending_evidence"].includes(request.status))
   const activeApprovedRequest = myRequests.find(
-    (request) => request.status === "approved" && (!request.end_date || request.end_date >= todayIsoDate)
+    (request) =>
+      request.status === "approved" &&
+      (!request.start_date || request.start_date <= todayIsoDate) &&
+      (!request.end_date || request.end_date >= todayIsoDate)
   )
   const hasBlockingRequest = hasPendingRequest || Boolean(activeApprovedRequest)
   const activeRelieverCommitments = useMemo(
@@ -227,6 +233,22 @@ export function LeaveContent({
   const selectedBalance = useMemo(() => balanceMap.get(formData.leave_type_id), [balanceMap, formData.leave_type_id])
   const availableDays = Math.max(1, selectedBalance?.balance_days ?? selectedLeaveType?.max_days ?? 1)
   const detailApprovals = useMemo(() => sortApprovals(detailRequest?.approvals), [detailRequest])
+  const detailLeadApprover = useMemo(
+    () =>
+      [...detailApprovals]
+        .reverse()
+        .find((approval) =>
+          ["pending_department_lead", "supervisor_pending"].includes(String(approval.stage_code || ""))
+        ),
+    [detailApprovals]
+  )
+  const detailHrApprover = useMemo(
+    () =>
+      [...detailApprovals]
+        .reverse()
+        .find((approval) => ["pending_admin_hr_lead", "hr_pending"].includes(String(approval.stage_code || ""))),
+    [detailApprovals]
+  )
 
   const canSubmit =
     formData.leave_type_id &&
@@ -237,35 +259,82 @@ export function LeaveContent({
     formData.reliever_identifier.trim().length > 0 &&
     selectedLeaveType?.eligibility_status !== "not_eligible" &&
     Number(formData.days_count) <= availableDays
-  const pendingMyReviews = useMemo(() => approverQueue.length, [approverQueue])
-  const relieverApprovalHistory = useMemo(
+  const visibleLeaveTabs = useMemo(
     () =>
-      approvalHistory.filter((item) =>
-        ["pending_reliever", "reliever_pending"].includes(String(item.stage_code || ""))
-      ),
-    [approvalHistory]
+      [
+        { key: "my-requests" as LeaveTableTab, label: "My Requests" },
+        { key: "reliever-commitments" as LeaveTableTab, label: "Reliever Commitments" },
+      ] as Array<{ key: LeaveTableTab; label: string }>,
+    []
   )
-  const nonRelieverApprovalHistory = useMemo(
+
+  const requestStatusCounts = useMemo(() => {
+    const known = new Set(["pending", "pending_evidence", "approved", "rejected", "cancelled"])
+    return {
+      all: myRequests.length,
+      pending: myRequests.filter((request) => ["pending", "pending_evidence"].includes(request.status)).length,
+      approved: myRequests.filter((request) => request.status === "approved").length,
+      rejected: myRequests.filter((request) => request.status === "rejected").length,
+      cancelled: myRequests.filter((request) => request.status === "cancelled").length,
+      other: myRequests.filter((request) => !known.has(request.status)).length,
+    }
+  }, [myRequests])
+
+  const myRequestRows = useMemo(() => {
+    const source = myRequests.filter((request) => {
+      if (requestStatusTab === "all") return true
+      if (requestStatusTab === "pending") return ["pending", "pending_evidence"].includes(request.status)
+      if (requestStatusTab === "other") {
+        return !["pending", "pending_evidence", "approved", "rejected", "cancelled"].includes(request.status)
+      }
+      return request.status === requestStatusTab
+    })
+
+    const query = requestsSearch.trim().toLowerCase()
+    const stageFiltered =
+      requestStageFilter === "all"
+        ? source
+        : source.filter(
+            (request) => (request.current_stage_code || request.approval_stage || "") === requestStageFilter
+          )
+    if (!query) return stageFiltered
+
+    return stageFiltered.filter((request) => {
+      const leaveName = request.leave_type?.name || "Leave Request"
+      const relieverName = request.reliever?.full_name || request.reliever?.company_email || ""
+      return (
+        leaveName.toLowerCase().includes(query) ||
+        String(request.reason || "")
+          .toLowerCase()
+          .includes(query) ||
+        relieverName.toLowerCase().includes(query)
+      )
+    })
+  }, [myRequests, requestStageFilter, requestStatusTab, requestsSearch])
+
+  const requestStageOptions = useMemo(
     () =>
-      approvalHistory.filter(
-        (item) => !["pending_reliever", "reliever_pending"].includes(String(item.stage_code || ""))
-      ),
-    [approvalHistory]
+      Array.from(
+        new Set(myRequests.map((request) => request.current_stage_code || request.approval_stage || "").filter(Boolean))
+      ).sort((a, b) => a.localeCompare(b)),
+    [myRequests]
   )
-  const departmentApprovalHistory = useMemo(
-    () =>
-      nonRelieverApprovalHistory.filter((item) =>
-        ["pending_department_lead", "supervisor_pending"].includes(String(item.stage_code || ""))
-      ),
-    [nonRelieverApprovalHistory]
-  )
-  const globalLeadApprovalHistory = useMemo(
-    () =>
-      nonRelieverApprovalHistory.filter(
-        (item) => !["pending_department_lead", "supervisor_pending"].includes(String(item.stage_code || ""))
-      ),
-    [nonRelieverApprovalHistory]
-  )
+
+  const relieverRows = useMemo(() => {
+    const source = relieverTab === "active" ? activeRelieverCommitments : relieverCommitments
+    const query = relieverSearch.trim().toLowerCase()
+    if (!query) return source
+    return source.filter((request) => {
+      const requesterName = request.user?.full_name || request.user?.company_email || ""
+      const leaveName = request.leave_type?.name || "Leave Request"
+      return leaveName.toLowerCase().includes(query) || requesterName.toLowerCase().includes(query)
+    })
+  }, [activeRelieverCommitments, relieverCommitments, relieverSearch, relieverTab])
+  useEffect(() => {
+    if (!visibleLeaveTabs.some((tab) => tab.key === leaveTableTab)) {
+      setLeaveTableTab(visibleLeaveTabs[0]?.key || "my-requests")
+    }
+  }, [leaveTableTab, visibleLeaveTabs])
 
   useEffect(() => {
     setFormData((prev) => ({
@@ -314,17 +383,14 @@ export function LeaveContent({
   }
 
   async function refreshData() {
-    const queueUrl = isAdminLikeViewer ? "/api/hr/leave/queue?all=true" : "/api/hr/leave/queue"
-    const [requestRes, queueRes, typesRes, relieversRes] = await Promise.all([
+    const [requestRes, typesRes, relieversRes] = await Promise.all([
       fetch("/api/hr/leave/requests"),
-      fetch(queueUrl),
       fetch("/api/hr/leave/types"),
       fetch("/api/hr/leave/relievers"),
     ])
 
-    const [requestPayload, queuePayload, typesPayload, relieversPayload] = await Promise.all([
+    const [requestPayload, typesPayload, relieversPayload] = await Promise.all([
       requestRes.json().catch(() => ({})),
-      queueRes.json().catch(() => ({})),
       typesRes.json().catch(() => ({})),
       relieversRes.json().catch(() => ({})),
     ])
@@ -338,13 +404,6 @@ export function LeaveContent({
       setRelieverCommitments(requestPayload.reliever_commitments || [])
     } else {
       errors.push(`requests: ${requestPayload.error || requestRes.statusText}`)
-    }
-
-    if (queueRes.ok) {
-      setApproverQueue(queuePayload.data || [])
-      setApprovalHistory(queuePayload.history || [])
-    } else {
-      errors.push(`queue: ${queuePayload.error || queueRes.statusText}`)
     }
 
     if (typesRes.ok) {
@@ -368,7 +427,7 @@ export function LeaveContent({
     refreshData().catch((error) => {
       toast.error(error instanceof Error ? error.message : "Failed to load leave data")
     })
-  }, [isAdminLikeViewer])
+  }, [])
 
   async function handleSubmitRequest(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -425,34 +484,6 @@ export function LeaveContent({
     }
   }
 
-  async function handleAction(requestId: string, action: "approve" | "reject") {
-    const comments = action === "reject" ? window.prompt("Reason for rejection") || "" : ""
-    if (action === "reject" && !comments.trim()) {
-      toast.error("Rejection reason is required")
-      return
-    }
-
-    try {
-      const response = await fetch("/api/hr/leave/approve", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          leave_request_id: requestId,
-          action,
-          comments,
-        }),
-      })
-
-      const payload = await response.json()
-      if (!response.ok) throw new Error(payload.error || "Failed to process action")
-
-      toast.success(payload.message || "Action completed")
-      await refreshData()
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to process action")
-    }
-  }
-
   async function handleUploadEvidence(requestId: string, documentType: string) {
     const fileUrl = window.prompt(`Enter URL for ${prettyDocName(documentType)}:`)?.trim()
     if (!fileUrl) return
@@ -488,20 +519,10 @@ export function LeaveContent({
         icon={CalendarDays}
         backLink={{ href: "/profile", label: "Back to Dashboard" }}
         actions={
-          <>
-            {pendingMyReviews > 0 && (
-              <Button
-                variant="outline"
-                onClick={() => approvalQueueRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
-              >
-                Pending Reviews ({pendingMyReviews})
-              </Button>
-            )}
-            <Button onClick={openCreateDialog} disabled={hasBlockingRequest}>
-              <Plus className="mr-2 h-4 w-4" />
-              New Request
-            </Button>
-          </>
+          <Button onClick={openCreateDialog} disabled={hasBlockingRequest}>
+            <Plus className="mr-2 h-4 w-4" />
+            New Request
+          </Button>
         }
       />
       <Card>
@@ -551,412 +572,231 @@ export function LeaveContent({
         )}
       </Card>
 
-      <Card ref={approvalQueueRef}>
-        <CardHeader>
-          <CardTitle>{isAdminLikeViewer ? "Active Leave Workflow Queue" : "My Approval Queue"}</CardTitle>
-          <CardDescription>
-            {isAdminLikeViewer
-              ? "Showing all active leave approvals in the system so you can monitor test flows."
-              : "Requests awaiting your action"}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {approverQueue.length === 0 ? (
-            <div className="text-muted-foreground rounded-md border border-dashed p-3 text-sm">
-              No leave requests are currently waiting in this queue.
-            </div>
-          ) : (
-            approverQueue.map((item) => (
-              <div key={item.id} className="flex flex-wrap items-start justify-between gap-3 rounded-md border p-3">
-                <div className="space-y-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-medium">{item.leave_type?.name || "Leave Request"}</p>
-                    <Badge variant="outline">{formatStage(item.current_stage_code || item.approval_stage)}</Badge>
-                    {item.current_approver?.full_name && isAdminLikeViewer && (
-                      <Badge variant="secondary">Assigned to {item.current_approver.full_name}</Badge>
-                    )}
-                  </div>
-                  <p className="text-muted-foreground text-sm">
-                    {formatDateLabel(item.start_date)} to {formatDateLabel(item.end_date)} ({item.days_count} days)
-                  </p>
-                  <p className="text-muted-foreground text-sm">
-                    Requester: {item.user?.full_name || item.user?.company_email || "Unknown"}
-                  </p>
-                  <p className="text-muted-foreground text-sm">
-                    Reliever: {item.reliever?.full_name || item.reliever?.company_email || "Not set"}
-                  </p>
-                  <p className="text-sm">Reason: {item.reason || "No reason provided"}</p>
-                  {item.handover_note && (
-                    <p className="text-muted-foreground text-sm">Handover: {item.handover_note}</p>
-                  )}
-                </div>
-                <div className="flex gap-2">
-                  <Button size="sm" variant="outline" onClick={() => setDetailRequest(item)}>
-                    <Eye className="mr-1 h-4 w-4" />
-                    View
-                  </Button>
-                  <Button size="sm" onClick={() => handleAction(item.id, "approve")}>
-                    Approve
-                  </Button>
-                  <Button size="sm" variant="destructive" onClick={() => handleAction(item.id, "reject")}>
-                    Reject
-                  </Button>
-                </div>
-              </div>
-            ))
-          )}
-        </CardContent>
-      </Card>
-
       <Card>
         <CardHeader>
-          <CardTitle>My Approval Activity</CardTitle>
-          <CardDescription>
-            Keep a visible trail of approvals, clearly separated by reliever actions and normal approver actions.
-          </CardDescription>
+          <CardTitle>Leave Records</CardTitle>
+          <CardDescription>Task-style table views with row actions and filters.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-3">
-          {approvalHistory.length === 0 ? (
-            <div className="text-muted-foreground rounded-md border border-dashed p-3 text-sm">
-              You have not acted on any leave requests yet.
-            </div>
-          ) : (
+        <CardContent className="space-y-4">
+          <Tabs value={leaveTableTab} onValueChange={(value) => setLeaveTableTab(value as LeaveTableTab)}>
+            <TabsList className="h-auto flex-wrap justify-start gap-1">
+              {visibleLeaveTabs.map((tab) => (
+                <TabsTrigger key={tab.key} value={tab.key}>
+                  {tab.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+
+          {leaveTableTab === "my-requests" && (
             <>
-              <div className="space-y-3">
-                <div className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-                  Approved as Reliever ({relieverApprovalHistory.length})
-                </div>
-                {relieverApprovalHistory.length === 0 ? (
-                  <div className="text-muted-foreground rounded-md border border-dashed p-3 text-sm">
-                    No reliever approvals yet.
-                  </div>
-                ) : (
-                  relieverApprovalHistory.map((item) => (
-                    <div
-                      key={item.id}
-                      className="flex flex-wrap items-start justify-between gap-3 rounded-md border p-3"
-                    >
-                      <div className="space-y-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-medium">{item.request?.leave_type?.name || "Leave Request"}</p>
-                          <Badge variant={item.status === "approved" ? "default" : "destructive"}>
-                            {formatApprovalStatus(item.status)}
-                          </Badge>
-                          <Badge variant="secondary">Reliever Decision</Badge>
-                        </div>
-                        <p className="text-muted-foreground text-sm">
-                          {item.request?.user?.full_name || item.request?.user?.company_email || "Requester unknown"}
-                        </p>
-                        <p className="text-muted-foreground text-sm">Stage: {formatStage(item.stage_code)}</p>
-                      </div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => item.request && setDetailRequest(item.request)}
-                        disabled={!item.request}
-                      >
-                        <Eye className="mr-1 h-4 w-4" />
-                        View
-                      </Button>
-                    </div>
-                  ))
-                )}
+              <div className="space-y-1">
+                <p className="font-medium">My Leave Requests</p>
+                <p className="text-muted-foreground text-sm">Only leave requests you personally submitted.</p>
               </div>
-
-              <div className="space-y-3 pt-2">
-                <div className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-                  Approved as Department Lead ({departmentApprovalHistory.length})
-                </div>
-                {departmentApprovalHistory.length === 0 ? (
-                  <div className="text-muted-foreground rounded-md border border-dashed p-3 text-sm">
-                    No department-level approvals yet.
-                  </div>
-                ) : (
-                  departmentApprovalHistory.map((item) => (
-                    <div
-                      key={item.id}
-                      className="flex flex-wrap items-start justify-between gap-3 rounded-md border p-3"
-                    >
-                      <div className="space-y-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-medium">{item.request?.leave_type?.name || "Leave Request"}</p>
-                          <Badge variant={item.status === "approved" ? "default" : "destructive"}>
-                            {formatApprovalStatus(item.status)}
-                          </Badge>
-                          <Badge variant="outline">Department Approval</Badge>
-                        </div>
-                        <p className="text-muted-foreground text-sm">
-                          {item.request?.user?.full_name || item.request?.user?.company_email || "Requester unknown"}
-                        </p>
-                        <p className="text-muted-foreground text-sm">Stage: {formatStage(item.stage_code)}</p>
-                      </div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => item.request && setDetailRequest(item.request)}
-                        disabled={!item.request}
-                      >
-                        <Eye className="mr-1 h-4 w-4" />
-                        View
-                      </Button>
-                    </div>
-                  ))
-                )}
-              </div>
-
-              <div className="space-y-3 pt-2">
-                <div className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-                  Approved as Global Lead ({globalLeadApprovalHistory.length})
-                </div>
-                {globalLeadApprovalHistory.length === 0 ? (
-                  <div className="text-muted-foreground rounded-md border border-dashed p-3 text-sm">
-                    No global-lead approvals yet.
-                  </div>
-                ) : (
-                  globalLeadApprovalHistory.map((item) => (
-                    <div
-                      key={item.id}
-                      className="flex flex-wrap items-start justify-between gap-3 rounded-md border p-3"
-                    >
-                      <div className="space-y-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-medium">{item.request?.leave_type?.name || "Leave Request"}</p>
-                          <Badge variant={item.status === "approved" ? "default" : "destructive"}>
-                            {formatApprovalStatus(item.status)}
-                          </Badge>
-                          <Badge variant="outline">Global Approval</Badge>
-                        </div>
-                        <p className="text-muted-foreground text-sm">
-                          {item.request?.user?.full_name || item.request?.user?.company_email || "Requester unknown"}
-                        </p>
-                        <p className="text-muted-foreground text-sm">Stage: {formatStage(item.stage_code)}</p>
-                      </div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => item.request && setDetailRequest(item.request)}
-                        disabled={!item.request}
-                      >
-                        <Eye className="mr-1 h-4 w-4" />
-                        View
-                      </Button>
-                    </div>
-                  ))
-                )}
+              <Tabs
+                value={requestStatusTab}
+                onValueChange={(value) => setRequestStatusTab(value as MyRequestStatusTab)}
+              >
+                <TabsList className="h-auto flex-wrap justify-start gap-1">
+                  <TabsTrigger value="all">All ({requestStatusCounts.all})</TabsTrigger>
+                  <TabsTrigger value="pending">Pending ({requestStatusCounts.pending})</TabsTrigger>
+                  <TabsTrigger value="approved">Approved ({requestStatusCounts.approved})</TabsTrigger>
+                  <TabsTrigger value="rejected">Rejected ({requestStatusCounts.rejected})</TabsTrigger>
+                  <TabsTrigger value="cancelled">Cancelled ({requestStatusCounts.cancelled})</TabsTrigger>
+                  <TabsTrigger value="other">Other ({requestStatusCounts.other})</TabsTrigger>
+                </TabsList>
+              </Tabs>
+              <ListToolbar
+                search={
+                  <Input
+                    placeholder="Search your leave requests"
+                    value={requestsSearch}
+                    onChange={(event) => setRequestsSearch(event.target.value)}
+                    className="w-full sm:max-w-[320px]"
+                  />
+                }
+                filters={
+                  <Select value={requestStageFilter} onValueChange={setRequestStageFilter}>
+                    <SelectTrigger className="w-[220px]">
+                      <SelectValue placeholder="Filter by stage" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All stages</SelectItem>
+                      {requestStageOptions.map((stage) => (
+                        <SelectItem key={stage} value={stage}>
+                          {formatStage(stage)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                }
+              />
+              <div className="w-full overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-14">S/N</TableHead>
+                      <TableHead>Leave Type</TableHead>
+                      <TableHead>Window</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Stage</TableHead>
+                      <TableHead>Reliever</TableHead>
+                      <TableHead>Reason</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {myRequestRows.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={8} className="text-muted-foreground py-6 text-center">
+                          No leave requests found for this filter.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      myRequestRows.map((request, index) => (
+                        <TableRow key={request.id}>
+                          <TableCell className="text-muted-foreground">{index + 1}</TableCell>
+                          <TableCell>{request.leave_type?.name || "Leave Request"}</TableCell>
+                          <TableCell>
+                            {formatDateLabel(request.start_date)} to {formatDateLabel(request.end_date)}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={getLeaveStatusBadgeVariant(request.status)}>
+                              {formatApprovalStatus(request.status)}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={getLeaveStageBadgeVariant(request.current_stage_code || request.approval_stage)}
+                            >
+                              {formatStage(request.current_stage_code || request.approval_stage)}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{request.reliever?.full_name || request.reliever?.company_email || "-"}</TableCell>
+                          <TableCell className="max-w-[320px] truncate">{request.reason || "-"}</TableCell>
+                          <TableCell>
+                            <div className="flex flex-wrap gap-2">
+                              <Button size="sm" variant="outline" onClick={() => setDetailRequest(request)}>
+                                <Eye className="mr-1 h-4 w-4" />
+                                View
+                              </Button>
+                              {isRequesterEditable(request) && (
+                                <>
+                                  <Button
+                                    size="icon"
+                                    variant="outline"
+                                    className="h-8 w-8"
+                                    onClick={() => openEditDialog(request)}
+                                    title="Edit request"
+                                    aria-label="Edit request"
+                                  >
+                                    <Edit2 className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    size="icon"
+                                    variant="destructive"
+                                    className="h-8 w-8"
+                                    onClick={() => handleDeleteRequest(request)}
+                                    disabled={deletingRequestId === request.id}
+                                    title="Delete request"
+                                    aria-label="Delete request"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </>
+                              )}
+                              {request.status === "pending_evidence" &&
+                                (request.missing_documents || []).map((doc) => (
+                                  <Button
+                                    key={`${request.id}-${doc}`}
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={uploadingEvidenceFor === request.id}
+                                    onClick={() => handleUploadEvidence(request.id, doc)}
+                                  >
+                                    <Upload className="mr-1 h-3 w-3" />
+                                    {prettyDocName(doc)}
+                                  </Button>
+                                ))}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
               </div>
             </>
           )}
-        </CardContent>
-      </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>My Leave Requests</CardTitle>
-          <CardDescription>
-            Only leave requests you personally submitted, with ongoing and history views.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              size="sm"
-              variant={requestsTab === "ongoing" ? "default" : "outline"}
-              onClick={() => setRequestsTab("ongoing")}
-            >
-              Ongoing ({ongoingRequests.length})
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant={requestsTab === "history" ? "default" : "outline"}
-              onClick={() => setRequestsTab("history")}
-            >
-              History ({historyRequests.length})
-            </Button>
-          </div>
-
-          {requestsTab === "history" && (
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                size="sm"
-                variant={historyFilter === "all" ? "secondary" : "outline"}
-                onClick={() => setHistoryFilter("all")}
-              >
-                All
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant={historyFilter === "approved" ? "secondary" : "outline"}
-                onClick={() => setHistoryFilter("approved")}
-              >
-                Approved
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant={historyFilter === "rejected" ? "secondary" : "outline"}
-                onClick={() => setHistoryFilter("rejected")}
-              >
-                Rejected
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant={historyFilter === "cancelled" ? "secondary" : "outline"}
-                onClick={() => setHistoryFilter("cancelled")}
-              >
-                Cancelled
-              </Button>
-            </div>
-          )}
-
-          {(requestsTab === "ongoing" ? ongoingRequests : filteredHistoryRequests).length === 0 ? (
-            <div className="text-muted-foreground rounded-md border border-dashed p-3 text-sm">
-              {requestsTab === "ongoing" ? "No ongoing requests." : "No history requests for this filter."}
-            </div>
-          ) : (
-            (requestsTab === "ongoing" ? ongoingRequests : filteredHistoryRequests).map((request) => {
-              const durationDays = calculateInclusiveDays(
-                request.start_date,
-                request.end_date,
-                Number(request.days_count) || 0
-              )
-              const returnInDays = request.status === "approved" ? daysUntil(request.resume_date) : null
-              return (
-                <div key={request.id} className="rounded-md border p-3">
-                  {request.status === "approved" && (
-                    <div className="bg-muted/30 mb-2 rounded-md border px-2 py-1 text-xs">
-                      Leave window: {formatDateLabel(request.start_date)} to {formatDateLabel(request.end_date)} (
-                      {durationDays} day(s))
-                    </div>
-                  )}
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="font-medium">{request.leave_type?.name || "Leave Request"}</p>
-                    <div className="flex gap-2">
-                      <Badge
-                        variant={
-                          request.status === "approved"
-                            ? "default"
-                            : request.status === "rejected"
-                              ? "destructive"
-                              : "secondary"
-                        }
-                      >
-                        {request.status}
-                      </Badge>
-                      <Badge variant="outline">
-                        {formatStage(request.current_stage_code || request.approval_stage)}
-                      </Badge>
-                    </div>
-                  </div>
-                  <p className="text-muted-foreground mt-2 text-sm">
-                    {formatDateLabel(request.start_date)} to {formatDateLabel(request.end_date)} | Resume:{" "}
-                    {formatDateLabel(request.resume_date)} | {request.days_count} day(s)
-                  </p>
-                  {request.status === "approved" && returnInDays !== null && (
-                    <p className="text-muted-foreground mt-1 text-xs">
-                      {returnInDays > 0
-                        ? `${returnInDays} day(s) until resume date`
-                        : returnInDays === 0
-                          ? "Resumes today"
-                          : "Resume date has passed"}
-                    </p>
-                  )}
-                  <p className="mt-2 text-sm">{request.reason}</p>
-                  <p className="text-muted-foreground mt-2 text-sm">
-                    Reliever: {request.reliever?.full_name || request.reliever?.company_email || "Not set"}
-                  </p>
-                  {(request.required_documents || []).length > 0 && (
-                    <p className="text-muted-foreground mt-2 text-xs">
-                      Required documents: {(request.required_documents || []).map(prettyDocName).join(", ")}
-                    </p>
-                  )}
-                  {request.approvals?.length ? (
-                    <p className="text-muted-foreground mt-2 text-xs">
-                      Approval history: {request.approvals.length} recorded update
-                      {request.approvals.length > 1 ? "s" : ""}
-                    </p>
-                  ) : null}
-                  {(request.missing_documents || []).length > 0 && (
-                    <div className="mt-2 rounded-md border border-amber-500/50 bg-amber-50 p-2 text-xs text-amber-700">
-                      <p>Missing evidence: {(request.missing_documents || []).map(prettyDocName).join(", ")}</p>
-                      {request.status === "pending_evidence" && (
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          {(request.missing_documents || []).map((doc) => (
-                            <Button
-                              key={`${request.id}-${doc}`}
-                              size="sm"
-                              variant="outline"
-                              disabled={uploadingEvidenceFor === request.id}
-                              onClick={() => handleUploadEvidence(request.id, doc)}
-                            >
-                              <Upload className="mr-1 h-3 w-3" />
-                              Upload {prettyDocName(doc)}
-                            </Button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <Button size="sm" variant="outline" onClick={() => setDetailRequest(request)}>
-                      <Eye className="mr-1 h-4 w-4" />
-                      View Details
-                    </Button>
-                    {isRequesterEditable(request) && (
-                      <>
-                        <Button size="sm" variant="outline" onClick={() => openEditDialog(request)}>
-                          Edit
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={() => handleDeleteRequest(request)}
-                          disabled={deletingRequestId === request.id}
-                        >
-                          {deletingRequestId === request.id ? "Deleting..." : "Delete"}
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              )
-            })
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>My Reliever Commitments</CardTitle>
-          <CardDescription>
-            Leave requests where you are assigned as reliever. Overlapping personal leave requests are blocked for these
-            periods.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {activeRelieverCommitments.length === 0 ? (
-            <div className="text-muted-foreground rounded-md border border-dashed p-3 text-sm">
-              No active reliever commitments right now.
-            </div>
-          ) : (
-            activeRelieverCommitments.map((request) => (
-              <div key={`reliever-${request.id}`} className="rounded-md border p-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="font-medium">{request.leave_type?.name || "Leave Request"}</p>
-                  <Badge variant={request.status === "approved" ? "default" : "secondary"}>{request.status}</Badge>
-                </div>
-                <p className="text-muted-foreground mt-1 text-sm">
-                  Requester: {request.user?.full_name || request.user?.company_email || "Unknown"}
-                </p>
+          {leaveTableTab === "reliever-commitments" && (
+            <>
+              <div className="space-y-1">
+                <p className="font-medium">My Reliever Commitments</p>
                 <p className="text-muted-foreground text-sm">
-                  Commitment window: {formatDateLabel(request.start_date)} to {formatDateLabel(request.end_date)}
+                  Leave requests where you are assigned as reliever. Overlapping personal leave requests are blocked for
+                  these periods.
                 </p>
               </div>
-            ))
+              <Tabs value={relieverTab} onValueChange={(value) => setRelieverTab(value as typeof relieverTab)}>
+                <TabsList className="h-auto flex-wrap justify-start gap-1">
+                  <TabsTrigger value="active">Active ({activeRelieverCommitments.length})</TabsTrigger>
+                  <TabsTrigger value="all">All ({relieverCommitments.length})</TabsTrigger>
+                </TabsList>
+              </Tabs>
+              <ListToolbar
+                search={
+                  <Input
+                    placeholder="Search reliever commitments"
+                    value={relieverSearch}
+                    onChange={(event) => setRelieverSearch(event.target.value)}
+                    className="w-full sm:max-w-[320px]"
+                  />
+                }
+              />
+              <div className="w-full overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-14">S/N</TableHead>
+                      <TableHead>Leave Type</TableHead>
+                      <TableHead>Requester</TableHead>
+                      <TableHead>Window</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {relieverRows.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-muted-foreground py-6 text-center">
+                          No reliever commitments found for this filter.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      relieverRows.map((request, index) => (
+                        <TableRow key={`reliever-${request.id}`}>
+                          <TableCell className="text-muted-foreground">{index + 1}</TableCell>
+                          <TableCell>{request.leave_type?.name || "Leave Request"}</TableCell>
+                          <TableCell>{request.user?.full_name || request.user?.company_email || "Unknown"}</TableCell>
+                          <TableCell>
+                            {formatDateLabel(request.start_date)} to {formatDateLabel(request.end_date)}
+                          </TableCell>
+                          <TableCell>{formatApprovalStatus(request.status)}</TableCell>
+                          <TableCell>
+                            <Button size="sm" variant="outline" onClick={() => setDetailRequest(request)}>
+                              <Eye className="mr-1 h-4 w-4" />
+                              View
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
@@ -1017,17 +857,34 @@ export function LeaveContent({
                   Reliever: {detailRequest.reliever?.full_name || detailRequest.reliever?.company_email || "Not set"}
                 </p>
                 <p className="text-muted-foreground">
-                  Current approver:{" "}
-                  {detailRequest.current_approver?.full_name ||
-                    detailRequest.current_approver?.company_email ||
+                  Department Lead:{" "}
+                  {detailLeadApprover?.approver?.full_name ||
+                    detailLeadApprover?.approver?.company_email ||
+                    detailRequest.supervisor?.full_name ||
+                    detailRequest.supervisor?.company_email ||
                     "Not assigned"}
+                </p>
+                <p className="text-muted-foreground">
+                  Admin & HR Lead:{" "}
+                  {detailHrApprover?.approver?.full_name || detailHrApprover?.approver?.company_email || "Not assigned"}
+                </p>
+                <p className="text-muted-foreground">
+                  Current approver:{" "}
+                  {["approved", "rejected", "cancelled"].includes(detailRequest.status)
+                    ? "Completed (no current approver)"
+                    : detailRequest.current_approver?.full_name ||
+                      detailRequest.current_approver?.company_email ||
+                      "Not assigned"}
                 </p>
               </div>
 
               <div className="rounded-md border p-3">
                 <p className="font-medium">Reason</p>
                 <p className="text-muted-foreground mt-1">{detailRequest.reason || "No reason provided"}</p>
-                <p className="mt-3 font-medium">Handover Note</p>
+              </div>
+
+              <div className="rounded-md border p-3">
+                <p className="font-medium">Handover Note</p>
                 <p className="text-muted-foreground mt-1">
                   {detailRequest.handover_note || "No handover note provided"}
                 </p>

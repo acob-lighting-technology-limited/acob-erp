@@ -132,25 +132,28 @@ export function Sidebar({ user, profile, canAccessAdmin }: SidebarProps) {
     router.push("/auth/login")
   }
 
-  const isFinanceDepartment = (value?: string | null): boolean => {
-    const normalized = String(value || "")
-      .trim()
-      .toLowerCase()
-    return normalized === "finance" || normalized === "accounts"
+  const routeAliases: Record<string, string[]> = {
+    "/dashboard/payments": ["/payments", "/dashboard/payments"],
+    "/dashboard/projects": ["/projects", "/dashboard/projects"],
+    "/notification": ["/notification", "/dashboard/notifications"],
   }
-
-  const canAccessPayments =
-    ["developer", "super_admin", "admin"].includes(String(profile?.role || "").toLowerCase()) ||
-    isFinanceDepartment(profile?.department) ||
-    (profile?.lead_departments || []).some((dept) => isFinanceDepartment(dept))
 
   const isNavItemActive = (href: string): boolean => {
-    if (href === "/profile") {
-      return pathname === "/profile" || pathname === "/dashboard/profile"
+    if (!pathname) return false
+
+    const aliases = routeAliases[href]
+    if (aliases && aliases.some((alias) => pathname === alias || pathname.startsWith(`${alias}/`))) {
+      return true
     }
 
-    return pathname === href || pathname?.startsWith(`${href}/`)
+    if (href === "/profile") {
+      return pathname === "/profile" || pathname === "/dashboard/profile" || pathname.startsWith("/dashboard/profile/")
+    }
+
+    return pathname === href || pathname.startsWith(`${href}/`)
   }
+
+  const isLead = Boolean(profile?.lead_departments && profile.lead_departments.length > 0)
 
   const SidebarContent = () => (
     <>
@@ -193,7 +196,7 @@ export function Sidebar({ user, profile, canAccessAdmin }: SidebarProps) {
                     : user?.email?.split("@")[0]}
                 </p>
                 <p className="text-muted-foreground truncate text-xs whitespace-nowrap">
-                  {profile?.department || "employee Member"}
+                  {`${profile?.department || "employee Member"}${isLead ? " (Lead)" : ""}`}
                 </p>
                 {profile?.role && (
                   <Badge
@@ -207,71 +210,45 @@ export function Sidebar({ user, profile, canAccessAdmin }: SidebarProps) {
             )}
           </AnimatePresence>
         </div>
-
-        {/* Leading Departments */}
-        <AnimatePresence mode="wait">
-          {!isCollapsed && profile?.lead_departments && profile.lead_departments.length > 0 && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              className="shrink-0 overflow-hidden"
-            >
-              <div className="pt-2 text-xs">
-                <p className="text-muted-foreground mb-1">Leading:</p>
-                <div className="flex flex-wrap gap-1">
-                  {profile?.lead_departments?.map((dept) => (
-                    <Badge key={dept} variant="outline" className="text-xs">
-                      {dept}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
 
       {/* Navigation */}
       <nav className="scrollbar-custom flex-1 space-y-0.5 overflow-y-auto px-2.5 py-3">
         {/* Regular Navigation */}
-        {navigation
-          .filter((item) => item.href !== "/dashboard/payments" || canAccessPayments)
-          .map((item) => {
-            const isActive = isNavItemActive(item.href)
-            return (
-              <Link
-                key={item.name}
-                href={item.href}
-                onClick={() => setIsMobileMenuOpen(false)}
-                className={cn(
-                  "flex items-center rounded-md transition-[padding,gap,background-color,color] duration-300 ease-in-out",
-                  isCollapsed ? "justify-center px-2.5 py-2" : "gap-2.5 px-3 py-2",
-                  "min-h-[36px] text-sm font-medium",
-                  isActive
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "text-muted-foreground hover:bg-accent hover:text-foreground"
+        {navigation.map((item) => {
+          const isActive = isNavItemActive(item.href)
+          return (
+            <Link
+              key={item.name}
+              href={item.href}
+              onClick={() => setIsMobileMenuOpen(false)}
+              className={cn(
+                "flex items-center rounded-md transition-[padding,gap,background-color,color] duration-300 ease-in-out",
+                isCollapsed ? "justify-center px-2.5 py-2" : "gap-2.5 px-3 py-2",
+                "min-h-[36px] text-sm font-medium",
+                isActive
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
+              )}
+              title={isCollapsed ? item.name : undefined}
+            >
+              <item.icon className="h-4 w-4 shrink-0" />
+              <AnimatePresence mode="wait">
+                {!isCollapsed && (
+                  <motion.span
+                    initial={{ width: 0, opacity: 0 }}
+                    animate={{ width: "auto", opacity: 1 }}
+                    exit={{ width: 0, opacity: 0 }}
+                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                    className="overflow-hidden whitespace-nowrap"
+                  >
+                    {item.name}
+                  </motion.span>
                 )}
-                title={isCollapsed ? item.name : undefined}
-              >
-                <item.icon className="h-4 w-4 shrink-0" />
-                <AnimatePresence mode="wait">
-                  {!isCollapsed && (
-                    <motion.span
-                      initial={{ width: 0, opacity: 0 }}
-                      animate={{ width: "auto", opacity: 1 }}
-                      exit={{ width: 0, opacity: 0 }}
-                      transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                      className="overflow-hidden whitespace-nowrap"
-                    >
-                      {item.name}
-                    </motion.span>
-                  )}
-                </AnimatePresence>
-              </Link>
-            )
-          })}
+              </AnimatePresence>
+            </Link>
+          )
+        })}
 
         {/* HR Section Divider */}
         <div
