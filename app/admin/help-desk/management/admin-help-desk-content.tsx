@@ -152,7 +152,10 @@ export function AdminHelpDeskContent({ initialTickets, employees, leadDirectory,
     }
   }, [tickets])
 
-  const managedDepartments = viewer.managed_departments || viewer.lead_departments || []
+  const managedDepartments =
+    (Array.isArray(viewer.managed_departments) && viewer.managed_departments.length > 0
+      ? viewer.managed_departments
+      : viewer.lead_departments) || []
   const canLeadDepartment = (department: string | null) =>
     Boolean(viewer.is_department_lead && department && managedDepartments.includes(department))
 

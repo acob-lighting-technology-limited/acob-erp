@@ -11,16 +11,37 @@ interface BreadcrumbNavProps {
   path: string
   onNavigate: (path: string) => void
   rootLabel?: string
+  rootPath?: string
+  rootClickable?: boolean
 }
 
-export function BreadcrumbNav({ path, onNavigate, rootLabel = "OneDrive" }: BreadcrumbNavProps) {
-  const parts = path.split("/").filter(Boolean)
+function normalizePath(path: string): string {
+  const normalized = `/${path || ""}`.replace(/\/+/g, "/")
+  return normalized.length > 1 && normalized.endsWith("/") ? normalized.slice(0, -1) : normalized
+}
+
+export function BreadcrumbNav({
+  path,
+  onNavigate,
+  rootLabel = "OneDrive",
+  rootPath = "/",
+  rootClickable = true,
+}: BreadcrumbNavProps) {
+  const normalizedRootPath = normalizePath(rootPath)
+  const normalizedPath = normalizePath(path)
+  const relativePath = normalizedPath.startsWith(normalizedRootPath)
+    ? normalizedPath.slice(normalizedRootPath.length)
+    : normalizedPath
+  const parts = relativePath.split("/").filter(Boolean)
 
   const breadcrumbs = [
-    { label: rootLabel, path: "/" },
+    { label: rootLabel, path: normalizedRootPath },
     ...parts.map((part, index) => ({
       label: part,
-      path: "/" + parts.slice(0, index + 1).join("/"),
+      path:
+        normalizedRootPath === "/"
+          ? `/${parts.slice(0, index + 1).join("/")}`
+          : `${normalizedRootPath}/${parts.slice(0, index + 1).join("/")}`,
     })),
   ]
 
@@ -31,6 +52,11 @@ export function BreadcrumbNav({ path, onNavigate, rootLabel = "OneDrive" }: Brea
           {index > 0 && <ChevronRight className="text-muted-foreground mx-1 h-4 w-4" />}
           {index === breadcrumbs.length - 1 ? (
             <span className="text-foreground flex items-center gap-1 font-medium">
+              {index === 0 && <Home className="h-4 w-4" />}
+              {crumb.label}
+            </span>
+          ) : index === 0 && !rootClickable ? (
+            <span className="text-muted-foreground flex items-center gap-1">
               {index === 0 && <Home className="h-4 w-4" />}
               {crumb.label}
             </span>

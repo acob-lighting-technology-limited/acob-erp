@@ -39,28 +39,13 @@ interface HelpDeskTicket {
   requester_department?: string | null
 }
 
-interface HelpDeskCategory {
-  id: string
-  service_department: string
-  request_type: "support" | "procurement"
-  code: string
-  name: string
-  description: string | null
-  support_mode: "open_queue" | "lead_review_required" | null
-}
-
 interface HelpDeskContentProps {
   userId: string
   userDepartment: string | null
+  canReviewPendingApprovals: boolean
   initialDepartments: string[]
   initialTickets: HelpDeskTicket[]
   initialError?: string | null
-}
-
-interface HelpDeskCategoriesResponse {
-  data?: HelpDeskCategory[]
-  departments?: string[]
-  error?: string
 }
 
 function buildFetchDebugLabel(source: string, status: number, payload: any) {
@@ -71,6 +56,7 @@ function buildFetchDebugLabel(source: string, status: number, payload: any) {
 export function HelpDeskContent({
   userId,
   userDepartment,
+  canReviewPendingApprovals,
   initialDepartments,
   initialTickets,
   initialError,
@@ -79,7 +65,6 @@ export function HelpDeskContent({
   const [isSaving, setIsSaving] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
   const [pendingApprovals, setPendingApprovals] = useState<HelpDeskTicket[]>([])
-  const [categories, setCategories] = useState<HelpDeskCategory[]>([])
   const [availableDepartments, setAvailableDepartments] = useState<string[]>(initialDepartments || [])
   const pendingRef = useRef<HTMLDivElement | null>(null)
   const [form, setForm] = useState({
@@ -88,7 +73,6 @@ export function HelpDeskContent({
     service_department: "IT and Communications",
     priority: "medium",
     request_type: "support",
-    category_id: "",
   })
 
   const myOpenTickets = useMemo(
@@ -105,16 +89,13 @@ export function HelpDeskContent({
 
   useEffect(() => {
     const loadSupportData = async () => {
-      const [pendingRes, categoriesRes] = await Promise.all([
-        fetch("/api/help-desk/tickets?scope=department&status=pending_approval", { cache: "no-store" }),
-        fetch("/api/help-desk/categories", { cache: "no-store" }),
-      ])
+      const pendingApprovalsPath = canReviewPendingApprovals
+        ? "/api/help-desk/tickets?scope=department&status=pending_approval"
+        : "/api/help-desk/tickets?scope=mine&status=pending_approval"
 
-      const [pendingJson, categoriesJson] = await Promise.all([
-        pendingRes.json().catch(() => ({})),
-        categoriesRes.json().catch(() => ({})),
-      ])
-      const categoriesPayload = categoriesJson as HelpDeskCategoriesResponse
+      const pendingRes = await fetch(pendingApprovalsPath, { cache: "no-store" })
+
+      const pendingJson = await pendingRes.json().catch(() => ({}))
 
       if (pendingRes.ok) {
         setPendingApprovals(pendingJson.data || [])
@@ -122,35 +103,17 @@ export function HelpDeskContent({
         setPendingApprovals([])
         toast.error(buildFetchDebugLabel("Pending approvals load", pendingRes.status, pendingJson))
       }
-
-      if (categoriesRes.ok) {
-        setCategories(categoriesPayload.data || [])
-        setAvailableDepartments((prev) => {
-          const merged = [...prev, ...(categoriesPayload.departments || [])]
-          return Array.from(new Set(merged.map((item) => String(item || "").trim()).filter(Boolean)))
-        })
-        if (!Array.isArray(categoriesPayload.data) || categoriesPayload.data.length === 0) {
-          toast.error("Help desk categories are not configured yet. Department options are limited for now.")
-        }
-      } else {
-        setCategories([])
-        toast.error(buildFetchDebugLabel("Help desk categories load", categoriesRes.status, categoriesJson))
-      }
     }
 
     loadSupportData().catch((error) => {
       setPendingApprovals([])
-      setCategories([])
       toast.error(`Failed to load help desk setup data: ${error instanceof Error ? error.message : "Unknown error"}`)
     })
-  }, [])
+  }, [canReviewPendingApprovals])
 
   const departmentOptions = useMemo(() => {
     const options = new Set<string>()
     options.add(form.service_department)
-    for (const category of categories) {
-      if (category.service_department) options.add(category.service_department)
-    }
     for (const department of availableDepartments) {
       if (department) options.add(department)
     }
@@ -158,39 +121,14 @@ export function HelpDeskContent({
       if (ticket.service_department) options.add(ticket.service_department)
     }
     return Array.from(options).filter((department) => Boolean(department))
-  }, [availableDepartments, categories, form.service_department, tickets])
-
-  const filteredCategories = useMemo(
-    () =>
-      categories.filter(
-        (category) =>
-          category.service_department === form.service_department &&
-          category.request_type === form.request_type &&
-          category.service_department !== (userDepartment || "")
-      ),
-    [categories, form.request_type, form.service_department, userDepartment]
-  )
-
-  const selectedCategory = useMemo(
-    () => filteredCategories.find((category) => category.id === form.category_id) || null,
-    [filteredCategories, form.category_id]
-  )
+  }, [availableDepartments, form.service_department, tickets])
 
   useEffect(() => {
     if (form.service_department && userDepartment && form.service_department === userDepartment) {
       const fallbackDepartment = departmentOptions.find((department) => department !== userDepartment) || ""
-      setForm((prev) => ({ ...prev, service_department: fallbackDepartment, category_id: "" }))
-      return
+      setForm((prev) => ({ ...prev, service_department: fallbackDepartment }))
     }
-
-    if (filteredCategories.length === 0) {
-      setForm((prev) => ({ ...prev, category_id: "" }))
-      return
-    }
-    if (!filteredCategories.some((category) => category.id === form.category_id)) {
-      setForm((prev) => ({ ...prev, category_id: filteredCategories[0]?.id || "" }))
-    }
-  }, [departmentOptions, filteredCategories, form.category_id, form.service_department, userDepartment])
+  }, [departmentOptions, form.service_department, userDepartment])
 
   async function refreshTickets() {
     const res = await fetch("/api/help-desk/tickets?scope=mine", { cache: "no-store" })
@@ -235,7 +173,6 @@ export function HelpDeskContent({
         service_department: "IT and Communications",
         priority: "medium",
         request_type: "support",
-        category_id: "",
       })
       await refreshTickets()
     } catch (error: any) {
@@ -335,9 +272,7 @@ export function HelpDeskContent({
                     <Label>Department</Label>
                     <Select
                       value={form.service_department}
-                      onValueChange={(value) =>
-                        setForm((prev) => ({ ...prev, service_department: value, category_id: "" }))
-                      }
+                      onValueChange={(value) => setForm((prev) => ({ ...prev, service_department: value }))}
                     >
                       <SelectTrigger>
                         <SelectValue />
@@ -376,7 +311,7 @@ export function HelpDeskContent({
                     <Label>Type</Label>
                     <Select
                       value={form.request_type}
-                      onValueChange={(value) => setForm((prev) => ({ ...prev, request_type: value, category_id: "" }))}
+                      onValueChange={(value) => setForm((prev) => ({ ...prev, request_type: value }))}
                     >
                       <SelectTrigger>
                         <SelectValue />
@@ -386,39 +321,6 @@ export function HelpDeskContent({
                         <SelectItem value="procurement">Procurement</SelectItem>
                       </SelectContent>
                     </Select>
-                  </div>
-                  <div className="space-y-2 md:col-span-2">
-                    <Label>Category</Label>
-                    <Select
-                      value={form.category_id}
-                      onValueChange={(value) => setForm((prev) => ({ ...prev, category_id: value }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {filteredCategories.map((category) => (
-                          <SelectItem key={category.id} value={category.id}>
-                            {category.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {filteredCategories.length === 0 && form.request_type === "support" && (
-                      <p className="text-muted-foreground text-xs">
-                        No support categories configured for this department yet. Ticket will use General Support.
-                      </p>
-                    )}
-                    {selectedCategory?.description && (
-                      <p className="text-muted-foreground text-xs">{selectedCategory.description}</p>
-                    )}
-                    {form.request_type === "support" && selectedCategory?.support_mode && (
-                      <p className="text-muted-foreground text-xs">
-                        {selectedCategory.support_mode === "lead_review_required"
-                          ? "This category goes to the service department lead first."
-                          : "This category goes straight to the department queue."}
-                      </p>
-                    )}
                   </div>
                   <div className="md:col-span-2">
                     <Button type="submit" disabled={isSaving}>

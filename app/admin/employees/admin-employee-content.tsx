@@ -571,12 +571,40 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
       }
 
       const isLead = editForm.is_department_lead
+      let resolvedDepartmentId: string | null = null
+
+      if (isLead) {
+        const { data: departmentRow, error: departmentLookupError } = await supabase
+          .from("departments")
+          .select("id")
+          .eq("name", editForm.department)
+          .maybeSingle()
+
+        if (departmentLookupError) throw departmentLookupError
+
+        if (!departmentRow?.id) {
+          toast.error("Selected department was not found")
+          setIsSaving(false)
+          return
+        }
+
+        resolvedDepartmentId = departmentRow.id
+
+        // Demote previous lead and promote this user atomically in DB logic.
+        const { error: assignLeadError } = await supabase.rpc("assign_department_lead", {
+          p_department_id: resolvedDepartmentId,
+          p_new_lead_id: selectedEmployee.id,
+        })
+
+        if (assignLeadError) throw assignLeadError
+      }
 
       // Build update object with all fields
       const updateData: any = {
         role: editForm.role,
         admin_domains: editForm.role === "admin" ? editForm.admin_domains : null,
         department: editForm.department,
+        ...(resolvedDepartmentId ? { department_id: resolvedDepartmentId } : {}),
         office_location: editForm.office_location || null,
         company_role: editForm.company_role || null,
         is_department_lead: isLead,

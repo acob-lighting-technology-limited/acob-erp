@@ -31,7 +31,8 @@ export default async function WeeklyReportsPage() {
   return (
     <WeeklyReportsContent
       initialDepartments={departments}
-      scopedDepartments={scope.managedDepartments || []}
+      scopedDepartments={[]}
+      editableDepartments={scope.isAdminLike ? [] : scope.managedDepartments || []}
       currentUser={{
         id: user.id,
         role: scope.role,

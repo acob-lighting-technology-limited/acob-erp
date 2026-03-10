@@ -6,6 +6,13 @@ import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 
 export const dynamic = "force-dynamic"
 
+function isFinanceDepartment(value: string | null | undefined): boolean {
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase()
+  return normalized === "finance" || normalized === "accounts"
+}
+
 // Helper function to create Supabase client
 function createClient() {
   const cookieStore = cookies()
@@ -78,6 +85,10 @@ export async function GET(request: Request) {
         query = query.eq("department_id", departmentId)
       }
     } else {
+      if (!isFinanceDepartment((profile as any)?.department)) {
+        return NextResponse.json({ error: "Forbidden: finance access required" }, { status: 403 })
+      }
+
       const deptId = (profile as any)?.department_id || null
       if (deptId) {
         query = query.eq("department_id", deptId)
@@ -199,6 +210,10 @@ export async function POST(request: Request) {
         }
       }
     } else {
+      if (!isFinanceDepartment((profile as any)?.department)) {
+        return NextResponse.json({ error: "Forbidden: finance access required" }, { status: 403 })
+      }
+
       let userDepartmentId = (profile as any)?.department_id || null
       if (!userDepartmentId) {
         const rawDept = String((profile as any)?.department || "").trim()

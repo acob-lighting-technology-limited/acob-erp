@@ -51,6 +51,13 @@ async function getAdminNotificationsData() {
       ).data || []
     : null
   const scopedUserIds = profileIdsInScope ? profileIdsInScope.map((p: any) => p.id) : []
+  const departmentIdsInScope = departmentScope
+    ? (departmentScope.length > 0
+        ? await dataClient.from("departments").select("id").in("name", departmentScope)
+        : ({ data: [] as { id: string }[] } as any)
+      ).data || []
+    : null
+  const scopedDepartmentIds = departmentIdsInScope ? departmentIdsInScope.map((d: any) => d.id) : []
 
   const notificationList: DynamicNotification[] = []
   const now = new Date()
@@ -59,10 +66,17 @@ async function getAdminNotificationsData() {
 
   // Pending user approvals
   try {
-    const { count: pendingUsersCount } = await dataClient
+    let pendingUsersQuery = dataClient
       .from("pending_users")
       .select("*", { count: "exact", head: true })
       .eq("status", "pending")
+    if (departmentScope) {
+      pendingUsersQuery =
+        departmentScope.length > 0
+          ? pendingUsersQuery.in("department", departmentScope)
+          : pendingUsersQuery.eq("id", "__none__")
+    }
+    const { count: pendingUsersCount } = await pendingUsersQuery
 
     if (pendingUsersCount && pendingUsersCount > 0) {
       notificationList.push({
@@ -171,11 +185,18 @@ async function getAdminNotificationsData() {
 
   // Overdue payments
   try {
-    const { data: overduePayments } = await dataClient
+    let overduePaymentsQuery = dataClient
       .from("department_payments")
       .select("id")
       .lt("next_payment_due", now.toISOString())
       .eq("status", "due")
+    if (departmentScope) {
+      overduePaymentsQuery =
+        scopedDepartmentIds.length > 0
+          ? overduePaymentsQuery.in("department_id", scopedDepartmentIds)
+          : overduePaymentsQuery.eq("id", "__none__")
+    }
+    const { data: overduePayments } = await overduePaymentsQuery
 
     if (overduePayments && overduePayments.length > 0) {
       notificationList.push({
@@ -197,12 +218,19 @@ async function getAdminNotificationsData() {
   try {
     const sevenDaysFromNow = new Date()
     sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7)
-    const { data: dueSoonPayments } = await dataClient
+    let dueSoonPaymentsQuery = dataClient
       .from("department_payments")
       .select("id")
       .gte("next_payment_due", now.toISOString())
       .lte("next_payment_due", sevenDaysFromNow.toISOString())
       .eq("status", "due")
+    if (departmentScope) {
+      dueSoonPaymentsQuery =
+        scopedDepartmentIds.length > 0
+          ? dueSoonPaymentsQuery.in("department_id", scopedDepartmentIds)
+          : dueSoonPaymentsQuery.eq("id", "__none__")
+    }
+    const { data: dueSoonPayments } = await dueSoonPaymentsQuery
 
     if (dueSoonPayments && dueSoonPayments.length > 0) {
       notificationList.push({
@@ -252,10 +280,17 @@ async function getAdminNotificationsData() {
 
   // Unresolved asset issues
   try {
-    const { count: assetIssuesCount } = await dataClient
+    let assetIssuesQuery = dataClient
       .from("asset_issues")
       .select("*", { count: "exact", head: true })
       .in("status", ["open", "in_progress"])
+    if (departmentScope) {
+      assetIssuesQuery =
+        scopedUserIds.length > 0
+          ? assetIssuesQuery.in("created_by", scopedUserIds)
+          : assetIssuesQuery.eq("id", "__none__")
+    }
+    const { count: assetIssuesCount } = await assetIssuesQuery
 
     if (assetIssuesCount && assetIssuesCount > 0) {
       notificationList.push({

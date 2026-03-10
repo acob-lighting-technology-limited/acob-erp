@@ -2,6 +2,7 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { PaymentsTable } from "@/components/payments/payments-table"
+import { isAdminLikeRole } from "@/lib/admin/rbac"
 
 interface Payment {
   id: string
@@ -60,12 +61,29 @@ async function getPaymentsData() {
   // Fetch user profile with department info
   const { data: profile } = await dataClient
     .from("profiles")
-    .select("department, department_id")
+    .select("department, department_id, role, lead_departments")
     .eq("id", user.id)
     .single()
 
   let currentUserDepartmentId: string | null = null
-  let isAdmin = false
+
+  const isFinanceDepartment = (value: string | null | undefined): boolean => {
+    const normalized = String(value || "")
+      .trim()
+      .toLowerCase()
+    return normalized === "finance" || normalized === "accounts"
+  }
+
+  const canAccessPayments =
+    isAdminLikeRole((profile as any)?.role) ||
+    isFinanceDepartment((profile as any)?.department) ||
+    (Array.isArray((profile as any)?.lead_departments)
+      ? (profile as any).lead_departments.some((dept: string) => isFinanceDepartment(dept))
+      : false)
+
+  if (!canAccessPayments) {
+    return { redirect: "/profile" as const }
+  }
 
   const resolveDepartmentCandidates = (department: string | null | undefined): string[] => {
     const raw = String(department || "").trim()
@@ -105,9 +123,9 @@ async function getPaymentsData() {
     .order("created_at", { ascending: false })
 
   // Always filter by user's department on the user-facing page
-  if (currentUserDepartmentId) {
-    paymentsQuery = paymentsQuery.eq("department_id", currentUserDepartmentId)
-  }
+  paymentsQuery = currentUserDepartmentId
+    ? paymentsQuery.eq("department_id", currentUserDepartmentId)
+    : paymentsQuery.eq("department_id", "__none__")
 
   const { data: payments, error: paymentsError } = await paymentsQuery
   let loadError: string | null = null
@@ -134,7 +152,7 @@ async function getPaymentsData() {
     currentUser: {
       id: user.id,
       department_id: currentUserDepartmentId,
-      isAdmin: false, // User-facing page - hides admin controls
+      isAdmin: false,
     },
   }
 }

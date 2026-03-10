@@ -48,7 +48,7 @@ export async function getAdminDocumentationData() {
         documentation: [],
         employee: [],
         userProfile,
-        departmentDocs: { initialPath: "/Projects", rootLabel: "Projects", enabled: false },
+        departmentDocs: { initialPath: "/Projects", rootLabel: "Projects", enabled: false, lockToInitialPath: false },
       }
     }
   }
@@ -61,7 +61,7 @@ export async function getAdminDocumentationData() {
       documentation: [],
       employee: [],
       userProfile,
-      departmentDocs: { initialPath: "/Projects", rootLabel: "Projects", enabled: false },
+      departmentDocs: { initialPath: "/Projects", rootLabel: "Projects", enabled: false, lockToInitialPath: false },
     }
   }
 
@@ -104,11 +104,13 @@ export async function getAdminDocumentationData() {
           initialPath: oneDriveScope.defaultPath,
           rootLabel: oneDriveScope.rootLabel,
           enabled: true,
+          lockToInitialPath: !oneDriveScope.isAdminLike,
         }
       : {
           initialPath: "/Projects",
           rootLabel: "Projects",
           enabled: false,
+          lockToInitialPath: false,
         },
   }
 }

@@ -72,6 +72,7 @@ interface TrackerStatus {
 interface WeeklyReportsContentProps {
   initialDepartments: string[]
   scopedDepartments?: string[]
+  editableDepartments?: string[]
   currentUser: {
     id: string
     role: string
@@ -85,6 +86,7 @@ interface WeeklyReportsContentProps {
 export function WeeklyReportsContent({
   initialDepartments,
   scopedDepartments = [],
+  editableDepartments = [],
   currentUser,
 }: WeeklyReportsContentProps) {
   const currentOfficeWeek = getCurrentOfficeWeek()
@@ -120,13 +122,13 @@ export function WeeklyReportsContent({
       Array.isArray(currentUser.admin_domains) &&
       currentUser.admin_domains.includes("reports"))
 
-  const managedDepartments = [currentUser.department, ...(currentUser.lead_departments || [])].filter(
-    Boolean
-  ) as string[]
+  const managedDepartments =
+    editableDepartments.length > 0
+      ? editableDepartments
+      : ([currentUser.department, ...(currentUser.lead_departments || [])].filter(Boolean) as string[])
 
   const canMutateReport = (report: WeeklyReport) => {
     if (isGlobalReportsEditor) return true
-    if (report.user_id === currentUser.id) return true
     return managedDepartments.includes(report.department)
   }
 
@@ -146,10 +148,6 @@ export function WeeklyReportsContent({
       if (deptFilter !== "all") {
         query = query.eq("department", deptFilter)
       }
-      if (scopedDepartments.length > 0) {
-        query = query.in("department", scopedDepartments)
-      }
-
       const { data, error } = await query
       if (error) throw error
 
@@ -162,7 +160,7 @@ export function WeeklyReportsContent({
         .select("id, department, status")
         .eq("week_number", weekFilter)
         .eq("year", yearFilter)
-        .in("department", scopedDepartments.length > 0 ? scopedDepartments : initialDepartments)
+        .in("department", initialDepartments)
 
       if (!actionsError) {
         setTrackingData(actions || [])

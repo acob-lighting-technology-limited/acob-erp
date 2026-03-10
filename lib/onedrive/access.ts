@@ -62,7 +62,7 @@ export async function resolveOneDriveAccessScope(
     managedDepartments,
     allowedPrefixes,
     defaultPath: normalizePath(`/Projects/${defaultDepartment}`),
-    rootLabel: managedDepartments.length === 1 ? defaultDepartment : "Projects",
+    rootLabel: "Projects",
   }
 }
 
@@ -70,6 +70,5 @@ export function isPathAllowed(path: string, scope: OneDriveAccessScope): boolean
   const normalizedPath = normalizePath(path)
   if (!normalizedPath.startsWith("/Projects")) return false
   if (scope.isAdminLike) return true
-  if (normalizedPath === "/Projects") return true
   return scope.allowedPrefixes.some((prefix) => normalizedPath === prefix || normalizedPath.startsWith(`${prefix}/`))
 }

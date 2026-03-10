@@ -31,16 +31,38 @@ import { getFileCategory } from "@/lib/onedrive"
 interface DepartmentDocumentsBrowserProps {
   initialPath?: string
   rootLabel?: string
+  lockToInitialPath?: boolean
 }
 
 export function DepartmentDocumentsBrowser({
   initialPath = "/Projects",
   rootLabel = "Projects",
+  lockToInitialPath = false,
 }: DepartmentDocumentsBrowserProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  const pathFromUrl = searchParams.get("path") || initialPath
+  const normalizePath = (path: string) => {
+    const normalized = `/${path || ""}`.replace(/\/+/g, "/")
+    return normalized.length > 1 && normalized.endsWith("/") ? normalized.slice(0, -1) : normalized
+  }
+  const normalizedInitialPath = normalizePath(initialPath)
+
+  const clampPath = useCallback(
+    (path: string) => {
+      const normalized = normalizePath(path)
+      if (lockToInitialPath) {
+        if (normalized === normalizedInitialPath || normalized.startsWith(`${normalizedInitialPath}/`)) {
+          return normalized
+        }
+        return normalizedInitialPath
+      }
+      return normalized
+    },
+    [lockToInitialPath, normalizedInitialPath]
+  )
+
+  const pathFromUrl = clampPath(searchParams.get("path") || initialPath)
   const [currentPath, setCurrentPath] = useState(pathFromUrl)
   const [files, setFiles] = useState<FileItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -88,7 +110,7 @@ export function DepartmentDocumentsBrowser({
   }, [currentPath, router, searchParams])
 
   const navigateToFolder = (path: string) => {
-    setCurrentPath(path)
+    setCurrentPath(clampPath(path))
     setSearchQuery("")
   }
 
@@ -358,7 +380,13 @@ export function DepartmentDocumentsBrowser({
           </div>
 
           <div className="mb-4 border-b pb-4">
-            <BreadcrumbNav path={currentPath} onNavigate={navigateToFolder} rootLabel={rootLabel} />
+            <BreadcrumbNav
+              path={currentPath}
+              onNavigate={navigateToFolder}
+              rootLabel={rootLabel}
+              rootPath="/Projects"
+              rootClickable={!lockToInitialPath}
+            />
           </div>
 
           {loading ? (

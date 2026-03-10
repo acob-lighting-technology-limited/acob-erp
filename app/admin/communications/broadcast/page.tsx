@@ -2,6 +2,7 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { CommunicationsComposer } from "@/app/admin/communications/_components/communications-composer"
 import { applyAssignableStatusFilter } from "@/lib/workforce/assignment-policy"
+import { resolveAdminScope } from "@/lib/admin/rbac"
 
 export default async function CommunicationsBroadcastPage() {
   const supabase = await createClient()
@@ -21,8 +22,9 @@ export default async function CommunicationsBroadcastPage() {
     .eq("id", user.id)
     .single()
 
-  if (!profile || !["developer", "super_admin", "admin"].includes(profile.role)) {
-    redirect("/dashboard")
+  const scope = await resolveAdminScope(supabase as any, user.id)
+  if (!profile || !scope) {
+    redirect("/admin")
   }
 
   const { data: employees } = await applyAssignableStatusFilter(
