@@ -351,14 +351,14 @@ export function NotificationContent({ initialNotifications, userId }: Notificati
                       <div
                         key={notification.id}
                         className={cn(
-                          "group hover:bg-muted/30 relative cursor-pointer p-6 transition-all",
+                          "group hover:bg-muted/30 relative cursor-pointer px-4 py-3 transition-all",
                           !notification.read && "bg-blue-50/30 dark:bg-blue-950/10"
                         )}
                         onClick={() => handleNotificationClick(notification)}
                       >
-                        <div className="flex gap-4">
+                        <div className="flex gap-3">
                           {notification.actor_avatar || notification.actor_name ? (
-                            <Avatar className="h-12 w-12 shrink-0">
+                            <Avatar className="h-9 w-9 shrink-0">
                               {notification.actor_avatar && (
                                 <AvatarImage src={notification.actor_avatar} alt={notification.actor_name} />
                               )}
@@ -369,29 +369,31 @@ export function NotificationContent({ initialNotifications, userId }: Notificati
                           ) : (
                             <div
                               className={cn(
-                                "bg-muted flex h-12 w-12 shrink-0 items-center justify-center rounded-full",
+                                "bg-muted flex h-9 w-9 shrink-0 items-center justify-center rounded-full",
                                 priorityColors[notification.priority as keyof typeof priorityColors]
                               )}
                             >
-                              <Icon className="h-6 w-6" />
+                              <Icon className="h-4 w-4" />
                             </div>
                           )}
 
                           <div className="min-w-0 flex-1">
-                            <div className="flex items-start justify-between gap-4">
+                            <div className="flex items-start justify-between gap-3">
                               <div className="flex-1">
-                                <h3 className={cn("text-base leading-snug", !notification.read && "font-semibold")}>
+                                <h3 className={cn("text-sm leading-tight", !notification.read && "font-semibold")}>
                                   {notification.title}
                                 </h3>
-                                <p className="text-muted-foreground mt-1 text-sm">{notification.message}</p>
+                                <p className="text-muted-foreground mt-0.5 line-clamp-2 text-xs leading-snug">
+                                  {notification.message}
+                                </p>
 
-                                <div className="mt-2 flex items-center gap-4">
+                                <div className="mt-1.5 flex items-center gap-2.5">
                                   <span className="text-muted-foreground text-xs">
                                     {formatRelativeTime(notification.created_at)}
                                   </span>
                                   {notification.actor_name && (
                                     <>
-                                      <span className="text-muted-foreground">•</span>
+                                      <span className="text-muted-foreground">|</span>
                                       <span className="text-muted-foreground text-xs">
                                         by {notification.actor_name}
                                       </span>
@@ -403,20 +405,21 @@ export function NotificationContent({ initialNotifications, userId }: Notificati
                                 </div>
 
                                 {notification.action_url && (
-                                  <div className="text-primary mt-2 flex items-center gap-1 text-sm font-medium">
+                                  <div className="text-primary mt-1 flex items-center gap-1 text-xs font-medium">
                                     View details
-                                    <ChevronRight className="h-4 w-4" />
+                                    <ChevronRight className="h-3 w-3" />
                                   </div>
                                 )}
                               </div>
                             </div>
 
                             {/* Actions */}
-                            <div className="mt-3 flex items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+                            <div className="mt-1.5 flex items-center gap-1.5 opacity-0 transition-opacity group-hover:opacity-100">
                               {!notification.read && (
                                 <Button
                                   variant="ghost"
                                   size="sm"
+                                  className="h-7 px-2 text-xs"
                                   onClick={(e) => {
                                     e.stopPropagation()
                                     markAsRead(notification.id)
@@ -430,7 +433,7 @@ export function NotificationContent({ initialNotifications, userId }: Notificati
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                className="text-destructive hover:text-destructive hover:bg-destructive/10 h-7 px-2 text-xs"
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   deleteNotification(notification.id)

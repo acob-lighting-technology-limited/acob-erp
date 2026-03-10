@@ -8,16 +8,17 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Badge } from "@/components/ui/badge"
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import { MyTicketsTable } from "@/components/dashboard/help-desk/my-tickets-table"
+import { PriorityBadge, TicketStatusBadge } from "@/components/dashboard/help-desk/ticket-badges"
 import { PageHeader, PageWrapper } from "@/components/layout"
 import { Headset, Plus } from "lucide-react"
 
@@ -39,6 +40,40 @@ interface HelpDeskTicket {
   requester_department?: string | null
 }
 
+interface HelpDeskTicketDetailResponse {
+  ticket: HelpDeskTicket & {
+    description?: string | null
+    category?: string | null
+    category_id?: string | null
+    created_by?: string | null
+    updated_at?: string | null
+    closed_at?: string | null
+    csat_feedback?: string | null
+  }
+  comments: Array<{
+    id: string
+    body?: string | null
+    comment?: string | null
+    created_at?: string | null
+    actor_id?: string | null
+  }>
+  approvals: Array<{
+    id: string
+    approval_stage?: string | null
+    status?: string | null
+    decision_notes?: string | null
+    requested_at?: string | null
+    decided_at?: string | null
+  }>
+  events: Array<{
+    id: string
+    event_type?: string | null
+    old_status?: string | null
+    new_status?: string | null
+    created_at?: string | null
+  }>
+}
+
 interface HelpDeskContentProps {
   userId: string
   userDepartment: string | null
@@ -53,6 +88,22 @@ function buildFetchDebugLabel(source: string, status: number, payload: any) {
   return `${source} failed (${status}): ${detail}`
 }
 
+const TICKET_STATUS_OPTIONS = [
+  "new",
+  "pending_lead_review",
+  "department_queue",
+  "department_assigned",
+  "assigned",
+  "in_progress",
+  "pending_approval",
+  "approved_for_procurement",
+  "rejected",
+  "returned",
+  "resolved",
+  "closed",
+  "cancelled",
+] as const
+
 export function HelpDeskContent({
   userId,
   userDepartment,
@@ -66,6 +117,12 @@ export function HelpDeskContent({
   const [createOpen, setCreateOpen] = useState(false)
   const [pendingApprovals, setPendingApprovals] = useState<HelpDeskTicket[]>([])
   const [availableDepartments, setAvailableDepartments] = useState<string[]>(initialDepartments || [])
+  const [viewTicketId, setViewTicketId] = useState<string | null>(null)
+  const [viewTicketOpen, setViewTicketOpen] = useState(false)
+  const [viewTicketLoading, setViewTicketLoading] = useState(false)
+  const [viewTicketSaving, setViewTicketSaving] = useState(false)
+  const [viewTicketData, setViewTicketData] = useState<HelpDeskTicketDetailResponse | null>(null)
+  const [viewTicketStatus, setViewTicketStatus] = useState<string>("")
   const pendingRef = useRef<HTMLDivElement | null>(null)
   const [form, setForm] = useState({
     title: "",
@@ -219,6 +276,56 @@ export function HelpDeskContent({
       await refreshTickets()
     } catch (error: any) {
       toast.error(error.message || "Failed to submit rating")
+    }
+  }
+
+  async function openTicketDetails(ticketId: string) {
+    setViewTicketId(ticketId)
+    setViewTicketOpen(true)
+    setViewTicketLoading(true)
+
+    try {
+      const res = await fetch(`/api/help-desk/tickets/${ticketId}`, { cache: "no-store" })
+      const json = await res.json()
+
+      if (!res.ok) {
+        throw new Error(json?.error || "Failed to load ticket details")
+      }
+
+      setViewTicketData(json.data || null)
+      setViewTicketStatus(json.data?.ticket?.status || "")
+    } catch (error: any) {
+      toast.error(error.message || "Failed to load ticket details")
+      setViewTicketData(null)
+      setViewTicketStatus("")
+    } finally {
+      setViewTicketLoading(false)
+    }
+  }
+
+  async function saveTicketStatusFromModal() {
+    if (!viewTicketId || !viewTicketStatus) return
+
+    setViewTicketSaving(true)
+    try {
+      const res = await fetch(`/api/help-desk/tickets/${viewTicketId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: viewTicketStatus }),
+      })
+      const json = await res.json().catch(() => ({}))
+
+      if (!res.ok) {
+        throw new Error(json?.error || "Failed to update ticket")
+      }
+
+      toast.success("Ticket status updated")
+      await refreshTickets()
+      await openTicketDetails(viewTicketId)
+    } catch (error: any) {
+      toast.error(error.message || "Failed to update ticket")
+    } finally {
+      setViewTicketSaving(false)
     }
   }
 
@@ -380,7 +487,7 @@ export function HelpDeskContent({
                   <p className="font-medium">{ticket.ticket_number}</p>
                   <p className="text-muted-foreground text-xs">{ticket.title}</p>
                 </div>
-                <Badge variant="secondary">{ticket.status}</Badge>
+                <TicketStatusBadge status={ticket.status} />
               </div>
             ))}
           </CardContent>
@@ -392,67 +499,127 @@ export function HelpDeskContent({
           <CardTitle>My Tickets</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="w-full overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Ticket</TableHead>
-                  <TableHead>Department</TableHead>
-                  <TableHead>Priority</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {tickets.map((ticket) => (
-                  <TableRow key={ticket.id}>
-                    <TableCell>
-                      <div className="font-medium">{ticket.ticket_number}</div>
-                      <div className="text-muted-foreground text-xs">{ticket.title}</div>
-                    </TableCell>
-                    <TableCell>{ticket.service_department}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{ticket.priority}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge>{ticket.status}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex min-w-[180px] flex-wrap gap-2">
-                        {ticket.assigned_to === userId && ticket.status === "assigned" && (
-                          <Button size="sm" variant="outline" onClick={() => setStatus(ticket.id, "in_progress")}>
-                            Start
-                          </Button>
-                        )}
-                        {ticket.assigned_to === userId && ticket.status === "in_progress" && (
-                          <Button size="sm" variant="outline" onClick={() => setStatus(ticket.id, "resolved")}>
-                            Resolve
-                          </Button>
-                        )}
-                        {ticket.requester_id === userId && ticket.status === "resolved" && (
-                          <div className="flex gap-1">
-                            {[1, 2, 3, 4, 5].map((r) => (
-                              <Button
-                                key={r}
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => rateTicket(ticket.id, r)}
-                                title={`Rate ${r}`}
-                              >
-                                {r}
-                              </Button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+          <MyTicketsTable
+            tickets={tickets}
+            userId={userId}
+            onSetStatus={setStatus}
+            onRateTicket={rateTicket}
+            onViewTicket={openTicketDetails}
+          />
         </CardContent>
       </Card>
+
+      <Dialog open={viewTicketOpen} onOpenChange={setViewTicketOpen}>
+        <DialogContent className="max-h-[90vh] w-[95vw] max-w-3xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Ticket Details</DialogTitle>
+            <DialogDescription>View full ticket information and update status.</DialogDescription>
+          </DialogHeader>
+
+          {viewTicketLoading ? (
+            <p className="text-muted-foreground text-sm">Loading ticket details...</p>
+          ) : viewTicketData?.ticket ? (
+            <div className="space-y-5">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-1">
+                  <p className="text-muted-foreground text-xs uppercase">Ticket Number</p>
+                  <p className="font-medium">{viewTicketData.ticket.ticket_number}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-muted-foreground text-xs uppercase">Department</p>
+                  <p className="font-medium">{viewTicketData.ticket.service_department}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-muted-foreground text-xs uppercase">Priority</p>
+                  <PriorityBadge priority={viewTicketData.ticket.priority} />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-muted-foreground text-xs uppercase">Status</p>
+                  <TicketStatusBadge status={viewTicketData.ticket.status} />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-muted-foreground text-xs uppercase">Title</p>
+                <p className="font-medium">{viewTicketData.ticket.title || "-"}</p>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-muted-foreground text-xs uppercase">Description</p>
+                <p className="text-sm whitespace-pre-wrap">{viewTicketData.ticket.description || "-"}</p>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Status</Label>
+                  <Select value={viewTicketStatus} onValueChange={setViewTicketStatus}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TICKET_STATUS_OPTIONS.map((status) => (
+                        <SelectItem key={status} value={status}>
+                          {status.replaceAll("_", " ")}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-muted-foreground text-xs uppercase">Created</p>
+                  <p className="text-sm">
+                    {viewTicketData.ticket.created_at
+                      ? new Date(viewTicketData.ticket.created_at).toLocaleString()
+                      : "-"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-muted-foreground text-xs uppercase">Recent Activity</p>
+                <div className="max-h-44 space-y-2 overflow-y-auto rounded border p-3">
+                  {(viewTicketData.events || []).length === 0 ? (
+                    <p className="text-muted-foreground text-sm">No events yet.</p>
+                  ) : (
+                    viewTicketData.events
+                      .slice(-8)
+                      .reverse()
+                      .map((event) => (
+                        <div key={event.id} className="text-sm">
+                          <p className="font-medium">{event.event_type?.replaceAll("_", " ") || "event"}</p>
+                          <p className="text-muted-foreground text-xs">
+                            {(event.old_status || "-").replaceAll("_", " ")} to{" "}
+                            {(event.new_status || "-").replaceAll("_", " ")} at{" "}
+                            {event.created_at ? new Date(event.created_at).toLocaleString() : "-"}
+                          </p>
+                        </div>
+                      ))
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <p className="text-muted-foreground text-sm">Ticket details could not be loaded.</p>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setViewTicketOpen(false)}>
+              Close
+            </Button>
+            <Button
+              onClick={saveTicketStatusFromModal}
+              disabled={
+                !viewTicketData?.ticket ||
+                !viewTicketStatus ||
+                viewTicketStatus === viewTicketData.ticket.status ||
+                viewTicketSaving
+              }
+            >
+              {viewTicketSaving ? "Saving..." : "Update Status"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </PageWrapper>
   )
 }

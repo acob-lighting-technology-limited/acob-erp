@@ -2,7 +2,6 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { PaymentsTable } from "@/components/payments/payments-table"
-import { isAdminLikeRole } from "@/lib/admin/rbac"
 
 interface Payment {
   id: string
@@ -66,24 +65,6 @@ async function getPaymentsData() {
     .single()
 
   let currentUserDepartmentId: string | null = null
-
-  const isFinanceDepartment = (value: string | null | undefined): boolean => {
-    const normalized = String(value || "")
-      .trim()
-      .toLowerCase()
-    return normalized === "finance" || normalized === "accounts"
-  }
-
-  const canAccessPayments =
-    isAdminLikeRole((profile as any)?.role) ||
-    isFinanceDepartment((profile as any)?.department) ||
-    (Array.isArray((profile as any)?.lead_departments)
-      ? (profile as any).lead_departments.some((dept: string) => isFinanceDepartment(dept))
-      : false)
-
-  if (!canAccessPayments) {
-    return { redirect: "/profile" as const }
-  }
 
   const resolveDepartmentCandidates = (department: string | null | undefined): string[] => {
     const raw = String(department || "").trim()

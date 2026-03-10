@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import {
   areRequiredDocumentsVerified,
   assertNoOverlap,
@@ -297,6 +298,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
+    const validationClient = getServiceRoleClientOrFallback(supabase)
     const {
       data: { user },
     } = await supabase.auth.getUser()
@@ -375,10 +377,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "You cannot assign yourself as reliever" }, { status: 400 })
     }
 
-    await assertNoOverlap(supabase, user.id, start_date, endDate)
-    await assertNoDepartmentOverlap(supabase, user.id, requester.department_id, start_date, endDate)
-    await assertRequesterNotBlockedByRelieverCommitment(supabase, user.id, start_date, endDate)
-    await assertRelieverAvailability(supabase, reliever.id, start_date, endDate)
+    await assertNoOverlap(validationClient, user.id, start_date, endDate)
+    await assertNoDepartmentOverlap(validationClient, user.id, requester.department_id, start_date, endDate)
+    await assertRequesterNotBlockedByRelieverCommitment(validationClient, user.id, start_date, endDate)
+    await assertRelieverAvailability(validationClient, reliever.id, start_date, endDate)
 
     const { data: balance } = await supabase
       .from("leave_balances")
@@ -408,18 +410,21 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const todayIsoDate = new Date().toISOString().slice(0, 10)
     const { data: activeApprovedRequest } = await supabase
       .from("leave_requests")
-      .select("id, end_date")
+      .select("id, start_date, end_date")
       .eq("user_id", user.id)
       .eq("status", "approved")
-      .gte("end_date", todayIsoDate)
+      .lte("start_date", endDate)
+      .gte("end_date", start_date)
       .limit(1)
 
     if (activeApprovedRequest && activeApprovedRequest.length > 0) {
+      const activeRange = activeApprovedRequest[0]
       return NextResponse.json(
-        { error: "You already have an approved leave that has not ended yet. Submit a new request after it ends." },
+        {
+          error: `You already have an approved leave overlapping these dates (${activeRange.start_date} to ${activeRange.end_date}). Choose a different period.`,
+        },
         { status: 400 }
       )
     }
@@ -520,6 +525,7 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const supabase = await createClient()
+    const validationClient = getServiceRoleClientOrFallback(supabase)
     const {
       data: { user },
     } = await supabase.auth.getUser()
@@ -556,7 +562,7 @@ export async function PUT(request: NextRequest) {
       }
 
       await assertRelieverAvailability(
-        supabase,
+        validationClient,
         newReliever.id,
         existingRequest.start_date,
         existingRequest.end_date,
@@ -691,10 +697,10 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "Invalid reliever selected" }, { status: 400 })
     }
 
-    await assertNoOverlap(supabase, user.id, targetStartDate, endDate, id)
-    await assertNoDepartmentOverlap(supabase, user.id, requester.department_id, targetStartDate, endDate, id)
-    await assertRequesterNotBlockedByRelieverCommitment(supabase, user.id, targetStartDate, endDate, id)
-    await assertRelieverAvailability(supabase, relieverId, targetStartDate, endDate, id)
+    await assertNoOverlap(validationClient, user.id, targetStartDate, endDate, id)
+    await assertNoDepartmentOverlap(validationClient, user.id, requester.department_id, targetStartDate, endDate, id)
+    await assertRequesterNotBlockedByRelieverCommitment(validationClient, user.id, targetStartDate, endDate, id)
+    await assertRelieverAvailability(validationClient, relieverId, targetStartDate, endDate, id)
 
     const { data: balance } = await supabase
       .from("leave_balances")
