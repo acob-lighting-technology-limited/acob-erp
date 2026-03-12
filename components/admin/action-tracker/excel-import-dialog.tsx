@@ -104,10 +104,14 @@ export function ExcelImportDialog({ isOpen, onClose, onComplete, departments }: 
             year: year,
             assigned_by: user.id,
             status: "pending",
+            source_type: "action_item",
+            category: "weekly_action",
+            assignment_type: "department",
+            priority: priority,
           }
         })
 
-        const { error } = await supabase.from("action_items").insert(tasksToInsert)
+        const { error } = await supabase.from("tasks").insert(tasksToInsert)
 
         if (error) throw error
 

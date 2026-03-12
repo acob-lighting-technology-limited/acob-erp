@@ -236,6 +236,22 @@ export default function HRAdminDashboard() {
             </CardContent>
           </Card>
 
+          {/* Fleet Booking */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5" />
+                Fleet Booking
+              </CardTitle>
+              <CardDescription>Manage resources and review fleet booking applications</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Link href="/admin/hr/fleet">
+                <Button className="w-full">Open Fleet Admin</Button>
+              </Link>
+            </CardContent>
+          </Card>
+
           {/* Attendance Reports */}
           <Card>
             <CardHeader>

@@ -24,6 +24,7 @@ import {
   CreditCard,
   Calendar,
   Clock,
+  Car,
   Target,
   Wrench,
   FileBarChart,
@@ -75,6 +76,7 @@ const navigation = [
 const hrNavigation = [
   { name: "Leave", href: "/dashboard/leave", icon: Calendar },
   { name: "Attendance", href: "/dashboard/attendance", icon: Clock },
+  { name: "Fleet", href: "/dashboard/fleet", icon: Car },
   { name: "Goals", href: "/dashboard/goals", icon: Target },
 ]
 

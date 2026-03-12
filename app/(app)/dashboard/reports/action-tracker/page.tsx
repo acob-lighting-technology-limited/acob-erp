@@ -98,8 +98,9 @@ export default function ActionTrackerPortal() {
     setLoading(true)
     try {
       let query = supabase
-        .from("action_items")
+        .from("tasks")
         .select("*")
+        .eq("category", "weekly_action")
         .eq("week_number", week)
         .eq("year", year)
         .order("department", { ascending: true })
@@ -135,7 +136,7 @@ export default function ActionTrackerPortal() {
 
     try {
       const { error } = await supabase
-        .from("action_items")
+        .from("tasks")
         .update({ status: newStatus, updated_at: new Date().toISOString() })
         .eq("id", taskId)
 

@@ -156,8 +156,9 @@ export function WeeklyReportsContent({
 
       // ─── Fetch Action Items for Aggregate Status (SAME WEEK) ─────────────────
       const { data: actions, error: actionsError } = await supabase
-        .from("action_items")
+        .from("tasks")
         .select("id, department, status")
+        .eq("category", "weekly_action")
         .eq("week_number", weekFilter)
         .eq("year", yearFilter)
         .in("department", initialDepartments)

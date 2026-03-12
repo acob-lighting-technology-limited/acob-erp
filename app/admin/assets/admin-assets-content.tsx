@@ -86,6 +86,7 @@ export interface Asset {
     assigned_to?: string
     department?: string
     office_location?: string
+    assignment_type?: "individual" | "department" | "office" | string
     user?: {
       first_name: string
       last_name: string
@@ -155,6 +156,7 @@ const currentYear = new Date().getFullYear()
 
 export interface UserProfile {
   role: string
+  admin_domains?: string[] | null
   is_department_lead?: boolean
   lead_departments?: string[]
   managed_departments?: string[]
@@ -177,6 +179,16 @@ export function AdminAssetsContent({
   initialError,
 }: AdminAssetsContentProps) {
   const router = useRouter()
+  const normalizedRole = String(userProfile?.role || "")
+    .trim()
+    .toLowerCase()
+  const adminDomains = Array.isArray(userProfile?.admin_domains)
+    ? userProfile.admin_domains.map((domain) => String(domain).trim().toLowerCase())
+    : []
+  const canCreateAssetType =
+    normalizedRole === "developer" ||
+    normalizedRole === "super_admin" ||
+    (normalizedRole === "admin" && adminDomains.includes("assets"))
   const [assets, setAssets] = useState<Asset[]>(initialAssets)
   const [employees, setEmployees] = useState<Employee[]>(initialEmployees)
   const activeEmployees = employees.filter((member) => isAssignableProfile(member, { allowLegacyNullStatus: false }))
@@ -239,6 +251,7 @@ export function AdminAssetsContent({
   const [isCreatingAssetType, setIsCreatingAssetType] = useState(false)
   const [assetTypes, setAssetTypes] =
     useState<{ label: string; code: string; requiresSerialModel: boolean }[]>(ASSET_TYPES)
+  const [batchQuantity, setBatchQuantity] = useState(1)
 
   interface AssetFormState {
     asset_type: string
@@ -333,12 +346,23 @@ export function AdminAssetsContent({
 
   const loadAssetTypes = async () => {
     try {
-      const { data, error } = await supabase.from("asset_types").select("*").order("label", { ascending: true })
-      if (error) {
+      const response = await fetch("/api/admin/assets/types", {
+        method: "GET",
+        credentials: "include",
+        cache: "no-store",
+      })
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as { error?: string } | null
         // Fallback to hardcoded types if table doesn't exist yet
-        console.warn("Could not load asset types from database:", error)
+        console.warn("Could not load asset types from API:", payload?.error || response.status)
         return
       }
+
+      const payload = (await response.json()) as {
+        data?: { label: string; code: string; requires_serial_model?: boolean | null }[]
+      }
+      const data = payload?.data || []
       if (data && data.length > 0) {
         setAssetTypes(
           data.map((t) => ({
@@ -354,6 +378,11 @@ export function AdminAssetsContent({
   }
 
   const handleCreateAssetType = async () => {
+    if (!canCreateAssetType) {
+      toast.error("You do not have permission to create asset types")
+      return
+    }
+
     if (!newAssetType.label.trim() || !newAssetType.code.trim()) {
       toast.error("Please provide both full name and short name")
       return
@@ -368,30 +397,30 @@ export function AdminAssetsContent({
 
     setIsCreatingAssetType(true)
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (!user) {
-        toast.error("You must be logged in to create asset types")
-        setIsCreatingAssetType(false)
-        return
-      }
-
-      const { error } = await supabase.from("asset_types").insert({
-        label: newAssetType.label.trim(),
-        code: code,
-        requires_serial_model: newAssetType.requiresSerialModel,
-        created_by: user.id,
+      const response = await fetch("/api/admin/assets/types", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          label: newAssetType.label.trim(),
+          code,
+          requiresSerialModel: newAssetType.requiresSerialModel,
+        }),
       })
 
-      if (error) {
-        if (error.code === "23505") {
-          // Unique constraint violation
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as { error?: string; code?: string } | null
+        if (response.status === 409 || payload?.code === "23505") {
           toast.error("An asset type with this name or code already exists")
+        } else if (response.status === 403) {
+          toast.error("You do not have permission to create asset types")
+        } else if (response.status === 401) {
+          toast.error("You must be logged in to create asset types")
         } else {
-          throw error
+          throw new Error(payload?.error || "Failed to create asset type")
         }
-        setIsCreatingAssetType(false)
         return
       }
 
@@ -718,6 +747,7 @@ export function AdminAssetsContent({
 
   const handleOpenAssetDialog = async (asset?: Asset) => {
     if (asset) {
+      setBatchQuantity(1)
       setSelectedAsset(asset)
 
       // Fetch current assignment details if asset is assigned
@@ -794,6 +824,7 @@ export function AdminAssetsContent({
         data: { user },
       } = await supabase.auth.getUser()
 
+      setBatchQuantity(1)
       setSelectedAsset(null)
       setAssetForm({
         asset_type: "",
@@ -842,176 +873,53 @@ export function AdminAssetsContent({
     if (isSaving) return
     setIsSaving(true)
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (!user) {
-        setIsSaving(false)
-        return
-      }
-
       if (!assetForm.asset_type) {
         toast.error("Please select an asset type")
         setIsSaving(false)
         return
       }
 
-      if (selectedAsset) {
-        // UPDATE MODE
-        const { error: updateError } = await supabase
-          .from("assets")
-          .update({
-            status: assetForm.status,
-            notes: assetForm.notes || null,
-            asset_model: assetForm.asset_model || null,
-            serial_number: assetForm.serial_number || null,
-            acquisition_year: assetForm.acquisition_year,
-          })
-          .eq("id", selectedAsset.id)
-
-        if (updateError) throw updateError
-
-        // If status changed FROM assigned TO something else (returned, maintenance, etc.)
-        if (selectedAsset.status === "assigned" && assetForm.status !== "assigned") {
-          const { error: closeError } = await supabase
-            .from("asset_assignments")
-            .update({
-              is_current: false,
-              handed_over_at: new Date().toISOString(),
-              handover_notes: `Status changed to ${assetForm.status}`,
-            })
-            .eq("asset_id", selectedAsset.id)
-            .eq("is_current", true)
-
-          if (closeError) {
-            console.error("Error closing assignment:", closeError)
-            throw new Error(`Failed to close current assignment: ${closeError.message}`)
-          }
-        }
-
-        // Detect Transfer/Reassignment in EDIT mode
-        const isAssigneeChanged =
-          selectedAsset.status === "assigned" &&
-          assetForm.status === "assigned" &&
-          (assetForm.assigned_to !== originalAssetForm.assigned_to ||
-            assetForm.assignment_department !== originalAssetForm.assignment_department ||
-            assetForm.office_location !== originalAssetForm.office_location)
-
-        if (isAssigneeChanged) {
-          const assignmentResponse = getAssignmentData(selectedAsset.id, user.id)
-          if (!assignmentResponse.success) {
-            toast.error(assignmentResponse.error)
-            return
-          }
-
-          const assignmentData = assignmentResponse.data
-          const { error: rpcError } = await supabase.rpc("reassign_asset", {
-            p_asset_id: selectedAsset.id,
-            p_new_assignment_type: assetForm.assignment_type,
-            p_assigned_to: (assignmentData as any).assigned_to || null,
-            p_department: (assignmentData as any).department || null,
-            p_office_location: (assignmentData as any).office_location || null,
-            p_assigned_by: (assignmentData as any).assigned_by,
-            p_assigned_at: (assignmentData as any).assigned_at,
-            p_assignment_notes: (assignmentData as any).assignment_notes,
-            p_handover_notes: `Reassigned via Edit`,
-            p_new_status: assetForm.status,
-          })
-
-          if (rpcError) throw rpcError
-        } else if (selectedAsset.status !== "assigned" && assetForm.status === "assigned") {
-          // Normal initial assignment
-          const assignmentResponse = getAssignmentData(selectedAsset.id, user.id)
-          if (!assignmentResponse.success) {
-            toast.error(assignmentResponse.error)
-            return
-          }
-
-          const { error: assignError } = await supabase.from("asset_assignments").insert(assignmentResponse.data)
-          if (assignError) throw assignError
-
-          // Update asset record to reflect assignment fields (crucial for consistency)
-          const { error: assetFieldsError } = await supabase
-            .from("assets")
-            .update({
-              assignment_type: assetForm.assignment_type,
-              department: (assignmentResponse.data as any).department || null,
-              office_location: (assignmentResponse.data as any).office_location || null,
-            })
-            .eq("id", selectedAsset.id)
-
-          if (assetFieldsError) throw assetFieldsError
-        }
-
-        toast.success("Asset updated successfully")
-      } else {
-        // CREATE MODE
-        // 1. Validate year (sequential check)
-        const { data: latestAsset } = await supabase
-          .from("assets")
-          .select("acquisition_year")
-          .eq("asset_type", assetForm.asset_type)
-          .order("acquisition_year", { ascending: false })
-          .limit(1)
-          .single()
-
-        if (latestAsset && assetForm.acquisition_year < latestAsset.acquisition_year) {
-          toast.error(`Year must be ${latestAsset.acquisition_year} or later for this asset type.`)
+      if (!selectedAsset) {
+        if (!Number.isInteger(batchQuantity) || batchQuantity < 1 || batchQuantity > 100) {
+          toast.error("Quantity must be between 1 and 100")
+          setIsSaving(false)
           return
         }
 
-        // 2. Get unique code
-        const { data: uniqueCodeData, error: serialError } = await supabase.rpc("get_next_asset_serial", {
-          asset_code: assetForm.asset_type,
-          year: assetForm.acquisition_year,
-        })
-        if (serialError) throw serialError
-
-        // 3. Insert asset
-        const { data: newAsset, error: insertError } = await supabase
-          .from("assets")
-          .insert({
-            asset_type: assetForm.asset_type,
-            acquisition_year: assetForm.acquisition_year,
-            unique_code: uniqueCodeData,
-            status: assetForm.status,
-            notes: assetForm.notes || null,
-            asset_model: assetForm.asset_model || null,
-            serial_number: assetForm.serial_number || null,
-            created_by: user.id,
-          })
-          .select()
-          .single()
-
-        if (insertError) throw insertError
-
-        // 4. Handle initial assignment if status is 'assigned'
-        if (assetForm.status === "assigned" && newAsset) {
-          const assignmentResponse = getAssignmentData(newAsset.id, user.id)
-          if (!assignmentResponse.success) {
-            toast.error(assignmentResponse.error)
-            return
-          }
-
-          const assignmentData = assignmentResponse.data
-          const { error: assignError } = await supabase.from("asset_assignments").insert(assignmentData)
-          if (assignError) throw assignError
-
-          // Update asset state
-          const { error: assetFieldsError } = await supabase
-            .from("assets")
-            .update({
-              assignment_type: assetForm.assignment_type,
-              department: (assignmentData as any).department || null,
-              office_location: (assignmentData as any).office_location || null,
-            })
-            .eq("id", newAsset.id)
-
-          if (assetFieldsError) throw assetFieldsError
+        if (batchQuantity > 1 && String(assetForm.serial_number || "").trim()) {
+          toast.error("For batch creation, leave Serial Number empty. You can edit each asset later if needed.")
+          setIsSaving(false)
+          return
         }
-
-        toast.success(`Asset created successfully: ${uniqueCodeData}`)
       }
+
+      const response = await fetch("/api/admin/assets", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          mode: selectedAsset ? "update" : "create",
+          assetForm,
+          quantity: selectedAsset ? 1 : batchQuantity,
+          selectedAsset: selectedAsset ? { id: selectedAsset.id, status: selectedAsset.status } : null,
+          originalAssetForm: selectedAsset
+            ? {
+                assigned_to: originalAssetForm.assigned_to,
+                assignment_department: originalAssetForm.assignment_department,
+                office_location: originalAssetForm.office_location,
+              }
+            : null,
+        }),
+      })
+
+      const payload = (await response.json().catch(() => null)) as { error?: string; message?: string } | null
+      if (!response.ok) {
+        throw new Error(payload?.error || "Failed to save asset")
+      }
+
+      toast.success(payload?.message || (selectedAsset ? "Asset updated successfully" : "Asset created successfully"))
 
       setIsAssetDialogOpen(false)
       loadData()
@@ -1214,6 +1122,45 @@ export function AdminAssetsContent({
     setSortConfig({ key, direction })
   }
 
+  const getEffectiveAssignmentType = (asset: Asset) =>
+    (asset.current_assignment?.assignment_type || asset.assignment_type || "").toLowerCase()
+
+  const getAssignedPersonName = (asset: Asset) => {
+    const assignedId = asset.current_assignment?.assigned_to
+    if (!assignedId) return null
+
+    const assignmentUser = asset.current_assignment?.user
+    const employeeUser = employees.find((member) => member.id === assignedId)
+    const firstName = assignmentUser?.first_name || employeeUser?.first_name || ""
+    const lastName = assignmentUser?.last_name || employeeUser?.last_name || ""
+    const fullName = `${formatName(firstName)} ${formatName(lastName)}`.trim()
+
+    return fullName || "Assigned User"
+  }
+
+  const getAssignedToLabel = (asset: Asset, withStatusSuffix = false) => {
+    const isAssignedLike = asset.status === "assigned" || asset.status === "retired" || asset.status === "maintenance"
+    if (!isAssignedLike) return "Unassigned"
+
+    const statusSuffix =
+      withStatusSuffix && (asset.status === "retired" || asset.status === "maintenance") ? ` (${asset.status})` : ""
+
+    const assignmentType = getEffectiveAssignmentType(asset)
+    if (assignmentType === "office") {
+      return `${asset.current_assignment?.office_location || asset.office_location || "Office"}${statusSuffix}`
+    }
+
+    if (assignmentType === "department") {
+      return `${asset.current_assignment?.department || asset.department || "Assigned Department"}${statusSuffix}`
+    }
+
+    const personName = getAssignedPersonName(asset)
+    if (personName) return `${personName}${statusSuffix}`
+    if (asset.current_assignment?.department) return `${asset.current_assignment.department}${statusSuffix}`
+
+    return `Assigned${statusSuffix}`
+  }
+
   const getSortedAssets = (assetsToSort: Asset[]) => {
     if (!sortConfig) return assetsToSort
 
@@ -1243,20 +1190,8 @@ export function AdminAssetsContent({
           bValue = b.status
           break
         case "assigned_to":
-          if (a.current_assignment?.user) {
-            aValue = `${a.current_assignment.user.first_name} ${a.current_assignment.user.last_name}`
-          } else if (a.current_assignment?.department) {
-            aValue = a.current_assignment.department
-          } else {
-            aValue = ""
-          }
-          if (b.current_assignment?.user) {
-            bValue = `${b.current_assignment.user.first_name} ${b.current_assignment.user.last_name}`
-          } else if (b.current_assignment?.department) {
-            bValue = b.current_assignment.department
-          } else {
-            bValue = ""
-          }
+          aValue = getAssignedToLabel(a)
+          bValue = getAssignedToLabel(b)
           break
         default:
           return 0
@@ -1288,16 +1223,7 @@ export function AdminAssetsContent({
       if (selectedColumns["Year"]) row["Year"] = asset.acquisition_year
       if (selectedColumns["Status"]) row["Status"] = asset.status
       if (selectedColumns["Assigned To"]) {
-        row["Assigned To"] =
-          asset.status === "assigned" || asset.status === "retired" || asset.status === "maintenance"
-            ? asset.assignment_type === "office"
-              ? `${asset.office_location || "Office"}${asset.status === "retired" ? " (retired)" : asset.status === "maintenance" ? " (maintenance)" : ""}`
-              : asset.current_assignment?.user
-                ? `${formatName(asset.current_assignment.user.first_name)} ${formatName(asset.current_assignment.user.last_name)}${asset.status === "retired" ? " (retired)" : asset.status === "maintenance" ? " (maintenance)" : ""}`
-                : asset.current_assignment?.department
-                  ? `${asset.current_assignment.department}${asset.status === "retired" ? " (retired)" : asset.status === "maintenance" ? " (maintenance)" : ""}`
-                  : "Unassigned"
-            : "Unassigned"
+        row["Assigned To"] = getAssignedToLabel(asset, true)
       }
       if (selectedColumns["Department"]) {
         // For individual assignments: use user's department
@@ -1421,17 +1347,7 @@ export function AdminAssetsContent({
           headers.push("Status")
         }
         if (selectedColumns["Assigned To"]) {
-          row.push(
-            asset.status === "assigned" || asset.status === "retired" || asset.status === "maintenance"
-              ? asset.assignment_type === "office"
-                ? `${asset.office_location || "Office"}${asset.status === "retired" ? " (retired)" : asset.status === "maintenance" ? " (maintenance)" : ""}`
-                : asset.current_assignment?.user
-                  ? `${formatName(asset.current_assignment.user.first_name)} ${formatName(asset.current_assignment.user.last_name)}${asset.status === "retired" ? " (retired)" : asset.status === "maintenance" ? " (maintenance)" : ""}`
-                  : asset.current_assignment?.department
-                    ? `${asset.current_assignment.department}${asset.status === "retired" ? " (retired)" : asset.status === "maintenance" ? " (maintenance)" : ""}`
-                    : "Unassigned"
-              : "Unassigned"
-          )
+          row.push(getAssignedToLabel(asset, true))
           headers.push("Assigned To")
         }
         if (selectedColumns["Department"]) {
@@ -1601,19 +1517,7 @@ export function AdminAssetsContent({
           if (selectedColumns["Assigned To"]) {
             rowCells.push(
               new TableCell({
-                children: [
-                  new Paragraph(
-                    asset.status === "assigned" || asset.status === "retired" || asset.status === "maintenance"
-                      ? asset.assignment_type === "office"
-                        ? `${asset.office_location || "Office"}${asset.status === "retired" ? " (retired)" : asset.status === "maintenance" ? " (maintenance)" : ""}`
-                        : asset.current_assignment?.user
-                          ? `${formatName(asset.current_assignment.user.first_name)} ${formatName(asset.current_assignment.user.last_name)}${asset.status === "retired" ? " (retired)" : asset.status === "maintenance" ? " (maintenance)" : ""}`
-                          : asset.current_assignment?.department
-                            ? `${asset.current_assignment.department}${asset.status === "retired" ? " (retired)" : asset.status === "maintenance" ? " (maintenance)" : ""}`
-                            : "Unassigned"
-                      : "Unassigned"
-                  ),
-                ],
+                children: [new Paragraph(getAssignedToLabel(asset, true))],
               })
             )
           }
@@ -1982,9 +1886,7 @@ export function AdminAssetsContent({
         asset.notes,
         asset.department,
         asset.office_location,
-        asset.current_assignment?.user
-          ? `${asset.current_assignment.user.first_name} ${asset.current_assignment.user.last_name}`
-          : "",
+        getAssignedPersonName(asset),
         asset.current_assignment?.department,
       ].some((field) => field?.toLowerCase().includes(searchQuery.toLowerCase()))
 
@@ -2301,7 +2203,7 @@ export function AdminAssetsContent({
                     label="Asset Types"
                     icon={<Package className="h-4 w-4" />}
                     values={assetTypeFilter}
-                    options={ASSET_TYPES.map((type) => ({
+                    options={assetTypes.map((type) => ({
                       value: type.code,
                       label: type.label,
                     }))}
@@ -2564,27 +2466,29 @@ export function AdminAssetsContent({
                       </TableCell>
                       <TableCell>
                         {asset.status === "assigned" || asset.status === "retired" || asset.status === "maintenance" ? (
-                          asset.assignment_type === "office" ? (
+                          getEffectiveAssignmentType(asset) === "office" ? (
                             <div className="flex items-center gap-2 text-sm">
                               <Building className="text-muted-foreground h-3 w-3" />
-                              <span className="text-foreground">{asset.office_location || "Office"}</span>
+                              <span className="text-foreground">
+                                {asset.current_assignment?.office_location || asset.office_location || "Office"}
+                              </span>
                               {(asset.status === "retired" || asset.status === "maintenance") && (
                                 <span className="text-muted-foreground text-xs">({asset.status})</span>
                               )}
                             </div>
                           ) : asset.current_assignment ? (
-                            asset.assignment_type === "individual" && asset.current_assignment.user ? (
+                            (getEffectiveAssignmentType(asset) === "individual" ||
+                              asset.current_assignment.assigned_to) &&
+                            getAssignedPersonName(asset) ? (
                               <div className="flex items-center gap-2 text-sm">
                                 <User className="text-muted-foreground h-3 w-3" />
-                                <span className="text-foreground">
-                                  {formatName(asset.current_assignment.user.first_name)}{" "}
-                                  {formatName(asset.current_assignment.user.last_name)}
-                                </span>
+                                <span className="text-foreground">{getAssignedPersonName(asset)}</span>
                                 {(asset.status === "retired" || asset.status === "maintenance") && (
                                   <span className="text-muted-foreground text-xs">({asset.status})</span>
                                 )}
                               </div>
-                            ) : asset.assignment_type === "department" && asset.current_assignment.department ? (
+                            ) : getEffectiveAssignmentType(asset) === "department" &&
+                              asset.current_assignment.department ? (
                               <div className="flex items-center gap-2 text-sm">
                                 <Building2 className="text-muted-foreground h-3 w-3" />
                                 <span className="text-foreground">{asset.current_assignment.department}</span>
@@ -2593,19 +2497,16 @@ export function AdminAssetsContent({
                                 )}
                               </div>
                             ) : (
-                              <span className="text-muted-foreground text-sm">Unassigned</span>
+                              <span className="text-muted-foreground text-sm">Assigned</span>
                             )
                           ) : (
                             <span className="text-muted-foreground text-sm">Unassigned</span>
                           )
                         ) : asset.status === "available" ? (
-                          asset.current_assignment?.user ? (
+                          getAssignedPersonName(asset) ? (
                             <div className="flex items-center gap-2 text-sm opacity-70">
                               <History className="text-muted-foreground h-3 w-3" />
-                              <span className="text-muted-foreground italic">
-                                Last: {formatName(asset.current_assignment.user.first_name)}{" "}
-                                {formatName(asset.current_assignment.user.last_name)}
-                              </span>
+                              <span className="text-muted-foreground italic">Last: {getAssignedPersonName(asset)}</span>
                             </div>
                           ) : (
                             <span className="text-muted-foreground text-sm italic">Available</span>
@@ -2745,11 +2646,11 @@ export function AdminAssetsContent({
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground text-sm">Assigned To:</span>
                     {asset.status === "assigned" || asset.status === "retired" || asset.status === "maintenance" ? (
-                      asset.assignment_type === "office" ? (
+                      getEffectiveAssignmentType(asset) === "office" ? (
                         <div className="flex items-center gap-2">
                           <Building className="text-muted-foreground h-3 w-3" />
                           <span className="text-foreground text-sm font-medium">
-                            {asset.office_location || "Office"}
+                            {asset.current_assignment?.office_location || asset.office_location || "Office"}
                           </span>
                           {asset.status === "retired" && (
                             <span className="text-muted-foreground text-xs">(retired)</span>
@@ -2759,7 +2660,7 @@ export function AdminAssetsContent({
                           )}
                         </div>
                       ) : asset.current_assignment ? (
-                        asset.current_assignment.department ? (
+                        getEffectiveAssignmentType(asset) === "department" && asset.current_assignment.department ? (
                           <div className="flex items-center gap-2">
                             <Building2 className="text-muted-foreground h-3 w-3" />
                             <span className="text-foreground text-sm font-medium">
@@ -2772,13 +2673,10 @@ export function AdminAssetsContent({
                               <span className="text-muted-foreground text-xs">(maintenance)</span>
                             )}
                           </div>
-                        ) : asset.current_assignment.user ? (
+                        ) : getAssignedPersonName(asset) ? (
                           <div className="flex items-center gap-2">
                             <User className="text-muted-foreground h-3 w-3" />
-                            <span className="text-foreground text-sm font-medium">
-                              {formatName(asset.current_assignment.user.first_name)}{" "}
-                              {formatName(asset.current_assignment.user.last_name)}
-                            </span>
+                            <span className="text-foreground text-sm font-medium">{getAssignedPersonName(asset)}</span>
                             {asset.status === "retired" && (
                               <span className="text-muted-foreground text-xs">(retired)</span>
                             )}
@@ -2787,7 +2685,7 @@ export function AdminAssetsContent({
                             )}
                           </div>
                         ) : (
-                          <span className="text-muted-foreground text-sm">Unassigned</span>
+                          <span className="text-muted-foreground text-sm">Assigned</span>
                         )
                       ) : (
                         <span className="text-muted-foreground text-sm">Unassigned</span>
@@ -2904,7 +2802,14 @@ export function AdminAssetsContent({
                       type="button"
                       variant="ghost"
                       size="sm"
-                      onClick={() => setIsCreateAssetTypeDialogOpen(true)}
+                      onClick={() => {
+                        if (!canCreateAssetType) {
+                          toast.error("You do not have permission to create asset types")
+                          return
+                        }
+                        setIsCreateAssetTypeDialogOpen(true)
+                      }}
+                      disabled={!canCreateAssetType}
                       className="h-7 gap-1.5 text-xs"
                     >
                       <Plus className="h-3.5 w-3.5" />
@@ -2946,6 +2851,22 @@ export function AdminAssetsContent({
                   </p>
                 )}
               </div>
+              {!selectedAsset && (
+                <div>
+                  <Label htmlFor="asset_quantity">Quantity *</Label>
+                  <Input
+                    id="asset_quantity"
+                    type="number"
+                    min={1}
+                    max={100}
+                    value={batchQuantity}
+                    onChange={(e) => setBatchQuantity(Math.max(1, parseInt(e.target.value || "1", 10) || 1))}
+                  />
+                  <p className="text-muted-foreground mt-1 text-xs">
+                    Create multiple assets with the same type and year in one batch (max 100)
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Unique Code Preview */}
@@ -3157,6 +3078,8 @@ export function AdminAssetsContent({
                   assetForm.assigned_by === originalAssetForm.assigned_by &&
                   assetForm.assigned_at === originalAssetForm.assigned_at) ||
                 // For create with "assigned" status: validate assignment fields (only when creating, not editing)
+                (!selectedAsset && (!Number.isInteger(batchQuantity) || batchQuantity < 1 || batchQuantity > 100)) ||
+                (!selectedAsset && batchQuantity > 1 && !!String(assetForm.serial_number || "").trim()) ||
                 (!selectedAsset &&
                   assetForm.status === "assigned" &&
                   assetForm.assignment_type === "individual" &&
@@ -3171,7 +3094,7 @@ export function AdminAssetsContent({
                   !assetForm.office_location)
               }
             >
-              {selectedAsset ? "Update Asset" : "Create Asset"}
+              {selectedAsset ? "Update Asset" : batchQuantity > 1 ? `Create ${batchQuantity} Assets` : "Create Asset"}
             </Button>
           </DialogFooter>
         </DialogContent>

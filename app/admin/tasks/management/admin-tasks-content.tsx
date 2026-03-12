@@ -42,6 +42,9 @@ import {
   List,
   Users,
   Building2,
+  Ticket,
+  HeadphonesIcon,
+  FolderKanban,
 } from "lucide-react"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -65,6 +68,8 @@ export interface Task {
   task_start_date?: string
   task_end_date?: string
   created_at: string
+  work_item_number?: string
+  source_type?: "manual" | "help_desk" | "action_item" | "project_task"
   assignment_type?: "individual" | "multiple" | "department"
   assigned_to_user?: {
     first_name: string
@@ -495,10 +500,45 @@ export function AdminTasksContent({
     }
   }
 
+  const getSourceBadge = (sourceType?: string) => {
+    switch (sourceType) {
+      case "help_desk":
+        return (
+          <Badge
+            variant="outline"
+            className="gap-1 border-purple-200 text-[10px] text-purple-600 dark:border-purple-800 dark:text-purple-400"
+          >
+            <HeadphonesIcon className="h-2.5 w-2.5" /> Help Desk
+          </Badge>
+        )
+      case "action_item":
+        return (
+          <Badge
+            variant="outline"
+            className="gap-1 border-amber-200 text-[10px] text-amber-600 dark:border-amber-800 dark:text-amber-400"
+          >
+            <Ticket className="h-2.5 w-2.5" /> Action
+          </Badge>
+        )
+      case "project_task":
+        return (
+          <Badge
+            variant="outline"
+            className="gap-1 border-cyan-200 text-[10px] text-cyan-600 dark:border-cyan-800 dark:text-cyan-400"
+          >
+            <FolderKanban className="h-2.5 w-2.5" /> Project
+          </Badge>
+        )
+      default:
+        return null
+    }
+  }
+
   const filteredTasks = tasks.filter((task) => {
     const matchesSearch =
       task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      task.description?.toLowerCase().includes(searchQuery.toLowerCase())
+      task.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      task.work_item_number?.toLowerCase().includes(searchQuery.toLowerCase())
 
     const matchesStatus = statusFilter === "all" || task.status === statusFilter
     const matchesPriority = priorityFilter === "all" || task.priority === priorityFilter
@@ -831,8 +871,13 @@ export function AdminTasksContent({
                 <TableBody>
                   {allPendingWorkflowTasks.map((task, index) => (
                     <TableRow key={task.id}>
-                      <TableCell>{index + 1}</TableCell>
-                      <TableCell className="font-medium">{task.title}</TableCell>
+                      <TableCell>{task.work_item_number || index + 1}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{task.title}</span>
+                          {getSourceBadge(task.source_type)}
+                        </div>
+                      </TableCell>
                       <TableCell>
                         <Badge className={getStatusColor(task.status)}>{task.status.replace("_", " ")}</Badge>
                       </TableCell>
@@ -866,8 +911,13 @@ export function AdminTasksContent({
                 <TableBody>
                   {myTaskActionQueue.map((task, index) => (
                     <TableRow key={task.id}>
-                      <TableCell>{index + 1}</TableCell>
-                      <TableCell className="font-medium">{task.title}</TableCell>
+                      <TableCell>{task.work_item_number || index + 1}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{task.title}</span>
+                          {getSourceBadge(task.source_type)}
+                        </div>
+                      </TableCell>
                       <TableCell>
                         <Badge className={getStatusColor(task.status)}>{task.status.replace("_", " ")}</Badge>
                       </TableCell>
@@ -903,8 +953,13 @@ export function AdminTasksContent({
                 <TableBody>
                   {taskHistory.map((task, index) => (
                     <TableRow key={task.id}>
-                      <TableCell>{index + 1}</TableCell>
-                      <TableCell className="font-medium">{task.title}</TableCell>
+                      <TableCell>{task.work_item_number || index + 1}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{task.title}</span>
+                          {getSourceBadge(task.source_type)}
+                        </div>
+                      </TableCell>
                       <TableCell>
                         <Badge className={getStatusColor(task.status)}>{task.status.replace("_", " ")}</Badge>
                       </TableCell>
@@ -942,10 +997,15 @@ export function AdminTasksContent({
                 <TableBody>
                   {filteredTasks.map((task, index) => (
                     <TableRow key={task.id}>
-                      <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
+                      <TableCell className="text-muted-foreground font-medium">
+                        {task.work_item_number || index + 1}
+                      </TableCell>
                       <TableCell>
                         <div>
-                          <div className="text-foreground font-medium">{task.title}</div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-foreground font-medium">{task.title}</span>
+                            {getSourceBadge(task.source_type)}
+                          </div>
                           {task.description && (
                             <div className="text-muted-foreground mt-1 line-clamp-1 text-sm">{task.description}</div>
                           )}

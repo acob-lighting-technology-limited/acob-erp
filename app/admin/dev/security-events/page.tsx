@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
+import { requireAdminSectionAccess } from "@/lib/admin/rbac"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { ShieldAlert } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -37,6 +38,8 @@ function isSecurityEvent(log: any): boolean {
 export const dynamic = "force-dynamic"
 
 export default async function DevSecurityEventsPage() {
+  await requireAdminSectionAccess("dev")
+
   const supabase = await createClient()
   const dataClient = getServiceRoleClientOrFallback(supabase as any)
   const { data, error } = await dataClient

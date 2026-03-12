@@ -18,7 +18,7 @@ export default async function CommunicationsBroadcastPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role, full_name, department")
+    .select("role, full_name, department, company_email, additional_email")
     .eq("id", user.id)
     .single()
 
@@ -44,6 +44,7 @@ export default async function CommunicationsBroadcastPage() {
         id: user.id,
         full_name: profile?.full_name || null,
         department: profile?.department || null,
+        email: profile?.company_email || profile?.additional_email || user.email || null,
       }}
     />
   )
