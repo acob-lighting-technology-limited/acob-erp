@@ -14,6 +14,14 @@ import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
   Megaphone,
   Send,
   Users,
@@ -62,6 +70,7 @@ interface Props {
     id: string
     full_name: string | null
     department: string | null
+    email?: string | null
   }
 }
 
@@ -110,6 +119,66 @@ function stripHtmlToText(html: string): string {
     .trim()
 }
 
+function normalizeBroadcastHtml(html: string): string {
+  if (typeof window === "undefined") return html
+
+  const container = document.createElement("div")
+  container.innerHTML = html
+
+  const isEmptyParagraphLike = (node: Element): boolean => {
+    const tag = node.tagName.toLowerCase()
+    if (tag !== "p" && tag !== "div") return false
+
+    const text = (node.textContent || "").replace(/\u00a0/g, " ").trim()
+    const hasMedia = node.querySelector("img,video,table,iframe,hr,blockquote,pre,ul,ol,li")
+    return text.length === 0 && !hasMedia
+  }
+
+  const collapseEmptySiblings = (parent: Element | DocumentFragment) => {
+    let previousWasEmpty = false
+    const nodes = Array.from(parent.childNodes)
+    for (const node of nodes) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        if (!(node.textContent || "").trim()) parent.removeChild(node)
+        continue
+      }
+
+      if (node.nodeType !== Node.ELEMENT_NODE) continue
+      const element = node as HTMLElement
+      collapseEmptySiblings(element)
+
+      const isEmpty = isEmptyParagraphLike(element)
+      if (isEmpty) {
+        if (previousWasEmpty) {
+          parent.removeChild(element)
+          continue
+        }
+        element.innerHTML = "<br>"
+        previousWasEmpty = true
+        continue
+      }
+      previousWasEmpty = false
+    }
+  }
+
+  collapseEmptySiblings(container)
+
+  return container.innerHTML
+}
+
+function isValidEmailAddress(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+}
+
+function generateBroadcastReference(): string {
+  const now = new Date()
+  const yyyy = now.getFullYear()
+  const mm = String(now.getMonth() + 1).padStart(2, "0")
+  const dd = String(now.getDate()).padStart(2, "0")
+  const rand = Math.floor(Math.random() * 9000 + 1000)
+  return `BC-${yyyy}${mm}${dd}-${rand}`
+}
+
 export function CommunicationsComposer({ employees, mode = "meetings", currentUser }: Props) {
   // ── State ──────────────────────────────────────────────────────────────────
   const [reminderType, setReminderType] = useState<ReminderType>(
@@ -134,11 +203,16 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
   const [knowledgeDepartment, setKnowledgeDepartment] = useState("none")
   const [knowledgePresenterId, setKnowledgePresenterId] = useState("none")
   const [meetingPreparedById, setMeetingPreparedById] = useState("none")
-  const [broadcastSubject, setBroadcastSubject] = useState("Administrative Notice")
+  const [broadcastSubject, setBroadcastSubject] = useState("")
   const [broadcastBodyHtml, setBroadcastBodyHtml] = useState("<p>Type your message here...</p>")
   const [broadcastDepartment, setBroadcastDepartment] = useState(currentUser?.department || "Admin & HR")
-  const [broadcastPreparedById, setBroadcastPreparedById] = useState("none")
   const editorRef = useRef<HTMLDivElement | null>(null)
+  const savedSelectionRef = useRef<Range | null>(null)
+  const broadcastReferenceRef = useRef<string>(generateBroadcastReference())
+  const [isMailtoDialogOpen, setIsMailtoDialogOpen] = useState(false)
+  const [mailtoEmail, setMailtoEmail] = useState("")
+  const [mailtoSubject, setMailtoSubject] = useState("")
+  const [mailtoBody, setMailtoBody] = useState("")
 
   // Delivery timing
   const [sendTiming, setSendTiming] = useState<SendTiming>("now")
@@ -154,6 +228,7 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
   const supabase = createClient()
   const currentUserDept = (currentUser?.department || "").trim()
   const currentUserName = (currentUser?.full_name || "").trim()
+  const broadcastPreparedByName = currentUserName || "Current User"
   const isCurrentUserAdminHr =
     currentUserDept.toLowerCase().includes("admin") && currentUserDept.toLowerCase().includes("hr")
 
@@ -191,16 +266,17 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
     return employees.find((e) => e.id === meetingPreparedById) || null
   }, [employees, meetingPreparedById])
 
-  const broadcastPreparedByOptions = useMemo(() => {
-    return employees
-      .filter((e) => (e.department || "").trim() === broadcastDepartment)
-      .sort((a, b) => (a.full_name || "").localeCompare(b.full_name || ""))
-  }, [employees, broadcastDepartment])
+  const currentUserRecord = useMemo(() => {
+    return employees.find((employee) => employee.id === currentUser?.id) || null
+  }, [currentUser?.id, employees])
 
-  const selectedBroadcastPreparedBy = useMemo(() => {
-    if (broadcastPreparedById === "none") return null
-    return employees.find((e) => e.id === broadcastPreparedById) || null
-  }, [employees, broadcastPreparedById])
+  const defaultReplyEmail = useMemo(() => {
+    return (
+      (currentUser?.email || "").trim().toLowerCase() ||
+      (currentUserRecord?.company_email || "").trim().toLowerCase() ||
+      (currentUserRecord?.additional_email || "").trim().toLowerCase()
+    )
+  }, [currentUser?.email, currentUserRecord?.additional_email, currentUserRecord?.company_email])
 
   useEffect(() => {
     if (mode === "communications" && reminderType !== "admin_broadcast") {
@@ -227,17 +303,6 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
   }, [broadcastDepartment, currentUserDept, mode])
 
   useEffect(() => {
-    if (broadcastPreparedByOptions.length === 0) return
-    if (!broadcastPreparedByOptions.some((p) => p.id === broadcastPreparedById)) {
-      const preferred =
-        currentUserName && broadcastPreparedByOptions.some((p) => p.full_name === currentUserName)
-          ? broadcastPreparedByOptions.find((p) => p.full_name === currentUserName)?.id
-          : broadcastPreparedByOptions[0].id
-      setBroadcastPreparedById(preferred || broadcastPreparedByOptions[0].id)
-    }
-  }, [broadcastPreparedById, broadcastPreparedByOptions, currentUserName])
-
-  useEffect(() => {
     if (reminderType !== "admin_broadcast") return
     const el = editorRef.current
     if (!el) return
@@ -253,11 +318,83 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
     setBroadcastBodyHtml(editorRef.current.innerHTML)
   }, [])
 
+  const saveEditorSelection = useCallback(() => {
+    const editor = editorRef.current
+    if (!editor) return
+    const selection = window.getSelection()
+    if (!selection || selection.rangeCount === 0) return
+    const range = selection.getRangeAt(0)
+    if (!editor.contains(range.commonAncestorContainer)) return
+    savedSelectionRef.current = range.cloneRange()
+  }, [])
+
+  const restoreEditorSelection = useCallback(() => {
+    const selection = window.getSelection()
+    if (!selection || !savedSelectionRef.current) return
+    selection.removeAllRanges()
+    selection.addRange(savedSelectionRef.current)
+  }, [])
+
   const addEditorLink = useCallback(() => {
     const url = window.prompt("Enter link URL (https://...)")
     if (!url) return
     runEditorCommand("createLink", url.trim())
   }, [runEditorCommand])
+
+  const addEditorMailtoLink = useCallback(() => {
+    saveEditorSelection()
+    const subjectSeed = broadcastSubject.trim() || "Broadcast Message"
+    const defaultSubject = `RE: ${subjectSeed} [Ref: ${broadcastReferenceRef.current}]`
+    const defaultBody = [
+      "Hello HR Team,",
+      "",
+      `I am responding to: ${subjectSeed}`,
+      `Reference: ${broadcastReferenceRef.current}`,
+      "",
+      "My details:",
+      "Full Name:",
+      "Department:",
+      "",
+      "Regards,",
+    ].join("\n")
+
+    setMailtoEmail(defaultReplyEmail)
+    setMailtoSubject(defaultSubject)
+    setMailtoBody(defaultBody)
+    setIsMailtoDialogOpen(true)
+  }, [broadcastSubject, defaultReplyEmail, saveEditorSelection])
+
+  const applyEditorMailtoLink = useCallback(() => {
+    const normalizedEmail = mailtoEmail.trim().toLowerCase()
+    if (!isValidEmailAddress(normalizedEmail)) {
+      toast.error("Please enter a valid email address")
+      return
+    }
+
+    const subjectValue = mailtoSubject.trim()
+    const bodyValue = mailtoBody.trim()
+
+    const params = new URLSearchParams()
+    if (subjectValue) params.set("subject", subjectValue)
+    if (bodyValue) params.set("body", bodyValue)
+    const query = params.toString()
+    const mailto = query ? `mailto:${normalizedEmail}?${query}` : `mailto:${normalizedEmail}`
+
+    if (!editorRef.current) return
+    editorRef.current.focus()
+    restoreEditorSelection()
+    const selectedText = window.getSelection()?.toString().trim() || ""
+
+    if (selectedText) {
+      document.execCommand("createLink", false, mailto)
+    } else {
+      const safeLabel = normalizedEmail.replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      const safeHref = mailto.replace(/"/g, "&quot;")
+      document.execCommand("insertHTML", false, `<a href="${safeHref}">${safeLabel}</a>`)
+    }
+    setBroadcastBodyHtml(editorRef.current.innerHTML)
+    setIsMailtoDialogOpen(false)
+  }, [mailtoBody, mailtoEmail, mailtoSubject, restoreEditorSelection])
 
   const logMailAudit = useCallback(
     async (params: {
@@ -393,6 +530,9 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
       return
     }
 
+    const normalizedBroadcastBodyHtml =
+      reminderType === "admin_broadcast" ? normalizeBroadcastHtml(broadcastBodyHtml) : broadcastBodyHtml
+
     if (reminderType === "admin_broadcast") {
       if (!broadcastSubject.trim()) {
         toast.error("Broadcast subject is required")
@@ -402,13 +542,16 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
         toast.error("Broadcast department is required")
         return
       }
-      if (!stripHtmlToText(broadcastBodyHtml)) {
+      if (!stripHtmlToText(normalizedBroadcastBodyHtml)) {
         toast.error("Broadcast body is required")
         return
       }
-      if (!selectedBroadcastPreparedBy?.full_name) {
+      if (!broadcastPreparedByName.trim()) {
         toast.error("Prepared by is required")
         return
+      }
+      if (normalizedBroadcastBodyHtml !== broadcastBodyHtml) {
+        setBroadcastBodyHtml(normalizedBroadcastBodyHtml)
       }
     }
 
@@ -451,10 +594,9 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
             sessionTime: reminderType === "knowledge_sharing" ? sessionTime : undefined,
             duration: reminderType === "knowledge_sharing" ? duration : undefined,
             broadcastSubject: reminderType === "admin_broadcast" ? broadcastSubject : undefined,
-            broadcastBodyHtml: reminderType === "admin_broadcast" ? broadcastBodyHtml : undefined,
+            broadcastBodyHtml: reminderType === "admin_broadcast" ? normalizedBroadcastBodyHtml : undefined,
             broadcastDepartment: reminderType === "admin_broadcast" ? broadcastDepartment : undefined,
-            broadcastPreparedByName:
-              reminderType === "admin_broadcast" ? selectedBroadcastPreparedBy?.full_name || null : undefined,
+            broadcastPreparedByName: reminderType === "admin_broadcast" ? broadcastPreparedByName : undefined,
           },
         }
 
@@ -551,9 +693,9 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
         payload.duration = duration
       } else {
         payload.broadcastSubject = broadcastSubject.trim()
-        payload.broadcastBodyHtml = broadcastBodyHtml
+        payload.broadcastBodyHtml = normalizedBroadcastBodyHtml
         payload.broadcastDepartment = broadcastDepartment
-        payload.broadcastPreparedByName = selectedBroadcastPreparedBy?.full_name || null
+        payload.broadcastPreparedByName = broadcastPreparedByName
       }
 
       const targetFunction = reminderType === "admin_broadcast" ? "send-communications-mail" : "send-meeting-reminder"
@@ -590,9 +732,7 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
           recipient_count: resolvedRecipients.length,
           subject: reminderType === "admin_broadcast" ? broadcastSubject.trim() : label,
           prepared_by:
-            reminderType === "admin_broadcast"
-              ? selectedBroadcastPreparedBy?.full_name || null
-              : selectedMeetingPreparedBy?.full_name || null,
+            reminderType === "admin_broadcast" ? broadcastPreparedByName : selectedMeetingPreparedBy?.full_name || null,
         },
       })
     } catch (err: any) {
@@ -867,20 +1007,8 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="broadcast-prepared-by">Prepared by</Label>
-                      <Select value={broadcastPreparedById} onValueChange={setBroadcastPreparedById}>
-                        <SelectTrigger id="broadcast-prepared-by" className="w-full">
-                          <SelectValue placeholder="Select person" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">Select person</SelectItem>
-                          {broadcastPreparedByOptions.map((emp) => (
-                            <SelectItem key={emp.id} value={emp.id}>
-                              {emp.full_name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <p className="text-muted-foreground text-xs">This will appear as “Prepared by” in the footer.</p>
+                      <Input id="broadcast-prepared-by" value={broadcastPreparedByName} readOnly className="w-full" />
+                      <p className="text-muted-foreground text-xs">Locked to the logged-in sender.</p>
                     </div>
                   </div>
 
@@ -945,6 +1073,16 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
                         <Button type="button" size="icon" variant="ghost" className="h-8 w-8" onClick={addEditorLink}>
                           <Link2 className="h-4 w-4" />
                         </Button>
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8"
+                          onClick={addEditorMailtoLink}
+                          title="Add email link (mailto)"
+                        >
+                          <Mail className="h-4 w-4" />
+                        </Button>
                         <div className="bg-border mx-1 h-5 w-px" />
                         <Button
                           type="button"
@@ -969,7 +1107,7 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
                         ref={editorRef}
                         contentEditable
                         suppressContentEditableWarning
-                        className="bg-background min-h-[220px] rounded-b-lg border p-3 text-sm leading-6 outline-none focus:ring-2 focus:ring-orange-500"
+                        className="bg-background min-h-[220px] rounded-b-lg border p-3 text-sm leading-6 outline-none focus:ring-2 focus:ring-orange-500 [&_a]:text-blue-700 [&_a]:underline [&_a]:underline-offset-2"
                         onInput={(e) => setBroadcastBodyHtml((e.currentTarget as HTMLDivElement).innerHTML)}
                       />
                       <p className="text-muted-foreground text-xs">
@@ -1375,7 +1513,7 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
                     <div className="flex min-w-0 items-center justify-between gap-2 text-sm">
                       <span className="text-muted-foreground shrink-0">Prepared by</span>
                       <Badge variant="outline" className="max-w-[68%] truncate">
-                        {selectedBroadcastPreparedBy?.full_name || "Not set"}
+                        {broadcastPreparedByName}
                       </Badge>
                     </div>
                     <div className="flex min-w-0 items-center justify-between gap-2 text-sm">
@@ -1524,6 +1662,65 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
           )}
         </aside>
       </div>
+
+      <Dialog open={isMailtoDialogOpen} onOpenChange={setIsMailtoDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Email Link</DialogTitle>
+            <DialogDescription>
+              This creates a mailto link on the selected text in the broadcast body.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label htmlFor="mailto-email">Email address</Label>
+              <Input
+                id="mailto-email"
+                type="email"
+                inputMode="email"
+                value={mailtoEmail}
+                onChange={(e) => setMailtoEmail(e.target.value)}
+                placeholder="hr@company.com"
+                autoComplete="email"
+              />
+              <p className="text-muted-foreground text-xs">Auto-filled with your email. You can edit it if needed.</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="mailto-subject">Email Subject</Label>
+              <Input
+                id="mailto-subject"
+                value={mailtoSubject}
+                onChange={(e) => setMailtoSubject(e.target.value)}
+                placeholder="Enter subject"
+              />
+              <p className="text-muted-foreground text-xs">Optional. You can leave this blank.</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="mailto-body">Email Body</Label>
+              <Textarea
+                id="mailto-body"
+                value={mailtoBody}
+                onChange={(e) => setMailtoBody(e.target.value)}
+                placeholder="Enter email body"
+                className="min-h-[140px]"
+              />
+              <p className="text-muted-foreground text-xs">Optional. You can leave this blank.</p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setIsMailtoDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={applyEditorMailtoLink}>
+              Insert Email Link
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </PageWrapper>
   )
 }

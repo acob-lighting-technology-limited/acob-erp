@@ -53,6 +53,7 @@ interface ActionTask {
   week_number: number
   year: number
   original_week?: number
+  work_item_number?: string
 }
 
 interface ActionTrackerContentProps {
@@ -97,8 +98,9 @@ export function ActionTrackerContent({
     setLoading(true)
     try {
       let query = supabase
-        .from("action_items")
+        .from("tasks")
         .select("*")
+        .eq("category", "weekly_action")
         .eq("week_number", weekFilter)
         .eq("year", yearFilter)
         .order("department", { ascending: true })
@@ -140,7 +142,7 @@ export function ActionTrackerContent({
 
     try {
       const { error } = await supabase
-        .from("action_items")
+        .from("tasks")
         .update({ status: newStatus, updated_at: new Date().toISOString() })
         .eq("id", taskId)
 
@@ -161,7 +163,7 @@ export function ActionTrackerContent({
     }
     if (!confirm("Are you sure you want to delete this action?")) return
     try {
-      const { error } = await supabase.from("action_items").delete().eq("id", id)
+      const { error } = await supabase.from("tasks").delete().eq("id", id)
       if (error) throw error
       toast.success("Action deleted")
       loadTasks()

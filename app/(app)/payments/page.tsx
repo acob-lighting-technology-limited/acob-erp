@@ -44,6 +44,14 @@ interface Category {
   name: string
 }
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+const normalizeDepartmentId = (value: unknown): string | null => {
+  const raw = typeof value === "string" ? value.trim() : ""
+  if (!raw || !UUID_REGEX.test(raw)) return null
+  return raw
+}
+
 async function getPaymentsData() {
   const supabase = await createClient()
   const dataClient = getServiceRoleClientOrFallback(supabase as any)
@@ -74,7 +82,7 @@ async function getPaymentsData() {
   }
 
   if (profile) {
-    currentUserDepartmentId = (profile as any).department_id || null
+    currentUserDepartmentId = normalizeDepartmentId((profile as any).department_id)
     if (!currentUserDepartmentId) {
       const candidates = resolveDepartmentCandidates(profile.department)
       if (candidates.length > 0) {
