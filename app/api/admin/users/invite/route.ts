@@ -9,6 +9,7 @@ import {
 } from "@/lib/role-management"
 import { rateLimit, getClientId } from "@/lib/rate-limit"
 import { logger } from "@/lib/logger"
+import { writeAuditLog } from "@/lib/audit/write-audit"
 
 const log = logger("admin-users-invite")
 
@@ -199,6 +200,20 @@ export async function POST(request: Request) {
     if (profileError) {
       throw profileError
     }
+
+    // Audit: user invite/profile creation
+    await writeAuditLog(supabase, {
+      action: existingUser ? "update" : "create",
+      entityType: "profile",
+      entityId: userId,
+      actorId: user.id,
+      newValues: {
+        company_email: emailNormalized,
+        ...(roleToApply ? { role: roleToApply } : {}),
+        ...(department ? { department } : {}),
+      },
+      metadata: { source: "admin-users-invite", invited: !existingUser },
+    }, { failOpen: true })
 
     return NextResponse.json({ success: true, userId })
   } catch (error: any) {

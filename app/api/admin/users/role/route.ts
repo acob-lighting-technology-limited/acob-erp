@@ -9,6 +9,7 @@ import {
 } from "@/lib/role-management"
 import { logger } from "@/lib/logger"
 import { syncEmploymentStatusToAuth } from "@/lib/supabase/admin"
+import { writeAuditLog } from "@/lib/audit/write-audit"
 
 const log = logger("admin-users-role")
 
@@ -146,6 +147,17 @@ export async function POST(request: Request) {
     if (employmentStatus) {
       await syncEmploymentStatusToAuth(targetUserId, employmentStatus)
     }
+
+    // Audit: role change is a critical admin action
+    await writeAuditLog(supabase, {
+      action: "update",
+      entityType: "profile",
+      entityId: targetUserId,
+      actorId: user.id,
+      newValues: { role: targetRole, admin_domains: targetRole === "admin" ? adminDomains : null, ...(employmentStatus ? { employment_status: employmentStatus } : {}) },
+      oldValues: { role: targetProfile.role },
+      metadata: { source: "admin-users-role" },
+    }, { failOpen: true })
 
     return NextResponse.json({ ok: true })
   } catch (error) {

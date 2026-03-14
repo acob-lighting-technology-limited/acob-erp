@@ -162,10 +162,22 @@ export async function GET(request: NextRequest) {
       approvalsByRequest.set(approval.leave_request_id, rows)
     }
 
+    // Pre-fetch all leave policies in parallel (one per unique leave_type_id)
+    // instead of fetching inside the map (which would be N sequential queries).
+    const uniqueLeaveTypeIds = Array.from(new Set(requestRows.map((r: any) => r.leave_type_id).filter(Boolean)))
+    const policyEntries = await Promise.all(
+      uniqueLeaveTypeIds.map(async (ltId) => {
+        const policy = await getLeavePolicy(supabase, ltId as string)
+        return [ltId, policy] as const
+      })
+    )
+    const policyMap = new Map(policyEntries)
+
+    // Check evidence completeness for all requests in parallel
     const enriched = await Promise.all(
       requestRows.map(async (leaveRequest: any) => {
-        const policy = await getLeavePolicy(supabase, leaveRequest.leave_type_id)
-        const requiredDocs = policy.required_documents || []
+        const policy = policyMap.get(leaveRequest.leave_type_id) ?? { required_documents: [] }
+        const requiredDocs = (policy as any).required_documents || []
         const evidence = await areRequiredDocumentsVerified(supabase, leaveRequest.id, requiredDocs)
         return {
           ...leaveRequest,

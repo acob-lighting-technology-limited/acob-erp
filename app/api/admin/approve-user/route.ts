@@ -9,6 +9,7 @@ import { resolveActiveLeadRecipients, sendNotificationEmail } from "@/lib/notifi
 import { isSystemNotificationChannelEnabled, resolveChannelEligibleUserIds } from "@/lib/notifications/delivery-policy"
 import { withSubjectPrefix } from "@/lib/notifications/subject-policy"
 import { syncEmploymentStatusToAuth } from "@/lib/supabase/admin"
+import { writeAuditLog } from "@/lib/audit/write-audit"
 
 const log = logger("approve-user")
 
@@ -211,6 +212,23 @@ export async function POST(req: Request) {
 
     // Sync employment_status into JWT metadata so middleware doesn't need a DB query
     await syncEmploymentStatusToAuth(authUserId!, "active")
+
+    // Audit: new employee onboarding is a critical action
+    const supabaseForAudit = await createServerClient()
+    await writeAuditLog(supabaseForAudit, {
+      action: "create",
+      entityType: "profile",
+      entityId: authUserId!,
+      actorId: caller.id,
+      newValues: {
+        employee_number: employeeId,
+        company_email: pendingUser.company_email,
+        department: pendingUser.department,
+        role: "employee",
+        employment_status: "active",
+      },
+      metadata: { source: "approve-user", pending_user_id: pendingUserId },
+    }, { failOpen: true })
 
     return NextResponse.json({ success: true, employeeId })
   } catch (error: any) {
