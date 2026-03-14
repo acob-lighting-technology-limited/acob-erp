@@ -9,6 +9,11 @@ import { Card, CardContent } from "@/components/ui/card"
 import { ArrowLeft } from "lucide-react"
 import { toast } from "sonner"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("profile-edit")
+
+
 export default function EditProfilePage() {
   const router = useRouter()
   const supabase = createClient()
@@ -74,7 +79,7 @@ export default function EditProfilePage() {
         setProfile(profileData)
       }
     } catch (error: any) {
-      console.error("Error loading user data:", error)
+      log.error("Error loading user data:", error)
       toast.error("Failed to load profile data")
     }
   }

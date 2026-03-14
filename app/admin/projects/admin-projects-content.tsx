@@ -49,6 +49,11 @@ import type { Project, employee } from "./page"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { isAssignableProfile } from "@/lib/workforce/assignment-policy"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("projects-admin-projects-content")
+
+
 interface AdminProjectsContentProps {
   initialProjects: Project[]
   initialemployee: employee[]
@@ -107,7 +112,7 @@ export function AdminProjectsContent({ initialProjects, initialemployee }: Admin
       if (error) throw error
       setProjects((data as any) || [])
     } catch (error) {
-      console.error("Error loading data:", error)
+      log.error("Error loading data:", error)
       toast.error("Failed to refresh data")
     }
   }
@@ -205,7 +210,7 @@ export function AdminProjectsContent({ initialProjects, initialemployee }: Admin
       setIsProjectDialogOpen(false)
       loadData()
     } catch (error) {
-      console.error("Error saving project:", error)
+      log.error("Error saving project:", error)
       toast.error(`Failed to save project: ${error instanceof Error ? error.message : "Unknown error"}`)
     } finally {
       setIsSaving(false)
@@ -227,7 +232,7 @@ export function AdminProjectsContent({ initialProjects, initialemployee }: Admin
       setProjectToDelete(null)
       loadData()
     } catch (error) {
-      console.error("Error deleting project:", error)
+      log.error("Error deleting project:", error)
       toast.error(`Failed to delete project: ${error instanceof Error ? error.message : "Unknown error"}`)
     } finally {
       setIsDeleting(false)

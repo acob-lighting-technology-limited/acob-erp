@@ -8,6 +8,9 @@ import {
   isAdminRole,
 } from "@/lib/help-desk/server"
 import { sendHelpDeskMail } from "@/lib/help-desk/mailer"
+import { logger } from "@/lib/logger"
+
+const log = logger("help-desk-ticket")
 
 export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -57,7 +60,7 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
       },
     })
   } catch (error) {
-    console.error("Error in GET /api/help-desk/tickets/[id]:", error)
+    log.error({ err: String(error) }, "Unhandled error in GET")
     return NextResponse.json({ error: "Failed to fetch ticket" }, { status: 500 })
   }
 }
@@ -181,13 +184,13 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
           ticketNumber: ticket.ticket_number,
         })
       } catch (mailError) {
-        console.error("Help desk mail error (resolved):", mailError)
+        log.error({ err: String(mailError) }, "Help desk mail error on resolve")
       }
     }
 
     return NextResponse.json({ data: updated })
   } catch (error) {
-    console.error("Error in PATCH /api/help-desk/tickets/[id]:", error)
+    log.error({ err: String(error) }, "Unhandled error in PATCH")
     return NextResponse.json({ error: "Failed to update ticket" }, { status: 500 })
   }
 }

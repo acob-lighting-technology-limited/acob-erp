@@ -1,5 +1,10 @@
 import { toast } from "sonner"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("lib-hooks-useDataExport")
+
+
 interface ExportOptions {
   filename: string
   sheetName?: string
@@ -34,7 +39,7 @@ export function useDataExport<T extends Record<string, any>>() {
       saveAs(blob, `${options.filename}.xlsx`)
       toast.success("Excel file exported successfully")
     } catch (error) {
-      console.error("Error exporting to Excel:", error)
+      log.error("Error exporting to Excel:", error)
       toast.error("Failed to export to Excel")
     }
   }
@@ -63,7 +68,7 @@ export function useDataExport<T extends Record<string, any>>() {
       doc.save(`${options.filename}.pdf`)
       toast.success("PDF file exported successfully")
     } catch (error) {
-      console.error("Error exporting to PDF:", error)
+      log.error("Error exporting to PDF:", error)
       toast.error("Failed to export to PDF")
     }
   }
@@ -114,7 +119,7 @@ export function useDataExport<T extends Record<string, any>>() {
       saveAs(blob, `${options.filename}.docx`)
       toast.success("Word document exported successfully")
     } catch (error) {
-      console.error("Error exporting to Word:", error)
+      log.error("Error exporting to Word:", error)
       toast.error("Failed to export to Word")
     }
   }

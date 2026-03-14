@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { logger } from "@/lib/logger"
 import {
   areRequiredDocumentsVerified,
   assertNoOverlap,
@@ -16,6 +17,8 @@ import {
   notifyStageApprover,
   stageCodeForRole,
 } from "@/lib/hr/leave-routing"
+
+const log = logger("leave-requests")
 
 function isRelieverStage(request: any) {
   const stage = request.current_stage_code || request.approval_stage
@@ -186,7 +189,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ data: enriched, balances: balances || [] })
   } catch (error) {
-    console.error("Error in GET /api/hr/leave/requests:", error)
+    log.error({ err: String(error) }, "Unhandled error in GET")
     return NextResponse.json({ error: "An error occurred" }, { status: 500 })
   }
 }
@@ -379,7 +382,7 @@ export async function POST(request: NextRequest) {
           : "Leave request created successfully",
     })
   } catch (error) {
-    console.error("Error in POST /api/hr/leave/requests:", error)
+    log.error({ err: String(error) }, "Unhandled error in POST")
     const message = error instanceof Error ? error.message : "An error occurred"
     const status =
       message.startsWith("LEAVE_APPROVER_NOT_CONFIGURED:") || message.startsWith("LEAVE_APPROVER_CONFLICT:") ? 400 : 500
@@ -631,7 +634,7 @@ export async function PUT(request: NextRequest) {
       message: "Leave request updated successfully",
     })
   } catch (error) {
-    console.error("Error in PUT /api/hr/leave/requests:", error)
+    log.error({ err: String(error) }, "Unhandled error in PUT")
     const message = error instanceof Error ? error.message : "An error occurred"
     const status =
       message.startsWith("LEAVE_APPROVER_NOT_CONFIGURED:") || message.startsWith("LEAVE_APPROVER_CONFLICT:") ? 400 : 500
@@ -675,7 +678,7 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ message: "Leave request deleted successfully" })
   } catch (error) {
-    console.error("Error in DELETE /api/hr/leave/requests:", error)
+    log.error({ err: String(error) }, "Unhandled error in DELETE")
     return NextResponse.json({ error: "An error occurred" }, { status: 500 })
   }
 }

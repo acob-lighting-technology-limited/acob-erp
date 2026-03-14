@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { logger } from "@/lib/logger"
+
+const log = logger("v1-hr-attendance-clock-in")
 
 export async function POST(request: NextRequest) {
   try {
@@ -39,7 +42,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error("Error clocking in:", error)
+      log.error({ err: String(error) }, "Error clocking in:")
       return NextResponse.json({ error: "Failed to clock in" }, { status: 500 })
     }
 
@@ -48,7 +51,7 @@ export async function POST(request: NextRequest) {
       message: "Clocked in successfully",
     })
   } catch (error) {
-    console.error("Error in POST /api/hr/attendance/clock-in:", error)
+    log.error({ err: String(error) }, "Error in POST /api/hr/attendance/clock-in:")
     return NextResponse.json({ error: "An error occurred" }, { status: 500 })
   }
 }

@@ -2,6 +2,9 @@ import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 import { resolveAdminScope } from "@/lib/admin/rbac"
+import { logger } from "@/lib/logger"
+
+const log = logger("payments-categories")
 
 export const dynamic = "force-dynamic"
 
@@ -49,7 +52,7 @@ export async function GET() {
 
     return NextResponse.json({ data: categories })
   } catch (error) {
-    console.error("Error fetching payment categories:", error)
+    log.error({ err: String(error) }, "Error fetching payment categories:")
     return NextResponse.json({ error: "Failed to fetch payment categories" }, { status: 500 })
   }
 }
@@ -85,7 +88,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ data: category }, { status: 201 })
   } catch (error) {
-    console.error("Error creating payment category:", error)
+    log.error({ err: String(error) }, "Error creating payment category:")
     return NextResponse.json({ error: "Failed to create payment category" }, { status: 500 })
   }
 }

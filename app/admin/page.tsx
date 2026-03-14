@@ -27,6 +27,11 @@ import { PageWrapper, PageHeader, Section } from "@/components/layout"
 import { StatCard } from "@/components/ui/stat-card"
 import { EmptyState } from "@/components/ui/patterns"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("")
+
+
 type NotificationType = "error" | "warning" | "info"
 
 interface NotificationItem {
@@ -389,11 +394,11 @@ export default async function AdminDashboardPage() {
     dataClient.from("feedback").select("*", { count: "exact", head: true }),
   ])
 
-  if (employeeStats.error) console.error("Admin dashboard stats: profiles count failed", employeeStats.error)
-  if (assetStats.error) console.error("Admin dashboard stats: assets count failed", assetStats.error)
-  if (taskStats.error) console.error("Admin dashboard stats: tasks count failed", taskStats.error)
-  if (docStats.error) console.error("Admin dashboard stats: user_documentation count failed", docStats.error)
-  if (feedbackStats.error) console.error("Admin dashboard stats: feedback count failed", feedbackStats.error)
+  if (employeeStats.error) log.error("Admin dashboard stats: profiles count failed", employeeStats.error)
+  if (assetStats.error) log.error("Admin dashboard stats: assets count failed", assetStats.error)
+  if (taskStats.error) log.error("Admin dashboard stats: tasks count failed", taskStats.error)
+  if (docStats.error) log.error("Admin dashboard stats: user_documentation count failed", docStats.error)
+  if (feedbackStats.error) log.error("Admin dashboard stats: feedback count failed", feedbackStats.error)
 
   const employeeCount = employeeStats.count || 0
   const assetCount = assetStats.count || 0
@@ -417,7 +422,7 @@ export default async function AdminDashboardPage() {
   }
   const { data: rawRecentActivity, error: rawRecentActivityError } = await recentActivityQuery
   if (rawRecentActivityError) {
-    console.error("Admin dashboard recent activity query failed", rawRecentActivityError)
+    log.error("Admin dashboard recent activity query failed", rawRecentActivityError)
   }
 
   const filteredRawActivity = (rawRecentActivity || [])

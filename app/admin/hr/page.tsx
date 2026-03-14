@@ -10,6 +10,11 @@ import { PageWrapper, PageHeader, Section } from "@/components/layout"
 import { StatCard } from "@/components/ui/stat-card"
 import { applyAssignableStatusFilter } from "@/lib/workforce/assignment-policy"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("hr")
+
+
 interface DashboardStats {
   pendingLeaveRequests: number
   todayAttendance: number
@@ -76,7 +81,7 @@ export default function HRAdminDashboard() {
         ).size,
       })
     } catch (error) {
-      console.error("Error fetching dashboard data:", error)
+      log.error("Error fetching dashboard data:", error)
     } finally {
       setLoading(false)
     }

@@ -9,6 +9,9 @@ import {
 } from "@/lib/help-desk/server"
 import { sendHelpDeskMail } from "@/lib/help-desk/mailer"
 import { applyAssignableStatusFilter } from "@/lib/workforce/assignment-policy"
+import { logger } from "@/lib/logger"
+
+const log = logger("help-desk-tickets-pivot")
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -90,7 +93,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         ctaPath: "/admin/help-desk",
       })
     } catch (mailError) {
-      console.error("Help desk mail error (pivot):", mailError)
+      log.error({ err: String(mailError) }, "Help desk mail error (pivot):")
     }
 
     await appendHelpDeskEvent({
@@ -115,7 +118,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     return NextResponse.json({ data: updated })
   } catch (error) {
-    console.error("Error in POST /api/help-desk/tickets/[id]/pivot:", error)
+    log.error({ err: String(error) }, "Error in POST /api/help-desk/tickets/[id]/pivot:")
     return NextResponse.json({ error: "Failed to pivot ticket" }, { status: 500 })
   }
 }

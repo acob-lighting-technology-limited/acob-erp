@@ -2,6 +2,8 @@
 
 import { useState, useMemo, useCallback, useEffect, useRef } from "react"
 import { toast } from "sonner"
+import DOMPurify from "dompurify"
+import { logger } from "@/lib/logger"
 import { createClient } from "@/lib/supabase/client"
 import { writeAuditLogClient } from "@/lib/audit/client"
 import { PageWrapper, PageHeader } from "@/components/layout"
@@ -41,6 +43,9 @@ import {
   Repeat,
   Trash2,
 } from "lucide-react"
+import { PromptDialog } from "@/components/ui/prompt-dialog"
+
+const log = logger("communications-composer")
 
 type Employee = {
   id: string
@@ -115,6 +120,7 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
   const [reminderType, setReminderType] = useState<ReminderType>(
     mode === "communications" ? "admin_broadcast" : "meeting"
   )
+  const [linkPromptOpen, setLinkPromptOpen] = useState(false)
   const [recipientMode, setRecipientMode] = useState<RecipientMode>("select")
   const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<Set<string>>(new Set())
   const [manualEmails, setManualEmails] = useState<string[]>([])
@@ -241,8 +247,9 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
     if (reminderType !== "admin_broadcast") return
     const el = editorRef.current
     if (!el) return
-    if (el.innerHTML !== broadcastBodyHtml) {
-      el.innerHTML = broadcastBodyHtml
+    const clean = DOMPurify.sanitize(broadcastBodyHtml)
+    if (el.innerHTML !== clean) {
+      el.innerHTML = clean
     }
   }, [reminderType, broadcastBodyHtml])
 
@@ -254,10 +261,8 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
   }, [])
 
   const addEditorLink = useCallback(() => {
-    const url = window.prompt("Enter link URL (https://...)")
-    if (!url) return
-    runEditorCommand("createLink", url.trim())
-  }, [runEditorCommand])
+    setLinkPromptOpen(true)
+  }, [])
 
   const logMailAudit = useCallback(
     async (params: {
@@ -287,7 +292,7 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
           { failOpen: true }
         )
       } catch (error) {
-        console.error("[communications-mail] Failed to write audit log", error)
+        log.error({ err: String(error) }, "[communications-mail] Failed to write audit log")
       }
     },
     [currentUser?.id, supabase]
@@ -495,7 +500,7 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
         )
         fetchSchedules()
       } catch (err: any) {
-        console.error("[Schedule Error]", err)
+        log.error({ err: String(err) }, "[Schedule Error]")
         toast.error(err.message || "Failed to save schedule", { id: toastId })
       }
       return
@@ -596,7 +601,7 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
         },
       })
     } catch (err: any) {
-      console.error("[Meeting Reminder Error]", err)
+      log.error({ err: String(err) }, "[Meeting Reminder Error]")
       toast.error(err.message || "Failed to send", { id: toastId })
     } finally {
       setIsSending(false)
@@ -1525,5 +1530,22 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
         </aside>
       </div>
     </PageWrapper>
+
+    <PromptDialog
+      open={linkPromptOpen}
+      onOpenChange={setLinkPromptOpen}
+      title="Insert Link"
+      description="Enter the URL to insert into the editor."
+      label="URL"
+      placeholder="https://..."
+      inputType="url"
+      required
+      confirmLabel="Insert"
+      onConfirm={(url) => {
+        setLinkPromptOpen(false)
+        runEditorCommand("createLink", url.trim())
+      }}
+      onCancel={() => setLinkPromptOpen(false)}
+    />
   )
 }

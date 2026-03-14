@@ -11,6 +11,11 @@ import { StatCard } from "@/components/ui/stat-card"
 import { EmptyState } from "@/components/ui/patterns"
 import { toast } from "sonner"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("purchasing-receipts")
+
+
 interface Receipt {
   id: string
   receipt_number: string
@@ -47,7 +52,7 @@ export default function ReceiptsPage() {
 
       setReceipts(receiptsData)
     } catch (error) {
-      console.error("Error:", error)
+      log.error("Error:", error)
       toast.error("Failed to load receipts")
     } finally {
       setLoading(false)

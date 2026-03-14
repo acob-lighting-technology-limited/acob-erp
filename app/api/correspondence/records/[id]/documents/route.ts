@@ -5,6 +5,9 @@ import {
   appendCorrespondenceEvent,
   appendCorrespondenceAuditLog,
 } from "@/lib/correspondence/server"
+import { logger } from "@/lib/logger"
+
+const log = logger("correspondence-records-documents")
 
 const BUCKET = "correspondence_documents"
 
@@ -79,7 +82,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
 
     return NextResponse.json({ data: files })
   } catch (error: any) {
-    console.error("Error in GET /api/correspondence/records/[id]/documents:", error)
+    log.error({ err: String(error) }, "Error in GET /api/correspondence/records/[id]/documents:")
     return NextResponse.json({ error: error?.message || "Internal Server Error" }, { status: 500 })
   }
 }
@@ -220,7 +223,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
     return NextResponse.json({ data: versionRow }, { status: 201 })
   } catch (error: any) {
-    console.error("Error in POST /api/correspondence/records/[id]/documents:", error)
+    log.error({ err: String(error) }, "Error in POST /api/correspondence/records/[id]/documents:")
     return NextResponse.json({ error: error?.message || "Internal Server Error" }, { status: 500 })
   }
 }

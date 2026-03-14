@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { evaluateLeaveEligibility, getLeavePolicy } from "@/lib/hr/leave-workflow"
+import { logger } from "@/lib/logger"
+
+const log = logger("hr-leave-types")
 
 export async function GET(_: NextRequest) {
   try {
@@ -33,7 +36,7 @@ export async function GET(_: NextRequest) {
     }
 
     if (error) {
-      console.error("Error fetching leave types:", error)
+      log.error({ err: String(error) }, "Error fetching leave types:")
       return NextResponse.json({ error: "Failed to fetch leave types" }, { status: 500 })
     }
 
@@ -62,7 +65,7 @@ export async function GET(_: NextRequest) {
 
     return NextResponse.json({ data: enriched })
   } catch (error) {
-    console.error("Error in GET /api/hr/leave/types:", error)
+    log.error({ err: String(error) }, "Error in GET /api/hr/leave/types:")
     return NextResponse.json({ error: "An error occurred" }, { status: 500 })
   }
 }

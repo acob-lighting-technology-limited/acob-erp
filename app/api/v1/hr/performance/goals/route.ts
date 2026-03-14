@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { logger } from "@/lib/logger"
+
+const log = logger("v1-hr-performance-goals")
 
 export async function GET(request: NextRequest) {
   try {
@@ -45,13 +48,13 @@ export async function GET(request: NextRequest) {
     const { data: goals, error } = await query
 
     if (error) {
-      console.error("Error fetching goals:", error)
+      log.error({ err: String(error) }, "Error fetching goals:")
       return NextResponse.json({ error: "Failed to fetch goals" }, { status: 500 })
     }
 
     return NextResponse.json({ data: goals })
   } catch (error) {
-    console.error("Error in GET /api/hr/performance/goals:", error)
+    log.error({ err: String(error) }, "Error in GET /api/hr/performance/goals:")
     return NextResponse.json({ error: "An error occurred" }, { status: 500 })
   }
 }
@@ -102,7 +105,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error("Error creating goal:", error)
+      log.error({ err: String(error) }, "Error creating goal:")
       return NextResponse.json({ error: "Failed to create goal" }, { status: 500 })
     }
 
@@ -111,7 +114,7 @@ export async function POST(request: NextRequest) {
       message: "Goal created successfully",
     })
   } catch (error) {
-    console.error("Error in POST /api/hr/performance/goals:", error)
+    log.error({ err: String(error) }, "Error in POST /api/hr/performance/goals:")
     return NextResponse.json({ error: "An error occurred" }, { status: 500 })
   }
 }
@@ -139,7 +142,7 @@ export async function PUT(request: NextRequest) {
     const { data: goal, error } = await supabase.from("goals_objectives").update(updates).eq("id", id).select().single()
 
     if (error) {
-      console.error("Error updating goal:", error)
+      log.error({ err: String(error) }, "Error updating goal:")
       return NextResponse.json({ error: "Failed to update goal" }, { status: 500 })
     }
 
@@ -148,7 +151,7 @@ export async function PUT(request: NextRequest) {
       message: "Goal updated successfully",
     })
   } catch (error) {
-    console.error("Error in PUT /api/hr/performance/goals:", error)
+    log.error({ err: String(error) }, "Error in PUT /api/hr/performance/goals:")
     return NextResponse.json({ error: "An error occurred" }, { status: 500 })
   }
 }

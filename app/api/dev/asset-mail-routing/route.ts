@@ -8,6 +8,9 @@ import {
   type AssetMailRoutingProfile,
 } from "@/lib/asset-mail-routing"
 import { applyAssignableStatusFilter } from "@/lib/workforce/assignment-policy"
+import { logger } from "@/lib/logger"
+
+const log = logger("dev-asset-mail-routing")
 
 export async function GET() {
   try {
@@ -63,7 +66,7 @@ export async function GET() {
       ],
     })
   } catch (error) {
-    console.error("Error in GET /api/dev/asset-mail-routing:", error)
+    log.error({ err: String(error) }, "Error in GET /api/dev/asset-mail-routing:")
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

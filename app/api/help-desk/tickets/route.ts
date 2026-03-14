@@ -10,6 +10,9 @@ import {
   resolveLeadForDepartment,
 } from "@/lib/help-desk/server"
 import { sendHelpDeskMail } from "@/lib/help-desk/mailer"
+import { logger } from "@/lib/logger"
+
+const log = logger("help-desk-tickets")
 
 function describeError(error: unknown): string {
   if (error instanceof Error) return error.message
@@ -84,7 +87,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ data: rows })
   } catch (error) {
-    console.error("Error in GET /api/help-desk/tickets:", error)
+    log.error({ err: String(error) }, "Unhandled error in GET")
     return NextResponse.json({ error: `Failed to fetch tickets: ${describeError(error)}` }, { status: 500 })
   }
 }
@@ -329,12 +332,12 @@ export async function POST(request: NextRequest) {
         ctaPath: approvalRequired ? "/admin/help-desk" : "/dashboard/help-desk",
       })
     } catch (mailError) {
-      console.error("Help desk mail error (create):", mailError)
+      log.error({ err: String(mailError) }, "Help desk mail error on create")
     }
 
     return NextResponse.json({ data: created }, { status: 201 })
   } catch (error) {
-    console.error("Error in POST /api/help-desk/tickets:", error)
+    log.error({ err: String(error) }, "Unhandled error in POST")
     return NextResponse.json({ error: `Failed to create ticket: ${describeError(error)}` }, { status: 500 })
   }
 }

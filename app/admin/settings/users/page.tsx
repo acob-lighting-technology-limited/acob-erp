@@ -53,6 +53,11 @@ const roleColors: Record<string, string> = {
 
 import { useSearchParams } from "next/navigation"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("settings-users")
+
+
 export default function UsersPage() {
   const searchParams = useSearchParams()
   const [users, setUsers] = useState<User[]>([])
@@ -107,7 +112,7 @@ export default function UsersPage() {
         setCurrentUserRole(me?.role || "")
       }
     } catch (error) {
-      console.error("Error:", error)
+      log.error("Error:", error)
       toast.error("Failed to load users")
     } finally {
       setLoading(false)
@@ -243,7 +248,7 @@ export default function UsersPage() {
       setIsAddUserDialogOpen(false)
       fetchUsers()
     } catch (error: any) {
-      console.error("Error adding user to role:", error)
+      log.error("Error adding user to role:", error)
       toast.error(error.message || "Failed to update role")
     }
   }

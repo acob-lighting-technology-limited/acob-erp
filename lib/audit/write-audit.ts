@@ -1,6 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { buildAuditRpcParams, isCriticalAuditAction, type AuditPayload } from "@/lib/audit/core"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("lib-audit-write-audit")
+
+
 export class AuditWriteError extends Error {
   details?: unknown
 
@@ -38,7 +43,7 @@ export async function writeAuditLog(
       throw auditError
     }
 
-    const log = options?.logger || ((message: string, details?: unknown) => console.error(message, details))
+    const log = options?.logger || ((message: string, details?: unknown) => log.error(message, details))
     log("audit write failed (fail-open)", {
       error,
       payload: {

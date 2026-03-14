@@ -1,6 +1,11 @@
 import { createClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("auth-confirm")
+
+
 /**
  * Handles confirmation links from Supabase emails (invite, recovery, email confirmation).
  * Exchanges token_hash for a session, then redirects to the appropriate page.
@@ -45,7 +50,7 @@ export async function GET(request: Request) {
   })
 
   if (error) {
-    console.error("Confirm error:", error.message)
+    log.error("Confirm error:", error.message)
     return NextResponse.redirect(new URL(`/auth/error?message=${encodeURIComponent(error.message)}`, request.url))
   }
 

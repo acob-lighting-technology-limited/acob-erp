@@ -16,6 +16,11 @@ import { KeyRound, Mail, ArrowLeft, Eye, EyeOff } from "lucide-react"
 import Image from "next/image"
 import { useTheme } from "next-themes"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("auth-login")
+
+
 export default function LoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -120,7 +125,7 @@ export default function LoginPage() {
       toast.success("A 6-digit code has been sent to your email")
       setStep("otp")
     } catch (error: unknown) {
-      console.error("OTP Request Error:", error)
+      log.error("OTP Request Error:", error)
       let displayMessage = error instanceof Error ? error.message : "An error occurred"
       if (displayMessage.includes("Signups not allowed")) {
         displayMessage = "This email is not registered. Please contact your administrator."
@@ -160,12 +165,12 @@ export default function LoginPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ authMethod: "password" }),
         keepalive: true,
-      }).catch((err) => console.warn("dev login log failed (password)", err))
+      }).catch((err) => log.warn("dev login log failed (password)", err))
       toast.success("Login successful!")
       const nextPath = getSafeNextPath(searchParams.get("next"))
       window.location.href = nextPath
     } catch (error: unknown) {
-      console.error("Password Login Error:", error)
+      log.error("Password Login Error:", error)
       const message = error instanceof Error ? error.message : "Invalid email or password"
       setError(message)
       toast.error(message)
@@ -199,12 +204,12 @@ export default function LoginPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ authMethod: "otp" }),
         keepalive: true,
-      }).catch((err) => console.warn("dev login log failed (otp)", err))
+      }).catch((err) => log.warn("dev login log failed (otp)", err))
       toast.success("Login successful!")
       const nextPath = getSafeNextPath(searchParams.get("next"))
       window.location.href = nextPath
     } catch (error: unknown) {
-      console.error("OTP Verification Error:", error)
+      log.error("OTP Verification Error:", error)
       const message = error instanceof Error ? error.message : "Invalid OTP"
       setError(message)
       toast.error(message)

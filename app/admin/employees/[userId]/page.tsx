@@ -33,6 +33,11 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { PageHeader } from "@/components/layout/page-header"
 import { EmptyState } from "@/components/ui/patterns"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("employees-[userId]")
+
+
 interface UserProfile {
   id: string
   first_name: string
@@ -235,7 +240,7 @@ export default function UserDetailPage() {
 
       if (feedbackData) setFeedback(feedbackData)
     } catch (error: any) {
-      console.error("Error loading user data:", error)
+      log.error("Error loading user data:", error)
       toast.error("Failed to load user data")
     } finally {
       setIsLoading(false)

@@ -2,6 +2,9 @@ import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 import { getOneDriveService } from "@/lib/onedrive"
+import { logger } from "@/lib/logger"
+
+const log = logger("payments-documents")
 
 function createClient() {
   const cookieStore = cookies()
@@ -91,7 +94,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     const { error: uploadError } = await supabase.storage.from("payment_documents").upload(filePath, file)
 
     if (uploadError) {
-      console.error("Storage upload error:", uploadError)
+      log.error({ err: String(uploadError) }, "Storage upload error:")
       return NextResponse.json({ error: "Failed to upload file to storage" }, { status: 500 })
     }
 
@@ -113,7 +116,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       .single()
 
     if (dbError) {
-      console.error("Database insert error:", dbError)
+      log.error({ err: String(dbError) }, "Database insert error:")
       return NextResponse.json({ error: dbError.message || "Failed to save document record" }, { status: 500 })
     }
 
@@ -129,7 +132,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
         .eq("id", replaceDocumentId)
 
       if (archiveError) {
-        console.error("Error archiving old document:", archiveError)
+        log.error({ err: String(archiveError) }, "Error archiving old document:")
         // Don't fail the request, the new document was created successfully
       }
     }
@@ -158,17 +161,17 @@ export async function POST(request: Request, { params }: { params: { id: string 
           const arrayBuffer = await file.arrayBuffer()
 
           await onedrive.uploadFile(onedrivePath, arrayBuffer, file.type)
-          console.log(`Synced document to OneDrive: ${onedrivePath}`)
+          log.info(`Synced document to OneDrive: ${onedrivePath}`)
         }
       }
     } catch (onedriveError) {
       // Log but don't fail the request - OneDrive sync is best effort
-      console.error("OneDrive sync error (non-fatal):", onedriveError)
+      log.error({ err: String(onedriveError) }, "OneDrive sync error (non-fatal):")
     }
 
     return NextResponse.json({ data: newDocument }, { status: 201 })
   } catch (error: unknown) {
-    console.error("Upload handler error:", error)
+    log.error({ err: String(error) }, "Upload handler error:")
     const message = error instanceof Error ? error.message : "Internal Server Error"
     return NextResponse.json({ error: message }, { status: 500 })
   }

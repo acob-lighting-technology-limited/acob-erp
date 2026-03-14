@@ -14,6 +14,11 @@ import { Plus, Trash2, Receipt } from "lucide-react"
 import { toast } from "sonner"
 import { FormFieldGroup } from "@/components/ui/patterns"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("finance-bills-new")
+
+
 interface BillItem {
   id: string
   description: string
@@ -140,7 +145,7 @@ export default function NewBillPage() {
       toast.success(`Bill ${billNumber} created successfully!`)
       router.push("/admin/finance/bills")
     } catch (error: any) {
-      console.error("Error creating bill:", error)
+      log.error("Error creating bill:", error)
       toast.error(error.message || "Failed to create bill")
     } finally {
       setSaving(false)

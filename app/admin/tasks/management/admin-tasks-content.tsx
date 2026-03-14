@@ -51,6 +51,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { EmptyState } from "@/components/ui/patterns"
 import { isAssignableProfile } from "@/lib/workforce/assignment-policy"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("tasks-management-admin-tasks-content")
+
+
 export interface Task {
   id: string
   title: string
@@ -234,7 +239,7 @@ export function AdminTasksContent({
 
       setTasks(filteredTasks as Task[])
     } catch (error: any) {
-      console.error("Error loading data:", error)
+      log.error("Error loading data:", error)
       toast.error("Failed to reload tasks")
     }
   }
@@ -462,7 +467,7 @@ export function AdminTasksContent({
       setIsTaskDialogOpen(false)
       loadData()
     } catch (error: any) {
-      console.error("Error saving task:", error)
+      log.error("Error saving task:", error)
       toast.error(`Failed to save task: ${error.message || "Unknown error"}`)
     } finally {
       setIsSaving(false)
@@ -488,7 +493,7 @@ export function AdminTasksContent({
       setTaskToDelete(null)
       loadData()
     } catch (error) {
-      console.error("Error deleting task:", error)
+      log.error("Error deleting task:", error)
       toast.error("Failed to delete task")
     } finally {
       setIsDeleting(false)

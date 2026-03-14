@@ -16,6 +16,11 @@ import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { StatCard } from "@/components/ui/stat-card"
 import { EmptyState, ListToolbar } from "@/components/ui/patterns"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("assets-issues")
+
+
 interface AssetIssue {
   id: string
   asset_id: string
@@ -176,7 +181,7 @@ export default function AssetIssuesPage() {
 
       setIssues(issuesWithDetails as AssetIssue[])
     } catch (error: any) {
-      console.error("Error loading issues:", error)
+      log.error("Error loading issues:", error)
       toast.error("Failed to load issues")
     } finally {
       setLoading(false)
@@ -192,7 +197,7 @@ export default function AssetIssuesPage() {
       toast.success(issue.resolved ? "Issue marked as unresolved" : "Issue marked as resolved")
       await loadIssues()
     } catch (error: any) {
-      console.error("Error toggling issue:", error)
+      log.error("Error toggling issue:", error)
       toast.error("Failed to update issue")
     }
   }
@@ -208,7 +213,7 @@ export default function AssetIssuesPage() {
       toast.success("Issue deleted")
       await loadIssues()
     } catch (error: any) {
-      console.error("Error deleting issue:", error)
+      log.error("Error deleting issue:", error)
       toast.error("Failed to delete issue")
     }
   }

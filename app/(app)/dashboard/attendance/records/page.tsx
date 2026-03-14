@@ -9,6 +9,11 @@ import { PageHeader } from "@/components/layout/page-header"
 import { StatCard } from "@/components/ui/stat-card"
 import { EmptyState } from "@/components/ui/patterns"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("dashboard-attendance-records")
+
+
 interface AttendanceRecord {
   id: string
   date: string
@@ -38,7 +43,7 @@ export default function AttendanceRecordsPage() {
         setRecords(data.records)
       }
     } catch (error) {
-      console.error("Error fetching records:", error)
+      log.error("Error fetching records:", error)
     } finally {
       setLoading(false)
     }

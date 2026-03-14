@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createClient as createAdminClient } from "@supabase/supabase-js"
 import { DEFAULT_MAINTENANCE_MESSAGE, canManageMaintenanceMode, parseMaintenanceMode } from "@/lib/maintenance"
+import { logger } from "@/lib/logger"
+
+const log = logger("dev-maintenance")
 
 export async function GET() {
   try {
@@ -46,7 +49,7 @@ export async function GET() {
       can_toggle: canManageMaintenanceMode(profile?.role),
     })
   } catch (error) {
-    console.error("Error in GET /api/dev/maintenance:", error)
+    log.error({ err: String(error) }, "Error in GET /api/dev/maintenance:")
     return NextResponse.json({ error: "An error occurred" }, { status: 500 })
   }
 }
@@ -109,7 +112,7 @@ export async function PUT(request: NextRequest) {
       message: enabled ? "Maintenance mode enabled" : "Maintenance mode disabled",
     })
   } catch (error) {
-    console.error("Error in PUT /api/dev/maintenance:", error)
+    log.error({ err: String(error) }, "Error in PUT /api/dev/maintenance:")
     return NextResponse.json({ error: "An error occurred" }, { status: 500 })
   }
 }

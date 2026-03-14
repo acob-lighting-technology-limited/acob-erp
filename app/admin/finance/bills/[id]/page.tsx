@@ -11,6 +11,11 @@ import { Printer, FileText, CheckCircle } from "lucide-react"
 import { toast } from "sonner"
 import { PageHeader } from "@/components/layout/page-header"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("finance-bills")
+
+
 interface Bill {
   id: string
   bill_number: string
@@ -52,7 +57,7 @@ export default function BillDetailPage() {
       if (error) throw error
       setBill(data)
     } catch (error) {
-      console.error("Error:", error)
+      log.error("Error:", error)
       toast.error("Bill not found")
       router.push("/admin/finance/bills")
     } finally {

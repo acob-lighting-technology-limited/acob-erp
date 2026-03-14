@@ -1,11 +1,20 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { resolveAdminScope } from "@/lib/admin/rbac"
+import { rateLimit, getClientId } from "@/lib/rate-limit"
+import { logger } from "@/lib/logger"
+
+const log = logger("search")
 
 // Mark this route as dynamic since it uses search params
 export const dynamic = "force-dynamic"
 
 export async function GET(request: NextRequest) {
+  const rl = rateLimit(`search:${getClientId(request)}`, { limit: 30, windowSec: 60 })
+  if (!rl.allowed) {
+    return NextResponse.json({ error: "Too many requests. Please slow down." }, { status: 429 })
+  }
+
   try {
     const searchParams = request.nextUrl.searchParams
     const query = searchParams.get("q")
@@ -253,7 +262,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ results: sortedResults.slice(0, 20) })
   } catch (error) {
-    console.error("Search error:", error)
+    log.error({ err: String(error) }, "Search error:")
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

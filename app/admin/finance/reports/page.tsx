@@ -9,6 +9,11 @@ import { EmptyState } from "@/components/ui/patterns"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { TrendingUp, TrendingDown, DollarSign, Calendar, BarChart3 } from "lucide-react"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("finance-reports")
+
+
 interface ReportData {
   totalRevenue: number
   totalExpenses: number
@@ -80,7 +85,7 @@ export default function FinanceReportsPage() {
         paymentsByCategory,
       })
     } catch (error) {
-      console.error("Error fetching report data:", error)
+      log.error("Error fetching report data:", error)
     } finally {
       setLoading(false)
     }

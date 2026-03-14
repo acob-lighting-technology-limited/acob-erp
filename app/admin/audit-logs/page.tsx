@@ -5,6 +5,11 @@ import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
 import { normalizeAuditAction } from "@/lib/audit/core"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("audit-logs")
+
+
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 type AuditLogsData =
@@ -57,7 +62,7 @@ async function getAuditLogsData(): Promise<AuditLogsData> {
   const { data: logsData, error: logsError } = await logsQuery
 
   if (logsError) {
-    console.error("Audit logs error:", logsError)
+    log.error("Audit logs error:", logsError)
     return { kind: "data", logs: [], totalCount: 0, employee: [], departments: [], userProfile }
   }
 
@@ -163,7 +168,7 @@ async function getAuditLogsData(): Promise<AuditLogsData> {
         .eq("is_current", true)
 
       if (assignmentsError) {
-        console.error("Error fetching asset assignments for audit logs:", assignmentsError)
+        log.error("Error fetching asset assignments for audit logs:", assignmentsError)
       } else {
         assignments?.forEach((a) => {
           assetAssignmentsMap.set(a.asset_id, a)
@@ -188,7 +193,7 @@ async function getAuditLogsData(): Promise<AuditLogsData> {
       const { data, error: usersError } = await usersQuery
 
       if (usersError) {
-        console.error("Error fetching users for audit logs:", usersError)
+        log.error("Error fetching users for audit logs:", usersError)
       } else {
         usersData = data || []
       }

@@ -9,6 +9,11 @@ import Link from "next/link"
 import { PageWrapper, PageHeader, Section } from "@/components/layout"
 import { StatCard } from "@/components/ui/stat-card"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("purchasing")
+
+
 interface PurchasingStats {
   totalSuppliers: number
   activeOrders: number
@@ -47,7 +52,7 @@ export default function PurchasingDashboard() {
         totalOrderValue: totalValue,
       })
     } catch (error) {
-      console.error("Error:", error)
+      log.error("Error:", error)
     } finally {
       setLoading(false)
     }

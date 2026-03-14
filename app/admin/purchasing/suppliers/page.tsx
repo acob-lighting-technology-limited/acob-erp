@@ -16,6 +16,11 @@ import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { StatCard } from "@/components/ui/stat-card"
 import { EmptyState, FormFieldGroup, ListToolbar, StatusBadge } from "@/components/ui/patterns"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("purchasing-suppliers")
+
+
 interface Supplier {
   id: string
   name: string
@@ -55,7 +60,7 @@ export default function SuppliersPage() {
       if (error && error.code !== "42P01") throw error
       setSuppliers(data || [])
     } catch (error) {
-      console.error("Error:", error)
+      log.error("Error:", error)
       toast.error("Failed to load suppliers")
     } finally {
       setLoading(false)

@@ -34,6 +34,11 @@ import {
 } from "lucide-react"
 import type { Notification } from "./page"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("notification-notification-content")
+
+
 // Type icons
 const typeIcons = {
   task_assigned: User,
@@ -141,7 +146,7 @@ export function NotificationContent({ initialNotifications, userId }: Notificati
 
       setNotifications((prev) => prev.map((n) => (n.id === notificationId ? { ...n, read: true } : n)))
     } catch (error: any) {
-      console.error("Error marking as read:", error)
+      log.error("Error marking as read:", error)
       toast.error("Failed to mark as read")
     }
   }
@@ -158,7 +163,7 @@ export function NotificationContent({ initialNotifications, userId }: Notificati
       setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
       toast.success("All notifications marked as read")
     } catch (error: any) {
-      console.error("Error:", error)
+      log.error("Error:", error)
       toast.error("Failed to mark all as read")
     }
   }
@@ -172,7 +177,7 @@ export function NotificationContent({ initialNotifications, userId }: Notificati
       setNotifications((prev) => prev.filter((n) => n.id !== notificationId))
       toast.success("Notification deleted")
     } catch (error: any) {
-      console.error("Error:", error)
+      log.error("Error:", error)
       toast.error("Failed to delete notification")
     }
   }

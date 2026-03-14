@@ -16,6 +16,11 @@ import { StatCard } from "@/components/ui/stat-card"
 import { EmptyState } from "@/components/ui/empty-state"
 import { Skeleton } from "@/components/ui/skeleton"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("finance-bills")
+
+
 interface Bill {
   id: string
   bill_number: string
@@ -56,7 +61,7 @@ export default function BillsPage() {
 
       if (error) {
         if (error.code === "42P01") {
-          console.log("Bills table does not exist yet")
+          log.debug("Bills table does not exist yet")
           setBills([])
           return
         }
@@ -65,7 +70,7 @@ export default function BillsPage() {
 
       setBills(data || [])
     } catch (error) {
-      console.error("Error fetching bills:", error)
+      log.error("Error fetching bills:", error)
       toast.error("Failed to load bills")
     } finally {
       setLoading(false)

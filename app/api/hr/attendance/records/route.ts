@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { logger } from "@/lib/logger"
+
+const log = logger("hr-attendance-records")
 
 export async function GET(request: NextRequest) {
   try {
@@ -46,13 +49,13 @@ export async function GET(request: NextRequest) {
     const { data: records, error } = await query
 
     if (error) {
-      console.error("Error fetching attendance records:", error)
+      log.error({ err: String(error) }, "Error fetching attendance records:")
       return NextResponse.json({ error: "Failed to fetch attendance records" }, { status: 500 })
     }
 
     return NextResponse.json({ data: records })
   } catch (error) {
-    console.error("Error in GET /api/hr/attendance/records:", error)
+    log.error({ err: String(error) }, "Error in GET /api/hr/attendance/records:")
     return NextResponse.json({ error: "An error occurred" }, { status: 500 })
   }
 }

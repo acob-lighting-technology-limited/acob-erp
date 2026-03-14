@@ -28,6 +28,11 @@ import { StatCard } from "@/components/ui/stat-card"
 import { EmptyState } from "@/components/ui/patterns"
 import { ASSIGNABLE_ROLES } from "@/lib/role-management"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("settings-roles")
+
+
 interface Role {
   id: string
   name: string
@@ -140,7 +145,7 @@ export default function RolesPage() {
 
       setRoles(rolesWithCounts)
     } catch (error: any) {
-      console.error("Error loading roles:", error)
+      log.error("Error loading roles:", error)
       // If table missing, fallback to defaults
       if (error?.code === "42P01" || error?.message?.includes("relation")) {
         setRoles([

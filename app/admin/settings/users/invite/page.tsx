@@ -13,6 +13,11 @@ import { toast } from "sonner"
 import { getAssignableRolesForActor } from "@/lib/role-management"
 import { FormFieldGroup } from "@/components/ui/patterns"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("settings-users-invite")
+
+
 export default function InviteUserPage() {
   const router = useRouter()
   const [sending, setSending] = useState(false)
@@ -66,7 +71,7 @@ export default function InviteUserPage() {
       toast.success(`Invitation sent to ${formData.email}`)
       router.push("/admin/settings/users")
     } catch (error: any) {
-      console.error("Error inviting user:", error)
+      log.error("Error inviting user:", error)
       toast.error(error.message || "Failed to invite user")
     } finally {
       setSending(false)

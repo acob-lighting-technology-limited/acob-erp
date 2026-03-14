@@ -9,6 +9,11 @@ import Link from "next/link"
 import { PageWrapper, PageHeader, Section } from "@/components/layout"
 import { StatCard } from "@/components/ui/stat-card"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("inventory")
+
+
 interface InventoryStats {
   totalProducts: number
   totalCategories: number
@@ -36,13 +41,13 @@ export default function InventoryDashboard() {
       const supabase = createClient()
 
       const { data: products, error: prodError } = await supabase.from("products").select("*")
-      if (prodError && prodError.code !== "42P01") console.error("Error fetching products:", prodError)
+      if (prodError && prodError.code !== "42P01") log.error("Error fetching products:", prodError)
 
       const { data: categories, error: catError } = await supabase.from("product_categories").select("*")
-      if (catError && catError.code !== "42P01") console.error("Error fetching categories:", catError)
+      if (catError && catError.code !== "42P01") log.error("Error fetching categories:", catError)
 
       const { data: warehouses, error: whError } = await supabase.from("warehouses").select("*")
-      if (whError && whError.code !== "42P01") console.error("Error fetching warehouses:", whError)
+      if (whError && whError.code !== "42P01") log.error("Error fetching warehouses:", whError)
 
       const allProducts = products || []
       const lowStock = allProducts.filter((p: any) => p.quantity_on_hand <= (p.reorder_level || 10))
@@ -59,7 +64,7 @@ export default function InventoryDashboard() {
         totalValue: totalVal,
       })
     } catch (error) {
-      console.error("Error fetching inventory data:", error)
+      log.error("Error fetching inventory data:", error)
     } finally {
       setLoading(false)
     }

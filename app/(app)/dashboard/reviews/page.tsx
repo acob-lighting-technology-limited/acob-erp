@@ -2,6 +2,11 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { ReviewsContent } from "./reviews-content"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("dashboard-reviews")
+
+
 export interface Review {
   id: string
   overall_rating: number
@@ -48,7 +53,7 @@ async function getReviewsData() {
     .order("created_at", { ascending: false })
 
   if (error) {
-    console.error("Error loading reviews:", error)
+    log.error("Error loading reviews:", error)
   }
 
   return {

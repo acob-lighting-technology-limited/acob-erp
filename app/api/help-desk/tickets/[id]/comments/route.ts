@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { appendHelpDeskEvent, canLeadDepartment, getAuthContext, isAdminRole } from "@/lib/help-desk/server"
+import { logger } from "@/lib/logger"
+
+const log = logger("help-desk-tickets-comments")
 
 export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -40,7 +43,7 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
 
     return NextResponse.json({ data: data || [] })
   } catch (error) {
-    console.error("Error in GET /api/help-desk/tickets/[id]/comments:", error)
+    log.error({ err: String(error) }, "Error in GET /api/help-desk/tickets/[id]/comments:")
     return NextResponse.json({ error: "Failed to fetch comments" }, { status: 500 })
   }
 }
@@ -106,7 +109,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     return NextResponse.json({ data: created }, { status: 201 })
   } catch (error) {
-    console.error("Error in POST /api/help-desk/tickets/[id]/comments:", error)
+    log.error({ err: String(error) }, "Error in POST /api/help-desk/tickets/[id]/comments:")
     return NextResponse.json({ error: "Failed to add comment" }, { status: 500 })
   }
 }

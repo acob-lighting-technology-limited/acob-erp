@@ -1007,7 +1007,7 @@ export function DevTestsContent() {
   }, [])
 
   useEffect(() => {
-    load().catch(console.error)
+    load().catch((err) => log.error({ err: String(err) }, "load failed"))
   }, [load])
 
   return (

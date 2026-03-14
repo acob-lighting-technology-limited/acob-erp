@@ -3,6 +3,9 @@ import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
+import { logger } from "@/lib/logger"
+
+const log = logger("payments")
 
 export const dynamic = "force-dynamic"
 
@@ -111,7 +114,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ data: payments })
   } catch (error) {
-    console.error("Error fetching payments:", error)
+    log.error({ err: String(error) }, "Error fetching payments:")
     return NextResponse.json({ error: "Failed to fetch payments" }, { status: 500 })
   }
 }
@@ -250,7 +253,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ data: payment }, { status: 201 })
   } catch (error: any) {
-    console.error("Error creating payment:", error)
+    log.error({ err: String(error) }, "Error creating payment:")
     return NextResponse.json({ error: error?.message || "Failed to create payment" }, { status: 500 })
   }
 }

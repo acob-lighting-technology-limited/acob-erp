@@ -8,6 +8,9 @@ import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 import { getOneDriveService } from "@/lib/onedrive"
 import { isPathAllowed, resolveOneDriveAccessScope } from "@/lib/onedrive/access"
+import { logger } from "@/lib/logger"
+
+const log = logger("onedrive")
 
 export const dynamic = "force-dynamic"
 
@@ -112,7 +115,7 @@ export async function GET(request: Request) {
       parentPath: path === "/" ? null : path.substring(0, path.lastIndexOf("/")) || "/",
     })
   } catch (error: unknown) {
-    console.error("Error listing OneDrive folder:", error)
+    log.error({ err: String(error) }, "Error listing OneDrive folder:")
     const message = error instanceof Error ? error.message : "Failed to list folder"
     return NextResponse.json({ error: message }, { status: 500 })
   }
@@ -185,7 +188,7 @@ export async function POST(request: Request) {
       },
     })
   } catch (error: unknown) {
-    console.error("Error uploading to OneDrive:", error)
+    log.error({ err: String(error) }, "Error uploading to OneDrive:")
     const message = error instanceof Error ? error.message : "Failed to upload file"
     return NextResponse.json({ error: message }, { status: 500 })
   }

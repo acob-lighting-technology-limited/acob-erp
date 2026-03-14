@@ -5,6 +5,9 @@ import {
   canAccessRecord,
   getAuthContext,
 } from "@/lib/correspondence/server"
+import { logger } from "@/lib/logger"
+
+const log = logger("correspondence-records-link-response")
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -88,7 +91,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     return NextResponse.json({ data: updatedRecord })
   } catch (error) {
-    console.error("Error in POST /api/correspondence/records/[id]/link-response:", error)
+    log.error({ err: String(error) }, "Error in POST /api/correspondence/records/[id]/link-response:")
     return NextResponse.json({ error: "Failed to link incoming reference" }, { status: 500 })
   }
 }

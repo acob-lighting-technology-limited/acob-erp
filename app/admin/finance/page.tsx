@@ -18,6 +18,11 @@ import { PageWrapper, PageHeader, Section } from "@/components/layout"
 import { StatCard } from "@/components/ui/stat-card"
 import { EmptyState } from "@/components/ui/patterns"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("finance")
+
+
 interface FinanceStats {
   totalPayments: number
   pendingPayments: number
@@ -67,7 +72,7 @@ export default function FinanceDashboard() {
 
       setRecentPayments(allPayments.slice(0, 5))
     } catch (error) {
-      console.error("Error fetching finance data:", error)
+      log.error("Error fetching finance data:", error)
     } finally {
       setLoading(false)
     }

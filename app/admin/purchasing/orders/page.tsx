@@ -16,6 +16,11 @@ import { StatCard } from "@/components/ui/stat-card"
 import { EmptyState } from "@/components/ui/empty-state"
 import { Skeleton } from "@/components/ui/skeleton"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("purchasing-orders")
+
+
 interface PurchaseOrder {
   id: string
   po_number: string
@@ -64,7 +69,7 @@ export default function PurchaseOrdersPage() {
 
       setOrders(ordersWithSupplier)
     } catch (error) {
-      console.error("Error:", error)
+      log.error("Error:", error)
       toast.error("Failed to load orders")
     } finally {
       setLoading(false)

@@ -1,3 +1,7 @@
+import { logger } from "@/lib/logger"
+
+const log = logger("lib-convert-image")
+
 /**
  * Checks if a file is a HEIC/HEIF image
  */
@@ -34,7 +38,7 @@ export async function convertImageIfNeeded(file: File): Promise<File> {
     // Dynamically import heic2any only when needed (client-side only)
     const heic2any = (await import("heic2any")).default
 
-    console.log(`Converting ${file.name} (${(file.size / 1024).toFixed(1)}KB)...`)
+    log.debug(`Converting ${file.name} (${(file.size / 1024).toFixed(1)}KB)...`)
 
     // Convert HEIC to JPEG blob with multiple quality options
     let convertedBlob: Blob | Blob[]
@@ -46,7 +50,7 @@ export async function convertImageIfNeeded(file: File): Promise<File> {
         quality: 0.9,
       })
     } catch (highQualityError) {
-      console.warn("High quality conversion failed, trying lower quality:", highQualityError)
+      log.warn("High quality conversion failed, trying lower quality:", highQualityError)
       // Fallback to lower quality
       convertedBlob = await heic2any({
         blob: file,
@@ -69,10 +73,10 @@ export async function convertImageIfNeeded(file: File): Promise<File> {
       lastModified: Date.now(),
     })
 
-    console.log(`Successfully converted ${file.name} to ${originalName}`)
+    log.debug(`Successfully converted ${file.name} to ${originalName}`)
     return convertedFile
   } catch (error) {
-    console.error("Failed to convert HEIC image:", error)
+    log.error("Failed to convert HEIC image:", error)
 
     // Provide more specific error messages
     if (error instanceof Error) {
