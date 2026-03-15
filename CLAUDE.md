@@ -34,3 +34,16 @@
 - **Structured logger**: use `logger("module-name")` from `@/lib/logger` — never use `console.log`
 - **No `window.prompt` / `window.confirm` / `window.alert`**: use `<PromptDialog>` or `<AlertDialog>` from shadcn/ui instead
 - **No `Math.random()`** for anything security-related — use `crypto.randomUUID()` or `crypto.getRandomValues()`
+
+## API versioning policy
+
+Unversioned routes (`/api/`) are the canonical routes used by the frontend. `/api/v1/` routes are legacy duplicates created during an earlier refactor. They are kept for backward compatibility but should not have new features added. New routes go into `/api/` (unversioned). The `/api/v1/` routes will be removed once all callers have been migrated to their `/api/` equivalents.
+
+Current v1 routes and their unversioned equivalents:
+- `/api/v1/hr/attendance/clock-in` → use `/api/hr/attendance/clock-in` (TBD)
+- `/api/v1/hr/attendance/clock-out` → use `/api/hr/attendance/clock-out` (TBD)
+- `/api/v1/hr/performance/goals` → use `/api/hr/performance/goals`
+- `/api/v1/hr/performance/reviews` → use `/api/hr/performance/reviews` (TBD)
+- `/api/v1/hr/departments` → use `/api/departments`
+- `/api/v1/finance/payments` → use `/api/payments`
+- `/api/v1/hr/employees/[id]/status` → use `/api/v1/hr/employees/[id]/status` (no equivalent yet)
