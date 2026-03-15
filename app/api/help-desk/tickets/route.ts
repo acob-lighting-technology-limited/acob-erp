@@ -37,9 +37,7 @@ function describeError(error: unknown): string {
 
 function generateFallbackHelpDeskTicketNumber() {
   const epochMillis = Date.now().toString()
-  const randomSuffix = Math.floor(Math.random() * 1000)
-    .toString()
-    .padStart(3, "0")
+  const randomSuffix = parseInt(crypto.randomUUID().replace(/-/g, "").slice(0, 3), 16).toString().padStart(3, "0")
   return `HD-${epochMillis}${randomSuffix}`
 }
 

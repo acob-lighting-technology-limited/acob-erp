@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
+import { writeAuditLog } from "@/lib/audit/write-audit"
 
 export async function POST(request: Request) {
   try {
@@ -38,6 +39,18 @@ export async function POST(request: Request) {
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
+
+    await writeAuditLog(
+      supabase,
+      {
+        action: "update",
+        entityType: "profile",
+        entityId: user.id,
+        newValues: payload,
+        context: { actorId: user.id, source: "api", route: "/api/profile/update" },
+      },
+      { failOpen: true }
+    )
 
     return NextResponse.json({ ok: true })
   } catch (err) {

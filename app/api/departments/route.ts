@@ -3,6 +3,7 @@ import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
 import { logger } from "@/lib/logger"
+import { writeAuditLog } from "@/lib/audit/write-audit"
 
 const log = logger("departments")
 
@@ -103,6 +104,18 @@ export async function POST(request: Request) {
       .single()
 
     if (error) throw error
+
+    await writeAuditLog(
+      supabase as any,
+      {
+        action: "create",
+        entityType: "department",
+        entityId: department.id,
+        newValues: { name, description, department_head_id },
+        context: { actorId: user.id, source: "api", route: "/api/departments" },
+      },
+      { failOpen: true }
+    )
 
     return NextResponse.json({ data: department }, { status: 201 })
   } catch (error) {

@@ -3,6 +3,7 @@ import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
 import { logger } from "@/lib/logger"
+import { writeAuditLog } from "@/lib/audit/write-audit"
 
 const log = logger("departments")
 
@@ -106,6 +107,18 @@ export async function PUT(request: Request, { params }: { params: { id: string }
 
     if (error) throw error
 
+    await writeAuditLog(
+      supabase as any,
+      {
+        action: "update",
+        entityType: "department",
+        entityId: params.id,
+        newValues: { name, description, department_head_id },
+        context: { actorId: user.id, source: "api", route: `/api/departments/${params.id}` },
+      },
+      { failOpen: true }
+    )
+
     return NextResponse.json({ data: department })
   } catch (error) {
     log.error({ err: String(error) }, "Error updating department:")
@@ -162,6 +175,18 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
       .eq("id", params.id)
 
     if (error) throw error
+
+    await writeAuditLog(
+      supabase as any,
+      {
+        action: "delete",
+        entityType: "department",
+        entityId: params.id,
+        oldValues: { name: existingDepartment.name, is_active: true },
+        context: { actorId: user.id, source: "api", route: `/api/departments/${params.id}` },
+      },
+      { failOpen: true }
+    )
 
     return NextResponse.json({ success: true, soft_deleted: true })
   } catch (error) {
