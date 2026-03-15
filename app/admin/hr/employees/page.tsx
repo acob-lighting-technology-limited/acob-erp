@@ -27,7 +27,7 @@ async function getAdminEmployeeData() {
   }
 
   // Fetch employees - all leads can view users; mutation is restricted in the UI and backend.
-  let query = dataClient.from("profiles").select("*").order("last_name", { ascending: true })
+  const query = dataClient.from("profiles").select("*").order("last_name", { ascending: true })
 
   const { data: employeeData, error: employeeError } = await query
 

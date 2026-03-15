@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createClient as createAdminClient } from "@supabase/supabase-js"
 import { DEFAULT_MAINTENANCE_MESSAGE, canManageMaintenanceMode, parseMaintenanceMode } from "@/lib/maintenance"
+import { invalidateMaintenanceCache } from "@/lib/supabase/middleware"
 
 export async function GET() {
   try {
@@ -100,6 +101,10 @@ export async function PUT(request: NextRequest) {
     if (upsertError) {
       return NextResponse.json({ error: `Failed to update maintenance mode: ${upsertError.message}` }, { status: 500 })
     }
+
+    // Immediately invalidate the in-process cache so the next request
+    // reflects the new state without waiting for the 30s TTL to expire.
+    invalidateMaintenanceCache()
 
     return NextResponse.json({
       data: {

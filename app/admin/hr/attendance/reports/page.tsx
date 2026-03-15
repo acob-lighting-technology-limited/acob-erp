@@ -49,7 +49,7 @@ export default function AttendanceReportsPage() {
     try {
       const supabase = createClient()
 
-      let query = supabase
+      const query = supabase
         .from("attendance_records")
         .select(
           `

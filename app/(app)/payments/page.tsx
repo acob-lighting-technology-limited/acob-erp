@@ -65,7 +65,7 @@ async function getPaymentsData() {
     .single()
 
   let currentUserDepartmentId: string | null = null
-  let isAdmin = false
+  const isAdmin = false
 
   const resolveDepartmentCandidates = (department: string | null | undefined): string[] => {
     const raw = String(department || "").trim()

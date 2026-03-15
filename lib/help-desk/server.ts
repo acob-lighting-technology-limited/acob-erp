@@ -1,6 +1,14 @@
 import { createClient } from "@/lib/supabase/server"
 import { resolveAdminScope } from "@/lib/admin/rbac"
 import { writeAuditLog } from "@/lib/audit/write-audit"
+import {
+  BUSINESS_HOUR_START,
+  BUSINESS_HOUR_END,
+  SLA_URGENT_HOURS,
+  SLA_HIGH_HOURS,
+  SLA_MEDIUM_DAYS,
+  SLA_LOW_DAYS,
+} from "@/config/constants"
 
 export const HELP_DESK_PRIORITIES = ["low", "medium", "high", "urgent"] as const
 export const HELP_DESK_STATUSES = [
@@ -37,7 +45,7 @@ export function addBusinessHours(baseDate: Date, hours: number): Date {
     if (day === 0 || day === 6) continue
 
     const hour = date.getHours()
-    if (hour >= 9 && hour < 18) {
+    if (hour >= BUSINESS_HOUR_START && hour < BUSINESS_HOUR_END) {
       remainingHours -= 1
     }
   }
@@ -61,10 +69,10 @@ export function addBusinessDays(baseDate: Date, days: number): Date {
 }
 
 export function getSlaTarget(priority: HelpDeskPriority, submittedAt: Date): Date {
-  if (priority === "urgent") return addBusinessHours(submittedAt, 4)
-  if (priority === "high") return addBusinessHours(submittedAt, 24)
-  if (priority === "medium") return addBusinessDays(submittedAt, 3)
-  return addBusinessDays(submittedAt, 7)
+  if (priority === "urgent") return addBusinessHours(submittedAt, SLA_URGENT_HOURS)
+  if (priority === "high") return addBusinessHours(submittedAt, SLA_HIGH_HOURS)
+  if (priority === "medium") return addBusinessDays(submittedAt, SLA_MEDIUM_DAYS)
+  return addBusinessDays(submittedAt, SLA_LOW_DAYS)
 }
 
 export function isAdminRole(role?: string | null): boolean {

@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createClient as createAdminClient } from "@supabase/supabase-js"
 import { applyAssignableStatusFilter } from "@/lib/workforce/assignment-policy"
+import { DEPT_EXECUTIVE_MANAGEMENT, DEPT_CORPORATE_SERVICES } from "@/config/constants"
 
 type StepResult = {
   step: string
@@ -177,12 +178,12 @@ async function testHelpDesk(admin: any, body: any): Promise<{ ok: boolean; steps
         const managed = Array.isArray(p.lead_departments) ? p.lead_departments : []
         return (
           (["developer", "admin", "super_admin"].includes(p.role) || p.is_department_lead) &&
-          (p.department === "Corporate Services" || managed.includes("Corporate Services"))
+          (p.department === DEPT_CORPORATE_SERVICES || managed.includes(DEPT_CORPORATE_SERVICES))
         )
       })
       const md = (profiles || []).find((p: any) => {
         return (
-          (["developer", "admin", "super_admin"].includes(p.role) && p.department === "Executive Management") ||
+          (["developer", "admin", "super_admin"].includes(p.role) && p.department === DEPT_EXECUTIVE_MANAGEMENT) ||
           p.role === "developer" ||
           p.role === "super_admin"
         )

@@ -226,21 +226,14 @@ export function WeeklyReportAdminDialog({
         department: isLead ? currentUser.department || formData.department : formData.department,
       }
 
-      let reportId = report?.id
-      if (report) {
-        const { error } = await supabase.from("weekly_reports").update(safeFormData).eq("id", report.id)
-        if (error) throw error
-        toast.success("Updated")
-      } else {
-        const { data: newReport, error } = await supabase
-          .from("weekly_reports")
-          .insert([safeFormData])
-          .select("id")
-          .single()
-        if (error) throw error
-        reportId = newReport.id
-        toast.success("Created")
-      }
+      const { data: savedReport, error: reportError } = await supabase
+        .from("weekly_reports")
+        .upsert(safeFormData, { onConflict: "department,week_number,year" })
+        .select("id")
+        .single()
+      if (reportError) throw reportError
+      const reportId = savedReport.id
+      toast.success(report ? "Updated" : "Saved")
 
       if (!isNextWeekActive) {
         const payload: any[] = []

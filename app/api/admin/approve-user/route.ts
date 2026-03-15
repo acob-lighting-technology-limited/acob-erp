@@ -6,6 +6,8 @@ import { renderInternalNotificationEmail } from "@/lib/email-templates/internal-
 import { resolveActiveLeadRecipients, sendNotificationEmail } from "@/lib/notifications/email-gateway"
 import { isSystemNotificationChannelEnabled, resolveChannelEligibleUserIds } from "@/lib/notifications/delivery-policy"
 import { withSubjectPrefix } from "@/lib/notifications/subject-policy"
+import { syncEmploymentStatusToAuth } from "@/lib/supabase/admin"
+import { PORTAL_URL } from "@/config/constants"
 
 export async function POST(req: Request) {
   // 1. Verify Caller is an Admin
@@ -63,7 +65,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: `Missing required user data: ${missingFields.join(", ")}` }, { status: 422 })
     }
 
-    // 2. Determine Employee ID with Retry Logic for Race Conditions
+    // 2. Determine Employee ID
+    //    If manually provided: validate format only.
+    //    If auto-generated: use the DB function which holds an advisory lock
+    //    for the duration of the transaction, eliminating race conditions.
     let employeeId = manualEmployeeId
     const currentYear = new Date().getFullYear()
 
@@ -78,46 +83,19 @@ export async function POST(req: Request) {
     }
 
     if (!employeeId) {
-      let retryCount = 0
-      const maxRetries = 3
-      while (retryCount < maxRetries) {
-        const { data: lastProfile } = await supabaseAdmin
-          .from("profiles")
-          .select("employee_number")
-          .not("employee_number", "is", null)
-          .order("employee_number", { ascending: false })
-          .limit(1)
-          .single()
+      // generate_next_employee_number uses pg_advisory_xact_lock internally,
+      // so concurrent calls are serialised at the DB level — no retry needed.
+      const { data: genResult, error: genError } = await supabaseAdmin
+        .rpc("generate_next_employee_number", { p_year: currentYear })
 
-        let nextIdNumber = 1
-        if (lastProfile && lastProfile.employee_number) {
-          const parts = lastProfile.employee_number.split("/")
-          if (parts.length === 3) {
-            const lastNum = parseInt(parts[2], 10)
-            if (!isNaN(lastNum)) nextIdNumber = lastNum + retryCount + 1
-          }
-        }
-        employeeId = `ACOB/${currentYear}/${nextIdNumber.toString().padStart(3, "0")}`
-
-        // Check if this ID is already taken
-        const { data: exists } = await supabaseAdmin
-          .from("profiles")
-          .select("id")
-          .eq("employee_number", employeeId)
-          .single()
-        if (!exists) break
-        retryCount++
+      if (genError || !genResult) {
+        throw new Error(`Failed to generate employee number: ${genError?.message ?? "unknown error"}`)
       }
-
-      if (retryCount >= maxRetries) {
-        throw new Error(
-          "Failed to generate a unique employee ID after multiple attempts. Please try again or specify an ID manually."
-        )
-      }
+      employeeId = genResult as string
     }
 
     const tempPassword = `Welcome${currentYear}!`
-    const portalUrl = "https://acoblighting.com/mail"
+    const portalUrl = PORTAL_URL
 
     // 3. Create or Update Auth User
     // First check if user already exists
@@ -155,94 +133,40 @@ export async function POST(req: Request) {
       }
     }
 
-    // 4. Upsert Profile Record with Retry for Employee ID
-    let profileError = null
-    let retryUpsert = 0
-    const maxUpsertRetries = 3
+    // 4. Atomically upsert the profile AND delete the pending_user record.
+    //    complete_user_approval() runs both writes in a single DB transaction,
+    //    so a failure in either step rolls back both — no ghost records.
+    const { error: approvalError } = await supabaseAdmin.rpc("complete_user_approval", {
+      p_auth_user_id:        authUserId,
+      p_pending_user_id:     pendingUserId,
+      p_employee_number:     employeeId,
+      p_first_name:          pendingUser.first_name,
+      p_last_name:           pendingUser.last_name,
+      p_other_names:         pendingUser.other_names ?? null,
+      p_department:          pendingUser.department,
+      p_company_role:        pendingUser.company_role,
+      p_company_email:       pendingUser.company_email,
+      p_personal_email:      pendingUser.personal_email,
+      p_phone_number:        pendingUser.phone_number ?? null,
+      p_additional_phone:    pendingUser.additional_phone_number ?? null,
+      p_residential_address: pendingUser.residential_address ?? null,
+      p_office_location:     pendingUser.office_location ?? null,
+      p_employment_date:     hireDate || new Date().toISOString(),
+    })
 
-    while (retryUpsert < maxUpsertRetries) {
-      // If employeeId is NOT manually set and we are retrying, regenerate it
-      if (!manualEmployeeId && retryUpsert > 0) {
-        const { data: lastProfile } = await supabaseAdmin
-          .from("profiles")
-          .select("employee_number")
-          .not("employee_number", "is", null)
-          .order("employee_number", { ascending: false })
-          .limit(1)
-          .single()
-
-        let nextIdNumber = 1
-        if (lastProfile && lastProfile.employee_number) {
-          const parts = lastProfile.employee_number.split("/")
-          if (parts.length === 3) {
-            const lastNum = parseInt(parts[2], 10)
-            if (!isNaN(lastNum)) nextIdNumber = lastNum + retryUpsert + 1
-          }
-        }
-        employeeId = `ACOB/${currentYear}/${nextIdNumber.toString().padStart(3, "0")}`
-      }
-
-      const { error } = await supabaseAdmin.from("profiles").upsert(
-        {
-          id: authUserId,
-          first_name: pendingUser.first_name,
-          last_name: pendingUser.last_name,
-          other_names: pendingUser.other_names,
-          department: pendingUser.department,
-          company_role: pendingUser.company_role,
-          role: "employee",
-          employment_status: "active",
-          employee_number: employeeId,
-          company_email: pendingUser.company_email,
-          personal_email: pendingUser.personal_email,
-          phone_number: pendingUser.phone_number,
-          additional_phone: pendingUser.additional_phone_number,
-          residential_address: pendingUser.residential_address,
-          office_location: pendingUser.office_location,
-          employment_date: hireDate || new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          setup_token: null,
-          setup_token_expires_at: null,
-          must_reset_password: false,
-        },
-        { onConflict: "id" }
-      )
-
-      if (!error) {
-        profileError = null
-        break
-      }
-
-      // Check for employee_number unique constraint violation
-      // Postgres error code 23505 is unique_violation
-      if (error && error.code === "23505" && error.message.includes("profiles_employee_number_key")) {
-        console.warn(`Employee ID collision for ${employeeId}, retrying...`)
-        retryUpsert++
-        profileError = error
-        continue
-      } else {
-        // Other errors are fatal
-        profileError = error
-        break
-      }
-    }
-
-    if (profileError) {
+    if (approvalError) {
       // Clean up orphaned auth user if we just created one
       if (!existingProfile && authUserId) {
         await supabaseAdmin.auth.admin
           .deleteUser(authUserId)
           .catch((e) => console.error("Failed to clean up orphaned auth user:", e))
       }
-      throw new Error(`Profile creation failed: ${profileError.message}`)
+      throw new Error(`Profile creation failed: ${approvalError.message}`)
     }
 
-    // 5. Delete from Pending Users
-    const { error: deleteError } = await supabaseAdmin.from("pending_users").delete().eq("id", pendingUserId)
-    if (deleteError) {
-      console.error("CRITICAL ERROR: Failed to delete pending user record after profile creation", deleteError)
-      // We don't throw because the profile is already created, but this is a serious data integrity issue
-    }
+    // Sync employment_status to Auth user_metadata so the middleware can read
+    // it from the session without an extra DB query on every request.
+    await syncEmploymentStatusToAuth(authUserId!, "active")
 
     // 6. Send Welcome Email
     try {

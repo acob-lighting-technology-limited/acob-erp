@@ -1,5 +1,6 @@
 import type { UserRole, Profile } from "@/types/database"
 import { canAssignRole as canAssignManagedRole } from "@/lib/role-management"
+import { DEPT_EXECUTIVE_MANAGEMENT } from "@/config/constants"
 
 /**
  * Role Hierarchy (from highest to lowest):
@@ -170,7 +171,7 @@ export const DEPARTMENTS = [
   "Accounts",
   "Admin & HR",
   "Business, Growth and Innovation",
-  "Executive Management",
+  DEPT_EXECUTIVE_MANAGEMENT,
   "IT and Communications",
   "Legal, Regulatory and Compliance",
   "Logistics",

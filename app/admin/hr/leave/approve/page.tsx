@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Clock, History, CalendarCheck2, CheckCircle2, AlertCircle } from "lucide-react"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { StatCard } from "@/components/ui/stat-card"
 import { EmptyState } from "@/components/ui/patterns"
+import { PromptDialog } from "@/components/ui/prompt-dialog"
 
 interface LeaveItem {
   id: string
@@ -55,11 +56,28 @@ const STAGE_LABELS: Record<string, string> = {
   cancelled: "Cancelled",
 }
 
+interface ActionDialogState {
+  open: boolean
+  id: string
+  action: "approve" | "reject"
+  /** Set when approve requires evidence override */
+  missingDocuments: string[]
+}
+
 export default function LeaveApprovePage() {
   const [loading, setLoading] = useState(true)
   const [myQueue, setMyQueue] = useState<LeaveItem[]>([])
   const [allPendingQueue, setAllPendingQueue] = useState<LeaveItem[]>([])
   const [history, setHistory] = useState<LeaveItem[]>([])
+
+  const [actionDialog, setActionDialog] = useState<ActionDialogState>({
+    open: false,
+    id: "",
+    action: "reject",
+    missingDocuments: [],
+  })
+  // Ref to carry "overrideEvidence" flag from the dialog into submitAction
+  const overrideEvidenceRef = useRef(false)
 
   useEffect(() => {
     void loadData()
@@ -90,30 +108,27 @@ export default function LeaveApprovePage() {
     }
   }
 
-  async function handleAction(id: string, action: "approve" | "reject") {
+  function handleAction(id: string, action: "approve" | "reject") {
     const target = myQueue.find((item) => item.id === id) || history.find((item) => item.id === id)
     const needsOverride = action === "approve" && target && target.evidence_complete === false
 
-    let comments = action === "reject" ? window.prompt("Rejection reason") || "" : ""
-    let overrideEvidence = false
-
-    if (needsOverride) {
-      comments =
-        window.prompt(
-          `Evidence is incomplete (${(target?.missing_documents || []).join(", ")}). Enter override reason to proceed:`
-        ) || ""
-      if (!comments.trim()) {
-        toast.error("Override reason is required when evidence is incomplete")
-        return
-      }
-      overrideEvidence = true
-    }
-
-    if (action === "reject" && !comments.trim()) {
-      toast.error("Rejection reason is required")
+    if (action === "approve" && !needsOverride) {
+      // No prompt needed — submit directly
+      void submitAction(id, "approve", "", false)
       return
     }
 
+    // Open the appropriate dialog
+    overrideEvidenceRef.current = needsOverride
+    setActionDialog({
+      open: true,
+      id,
+      action,
+      missingDocuments: needsOverride ? (target?.missing_documents || []) : [],
+    })
+  }
+
+  async function submitAction(id: string, action: "approve" | "reject", comments: string, overrideEvidence: boolean) {
     try {
       const response = await fetch("/api/hr/leave/approve", {
         method: "POST",
@@ -153,7 +168,33 @@ export default function LeaveApprovePage() {
     history: history.length,
   }
 
+  const isOverride = actionDialog.missingDocuments.length > 0
+
   return (
+    <>
+    <PromptDialog
+      open={actionDialog.open}
+      onOpenChange={(open) => setActionDialog((s) => ({ ...s, open }))}
+      title={
+        isOverride
+          ? "Override Incomplete Evidence"
+          : "Rejection Reason"
+      }
+      description={
+        isOverride
+          ? `Evidence is incomplete (${actionDialog.missingDocuments.join(", ")}). Provide an override reason to proceed with approval.`
+          : "Please provide a reason for rejecting this leave request."
+      }
+      label={isOverride ? "Override reason" : "Rejection reason"}
+      placeholder={isOverride ? "Explain why evidence requirement is being waived…" : "Enter rejection reason…"}
+      inputType="textarea"
+      required
+      confirmLabel={isOverride ? "Approve with Override" : "Reject"}
+      confirmVariant={isOverride ? "default" : "destructive"}
+      onConfirm={(value) => {
+        void submitAction(actionDialog.id, actionDialog.action, value, overrideEvidenceRef.current)
+      }}
+    />
     <AdminTablePage
       title="Leave Approvals"
       description="HR final endorsement dashboard with full leave history"
@@ -389,5 +430,6 @@ export default function LeaveApprovePage() {
         </TabsContent>
       </Tabs>
     </AdminTablePage>
+    </>
   )
 }

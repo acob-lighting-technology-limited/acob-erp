@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { PromptDialog } from "@/components/ui/prompt-dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -102,6 +103,10 @@ export function LeaveContent({
   const [showLeavePolicy, setShowLeavePolicy] = useState(false)
   const [requestsTab, setRequestsTab] = useState<"ongoing" | "history">("ongoing")
   const [historyFilter, setHistoryFilter] = useState<"all" | "approved" | "rejected" | "cancelled">("all")
+  // Rejection reason dialog state
+  const [rejectPrompt, setRejectPrompt] = useState<{ requestId: string } | null>(null)
+  // Evidence URL dialog state
+  const [evidencePrompt, setEvidencePrompt] = useState<{ requestId: string; documentType: string } | null>(null)
   const approvalQueueRef = useRef<HTMLDivElement | null>(null)
   const [formData, setFormData] = useState(EMPTY_REQUEST_FORM)
   const todayIsoDate = useMemo(() => getTodayLocalIsoDate(), [])
@@ -312,27 +317,15 @@ export function LeaveContent({
     }
   }
 
-  async function handleAction(requestId: string, action: "approve" | "reject") {
-    const comments = action === "reject" ? window.prompt("Reason for rejection") || "" : ""
-    if (action === "reject" && !comments.trim()) {
-      toast.error("Rejection reason is required")
-      return
-    }
-
+  async function submitAction(requestId: string, action: "approve" | "reject", comments: string) {
     try {
       const response = await fetch("/api/hr/leave/approve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          leave_request_id: requestId,
-          action,
-          comments,
-        }),
+        body: JSON.stringify({ leave_request_id: requestId, action, comments }),
       })
-
       const payload = await response.json()
       if (!response.ok) throw new Error(payload.error || "Failed to process action")
-
       toast.success(payload.message || "Action completed")
       await refreshData()
     } catch (error) {
@@ -340,22 +333,23 @@ export function LeaveContent({
     }
   }
 
-  async function handleUploadEvidence(requestId: string, documentType: string) {
-    const fileUrl = window.prompt(`Enter URL for ${prettyDocName(documentType)}:`)?.trim()
-    if (!fileUrl) return
+  function handleAction(requestId: string, action: "approve" | "reject") {
+    if (action === "reject") {
+      // Open modal to collect rejection reason
+      setRejectPrompt({ requestId })
+    } else {
+      submitAction(requestId, "approve", "")
+    }
+  }
 
+  async function submitEvidence(requestId: string, documentType: string, fileUrl: string) {
     setUploadingEvidenceFor(requestId)
     try {
       const response = await fetch("/api/hr/leave/evidence", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          leave_request_id: requestId,
-          document_type: documentType,
-          file_url: fileUrl,
-        }),
+        body: JSON.stringify({ leave_request_id: requestId, document_type: documentType, file_url: fileUrl }),
       })
-
       const payload = await response.json()
       if (!response.ok) throw new Error(payload.error || "Failed to upload evidence")
       toast.success(payload.message || "Evidence uploaded")
@@ -367,7 +361,47 @@ export function LeaveContent({
     }
   }
 
+  function handleUploadEvidence(requestId: string, documentType: string) {
+    setEvidencePrompt({ requestId, documentType })
+  }
+
   return (
+    <>
+    {/* Rejection reason dialog */}
+    <PromptDialog
+      open={!!rejectPrompt}
+      onOpenChange={(open) => { if (!open) setRejectPrompt(null) }}
+      title="Rejection Reason"
+      description="Please provide a reason for rejecting this leave request."
+      label="Reason"
+      placeholder="Enter rejection reason..."
+      inputType="textarea"
+      required
+      confirmLabel="Reject Leave"
+      confirmVariant="destructive"
+      onConfirm={(reason) => {
+        if (rejectPrompt) submitAction(rejectPrompt.requestId, "reject", reason)
+        setRejectPrompt(null)
+      }}
+    />
+
+    {/* Evidence URL dialog */}
+    <PromptDialog
+      open={!!evidencePrompt}
+      onOpenChange={(open) => { if (!open) setEvidencePrompt(null) }}
+      title={`Upload Evidence: ${evidencePrompt ? prettyDocName(evidencePrompt.documentType) : ""}`}
+      description="Enter the URL of the uploaded document."
+      label="Document URL"
+      placeholder="https://..."
+      inputType="url"
+      required
+      confirmLabel="Submit"
+      onConfirm={(url) => {
+        if (evidencePrompt) submitEvidence(evidencePrompt.requestId, evidencePrompt.documentType, url)
+        setEvidencePrompt(null)
+      }}
+    />
+
     <PageWrapper maxWidth="full" background="gradient">
       <PageHeader
         title="Leave Management"
@@ -761,5 +795,6 @@ export function LeaveContent({
         </div>
       )}
     </PageWrapper>
+    </>
   )
 }

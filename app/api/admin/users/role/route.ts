@@ -7,6 +7,7 @@ import {
   canManageDeveloperAccounts,
   canManageSuperAdminAccounts,
 } from "@/lib/role-management"
+import { syncEmploymentStatusToAuth } from "@/lib/supabase/admin"
 
 export async function POST(request: Request) {
   try {
@@ -136,6 +137,12 @@ export async function POST(request: Request) {
 
     if (updateError) {
       return NextResponse.json({ error: updateError.message }, { status: 400 })
+    }
+
+    // Sync employment_status to Auth user_metadata so the middleware can read
+    // it from the session without an extra DB query on every request.
+    if (employmentStatus) {
+      await syncEmploymentStatusToAuth(targetUserId, employmentStatus)
     }
 
     return NextResponse.json({ ok: true })

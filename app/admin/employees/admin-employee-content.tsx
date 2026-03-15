@@ -230,7 +230,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
     setIsLoading(true)
     try {
       // Fetch employees - all leads can view users; mutation is restricted to HR lead/admin/super admin.
-      let query = supabase.from("profiles").select("*").order("last_name", { ascending: true })
+      const query = supabase.from("profiles").select("*").order("last_name", { ascending: true })
 
       const { data, error } = await query
 

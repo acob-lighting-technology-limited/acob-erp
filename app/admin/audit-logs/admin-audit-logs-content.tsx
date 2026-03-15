@@ -667,8 +667,8 @@ export function AdminAuditLogsContent({
           }
 
           // ENRICHMENT: Inject human-readable labels into the JSON blobs for the details view
-          let enrichedNewValues = new_values ? { ...new_values } : null
-          let enrichedOldValues = old_values ? { ...old_values } : null
+          const enrichedNewValues = new_values ? { ...new_values } : null
+          const enrichedOldValues = old_values ? { ...old_values } : null
 
           // 1. Resolve Department Name
           let dName = null

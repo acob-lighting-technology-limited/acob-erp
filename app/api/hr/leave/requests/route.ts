@@ -159,25 +159,68 @@ export async function GET(request: NextRequest) {
       approvalsByRequest.set(approval.leave_request_id, rows)
     }
 
-    const enriched = await Promise.all(
-      requestRows.map(async (leaveRequest: any) => {
-        const policy = await getLeavePolicy(supabase, leaveRequest.leave_type_id)
-        const requiredDocs = policy.required_documents || []
-        const evidence = await areRequiredDocumentsVerified(supabase, leaveRequest.id, requiredDocs)
-        return {
-          ...leaveRequest,
-          user: leaveRequest.user_id ? profileMap.get(leaveRequest.user_id) || null : null,
-          reliever: leaveRequest.reliever_id ? profileMap.get(leaveRequest.reliever_id) || null : null,
-          supervisor: leaveRequest.supervisor_id ? profileMap.get(leaveRequest.supervisor_id) || null : null,
-          leave_type: leaveRequest.leave_type_id ? leaveTypeMap.get(leaveRequest.leave_type_id) || null : null,
-          evidence: evidenceByRequest.get(leaveRequest.id) || [],
-          approvals: approvalsByRequest.get(leaveRequest.id) || [],
-          required_documents: requiredDocs,
-          evidence_complete: evidence.complete,
-          missing_documents: evidence.missing,
+    // Pre-fetch all leave policies in a single batch query (eliminates N→1 queries)
+    const uniqueLeaveTypeIds = Array.from(
+      new Set(requestRows.map((r: any) => r.leave_type_id).filter(Boolean))
+    ) as string[]
+    const batchPolicyMap = new Map<string, any>()
+    if (uniqueLeaveTypeIds.length > 0) {
+      const { data: policyRows } = await supabase
+        .from("leave_policies")
+        .select(
+          "leave_type_id, annual_days, eligibility, min_tenure_months, notice_days, accrual_mode, is_active, eligibility_conditions, required_documents, frequency_rules, override_allowed"
+        )
+        .in("leave_type_id", uniqueLeaveTypeIds)
+      for (const p of policyRows || []) {
+        if (p.is_active) {
+          batchPolicyMap.set(p.leave_type_id, {
+            ...p,
+            eligibility_conditions: p.eligibility_conditions || {},
+            required_documents: Array.isArray(p.required_documents)
+              ? p.required_documents.filter((d: unknown) => typeof d === "string")
+              : [],
+            frequency_rules: p.frequency_rules || {},
+            override_allowed: p.override_allowed ?? true,
+          })
         }
-      })
-    )
+      }
+    }
+
+    // Compute evidence completeness from already-batched evidenceRows — no extra queries
+    const enriched = requestRows.map((leaveRequest: any) => {
+      const policy = batchPolicyMap.get(leaveRequest.leave_type_id)
+      const requiredDocs: string[] = policy?.required_documents || []
+      const requestEvidence = evidenceByRequest.get(leaveRequest.id) || []
+
+      let evidenceComplete = true
+      const missingDocs: string[] = []
+      if (requiredDocs.length > 0) {
+        const verifiedSet = new Set(
+          requestEvidence
+            .filter((e: any) => e.status === "verified")
+            .map((e: any) => e.document_type)
+        )
+        for (const doc of requiredDocs) {
+          if (!verifiedSet.has(doc)) {
+            evidenceComplete = false
+            missingDocs.push(doc)
+          }
+        }
+      }
+
+      return {
+        ...leaveRequest,
+        user: leaveRequest.user_id ? profileMap.get(leaveRequest.user_id) || null : null,
+        reliever: leaveRequest.reliever_id ? profileMap.get(leaveRequest.reliever_id) || null : null,
+        supervisor: leaveRequest.supervisor_id ? profileMap.get(leaveRequest.supervisor_id) || null : null,
+        leave_type: leaveRequest.leave_type_id ? leaveTypeMap.get(leaveRequest.leave_type_id) || null : null,
+        evidence: requestEvidence,
+        approvals: approvalsByRequest.get(leaveRequest.id) || [],
+        required_documents: requiredDocs,
+        evidence_complete: evidenceComplete,
+        missing_documents: missingDocs,
+      }
+    })
 
     const balances = (balanceRows || []).map((row: any) => ({
       ...row,

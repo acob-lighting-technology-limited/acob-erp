@@ -59,6 +59,7 @@ async function getData() {
   return {
     userId: user.id,
     currentViewerRole: role,
+    isDepartmentLead: isDeptLead,
     currentViewerName,
     currentViewerDepartment: profile?.department || "",
     records: scopedRecords || [],
@@ -77,6 +78,7 @@ export default async function ToolsReferenceGeneratorPage() {
     <PortalCorrespondenceContent
       userId={data.userId}
       currentViewerRole={data.currentViewerRole}
+      isDepartmentLead={data.isDepartmentLead}
       currentViewerName={data.currentViewerName}
       currentViewerDepartment={data.currentViewerDepartment}
       initialRecords={data.records as any}

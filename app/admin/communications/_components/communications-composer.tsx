@@ -1,6 +1,8 @@
 "use client"
 
 import { useState, useMemo, useCallback, useEffect, useRef } from "react"
+import DOMPurify from "dompurify"
+import { PromptDialog } from "@/components/ui/prompt-dialog"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
 import { writeAuditLogClient } from "@/lib/audit/client"
@@ -150,6 +152,7 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
   const [isSending, setIsSending] = useState(false)
   const [sendResult, setSendResult] = useState<any>(null)
   const [activeSchedules, setActiveSchedules] = useState<any[]>([])
+  const [linkDialogOpen, setLinkDialogOpen] = useState(false)
 
   const supabase = createClient()
   const currentUserDept = (currentUser?.department || "").trim()
@@ -241,8 +244,9 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
     if (reminderType !== "admin_broadcast") return
     const el = editorRef.current
     if (!el) return
-    if (el.innerHTML !== broadcastBodyHtml) {
-      el.innerHTML = broadcastBodyHtml
+    const sanitized = DOMPurify.sanitize(broadcastBodyHtml)
+    if (el.innerHTML !== sanitized) {
+      el.innerHTML = sanitized
     }
   }, [reminderType, broadcastBodyHtml])
 
@@ -250,13 +254,21 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
     if (!editorRef.current) return
     editorRef.current.focus()
     document.execCommand(command, false, value)
-    setBroadcastBodyHtml(editorRef.current.innerHTML)
+    setBroadcastBodyHtml(DOMPurify.sanitize(editorRef.current.innerHTML))
   }, [])
 
   const addEditorLink = useCallback(() => {
-    const url = window.prompt("Enter link URL (https://...)")
-    if (!url) return
-    runEditorCommand("createLink", url.trim())
+    setLinkDialogOpen(true)
+  }, [])
+
+  const handleLinkConfirm = useCallback((url: string) => {
+    const trimmed = url.trim()
+    // Only allow http/https URLs to prevent javascript: XSS via link injection
+    if (!/^https?:\/\//i.test(trimmed)) {
+      toast.error("Only https:// or http:// links are allowed.")
+      return
+    }
+    runEditorCommand("createLink", trimmed)
   }, [runEditorCommand])
 
   const logMailAudit = useCallback(
@@ -615,6 +627,19 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
+    <>
+    <PromptDialog
+      open={linkDialogOpen}
+      onOpenChange={setLinkDialogOpen}
+      title="Insert Link"
+      description="Only https:// or http:// URLs are permitted."
+      label="URL"
+      placeholder="https://example.com"
+      inputType="url"
+      required
+      confirmLabel="Insert"
+      onConfirm={handleLinkConfirm}
+    />
     <PageWrapper maxWidth="full" background="gradient">
       <PageHeader
         title={mode === "communications" ? "Broadcast Communications" : "Meeting Reminders"}
@@ -970,7 +995,7 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
                         contentEditable
                         suppressContentEditableWarning
                         className="bg-background min-h-[220px] rounded-b-lg border p-3 text-sm leading-6 outline-none focus:ring-2 focus:ring-orange-500"
-                        onInput={(e) => setBroadcastBodyHtml((e.currentTarget as HTMLDivElement).innerHTML)}
+                        onInput={(e) => setBroadcastBodyHtml(DOMPurify.sanitize((e.currentTarget as HTMLDivElement).innerHTML))}
                       />
                       <p className="text-muted-foreground text-xs">
                         Paste text from Word or type directly. This message is placed between the ACOB header and
@@ -1525,5 +1550,6 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
         </aside>
       </div>
     </PageWrapper>
+    </>
   )
 }

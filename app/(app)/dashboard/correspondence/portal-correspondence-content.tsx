@@ -32,6 +32,7 @@ interface PortalCorrespondenceContentProps {
   currentViewerName: string
   currentViewerDepartment: string
   currentViewerRole?: string
+  isDepartmentLead?: boolean
   initialRecords: CorrespondenceRecord[]
   departmentCodes: DepartmentCodeOption[]
 }
@@ -40,6 +41,7 @@ export function PortalCorrespondenceContent({
   currentViewerName,
   currentViewerDepartment,
   currentViewerRole,
+  isDepartmentLead,
   initialRecords,
   departmentCodes,
 }: PortalCorrespondenceContentProps) {
@@ -78,7 +80,7 @@ export function PortalCorrespondenceContent({
       incoming: records.filter((r) => r.direction === "incoming").length,
     }
   }, [records])
-  const isLead = currentViewerRole === "lead"
+  const isLead = Boolean(isDepartmentLead)
   const pendingRecords = useMemo(
     () => records.filter((r) => ["open", "under_review", "assigned_action_pending"].includes(r.status)),
     [records]

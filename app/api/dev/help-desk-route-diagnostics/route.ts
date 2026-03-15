@@ -12,6 +12,7 @@ import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createClient as createAdminClient } from "@supabase/supabase-js"
 import { applyAssignableStatusFilter } from "@/lib/workforce/assignment-policy"
+import { DEPT_EXECUTIVE_MANAGEMENT, DEPT_CORPORATE_SERVICES } from "@/config/constants"
 
 type DiagRow = {
   flow_kind: "support" | "procurement"
@@ -47,7 +48,7 @@ function isHcsCandidate(profile: any): boolean {
       profile.role === "super_admin" ||
       profile.role === "admin" ||
       profile.is_department_lead) &&
-    (profile.department === "Corporate Services" || managed.includes("Corporate Services"))
+    (profile.department === DEPT_CORPORATE_SERVICES || managed.includes(DEPT_CORPORATE_SERVICES))
   )
 }
 
@@ -55,7 +56,7 @@ function isMdCandidate(profile: any): boolean {
   if (!profile) return false
   return (
     ((profile.role === "developer" || profile.role === "super_admin" || profile.role === "admin") &&
-      profile.department === "Executive Management") ||
+      profile.department === DEPT_EXECUTIVE_MANAGEMENT) ||
     profile.role === "developer" ||
     profile.role === "super_admin"
   )

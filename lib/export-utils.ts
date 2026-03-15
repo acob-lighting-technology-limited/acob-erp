@@ -1,6 +1,7 @@
 import { jsPDF } from "jspdf"
 import autoTable from "jspdf-autotable"
 import { saveAs } from "file-saver"
+import { DEPT_EXECUTIVE_MANAGEMENT } from "@/config/constants"
 import {
   Document,
   Footer,
@@ -59,7 +60,7 @@ export interface WeeklyReport {
 export const DEPARTMENT_ORDER = [
   "Accounts",
   "Business, Growth and Innovation",
-  "Executive Management",
+  DEPT_EXECUTIVE_MANAGEMENT,
   "IT and Communications",
   "Admin & HR",
   "Legal, Regulatory and Compliance",
