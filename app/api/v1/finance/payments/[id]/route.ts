@@ -1,6 +1,9 @@
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
+import { logger } from "@/lib/logger"
+
+const log = logger("v1-finance-payments")
 
 export const dynamic = "force-dynamic"
 
@@ -57,7 +60,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
 
     return NextResponse.json({ data: category })
   } catch (error) {
-    console.error("Error updating payment category:", error)
+    log.error({ err: String(error) }, "Error updating payment category:")
     return NextResponse.json({ error: "Failed to update payment category" }, { status: 500 })
   }
 }
@@ -81,7 +84,7 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error("Error deleting payment category:", error)
+    log.error({ err: String(error) }, "Error deleting payment category:")
     return NextResponse.json({ error: "Failed to delete payment category" }, { status: 500 })
   }
 }

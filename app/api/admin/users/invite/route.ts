@@ -7,6 +7,11 @@ import {
   canManageDeveloperAccounts,
   canManageSuperAdminAccounts,
 } from "@/lib/role-management"
+import { rateLimit, getClientId } from "@/lib/rate-limit"
+import { logger } from "@/lib/logger"
+import { writeAuditLog } from "@/lib/audit/write-audit"
+
+const log = logger("admin-users-invite")
 
 const SUPER_ADMIN_ROLE = "super_admin"
 type AllowedRole = (typeof ASSIGNABLE_ROLES)[number]
@@ -16,6 +21,11 @@ function isValidRole(role: string): role is AllowedRole {
 }
 
 export async function POST(request: Request) {
+  const rl = rateLimit(`invite:${getClientId(request)}`, { limit: 10, windowSec: 600 })
+  if (!rl.allowed) {
+    return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 })
+  }
+
   try {
     const supabase = await createClient()
 
@@ -34,7 +44,7 @@ export async function POST(request: Request) {
       .single()
 
     if (profileFetchError) {
-      console.error("Error fetching requester profile:", profileFetchError)
+      log.error({ err: String(profileFetchError) }, "Error fetching requester profile:")
       return NextResponse.json({ error: "Internal server error" }, { status: 500 })
     }
 
@@ -89,7 +99,7 @@ export async function POST(request: Request) {
       })
 
       if (searchError) {
-        console.error("Error listing users:", searchError)
+        log.error({ err: String(searchError) }, "Error listing users:")
         return NextResponse.json({ error: "Failed to check existing users" }, { status: 500 })
       }
 
@@ -191,9 +201,23 @@ export async function POST(request: Request) {
       throw profileError
     }
 
+    // Audit: user invite/profile creation
+    await writeAuditLog(supabase, {
+      action: existingUser ? "update" : "create",
+      entityType: "profile",
+      entityId: userId,
+      context: { actorId: user.id, source: "api" as const },
+      newValues: {
+        company_email: emailNormalized,
+        ...(roleToApply ? { role: roleToApply } : {}),
+        ...(department ? { department } : {}),
+      },
+      metadata: { source: "admin-users-invite", invited: !existingUser },
+    }, { failOpen: true })
+
     return NextResponse.json({ success: true, userId })
   } catch (error: any) {
-    console.error("Invite error:", error)
+    log.error({ err: String(error) }, "Invite error:")
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

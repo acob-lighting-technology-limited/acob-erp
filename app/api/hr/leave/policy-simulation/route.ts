@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { evaluateLeaveEligibility, getLeavePolicy } from "@/lib/hr/leave-workflow"
+import { logger } from "@/lib/logger"
+
+const log = logger("hr-leave-policy-simulation")
 
 export async function GET(request: NextRequest) {
   try {
@@ -60,7 +63,7 @@ export async function GET(request: NextRequest) {
       data: simulations,
     })
   } catch (error) {
-    console.error("Error in GET /api/hr/leave/policy-simulation:", error)
+    log.error({ err: String(error) }, "Error in GET /api/hr/leave/policy-simulation:")
     return NextResponse.json({ error: error instanceof Error ? error.message : "An error occurred" }, { status: 500 })
   }
 }

@@ -6,6 +6,9 @@ import {
   canAccessRecord,
   getAuthContext,
 } from "@/lib/correspondence/server"
+import { logger } from "@/lib/logger"
+
+const log = logger("correspondence-records")
 
 export async function GET(_request: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -51,7 +54,7 @@ export async function GET(_request: NextRequest, { params }: { params: { id: str
       data: { record, approvals: approvals || [], events: events || [], versions: versions || [] },
     })
   } catch (error) {
-    console.error("Error in GET /api/correspondence/records/[id]:", error)
+    log.error({ err: String(error) }, "Error in GET /api/correspondence/records/[id]:")
     return NextResponse.json({ error: "Failed to fetch record details" }, { status: 500 })
   }
 }
@@ -183,7 +186,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
     return NextResponse.json({ data: updated })
   } catch (error) {
-    console.error("Error in PATCH /api/correspondence/records/[id]:", error)
+    log.error({ err: String(error) }, "Error in PATCH /api/correspondence/records/[id]:")
     return NextResponse.json({ error: "Failed to update correspondence record" }, { status: 500 })
   }
 }

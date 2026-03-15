@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { areRequiredDocumentsVerified, getLeavePolicy, notifyUsers } from "@/lib/hr/leave-workflow"
+import { logger } from "@/lib/logger"
+
+const log = logger("hr-leave-evidence")
 
 export async function POST(request: NextRequest) {
   try {
@@ -64,7 +67,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ data: evidence, message: "Evidence uploaded successfully" })
   } catch (error) {
-    console.error("Error in POST /api/hr/leave/evidence:", error)
+    log.error({ err: String(error) }, "Error in POST /api/hr/leave/evidence:")
     return NextResponse.json({ error: error instanceof Error ? error.message : "An error occurred" }, { status: 500 })
   }
 }

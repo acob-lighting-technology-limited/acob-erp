@@ -8,16 +8,17 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Badge } from "@/components/ui/badge"
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import { MyTicketsTable } from "@/components/dashboard/help-desk/my-tickets-table"
+import { PriorityBadge, TicketStatusBadge } from "@/components/dashboard/help-desk/ticket-badges"
 import { PageHeader, PageWrapper } from "@/components/layout"
 import { Headset, Plus } from "lucide-react"
 
@@ -39,28 +40,47 @@ interface HelpDeskTicket {
   requester_department?: string | null
 }
 
-interface HelpDeskCategory {
-  id: string
-  service_department: string
-  request_type: "support" | "procurement"
-  code: string
-  name: string
-  description: string | null
-  support_mode: "open_queue" | "lead_review_required" | null
+interface HelpDeskTicketDetailResponse {
+  ticket: HelpDeskTicket & {
+    description?: string | null
+    category?: string | null
+    category_id?: string | null
+    created_by?: string | null
+    updated_at?: string | null
+    closed_at?: string | null
+    csat_feedback?: string | null
+  }
+  comments: Array<{
+    id: string
+    body?: string | null
+    comment?: string | null
+    created_at?: string | null
+    actor_id?: string | null
+  }>
+  approvals: Array<{
+    id: string
+    approval_stage?: string | null
+    status?: string | null
+    decision_notes?: string | null
+    requested_at?: string | null
+    decided_at?: string | null
+  }>
+  events: Array<{
+    id: string
+    event_type?: string | null
+    old_status?: string | null
+    new_status?: string | null
+    created_at?: string | null
+  }>
 }
 
 interface HelpDeskContentProps {
   userId: string
   userDepartment: string | null
+  canReviewPendingApprovals: boolean
   initialDepartments: string[]
   initialTickets: HelpDeskTicket[]
   initialError?: string | null
-}
-
-interface HelpDeskCategoriesResponse {
-  data?: HelpDeskCategory[]
-  departments?: string[]
-  error?: string
 }
 
 function buildFetchDebugLabel(source: string, status: number, payload: any) {
@@ -68,9 +88,26 @@ function buildFetchDebugLabel(source: string, status: number, payload: any) {
   return `${source} failed (${status}): ${detail}`
 }
 
+const TICKET_STATUS_OPTIONS = [
+  "new",
+  "pending_lead_review",
+  "department_queue",
+  "department_assigned",
+  "assigned",
+  "in_progress",
+  "pending_approval",
+  "approved_for_procurement",
+  "rejected",
+  "returned",
+  "resolved",
+  "closed",
+  "cancelled",
+] as const
+
 export function HelpDeskContent({
   userId,
   userDepartment,
+  canReviewPendingApprovals,
   initialDepartments,
   initialTickets,
   initialError,
@@ -79,8 +116,13 @@ export function HelpDeskContent({
   const [isSaving, setIsSaving] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
   const [pendingApprovals, setPendingApprovals] = useState<HelpDeskTicket[]>([])
-  const [categories, setCategories] = useState<HelpDeskCategory[]>([])
   const [availableDepartments, setAvailableDepartments] = useState<string[]>(initialDepartments || [])
+  const [viewTicketId, setViewTicketId] = useState<string | null>(null)
+  const [viewTicketOpen, setViewTicketOpen] = useState(false)
+  const [viewTicketLoading, setViewTicketLoading] = useState(false)
+  const [viewTicketSaving, setViewTicketSaving] = useState(false)
+  const [viewTicketData, setViewTicketData] = useState<HelpDeskTicketDetailResponse | null>(null)
+  const [viewTicketStatus, setViewTicketStatus] = useState<string>("")
   const pendingRef = useRef<HTMLDivElement | null>(null)
   const [form, setForm] = useState({
     title: "",
@@ -88,7 +130,6 @@ export function HelpDeskContent({
     service_department: "IT and Communications",
     priority: "medium",
     request_type: "support",
-    category_id: "",
   })
 
   const myOpenTickets = useMemo(
@@ -105,16 +146,13 @@ export function HelpDeskContent({
 
   useEffect(() => {
     const loadSupportData = async () => {
-      const [pendingRes, categoriesRes] = await Promise.all([
-        fetch("/api/help-desk/tickets?scope=department&status=pending_approval", { cache: "no-store" }),
-        fetch("/api/help-desk/categories", { cache: "no-store" }),
-      ])
+      const pendingApprovalsPath = canReviewPendingApprovals
+        ? "/api/help-desk/tickets?scope=department&status=pending_approval"
+        : "/api/help-desk/tickets?scope=mine&status=pending_approval"
 
-      const [pendingJson, categoriesJson] = await Promise.all([
-        pendingRes.json().catch(() => ({})),
-        categoriesRes.json().catch(() => ({})),
-      ])
-      const categoriesPayload = categoriesJson as HelpDeskCategoriesResponse
+      const pendingRes = await fetch(pendingApprovalsPath, { cache: "no-store" })
+
+      const pendingJson = await pendingRes.json().catch(() => ({}))
 
       if (pendingRes.ok) {
         setPendingApprovals(pendingJson.data || [])
@@ -122,35 +160,17 @@ export function HelpDeskContent({
         setPendingApprovals([])
         toast.error(buildFetchDebugLabel("Pending approvals load", pendingRes.status, pendingJson))
       }
-
-      if (categoriesRes.ok) {
-        setCategories(categoriesPayload.data || [])
-        setAvailableDepartments((prev) => {
-          const merged = [...prev, ...(categoriesPayload.departments || [])]
-          return Array.from(new Set(merged.map((item) => String(item || "").trim()).filter(Boolean)))
-        })
-        if (!Array.isArray(categoriesPayload.data) || categoriesPayload.data.length === 0) {
-          toast.error("Help desk categories are not configured yet. Department options are limited for now.")
-        }
-      } else {
-        setCategories([])
-        toast.error(buildFetchDebugLabel("Help desk categories load", categoriesRes.status, categoriesJson))
-      }
     }
 
     loadSupportData().catch((error) => {
       setPendingApprovals([])
-      setCategories([])
       toast.error(`Failed to load help desk setup data: ${error instanceof Error ? error.message : "Unknown error"}`)
     })
-  }, [])
+  }, [canReviewPendingApprovals])
 
   const departmentOptions = useMemo(() => {
     const options = new Set<string>()
     options.add(form.service_department)
-    for (const category of categories) {
-      if (category.service_department) options.add(category.service_department)
-    }
     for (const department of availableDepartments) {
       if (department) options.add(department)
     }
@@ -158,39 +178,14 @@ export function HelpDeskContent({
       if (ticket.service_department) options.add(ticket.service_department)
     }
     return Array.from(options).filter((department) => Boolean(department))
-  }, [availableDepartments, categories, form.service_department, tickets])
-
-  const filteredCategories = useMemo(
-    () =>
-      categories.filter(
-        (category) =>
-          category.service_department === form.service_department &&
-          category.request_type === form.request_type &&
-          category.service_department !== (userDepartment || "")
-      ),
-    [categories, form.request_type, form.service_department, userDepartment]
-  )
-
-  const selectedCategory = useMemo(
-    () => filteredCategories.find((category) => category.id === form.category_id) || null,
-    [filteredCategories, form.category_id]
-  )
+  }, [availableDepartments, form.service_department, tickets])
 
   useEffect(() => {
     if (form.service_department && userDepartment && form.service_department === userDepartment) {
       const fallbackDepartment = departmentOptions.find((department) => department !== userDepartment) || ""
-      setForm((prev) => ({ ...prev, service_department: fallbackDepartment, category_id: "" }))
-      return
+      setForm((prev) => ({ ...prev, service_department: fallbackDepartment }))
     }
-
-    if (filteredCategories.length === 0) {
-      setForm((prev) => ({ ...prev, category_id: "" }))
-      return
-    }
-    if (!filteredCategories.some((category) => category.id === form.category_id)) {
-      setForm((prev) => ({ ...prev, category_id: filteredCategories[0]?.id || "" }))
-    }
-  }, [departmentOptions, filteredCategories, form.category_id, form.service_department, userDepartment])
+  }, [departmentOptions, form.service_department, userDepartment])
 
   async function refreshTickets() {
     const res = await fetch("/api/help-desk/tickets?scope=mine", { cache: "no-store" })
@@ -235,7 +230,6 @@ export function HelpDeskContent({
         service_department: "IT and Communications",
         priority: "medium",
         request_type: "support",
-        category_id: "",
       })
       await refreshTickets()
     } catch (error: any) {
@@ -282,6 +276,56 @@ export function HelpDeskContent({
       await refreshTickets()
     } catch (error: any) {
       toast.error(error.message || "Failed to submit rating")
+    }
+  }
+
+  async function openTicketDetails(ticketId: string) {
+    setViewTicketId(ticketId)
+    setViewTicketOpen(true)
+    setViewTicketLoading(true)
+
+    try {
+      const res = await fetch(`/api/help-desk/tickets/${ticketId}`, { cache: "no-store" })
+      const json = await res.json()
+
+      if (!res.ok) {
+        throw new Error(json?.error || "Failed to load ticket details")
+      }
+
+      setViewTicketData(json.data || null)
+      setViewTicketStatus(json.data?.ticket?.status || "")
+    } catch (error: any) {
+      toast.error(error.message || "Failed to load ticket details")
+      setViewTicketData(null)
+      setViewTicketStatus("")
+    } finally {
+      setViewTicketLoading(false)
+    }
+  }
+
+  async function saveTicketStatusFromModal() {
+    if (!viewTicketId || !viewTicketStatus) return
+
+    setViewTicketSaving(true)
+    try {
+      const res = await fetch(`/api/help-desk/tickets/${viewTicketId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: viewTicketStatus }),
+      })
+      const json = await res.json().catch(() => ({}))
+
+      if (!res.ok) {
+        throw new Error(json?.error || "Failed to update ticket")
+      }
+
+      toast.success("Ticket status updated")
+      await refreshTickets()
+      await openTicketDetails(viewTicketId)
+    } catch (error: any) {
+      toast.error(error.message || "Failed to update ticket")
+    } finally {
+      setViewTicketSaving(false)
     }
   }
 
@@ -335,9 +379,7 @@ export function HelpDeskContent({
                     <Label>Department</Label>
                     <Select
                       value={form.service_department}
-                      onValueChange={(value) =>
-                        setForm((prev) => ({ ...prev, service_department: value, category_id: "" }))
-                      }
+                      onValueChange={(value) => setForm((prev) => ({ ...prev, service_department: value }))}
                     >
                       <SelectTrigger>
                         <SelectValue />
@@ -376,7 +418,7 @@ export function HelpDeskContent({
                     <Label>Type</Label>
                     <Select
                       value={form.request_type}
-                      onValueChange={(value) => setForm((prev) => ({ ...prev, request_type: value, category_id: "" }))}
+                      onValueChange={(value) => setForm((prev) => ({ ...prev, request_type: value }))}
                     >
                       <SelectTrigger>
                         <SelectValue />
@@ -386,39 +428,6 @@ export function HelpDeskContent({
                         <SelectItem value="procurement">Procurement</SelectItem>
                       </SelectContent>
                     </Select>
-                  </div>
-                  <div className="space-y-2 md:col-span-2">
-                    <Label>Category</Label>
-                    <Select
-                      value={form.category_id}
-                      onValueChange={(value) => setForm((prev) => ({ ...prev, category_id: value }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {filteredCategories.map((category) => (
-                          <SelectItem key={category.id} value={category.id}>
-                            {category.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {filteredCategories.length === 0 && form.request_type === "support" && (
-                      <p className="text-muted-foreground text-xs">
-                        No support categories configured for this department yet. Ticket will use General Support.
-                      </p>
-                    )}
-                    {selectedCategory?.description && (
-                      <p className="text-muted-foreground text-xs">{selectedCategory.description}</p>
-                    )}
-                    {form.request_type === "support" && selectedCategory?.support_mode && (
-                      <p className="text-muted-foreground text-xs">
-                        {selectedCategory.support_mode === "lead_review_required"
-                          ? "This category goes to the service department lead first."
-                          : "This category goes straight to the department queue."}
-                      </p>
-                    )}
                   </div>
                   <div className="md:col-span-2">
                     <Button type="submit" disabled={isSaving}>
@@ -478,7 +487,7 @@ export function HelpDeskContent({
                   <p className="font-medium">{ticket.ticket_number}</p>
                   <p className="text-muted-foreground text-xs">{ticket.title}</p>
                 </div>
-                <Badge variant="secondary">{ticket.status}</Badge>
+                <TicketStatusBadge status={ticket.status} />
               </div>
             ))}
           </CardContent>
@@ -490,67 +499,127 @@ export function HelpDeskContent({
           <CardTitle>My Tickets</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="w-full overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Ticket</TableHead>
-                  <TableHead>Department</TableHead>
-                  <TableHead>Priority</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {tickets.map((ticket) => (
-                  <TableRow key={ticket.id}>
-                    <TableCell>
-                      <div className="font-medium">{ticket.ticket_number}</div>
-                      <div className="text-muted-foreground text-xs">{ticket.title}</div>
-                    </TableCell>
-                    <TableCell>{ticket.service_department}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{ticket.priority}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge>{ticket.status}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex min-w-[180px] flex-wrap gap-2">
-                        {ticket.assigned_to === userId && ticket.status === "assigned" && (
-                          <Button size="sm" variant="outline" onClick={() => setStatus(ticket.id, "in_progress")}>
-                            Start
-                          </Button>
-                        )}
-                        {ticket.assigned_to === userId && ticket.status === "in_progress" && (
-                          <Button size="sm" variant="outline" onClick={() => setStatus(ticket.id, "resolved")}>
-                            Resolve
-                          </Button>
-                        )}
-                        {ticket.requester_id === userId && ticket.status === "resolved" && (
-                          <div className="flex gap-1">
-                            {[1, 2, 3, 4, 5].map((r) => (
-                              <Button
-                                key={r}
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => rateTicket(ticket.id, r)}
-                                title={`Rate ${r}`}
-                              >
-                                {r}
-                              </Button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+          <MyTicketsTable
+            tickets={tickets}
+            userId={userId}
+            onSetStatus={setStatus}
+            onRateTicket={rateTicket}
+            onViewTicket={openTicketDetails}
+          />
         </CardContent>
       </Card>
+
+      <Dialog open={viewTicketOpen} onOpenChange={setViewTicketOpen}>
+        <DialogContent className="max-h-[90vh] w-[95vw] max-w-3xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Ticket Details</DialogTitle>
+            <DialogDescription>View full ticket information and update status.</DialogDescription>
+          </DialogHeader>
+
+          {viewTicketLoading ? (
+            <p className="text-muted-foreground text-sm">Loading ticket details...</p>
+          ) : viewTicketData?.ticket ? (
+            <div className="space-y-5">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-1">
+                  <p className="text-muted-foreground text-xs uppercase">Ticket Number</p>
+                  <p className="font-medium">{viewTicketData.ticket.ticket_number}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-muted-foreground text-xs uppercase">Department</p>
+                  <p className="font-medium">{viewTicketData.ticket.service_department}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-muted-foreground text-xs uppercase">Priority</p>
+                  <PriorityBadge priority={viewTicketData.ticket.priority} />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-muted-foreground text-xs uppercase">Status</p>
+                  <TicketStatusBadge status={viewTicketData.ticket.status} />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-muted-foreground text-xs uppercase">Title</p>
+                <p className="font-medium">{viewTicketData.ticket.title || "-"}</p>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-muted-foreground text-xs uppercase">Description</p>
+                <p className="text-sm whitespace-pre-wrap">{viewTicketData.ticket.description || "-"}</p>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Status</Label>
+                  <Select value={viewTicketStatus} onValueChange={setViewTicketStatus}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TICKET_STATUS_OPTIONS.map((status) => (
+                        <SelectItem key={status} value={status}>
+                          {status.replaceAll("_", " ")}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-muted-foreground text-xs uppercase">Created</p>
+                  <p className="text-sm">
+                    {viewTicketData.ticket.created_at
+                      ? new Date(viewTicketData.ticket.created_at).toLocaleString()
+                      : "-"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-muted-foreground text-xs uppercase">Recent Activity</p>
+                <div className="max-h-44 space-y-2 overflow-y-auto rounded border p-3">
+                  {(viewTicketData.events || []).length === 0 ? (
+                    <p className="text-muted-foreground text-sm">No events yet.</p>
+                  ) : (
+                    viewTicketData.events
+                      .slice(-8)
+                      .reverse()
+                      .map((event) => (
+                        <div key={event.id} className="text-sm">
+                          <p className="font-medium">{event.event_type?.replaceAll("_", " ") || "event"}</p>
+                          <p className="text-muted-foreground text-xs">
+                            {(event.old_status || "-").replaceAll("_", " ")} to{" "}
+                            {(event.new_status || "-").replaceAll("_", " ")} at{" "}
+                            {event.created_at ? new Date(event.created_at).toLocaleString() : "-"}
+                          </p>
+                        </div>
+                      ))
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <p className="text-muted-foreground text-sm">Ticket details could not be loaded.</p>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setViewTicketOpen(false)}>
+              Close
+            </Button>
+            <Button
+              onClick={saveTicketStatusFromModal}
+              disabled={
+                !viewTicketData?.ticket ||
+                !viewTicketStatus ||
+                viewTicketStatus === viewTicketData.ticket.status ||
+                viewTicketSaving
+              }
+            >
+              {viewTicketSaving ? "Saving..." : "Update Status"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </PageWrapper>
   )
 }

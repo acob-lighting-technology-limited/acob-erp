@@ -11,6 +11,11 @@ import { Printer, CheckCircle, Package } from "lucide-react"
 import { toast } from "sonner"
 import { PageHeader } from "@/components/layout/page-header"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("purchasing-orders")
+
+
 interface PurchaseOrder {
   id: string
   po_number: string
@@ -61,7 +66,7 @@ export default function PurchaseOrderDetailPage() {
       }
       setOrder(orderWithNames)
     } catch (error) {
-      console.error("Error:", error)
+      log.error("Error:", error)
       toast.error("Order not found")
       router.push("/admin/purchasing/orders")
     } finally {

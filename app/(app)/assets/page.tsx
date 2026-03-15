@@ -3,6 +3,11 @@ import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { AssetsContent } from "./assets-content"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("assets")
+
+
 export interface Asset {
   id: string
   unique_code: string
@@ -82,7 +87,7 @@ async function getAssetsData() {
     .order("assigned_at", { ascending: false })
 
   if (individualError) {
-    console.error("Error loading individual assignments:", individualError)
+    log.error("Error loading individual assignments:", individualError)
     loadError = "Failed to load some asset data"
   }
 
@@ -139,7 +144,7 @@ async function getAssetsData() {
     ])
 
     if (departmentAssetsRes.error || officeAssetsRes.error) {
-      console.error("Error loading shared asset assignments:", departmentAssetsRes.error || officeAssetsRes.error)
+      log.error("Error loading shared asset assignments:", departmentAssetsRes.error || officeAssetsRes.error)
       loadError = loadError || "Failed to load some asset data"
     }
 

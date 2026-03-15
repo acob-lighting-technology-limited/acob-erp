@@ -13,6 +13,11 @@ import { Download, Send, Printer, CheckCircle, Pencil, FileText } from "lucide-r
 import Link from "next/link"
 import { toast } from "sonner"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("finance-invoices")
+
+
 interface Invoice {
   id: string
   invoice_number: string
@@ -85,7 +90,7 @@ export default function InvoiceDetailPage() {
       setInvoice(invoiceData)
       setItems(itemsData || [])
     } catch (error) {
-      console.error("Error fetching invoice:", error)
+      log.error("Error fetching invoice:", error)
       toast.error("Failed to load invoice")
     } finally {
       setLoading(false)
@@ -105,7 +110,7 @@ export default function InvoiceDetailPage() {
       toast.success("Invoice marked as sent")
       fetchInvoice()
     } catch (error) {
-      console.error("Error updating invoice:", error)
+      log.error("Error updating invoice:", error)
       toast.error("Failed to update invoice")
     }
   }
@@ -130,7 +135,7 @@ export default function InvoiceDetailPage() {
       toast.success("Invoice marked as paid")
       fetchInvoice()
     } catch (error) {
-      console.error("Error updating invoice:", error)
+      log.error("Error updating invoice:", error)
       toast.error("Failed to update invoice")
     }
   }

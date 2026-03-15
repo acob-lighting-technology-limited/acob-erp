@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createClient as createAdminClient } from "@supabase/supabase-js"
 import { DEFAULT_MAINTENANCE_MESSAGE, canManageMaintenanceMode, parseMaintenanceMode } from "@/lib/maintenance"
-import { invalidateMaintenanceCache } from "@/lib/supabase/middleware"
+import { logger } from "@/lib/logger"
+
+const log = logger("dev-maintenance")
 
 export async function GET() {
   try {
@@ -47,7 +49,7 @@ export async function GET() {
       can_toggle: canManageMaintenanceMode(profile?.role),
     })
   } catch (error) {
-    console.error("Error in GET /api/dev/maintenance:", error)
+    log.error({ err: String(error) }, "Error in GET /api/dev/maintenance:")
     return NextResponse.json({ error: "An error occurred" }, { status: 500 })
   }
 }
@@ -102,10 +104,6 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: `Failed to update maintenance mode: ${upsertError.message}` }, { status: 500 })
     }
 
-    // Immediately invalidate the in-process cache so the next request
-    // reflects the new state without waiting for the 30s TTL to expire.
-    invalidateMaintenanceCache()
-
     return NextResponse.json({
       data: {
         enabled,
@@ -114,7 +112,7 @@ export async function PUT(request: NextRequest) {
       message: enabled ? "Maintenance mode enabled" : "Maintenance mode disabled",
     })
   } catch (error) {
-    console.error("Error in PUT /api/dev/maintenance:", error)
+    log.error({ err: String(error) }, "Error in PUT /api/dev/maintenance:")
     return NextResponse.json({ error: "An error occurred" }, { status: 500 })
   }
 }

@@ -1,11 +1,30 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { resolveAdminScope } from "@/lib/admin/rbac"
+import { rateLimit, getClientId } from "@/lib/rate-limit"
+import { logger } from "@/lib/logger"
+
+const log = logger("search")
 
 // Mark this route as dynamic since it uses search params
 export const dynamic = "force-dynamic"
 
+interface SearchResult {
+  id: string
+  type: string
+  title: string
+  subtitle?: string
+  description?: string
+  href: string
+  metadata?: Record<string, unknown>
+}
+
 export async function GET(request: NextRequest) {
+  const rl = rateLimit(`search:${getClientId(request)}`, { limit: 30, windowSec: 60 })
+  if (!rl.allowed) {
+    return NextResponse.json({ error: "Too many requests. Please slow down." }, { status: 429 })
+  }
+
   try {
     const searchParams = request.nextUrl.searchParams
     const query = searchParams.get("q")
@@ -23,29 +42,21 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const scope = await resolveAdminScope(supabase as any, user.id)
+    const scope = await resolveAdminScope(supabase as never, user.id)
     if (!scope) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
     const searchQuery = query.trim()
-    const results: Array<{
-      id: string
-      type: string
-      title: string
-      subtitle?: string
-      description?: string
-      href: string
-      metadata?: Record<string, any>
-    }> = []
 
-    // -------------------------------------------------------------------------
-    // Run all top-level searches in parallel — zero sequential round-trips
-    // -------------------------------------------------------------------------
+    // -----------------------------------------------------------------------
+    // Fire all top-level queries in parallel — one round-trip for each entity
+    // type instead of sequential awaits.
+    // -----------------------------------------------------------------------
     const [
       { data: profiles },
-      { data: assets },
-      { data: tasks },
+      { data: directAssets },
+      { data: directTasks },
       { data: documentation },
       { data: feedback },
     ] = await Promise.all([
@@ -85,103 +96,89 @@ export async function GET(request: NextRequest) {
         .limit(5),
     ])
 
-    // -------------------------------------------------------------------------
-    // For profiles found, batch-fetch related tasks, asset assignments, and docs
-    // in 3 parallel queries (instead of 3 per-profile queries = N×3 → 3 total)
-    // -------------------------------------------------------------------------
+    const results: SearchResult[] = []
+
+    // -----------------------------------------------------------------------
+    // Profile results + batched related-item lookups.
+    // Instead of 3 sequential queries per profile (N*3 total), we collect all
+    // profile IDs then fire 3 parallel batch queries covering all profiles.
+    // -----------------------------------------------------------------------
     if (profiles && profiles.length > 0) {
       const profileIds = profiles.map((p) => p.id)
+      const profileNameMap = new Map(
+        profiles.map((p) => [
+          p.id,
+          `${p.first_name || ""} ${p.last_name || ""}`.trim() || p.company_email || "Unknown",
+        ])
+      )
 
+      // Add profile results
+      profiles.forEach((profile) => {
+        results.push({
+          id: profile.id,
+          type: "profile",
+          title: profileNameMap.get(profile.id)!,
+          subtitle: profile.company_email || undefined,
+          description: `${profile.department || ""} ${profile.role || ""}`.trim() || undefined,
+          href: `/admin/employees/${profile.id}`,
+          metadata: profile as Record<string, unknown>,
+        })
+      })
+
+      // Batch fetch all related items for all profiles in parallel
       const [
-        { data: relatedTasks },
-        { data: relatedAssignments },
-        { data: relatedDocs },
+        { data: profileTasks },
+        { data: profileAssetAssignments },
+        { data: profileDocs },
       ] = await Promise.all([
         supabase
           .from("tasks")
           .select("id, title, status, department, assigned_to")
           .in("assigned_to", profileIds)
-          .limit(15),
+          .limit(3 * profileIds.length),
 
         supabase
           .from("asset_assignments")
           .select("id, asset_id, assigned_to, assigned_at, is_current")
           .in("assigned_to", profileIds)
           .eq("is_current", true)
-          .limit(15),
+          .limit(3 * profileIds.length),
 
         supabase
           .from("user_documentation")
           .select("id, title, category, created_at, user_id")
           .in("user_id", profileIds)
-          .limit(15),
+          .limit(3 * profileIds.length),
       ])
 
-      // Fetch asset details for all current assignments in one query
-      const assetIds = (relatedAssignments || []).map((a) => a.asset_id).filter(Boolean)
-      const { data: relatedAssets } = assetIds.length > 0
-        ? await supabase
-            .from("assets")
-            .select("id, unique_code, asset_type, asset_model, serial_number")
-            .in("id", assetIds)
-            .is("deleted_at", null)
-        : { data: [] }
-
-      // Build lookup maps for O(1) access
-      const tasksByUser = new Map<string, typeof relatedTasks>()
-      for (const task of relatedTasks || []) {
-        const list = tasksByUser.get(task.assigned_to) || []
-        list.push(task)
-        tasksByUser.set(task.assigned_to, list)
-      }
-
-      const assignmentsByUser = new Map<string, typeof relatedAssignments>()
-      for (const assignment of relatedAssignments || []) {
-        const list = assignmentsByUser.get(assignment.assigned_to) || []
-        list.push(assignment)
-        assignmentsByUser.set(assignment.assigned_to, list)
-      }
-
-      const docsByUser = new Map<string, typeof relatedDocs>()
-      for (const doc of relatedDocs || []) {
-        const list = docsByUser.get(doc.user_id) || []
-        list.push(doc)
-        docsByUser.set(doc.user_id, list)
-      }
-
-      const assetMap = new Map((relatedAssets || []).map((a) => [a.id, a]))
-
-      for (const profile of profiles) {
-        const name =
-          `${profile.first_name || ""} ${profile.last_name || ""}`.trim() || profile.company_email || "Unknown"
-
+      // Related tasks
+      profileTasks?.forEach((task) => {
+        const name = profileNameMap.get(task.assigned_to) ?? "Unknown"
         results.push({
-          id: profile.id,
-          type: "profile",
-          title: name,
-          subtitle: profile.company_email || undefined,
-          description: `${profile.department || ""} ${profile.role || ""}`.trim() || undefined,
-          href: `/admin/employees/${profile.id}`,
-          metadata: profile,
+          id: `task-${task.id}`,
+          type: "task",
+          title: task.title || "Task",
+          subtitle: `Assigned to ${name}`,
+          description: `${task.department || ""} • ${task.status || ""}`.trim() || undefined,
+          href: `/admin/tasks?taskId=${task.id}`,
+          metadata: { ...task, related_user: task.assigned_to } as Record<string, unknown>,
         })
+      })
 
-        // Related tasks (from batch)
-        for (const task of tasksByUser.get(profile.id) || []) {
-          results.push({
-            id: `task-${task.id}`,
-            type: "task",
-            title: task.title || "Task",
-            subtitle: `Assigned to ${name}`,
-            description: `${task.department || ""} • ${task.status || ""}`.trim() || undefined,
-            href: `/admin/tasks?taskId=${task.id}`,
-            metadata: { ...task, related_user: profile.id },
-          })
-        }
+      // Related assets — one extra batch query to resolve asset details from IDs
+      if (profileAssetAssignments && profileAssetAssignments.length > 0) {
+        const assetIds = Array.from(new Set(profileAssetAssignments.map((aa) => aa.asset_id)))
+        const assignedToMap = new Map(profileAssetAssignments.map((aa) => [aa.asset_id, aa.assigned_to]))
 
-        // Related assets (from batch)
-        for (const assignment of assignmentsByUser.get(profile.id) || []) {
-          const asset = assetMap.get(assignment.asset_id)
-          if (!asset) continue
+        const { data: relatedAssets } = await supabase
+          .from("assets")
+          .select("id, unique_code, asset_type, asset_model, serial_number")
+          .in("id", assetIds)
+          .is("deleted_at", null)
+
+        relatedAssets?.forEach((asset) => {
+          const assignedTo = assignedToMap.get(asset.id)
+          const name = assignedTo ? (profileNameMap.get(assignedTo) ?? "Unknown") : "Unknown"
           results.push({
             id: `asset-${asset.id}`,
             type: "asset",
@@ -193,27 +190,28 @@ export async function GET(request: NextRequest) {
                 ? `SN: ${asset.serial_number}`
                 : undefined,
             href: `/admin/assets?assetId=${asset.id}`,
-            metadata: { ...asset, related_user: profile.id },
+            metadata: { ...asset, related_user: assignedTo } as Record<string, unknown>,
           })
-        }
-
-        // Related docs (from batch)
-        for (const doc of docsByUser.get(profile.id) || []) {
-          results.push({
-            id: `doc-${doc.id}`,
-            type: "documentation",
-            title: doc.title || "Documentation",
-            subtitle: `Created by ${name}`,
-            description: doc.category || undefined,
-            href: `/admin/documentation/internal?docId=${doc.id}`,
-            metadata: { ...doc, related_user: profile.id },
-          })
-        }
+        })
       }
+
+      // Related docs
+      profileDocs?.forEach((doc) => {
+        const name = profileNameMap.get(doc.user_id) ?? "Unknown"
+        results.push({
+          id: `doc-${doc.id}`,
+          type: "documentation",
+          title: doc.title || "Documentation",
+          subtitle: `Created by ${name}`,
+          description: doc.category || undefined,
+          href: `/admin/documentation/internal?docId=${doc.id}`,
+          metadata: { ...doc, related_user: doc.user_id } as Record<string, unknown>,
+        })
+      })
     }
 
-    // Direct asset search results
-    for (const asset of assets || []) {
+    // Direct asset results
+    directAssets?.forEach((asset) => {
       results.push({
         id: asset.id,
         type: "asset",
@@ -225,12 +223,12 @@ export async function GET(request: NextRequest) {
             ? `SN: ${asset.serial_number}`
             : asset.status || undefined,
         href: `/admin/assets?assetId=${asset.id}`,
-        metadata: asset,
+        metadata: asset as Record<string, unknown>,
       })
-    }
+    })
 
-    // Direct task search results
-    for (const task of tasks || []) {
+    // Direct task results
+    directTasks?.forEach((task) => {
       results.push({
         id: task.id,
         type: "task",
@@ -238,12 +236,12 @@ export async function GET(request: NextRequest) {
         subtitle: task.department || undefined,
         description: task.description ? task.description.substring(0, 100) : undefined,
         href: `/admin/tasks?taskId=${task.id}`,
-        metadata: task,
+        metadata: task as Record<string, unknown>,
       })
-    }
+    })
 
-    // Direct documentation search results
-    for (const doc of documentation || []) {
+    // Direct documentation results
+    documentation?.forEach((doc) => {
       results.push({
         id: doc.id,
         type: "documentation",
@@ -251,12 +249,12 @@ export async function GET(request: NextRequest) {
         subtitle: doc.category || undefined,
         description: doc.content ? doc.content.substring(0, 100).replace(/[#*`]/g, "") : undefined,
         href: `/admin/documentation/internal?docId=${doc.id}`,
-        metadata: doc,
+        metadata: doc as Record<string, unknown>,
       })
-    }
+    })
 
     // Feedback results
-    for (const fb of feedback || []) {
+    feedback?.forEach((fb) => {
       results.push({
         id: fb.id,
         type: "feedback",
@@ -264,32 +262,35 @@ export async function GET(request: NextRequest) {
         subtitle: fb.feedback_type || undefined,
         description: fb.description ? fb.description.substring(0, 100) : undefined,
         href: `/admin/feedback?feedbackId=${fb.id}`,
-        metadata: fb,
+        metadata: fb as Record<string, unknown>,
       })
-    }
+    })
 
-    // Deduplicate by id and sort by relevance
+    // Deduplicate by id (profile-related queries may overlap with direct queries)
     const seen = new Set<string>()
-    const unique = results.filter((r) => {
+    const deduped = results.filter((r) => {
       if (seen.has(r.id)) return false
       seen.add(r.id)
       return true
     })
 
+    // Sort: exact title-start matches first, then partial, then rest
     const queryLower = query.toLowerCase()
-    const sorted = unique.sort((a, b) => {
-      const aTitle = a.title.toLowerCase()
-      const bTitle = b.title.toLowerCase()
-      if (aTitle.startsWith(queryLower) && !bTitle.startsWith(queryLower)) return -1
-      if (!aTitle.startsWith(queryLower) && bTitle.startsWith(queryLower)) return 1
-      if (aTitle.includes(queryLower) && !bTitle.includes(queryLower)) return -1
-      if (!aTitle.includes(queryLower) && bTitle.includes(queryLower)) return 1
+    deduped.sort((a, b) => {
+      const aStart = a.title.toLowerCase().startsWith(queryLower)
+      const bStart = b.title.toLowerCase().startsWith(queryLower)
+      if (aStart && !bStart) return -1
+      if (!aStart && bStart) return 1
+      const aContains = a.title.toLowerCase().includes(queryLower)
+      const bContains = b.title.toLowerCase().includes(queryLower)
+      if (aContains && !bContains) return -1
+      if (!aContains && bContains) return 1
       return 0
     })
 
-    return NextResponse.json({ results: sorted.slice(0, 20) })
+    return NextResponse.json({ results: deduped.slice(0, 20) })
   } catch (error) {
-    console.error("Search error:", error)
+    log.error({ err: String(error) }, "Search error")
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
+import { rateLimit, getClientId } from "@/lib/rate-limit"
+import { logger } from "@/lib/logger"
+
+const log = logger("telemetry-errors")
 
 type ErrorSource = "window.error" | "unhandledrejection" | "react.error_boundary" | "react.global_error_boundary"
 
@@ -32,6 +36,11 @@ function getFirstIp(request: NextRequest): string | null {
 }
 
 export async function POST(request: NextRequest) {
+  const rl = rateLimit(`telemetry:${getClientId(request)}`, { limit: 20, windowSec: 60 })
+  if (!rl.allowed) {
+    return NextResponse.json({ error: "Too many requests." }, { status: 429 })
+  }
+
   try {
     const payload = (await request.json()) as ErrorPayload
     const message = truncate(String(payload?.message || "").trim(), 600)
@@ -79,13 +88,13 @@ export async function POST(request: NextRequest) {
     const { data, error } = await dataClient.from("audit_logs").insert(insertPayload).select("id").single()
 
     if (error) {
-      console.error("Telemetry insert failed:", error)
+      log.error({ err: String(error) }, "Telemetry insert failed:")
       return NextResponse.json({ error: "failed_to_log" }, { status: 500 })
     }
 
     return NextResponse.json({ ok: true, eventId: data?.id || null })
   } catch (error) {
-    console.error("Telemetry route failed:", error)
+    log.error({ err: String(error) }, "Telemetry route failed:")
     return NextResponse.json({ error: "invalid_payload" }, { status: 400 })
   }
 }

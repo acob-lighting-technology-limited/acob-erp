@@ -4,9 +4,14 @@ import {
   appendCorrespondenceEvent,
   canAccessDepartment,
   getAuthContext,
+  getDepartmentCodeByName,
   isAdminRole,
 } from "@/lib/correspondence/server"
 import type { CorrespondenceDirection } from "@/types/correspondence"
+import { logger } from "@/lib/logger"
+import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
+
+const log = logger("correspondence-records")
 
 export async function GET(request: NextRequest) {
   try {
@@ -51,7 +56,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ data: filtered })
   } catch (error) {
-    console.error("Error in GET /api/correspondence/records:", error)
+    log.error({ err: String(error) }, "Error in GET /api/correspondence/records:")
     return NextResponse.json({ error: "Failed to fetch correspondence records" }, { status: 500 })
   }
 }
@@ -59,19 +64,18 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const { supabase, user, profile } = await getAuthContext()
+    const dataClient = getServiceRoleClientOrFallback(supabase as any)
 
     if (!user || !profile) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
     const body = await request.json()
-    const direction: CorrespondenceDirection = body?.direction === "incoming" ? "incoming" : "outgoing"
+    const direction = "outgoing"
     const subject = String(body?.subject || "").trim()
     const profileDepartment = profile?.department ? String(profile.department).trim() : null
     const departmentName = body?.department_name ? String(body.department_name).trim() : profileDepartment
-    const assignedDepartmentName = body?.assigned_department_name
-      ? String(body.assigned_department_name).trim()
-      : profileDepartment
+    const assignedDepartmentName = departmentName
 
     if (!subject) {
       return NextResponse.json({ error: "subject is required" }, { status: 400 })
@@ -79,6 +83,15 @@ export async function POST(request: NextRequest) {
 
     if (direction === "outgoing" && !departmentName) {
       return NextResponse.json({ error: "department_name is required for outgoing correspondence" }, { status: 400 })
+    }
+    const resolvedDepartmentName = departmentName as string
+
+    const departmentCode = await getDepartmentCodeByName(resolvedDepartmentName)
+    if (!departmentCode) {
+      return NextResponse.json(
+        { error: `No active department code configured for ${resolvedDepartmentName}` },
+        { status: 400 }
+      )
     }
 
     if (profile.is_department_lead && !isAdminRole(profile.role)) {
@@ -88,7 +101,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const initialStatus = direction === "incoming" ? "open" : "draft"
+    const initialStatus = "draft"
     const senderName =
       (body?.sender_name ? String(body.sender_name).trim() : "") ||
       profile?.full_name ||
@@ -99,7 +112,8 @@ export async function POST(request: NextRequest) {
     const insertPayload: Record<string, unknown> = {
       direction,
       subject,
-      department_name: departmentName,
+      department_name: resolvedDepartmentName,
+      department_code: departmentCode,
       letter_type: body?.letter_type || null,
       category: body?.category || null,
       recipient_name: body?.recipient_name ? String(body.recipient_name).trim() : null,
@@ -113,10 +127,10 @@ export async function POST(request: NextRequest) {
       status: initialStatus,
       originator_id: user.id,
       submitted_at: new Date().toISOString(),
-      received_at: direction === "incoming" ? new Date().toISOString() : null,
+      received_at: null,
     }
 
-    const { data: created, error } = await supabase
+    const { data: created, error } = await dataClient
       .from("correspondence_records")
       .insert(insertPayload)
       .select("*")
@@ -153,7 +167,7 @@ export async function POST(request: NextRequest) {
     try {
       const notifyDepartment = created.assigned_department_name || created.department_name
       if (notifyDepartment) {
-        const { data: leadCandidates } = await supabase
+        const { data: leadCandidates } = await dataClient
           .from("profiles")
           .select("id, role, lead_departments, department, is_department_lead")
           .eq("is_department_lead", true)
@@ -177,12 +191,21 @@ export async function POST(request: NextRequest) {
         }
       }
     } catch (notifyError) {
-      console.error("Correspondence notification error:", notifyError)
+      log.error({ err: String(notifyError) }, "Correspondence notification error:")
     }
 
     return NextResponse.json({ data: created }, { status: 201 })
   } catch (error) {
-    console.error("Error in POST /api/correspondence/records:", error)
-    return NextResponse.json({ error: "Failed to create correspondence record" }, { status: 500 })
+    log.error({ err: String(error) }, "Error in POST /api/correspondence/records:")
+    const details = error as { message?: string; details?: string; hint?: string; code?: string }
+    return NextResponse.json(
+      {
+        error: details?.message || "Failed to create correspondence record",
+        details: details?.details || null,
+        hint: details?.hint || null,
+        code: details?.code || null,
+      },
+      { status: 500 }
+    )
   }
 }

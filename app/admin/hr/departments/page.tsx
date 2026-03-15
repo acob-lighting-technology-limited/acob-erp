@@ -29,6 +29,11 @@ import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { applyAssignableStatusFilter } from "@/lib/workforce/assignment-policy"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("hr-departments")
+
+
 interface Department {
   id: string
   name: string
@@ -125,7 +130,7 @@ export default function DepartmentsPage() {
       setDepartments(deptsWithCounts)
       setDepartmentEmployees(employeesByDepartment)
     } catch (error) {
-      console.error("Error fetching departments:", error)
+      log.error("Error fetching departments:", error)
       toast.error("Failed to load departments")
     } finally {
       setLoading(false)
@@ -174,7 +179,7 @@ export default function DepartmentsPage() {
       setFormData({ name: "", description: "", is_active: true })
       fetchDepartments()
     } catch (error: any) {
-      console.error("Error saving department:", error)
+      log.error("Error saving department:", error)
       toast.error(error.message || "Failed to save department")
     }
   }

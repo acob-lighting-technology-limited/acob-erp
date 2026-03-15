@@ -60,6 +60,7 @@ interface AdminDocumentationContentProps {
     initialPath: string
     rootLabel: string
     enabled: boolean
+    lockToInitialPath?: boolean
   }
   defaultTab?: "knowledge-docs" | "department-documents"
   hideTabList?: boolean
@@ -562,7 +563,11 @@ export function AdminDocumentationContent({
 
       <TabsContent value="department-documents" className="space-y-4">
         {departmentDocs.enabled ? (
-          <DepartmentDocumentsBrowser initialPath={departmentDocs.initialPath} rootLabel={departmentDocs.rootLabel} />
+          <DepartmentDocumentsBrowser
+            initialPath={departmentDocs.initialPath}
+            rootLabel={departmentDocs.rootLabel}
+            lockToInitialPath={Boolean(departmentDocs.lockToInitialPath)}
+          />
         ) : (
           <Card className="border-2">
             <CardContent className="p-12 text-center">

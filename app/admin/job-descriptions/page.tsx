@@ -34,6 +34,11 @@ import { getRoleDisplayName, getRoleBadgeColor } from "@/lib/permissions"
 import { formatName } from "@/lib/utils"
 import { EmptyState } from "@/components/ui/patterns"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("job-descriptions")
+
+
 interface Profile {
   id: string
   first_name: string
@@ -105,7 +110,7 @@ export default function AdminJobDescriptionsPage() {
 
       setProfiles(data || [])
     } catch (error: any) {
-      console.error("Error loading profiles:", error)
+      log.error("Error loading profiles:", error)
       toast.error("Failed to load job descriptions")
     } finally {
       setIsLoading(false)

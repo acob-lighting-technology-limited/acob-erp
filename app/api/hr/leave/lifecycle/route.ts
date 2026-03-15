@@ -7,6 +7,9 @@ import {
   syncAttendanceForApprovedLeave,
   toISODate,
 } from "@/lib/hr/leave-workflow"
+import { logger } from "@/lib/logger"
+
+const log = logger("hr-leave-lifecycle")
 
 async function restoreBalance(supabase: any, userId: string, leaveTypeId: string, days: number) {
   const currentYear = new Date().getUTCFullYear()
@@ -200,7 +203,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ error: "Unsupported lifecycle action" }, { status: 400 })
   } catch (error) {
-    console.error("Error in POST /api/hr/leave/lifecycle:", error)
+    log.error({ err: String(error) }, "Error in POST /api/hr/leave/lifecycle:")
     return NextResponse.json({ error: error instanceof Error ? error.message : "An error occurred" }, { status: 500 })
   }
 }

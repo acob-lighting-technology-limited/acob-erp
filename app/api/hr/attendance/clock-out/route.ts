@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { logger } from "@/lib/logger"
+
+const log = logger("hr-attendance-clock-out")
 
 export async function POST(request: NextRequest) {
   try {
@@ -51,7 +54,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error("Error clocking out:", error)
+      log.error({ err: String(error) }, "Error clocking out:")
       return NextResponse.json({ error: "Failed to clock out" }, { status: 500 })
     }
 
@@ -60,7 +63,7 @@ export async function POST(request: NextRequest) {
       message: "Clocked out successfully",
     })
   } catch (error) {
-    console.error("Error in POST /api/hr/attendance/clock-out:", error)
+    log.error({ err: String(error) }, "Error in POST /api/hr/attendance/clock-out:")
     return NextResponse.json({ error: "An error occurred" }, { status: 500 })
   }
 }

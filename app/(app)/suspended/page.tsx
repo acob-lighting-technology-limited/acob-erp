@@ -10,6 +10,11 @@ import { format, formatDistanceToNow } from "date-fns"
 import { useRouter } from "next/navigation"
 import type { EmployeeSuspension } from "@/types/hr"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("suspended")
+
+
 interface SuspensionData {
   reason: string
   start_date: string
@@ -92,7 +97,7 @@ export default function SuspendedPage() {
           })
         }
       } catch (error) {
-        console.error("Error loading suspension data:", error)
+        log.error("Error loading suspension data:", error)
       } finally {
         setLoading(false)
       }

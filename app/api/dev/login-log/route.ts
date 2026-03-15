@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { logger } from "@/lib/logger"
+
+const log = logger("dev-login-log")
 
 export async function POST(request: NextRequest) {
   try {
@@ -67,7 +70,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ ok: true })
   } catch (error) {
-    console.warn("[dev-login-log] fail-open logging error", error)
+    log.warn({ data: String(error) }, "[dev-login-log] fail-open logging error")
     return NextResponse.json({ ok: true })
   }
 }

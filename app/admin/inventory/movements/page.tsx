@@ -12,6 +12,11 @@ import { Badge } from "@/components/ui/badge"
 import { ArrowUpDown, ArrowUp, ArrowDown, Filter, Boxes } from "lucide-react"
 import { toast } from "sonner"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("inventory-movements")
+
+
 interface StockMovement {
   id: string
   product_id: string
@@ -73,7 +78,7 @@ export default function MovementsPage() {
 
       setMovements(movementsWithNames)
     } catch (error) {
-      console.error("Error:", error)
+      log.error("Error:", error)
       toast.error("Failed to load movements")
     } finally {
       setLoading(false)

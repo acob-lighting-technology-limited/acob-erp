@@ -77,10 +77,22 @@ serve(async (req) => {
 
     // 2. Fetch Asset & Assignment Data
     let assetType = "Asset"
-    let assetModel = "Unknown"
+    let assetModel = "N/A"
     let serialNumber = "N/A"
     let assignedByName = "System Admin"
-    let assignedDate = new Date().toLocaleDateString("en-GB")
+    const rawEventDate =
+      notificationPayload.assigned_date ||
+      notificationPayload.assigned_at ||
+      notificationPayload.transfer_date ||
+      notificationPayload.return_date ||
+      notificationPayload.date ||
+      record.created_at ||
+      null
+    const parsedEventDate = rawEventDate ? new Date(rawEventDate) : null
+    let assignedDate =
+      parsedEventDate && !isNaN(parsedEventDate.getTime())
+        ? parsedEventDate.toLocaleDateString("en-GB")
+        : new Date().toLocaleDateString("en-GB")
 
     if (assetCode) {
       const { data: assetData } = await supabase
@@ -97,7 +109,7 @@ serve(async (req) => {
           .eq("code", assetData.asset_type)
           .single()
         assetType = typeData?.label || assetData.asset_type || "Asset"
-        assetModel = assetData.asset_model || "Unknown"
+        assetModel = assetData.asset_model || "N/A"
         serialNumber = assetData.serial_number || "N/A"
       }
 

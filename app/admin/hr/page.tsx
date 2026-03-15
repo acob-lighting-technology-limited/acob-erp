@@ -10,6 +10,11 @@ import { PageWrapper, PageHeader, Section } from "@/components/layout"
 import { StatCard } from "@/components/ui/stat-card"
 import { applyAssignableStatusFilter } from "@/lib/workforce/assignment-policy"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("hr")
+
+
 interface DashboardStats {
   pendingLeaveRequests: number
   todayAttendance: number
@@ -37,6 +42,27 @@ export default function HRAdminDashboard() {
   async function fetchDashboardData() {
     try {
       const supabase = createClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      const { data: profile } = user
+        ? await supabase
+            .from("profiles")
+            .select("role, department, is_department_lead, lead_departments")
+            .eq("id", user.id)
+            .maybeSingle()
+        : ({ data: null } as any)
+
+      const isAdminLike = ["developer", "admin", "super_admin"].includes(String(profile?.role || ""))
+      const scopedDepartments =
+        !isAdminLike && profile?.is_department_lead
+          ? Array.from(new Set([profile?.department, ...((profile as any)?.lead_departments || [])].filter(Boolean)))
+          : []
+      const scopedUserIds = scopedDepartments.length
+        ? (await supabase.from("profiles").select("id").in("department", scopedDepartments)).data?.map(
+            (row: any) => row.id
+          ) || []
+        : []
 
       // Fetch pending leave requests scoped to this approver, matching /admin/hr/leave/approve queue.
       let pendingLeaveCount = 0
@@ -52,31 +78,48 @@ export default function HRAdminDashboard() {
 
       // Fetch today's attendance
       const today = new Date().toISOString().split("T")[0]
-      const { data: attendance } = await supabase.from("attendance_records").select("id").eq("date", today)
+      const { data: attendance } = await supabase.from("attendance_records").select("id, user_id").eq("date", today)
+      const attendanceRows =
+        scopedUserIds.length > 0
+          ? attendance?.filter((row: any) => scopedUserIds.includes((row as any).user_id))
+          : attendance
 
       // Fetch upcoming reviews
-      const { data: reviews } = await supabase.from("performance_reviews").select("id").eq("status", "draft")
+      const { data: reviews } = await supabase.from("performance_reviews").select("id, user_id").eq("status", "draft")
+      const reviewRows =
+        scopedUserIds.length > 0 ? reviews?.filter((row: any) => scopedUserIds.includes(row.user_id)) : reviews
 
       // Fetch total employees
-      const { count: employeeCount } = await supabase.from("profiles").select("*", { count: "exact", head: true })
-      const { count: departmentCount } = await supabase.from("departments").select("*", { count: "exact", head: true })
+      let employeeCountQuery = supabase.from("profiles").select("*", { count: "exact", head: true })
+      if (scopedDepartments.length > 0) {
+        employeeCountQuery = employeeCountQuery.in("department", scopedDepartments)
+      }
+      const { count: employeeCount } = await employeeCountQuery
+      let departmentCountQuery = supabase.from("departments").select("*", { count: "exact", head: true })
+      if (scopedDepartments.length > 0) {
+        departmentCountQuery = departmentCountQuery.in("name", scopedDepartments)
+      }
+      const { count: departmentCount } = await departmentCountQuery
       const { data: locations } = await applyAssignableStatusFilter(
-        supabase.from("profiles").select("office_location"),
+        supabase.from("profiles").select("office_location, department"),
         { allowLegacyNullStatus: false }
       )
+      const locationRows =
+        scopedDepartments.length > 0
+          ? (locations || []).filter((row: any) => scopedDepartments.includes(String((row as any).department || "")))
+          : locations || []
 
       setStats({
         pendingLeaveRequests: pendingLeaveCount,
-        todayAttendance: attendance?.length || 0,
-        upcomingReviews: reviews?.length || 0,
+        todayAttendance: attendanceRows?.length || 0,
+        upcomingReviews: reviewRows?.length || 0,
         totalEmployees: employeeCount || 0,
         totalDepartments: departmentCount || 0,
-        totalOfficeLocations: new Set(
-          (locations || []).map((l: any) => (l.office_location || "").trim()).filter(Boolean)
-        ).size,
+        totalOfficeLocations: new Set(locationRows.map((l: any) => (l.office_location || "").trim()).filter(Boolean))
+          .size,
       })
     } catch (error) {
-      console.error("Error fetching dashboard data:", error)
+      log.error("Error fetching dashboard data:", error)
     } finally {
       setLoading(false)
     }
@@ -194,6 +237,22 @@ export default function HRAdminDashboard() {
             <CardContent>
               <Link href="/admin/hr/leave/approve">
                 <Button className="w-full">Approve Requests ({stats.pendingLeaveRequests})</Button>
+              </Link>
+            </CardContent>
+          </Card>
+
+          {/* Fleet Booking */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5" />
+                Fleet Booking
+              </CardTitle>
+              <CardDescription>Manage resources and review fleet booking applications</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Link href="/admin/hr/fleet">
+                <Button className="w-full">Open Fleet Admin</Button>
               </Link>
             </CardContent>
           </Card>

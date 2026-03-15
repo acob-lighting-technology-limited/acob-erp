@@ -6,6 +6,9 @@ import {
   getAuthContext,
   isAdminRole,
 } from "@/lib/correspondence/server"
+import { logger } from "@/lib/logger"
+
+const log = logger("correspondence-records-dispatch")
 
 const FINAL_STATUSES = ["sent", "filed"]
 const DISPATCH_METHODS = ["email", "courier", "hand_delivery", "regulatory_portal"]
@@ -96,7 +99,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     return NextResponse.json({ data: updatedRecord })
   } catch (error) {
-    console.error("Error in POST /api/correspondence/records/[id]/dispatch:", error)
+    log.error({ err: String(error) }, "Error in POST /api/correspondence/records/[id]/dispatch:")
     return NextResponse.json({ error: "Failed to finalize dispatch" }, { status: 500 })
   }
 }

@@ -4,6 +4,11 @@ import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
 import { resolveOneDriveAccessScope } from "@/lib/onedrive/access"
 import type { Documentation, UserProfile, employeeMember } from "./admin-documentation-content"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("documentation-data")
+
+
 export async function getAdminDocumentationData() {
   const supabase = await createClient()
   const dataClient = getServiceRoleClientOrFallback(supabase as any)
@@ -48,7 +53,7 @@ export async function getAdminDocumentationData() {
         documentation: [],
         employee: [],
         userProfile,
-        departmentDocs: { initialPath: "/Projects", rootLabel: "Projects", enabled: false },
+        departmentDocs: { initialPath: "/Projects", rootLabel: "Projects", enabled: false, lockToInitialPath: false },
       }
     }
   }
@@ -56,12 +61,12 @@ export async function getAdminDocumentationData() {
   const { data: docsData, error: docsError } = await docsQuery
 
   if (docsError) {
-    console.error("Documentation error:", docsError)
+    log.error("Documentation error:", docsError)
     return {
       documentation: [],
       employee: [],
       userProfile,
-      departmentDocs: { initialPath: "/Projects", rootLabel: "Projects", enabled: false },
+      departmentDocs: { initialPath: "/Projects", rootLabel: "Projects", enabled: false, lockToInitialPath: false },
     }
   }
 
@@ -104,11 +109,13 @@ export async function getAdminDocumentationData() {
           initialPath: oneDriveScope.defaultPath,
           rootLabel: oneDriveScope.rootLabel,
           enabled: true,
+          lockToInitialPath: !oneDriveScope.isAdminLike,
         }
       : {
           initialPath: "/Projects",
           rootLabel: "Projects",
           enabled: false,
+          lockToInitialPath: false,
         },
   }
 }

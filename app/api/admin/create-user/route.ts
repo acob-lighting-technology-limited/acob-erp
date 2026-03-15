@@ -9,6 +9,9 @@ import {
   canManageSuperAdminAccounts,
 } from "@/lib/role-management"
 import { formValidation } from "@/lib/validation"
+import { logger } from "@/lib/logger"
+
+const log = logger("admin-create-user")
 
 export const dynamic = "force-dynamic"
 
@@ -34,7 +37,7 @@ export async function POST(request: NextRequest) {
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
   if (!supabaseUrl || !supabaseServiceKey) {
-    console.error("Missing required Supabase configuration")
+    log.error("Missing required Supabase configuration")
     return NextResponse.json({ success: false, error: "Configuration error: Missing configuration" }, { status: 500 })
   }
 
@@ -222,7 +225,7 @@ export async function POST(request: NextRequest) {
       .eq("id", authData.user.id)
 
     if (profileError) {
-      console.error("[Create User] Profile update error:", profileError)
+      log.error({ err: String(profileError) }, "[Create User] Profile update error:")
       // If profile update fails, try to delete the auth user
       await serviceSupabase.auth.admin.deleteUser(authData.user.id)
       return NextResponse.json(
@@ -244,7 +247,7 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     )
   } catch (error) {
-    console.error("[v0] Create user failed:", error)
+    log.error({ err: String(error) }, "[v0] Create user failed:")
     return NextResponse.json(
       {
         success: false,

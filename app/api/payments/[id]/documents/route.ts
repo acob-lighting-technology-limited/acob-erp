@@ -2,6 +2,11 @@ import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 import { getOneDriveService } from "@/lib/onedrive"
+import { logger } from "@/lib/logger"
+import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
+import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
+
+const log = logger("payments-documents")
 
 function createClient() {
   const cookieStore = cookies()
@@ -22,6 +27,61 @@ function createClient() {
   })
 }
 
+function normalizeDepartment(value: string | null | undefined): string {
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase()
+  if (normalized === "finance") return "accounts"
+  return normalized
+}
+
+function isFinanceDepartment(value: string | null | undefined): boolean {
+  return normalizeDepartment(value) === "accounts"
+}
+
+async function assertPaymentAccess(supabase: ReturnType<typeof createClient>, userId: string, paymentId: string) {
+  const scope = await resolveAdminScope(supabase as any, userId)
+  const { data: profile } = await supabase.from("profiles").select("department").eq("id", userId).single()
+  const dataClient = getServiceRoleClientOrFallback(supabase as any)
+
+  const { data: payment } = await dataClient
+    .from("department_payments")
+    .select("department:departments(name)")
+    .eq("id", paymentId)
+    .single()
+
+  const paymentDepartment = Array.isArray((payment as any)?.department)
+    ? (payment as any)?.department?.[0]?.name
+    : (payment as any)?.department?.name
+
+  if (!paymentDepartment) {
+    return { allowed: false as const, status: 404, error: "Payment not found" }
+  }
+
+  if (scope) {
+    const scopedDepartments = getDepartmentScope(scope, "finance")
+    if (scopedDepartments) {
+      const inScope = scopedDepartments.some(
+        (dept) => normalizeDepartment(dept) === normalizeDepartment(paymentDepartment)
+      )
+      if (!inScope) {
+        return { allowed: false as const, status: 403, error: "Forbidden: outside your finance scope" }
+      }
+    }
+    return { allowed: true as const }
+  }
+
+  if (!isFinanceDepartment(profile?.department)) {
+    return { allowed: false as const, status: 403, error: "Forbidden: finance access required" }
+  }
+
+  if (normalizeDepartment(profile?.department) !== normalizeDepartment(paymentDepartment)) {
+    return { allowed: false as const, status: 403, error: "Forbidden: Department mismatch" }
+  }
+
+  return { allowed: true as const }
+}
+
 // GET /api/payments/[id]/documents - List all documents for a payment
 export async function GET(request: Request, { params }: { params: { id: string } }) {
   try {
@@ -36,6 +96,11 @@ export async function GET(request: Request, { params }: { params: { id: string }
 
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const access = await assertPaymentAccess(supabase, user.id, paymentId)
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.error }, { status: access.status })
     }
 
     let query = supabase
@@ -74,6 +139,11 @@ export async function POST(request: Request, { params }: { params: { id: string 
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    const access = await assertPaymentAccess(supabase, user.id, paymentId)
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.error }, { status: access.status })
+    }
+
     const formData = await request.formData()
     const file = formData.get("file") as File
     const documentType = formData.get("document_type") as string
@@ -91,7 +161,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     const { error: uploadError } = await supabase.storage.from("payment_documents").upload(filePath, file)
 
     if (uploadError) {
-      console.error("Storage upload error:", uploadError)
+      log.error({ err: String(uploadError) }, "Storage upload error:")
       return NextResponse.json({ error: "Failed to upload file to storage" }, { status: 500 })
     }
 
@@ -113,7 +183,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       .single()
 
     if (dbError) {
-      console.error("Database insert error:", dbError)
+      log.error({ err: String(dbError) }, "Database insert error:")
       return NextResponse.json({ error: dbError.message || "Failed to save document record" }, { status: 500 })
     }
 
@@ -129,7 +199,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
         .eq("id", replaceDocumentId)
 
       if (archiveError) {
-        console.error("Error archiving old document:", archiveError)
+        log.error({ err: String(archiveError) }, "Error archiving old document:")
         // Don't fail the request, the new document was created successfully
       }
     }
@@ -158,17 +228,17 @@ export async function POST(request: Request, { params }: { params: { id: string 
           const arrayBuffer = await file.arrayBuffer()
 
           await onedrive.uploadFile(onedrivePath, arrayBuffer, file.type)
-          console.log(`Synced document to OneDrive: ${onedrivePath}`)
+          log.info(`Synced document to OneDrive: ${onedrivePath}`)
         }
       }
     } catch (onedriveError) {
       // Log but don't fail the request - OneDrive sync is best effort
-      console.error("OneDrive sync error (non-fatal):", onedriveError)
+      log.error({ err: String(onedriveError) }, "OneDrive sync error (non-fatal):")
     }
 
     return NextResponse.json({ data: newDocument }, { status: 201 })
   } catch (error: unknown) {
-    console.error("Upload handler error:", error)
+    log.error({ err: String(error) }, "Upload handler error:")
     const message = error instanceof Error ? error.message : "Internal Server Error"
     return NextResponse.json({ error: message }, { status: 500 })
   }

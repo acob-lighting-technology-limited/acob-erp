@@ -51,9 +51,15 @@ import {
   autoNumberLines,
   sortReportsByDepartment,
   type WeeklyPptxMode,
+  type WeeklyPptxTheme,
   type WeeklyReport,
 } from "@/lib/export-utils"
 import { format } from "date-fns"
+
+import { logger } from "@/lib/logger"
+
+const log = logger("dashboard-reports-weekly-reports")
+
 
 export default function WeeklyReportsPortal() {
   const currentOfficeWeek = getCurrentOfficeWeek()
@@ -114,7 +120,7 @@ export default function WeeklyReportsPortal() {
         }
       }
     } catch (error) {
-      console.error("Error fetching initial data:", error)
+      log.error("Error fetching initial data:", error)
     }
   }
 
@@ -138,7 +144,7 @@ export default function WeeklyReportsPortal() {
       if (error) throw error
       setReports(sortReportsByDepartment(data || []))
     } catch (error) {
-      console.error("Error loading reports:", error)
+      log.error("Error loading reports:", error)
       toast.error("Failed to load reports")
     } finally {
       setLoading(false)
@@ -188,12 +194,12 @@ export default function WeeklyReportsPortal() {
     setPptxModeDialogOpen(true)
   }
 
-  const runPptxExport = async (mode: WeeklyPptxMode) => {
+  const runPptxExport = async (mode: WeeklyPptxMode, theme: WeeklyPptxTheme = "light") => {
     if (!pendingPptxExport) return
     if (pendingPptxExport.kind === "all") {
-      await exportAllToPPTX(filteredReports, weekFilter, yearFilter, mode)
+      await exportAllToPPTX(filteredReports, weekFilter, yearFilter, mode, theme)
     } else {
-      await exportToPPTX(pendingPptxExport.report, mode)
+      await exportToPPTX(pendingPptxExport.report, mode, theme)
     }
     setPptxModeDialogOpen(false)
     setPendingPptxExport(null)
@@ -525,16 +531,20 @@ export default function WeeklyReportsPortal() {
         <DialogContent className="max-h-[90vh] w-[95vw] max-w-2xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Select PPTX Mode</DialogTitle>
-            <DialogDescription>
-              Compact uses the previous pushed layout. Full uses the current expanded layout.
-            </DialogDescription>
+            <DialogDescription>Choose layout mode and theme for the PowerPoint export.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-3">
-            <Button variant="outline" onClick={() => runPptxExport("compact")} className="justify-start">
-              Compact (Previous)
+            <Button variant="outline" onClick={() => runPptxExport("compact", "light")} className="justify-start">
+              Compact (Light)
             </Button>
-            <Button onClick={() => runPptxExport("full")} className="justify-start">
-              Full (Current)
+            <Button variant="outline" onClick={() => runPptxExport("full", "light")} className="justify-start">
+              Full (Light)
+            </Button>
+            <Button variant="outline" onClick={() => runPptxExport("compact", "dark")} className="justify-start">
+              Compact (Dark)
+            </Button>
+            <Button onClick={() => runPptxExport("full", "dark")} className="justify-start">
+              Full (Dark)
             </Button>
           </div>
         </DialogContent>

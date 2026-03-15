@@ -27,6 +27,11 @@ import { PageWrapper, PageHeader, Section } from "@/components/layout"
 import { StatCard } from "@/components/ui/stat-card"
 import { EmptyState } from "@/components/ui/patterns"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("")
+
+
 type NotificationType = "error" | "warning" | "info"
 
 interface NotificationItem {
@@ -376,24 +381,63 @@ export default async function AdminDashboardPage() {
   } = await supabase.auth.getUser()
   const scope = user ? await resolveAdminScope(supabase as any, user.id) : null
   const departmentScope = scope ? getDepartmentScope(scope, "general") : null
+  const profileIdsInScope = departmentScope
+    ? (departmentScope.length > 0
+        ? await dataClient.from("profiles").select("id").in("department", departmentScope)
+        : ({ data: [] as { id: string }[] } as any)
+      ).data || []
+    : null
+  const scopedUserIds = profileIdsInScope ? profileIdsInScope.map((p: any) => p.id) : []
 
   // Fetch user profile with role
   const { data: profile } = await dataClient.from("profiles").select("*").eq("id", user?.id).single()
 
   // Fetch stats
+  const profilesCountQuery = dataClient.from("profiles").select("*", { count: "exact", head: true })
+  const assetsCountQuery = dataClient.from("assets").select("*", { count: "exact", head: true }).is("deleted_at", null)
+  const tasksCountQuery = dataClient.from("tasks").select("*", { count: "exact", head: true })
+  const docsCountQuery = dataClient.from("user_documentation").select("*", { count: "exact", head: true })
+  const feedbackCountQuery = dataClient.from("feedback").select("*", { count: "exact", head: true })
+
+  const scopedProfilesCountQuery = departmentScope
+    ? departmentScope.length > 0
+      ? profilesCountQuery.in("department", departmentScope)
+      : profilesCountQuery.eq("id", "__none__")
+    : profilesCountQuery
+  const scopedAssetsCountQuery = departmentScope
+    ? departmentScope.length > 0
+      ? assetsCountQuery.in("department", departmentScope)
+      : assetsCountQuery.eq("id", "__none__")
+    : assetsCountQuery
+  const scopedTasksCountQuery = departmentScope
+    ? departmentScope.length > 0
+      ? tasksCountQuery.in("department", departmentScope)
+      : tasksCountQuery.eq("id", "__none__")
+    : tasksCountQuery
+  const scopedDocsCountQuery = departmentScope
+    ? scopedUserIds.length > 0
+      ? docsCountQuery.in("user_id", scopedUserIds)
+      : docsCountQuery.eq("id", "__none__")
+    : docsCountQuery
+  const scopedFeedbackCountQuery = departmentScope
+    ? scopedUserIds.length > 0
+      ? feedbackCountQuery.in("user_id", scopedUserIds)
+      : feedbackCountQuery.eq("id", "__none__")
+    : feedbackCountQuery
+
   const [employeeStats, assetStats, taskStats, docStats, feedbackStats] = await Promise.all([
-    dataClient.from("profiles").select("*", { count: "exact", head: true }),
-    dataClient.from("assets").select("*", { count: "exact", head: true }).is("deleted_at", null),
-    dataClient.from("tasks").select("*", { count: "exact", head: true }),
-    dataClient.from("user_documentation").select("*", { count: "exact", head: true }),
-    dataClient.from("feedback").select("*", { count: "exact", head: true }),
+    scopedProfilesCountQuery,
+    scopedAssetsCountQuery,
+    scopedTasksCountQuery,
+    scopedDocsCountQuery,
+    scopedFeedbackCountQuery,
   ])
 
-  if (employeeStats.error) console.error("Admin dashboard stats: profiles count failed", employeeStats.error)
-  if (assetStats.error) console.error("Admin dashboard stats: assets count failed", assetStats.error)
-  if (taskStats.error) console.error("Admin dashboard stats: tasks count failed", taskStats.error)
-  if (docStats.error) console.error("Admin dashboard stats: user_documentation count failed", docStats.error)
-  if (feedbackStats.error) console.error("Admin dashboard stats: feedback count failed", feedbackStats.error)
+  if (employeeStats.error) log.error("Admin dashboard stats: profiles count failed", employeeStats.error)
+  if (assetStats.error) log.error("Admin dashboard stats: assets count failed", assetStats.error)
+  if (taskStats.error) log.error("Admin dashboard stats: tasks count failed", taskStats.error)
+  if (docStats.error) log.error("Admin dashboard stats: user_documentation count failed", docStats.error)
+  if (feedbackStats.error) log.error("Admin dashboard stats: feedback count failed", feedbackStats.error)
 
   const employeeCount = employeeStats.count || 0
   const assetCount = assetStats.count || 0
@@ -417,7 +461,7 @@ export default async function AdminDashboardPage() {
   }
   const { data: rawRecentActivity, error: rawRecentActivityError } = await recentActivityQuery
   if (rawRecentActivityError) {
-    console.error("Admin dashboard recent activity query failed", rawRecentActivityError)
+    log.error("Admin dashboard recent activity query failed", rawRecentActivityError)
   }
 
   const filteredRawActivity = (rawRecentActivity || [])
@@ -469,10 +513,17 @@ export default async function AdminDashboardPage() {
   const notifications: NotificationItem[] = []
 
   // Pending user approvals
-  const { count: pendingUsersCount } = await supabase
+  let pendingUsersQuery = supabase
     .from("pending_users")
     .select("*", { count: "exact", head: true })
     .eq("status", "pending")
+  if (departmentScope) {
+    pendingUsersQuery =
+      departmentScope.length > 0
+        ? pendingUsersQuery.in("department", departmentScope)
+        : pendingUsersQuery.eq("id", "__none__")
+  }
+  const { count: pendingUsersCount } = await pendingUsersQuery
 
   if (pendingUsersCount && pendingUsersCount > 0) {
     notifications.push({
@@ -487,10 +538,12 @@ export default async function AdminDashboardPage() {
   }
 
   // Open feedback that needs attention
-  const { count: openFeedbackCount } = await supabase
-    .from("feedback")
-    .select("*", { count: "exact", head: true })
-    .eq("status", "open")
+  let openFeedbackQuery = supabase.from("feedback").select("*", { count: "exact", head: true }).eq("status", "open")
+  if (departmentScope) {
+    openFeedbackQuery =
+      scopedUserIds.length > 0 ? openFeedbackQuery.in("user_id", scopedUserIds) : openFeedbackQuery.eq("id", "__none__")
+  }
+  const { count: openFeedbackCount } = await openFeedbackQuery
 
   if (openFeedbackCount && openFeedbackCount > 0) {
     notifications.push({
@@ -505,11 +558,18 @@ export default async function AdminDashboardPage() {
   }
 
   // Urgent tasks
-  const { count: urgentTasksCount } = await supabase
+  let urgentTasksQuery = supabase
     .from("tasks")
     .select("*", { count: "exact", head: true })
     .eq("priority", "urgent")
     .in("status", ["pending", "in_progress"])
+  if (departmentScope) {
+    urgentTasksQuery =
+      departmentScope.length > 0
+        ? urgentTasksQuery.in("department", departmentScope)
+        : urgentTasksQuery.eq("id", "__none__")
+  }
+  const { count: urgentTasksCount } = await urgentTasksQuery
 
   if (urgentTasksCount && urgentTasksCount > 0) {
     notifications.push({
@@ -525,11 +585,18 @@ export default async function AdminDashboardPage() {
 
   // Overdue tasks
   const today = new Date().toISOString().split("T")[0]
-  const { data: overdueTasks } = await supabase
+  let overdueTasksQuery = supabase
     .from("tasks")
     .select("id", { count: "exact", head: false })
     .lt("due_date", today)
     .in("status", ["pending", "in_progress"])
+  if (departmentScope) {
+    overdueTasksQuery =
+      departmentScope.length > 0
+        ? overdueTasksQuery.in("department", departmentScope)
+        : overdueTasksQuery.eq("id", "__none__")
+  }
+  const { data: overdueTasks } = await overdueTasksQuery
 
   if (overdueTasks && overdueTasks.length > 0) {
     notifications.push({
@@ -546,10 +613,17 @@ export default async function AdminDashboardPage() {
   // Recent audit logs (show if there are many actions today)
   const todayStart = new Date()
   todayStart.setHours(0, 0, 0, 0)
-  const { count: todayAuditCount } = await supabase
+  let todayAuditQuery = supabase
     .from("audit_logs")
     .select("*", { count: "exact", head: true })
     .gte("created_at", todayStart.toISOString())
+  if (departmentScope) {
+    todayAuditQuery =
+      departmentScope.length > 0
+        ? todayAuditQuery.in("department", departmentScope)
+        : todayAuditQuery.eq("id", "__none__")
+  }
+  const { count: todayAuditCount } = await todayAuditQuery
 
   if (todayAuditCount && todayAuditCount > 50) {
     notifications.push({

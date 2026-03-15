@@ -16,6 +16,11 @@ import { StatCard } from "@/components/ui/stat-card"
 import { EmptyState } from "@/components/ui/empty-state"
 import { Skeleton } from "@/components/ui/skeleton"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("inventory-products")
+
+
 interface Product {
   id: string
   sku: string
@@ -58,7 +63,7 @@ export default function ProductsPage() {
 
       if (error) {
         if (error.code === "42P01") {
-          console.log("Products table does not exist yet")
+          log.debug("Products table does not exist yet")
           setProducts([])
           return
         }
@@ -72,7 +77,7 @@ export default function ProductsPage() {
 
       setProducts(productsWithCategory)
     } catch (error) {
-      console.error("Error fetching products:", error)
+      log.error("Error fetching products:", error)
       toast.error("Failed to load products")
     } finally {
       setLoading(false)

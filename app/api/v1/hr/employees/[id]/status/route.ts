@@ -4,6 +4,9 @@ import { NextRequest, NextResponse } from "next/server"
 import type { EmploymentStatus } from "@/types/database"
 import { getSeparationBlockers } from "@/lib/hr/separation-blockers"
 import { canAccessAdminSection, resolveAdminScope } from "@/lib/admin/rbac"
+import { logger } from "@/lib/logger"
+
+const log = logger("v1-hr-employees-status")
 
 // Force dynamic rendering to allow cookies/auth
 export const dynamic = "force-dynamic"
@@ -114,7 +117,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const { error: updateError } = await supabase.from("profiles").update(updateData).eq("id", employeeId)
 
     if (updateError) {
-      console.error("Error updating employee status:", updateError)
+      log.error({ err: String(updateError) }, "Error updating employee status:")
       return NextResponse.json({ error: "Failed to update status" }, { status: 500 })
     }
 
@@ -130,7 +133,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       })
 
       if (suspensionError) {
-        console.error("Error creating suspension record:", suspensionError)
+        log.error({ err: String(suspensionError) }, "Error creating suspension record:")
         // Status was updated, but suspension record failed - log but don't fail the request
       }
     }
@@ -149,7 +152,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         .eq("is_active", true)
 
       if (liftError) {
-        console.error("Error lifting suspension:", liftError)
+        log.error({ err: String(liftError) }, "Error lifting suspension:")
       }
     }
 
@@ -192,7 +195,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       },
     })
   } catch (error) {
-    console.error("Error in status update:", error)
+    log.error({ err: String(error) }, "Error in status update:")
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
@@ -248,7 +251,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       blockers,
     })
   } catch (error) {
-    console.error("Error fetching status:", error)
+    log.error({ err: String(error) }, "Error fetching status:")
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

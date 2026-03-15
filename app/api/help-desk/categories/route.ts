@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
+import { logger } from "@/lib/logger"
+
+const log = logger("help-desk-categories")
 
 function describeError(error: unknown): string {
   if (error instanceof Error) return error.message
@@ -84,7 +87,7 @@ export async function GET() {
 
     return NextResponse.json({ data: data || [], departments: uniqueDepartments })
   } catch (error) {
-    console.error("Error in GET /api/help-desk/categories:", error)
+    log.error({ err: String(error) }, "Error in GET /api/help-desk/categories:")
     return NextResponse.json(
       {
         error: `Failed to fetch help desk categories: ${describeError(error)}`,

@@ -14,6 +14,11 @@ import { StatCard } from "@/components/ui/stat-card"
 import { toast } from "sonner"
 import { FormFieldGroup } from "@/components/ui/patterns"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("inventory-products-new")
+
+
 interface Category {
   id: string
   name: string
@@ -45,12 +50,12 @@ export default function NewProductPage() {
       const { data, error } = await supabase.from("product_categories").select("id, name").order("name")
 
       if (error && error.code !== "42P01") {
-        console.error("Error fetching categories:", error)
+        log.error("Error fetching categories:", error)
       }
 
       setCategories(data || [])
     } catch (error) {
-      console.error("Error:", error)
+      log.error("Error:", error)
     }
   }
 
@@ -93,7 +98,7 @@ export default function NewProductPage() {
       toast.success("Product created successfully!")
       router.push("/admin/inventory/products")
     } catch (error: any) {
-      console.error("Error creating product:", error)
+      log.error("Error creating product:", error)
       toast.error(error.message || "Failed to create product")
     } finally {
       setSaving(false)

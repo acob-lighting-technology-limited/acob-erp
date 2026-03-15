@@ -3,6 +3,24 @@ import { createClient } from "@/lib/supabase/server"
 import { evaluateLeaveEligibility, getLeavePolicy } from "@/lib/hr/leave-workflow"
 import { LeaveContent } from "./leave-content"
 
+export interface LeaveApprovalAudit {
+  id: string
+  approver_id?: string | null
+  approval_level?: number | null
+  status: string
+  comments?: string | null
+  approved_at?: string | null
+  stage_code?: string | null
+  stage_order?: number | null
+  reliever_revision?: number | null
+  superseded?: boolean | null
+  approver?: {
+    id?: string
+    full_name?: string | null
+    company_email?: string | null
+  } | null
+}
+
 export interface LeaveRequest {
   id: string
   user_id: string
@@ -41,9 +59,16 @@ export interface LeaveRequest {
     full_name?: string | null
     company_email?: string | null
   } | null
+  current_approver?: {
+    id?: string
+    full_name?: string | null
+    company_email?: string | null
+    role?: string | null
+  } | null
   required_documents?: string[]
   missing_documents?: string[]
   evidence_complete?: boolean
+  approvals?: LeaveApprovalAudit[]
 }
 
 export interface LeaveBalance {
@@ -97,7 +122,7 @@ async function getLeaveData() {
       supabase
         .from("profiles")
         .select(
-          "id, gender, employment_date, employment_type, marital_status, has_children, pregnancy_status, work_location"
+          "id, role, gender, employment_date, employment_type, marital_status, has_children, pregnancy_status, work_location"
         )
         .eq("id", user.id)
         .single(),
@@ -105,6 +130,7 @@ async function getLeaveData() {
 
   const requesterProfile = profileData || {
     id: user.id,
+    role: "employee",
     gender: "unspecified",
     employment_date: null,
     employment_type: null,
@@ -137,6 +163,7 @@ async function getLeaveData() {
 
   return {
     currentUserId: user.id,
+    currentUserRole: requesterProfile.role || "employee",
     requests: (requestsData || []) as LeaveRequest[],
     balances: (balancesData || []) as LeaveBalance[],
     leaveTypes: enrichedLeaveTypes as LeaveType[],
@@ -152,6 +179,7 @@ export default async function LeavePage() {
 
   const leaveData = data as {
     currentUserId: string
+    currentUserRole: string
     requests: LeaveRequest[]
     balances: LeaveBalance[]
     leaveTypes: LeaveType[]
@@ -160,6 +188,7 @@ export default async function LeavePage() {
   return (
     <LeaveContent
       currentUserId={leaveData.currentUserId}
+      currentUserRole={leaveData.currentUserRole}
       initialRequests={leaveData.requests}
       initialBalances={leaveData.balances}
       initialLeaveTypes={leaveData.leaveTypes}

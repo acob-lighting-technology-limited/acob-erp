@@ -239,6 +239,11 @@ const adminSections = [
   { key: "dev", label: "DEV" },
 ]
 
+const ADMIN_ROUTE_ALIASES: Record<string, string[]> = {
+  "/admin/finance": ["/admin/payments", "/admin/purchasing"],
+  "/admin/assets": ["/admin/inventory"],
+}
+
 export function AdminSidebar({ user, profile }: AdminSidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
@@ -313,6 +318,23 @@ export function AdminSidebar({ user, profile }: AdminSidebarProps) {
     }))
     .filter((section) => section.items.length > 0)
 
+  const isAdminNavItemActive = (href: string): boolean => {
+    if (!pathname) return false
+    if (href === "/admin") return pathname === "/admin"
+    if (pathname === href || pathname.startsWith(`${href}/`)) return true
+
+    const aliases = ADMIN_ROUTE_ALIASES[href]
+    if (aliases && aliases.some((alias) => pathname === alias || pathname.startsWith(`${alias}/`))) {
+      return true
+    }
+
+    return false
+  }
+
+  const isLead = Boolean(
+    profile?.is_department_lead || (profile?.lead_departments && profile.lead_departments.length > 0)
+  )
+
   const SidebarContent = () => (
     <>
       {/* Empty space for logo (moved to navbar) */}
@@ -354,7 +376,7 @@ export function AdminSidebar({ user, profile }: AdminSidebarProps) {
                     : user?.email?.split("@")[0]}
                 </p>
                 <p className="text-muted-foreground truncate text-xs whitespace-nowrap">
-                  {profile?.department || "employee Member"}
+                  {`${profile?.department || "employee Member"}${isLead ? " (Lead)" : ""}`}
                 </p>
                 {profile?.role && (
                   <Badge
@@ -368,30 +390,6 @@ export function AdminSidebar({ user, profile }: AdminSidebarProps) {
             )}
           </AnimatePresence>
         </div>
-
-        {/* Leading Departments - Fixed height container */}
-        <AnimatePresence mode="wait">
-          {!isCollapsed && profile?.lead_departments && profile.lead_departments.length > 0 && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              className="shrink-0 overflow-hidden"
-            >
-              <div className="pt-2 text-xs">
-                <p className="text-muted-foreground mb-1">Leading:</p>
-                <div className="flex flex-wrap gap-1">
-                  {profile?.lead_departments?.map((dept) => (
-                    <Badge key={dept} variant="outline" className="text-xs">
-                      {dept}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
 
       {/* Navigation */}
@@ -402,10 +400,7 @@ export function AdminSidebar({ user, profile }: AdminSidebarProps) {
               <p className="text-muted-foreground px-3 pt-1 pb-1 text-[11px] font-semibold">{section.label}</p>
             )}
             {section.items.map((item) => {
-              const isActive =
-                item.href === "/admin"
-                  ? pathname === "/admin"
-                  : pathname === item.href || pathname?.startsWith(item.href + "/")
+              const isActive = isAdminNavItemActive(item.href)
               return (
                 <Link
                   key={item.name}

@@ -15,6 +15,11 @@ import { StatCard } from "@/components/ui/stat-card"
 import { toast } from "sonner"
 import { FormFieldGroup } from "@/components/ui/patterns"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("finance-invoices-new")
+
+
 interface InvoiceItem {
   id: string
   description: string
@@ -164,7 +169,7 @@ export default function NewInvoicePage() {
       toast.success(`Invoice ${invoiceNumber} created successfully!`)
       router.push("/admin/finance/invoices")
     } catch (error: any) {
-      console.error("Error creating invoice:", error)
+      log.error("Error creating invoice:", error)
       toast.error(error.message || "Failed to create invoice")
     } finally {
       setSaving(false)

@@ -1,7 +1,8 @@
 import { Resend } from "resend"
 import { applyAssignableStatusFilter } from "@/lib/workforce/assignment-policy"
+import { ORG_NOTIFICATION_SENDER } from "@/lib/org-config"
 
-export const DEFAULT_NOTIFICATION_SENDER = "ACOB Internal Systems <notifications@acoblighting.com>"
+export const DEFAULT_NOTIFICATION_SENDER = ORG_NOTIFICATION_SENDER
 
 interface SendEmailInput {
   to: string[]

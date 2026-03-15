@@ -3,8 +3,19 @@ import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
+import { logger } from "@/lib/logger"
+
+const log = logger("payments")
 
 export const dynamic = "force-dynamic"
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+const normalizeDepartmentId = (value: unknown): string | null => {
+  const raw = typeof value === "string" ? value.trim() : ""
+  if (!raw || !UUID_REGEX.test(raw)) return null
+  return raw
+}
 
 // Helper function to create Supabase client
 function createClient() {
@@ -78,7 +89,7 @@ export async function GET(request: Request) {
         query = query.eq("department_id", departmentId)
       }
     } else {
-      const deptId = (profile as any)?.department_id || null
+      const deptId = normalizeDepartmentId((profile as any)?.department_id)
       if (deptId) {
         query = query.eq("department_id", deptId)
       } else {
@@ -111,7 +122,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ data: payments })
   } catch (error) {
-    console.error("Error fetching payments:", error)
+    log.error({ err: String(error) }, "Error fetching payments:")
     return NextResponse.json({ error: "Failed to fetch payments" }, { status: 500 })
   }
 }
@@ -199,7 +210,7 @@ export async function POST(request: Request) {
         }
       }
     } else {
-      let userDepartmentId = (profile as any)?.department_id || null
+      let userDepartmentId = normalizeDepartmentId((profile as any)?.department_id)
       if (!userDepartmentId) {
         const rawDept = String((profile as any)?.department || "").trim()
         const deptCandidates = rawDept.toLowerCase() === "finance" ? ["Accounts", rawDept] : [rawDept]
@@ -250,7 +261,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ data: payment }, { status: 201 })
   } catch (error: any) {
-    console.error("Error creating payment:", error)
+    log.error({ err: String(error) }, "Error creating payment:")
     return NextResponse.json({ error: error?.message || "Failed to create payment" }, { status: 500 })
   }
 }

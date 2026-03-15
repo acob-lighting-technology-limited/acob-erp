@@ -2,6 +2,11 @@ import { createClient } from "@/lib/supabase/server"
 import { resolveOneDriveAccessScope } from "@/lib/onedrive/access"
 import type { Documentation } from "./page"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("documentation-data")
+
+
 export async function getDocumentationData() {
   const supabase = await createClient()
 
@@ -21,7 +26,7 @@ export async function getDocumentationData() {
     .order("updated_at", { ascending: false })
 
   if (error) {
-    console.error("Error loading documentation:", error)
+    log.error("Error loading documentation:", error)
   }
 
   const oneDriveScope = await resolveOneDriveAccessScope(supabase as any, user.id)

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { logger } from "@/lib/logger"
+import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import {
   areRequiredDocumentsVerified,
   assertNoOverlap,
@@ -17,9 +19,86 @@ import {
   stageCodeForRole,
 } from "@/lib/hr/leave-routing"
 
+const log = logger("leave-requests")
+
 function isRelieverStage(request: any) {
   const stage = request.current_stage_code || request.approval_stage
   return stage === "pending_reliever" || stage === "reliever_pending"
+}
+
+async function assertNoDepartmentOverlap(
+  supabase: any,
+  requesterId: string,
+  departmentId: string | null | undefined,
+  startDate: string,
+  endDate: string,
+  excludeRequestId?: string
+) {
+  if (!departmentId) return
+
+  const { data: peers } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("department_id", departmentId)
+    .neq("id", requesterId)
+
+  const peerIds = (peers || []).map((row: any) => row.id).filter(Boolean)
+  if (peerIds.length === 0) return
+
+  let overlapQuery = supabase
+    .from("leave_requests")
+    .select("id, user_id, start_date, end_date, status")
+    .in("user_id", peerIds)
+    .in("status", ["pending", "pending_evidence", "approved"])
+    .lte("start_date", endDate)
+    .gte("end_date", startDate)
+    .limit(1)
+
+  if (excludeRequestId) {
+    overlapQuery = overlapQuery.neq("id", excludeRequestId)
+  }
+
+  const { data: overlapRows, error: overlapError } = await overlapQuery
+  if (overlapError) {
+    throw new Error("Failed to validate department leave overlap")
+  }
+
+  if (overlapRows && overlapRows.length > 0) {
+    throw new Error("Another employee in your department already has an overlapping leave for these dates.")
+  }
+}
+
+async function assertRequesterNotBlockedByRelieverCommitment(
+  supabase: any,
+  requesterId: string,
+  startDate: string,
+  endDate: string,
+  excludeRequestId?: string
+) {
+  let overlapQuery = supabase
+    .from("leave_requests")
+    .select("id, user_id, reliever_id, start_date, end_date, status")
+    .eq("reliever_id", requesterId)
+    .neq("user_id", requesterId)
+    .in("status", ["pending", "pending_evidence", "approved"])
+    .lte("start_date", endDate)
+    .gte("end_date", startDate)
+    .limit(1)
+
+  if (excludeRequestId) {
+    overlapQuery = overlapQuery.neq("id", excludeRequestId)
+  }
+
+  const { data: overlapRows, error: overlapError } = await overlapQuery
+  if (overlapError) {
+    throw new Error("Failed to validate reliever commitment overlap")
+  }
+
+  if (overlapRows && overlapRows.length > 0) {
+    throw new Error(
+      "You are assigned as reliever for another leave during this period. You cannot request leave until that relief period ends."
+    )
+  }
 }
 
 async function canRequesterModifyBeforeRelieverDecision(supabase: any, request: any) {
@@ -159,77 +238,74 @@ export async function GET(request: NextRequest) {
       approvalsByRequest.set(approval.leave_request_id, rows)
     }
 
-    // Pre-fetch all leave policies in a single batch query (eliminates N→1 queries)
-    const uniqueLeaveTypeIds = Array.from(
-      new Set(requestRows.map((r: any) => r.leave_type_id).filter(Boolean))
-    ) as string[]
-    const batchPolicyMap = new Map<string, any>()
-    if (uniqueLeaveTypeIds.length > 0) {
-      const { data: policyRows } = await supabase
-        .from("leave_policies")
-        .select(
-          "leave_type_id, annual_days, eligibility, min_tenure_months, notice_days, accrual_mode, is_active, eligibility_conditions, required_documents, frequency_rules, override_allowed"
-        )
-        .in("leave_type_id", uniqueLeaveTypeIds)
-      for (const p of policyRows || []) {
-        if (p.is_active) {
-          batchPolicyMap.set(p.leave_type_id, {
-            ...p,
-            eligibility_conditions: p.eligibility_conditions || {},
-            required_documents: Array.isArray(p.required_documents)
-              ? p.required_documents.filter((d: unknown) => typeof d === "string")
-              : [],
-            frequency_rules: p.frequency_rules || {},
-            override_allowed: p.override_allowed ?? true,
-          })
+    // Pre-fetch all leave policies in parallel (one per unique leave_type_id)
+    // instead of fetching inside the map (which would be N sequential queries).
+    const uniqueLeaveTypeIds = Array.from(new Set(requestRows.map((r: any) => r.leave_type_id).filter(Boolean)))
+    const policyEntries = await Promise.all(
+      uniqueLeaveTypeIds.map(async (ltId) => {
+        const policy = await getLeavePolicy(supabase, ltId as string)
+        return [ltId, policy] as const
+      })
+    )
+    const policyMap = new Map(policyEntries)
+
+    // Check evidence completeness for all requests in parallel
+    const enriched = await Promise.all(
+      requestRows.map(async (leaveRequest: any) => {
+        const policy = policyMap.get(leaveRequest.leave_type_id) ?? { required_documents: [] }
+        const requiredDocs = (policy as any).required_documents || []
+        const evidence = await areRequiredDocumentsVerified(supabase, leaveRequest.id, requiredDocs)
+        return {
+          ...leaveRequest,
+          user: leaveRequest.user_id ? profileMap.get(leaveRequest.user_id) || null : null,
+          reliever: leaveRequest.reliever_id ? profileMap.get(leaveRequest.reliever_id) || null : null,
+          supervisor: leaveRequest.supervisor_id ? profileMap.get(leaveRequest.supervisor_id) || null : null,
+          leave_type: leaveRequest.leave_type_id ? leaveTypeMap.get(leaveRequest.leave_type_id) || null : null,
+          evidence: evidenceByRequest.get(leaveRequest.id) || [],
+          approvals: approvalsByRequest.get(leaveRequest.id) || [],
+          required_documents: requiredDocs,
+          evidence_complete: evidence.complete,
+          missing_documents: evidence.missing,
         }
-      }
-    }
-
-    // Compute evidence completeness from already-batched evidenceRows — no extra queries
-    const enriched = requestRows.map((leaveRequest: any) => {
-      const policy = batchPolicyMap.get(leaveRequest.leave_type_id)
-      const requiredDocs: string[] = policy?.required_documents || []
-      const requestEvidence = evidenceByRequest.get(leaveRequest.id) || []
-
-      let evidenceComplete = true
-      const missingDocs: string[] = []
-      if (requiredDocs.length > 0) {
-        const verifiedSet = new Set(
-          requestEvidence
-            .filter((e: any) => e.status === "verified")
-            .map((e: any) => e.document_type)
-        )
-        for (const doc of requiredDocs) {
-          if (!verifiedSet.has(doc)) {
-            evidenceComplete = false
-            missingDocs.push(doc)
-          }
-        }
-      }
-
-      return {
-        ...leaveRequest,
-        user: leaveRequest.user_id ? profileMap.get(leaveRequest.user_id) || null : null,
-        reliever: leaveRequest.reliever_id ? profileMap.get(leaveRequest.reliever_id) || null : null,
-        supervisor: leaveRequest.supervisor_id ? profileMap.get(leaveRequest.supervisor_id) || null : null,
-        leave_type: leaveRequest.leave_type_id ? leaveTypeMap.get(leaveRequest.leave_type_id) || null : null,
-        evidence: requestEvidence,
-        approvals: approvalsByRequest.get(leaveRequest.id) || [],
-        required_documents: requiredDocs,
-        evidence_complete: evidenceComplete,
-        missing_documents: missingDocs,
-      }
-    })
+      })
+    )
 
     const balances = (balanceRows || []).map((row: any) => ({
       ...row,
       leave_type: row.leave_type_id ? leaveTypeMap.get(row.leave_type_id) || null : null,
     }))
 
-    return NextResponse.json({ data: enriched, balances: balances || [] })
+    let relieverCommitments: any[] = []
+    if (!all) {
+      const todayIsoDate = new Date().toISOString().slice(0, 10)
+      const { data: relieverRows } = await supabase
+        .from("leave_requests")
+        .select(
+          `
+          id,
+          user_id,
+          leave_type_id,
+          start_date,
+          end_date,
+          resume_date,
+          days_count,
+          status,
+          user:profiles!leave_requests_user_id_profiles_fkey(id, full_name, company_email),
+          leave_type:leave_types!leave_requests_leave_type_id_fkey(id, name)
+        `
+        )
+        .eq("reliever_id", targetUserId)
+        .neq("user_id", targetUserId)
+        .in("status", ["pending", "pending_evidence", "approved"])
+        .gte("end_date", todayIsoDate)
+        .order("start_date", { ascending: true })
+
+      relieverCommitments = relieverRows || []
+    }
+
+    return NextResponse.json({ data: enriched, balances: balances || [], reliever_commitments: relieverCommitments })
   } catch (error) {
-    console.error("Error in GET /api/hr/leave/requests:", error)
+    log.error({ err: String(error) }, "Unhandled error in GET")
     return NextResponse.json({ error: "An error occurred" }, { status: 500 })
   }
 }
@@ -237,6 +313,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
+    const validationClient = getServiceRoleClientOrFallback(supabase)
     const {
       data: { user },
     } = await supabase.auth.getUser()
@@ -315,8 +392,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "You cannot assign yourself as reliever" }, { status: 400 })
     }
 
-    await assertNoOverlap(supabase, user.id, start_date, endDate)
-    await assertRelieverAvailability(supabase, reliever.id, start_date, endDate)
+    await assertNoOverlap(validationClient, user.id, start_date, endDate)
+    await assertNoDepartmentOverlap(validationClient, user.id, requester.department_id, start_date, endDate)
+    await assertRequesterNotBlockedByRelieverCommitment(validationClient, user.id, start_date, endDate)
+    await assertRelieverAvailability(validationClient, reliever.id, start_date, endDate)
 
     const { data: balance } = await supabase
       .from("leave_balances")
@@ -332,16 +411,35 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { data: existingRequest } = await supabase
+    const { data: existingWorkflowRequest } = await supabase
       .from("leave_requests")
       .select("id")
       .eq("user_id", user.id)
       .in("status", ["pending", "pending_evidence"])
       .limit(1)
 
-    if (existingRequest && existingRequest.length > 0) {
+    if (existingWorkflowRequest && existingWorkflowRequest.length > 0) {
       return NextResponse.json(
         { error: "You already have an active leave request. Complete it before submitting another." },
+        { status: 400 }
+      )
+    }
+
+    const { data: activeApprovedRequest } = await supabase
+      .from("leave_requests")
+      .select("id, start_date, end_date")
+      .eq("user_id", user.id)
+      .eq("status", "approved")
+      .lte("start_date", endDate)
+      .gte("end_date", start_date)
+      .limit(1)
+
+    if (activeApprovedRequest && activeApprovedRequest.length > 0) {
+      const activeRange = activeApprovedRequest[0]
+      return NextResponse.json(
+        {
+          error: `You already have an approved leave overlapping these dates (${activeRange.start_date} to ${activeRange.end_date}). Choose a different period.`,
+        },
         { status: 400 }
       )
     }
@@ -399,11 +497,14 @@ export async function POST(request: NextRequest) {
     const requesterName = requester.full_name || `${requester.first_name || ""} ${requester.last_name || ""}`.trim()
 
     if (initialStatus === "pending") {
+      const isRelieverStage = firstStage.approver_role_code === "reliever"
       await notifyStageApprover({
         supabase,
         approverUserId: firstStage.approver_user_id,
-        title: "Leave request awaiting your approval",
-        message: `${requesterName || "Employee"} requested ${effectiveDays} day(s) leave from ${start_date} to ${endDate}.`,
+        title: isRelieverStage ? "Leave relief confirmation required" : "Leave request awaiting your approval",
+        message: isRelieverStage
+          ? `${requesterName || "Employee"} selected you as reliever for ${leaveType.name} from ${start_date} to ${endDate}. Review the handover note and confirm coverage so the request can continue.`
+          : `${requesterName || "Employee"} requested ${effectiveDays} day(s) leave from ${start_date} to ${endDate}.`,
         actorId: user.id,
         entityId: newRequest.id,
         linkUrl: "/dashboard/leave",
@@ -422,10 +523,16 @@ export async function POST(request: NextRequest) {
           : "Leave request created successfully",
     })
   } catch (error) {
-    console.error("Error in POST /api/hr/leave/requests:", error)
+    log.error({ err: String(error) }, "Unhandled error in POST")
     const message = error instanceof Error ? error.message : "An error occurred"
     const status =
-      message.startsWith("LEAVE_APPROVER_NOT_CONFIGURED:") || message.startsWith("LEAVE_APPROVER_CONFLICT:") ? 400 : 500
+      message.startsWith("LEAVE_APPROVER_NOT_CONFIGURED:") ||
+      message.startsWith("LEAVE_APPROVER_CONFLICT:") ||
+      message.toLowerCase().includes("overlap") ||
+      message.toLowerCase().includes("reliever") ||
+      message.toLowerCase().includes("already has an approved leave")
+        ? 400
+        : 500
     return NextResponse.json({ error: message }, { status })
   }
 }
@@ -433,6 +540,7 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const supabase = await createClient()
+    const validationClient = getServiceRoleClientOrFallback(supabase)
     const {
       data: { user },
     } = await supabase.auth.getUser()
@@ -469,7 +577,7 @@ export async function PUT(request: NextRequest) {
       }
 
       await assertRelieverAvailability(
-        supabase,
+        validationClient,
         newReliever.id,
         existingRequest.start_date,
         existingRequest.end_date,
@@ -604,8 +712,10 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "Invalid reliever selected" }, { status: 400 })
     }
 
-    await assertNoOverlap(supabase, user.id, targetStartDate, endDate, id)
-    await assertRelieverAvailability(supabase, relieverId, targetStartDate, endDate, id)
+    await assertNoOverlap(validationClient, user.id, targetStartDate, endDate, id)
+    await assertNoDepartmentOverlap(validationClient, user.id, requester.department_id, targetStartDate, endDate, id)
+    await assertRequesterNotBlockedByRelieverCommitment(validationClient, user.id, targetStartDate, endDate, id)
+    await assertRelieverAvailability(validationClient, relieverId, targetStartDate, endDate, id)
 
     const { data: balance } = await supabase
       .from("leave_balances")
@@ -674,10 +784,15 @@ export async function PUT(request: NextRequest) {
       message: "Leave request updated successfully",
     })
   } catch (error) {
-    console.error("Error in PUT /api/hr/leave/requests:", error)
+    log.error({ err: String(error) }, "Unhandled error in PUT")
     const message = error instanceof Error ? error.message : "An error occurred"
     const status =
-      message.startsWith("LEAVE_APPROVER_NOT_CONFIGURED:") || message.startsWith("LEAVE_APPROVER_CONFLICT:") ? 400 : 500
+      message.startsWith("LEAVE_APPROVER_NOT_CONFIGURED:") ||
+      message.startsWith("LEAVE_APPROVER_CONFLICT:") ||
+      message.toLowerCase().includes("overlap") ||
+      message.toLowerCase().includes("reliever")
+        ? 400
+        : 500
     return NextResponse.json({ error: message }, { status })
   }
 }
@@ -718,7 +833,7 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ message: "Leave request deleted successfully" })
   } catch (error) {
-    console.error("Error in DELETE /api/hr/leave/requests:", error)
+    log.error({ err: String(error) }, "Unhandled error in DELETE")
     return NextResponse.json({ error: "An error occurred" }, { status: 500 })
   }
 }

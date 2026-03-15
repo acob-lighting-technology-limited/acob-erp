@@ -126,8 +126,9 @@ export function WeeklyReportDialog({ isOpen, onClose, onSuccess, initialData }: 
 
       // Meta checks
       const { data: nextActions } = await supabase
-        .from("action_items")
+        .from("tasks")
         .select("*")
+        .eq("category", "weekly_action")
         .eq("department", dept)
         .eq("week_number", week)
         .eq("year", year)
@@ -140,8 +141,9 @@ export function WeeklyReportDialog({ isOpen, onClose, onSuccess, initialData }: 
       }
 
       const { data: current } = await supabase
-        .from("action_items")
+        .from("tasks")
         .select("*")
+        .eq("category", "weekly_action")
         .eq("department", dept)
         .eq("week_number", week)
         .eq("year", year)
@@ -212,13 +214,23 @@ export function WeeklyReportDialog({ isOpen, onClose, onSuccess, initialData }: 
               })
           })
         await supabase
-          .from("action_items")
+          .from("tasks")
           .delete()
           .eq("department", formData.department)
           .eq("week_number", formData.week_number)
           .eq("year", formData.year)
+          .eq("category", "weekly_action")
           .eq("status", "pending")
-        if (payload.length > 0) await supabase.from("action_items").insert(payload)
+        if (payload.length > 0) {
+          const enrichedPayload = payload.map((p: any) => ({
+            ...p,
+            source_type: "action_item",
+            category: "weekly_action",
+            assignment_type: "department",
+            priority: "medium",
+          }))
+          await supabase.from("tasks").insert(enrichedPayload)
+        }
       }
       toast.success("Success")
       onSuccess()

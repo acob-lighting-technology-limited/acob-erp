@@ -11,6 +11,11 @@ import {
 } from "./management/admin-tasks-content"
 import { listAssignableProfiles } from "@/lib/workforce/assignment-policy"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("tasks")
+
+
 async function getAdminTasksData() {
   const supabase = await createClient()
   const dataClient = getServiceRoleClientOrFallback(supabase as any)
@@ -58,7 +63,7 @@ async function getAdminTasksData() {
   ])
 
   if (tasksResult.error || employeeResult.error || projectsResult.error) {
-    console.error("Error loading data:", tasksResult.error || employeeResult.error || projectsResult.error)
+    log.error("Error loading data:", tasksResult.error || employeeResult.error || projectsResult.error)
     return { tasks: [], employee: [], projects: [], departments: [], userProfile }
   }
 

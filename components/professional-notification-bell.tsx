@@ -353,11 +353,11 @@ export function ProfessionalNotificationBell({ isAdmin = false }: ProfessionalNo
 
       <DropdownMenuContent
         align="end"
-        className="w-[480px] border-2 p-0 shadow-xl"
+        className="w-[460px] border-2 p-0 shadow-xl"
         onCloseAutoFocus={(e) => e.preventDefault()}
       >
         {/* Header */}
-        <div className="bg-muted/30 flex items-center justify-between border-b p-4">
+        <div className="bg-muted/30 flex items-center justify-between border-b p-3">
           <div className="flex items-center gap-2">
             <Bell className="text-foreground h-5 w-5" />
             <h3 className="text-base font-semibold">Notifications</h3>
@@ -385,14 +385,14 @@ export function ProfessionalNotificationBell({ isAdmin = false }: ProfessionalNo
         </div>
 
         {/* Search */}
-        <div className="border-b p-3">
+        <div className="border-b p-2.5">
           <div className="relative">
             <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
             <Input
               placeholder="Search notifications..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-9 pl-9"
+              className="h-8 pl-9"
             />
           </div>
         </div>
@@ -402,7 +402,7 @@ export function ProfessionalNotificationBell({ isAdmin = false }: ProfessionalNo
           <TabsList className="h-auto w-full justify-start rounded-none border-b bg-transparent p-0">
             <TabsTrigger
               value="all"
-              className="data-[state=active]:border-primary rounded-none border-b-2 border-transparent px-4 py-3 data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+              className="data-[state=active]:border-primary rounded-none border-b-2 border-transparent px-3 py-2 data-[state=active]:bg-transparent data-[state=active]:shadow-none"
             >
               All{" "}
               {categoryCounts.all > 0 && (
@@ -414,7 +414,7 @@ export function ProfessionalNotificationBell({ isAdmin = false }: ProfessionalNo
 
             <TabsTrigger
               value="unread"
-              className="data-[state=active]:border-primary rounded-none border-b-2 border-transparent px-4 py-3 data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+              className="data-[state=active]:border-primary rounded-none border-b-2 border-transparent px-3 py-2 data-[state=active]:bg-transparent data-[state=active]:shadow-none"
             >
               Unread{" "}
               {categoryCounts.unread > 0 && (
@@ -427,7 +427,7 @@ export function ProfessionalNotificationBell({ isAdmin = false }: ProfessionalNo
             {categoryCounts.mentions > 0 && (
               <TabsTrigger
                 value="mentions"
-                className="data-[state=active]:border-primary rounded-none border-b-2 border-transparent px-4 py-3 data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+                className="data-[state=active]:border-primary rounded-none border-b-2 border-transparent px-3 py-2 data-[state=active]:bg-transparent data-[state=active]:shadow-none"
               >
                 <MessageSquare className="mr-1 h-4 w-4" />
                 Mentions{" "}
@@ -441,7 +441,7 @@ export function ProfessionalNotificationBell({ isAdmin = false }: ProfessionalNo
           </TabsList>
 
           <TabsContent value={activeTab} className="mt-0">
-            <ScrollArea className="h-[500px]">
+            <ScrollArea className="h-[430px]">
               {filteredNotifications.length > 0 ? (
                 <div className="divide-y">
                   {filteredNotifications.map((notification) => {
@@ -451,18 +451,15 @@ export function ProfessionalNotificationBell({ isAdmin = false }: ProfessionalNo
                       <div
                         key={notification.id}
                         className={cn(
-                          "group hover:bg-muted/30 relative cursor-pointer p-4 transition-all",
+                          "group hover:bg-muted/30 relative cursor-pointer px-3 py-2.5 transition-all",
                           !notification.read && "bg-blue-50/30 dark:bg-blue-950/10"
                         )}
                         onClick={() => handleNotificationClick(notification)}
                       >
-                        {/* Unread indicator */}
-                        {!notification.read && <div className="bg-primary absolute top-0 bottom-0 left-0 w-1" />}
-
-                        <div className="flex gap-3 pl-2">
+                        <div className="flex gap-2.5">
                           {/* Actor Avatar or Icon */}
                           {notification.actor_avatar || notification.actor_name ? (
-                            <Avatar className="h-10 w-10 shrink-0">
+                            <Avatar className="h-8 w-8 shrink-0">
                               {notification.actor_avatar && (
                                 <AvatarImage src={notification.actor_avatar} alt={notification.actor_name} />
                               )}
@@ -473,12 +470,12 @@ export function ProfessionalNotificationBell({ isAdmin = false }: ProfessionalNo
                           ) : (
                             <div
                               className={cn(
-                                "flex h-10 w-10 shrink-0 items-center justify-center rounded-full",
+                                "flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
                                 "bg-muted",
                                 priorityColors[notification.priority as keyof typeof priorityColors]
                               )}
                             >
-                              <Icon className="h-5 w-5" />
+                              <Icon className="h-4 w-4" />
                             </div>
                           )}
 
@@ -486,16 +483,16 @@ export function ProfessionalNotificationBell({ isAdmin = false }: ProfessionalNo
                           <div className="min-w-0 flex-1">
                             <div className="flex items-start justify-between gap-2">
                               <div className="flex-1">
-                                <p className={cn("text-sm leading-snug", !notification.read && "font-semibold")}>
+                                <p className={cn("text-sm leading-tight", !notification.read && "font-semibold")}>
                                   {notification.title}
                                 </p>
-                                <p className="text-muted-foreground mt-0.5 line-clamp-2 text-xs">
+                                <p className="text-muted-foreground mt-0.5 line-clamp-2 text-xs leading-snug">
                                   {notification.message}
                                 </p>
 
                                 {/* Link indicator */}
                                 {notification.action_url && (
-                                  <div className="text-primary mt-1 flex items-center gap-1 text-xs font-medium">
+                                  <div className="text-primary mt-0.5 flex items-center gap-1 text-xs font-medium">
                                     View details
                                     <ChevronRight className="h-3 w-3" />
                                   </div>
@@ -510,12 +507,12 @@ export function ProfessionalNotificationBell({ isAdmin = false }: ProfessionalNo
                             </div>
 
                             {/* Action buttons (hidden, show on hover) */}
-                            <div className="mt-2 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                            <div className="mt-1.5 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
                               {!notification.read && (
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  className="h-7 px-2 text-xs"
+                                  className="h-6 px-2 text-[11px]"
                                   onClick={(e) => {
                                     e.stopPropagation()
                                     markAsRead(notification.id)
@@ -529,7 +526,7 @@ export function ProfessionalNotificationBell({ isAdmin = false }: ProfessionalNo
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="text-destructive hover:text-destructive hover:bg-destructive/10 h-7 px-2 text-xs"
+                                className="text-destructive hover:text-destructive hover:bg-destructive/10 h-6 px-2 text-[11px]"
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   deleteNotification(notification.id)

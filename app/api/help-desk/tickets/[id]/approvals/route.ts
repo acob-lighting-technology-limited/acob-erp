@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server"
 import { appendAuditLog, appendHelpDeskEvent, getAuthContext, resolveLeadForDepartment } from "@/lib/help-desk/server"
 import { sendHelpDeskMail } from "@/lib/help-desk/mailer"
 import { applyAssignableStatusFilter } from "@/lib/workforce/assignment-policy"
-import { DEPT_EXECUTIVE_MANAGEMENT, DEPT_CORPORATE_SERVICES } from "@/config/constants"
+import { logger } from "@/lib/logger"
+
+const log = logger("help-desk-tickets-approvals")
 
 const STAGE_ORDER = [
   "requester_department_lead",
@@ -85,8 +87,8 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       (approvalStage === "requester_department_lead" &&
         managesDepartmentStrict(profile, ticket.requester_department)) ||
       (approvalStage === "service_department_lead" && managesDepartmentStrict(profile, ticket.service_department)) ||
-      (approvalStage === "head_corporate_services" && managesDepartmentStrict(profile, DEPT_CORPORATE_SERVICES)) ||
-      (approvalStage === "managing_director" && managesDepartmentStrict(profile, DEPT_EXECUTIVE_MANAGEMENT))
+      (approvalStage === "head_corporate_services" && managesDepartmentStrict(profile, "Corporate Services")) ||
+      (approvalStage === "managing_director" && managesDepartmentStrict(profile, "Executive Management"))
 
     if (!canApproveStage) {
       return NextResponse.json({ error: "You are not authorized to decide this approval stage" }, { status: 403 })
@@ -138,7 +140,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
           ticketNumber: ticket.ticket_number,
         })
       } catch (mailError) {
-        console.error("Help desk mail error (rejected):", mailError)
+        log.error({ err: String(mailError) }, "Help desk mail error (rejected):")
       }
     } else {
       const upcomingStage = nextStage(approvalStage)
@@ -181,7 +183,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
             ticketNumber: ticket.ticket_number,
           })
         } catch (mailError) {
-          console.error("Help desk mail error (final approval):", mailError)
+          log.error({ err: String(mailError) }, "Help desk mail error (final approval):")
         }
       } else {
         finalStatus = "pending_approval"
@@ -204,7 +206,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
               rows.find((p: any) => {
                 return (
                   p.is_department_lead &&
-                  (p.department === DEPT_CORPORATE_SERVICES || (p.lead_departments || []).includes(DEPT_CORPORATE_SERVICES))
+                  (p.department === "Corporate Services" || (p.lead_departments || []).includes("Corporate Services"))
                 )
               }) || null
             )
@@ -213,7 +215,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
             rows.find((p: any) => {
               return (
                 p.is_department_lead &&
-                (p.department === DEPT_EXECUTIVE_MANAGEMENT || (p.lead_departments || []).includes(DEPT_EXECUTIVE_MANAGEMENT))
+                (p.department === "Executive Management" || (p.lead_departments || []).includes("Executive Management"))
               )
             }) || null
           )
@@ -246,7 +248,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
               ctaPath: "/admin/help-desk",
             })
           } catch (mailError) {
-            console.error("Help desk mail error (next approver):", mailError)
+            log.error({ err: String(mailError) }, "Help desk mail error (next approver):")
           }
         }
       }
@@ -288,7 +290,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       },
     })
   } catch (error) {
-    console.error("Error in POST /api/help-desk/tickets/[id]/approvals:", error)
+    log.error({ err: String(error) }, "Error in POST /api/help-desk/tickets/[id]/approvals:")
     return NextResponse.json({ error: "Failed to process approval decision" }, { status: 500 })
   }
 }

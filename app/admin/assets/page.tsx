@@ -5,6 +5,11 @@ import { AdminAssetsContent, type Asset, type Employee, type UserProfile } from 
 import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
 import { listAssignableProfiles } from "@/lib/workforce/assignment-policy"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("assets")
+
+
 async function getAdminAssetsData() {
   const supabase = await createClient()
 
@@ -24,6 +29,7 @@ async function getAdminAssetsData() {
 
   const userProfile: UserProfile = {
     role: scope.role,
+    admin_domains: scope.adminDomains,
     is_department_lead: scope.isDepartmentLead,
     lead_departments: scope.leadDepartments,
     managed_departments: scope.managedDepartments,
@@ -47,14 +53,14 @@ async function getAdminAssetsData() {
   }
 
   if (assetsError) {
-    console.error("Error loading assets:", assetsError)
+    log.error("Error loading assets:", assetsError)
     return { assets: [], employees: [], departments: [], userProfile, loadError: "Failed to load admin assets" }
   }
 
   // Fetch current assignments for all assets
   const { data: assignmentsData } = await dataClient
     .from("asset_assignments")
-    .select("asset_id, assigned_to, department, office_location")
+    .select("asset_id, assigned_to, department, office_location, assignment_type")
     .eq("is_current", true)
 
   // Fetch user details for assignments
@@ -113,6 +119,7 @@ async function getAdminAssetsData() {
             assigned_to: assignment.assigned_to,
             department: assignment.department,
             office_location: assignment.office_location,
+            assignment_type: assignment.assignment_type,
             user: assignment.assigned_to ? assignmentUsersMap.get(assignment.assigned_to) : null,
           }
         : undefined,

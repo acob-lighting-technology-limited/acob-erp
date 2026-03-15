@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { logger } from "@/lib/logger"
+
+const log = logger("hr-leave-payroll-feed")
 
 export async function GET(request: NextRequest) {
   try {
@@ -53,7 +56,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ data: data || [] })
   } catch (error) {
-    console.error("Error in GET /api/hr/leave/payroll-feed:", error)
+    log.error({ err: String(error) }, "Error in GET /api/hr/leave/payroll-feed:")
     return NextResponse.json({ error: "An error occurred" }, { status: 500 })
   }
 }

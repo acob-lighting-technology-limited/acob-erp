@@ -13,6 +13,11 @@ import { StatCard } from "@/components/ui/stat-card"
 import { EmptyState } from "@/components/ui/patterns"
 import { BarChart3, Download, FileText, Users } from "lucide-react"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("hr-attendance-reports")
+
+
 interface AttendanceReport {
   user_id: string
   user_name: string
@@ -104,7 +109,7 @@ export default function AttendanceReportsPage() {
         setReports(Array.from(userMap.values()))
       }
     } catch (error) {
-      console.error("Error generating report:", error)
+      log.error("Error generating report:", error)
     } finally {
       setLoading(false)
     }

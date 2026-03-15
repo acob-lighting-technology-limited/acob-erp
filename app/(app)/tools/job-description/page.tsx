@@ -13,6 +13,11 @@ import { writeAuditLogClient } from "@/lib/audit/client"
 import { PageHeader } from "@/components/layout"
 import { EmptyState } from "@/components/ui/patterns"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("tools-job-description")
+
+
 export default function JobDescriptionPage() {
   const [jobDescription, setJobDescription] = useState("")
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
@@ -61,7 +66,7 @@ export default function JobDescriptionPage() {
         })
       }
     } catch (error) {
-      console.error("Error loading job description:", error)
+      log.error("Error loading job description:", error)
       toast.error("Failed to load job description")
     }
   }
@@ -105,7 +110,7 @@ export default function JobDescriptionPage() {
       setIsEditing(false)
       setLastUpdated(new Date().toISOString())
     } catch (error) {
-      console.error("Error saving job description:", error)
+      log.error("Error saving job description:", error)
       toast.error("Failed to save job description")
     } finally {
       setIsSaving(false)

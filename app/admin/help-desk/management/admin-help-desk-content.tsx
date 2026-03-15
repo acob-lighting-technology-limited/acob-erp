@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { StatCard } from "@/components/ui/stat-card"
 import { EmptyState } from "@/components/ui/patterns"
+import { PriorityBadge, TicketStatusBadge } from "@/components/dashboard/help-desk/ticket-badges"
 import { Headset, Clock, AlertCircle, CheckCircle2 } from "lucide-react"
 import { isAssignableProfile } from "@/lib/workforce/assignment-policy"
 
@@ -152,7 +153,10 @@ export function AdminHelpDeskContent({ initialTickets, employees, leadDirectory,
     }
   }, [tickets])
 
-  const managedDepartments = viewer.managed_departments || viewer.lead_departments || []
+  const managedDepartments =
+    (Array.isArray(viewer.managed_departments) && viewer.managed_departments.length > 0
+      ? viewer.managed_departments
+      : viewer.lead_departments) || []
   const canLeadDepartment = (department: string | null) =>
     Boolean(viewer.is_department_lead && department && managedDepartments.includes(department))
 
@@ -329,10 +333,10 @@ export function AdminHelpDeskContent({ initialTickets, employees, leadDirectory,
             </TableCell>
             <TableCell>{ticket.service_department}</TableCell>
             <TableCell>
-              <Badge variant="outline">{ticket.priority}</Badge>
+              <PriorityBadge priority={ticket.priority} />
             </TableCell>
             <TableCell>
-              <Badge>{ticket.status}</Badge>
+              <TicketStatusBadge status={ticket.status} />
             </TableCell>
             <TableCell>
               <Badge variant="outline">{resolveCurrentStage(ticket)}</Badge>

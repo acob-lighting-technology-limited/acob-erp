@@ -19,6 +19,11 @@ import { toast } from "sonner"
 import { format } from "date-fns"
 import { cn, formatName, formatFullName } from "@/lib/utils"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("hr-employees-pending-applications-modal")
+
+
 interface PendingUser {
   id: string
   first_name: string
@@ -71,7 +76,7 @@ export function PendingApplicationsModal({ onEmployeeCreated }: PendingApplicati
         handleUserSelect(data[0])
       }
     } catch (error: any) {
-      console.error("Error fetching pending users:", error)
+      log.error("Error fetching pending users:", error)
       toast.error("Failed to load pending applications")
     } finally {
       setIsLoading(false)
@@ -102,7 +107,7 @@ export function PendingApplicationsModal({ onEmployeeCreated }: PendingApplicati
       }
       setEmployeeId(`ACOB/${currentYear}/${nextIdNumber.toString().padStart(3, "0")}`)
     } catch (err) {
-      console.error("Error suggesting ID:", err)
+      log.error("Error suggesting ID:", err)
       setEmployeeId(`ACOB/${new Date().getFullYear()}/001`)
     }
   }
@@ -152,7 +157,7 @@ export function PendingApplicationsModal({ onEmployeeCreated }: PendingApplicati
       }
       onEmployeeCreated()
     } catch (error: any) {
-      console.error("Approval error:", error)
+      log.error("Approval error:", error)
       toast.error(error.message || "Failed to approve user")
     } finally {
       setIsProcessing(false)
@@ -179,7 +184,7 @@ export function PendingApplicationsModal({ onEmployeeCreated }: PendingApplicati
         setEmployeeId("")
       }
     } catch (error: any) {
-      console.error("Rejection error:", error)
+      log.error("Rejection error:", error)
       toast.error("Failed to reject application")
     } finally {
       setIsProcessing(false)

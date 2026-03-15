@@ -1,15 +1,24 @@
 import { createClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
 import { createClient as createServerClient } from "@/lib/supabase/server"
+import { rateLimit, getClientId } from "@/lib/rate-limit"
+import { logger } from "@/lib/logger"
 import { renderWelcomeEmail } from "@/lib/email-templates/welcome"
 import { renderInternalNotificationEmail } from "@/lib/email-templates/internal-notification"
 import { resolveActiveLeadRecipients, sendNotificationEmail } from "@/lib/notifications/email-gateway"
 import { isSystemNotificationChannelEnabled, resolveChannelEligibleUserIds } from "@/lib/notifications/delivery-policy"
 import { withSubjectPrefix } from "@/lib/notifications/subject-policy"
 import { syncEmploymentStatusToAuth } from "@/lib/supabase/admin"
-import { PORTAL_URL } from "@/config/constants"
+import { writeAuditLog } from "@/lib/audit/write-audit"
+
+const log = logger("approve-user")
 
 export async function POST(req: Request) {
+  const rl = rateLimit(`approve-user:${getClientId(req)}`, { limit: 20, windowSec: 600 })
+  if (!rl.allowed) {
+    return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 })
+  }
+
   // 1. Verify Caller is an Admin
   const supabase = await createServerClient()
   const {
@@ -25,13 +34,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Forbidden: Admin access required" }, { status: 403 })
   }
 
-  console.log("--- Starting Approval Process ---")
+  log.info({ callerId: caller.id }, "Starting approval process")
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
     if (!supabaseUrl || !supabaseServiceKey) {
-      console.error("CRITICAL ERROR: Missing Supabase environment variables")
+      log.error("Missing Supabase environment variables")
       return NextResponse.json({ error: "System configuration error: Missing database keys" }, { status: 500 })
     }
 
@@ -65,10 +74,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: `Missing required user data: ${missingFields.join(", ")}` }, { status: 422 })
     }
 
-    // 2. Determine Employee ID
-    //    If manually provided: validate format only.
-    //    If auto-generated: use the DB function which holds an advisory lock
-    //    for the duration of the transaction, eliminating race conditions.
+    // 2. Determine Employee ID — use DB sequence for atomic, collision-free generation
     let employeeId = manualEmployeeId
     const currentYear = new Date().getFullYear()
 
@@ -83,19 +89,17 @@ export async function POST(req: Request) {
     }
 
     if (!employeeId) {
-      // generate_next_employee_number uses pg_advisory_xact_lock internally,
-      // so concurrent calls are serialised at the DB level — no retry needed.
-      const { data: genResult, error: genError } = await supabaseAdmin
-        .rpc("generate_next_employee_number", { p_year: currentYear })
-
-      if (genError || !genResult) {
-        throw new Error(`Failed to generate employee number: ${genError?.message ?? "unknown error"}`)
+      // next_employee_number() calls nextval() on a sequence — fully atomic, no race condition
+      const { data: seqRow, error: seqError } = await supabaseAdmin
+        .rpc("next_employee_number")
+      if (seqError || !seqRow) {
+        throw new Error(`Failed to generate employee number: ${seqError?.message ?? "unknown error"}`)
       }
-      employeeId = genResult as string
+      employeeId = seqRow as string
     }
 
     const tempPassword = `Welcome${currentYear}!`
-    const portalUrl = PORTAL_URL
+    const portalUrl = "https://acoblighting.com/mail"
 
     // 3. Create or Update Auth User
     // First check if user already exists
@@ -133,10 +137,9 @@ export async function POST(req: Request) {
       }
     }
 
-    // 4. Atomically upsert the profile AND delete the pending_user record.
-    //    complete_user_approval() runs both writes in a single DB transaction,
-    //    so a failure in either step rolls back both — no ghost records.
-    const { error: approvalError } = await supabaseAdmin.rpc("complete_user_approval", {
+    // 4 & 5. Atomically upsert profile + delete from pending_users in one DB transaction.
+    // If either step fails, both roll back — no ghost users, no orphaned profiles.
+    const { error: approvalError } = await supabaseAdmin.rpc("atomic_complete_user_approval", {
       p_auth_user_id:        authUserId,
       p_pending_user_id:     pendingUserId,
       p_employee_number:     employeeId,
@@ -151,7 +154,7 @@ export async function POST(req: Request) {
       p_additional_phone:    pendingUser.additional_phone_number ?? null,
       p_residential_address: pendingUser.residential_address ?? null,
       p_office_location:     pendingUser.office_location ?? null,
-      p_employment_date:     hireDate || new Date().toISOString(),
+      p_employment_date:     hireDate ?? null,
     })
 
     if (approvalError) {
@@ -159,14 +162,10 @@ export async function POST(req: Request) {
       if (!existingProfile && authUserId) {
         await supabaseAdmin.auth.admin
           .deleteUser(authUserId)
-          .catch((e) => console.error("Failed to clean up orphaned auth user:", e))
+          .catch((e) => log.error({ err: String(e) }, "Failed to clean up orphaned auth user"))
       }
       throw new Error(`Profile creation failed: ${approvalError.message}`)
     }
-
-    // Sync employment_status to Auth user_metadata so the middleware can read
-    // it from the session without an extra DB query on every request.
-    await syncEmploymentStatusToAuth(authUserId!, "active")
 
     // 6. Send Welcome Email
     try {
@@ -179,7 +178,7 @@ export async function POST(req: Request) {
         })
       }
     } catch (emailError) {
-      console.error("Failed to send welcome email:", emailError)
+      log.error({ err: String(emailError) }, "Failed to send welcome email")
     }
 
     // 7. Send Internal Confirmation Email to Department Leads
@@ -208,12 +207,32 @@ export async function POST(req: Request) {
         }
       }
     } catch (emailError) {
-      console.error("Failed to send stakeholder notification emails:", emailError)
+      log.error({ err: String(emailError) }, "Failed to send stakeholder notification emails")
     }
+
+    // Sync employment_status into JWT metadata so middleware doesn't need a DB query
+    await syncEmploymentStatusToAuth(authUserId!, "active")
+
+    // Audit: new employee onboarding is a critical action
+    const supabaseForAudit = await createServerClient()
+    await writeAuditLog(supabaseForAudit, {
+      action: "create",
+      entityType: "profile",
+      entityId: authUserId!,
+      context: { actorId: caller.id, source: "api" as const },
+      newValues: {
+        employee_number: employeeId,
+        company_email: pendingUser.company_email,
+        department: pendingUser.department,
+        role: "employee",
+        employment_status: "active",
+      },
+      metadata: { source: "approve-user", pending_user_id: pendingUserId },
+    }, { failOpen: true })
 
     return NextResponse.json({ success: true, employeeId })
   } catch (error: any) {
-    console.error("Approval Process Error:", error)
+    log.error({ err: String(error) }, "Approval process failed")
     // Redact internal error details from the client
     const message = error.message?.includes("Auth creation failed")
       ? error.message

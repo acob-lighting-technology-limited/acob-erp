@@ -2,6 +2,11 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { GoalsContent } from "./goals-content"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("dashboard-goals")
+
+
 export interface Goal {
   id: string
   title: string
@@ -34,7 +39,7 @@ async function getGoalsData() {
     .order("created_at", { ascending: false })
 
   if (error) {
-    console.error("Error loading goals:", error)
+    log.error("Error loading goals:", error)
   }
 
   return {

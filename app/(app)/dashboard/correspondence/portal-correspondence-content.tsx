@@ -57,15 +57,12 @@ export function PortalCorrespondenceContent({
   const pendingRef = useRef<HTMLDivElement | null>(null)
   const [linkReference, setLinkReference] = useState<Record<string, string>>({})
   const [form, setForm] = useState({
-    direction: "outgoing",
     department_name: initialDepartment,
     letter_type: "external",
     category: "notice",
     subject: "",
     recipient_name: "",
     sender_name: currentViewerName,
-    source_mode: "email",
-    assigned_department_name: initialDepartment,
     action_required: false,
     due_date: "",
     metadata_text: "",
@@ -100,8 +97,8 @@ export function PortalCorrespondenceContent({
       return
     }
 
-    if (form.direction === "outgoing" && !form.department_name) {
-      toast.error("Department is required for outgoing correspondence")
+    if (!form.department_name) {
+      toast.error("Department is required")
       return
     }
 
@@ -112,15 +109,12 @@ export function PortalCorrespondenceContent({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          direction: form.direction,
-          department_name: form.direction === "outgoing" ? form.department_name : null,
-          letter_type: form.direction === "outgoing" ? form.letter_type : null,
-          category: form.direction === "outgoing" ? form.category : null,
+          department_name: form.department_name,
+          letter_type: form.letter_type,
+          category: form.category,
           subject: form.subject,
           recipient_name: form.recipient_name || null,
           sender_name: form.sender_name || null,
-          source_mode: form.direction === "incoming" ? form.source_mode : null,
-          assigned_department_name: form.direction === "incoming" ? form.assigned_department_name || null : null,
           action_required: form.action_required,
           due_date: form.due_date || null,
           metadata,
@@ -135,15 +129,12 @@ export function PortalCorrespondenceContent({
       toast.success("Correspondence created")
       setCreateOpen(false)
       setForm({
-        direction: "outgoing",
         department_name: initialDepartment,
         letter_type: "external",
         category: "notice",
         subject: "",
         recipient_name: "",
         sender_name: currentViewerName,
-        source_mode: "email",
-        assigned_department_name: initialDepartment,
         action_required: false,
         due_date: "",
         metadata_text: "",
@@ -264,59 +255,23 @@ export function PortalCorrespondenceContent({
                 </DialogHeader>
                 <form className="grid gap-4 md:grid-cols-2" onSubmit={createRecord}>
                   <div className="space-y-2">
-                    <Label>Direction</Label>
+                    <Label>Department</Label>
                     <Select
-                      value={form.direction}
-                      onValueChange={(value) => setForm((prev) => ({ ...prev, direction: value }))}
+                      value={form.department_name}
+                      onValueChange={(value) => setForm((prev) => ({ ...prev, department_name: value }))}
                     >
                       <SelectTrigger>
-                        <SelectValue />
+                        <SelectValue placeholder="Select department" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="outgoing">Outgoing</SelectItem>
-                        <SelectItem value="incoming">Incoming</SelectItem>
+                        {departmentCodes.map((dept) => (
+                          <SelectItem key={dept.department_name} value={dept.department_name}>
+                            {dept.department_name} ({dept.department_code})
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
-                  {form.direction === "outgoing" ? (
-                    <div className="space-y-2">
-                      <Label>Department</Label>
-                      <Select
-                        value={form.department_name}
-                        onValueChange={(value) => setForm((prev) => ({ ...prev, department_name: value }))}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select department" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {departmentCodes.map((dept) => (
-                            <SelectItem key={dept.department_name} value={dept.department_name}>
-                              {dept.department_name} ({dept.department_code})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <Label>Assign Department</Label>
-                      <Select
-                        value={form.assigned_department_name}
-                        onValueChange={(value) => setForm((prev) => ({ ...prev, assigned_department_name: value }))}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select department" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {departmentCodes.map((dept) => (
-                            <SelectItem key={dept.department_name} value={dept.department_name}>
-                              {dept.department_name} ({dept.department_code})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
 
                   <div className="space-y-2 md:col-span-2">
                     <Label>Subject</Label>
@@ -341,61 +296,39 @@ export function PortalCorrespondenceContent({
                     />
                   </div>
 
-                  {form.direction === "outgoing" ? (
-                    <>
-                      <div className="space-y-2">
-                        <Label>Letter Type</Label>
-                        <Select
-                          value={form.letter_type}
-                          onValueChange={(value) => setForm((prev) => ({ ...prev, letter_type: value }))}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="internal">Internal</SelectItem>
-                            <SelectItem value="external">External</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Category</Label>
-                        <Select
-                          value={form.category}
-                          onValueChange={(value) => setForm((prev) => ({ ...prev, category: value }))}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="approval">Approval</SelectItem>
-                            <SelectItem value="notice">Notice</SelectItem>
-                            <SelectItem value="contract">Contract</SelectItem>
-                            <SelectItem value="invoice">Invoice</SelectItem>
-                            <SelectItem value="other">Other</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="space-y-2">
-                      <Label>Source Mode</Label>
-                      <Select
-                        value={form.source_mode}
-                        onValueChange={(value) => setForm((prev) => ({ ...prev, source_mode: value }))}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="email">Email</SelectItem>
-                          <SelectItem value="physical">Physical</SelectItem>
-                          <SelectItem value="portal">Portal</SelectItem>
-                          <SelectItem value="courier">Courier</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
+                  <div className="space-y-2">
+                    <Label>Letter Type</Label>
+                    <Select
+                      value={form.letter_type}
+                      onValueChange={(value) => setForm((prev) => ({ ...prev, letter_type: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="internal">Internal</SelectItem>
+                        <SelectItem value="external">External</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Category</Label>
+                    <Select
+                      value={form.category}
+                      onValueChange={(value) => setForm((prev) => ({ ...prev, category: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="approval">Approval</SelectItem>
+                        <SelectItem value="notice">Notice</SelectItem>
+                        <SelectItem value="contract">Contract</SelectItem>
+                        <SelectItem value="invoice">Invoice</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
                   <div className="space-y-2">
                     <Label>Due Date (Optional)</Label>

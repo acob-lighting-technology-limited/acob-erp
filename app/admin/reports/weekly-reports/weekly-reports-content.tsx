@@ -53,6 +53,7 @@ import {
   autoNumberLines,
   sortReportsByDepartment,
   type WeeklyPptxMode,
+  type WeeklyPptxTheme,
   type WeeklyReport,
 } from "@/lib/export-utils"
 import { WeeklyReportAdminDialog } from "@/components/admin/reports/weekly-report-dialog"
@@ -61,6 +62,11 @@ import { format } from "date-fns"
 import { Label } from "@/components/ui/label"
 import { Fragment } from "react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+
+import { logger } from "@/lib/logger"
+
+const log = logger("reports-weekly-reports-weekly-reports-co")
+
 
 interface TrackerStatus {
   id: string
@@ -71,6 +77,7 @@ interface TrackerStatus {
 interface WeeklyReportsContentProps {
   initialDepartments: string[]
   scopedDepartments?: string[]
+  editableDepartments?: string[]
   currentUser: {
     id: string
     role: string
@@ -84,6 +91,7 @@ interface WeeklyReportsContentProps {
 export function WeeklyReportsContent({
   initialDepartments,
   scopedDepartments = [],
+  editableDepartments = [],
   currentUser,
 }: WeeklyReportsContentProps) {
   const currentOfficeWeek = getCurrentOfficeWeek()
@@ -119,13 +127,13 @@ export function WeeklyReportsContent({
       Array.isArray(currentUser.admin_domains) &&
       currentUser.admin_domains.includes("reports"))
 
-  const managedDepartments = [currentUser.department, ...(currentUser.lead_departments || [])].filter(
-    Boolean
-  ) as string[]
+  const managedDepartments =
+    editableDepartments.length > 0
+      ? editableDepartments
+      : ([currentUser.department, ...(currentUser.lead_departments || [])].filter(Boolean) as string[])
 
   const canMutateReport = (report: WeeklyReport) => {
     if (isGlobalReportsEditor) return true
-    if (report.user_id === currentUser.id) return true
     return managedDepartments.includes(report.department)
   }
 
@@ -145,10 +153,6 @@ export function WeeklyReportsContent({
       if (deptFilter !== "all") {
         query = query.eq("department", deptFilter)
       }
-      if (scopedDepartments.length > 0) {
-        query = query.in("department", scopedDepartments)
-      }
-
       const { data, error } = await query
       if (error) throw error
 
@@ -157,17 +161,18 @@ export function WeeklyReportsContent({
 
       // ─── Fetch Action Items for Aggregate Status (SAME WEEK) ─────────────────
       const { data: actions, error: actionsError } = await supabase
-        .from("action_items")
+        .from("tasks")
         .select("id, department, status")
+        .eq("category", "weekly_action")
         .eq("week_number", weekFilter)
         .eq("year", yearFilter)
-        .in("department", scopedDepartments.length > 0 ? scopedDepartments : initialDepartments)
+        .in("department", initialDepartments)
 
       if (!actionsError) {
         setTrackingData(actions || [])
       }
     } catch (error) {
-      console.error("Error loading reports:", error)
+      log.error("Error loading reports:", error)
       toast.error("Failed to load reports")
     } finally {
       setLoading(false)
@@ -359,7 +364,7 @@ export function WeeklyReportsContent({
       await pres.writeFile({ fileName: `${report.department}_W${report.week_number}_Report.pptx` })
       toast.success("PowerPoint generated successfully")
     } catch (error) {
-      console.error("PPT Error:", error)
+      log.error("PPT Error:", error)
       toast.error("Failed to generate PowerPoint")
     }
   }
@@ -381,12 +386,12 @@ export function WeeklyReportsContent({
     setPptxModeDialogOpen(true)
   }
 
-  const runPptxExport = async (mode: WeeklyPptxMode) => {
+  const runPptxExport = async (mode: WeeklyPptxMode, theme: WeeklyPptxTheme = "light") => {
     if (!pendingPptxExport) return
     if (pendingPptxExport.kind === "all") {
-      await exportAllToPPTX(filteredReports, weekFilter, yearFilter, mode)
+      await exportAllToPPTX(filteredReports, weekFilter, yearFilter, mode, theme)
     } else {
-      await exportToPPTX(pendingPptxExport.report, mode)
+      await exportToPPTX(pendingPptxExport.report, mode, theme)
     }
     setPptxModeDialogOpen(false)
     setPendingPptxExport(null)
@@ -771,16 +776,20 @@ export function WeeklyReportsContent({
         <DialogContent className="max-h-[90vh] w-[95vw] max-w-2xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Select PPTX Mode</DialogTitle>
-            <DialogDescription>
-              Compact uses the previous pushed layout. Full uses the current expanded layout.
-            </DialogDescription>
+            <DialogDescription>Choose layout mode and theme for the PowerPoint export.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-3">
-            <Button variant="outline" onClick={() => runPptxExport("compact")} className="justify-start">
-              Compact (Previous)
+            <Button variant="outline" onClick={() => runPptxExport("compact", "light")} className="justify-start">
+              Compact (Light)
             </Button>
-            <Button onClick={() => runPptxExport("full")} className="justify-start">
-              Full (Current)
+            <Button variant="outline" onClick={() => runPptxExport("full", "light")} className="justify-start">
+              Full (Light)
+            </Button>
+            <Button variant="outline" onClick={() => runPptxExport("compact", "dark")} className="justify-start">
+              Compact (Dark)
+            </Button>
+            <Button onClick={() => runPptxExport("full", "dark")} className="justify-start">
+              Full (Dark)
             </Button>
           </div>
         </DialogContent>

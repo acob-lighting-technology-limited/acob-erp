@@ -8,6 +8,9 @@ import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 import { getOneDriveService, getFileCategory } from "@/lib/onedrive"
 import { isPathAllowed, resolveOneDriveAccessScope } from "@/lib/onedrive/access"
+import { logger } from "@/lib/logger"
+
+const log = logger("onedrive-preview")
 
 export const dynamic = "force-dynamic"
 
@@ -113,7 +116,7 @@ export async function GET(request: Request) {
       },
     })
   } catch (error: unknown) {
-    console.error("Error getting preview URL:", error)
+    log.error({ err: String(error) }, "Error getting preview URL:")
     const message = error instanceof Error ? error.message : "Failed to get preview"
     return NextResponse.json({ error: message }, { status: 500 })
   }

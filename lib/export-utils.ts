@@ -19,20 +19,28 @@ import {
 } from "docx"
 import { formatOfficeDateWithOrdinal, getOfficeWeekMonday } from "./meeting-week"
 
+// Augment the global Window interface so TypeScript knows about the PptxGenJS UMD global.
+declare global {
+  interface Window {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    PptxGenJS?: new (...args: any[]) => any
+  }
+}
+
 // Load pptxgenjs via a script tag (the correct browser usage pattern).
 // The UMD bundle sets window.PptxGenJS as a side effect, bypassing all webpack issues.
 // This avoids the "JSZip is not defined" error that occurs when webpack processes the UMD bundle.
-const loadPptxGenJS = (): Promise<any> => {
+const loadPptxGenJS = (): Promise<NonNullable<typeof window.PptxGenJS>> => {
   return new Promise((resolve, reject) => {
     // Already loaded
-    if (typeof (window as any).PptxGenJS === "function") {
-      return resolve((window as any).PptxGenJS)
+    if (typeof window.PptxGenJS === "function") {
+      return resolve(window.PptxGenJS)
     }
     const script = document.createElement("script")
     script.src = "https://cdn.jsdelivr.net/npm/pptxgenjs@4/dist/pptxgen.bundle.js"
     script.onload = () => {
-      if (typeof (window as any).PptxGenJS === "function") {
-        resolve((window as any).PptxGenJS)
+      if (typeof window.PptxGenJS === "function") {
+        resolve(window.PptxGenJS)
       } else {
         reject(new Error("PptxGenJS not found on window after script load"))
       }
@@ -65,6 +73,7 @@ export const DEPARTMENT_ORDER = [
   "Admin & HR",
   "Legal, Regulatory and Compliance",
   "Operations",
+  "Project",
   "Technical",
 ]
 
@@ -1572,12 +1581,49 @@ const ACOB_OFFWHITE = "F8FAF9"
 const LOGO_FULL = "/images/acob-logo-light.webp" // full ACOB LIGHTING logo
 const LOGO_ICON = "/images/acob-logo-dark.webp" // green-only icon variant
 
+export type WeeklyPptxTheme = "light" | "dark"
+
+const getWeeklyPptxThemeColors = (theme: WeeklyPptxTheme = "light") => {
+  if (theme === "dark") {
+    return {
+      canvas: "0B1220",
+      header: "020617",
+      accent: ACOB_GREEN,
+      footer: ACOB_GREEN,
+      textPrimary: "E2E8F0",
+      textMuted: "94A3B8",
+      textInverse: ACOB_WHITE,
+      card: "111827",
+      cardBorder: "1F2937",
+      separator: "334155",
+      sectionText: "E2E8F0",
+      titleFill: "134E4A",
+    }
+  }
+
+  return {
+    canvas: ACOB_OFFWHITE,
+    header: ACOB_DARK,
+    accent: ACOB_GREEN,
+    footer: ACOB_GREEN,
+    textPrimary: ACOB_DARK,
+    textMuted: ACOB_MUTED,
+    textInverse: ACOB_WHITE,
+    card: ACOB_WHITE,
+    cardBorder: "E2E8F0",
+    separator: "E2E8F0",
+    sectionText: ACOB_SLATE,
+    titleFill: ACOB_GREEN,
+  }
+}
+
 /** Adds the ACOB cover slide. */
-const addCoverSlide = (pres: any, week: number, year: number, subtitle?: string) => {
+const addCoverSlide = (pres: any, week: number, year: number, subtitle?: string, theme: WeeklyPptxTheme = "light") => {
+  const colors = getWeeklyPptxThemeColors(theme)
   const slide = pres.addSlide()
 
   // White body, dark header/footer only
-  slide.background = { color: ACOB_WHITE }
+  slide.background = { color: theme === "dark" ? colors.canvas : ACOB_WHITE }
 
   // ── Top dark header bar ───────────────────────────────────────────────────
   slide.addShape(pres.ShapeType?.rect ?? "rect", {
@@ -1585,8 +1631,8 @@ const addCoverSlide = (pres: any, week: number, year: number, subtitle?: string)
     y: 0,
     w: "100%",
     h: 0.55,
-    fill: { color: ACOB_DARK },
-    line: { color: ACOB_DARK },
+    fill: { color: colors.header },
+    line: { color: colors.header },
   })
   // thin green accent under header
   slide.addShape(pres.ShapeType?.rect ?? "rect", {
@@ -1594,8 +1640,8 @@ const addCoverSlide = (pres: any, week: number, year: number, subtitle?: string)
     y: 0.55,
     w: "100%",
     h: 0.06,
-    fill: { color: ACOB_GREEN },
-    line: { color: ACOB_GREEN },
+    fill: { color: colors.accent },
+    line: { color: colors.accent },
   })
 
   // ── Centred logo (full ACOB LIGHTING logo) ────────────────────────────────
@@ -1611,7 +1657,7 @@ const addCoverSlide = (pres: any, week: number, year: number, subtitle?: string)
   const logoX = (13.33 - logoW) / 2
   try {
     slide.addImage({
-      path: LOGO_FULL,
+      path: theme === "dark" ? LOGO_ICON : LOGO_FULL,
       x: logoX,
       y: blockStart,
       w: logoW,
@@ -1625,7 +1671,7 @@ const addCoverSlide = (pres: any, week: number, year: number, subtitle?: string)
       h: logoH,
       fontSize: 22,
       bold: true,
-      color: ACOB_DARK,
+      color: colors.textPrimary,
       align: "center",
       fontFace: "Calibri",
     })
@@ -1637,7 +1683,7 @@ const addCoverSlide = (pres: any, week: number, year: number, subtitle?: string)
     y: blockStart + 1.35,
     w: 10.33,
     h: 0,
-    line: { color: ACOB_GREEN, width: 1.5 },
+    line: { color: colors.accent, width: 1.5 },
   })
 
   // ── Main title block ──────────────────────────────────────────────────────
@@ -1651,7 +1697,7 @@ const addCoverSlide = (pres: any, week: number, year: number, subtitle?: string)
     h: 0.7,
     fontSize: 40,
     bold: true,
-    color: ACOB_DARK,
+    color: colors.textPrimary,
     align: "center",
     fontFace: "Calibri",
   })
@@ -1664,7 +1710,7 @@ const addCoverSlide = (pres: any, week: number, year: number, subtitle?: string)
     h: 0.55,
     fontSize: 26,
     bold: false,
-    color: ACOB_GREEN,
+    color: colors.accent,
     align: "center",
     fontFace: "Calibri",
   })
@@ -1678,8 +1724,8 @@ const addCoverSlide = (pres: any, week: number, year: number, subtitle?: string)
     h: 0.42,
     fontSize: 15,
     bold: true,
-    color: ACOB_WHITE,
-    fill: { color: ACOB_GREEN },
+    color: colors.textInverse,
+    fill: { color: colors.accent },
     align: "center",
     valign: "middle",
     fontFace: "Calibri",
@@ -1694,7 +1740,7 @@ const addCoverSlide = (pres: any, week: number, year: number, subtitle?: string)
     h: 0.45,
     fontSize: 16,
     bold: false,
-    color: ACOB_MUTED,
+    color: colors.textMuted,
     align: "center",
     fontFace: "Calibri",
   })
@@ -1708,7 +1754,7 @@ const addCoverSlide = (pres: any, week: number, year: number, subtitle?: string)
       h: 0.4,
       fontSize: 14,
       bold: false,
-      color: ACOB_GREEN,
+      color: colors.accent,
       align: "center",
       fontFace: "Calibri",
       italic: true,
@@ -1721,8 +1767,8 @@ const addCoverSlide = (pres: any, week: number, year: number, subtitle?: string)
     y: 6.9,
     w: "100%",
     h: 0.6,
-    fill: { color: ACOB_GREEN },
-    line: { color: ACOB_GREEN },
+    fill: { color: colors.footer },
+    line: { color: colors.footer },
   })
   slide.addText("Confidential — ACOB Internal Use Only", {
     x: 0,
@@ -1730,7 +1776,7 @@ const addCoverSlide = (pres: any, week: number, year: number, subtitle?: string)
     w: "100%",
     h: 0.6,
     fontSize: 10,
-    color: ACOB_WHITE,
+    color: colors.textInverse,
     align: "center",
     valign: "middle",
     fontFace: "Calibri",
@@ -1742,9 +1788,16 @@ const addCoverSlide = (pres: any, week: number, year: number, subtitle?: string)
 /**
  * Adds a department title slide (full-bleed green).
  */
-const addDeptTitleSlide = (pres: any, department: string, submittedBy: string, pageNumber?: number) => {
+const addDeptTitleSlide = (
+  pres: any,
+  department: string,
+  submittedBy: string,
+  pageNumber?: number,
+  theme: WeeklyPptxTheme = "light"
+) => {
+  const colors = getWeeklyPptxThemeColors(theme)
   const slide = pres.addSlide()
-  slide.background = { color: ACOB_GREEN }
+  slide.background = { color: colors.titleFill }
 
   // Subtle top-right circle decoration
   slide.addShape(pres.ShapeType?.ellipse ?? "ellipse", {
@@ -1752,8 +1805,8 @@ const addDeptTitleSlide = (pres: any, department: string, submittedBy: string, p
     y: -1.2,
     w: 4,
     h: 4,
-    fill: { color: ACOB_DARK, transparency: 60 },
-    line: { color: ACOB_DARK, transparency: 60 },
+    fill: { color: colors.header, transparency: 60 },
+    line: { color: colors.header, transparency: 60 },
   })
 
   slide.addText(department.toUpperCase(), {
@@ -1763,7 +1816,7 @@ const addDeptTitleSlide = (pres: any, department: string, submittedBy: string, p
     h: 1.2,
     fontSize: 48,
     bold: true,
-    color: ACOB_WHITE,
+    color: colors.textInverse,
     fontFace: "Calibri",
     align: "left",
   })
@@ -1773,7 +1826,7 @@ const addDeptTitleSlide = (pres: any, department: string, submittedBy: string, p
     y: 3.7,
     w: 5,
     h: 0,
-    line: { color: ACOB_WHITE, width: 2, transparency: 40 },
+    line: { color: colors.textInverse, width: 2, transparency: 40 },
   })
 
   // slide.addText(`Submitted by: ${submittedBy}`, {
@@ -1791,7 +1844,7 @@ const addDeptTitleSlide = (pres: any, department: string, submittedBy: string, p
       h: 0.5,
       fontSize: 10,
       bold: true,
-      color: ACOB_WHITE,
+      color: colors.textInverse,
       align: "center",
       valign: "middle",
       fontFace: "Calibri",
@@ -1809,10 +1862,12 @@ const addDeptIndexSlide = (
   departments: string[],
   week: number,
   year: number,
-  pageNumberForDepartment: (index: number) => number = (index) => index + 3
+  pageNumberForDepartment: (index: number) => number = (index) => index + 3,
+  theme: WeeklyPptxTheme = "light"
 ) => {
+  const colors = getWeeklyPptxThemeColors(theme)
   const slide = pres.addSlide()
-  slide.background = { color: ACOB_OFFWHITE }
+  slide.background = { color: colors.canvas }
 
   // Header
   slide.addShape(pres.ShapeType?.rect ?? "rect", {
@@ -1820,8 +1875,8 @@ const addDeptIndexSlide = (
     y: 0,
     w: "100%",
     h: 0.65,
-    fill: { color: ACOB_DARK },
-    line: { color: ACOB_DARK },
+    fill: { color: colors.header },
+    line: { color: colors.header },
   })
   slide.addText("Departments in This Report", {
     x: 0.3,
@@ -1830,7 +1885,7 @@ const addDeptIndexSlide = (
     h: 0.65,
     fontSize: 16,
     bold: true,
-    color: ACOB_WHITE,
+    color: colors.textInverse,
     valign: "middle",
     fontFace: "Calibri",
   })
@@ -1840,7 +1895,7 @@ const addDeptIndexSlide = (
     w: 3,
     h: 0.65,
     fontSize: 12,
-    color: ACOB_GREEN_LIGHT,
+    color: theme === "dark" ? colors.textMuted : ACOB_GREEN_LIGHT,
     valign: "middle",
     align: "right",
     fontFace: "Calibri",
@@ -1857,8 +1912,8 @@ const addDeptIndexSlide = (
       y: y + 0.05,
       w: 0.38,
       h: 0.38,
-      fill: { color: ACOB_GREEN },
-      line: { color: ACOB_GREEN },
+      fill: { color: colors.accent },
+      line: { color: colors.accent },
     })
     slide.addText(`${i + 1}`, {
       x: 0.5,
@@ -1867,7 +1922,7 @@ const addDeptIndexSlide = (
       h: 0.38,
       fontSize: 11,
       bold: true,
-      color: ACOB_WHITE,
+      color: colors.textInverse,
       align: "center",
       valign: "middle",
       fontFace: "Calibri",
@@ -1878,7 +1933,7 @@ const addDeptIndexSlide = (
       w: 10.5,
       h: 0.45,
       fontSize: 16,
-      color: ACOB_DARK,
+      color: colors.textPrimary,
       valign: "middle",
       fontFace: "Calibri",
     })
@@ -1889,7 +1944,7 @@ const addDeptIndexSlide = (
       h: 0.45,
       fontSize: 14,
       bold: true,
-      color: ACOB_GREEN,
+      color: colors.accent,
       valign: "middle",
       align: "right",
       fontFace: "Calibri",
@@ -1901,7 +1956,7 @@ const addDeptIndexSlide = (
         y: y + rowH - 0.05,
         w: 12.3,
         h: 0,
-        line: { color: "E2E8F0", width: 0.5 },
+        line: { color: colors.separator, width: 0.5 },
       })
     }
   })
@@ -1912,8 +1967,8 @@ const addDeptIndexSlide = (
     y: 6.9,
     w: "100%",
     h: 0.6,
-    fill: { color: ACOB_GREEN },
-    line: { color: ACOB_GREEN },
+    fill: { color: colors.footer },
+    line: { color: colors.footer },
   })
   return slide
 }
@@ -2166,8 +2221,10 @@ const addWeeklyHeaderAndFooter = (
   slide: any,
   department: string,
   nextDept?: string,
-  pageNumber?: number
+  pageNumber?: number,
+  theme: WeeklyPptxTheme = "light"
 ) => {
+  const colors = getWeeklyPptxThemeColors(theme)
   const { headerH, footerY, footerH } = WEEKLY_CONTENT_LAYOUT
 
   slide.addShape(pres.ShapeType?.rect ?? "rect", {
@@ -2175,8 +2232,8 @@ const addWeeklyHeaderAndFooter = (
     y: 0,
     w: "100%",
     h: headerH,
-    fill: { color: ACOB_DARK },
-    line: { color: ACOB_DARK },
+    fill: { color: colors.header },
+    line: { color: colors.header },
   })
 
   slide.addText(department.toUpperCase(), {
@@ -2186,7 +2243,7 @@ const addWeeklyHeaderAndFooter = (
     h: headerH,
     fontSize: 16,
     bold: true,
-    color: ACOB_WHITE,
+    color: colors.textInverse,
     valign: "middle",
     fontFace: "Calibri",
   })
@@ -2208,8 +2265,8 @@ const addWeeklyHeaderAndFooter = (
     y: footerY,
     w: "100%",
     h: footerH,
-    fill: { color: ACOB_GREEN },
-    line: { color: ACOB_GREEN },
+    fill: { color: colors.footer },
+    line: { color: colors.footer },
   })
 
   if (nextDept) {
@@ -2219,7 +2276,7 @@ const addWeeklyHeaderAndFooter = (
       w: 6.1,
       h: footerH,
       fontSize: 10,
-      color: ACOB_WHITE,
+      color: colors.textInverse,
       align: "right",
       valign: "middle",
       fontFace: "Calibri",
@@ -2234,7 +2291,7 @@ const addWeeklyHeaderAndFooter = (
       w: "100%",
       h: footerH,
       fontSize: 10,
-      color: ACOB_WHITE,
+      color: colors.textInverse,
       align: "center",
       valign: "middle",
       fontFace: "Calibri",
@@ -2252,15 +2309,17 @@ const addSectionCard = (
   text: string,
   fontSize: number,
   allowAutoShrink = true,
-  useManualHangingWrap = false
+  useManualHangingWrap = false,
+  theme: WeeklyPptxTheme = "light"
 ) => {
+  const colors = getWeeklyPptxThemeColors(theme)
   slide.addShape(pres.ShapeType?.rect ?? "rect", {
     x: box.x,
     y: box.y,
     w: box.w,
     h: box.h,
-    fill: { color: ACOB_WHITE },
-    line: { color: "E2E8F0", width: 1 },
+    fill: { color: colors.card },
+    line: { color: colors.cardBorder, width: 1 },
   })
   slide.addShape(pres.ShapeType?.rect ?? "rect", {
     x: box.x + 0.15,
@@ -2277,7 +2336,7 @@ const addSectionCard = (
     h: 0.22,
     fontSize: 8,
     bold: true,
-    color: ACOB_WHITE,
+    color: colors.textInverse,
     fontFace: "Calibri",
   })
   const wrappedText =
@@ -2294,7 +2353,7 @@ const addSectionCard = (
     w: box.textW,
     h: box.textH,
     fontSize,
-    color: ACOB_SLATE,
+    color: colors.sectionText,
     valign: "top",
     fontFace: "Calibri",
     breakLine: !useManualHangingWrap,
@@ -2396,11 +2455,13 @@ const addCompactContentSlide = (
   department: string,
   report: WeeklyReport,
   nextDept?: string,
-  pageNumber?: number
+  pageNumber?: number,
+  theme: WeeklyPptxTheme = "light"
 ) => {
+  const colors = getWeeklyPptxThemeColors(theme)
   const slide = pres.addSlide()
-  slide.background = { color: ACOB_OFFWHITE }
-  addWeeklyHeaderAndFooter(pres, slide, department, nextDept, pageNumber)
+  slide.background = { color: colors.canvas }
+  addWeeklyHeaderAndFooter(pres, slide, department, nextDept, pageNumber, theme)
 
   const boxes = getWeeklyContentBoxes()
   const workDoneText = autoNumberLines(report.work_done) || "No data provided."
@@ -2419,7 +2480,9 @@ const addCompactContentSlide = (
     ACOB_GREEN,
     workDoneFitted.text,
     workDoneFitted.fontSize,
-    false
+    false,
+    false,
+    theme
   )
   addSectionCard(
     pres,
@@ -2429,7 +2492,9 @@ const addCompactContentSlide = (
     "1D6A96",
     tasksFitted.text,
     tasksFitted.fontSize,
-    false
+    false,
+    false,
+    theme
   )
   addSectionCard(
     pres,
@@ -2439,7 +2504,9 @@ const addCompactContentSlide = (
     "B91C1C",
     challengesFitted.text,
     challengesFitted.fontSize,
-    false
+    false,
+    false,
+    theme
   )
 
   return slide
@@ -2450,11 +2517,13 @@ const addWorkDoneSlide = (
   department: string,
   workDonePlan: WeeklySectionPlan,
   nextDept?: string,
-  pageNumber?: number
+  pageNumber?: number,
+  theme: WeeklyPptxTheme = "light"
 ) => {
+  const colors = getWeeklyPptxThemeColors(theme)
   const slide = pres.addSlide()
-  slide.background = { color: ACOB_OFFWHITE }
-  addWeeklyHeaderAndFooter(pres, slide, department, nextDept, pageNumber)
+  slide.background = { color: colors.canvas }
+  addWeeklyHeaderAndFooter(pres, slide, department, nextDept, pageNumber, theme)
 
   const boxes = getWeeklyContentBoxes()
   addSectionCard(
@@ -2466,7 +2535,8 @@ const addWorkDoneSlide = (
     workDonePlan.text,
     workDonePlan.fontSize,
     true,
-    false
+    false,
+    theme
   )
 
   return slide
@@ -2478,11 +2548,13 @@ const addTasksAndChallengesSlide = (
   tasksPlan: WeeklySectionPlan,
   challengesPlan: WeeklySectionPlan,
   nextDept?: string,
-  pageNumber?: number
+  pageNumber?: number,
+  theme: WeeklyPptxTheme = "light"
 ) => {
+  const colors = getWeeklyPptxThemeColors(theme)
   const slide = pres.addSlide()
-  slide.background = { color: ACOB_OFFWHITE }
-  addWeeklyHeaderAndFooter(pres, slide, department, nextDept, pageNumber)
+  slide.background = { color: colors.canvas }
+  addWeeklyHeaderAndFooter(pres, slide, department, nextDept, pageNumber, theme)
 
   const boxes = getWeeklyContentBoxes()
   addSectionCard(
@@ -2494,7 +2566,8 @@ const addTasksAndChallengesSlide = (
     tasksPlan.text,
     tasksPlan.fontSize,
     true,
-    false
+    false,
+    theme
   )
   addSectionCard(
     pres,
@@ -2505,7 +2578,8 @@ const addTasksAndChallengesSlide = (
     challengesPlan.text,
     challengesPlan.fontSize,
     true,
-    false
+    false,
+    theme
   )
 
   return slide
@@ -2535,19 +2609,20 @@ const renderDepartmentWeeklySlides = (
   pres: any,
   departmentPlan: DepartmentPptxPlan,
   nextDepartmentName?: string,
-  startPageNumber?: number
+  startPageNumber?: number,
+  theme: WeeklyPptxTheme = "light"
 ) => {
   const { report, workDone, tasks, challenges } = departmentPlan
   const p = Array.isArray(report.profiles) ? report.profiles[0] : report.profiles
   const name = p ? `${p.first_name} ${p.last_name}` : "Employee"
 
   let pageCursor = startPageNumber
-  const titleSlide = addDeptTitleSlide(pres, report.department, name)
+  const titleSlide = addDeptTitleSlide(pres, report.department, name, undefined, theme)
   applyWeeklySlideTransition(titleSlide)
   if (typeof pageCursor === "number") pageCursor += 1
 
   const secondPageLabel = `${report.department} 2`
-  const workDoneSlide = addWorkDoneSlide(pres, report.department, workDone, secondPageLabel, pageCursor)
+  const workDoneSlide = addWorkDoneSlide(pres, report.department, workDone, secondPageLabel, pageCursor, theme)
   applyWeeklySlideTransition(workDoneSlide)
   if (typeof pageCursor === "number") pageCursor += 1
 
@@ -2557,7 +2632,8 @@ const renderDepartmentWeeklySlides = (
     tasks,
     challenges,
     nextDepartmentName,
-    pageCursor
+    pageCursor,
+    theme
   )
   applyWeeklySlideTransition(tasksChallengesSlide)
 }
@@ -2566,45 +2642,59 @@ const renderDepartmentCompactSlides = (
   pres: any,
   report: WeeklyReport,
   nextDepartmentName?: string,
-  contentPageNumber?: number
+  contentPageNumber?: number,
+  theme: WeeklyPptxTheme = "light"
 ) => {
   const p = Array.isArray(report.profiles) ? report.profiles[0] : report.profiles
   const name = p ? `${p.first_name} ${p.last_name}` : "Employee"
 
-  const titleSlide = addDeptTitleSlide(pres, report.department, name)
+  const titleSlide = addDeptTitleSlide(pres, report.department, name, undefined, theme)
   applyWeeklySlideTransition(titleSlide)
 
-  const contentSlide = addCompactContentSlide(pres, report.department, report, nextDepartmentName, contentPageNumber)
+  const contentSlide = addCompactContentSlide(
+    pres,
+    report.department,
+    report,
+    nextDepartmentName,
+    contentPageNumber,
+    theme
+  )
   applyWeeklySlideTransition(contentSlide)
 }
 
 // ─── Public Export Functions ──────────────────────────────────────────────────
 
-export const exportToPPTX = async (report: WeeklyReport, mode: WeeklyPptxMode = "full") => {
+export const exportToPPTX = async (
+  report: WeeklyReport,
+  mode: WeeklyPptxMode = "full",
+  theme: WeeklyPptxTheme = "light"
+) => {
   const PptxConstructor = await loadPptxGenJS()
   const pres = new PptxConstructor()
   pres.layout = "LAYOUT_WIDE"
 
   // Slide 1 — Cover
-  const coverSlide = addCoverSlide(pres, report.week_number, report.year, report.department)
+  const coverSlide = addCoverSlide(pres, report.week_number, report.year, report.department, theme)
   applyWeeklySlideTransition(coverSlide)
 
   if (mode === "compact") {
-    renderDepartmentCompactSlides(pres, report, undefined, 3)
+    renderDepartmentCompactSlides(pres, report, undefined, 3, theme)
   } else {
     const departmentPlan = buildDepartmentPptxPlan(report)
     // Slides 2+ — Department title + full-mode content slides
-    renderDepartmentWeeklySlides(pres, departmentPlan, undefined, 2)
+    renderDepartmentWeeklySlides(pres, departmentPlan, undefined, 2, theme)
   }
 
-  await pres.writeFile({ fileName: `ACOB_Report_${report.department}_W${report.week_number}.pptx` })
+  const themeSuffix = theme === "dark" ? "_dark" : ""
+  await pres.writeFile({ fileName: `ACOB_Report_${report.department}_W${report.week_number}${themeSuffix}.pptx` })
 }
 
 export const exportAllToPPTX = async (
   reports: WeeklyReport[],
   week: number,
   year: number,
-  mode: WeeklyPptxMode = "full"
+  mode: WeeklyPptxMode = "full",
+  theme: WeeklyPptxTheme = "light"
 ) => {
   const PptxConstructor = await loadPptxGenJS()
   const pres = new PptxConstructor()
@@ -2614,7 +2704,7 @@ export const exportAllToPPTX = async (
   const departments = sortedReports.map((entry) => entry.department)
 
   // Slide 1 — Cover
-  const coverSlide = addCoverSlide(pres, week, year)
+  const coverSlide = addCoverSlide(pres, week, year, undefined, theme)
   applyWeeklySlideTransition(coverSlide)
 
   let pageCursor = 3
@@ -2639,13 +2729,20 @@ export const exportAllToPPTX = async (
     departments,
     week,
     year,
-    (index) => departmentStartPages[index] ?? 3 + index * 2
+    (index) => departmentStartPages[index] ?? 3 + index * 2,
+    theme
   )
   applyWeeklySlideTransition(indexSlide)
 
   if (mode === "compact") {
     sortedReports.forEach((report, idx) => {
-      renderDepartmentCompactSlides(pres, report, sortedReports[idx + 1]?.department, departmentStartPages[idx] + 1)
+      renderDepartmentCompactSlides(
+        pres,
+        report,
+        sortedReports[idx + 1]?.department,
+        departmentStartPages[idx] + 1,
+        theme
+      )
     })
   } else {
     const departmentPlans = sortedReports.map((report, idx) => {
@@ -2658,10 +2755,12 @@ export const exportAllToPPTX = async (
         pres,
         departmentPlan,
         departmentPlans[idx + 1]?.report.department,
-        departmentPlan.startPage
+        departmentPlan.startPage,
+        theme
       )
     })
   }
 
-  await pres.writeFile({ fileName: `ACOB_Weekly_Reports_All_W${week}_${year}.pptx` })
+  const themeSuffix = theme === "dark" ? "_dark" : ""
+  await pres.writeFile({ fileName: `ACOB_Weekly_Reports_All_W${week}_${year}${themeSuffix}.pptx` })
 }

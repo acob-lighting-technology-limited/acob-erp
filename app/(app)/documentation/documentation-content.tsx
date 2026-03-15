@@ -36,6 +36,11 @@ import { AppTablePage } from "@/components/app/app-table-page"
 import { MarkdownContent } from "@/components/ui/markdown-content"
 import { DepartmentDocumentsBrowser } from "@/components/documentation/department-documents-browser"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("documentation-documentation-content")
+
+
 const CATEGORIES = [
   "Project Documentation",
   "Meeting Notes",
@@ -109,7 +114,7 @@ export function DocumentationContent({
       if (error) throw error
       setDocs(data || [])
     } catch (error) {
-      console.error("Error loading documentation:", error)
+      log.error("Error loading documentation:", error)
       toast.error("Failed to load documentation")
     }
   }
@@ -244,7 +249,7 @@ export function DocumentationContent({
       setIsDialogOpen(false)
       await loadDocumentation()
     } catch (error) {
-      console.error("Error saving documentation:", error)
+      log.error("Error saving documentation:", error)
       toast.error("Failed to save documentation")
     } finally {
       setIsSaving(false)
@@ -284,7 +289,7 @@ export function DocumentationContent({
       setSelectedDoc(null)
       await loadDocumentation()
     } catch (error) {
-      console.error("Error deleting documentation:", error)
+      log.error("Error deleting documentation:", error)
       toast.error("Failed to delete documentation")
     } finally {
       setIsSaving(false)

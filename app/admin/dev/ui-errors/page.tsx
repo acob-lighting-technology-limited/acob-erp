@@ -6,6 +6,11 @@ import { StatCard } from "@/components/ui/stat-card"
 import { EmptyState, ErrorState } from "@/components/ui/patterns"
 import { UiErrorsContent, type UiErrorRow } from "./ui-errors-content"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("dev-ui-errors")
+
+
 export default async function DevUiErrorsPage() {
   const supabase = await createClient()
   const dataClient = getServiceRoleClientOrFallback(supabase as any)
@@ -19,7 +24,7 @@ export default async function DevUiErrorsPage() {
     .limit(500)
 
   if (error) {
-    console.error("Error loading UI telemetry logs:", error)
+    log.error("Error loading UI telemetry logs:", error)
   }
 
   const userIds = Array.from(new Set((logs || []).map((l: any) => l.user_id).filter(Boolean)))

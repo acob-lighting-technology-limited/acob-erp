@@ -30,6 +30,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { PageHeader } from "@/components/layout/page-header"
 import { EmptyState } from "@/components/ui/patterns"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("projects")
+
+
 interface Project {
   id: string
   project_name: string
@@ -135,7 +140,7 @@ export default function ProjectDetailPage() {
         (r) => r.status === "rejected"
       )
       if (hasSecondaryError) {
-        console.warn("Some project sections failed to load", {
+        log.warn("Some project sections failed to load", {
           members: membersResult,
           items: itemsResult,
           updates: updatesResult,
@@ -144,7 +149,7 @@ export default function ProjectDetailPage() {
         toast.warning("Some project sections could not be loaded")
       }
     } catch (error) {
-      console.error("Error loading project data:", error)
+      log.error("Error loading project data:", error)
       toast.error("Failed to load project data")
     }
   }
@@ -280,7 +285,7 @@ export default function ProjectDetailPage() {
       setNewComment("")
       loadUpdates()
     } catch (error) {
-      console.error("Error adding comment:", error)
+      log.error("Error adding comment:", error)
       toast.error("Failed to add comment")
     } finally {
       setIsSaving(false)

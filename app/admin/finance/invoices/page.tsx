@@ -16,6 +16,11 @@ import { StatCard } from "@/components/ui/stat-card"
 import { EmptyState } from "@/components/ui/empty-state"
 import { Skeleton } from "@/components/ui/skeleton"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("finance-invoices")
+
+
 interface Invoice {
   id: string
   invoice_number: string
@@ -58,7 +63,7 @@ export default function InvoicesPage() {
       if (error) {
         // Table might not exist yet - that's okay
         if (error.code === "42P01") {
-          console.log("Invoices table does not exist yet")
+          log.debug("Invoices table does not exist yet")
           setInvoices([])
           return
         }
@@ -67,7 +72,7 @@ export default function InvoicesPage() {
 
       setInvoices(data || [])
     } catch (error) {
-      console.error("Error fetching invoices:", error)
+      log.error("Error fetching invoices:", error)
       toast.error("Failed to load invoices")
     } finally {
       setLoading(false)

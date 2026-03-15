@@ -2,6 +2,9 @@ import { NextResponse } from "next/server"
 import { headers } from "next/headers"
 import { createClient } from "@/lib/supabase/server"
 import { notifyUsers } from "@/lib/hr/leave-workflow"
+import { logger } from "@/lib/logger"
+
+const log = logger("hr-leave-sla-reminders")
 
 const LEGACY_SLA_STAGE_MAP: Record<string, string> = {
   pending_reliever: "reliever_pending",
@@ -138,7 +141,7 @@ export async function POST() {
 
     return NextResponse.json({ message: "SLA reminders processed", reminders_sent: remindersSent })
   } catch (error) {
-    console.error("Error in POST /api/hr/leave/sla/reminders:", error)
+    log.error({ err: String(error) }, "Error in POST /api/hr/leave/sla/reminders:")
     return NextResponse.json({ error: "An error occurred" }, { status: 500 })
   }
 }

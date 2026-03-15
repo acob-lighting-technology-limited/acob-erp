@@ -16,6 +16,11 @@ import { Edit2, MessageSquare, Plus, Search, Trash2 } from "lucide-react"
 import type { Feedback } from "./page"
 import { writeAuditLogClient } from "@/lib/audit/client"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("feedback-feedback-content")
+
+
 interface FeedbackContentProps {
   initialFeedback: Feedback[]
   userId: string
@@ -106,7 +111,7 @@ export function FeedbackContent({ initialFeedback, userId }: FeedbackContentProp
             { failOpen: true }
           )
         } catch (auditError) {
-          console.error("Failed to log audit for feedback deletion:", auditError)
+          log.error("Failed to log audit for feedback deletion:", auditError)
         }
       }
 

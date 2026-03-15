@@ -65,6 +65,11 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Textarea } from "@/components/ui/textarea"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("employees-admin-employee-content")
+
+
 export interface Employee {
   id: string
   first_name: string
@@ -238,7 +243,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
 
       setEmployees(data || [])
     } catch (error: any) {
-      console.error("Error loading employee:", error)
+      log.error("Error loading employee:", error)
       toast.error("Failed to load employee")
     } finally {
       setIsLoading(false)
@@ -314,7 +319,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
       setShowMoreOptions(false) // Reset expanded state
       setIsEditDialogOpen(true)
     } catch (error: any) {
-      console.error("Error loading employee for edit:", error)
+      log.error("Error loading employee for edit:", error)
       toast.error("Failed to load employee details")
     }
   }
@@ -331,7 +336,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         setSelectedEmployee(profileData as any)
       }
     } catch (error: any) {
-      console.error("Error loading profile for signature:", error)
+      log.error("Error loading profile for signature:", error)
       toast.error("Failed to load profile data")
     }
   }
@@ -455,7 +460,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         })
       }
     } catch (error: any) {
-      console.error("Error loading employee details:", error)
+      log.error("Error loading employee details:", error)
       toast.error("Failed to load employee details")
     }
   }
@@ -514,7 +519,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
       setAssignedItems(assigned)
       return assigned
     } catch (error: any) {
-      console.error("Error checking assigned items:", error)
+      log.error("Error checking assigned items:", error)
       toast.error("Failed to check assigned items")
       return null
     }
@@ -571,12 +576,40 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
       }
 
       const isLead = editForm.is_department_lead
+      let resolvedDepartmentId: string | null = null
+
+      if (isLead) {
+        const { data: departmentRow, error: departmentLookupError } = await supabase
+          .from("departments")
+          .select("id")
+          .eq("name", editForm.department)
+          .maybeSingle()
+
+        if (departmentLookupError) throw departmentLookupError
+
+        if (!departmentRow?.id) {
+          toast.error("Selected department was not found")
+          setIsSaving(false)
+          return
+        }
+
+        resolvedDepartmentId = departmentRow.id
+
+        // Demote previous lead and promote this user atomically in DB logic.
+        const { error: assignLeadError } = await supabase.rpc("assign_department_lead", {
+          p_department_id: resolvedDepartmentId,
+          p_new_lead_id: selectedEmployee.id,
+        })
+
+        if (assignLeadError) throw assignLeadError
+      }
 
       // Build update object with all fields
       const updateData: any = {
         role: editForm.role,
         admin_domains: editForm.role === "admin" ? editForm.admin_domains : null,
         department: editForm.department,
+        ...(resolvedDepartmentId ? { department_id: resolvedDepartmentId } : {}),
         office_location: editForm.office_location || null,
         company_role: editForm.company_role || null,
         is_department_lead: isLead,
@@ -617,7 +650,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         })
 
         if (historyError) {
-          console.error("Failed to log department history:", historyError)
+          log.error("Failed to log department history:", historyError)
           toast.error("Department updated but failed to record change history")
         }
       }
@@ -626,7 +659,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
       setIsEditDialogOpen(false)
       loadData()
     } catch (error: any) {
-      console.error("Error updating employee:", error)
+      log.error("Error updating employee:", error)
       toast.error("Failed to update employee")
     } finally {
       setIsSaving(false)
@@ -697,7 +730,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
       })
       loadData()
     } catch (error: any) {
-      console.error("Error creating user:", error)
+      log.error("Error creating user:", error)
       toast.error(error.message || "Failed to create user")
     } finally {
       setIsCreatingUser(false)
@@ -811,7 +844,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
       toast.success("Employees exported to Excel successfully")
       setExportDialogOpen(false)
     } catch (error: any) {
-      console.error("Error exporting employees to Excel:", error)
+      log.error("Error exporting employees to Excel:", error)
       toast.error("Failed to export employees to Excel")
     }
   }
@@ -938,7 +971,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
       toast.success("Employees exported to PDF successfully")
       setExportDialogOpen(false)
     } catch (error: any) {
-      console.error("Error exporting employees to PDF:", error)
+      log.error("Error exporting employees to PDF:", error)
       toast.error("Failed to export employees to PDF")
     }
   }
@@ -1023,7 +1056,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
       saveAs(blob, `employees-export-${new Date().toISOString().split("T")[0]}.docx`)
       toast.success("Employees exported to Word successfully")
     } catch (error: any) {
-      console.error("Error exporting employees to Word:", error)
+      log.error("Error exporting employees to Word:", error)
       toast.error("Failed to export employees to Word")
     }
   }

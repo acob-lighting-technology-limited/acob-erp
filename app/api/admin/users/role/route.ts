@@ -7,7 +7,11 @@ import {
   canManageDeveloperAccounts,
   canManageSuperAdminAccounts,
 } from "@/lib/role-management"
+import { logger } from "@/lib/logger"
 import { syncEmploymentStatusToAuth } from "@/lib/supabase/admin"
+import { writeAuditLog } from "@/lib/audit/write-audit"
+
+const log = logger("admin-users-role")
 
 export async function POST(request: Request) {
   try {
@@ -139,15 +143,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: updateError.message }, { status: 400 })
     }
 
-    // Sync employment_status to Auth user_metadata so the middleware can read
-    // it from the session without an extra DB query on every request.
+    // Sync employment_status into JWT metadata so middleware doesn't need a DB query
     if (employmentStatus) {
       await syncEmploymentStatusToAuth(targetUserId, employmentStatus)
     }
 
+    // Audit: role change is a critical admin action
+    await writeAuditLog(supabase, {
+      action: "update",
+      entityType: "profile",
+      entityId: targetUserId,
+      context: { actorId: user.id, source: "api" as const },
+      newValues: { role: targetRole, admin_domains: targetRole === "admin" ? adminDomains : null, ...(employmentStatus ? { employment_status: employmentStatus } : {}) },
+      oldValues: { role: targetProfile.role },
+      metadata: { source: "admin-users-role" },
+    }, { failOpen: true })
+
     return NextResponse.json({ ok: true })
   } catch (error) {
-    console.error("[admin-users-role]", error)
+    log.error({ err: String(error) }, "[admin-users-role]")
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
