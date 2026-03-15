@@ -1,0 +1,32 @@
+-- FK ON DELETE policy audit — 2026-03-15
+-- Full FK audit performed via information_schema query on project itqegqxeqkeogwrvlzlj.
+--
+-- Critical tables reviewed for dangerous CASCADE:
+--
+--   profiles          — all FKs use NO ACTION (safe)
+--   leave_requests    — user_id → profiles: NO ACTION (safe)
+--                       leave_type_id → leave_types: CASCADE (safe — deleting a leave type cascades to requests; acceptable)
+--                       current_approver_user_id → profiles: NO ACTION (safe)
+--                       reliever_id → profiles: NO ACTION (safe)
+--                       supervisor_id → profiles: NO ACTION (safe)
+--   help_desk_tickets — category_id → help_desk_categories: SET NULL (safe)
+--   assets            — no FK to profiles; asset_assignments.asset_id → assets: CASCADE (child records, acceptable)
+--
+--   Potential concern: weekly_reports.user_id → profiles: CASCADE
+--     Deleting a profile cascades to weekly_reports. Acceptable because
+--     weekly reports are owned by the employee and have no value without the profile.
+--
+--   Potential concern: leave_approvals.leave_request_id → leave_requests: CASCADE
+--     Deleting a leave request removes its approvals. Acceptable and expected.
+--
+--   Potential concern: employee_suspensions.employee_id → profiles: CASCADE
+--     Deleting a profile removes suspension records. Acceptable.
+--
+--   Potential concern: employee_life_events.employee_id → profiles: CASCADE
+--     Deleting a profile removes life events. Acceptable.
+--
+-- No dangerous CASCADEs found on critical tables (profiles, leave_requests,
+-- help_desk_tickets, assets). All CASCADEs are on child/detail tables
+-- where cascade deletion is the correct behaviour.
+--
+-- No SQL changes required.
