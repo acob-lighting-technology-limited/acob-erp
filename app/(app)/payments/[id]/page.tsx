@@ -1,6 +1,8 @@
 "use client"
 
 import { useEffect, useState, useRef } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
@@ -64,11 +66,11 @@ import {
 } from "date-fns"
 import { PageHeader } from "@/components/layout/page-header"
 import { EmptyState, FormFieldGroup } from "@/components/ui/patterns"
+import { PageLoader } from "@/components/ui/query-states"
 
 import { logger } from "@/lib/logger"
 
 const log = logger("payments")
-
 
 interface Department {
   id: string
@@ -294,14 +296,34 @@ const ScheduleList = ({
   )
 }
 
+interface PaymentPageData {
+  payment: Payment | null
+  departments: Department[]
+  categories: Category[]
+}
+
+async function fetchPaymentPageData(id: string): Promise<PaymentPageData> {
+  const [paymentRes, deptRes, catRes] = await Promise.all([
+    fetch(`/api/payments/${id}`),
+    fetch("/api/departments"),
+    fetch("/api/payments/categories"),
+  ])
+
+  const paymentJson = await paymentRes.json()
+  const payment: Payment | null = paymentRes.ok ? (paymentJson.data ?? null) : null
+  if (!paymentRes.ok) {
+    throw new Error(paymentJson.error ?? "Failed to fetch payment details")
+  }
+
+  const departments: Department[] = deptRes.ok ? ((await deptRes.json()).data ?? []) : []
+  const categories: Category[] = catRes.ok ? ((await catRes.json()).data ?? []) : []
+
+  return { payment, departments, categories }
+}
+
 export default function PaymentDetailsPage({ params }: { params: { id: string } }) {
   const router = useRouter()
-  const [payment, setPayment] = useState<Payment | null>(null)
-  const [loading, setLoading] = useState(true)
-
-  // Aux Data for Edit Form
-  const [departments, setDepartments] = useState<Department[]>([])
-  const [categories, setCategories] = useState<Category[]>([])
+  const queryClient = useQueryClient()
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState(false)
@@ -337,50 +359,20 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
     notes: "",
   })
 
-  useEffect(() => {
-    fetchPayment()
-    fetchAuxData()
-  }, [params.id])
+  const { data: pageData, isLoading: loading } = useQuery({
+    queryKey: QUERY_KEYS.appPaymentDetail(params.id),
+    queryFn: () => fetchPaymentPageData(params.id),
+  })
+
+  const payment = pageData?.payment ?? null
+  const departments = pageData?.departments ?? []
+  const categories = pageData?.categories ?? []
 
   useEffect(() => {
     if (payment && payment.payment_type === "recurring" && payment.next_payment_due && payment.recurrence_period) {
       generateSchedule()
     }
   }, [payment])
-
-  const fetchAuxData = async () => {
-    try {
-      const [deptRes, catRes] = await Promise.all([fetch("/api/departments"), fetch("/api/payments/categories")])
-      if (deptRes.ok) {
-        const data = await deptRes.json()
-        setDepartments(data.data || [])
-      }
-      if (catRes.ok) {
-        const data = await catRes.json()
-        setCategories(data.data || [])
-      }
-    } catch (error) {
-      log.error("Error fetching aux data", error)
-    }
-  }
-
-  const fetchPayment = async () => {
-    try {
-      setLoading(true)
-      const response = await fetch(`/api/payments/${params.id}`)
-      if (response.ok) {
-        const data = await response.json()
-        setPayment(data.data)
-      } else {
-        toast.error("Failed to fetch payment details")
-      }
-    } catch (error) {
-      log.error("Error:", error)
-      toast.error("Error fetching payment")
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const generateSchedule = () => {
     if (!payment || !payment.next_payment_due || !payment.recurrence_period) return
@@ -579,7 +571,7 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
       if (response.ok) {
         toast.success("Payment updated successfully")
         setEditDialogOpen(false)
-        fetchPayment()
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.appPaymentDetail(params.id) })
       } else {
         const data = await response.json()
         toast.error(data.error || "Failed to update payment")
@@ -663,7 +655,7 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
 
         if (response.ok) {
           toast.success("Payment recorded! Schedule advanced.")
-          fetchPayment()
+          queryClient.invalidateQueries({ queryKey: QUERY_KEYS.appPaymentDetail(params.id) })
         } else {
           toast.error("Failed to update payment")
         }
@@ -689,7 +681,7 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
 
       if (response.ok) {
         toast.success(`Payment marked as ${newStatus}`)
-        fetchPayment()
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.appPaymentDetail(params.id) })
       } else {
         toast.error("Failed to update status")
       }
@@ -738,7 +730,7 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
         toast.success(replaceDocumentId ? `${uploadType} replaced successfully` : `${uploadType} uploaded successfully`)
         setUploadDialogOpen(false)
         setReplaceDocumentId(null)
-        fetchPayment() // Refresh to show new doc
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.appPaymentDetail(params.id) }) // Refresh to show new doc
       } else {
         const data = await response.json()
         toast.error(data.error || "Upload failed")
@@ -800,16 +792,7 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
     return "paid"
   }
 
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="text-center">
-          <div className="mb-4 inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent"></div>
-          <p className="text-muted-foreground">Loading payment details...</p>
-        </div>
-      </div>
-    )
-  }
+  if (loading) return <PageLoader />
 
   if (!payment) {
     return (

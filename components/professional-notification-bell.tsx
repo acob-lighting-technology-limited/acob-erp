@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -36,6 +37,7 @@ import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 interface Notification {
   id: string
@@ -130,24 +132,23 @@ function getInitials(name?: string): string {
 export function ProfessionalNotificationBell({ isAdmin = false }: ProfessionalNotificationBellProps) {
   const router = useRouter()
   const supabase = createClient()
+  const queryClient = useQueryClient()
 
   // State
-  const [notifications, setNotifications] = useState<Notification[]>([])
   const [isOpen, setIsOpen] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
   const [activeTab, setActiveTab] = useState("all")
   const [searchQuery, setSearchQuery] = useState("")
 
   // Real-time subscription ref
   const subscriptionRef = useRef<any>(null)
 
-  // Load notifications
-  const loadNotifications = async () => {
-    try {
+  const { data: notifications = [], isLoading } = useQuery({
+    queryKey: QUERY_KEYS.notificationBell(),
+    queryFn: async () => {
       const {
         data: { user },
       } = await supabase.auth.getUser()
-      if (!user) return
+      if (!user) return []
 
       const { data, error } = await supabase
         .from("notifications")
@@ -156,13 +157,13 @@ export function ProfessionalNotificationBell({ isAdmin = false }: ProfessionalNo
         .order("created_at", { ascending: false })
         .limit(50)
 
-      if (error) throw error
-      setNotifications(data || [])
-    } catch (error: any) {
-      console.error("Error loading notifications:", error)
-    } finally {
-      setIsLoading(false)
-    }
+      if (error) throw new Error(error.message)
+      return data || []
+    },
+  })
+
+  const loadNotifications = () => {
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.notificationBell() })
   }
 
   // Setup real-time subscription
@@ -187,12 +188,11 @@ export function ProfessionalNotificationBell({ isAdmin = false }: ProfessionalNo
             filter: `user_id=eq.${user.id}`,
           },
           (payload) => {
-            console.log("Notification change:", payload)
+            // Invalidate query to refetch updated notifications
+            queryClient.invalidateQueries({ queryKey: QUERY_KEYS.notificationBell() })
 
+            // Show toast for new notification
             if (payload.eventType === "INSERT") {
-              setNotifications((prev) => [payload.new as Notification, ...prev])
-
-              // Show toast for new notification
               toast.info(payload.new.title, {
                 description: payload.new.message,
                 action: payload.new.action_url
@@ -202,10 +202,6 @@ export function ProfessionalNotificationBell({ isAdmin = false }: ProfessionalNo
                     }
                   : undefined,
               })
-            } else if (payload.eventType === "UPDATE") {
-              setNotifications((prev) => prev.map((n) => (n.id === payload.new.id ? (payload.new as Notification) : n)))
-            } else if (payload.eventType === "DELETE") {
-              setNotifications((prev) => prev.filter((n) => n.id !== payload.old.id))
             }
           }
         )
@@ -238,7 +234,7 @@ export function ProfessionalNotificationBell({ isAdmin = false }: ProfessionalNo
 
       if (error) throw error
 
-      setNotifications((prev) => prev.map((n) => (n.id === notificationId ? { ...n, read: true } : n)))
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.notificationBell() })
     } catch (error: any) {
       console.error("Error marking as read:", error)
     }
@@ -259,7 +255,7 @@ export function ProfessionalNotificationBell({ isAdmin = false }: ProfessionalNo
 
       if (error) throw error
 
-      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.notificationBell() })
       toast.success("All notifications marked as read")
     } catch (error: any) {
       console.error("Error marking all as read:", error)
@@ -274,7 +270,7 @@ export function ProfessionalNotificationBell({ isAdmin = false }: ProfessionalNo
 
       if (error) throw error
 
-      setNotifications((prev) => prev.filter((n) => n.id !== notificationId))
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.notificationBell() })
     } catch (error: any) {
       console.error("Error deleting notification:", error)
       toast.error("Failed to delete notification")

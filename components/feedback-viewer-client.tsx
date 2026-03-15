@@ -1,7 +1,9 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
+import { QUERY_KEYS } from "@/lib/query-keys"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
@@ -21,6 +23,60 @@ interface FeedbackViewerClientProps {
   feedback: any[]
 }
 
+interface FeedbackFilterData {
+  isDepartmentLead: boolean
+  leadDepartments: string[]
+  employees: { id: string; first_name: string; last_name: string; department: string }[]
+  departments: string[]
+}
+
+async function fetchFeedbackFilterData(): Promise<FeedbackFilterData> {
+  const supabase = createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { isDepartmentLead: false, leadDepartments: [], employees: [], departments: [] }
+
+  const { data: userProfile } = await supabase
+    .from("profiles")
+    .select("role, department, is_department_lead, lead_departments")
+    .eq("id", user.id)
+    .single()
+
+  const scopedDepartments = userProfile?.lead_departments?.length
+    ? userProfile.lead_departments
+    : userProfile?.department
+      ? [userProfile.department]
+      : []
+
+  let employeeQuery = supabase
+    .from("profiles")
+    .select("id, first_name, last_name, department")
+    .order("last_name", { ascending: true })
+
+  if (userProfile?.is_department_lead && scopedDepartments.length > 0) {
+    employeeQuery = employeeQuery.in("department", scopedDepartments)
+  }
+
+  const { data: employeeData } = await employeeQuery
+  const employees = (employeeData || []) as { id: string; first_name: string; last_name: string; department: string }[]
+
+  let uniqueDepartments: string[] = []
+  if (userProfile?.is_department_lead && scopedDepartments.length > 0) {
+    uniqueDepartments = [...scopedDepartments].sort()
+  } else {
+    uniqueDepartments = Array.from(new Set(employees.map((s) => s.department).filter(Boolean))) as string[]
+    uniqueDepartments.sort()
+  }
+
+  return {
+    isDepartmentLead: Boolean(userProfile?.is_department_lead),
+    leadDepartments: scopedDepartments,
+    employees,
+    departments: uniqueDepartments,
+  }
+}
+
 export function FeedbackViewerClient({ feedback }: FeedbackViewerClientProps) {
   const [filteredFeedback, setFilteredFeedback] = useState(feedback)
   const [searchQuery, setSearchQuery] = useState("")
@@ -32,77 +88,18 @@ export function FeedbackViewerClient({ feedback }: FeedbackViewerClientProps) {
   const [selectedFeedback, setSelectedFeedback] = useState<any | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isUpdating, setIsUpdating] = useState(false)
-  const [departments, setDepartments] = useState<string[]>([])
-  const [employees, setEmployees] = useState<
-    { id: string; first_name: string; last_name: string; department: string }[]
-  >([])
-  const [isDepartmentLead, setIsDepartmentLead] = useState(false)
-  const [leadDepartments, setLeadDepartments] = useState<string[]>([])
 
   const supabase = createClient()
 
-  // Load all departments and employee from database
-  useEffect(() => {
-    const loadFilterData = async () => {
-      try {
-        // Get current user profile to check if they're a lead
-        const {
-          data: { user },
-        } = await supabase.auth.getUser()
-        if (!user) return
+  const { data: filterData } = useQuery({
+    queryKey: QUERY_KEYS.feedbackViewer(),
+    queryFn: fetchFeedbackFilterData,
+  })
 
-        const { data: userProfile } = await supabase
-          .from("profiles")
-          .select("role, department, is_department_lead, lead_departments")
-          .eq("id", user.id)
-          .single()
-
-        const scopedDepartments = userProfile?.lead_departments?.length
-          ? userProfile.lead_departments
-          : userProfile?.department
-            ? [userProfile.department]
-            : []
-
-        if (userProfile) {
-          setIsDepartmentLead(Boolean(userProfile.is_department_lead))
-          setLeadDepartments(scopedDepartments || [])
-        }
-
-        // Load employee - leads can only see employee in their departments
-        let employeeQuery = supabase
-          .from("profiles")
-          .select("id, first_name, last_name, department")
-          .order("last_name", { ascending: true })
-
-        // If user is a lead, filter by their lead departments
-        if (userProfile?.is_department_lead && scopedDepartments.length > 0) {
-          employeeQuery = employeeQuery.in("department", scopedDepartments)
-        }
-
-        const { data: employeeData } = await employeeQuery
-
-        if (employeeData) {
-          setEmployees(employeeData)
-
-          // Extract unique departments - for leads, only show their lead departments
-          let uniqueDepartments: string[] = []
-          if (userProfile?.is_department_lead && scopedDepartments.length > 0) {
-            uniqueDepartments = [...scopedDepartments].sort()
-          } else {
-            uniqueDepartments = Array.from(
-              new Set(employeeData.map((s: any) => s.department).filter(Boolean))
-            ) as string[]
-            uniqueDepartments.sort()
-          }
-          setDepartments(uniqueDepartments)
-        }
-      } catch (error) {
-        console.error("Error loading filter data:", error)
-      }
-    }
-
-    loadFilterData()
-  }, [])
+  const isDepartmentLead = filterData?.isDepartmentLead ?? false
+  const leadDepartments = filterData?.leadDepartments ?? []
+  const employees = filterData?.employees ?? []
+  const departments = filterData?.departments ?? []
 
   // Real-time filtering with useEffect
   useEffect(() => {

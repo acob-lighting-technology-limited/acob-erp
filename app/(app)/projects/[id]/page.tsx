@@ -1,7 +1,9 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useParams, useRouter } from "next/navigation"
+import { useState } from "react"
+import { useParams } from "next/navigation"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -29,11 +31,11 @@ import Link from "next/link"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { PageHeader } from "@/components/layout/page-header"
 import { EmptyState } from "@/components/ui/patterns"
+import { PageLoader } from "@/components/ui/query-states"
 
 import { logger } from "@/lib/logger"
 
 const log = logger("projects")
-
 
 interface Project {
   id: string
@@ -106,161 +108,102 @@ interface Task {
   }
 }
 
+interface ProjectData {
+  project: Project
+  members: ProjectMember[]
+  items: ProjectItem[]
+  updates: ProjectUpdate[]
+  tasks: Task[]
+}
+
+async function fetchProjectData(projectId: string): Promise<ProjectData> {
+  const supabase = createClient()
+
+  const [projectResult, membersResult, itemsResult, updatesResult, tasksResult] = await Promise.allSettled([
+    supabase
+      .from("projects")
+      .select(
+        `*,
+        project_manager:profiles!projects_project_manager_id_fkey (first_name, last_name, company_email),
+        created_by_user:profiles!projects_created_by_fkey (first_name, last_name)`
+      )
+      .eq("id", projectId)
+      .single(),
+    supabase
+      .from("project_members")
+      .select(
+        `id, role, assigned_at,
+        user:profiles!project_members_user_id_fkey (first_name, last_name, company_email, department)`
+      )
+      .eq("project_id", projectId)
+      .eq("is_active", true)
+      .order("assigned_at", { ascending: false }),
+    supabase.from("project_items").select("*").eq("project_id", projectId).order("created_at", { ascending: false }),
+    supabase
+      .from("project_updates")
+      .select(
+        `id, content, update_type, created_at,
+        user:profiles!project_updates_user_id_fkey (first_name, last_name)`
+      )
+      .eq("project_id", projectId)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("tasks")
+      .select(
+        `id, title, description, priority, status, progress, due_date, task_start_date, task_end_date,
+        assigned_to_user:profiles!tasks_assigned_to_fkey (first_name, last_name)`
+      )
+      .eq("project_id", projectId)
+      .order("created_at", { ascending: false }),
+  ])
+
+  if (projectResult.status === "rejected" || projectResult.value.error) {
+    throw new Error(
+      projectResult.status === "rejected"
+        ? String(projectResult.reason)
+        : (projectResult.value.error?.message ?? "Failed to load project")
+    )
+  }
+
+  const hasSecondaryError = [membersResult, itemsResult, updatesResult, tasksResult].some(
+    (r) => r.status === "rejected" || (r.status === "fulfilled" && r.value.error)
+  )
+  if (hasSecondaryError) {
+    log.warn("Some project sections failed to load")
+  }
+
+  return {
+    project: projectResult.value.data as unknown as Project,
+    members:
+      (membersResult.status === "fulfilled" ? (membersResult.value.data as unknown as ProjectMember[]) : null) ?? [],
+    items: (itemsResult.status === "fulfilled" ? (itemsResult.value.data as ProjectItem[]) : null) ?? [],
+    updates:
+      (updatesResult.status === "fulfilled" ? (updatesResult.value.data as unknown as ProjectUpdate[]) : null) ?? [],
+    tasks: (tasksResult.status === "fulfilled" ? (tasksResult.value.data as unknown as Task[]) : null) ?? [],
+  }
+}
+
 export default function ProjectDetailPage() {
   const params = useParams()
-  const router = useRouter()
   const projectId = params.id as string
+  const queryClient = useQueryClient()
 
-  const [project, setProject] = useState<Project | null>(null)
-  const [members, setMembers] = useState<ProjectMember[]>([])
-  const [items, setItems] = useState<ProjectItem[]>([])
-  const [updates, setUpdates] = useState<ProjectUpdate[]>([])
-  const [tasks, setTasks] = useState<Task[]>([])
   const [newComment, setNewComment] = useState("")
   const [isSaving, setIsSaving] = useState(false)
 
   const supabase = createClient()
 
-  useEffect(() => {
-    if (projectId) {
-      loadProjectData()
-    }
-  }, [projectId])
+  const { data: projectData, isLoading } = useQuery({
+    queryKey: QUERY_KEYS.appProjectDetail(projectId),
+    queryFn: () => fetchProjectData(projectId),
+    enabled: Boolean(projectId),
+  })
 
-  const loadProjectData = async () => {
-    try {
-      const results = await Promise.allSettled([loadProject(), loadMembers(), loadItems(), loadUpdates(), loadTasks()])
-      const [projectResult, membersResult, itemsResult, updatesResult, tasksResult] = results
-
-      if (projectResult.status === "rejected") {
-        throw projectResult.reason
-      }
-
-      const hasSecondaryError = [membersResult, itemsResult, updatesResult, tasksResult].some(
-        (r) => r.status === "rejected"
-      )
-      if (hasSecondaryError) {
-        log.warn("Some project sections failed to load", {
-          members: membersResult,
-          items: itemsResult,
-          updates: updatesResult,
-          tasks: tasksResult,
-        })
-        toast.warning("Some project sections could not be loaded")
-      }
-    } catch (error) {
-      log.error("Error loading project data:", error)
-      toast.error("Failed to load project data")
-    }
-  }
-
-  const loadProject = async () => {
-    const { data, error } = await supabase
-      .from("projects")
-      .select(
-        `
-        *,
-        project_manager:profiles!projects_project_manager_id_fkey (
-          first_name,
-          last_name,
-          company_email
-        ),
-        created_by_user:profiles!projects_created_by_fkey (
-          first_name,
-          last_name
-        )
-      `
-      )
-      .eq("id", projectId)
-      .single()
-
-    if (error) throw error
-    setProject(data as any)
-  }
-
-  const loadMembers = async () => {
-    const { data, error } = await supabase
-      .from("project_members")
-      .select(
-        `
-        id,
-        role,
-        assigned_at,
-        user:profiles!project_members_user_id_fkey (
-          first_name,
-          last_name,
-          company_email,
-          department
-        )
-      `
-      )
-      .eq("project_id", projectId)
-      .eq("is_active", true)
-      .order("assigned_at", { ascending: false })
-
-    if (error) throw error
-    setMembers((data as any) || [])
-  }
-
-  const loadItems = async () => {
-    const { data, error } = await supabase
-      .from("project_items")
-      .select("*")
-      .eq("project_id", projectId)
-      .order("created_at", { ascending: false })
-
-    if (error) throw error
-    setItems(data || [])
-  }
-
-  const loadUpdates = async () => {
-    const { data, error } = await supabase
-      .from("project_updates")
-      .select(
-        `
-        id,
-        content,
-        update_type,
-        created_at,
-        user:profiles!project_updates_user_id_fkey (
-          first_name,
-          last_name
-        )
-      `
-      )
-      .eq("project_id", projectId)
-      .order("created_at", { ascending: false })
-
-    if (error) throw error
-    setUpdates((data as any) || [])
-  }
-
-  const loadTasks = async () => {
-    const { data, error } = await supabase
-      .from("tasks")
-      .select(
-        `
-        id,
-        title,
-        description,
-        priority,
-        status,
-        progress,
-        due_date,
-        task_start_date,
-        task_end_date,
-        assigned_to_user:profiles!tasks_assigned_to_fkey (
-          first_name,
-          last_name
-        )
-      `
-      )
-      .eq("project_id", projectId)
-      .order("created_at", { ascending: false })
-
-    if (error) throw error
-    setTasks((data as any) || [])
-  }
+  const project = projectData?.project ?? null
+  const members = projectData?.members ?? []
+  const items = projectData?.items ?? []
+  const updates = projectData?.updates ?? []
+  const tasks = projectData?.tasks ?? []
 
   const handleAddComment = async () => {
     if (!newComment.trim()) return
@@ -283,7 +226,7 @@ export default function ProjectDetailPage() {
 
       toast.success("Comment added successfully")
       setNewComment("")
-      loadUpdates()
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.appProjectDetail(projectId) })
     } catch (error) {
       log.error("Error adding comment:", error)
       toast.error("Failed to add comment")
@@ -374,6 +317,8 @@ export default function ProjectDetailPage() {
     })
   }
 
+  if (isLoading) return <PageLoader />
+
   if (!project) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -381,7 +326,7 @@ export default function ProjectDetailPage() {
           <AlertCircle className="mx-auto mb-4 h-12 w-12 text-red-500" />
           <h2 className="mb-2 text-xl font-semibold">Project not found</h2>
           <p className="text-muted-foreground mb-4">
-            The project you're looking for doesn't exist or you don't have access to it.
+            The project you&apos;re looking for doesn&apos;t exist or you don&apos;t have access to it.
           </p>
           <Link href="/projects">
             <Button>

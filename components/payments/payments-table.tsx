@@ -1,6 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
@@ -112,6 +114,35 @@ interface FormData {
   notes: string
 }
 
+interface PaymentsTableData {
+  payments: Payment[]
+  departments: Department[]
+  categories: Category[]
+}
+
+async function fetchPaymentsTableData(): Promise<PaymentsTableData> {
+  const [paymentsRes, deptRes, catRes] = await Promise.all([
+    fetch("/api/payments"),
+    fetch("/api/departments"),
+    fetch("/api/payments/categories"),
+  ])
+
+  if (!paymentsRes.ok) {
+    const data = await paymentsRes.json().catch(() => ({}))
+    throw new Error(data?.error ?? "Failed to fetch payments")
+  }
+
+  const paymentsJson = await paymentsRes.json()
+  const departments: Department[] = deptRes.ok ? ((await deptRes.json()).data ?? []) : []
+  const categories: Category[] = catRes.ok ? ((await catRes.json()).data ?? []) : []
+
+  return {
+    payments: paymentsJson.data ?? [],
+    departments,
+    categories,
+  }
+}
+
 interface PaymentsTableProps {
   initialPayments?: Payment[]
   initialDepartments?: Department[]
@@ -135,10 +166,20 @@ export function PaymentsTable({
   basePath = currentUser.isAdmin ? "/admin/payments" : "/payments",
 }: PaymentsTableProps) {
   const router = useRouter()
-  const [payments, setPayments] = useState<Payment[]>(initialPayments)
-  const [departments, setDepartments] = useState<Department[]>(initialDepartments)
-  const [categories, setCategories] = useState<Category[]>(initialCategories)
-  const [loading, setLoading] = useState(initialPayments.length === 0)
+  const queryClient = useQueryClient()
+
+  const { data: tableData, isLoading: loading } = useQuery({
+    queryKey: QUERY_KEYS.paymentsTable(),
+    queryFn: fetchPaymentsTableData,
+    initialData:
+      initialPayments.length > 0 || initialDepartments.length > 0 || initialCategories.length > 0
+        ? { payments: initialPayments, departments: initialDepartments, categories: initialCategories }
+        : undefined,
+  })
+
+  const payments = tableData?.payments ?? []
+  const departments = tableData?.departments ?? []
+  const categories = tableData?.categories ?? []
 
   // Filters
   const [searchQuery, setSearchQuery] = useState("")
@@ -204,48 +245,6 @@ export function PaymentsTable({
       toast.error(initialError)
     }
   }, [initialError])
-
-  useEffect(() => {
-    if (initialPayments.length === 0) {
-      fetchData()
-    }
-    if (initialDepartments.length === 0 || initialCategories.length === 0) {
-      fetchAuxData()
-    }
-  }, [])
-
-  const fetchData = async () => {
-    try {
-      const response = await fetch("/api/payments")
-      const data = await response.json()
-      if (response.ok) {
-        setPayments(data.data || [])
-      } else {
-        toast.error(data?.error || "Failed to fetch payments")
-      }
-    } catch (error) {
-      toast.error("Failed to fetch payments")
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const fetchAuxData = async () => {
-    try {
-      const [deptRes, catRes] = await Promise.all([fetch("/api/departments"), fetch("/api/payments/categories")])
-
-      if (deptRes.ok) {
-        const data = await deptRes.json()
-        setDepartments(data.data || [])
-      }
-      if (catRes.ok) {
-        const data = await catRes.json()
-        setCategories(data.data || [])
-      }
-    } catch (error) {
-      console.error("Failed to fetch aux data", error)
-    }
-  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -332,7 +331,7 @@ export function PaymentsTable({
           payment_reference: "",
           notes: "",
         })
-        fetchData()
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.paymentsTable() })
       } else {
         const data = await response.json()
         toast.error(data.error || "Failed to create payment")
