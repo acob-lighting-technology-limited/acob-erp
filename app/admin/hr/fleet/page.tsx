@@ -1,6 +1,7 @@
-﻿"use client"
+"use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { CalendarCheck2, CheckCircle2, Paperclip, Plus, XCircle } from "lucide-react"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
@@ -17,10 +18,11 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { StatCard } from "@/components/ui/stat-card"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
+import { QUERY_KEYS } from "@/lib/query-keys"
+import { TableSkeleton } from "@/components/ui/query-states"
 
 type FleetResource = {
   id: string
@@ -58,10 +60,23 @@ function formatDateTime(value: string) {
   return parsed.toLocaleString()
 }
 
+async function fetchFleetResources(): Promise<FleetResource[]> {
+  const response = await fetch("/api/admin/hr/fleet/resources")
+  const payload = await response.json()
+  if (!response.ok) throw new Error(payload.error || "Failed to load resources")
+  return payload.data || []
+}
+
+async function fetchFleetBookings(status?: string): Promise<FleetBooking[]> {
+  const statusParam = status === "pending" ? "?status=pending" : ""
+  const response = await fetch(`/api/admin/hr/fleet/bookings${statusParam}`)
+  const payload = await response.json()
+  if (!response.ok) throw new Error(payload.error || "Failed to load bookings")
+  return payload.data || []
+}
+
 export default function AdminFleetPage() {
-  const [resources, setResources] = useState<FleetResource[]>([])
-  const [bookings, setBookings] = useState<FleetBooking[]>([])
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
   const [tab, setTab] = useState<"pending" | "all">("pending")
 
   const [resourceName, setResourceName] = useState("")
@@ -74,33 +89,17 @@ export default function AdminFleetPage() {
   const [reviewing, setReviewing] = useState(false)
   const [adminNote, setAdminNote] = useState("")
 
-  async function loadData() {
-    setLoading(true)
-    try {
-      const statusParam = tab === "pending" ? "?status=pending" : ""
-      const [resourcesRes, bookingsRes] = await Promise.all([
-        fetch("/api/admin/hr/fleet/resources"),
-        fetch(`/api/admin/hr/fleet/bookings${statusParam}`),
-      ])
+  const { data: resources = [], isLoading: loadingResources } = useQuery({
+    queryKey: QUERY_KEYS.adminFleetResources(),
+    queryFn: fetchFleetResources,
+  })
 
-      const resourcesPayload = await resourcesRes.json()
-      const bookingsPayload = await bookingsRes.json()
+  const { data: bookings = [], isLoading: loadingBookings } = useQuery({
+    queryKey: QUERY_KEYS.adminFleetBookings(tab),
+    queryFn: () => fetchFleetBookings(tab),
+  })
 
-      if (!resourcesRes.ok) throw new Error(resourcesPayload.error || "Failed to load resources")
-      if (!bookingsRes.ok) throw new Error(bookingsPayload.error || "Failed to load bookings")
-
-      setResources(resourcesPayload.data || [])
-      setBookings(bookingsPayload.data || [])
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to load fleet admin data")
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    void loadData()
-  }, [tab])
+  const loading = loadingResources || loadingBookings
 
   async function createResource() {
     setSavingResource(true)
@@ -121,7 +120,7 @@ export default function AdminFleetPage() {
       setResourceName("")
       setResourceType("general")
       setResourceDescription("")
-      await loadData()
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminFleetResources() })
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to create resource")
     } finally {
@@ -139,7 +138,7 @@ export default function AdminFleetPage() {
       const payload = await response.json()
       if (!response.ok) throw new Error(payload.error || "Failed to update resource")
       toast.success(`Resource ${resource.is_active ? "deactivated" : "activated"}`)
-      await loadData()
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminFleetResources() })
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to update resource")
     }
@@ -173,7 +172,7 @@ export default function AdminFleetPage() {
       if (!response.ok) throw new Error(payload.error || "Review failed")
       toast.success(`Booking ${action}d`)
       setSelectedBooking(null)
-      await loadData()
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminFleetBookings(tab) })
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Review failed")
     } finally {
@@ -244,23 +243,29 @@ export default function AdminFleetPage() {
             <CardDescription>Activate/deactivate resources available for booking.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
-            {resources.map((resource) => (
-              <div key={resource.id} className="flex items-center justify-between rounded border p-3">
-                <div>
-                  <p className="font-medium">{resource.name}</p>
-                  <p className="text-muted-foreground text-xs">{resource.resource_type}</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant={resource.is_active ? "default" : "outline"}>
-                    {resource.is_active ? "Active" : "Inactive"}
-                  </Badge>
-                  <Button variant="outline" size="sm" onClick={() => toggleResource(resource)}>
-                    {resource.is_active ? "Deactivate" : "Activate"}
-                  </Button>
-                </div>
-              </div>
-            ))}
-            {resources.length === 0 ? <p className="text-muted-foreground text-sm">No resources found.</p> : null}
+            {loadingResources ? (
+              <TableSkeleton rows={3} cols={2} />
+            ) : (
+              <>
+                {resources.map((resource) => (
+                  <div key={resource.id} className="flex items-center justify-between rounded border p-3">
+                    <div>
+                      <p className="font-medium">{resource.name}</p>
+                      <p className="text-muted-foreground text-xs">{resource.resource_type}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant={resource.is_active ? "default" : "outline"}>
+                        {resource.is_active ? "Active" : "Inactive"}
+                      </Badge>
+                      <Button variant="outline" size="sm" onClick={() => toggleResource(resource)}>
+                        {resource.is_active ? "Deactivate" : "Activate"}
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+                {resources.length === 0 ? <p className="text-muted-foreground text-sm">No resources found.</p> : null}
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -277,8 +282,8 @@ export default function AdminFleetPage() {
           </Tabs>
         </CardHeader>
         <CardContent className="space-y-3">
-          {loading ? <p className="text-muted-foreground text-sm">Loading bookings...</p> : null}
-          {!loading && bookings.length === 0 ? (
+          {loadingBookings ? <TableSkeleton rows={3} cols={3} /> : null}
+          {!loadingBookings && bookings.length === 0 ? (
             <p className="text-muted-foreground text-sm">No bookings found.</p>
           ) : null}
 

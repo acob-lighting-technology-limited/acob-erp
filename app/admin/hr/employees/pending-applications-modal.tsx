@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   Dialog,
   DialogContent,
@@ -18,11 +19,11 @@ import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { format } from "date-fns"
 import { cn, formatName, formatFullName } from "@/lib/utils"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 import { logger } from "@/lib/logger"
 
 const log = logger("hr-employees-pending-applications-modal")
-
 
 interface PendingUser {
   id: string
@@ -44,44 +45,39 @@ interface PendingApplicationsModalProps {
   onEmployeeCreated: () => void
 }
 
+async function fetchPendingApplications(supabase: ReturnType<typeof createClient>): Promise<PendingUser[]> {
+  const { data, error } = await supabase
+    .from("pending_users")
+    .select("*")
+    .eq("status", "pending")
+    .order("created_at", { ascending: false })
+
+  if (error) throw new Error(error.message)
+  return data || []
+}
+
 export function PendingApplicationsModal({ onEmployeeCreated }: PendingApplicationsModalProps) {
   const [isOpen, setIsOpen] = useState(false)
-  const [pendingUsers, setPendingUsers] = useState<PendingUser[]>([])
-  const [isLoading, setIsLoading] = useState(false)
   const [selectedUser, setSelectedUser] = useState<PendingUser | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [employeeId, setEmployeeId] = useState("")
   const [hireDate, setHireDate] = useState(new Date().toISOString().split("T")[0])
 
   const supabase = createClient()
+  const queryClient = useQueryClient()
 
+  const { data: pendingUsers = [], isLoading } = useQuery({
+    queryKey: QUERY_KEYS.pendingApplications(),
+    queryFn: () => fetchPendingApplications(supabase),
+    enabled: isOpen,
+  })
+
+  // Auto-select first user when data loads
   useEffect(() => {
-    if (isOpen) {
-      fetchPendingUsers()
+    if (pendingUsers.length > 0 && !selectedUser) {
+      handleUserSelect(pendingUsers[0])
     }
-  }, [isOpen])
-
-  const fetchPendingUsers = async () => {
-    setIsLoading(true)
-    try {
-      const { data, error } = await supabase
-        .from("pending_users")
-        .select("*")
-        .eq("status", "pending")
-        .order("created_at", { ascending: false })
-
-      if (error) throw error
-      setPendingUsers(data || [])
-      if (data && data.length > 0 && !selectedUser) {
-        handleUserSelect(data[0])
-      }
-    } catch (error: any) {
-      log.error("Error fetching pending users:", error)
-      toast.error("Failed to load pending applications")
-    } finally {
-      setIsLoading(false)
-    }
-  }
+  }, [pendingUsers])
 
   const fetchSuggestedId = async () => {
     try {
@@ -147,8 +143,8 @@ export function PendingApplicationsModal({ onEmployeeCreated }: PendingApplicati
       }
 
       toast.success("User approved and account created successfully")
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.pendingApplications() })
       const remaining = pendingUsers.filter((u) => u.id !== selectedUser.id)
-      setPendingUsers(remaining)
       if (remaining.length > 0) {
         handleUserSelect(remaining[0])
       } else {
@@ -175,8 +171,8 @@ export function PendingApplicationsModal({ onEmployeeCreated }: PendingApplicati
       if (error) throw error
 
       toast.success("Application rejected")
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.pendingApplications() })
       const remaining = pendingUsers.filter((u) => u.id !== selectedUser.id)
-      setPendingUsers(remaining)
       if (remaining.length > 0) {
         handleUserSelect(remaining[0])
       } else {

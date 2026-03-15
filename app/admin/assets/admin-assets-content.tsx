@@ -68,10 +68,39 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { StatCard } from "@/components/ui/stat-card"
 
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
+
 import { logger } from "@/lib/logger"
 
 const log = logger("assets-admin-assets-content")
 
+async function fetchAssetTypes(): Promise<{ label: string; code: string; requiresSerialModel: boolean }[]> {
+  const response = await fetch("/api/admin/assets/types", {
+    method: "GET",
+    credentials: "include",
+    cache: "no-store",
+  })
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => null)) as { error?: string } | null
+    log.warn("Could not load asset types from API:", payload?.error || response.status)
+    return ASSET_TYPES
+  }
+
+  const payload = (await response.json()) as {
+    data?: { label: string; code: string; requires_serial_model?: boolean | null }[]
+  }
+  const data = payload?.data || []
+  if (data.length > 0) {
+    return data.map((t) => ({
+      label: t.label,
+      code: t.code,
+      requiresSerialModel: t.requires_serial_model || false,
+    }))
+  }
+  return ASSET_TYPES
+}
 
 export interface Asset {
   id: string
@@ -337,50 +366,26 @@ export function AdminAssetsContent({
   const scopedDepartments = userProfile.managed_departments ?? userProfile.lead_departments ?? []
   const scopedOffices = userProfile.managed_offices ?? []
 
-  // Initial data is passed via props from server component
-  // loadAssetTypes is called on mount
+  const queryClient = useQueryClient()
+
+  const { data: fetchedAssetTypes } = useQuery({
+    queryKey: QUERY_KEYS.adminAssetTypes(),
+    queryFn: fetchAssetTypes,
+    initialData: ASSET_TYPES,
+  })
+
+  // Keep assetTypes in sync with query result
   useEffect(() => {
-    loadAssetTypes()
-  }, [])
+    if (fetchedAssetTypes) {
+      setAssetTypes(fetchedAssetTypes)
+    }
+  }, [fetchedAssetTypes])
 
   useEffect(() => {
     if (initialError) {
       toast.error(initialError)
     }
   }, [initialError])
-
-  const loadAssetTypes = async () => {
-    try {
-      const response = await fetch("/api/admin/assets/types", {
-        method: "GET",
-        credentials: "include",
-        cache: "no-store",
-      })
-
-      if (!response.ok) {
-        const payload = (await response.json().catch(() => null)) as { error?: string } | null
-        // Fallback to hardcoded types if table doesn't exist yet
-        log.warn("Could not load asset types from API:", payload?.error || response.status)
-        return
-      }
-
-      const payload = (await response.json()) as {
-        data?: { label: string; code: string; requires_serial_model?: boolean | null }[]
-      }
-      const data = payload?.data || []
-      if (data && data.length > 0) {
-        setAssetTypes(
-          data.map((t) => ({
-            label: t.label,
-            code: t.code,
-            requiresSerialModel: t.requires_serial_model || false,
-          }))
-        )
-      }
-    } catch (error) {
-      log.error("Error loading asset types:", error)
-    }
-  }
 
   const handleCreateAssetType = async () => {
     if (!canCreateAssetType) {
@@ -432,7 +437,7 @@ export function AdminAssetsContent({
       toast.success("Asset type created successfully")
       setNewAssetType({ label: "", code: "", requiresSerialModel: false })
       setIsCreateAssetTypeDialogOpen(false)
-      await loadAssetTypes()
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminAssetTypes() })
       // Auto-select the newly created asset type
       setAssetForm({ ...assetForm, asset_type: code })
     } catch (error: any) {

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -8,108 +8,93 @@ import { Badge } from "@/components/ui/badge"
 import { AlertTriangle, Calendar, Clock, LogOut, Mail, Phone, User } from "lucide-react"
 import { format, formatDistanceToNow } from "date-fns"
 import { useRouter } from "next/navigation"
-import type { EmployeeSuspension } from "@/types/hr"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 import { logger } from "@/lib/logger"
 
 const log = logger("suspended")
-
 
 interface SuspensionData {
   reason: string
   start_date: string
   end_date: string | null
   suspended_by_name?: string
+  userName: string
+}
+
+async function fetchSuspensionData(supabase: ReturnType<typeof createClient>): Promise<SuspensionData | null> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) throw new Error("unauthenticated")
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("first_name, last_name, employment_status")
+    .eq("id", user.id)
+    .single()
+
+  const userName = profile ? `${profile.first_name} ${profile.last_name}` : ""
+
+  if (!profile || profile.employment_status !== "suspended") {
+    return null
+  }
+
+  const { data: suspensionData } = await supabase
+    .from("employee_suspensions")
+    .select(`reason, start_date, end_date, suspended_by`)
+    .eq("employee_id", user.id)
+    .eq("is_active", true)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .single()
+
+  if (!suspensionData)
+    return { userName, reason: "Pending investigation", start_date: new Date().toISOString(), end_date: null }
+
+  let suspendedByName = "HR Department"
+  if (suspensionData.suspended_by) {
+    const { data: suspender } = await supabase
+      .from("profiles")
+      .select("first_name, last_name")
+      .eq("id", suspensionData.suspended_by)
+      .single()
+    if (suspender) {
+      suspendedByName = `${suspender.first_name} ${suspender.last_name}`
+    }
+  }
+
+  return {
+    userName,
+    reason: suspensionData.reason,
+    start_date: suspensionData.start_date,
+    end_date: suspensionData.end_date,
+    suspended_by_name: suspendedByName,
+  }
 }
 
 export default function SuspendedPage() {
-  const [loading, setLoading] = useState(true)
-  const [suspension, setSuspension] = useState<SuspensionData | null>(null)
-  const [userName, setUserName] = useState("")
   const router = useRouter()
   const supabase = createClient()
 
-  useEffect(() => {
-    async function loadSuspensionData() {
-      try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser()
-        if (!user) {
-          router.push("/auth/login")
-          return
-        }
+  const { data: suspensionData, isLoading: loading } = useQuery({
+    queryKey: QUERY_KEYS.suspension("me"),
+    queryFn: () => fetchSuspensionData(supabase),
+    retry: false,
+  })
 
-        // Get user's profile
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("first_name, last_name, employment_status")
-          .eq("id", user.id)
-          .single()
-
-        if (profile) {
-          setUserName(`${profile.first_name} ${profile.last_name}`)
-
-          // If not suspended, redirect to profile
-          if (profile.employment_status !== "suspended") {
-            router.push("/profile")
-            return
-          }
-        }
-
-        // Get active suspension details
-        const { data: suspensionData } = await supabase
-          .from("employee_suspensions")
-          .select(
-            `
-            reason,
-            start_date,
-            end_date,
-            suspended_by
-          `
-          )
-          .eq("employee_id", user.id)
-          .eq("is_active", true)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .single()
-
-        if (suspensionData) {
-          // Get the name of who suspended them
-          let suspendedByName = "HR Department"
-          if (suspensionData.suspended_by) {
-            const { data: suspender } = await supabase
-              .from("profiles")
-              .select("first_name, last_name")
-              .eq("id", suspensionData.suspended_by)
-              .single()
-
-            if (suspender) {
-              suspendedByName = `${suspender.first_name} ${suspender.last_name}`
-            }
-          }
-
-          setSuspension({
-            reason: suspensionData.reason,
-            start_date: suspensionData.start_date,
-            end_date: suspensionData.end_date,
-            suspended_by_name: suspendedByName,
-          })
-        }
-      } catch (error) {
-        log.error("Error loading suspension data:", error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    loadSuspensionData()
-  }, [supabase, router])
+  // Handle unauthenticated or not-suspended redirects after render
+  if (!loading && suspensionData === null) {
+    router.push("/profile")
+  }
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
     router.push("/auth/login")
   }
+
+  const suspension = suspensionData ?? null
+  const userName = suspensionData?.userName ?? ""
 
   if (loading) {
     return (

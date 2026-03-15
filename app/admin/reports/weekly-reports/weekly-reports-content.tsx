@@ -1,6 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -57,6 +59,7 @@ import {
   type WeeklyReport,
 } from "@/lib/export-utils"
 import { WeeklyReportAdminDialog } from "@/components/admin/reports/weekly-report-dialog"
+import { TableSkeleton } from "@/components/ui/query-states"
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
 import { Label } from "@/components/ui/label"
@@ -67,6 +70,53 @@ import { logger } from "@/lib/logger"
 
 const log = logger("reports-weekly-reports-weekly-reports-co")
 
+interface AdminWeeklyReportsData {
+  reports: WeeklyReport[]
+  trackingData: TrackerStatus[]
+}
+
+async function fetchAdminWeeklyReports(
+  supabase: ReturnType<typeof createClient>,
+  weekFilter: number,
+  yearFilter: number,
+  deptFilter: string,
+  initialDepartments: string[]
+): Promise<AdminWeeklyReportsData> {
+  let query = supabase
+    .from("weekly_reports")
+    .select(
+      "id, department, week_number, year, work_done, tasks_new_week, challenges, status, user_id, created_at, profiles(first_name, last_name)"
+    )
+    .eq("status", "submitted")
+    .eq("week_number", weekFilter)
+    .eq("year", yearFilter)
+    .order("department", { ascending: true })
+
+  if (deptFilter !== "all") {
+    query = query.eq("department", deptFilter)
+  }
+  const { data, error } = await query
+  if (error) throw new Error(error.message)
+
+  const sortedData = sortReportsByDepartment(data || [])
+
+  const { data: actions, error: actionsError } = await supabase
+    .from("tasks")
+    .select("id, department, status")
+    .eq("category", "weekly_action")
+    .eq("week_number", weekFilter)
+    .eq("year", yearFilter)
+    .in("department", initialDepartments)
+
+  return {
+    reports: sortedData,
+    trackingData: actionsError ? [] : actions || [],
+  }
+}
+
+async function fetchAdminWeeklyReportLockState(supabase: ReturnType<typeof createClient>, week: number, year: number) {
+  return fetchWeeklyReportLockState(supabase, week, year)
+}
 
 interface TrackerStatus {
   id: string
@@ -95,8 +145,6 @@ export function WeeklyReportsContent({
   currentUser,
 }: WeeklyReportsContentProps) {
   const currentOfficeWeek = getCurrentOfficeWeek()
-  const [reports, setReports] = useState<WeeklyReport[]>([])
-  const [loading, setLoading] = useState(true)
   const [weekFilter, setWeekFilter] = useState(currentOfficeWeek.week)
   const [yearFilter, setYearFilter] = useState(currentOfficeWeek.year)
   const [deptFilter, setDeptFilter] = useState("all")
@@ -104,7 +152,6 @@ export function WeeklyReportsContent({
   const [isAdminDialogOpen, setIsAdminDialogOpen] = useState(false)
   const [editingReport, setEditingReport] = useState<WeeklyReport | null>(null)
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
-  const [trackingData, setTrackingData] = useState<TrackerStatus[]>([])
   const [pptxModeDialogOpen, setPptxModeDialogOpen] = useState(false)
   const [pendingPptxExport, setPendingPptxExport] = useState<
     { kind: "single"; report: WeeklyReport } | { kind: "all" } | null
@@ -114,9 +161,9 @@ export function WeeklyReportsContent({
   )
   const [meetingGraceHours, setMeetingGraceHours] = useState(24)
   const [savingMeetingWindow, setSavingMeetingWindow] = useState(false)
-  const [isFilteredWeekLocked, setIsFilteredWeekLocked] = useState(false)
 
   const supabase = createClient()
+  const queryClient = useQueryClient()
   const isLead = currentUser.is_department_lead
   const isAdminRole = ["developer", "admin", "super_admin"].includes(currentUser.role)
   const normalizedRole = (currentUser.role || "").trim().toLowerCase()
@@ -137,70 +184,32 @@ export function WeeklyReportsContent({
     return managedDepartments.includes(report.department)
   }
 
-  const loadReports = async () => {
-    setLoading(true)
-    try {
-      let query = supabase
-        .from("weekly_reports")
-        .select(
-          "id, department, week_number, year, work_done, tasks_new_week, challenges, status, user_id, created_at, profiles(first_name, last_name)"
-        )
-        .eq("status", "submitted")
-        .eq("week_number", weekFilter)
-        .eq("year", yearFilter)
-        .order("department", { ascending: true })
+  const {
+    data: reportsData,
+    isLoading: loading,
+    refetch: refetchReports,
+  } = useQuery({
+    queryKey: QUERY_KEYS.adminWeeklyReports({ weekFilter, yearFilter, deptFilter }),
+    queryFn: () => fetchAdminWeeklyReports(supabase, weekFilter, yearFilter, deptFilter, initialDepartments),
+  })
 
-      if (deptFilter !== "all") {
-        query = query.eq("department", deptFilter)
-      }
-      const { data, error } = await query
-      if (error) throw error
+  const reports = reportsData?.reports ?? []
+  const trackingData = reportsData?.trackingData ?? []
 
-      const sortedData = sortReportsByDepartment(data || [])
-      setReports(sortedData)
+  const { data: lockState } = useQuery({
+    queryKey: QUERY_KEYS.adminWeeklyReportLockState(weekFilter, yearFilter),
+    queryFn: () => fetchAdminWeeklyReportLockState(supabase, weekFilter, yearFilter),
+  })
 
-      // ─── Fetch Action Items for Aggregate Status (SAME WEEK) ─────────────────
-      const { data: actions, error: actionsError } = await supabase
-        .from("tasks")
-        .select("id, department, status")
-        .eq("category", "weekly_action")
-        .eq("week_number", weekFilter)
-        .eq("year", yearFilter)
-        .in("department", initialDepartments)
+  const isFilteredWeekLocked = lockState?.isLocked ?? false
 
-      if (!actionsError) {
-        setTrackingData(actions || [])
-      }
-    } catch (error) {
-      log.error("Error loading reports:", error)
-      toast.error("Failed to load reports")
-    } finally {
-      setLoading(false)
-    }
-  }
-
+  // Sync meeting window form inputs when lock state data loads
   useEffect(() => {
-    loadReports()
-  }, [weekFilter, yearFilter, deptFilter])
-
-  useEffect(() => {
-    const loadFilteredWeekLock = async () => {
-      const state = await fetchWeeklyReportLockState(supabase, weekFilter, yearFilter)
-      setIsFilteredWeekLocked(state.isLocked)
+    if (lockState && isAdminRole) {
+      setMeetingDateInput(lockState.meetingDate || getDefaultMeetingDateIso(weekFilter, yearFilter))
+      setMeetingGraceHours(lockState.graceHours || 24)
     }
-    loadFilteredWeekLock()
-  }, [weekFilter, yearFilter])
-
-  useEffect(() => {
-    const loadMeetingWindow = async () => {
-      const state = await fetchWeeklyReportLockState(supabase, weekFilter, yearFilter)
-      setMeetingDateInput(state.meetingDate || getDefaultMeetingDateIso(weekFilter, yearFilter))
-      setMeetingGraceHours(state.graceHours || 24)
-    }
-    if (isAdminRole) {
-      loadMeetingWindow()
-    }
-  }, [isAdminRole, weekFilter, yearFilter])
+  }, [lockState, isAdminRole])
 
   const toggleRow = (id: string) => {
     const newExpanded = new Set(expandedRows)
@@ -230,7 +239,7 @@ export function WeeklyReportsContent({
       const { error } = await supabase.from("weekly_reports").delete().eq("id", id)
       if (error) throw error
       toast.success("Report deleted")
-      loadReports()
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminWeeklyReports() })
     } catch (error) {
       toast.error("Delete failed")
     }
@@ -507,7 +516,13 @@ export function WeeklyReportsContent({
                   </SelectContent>
                 </Select>
               </div>
-              <Button variant="outline" size="icon" onClick={loadReports} disabled={loading} className="shrink-0">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => refetchReports()}
+                disabled={loading}
+                className="shrink-0"
+              >
                 <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
               </Button>
             </div>
@@ -560,11 +575,8 @@ export function WeeklyReportsContent({
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={6} className="h-32 text-center">
-                  <div className="text-muted-foreground flex items-center justify-center gap-2">
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                    Auditing records...
-                  </div>
+                <TableCell colSpan={6} className="p-4">
+                  <TableSkeleton rows={4} cols={5} />
                 </TableCell>
               </TableRow>
             ) : filteredReports.length === 0 ? (
@@ -762,7 +774,7 @@ export function WeeklyReportsContent({
         isOpen={isAdminDialogOpen}
         onClose={() => setIsAdminDialogOpen(false)}
         report={editingReport}
-        onSuccess={loadReports}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminWeeklyReports() })}
         currentUser={currentUser}
       />
 

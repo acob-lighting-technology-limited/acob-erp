@@ -1,7 +1,8 @@
 "use client"
 
-import { useState, useEffect, Suspense, Fragment } from "react"
+import { useState, useEffect, Fragment } from "react"
 import { useSearchParams } from "next/navigation"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -20,7 +21,6 @@ import {
   Search,
   ChevronDown,
   ChevronRight,
-  Loader2,
   RefreshCw,
   FileText,
   File as FileIcon,
@@ -38,11 +38,12 @@ import {
 } from "@/lib/export-utils"
 import { StatCard } from "@/components/ui/stat-card"
 import { EmptyState } from "@/components/ui/patterns"
+import { TableSkeleton } from "@/components/ui/query-states"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 import { logger } from "@/lib/logger"
 
 const log = logger("dashboard-reports-action-tracker")
-
 
 interface ActionTask {
   id: string
@@ -56,14 +57,66 @@ interface ActionTask {
   year: number
 }
 
+interface ActionTrackerMetadata {
+  profile: any
+  allDepartments: string[]
+}
+
+interface ActionTrackerTasksResult {
+  tasks: ActionTask[]
+}
+
+async function fetchActionTrackerMetadata(supabase: ReturnType<typeof createClient>): Promise<ActionTrackerMetadata> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  let profile: any = null
+  if (user) {
+    const { data: p } = await supabase.from("profiles").select("*").eq("id", user.id).single()
+    profile = p
+  }
+
+  const { data: depts } = await supabase.from("profiles").select("department").not("department", "is", null)
+  const allDepartments = depts
+    ? (Array.from(new Set(depts.map((d) => d.department)))
+        .filter(Boolean)
+        .sort() as string[])
+    : []
+
+  return { profile, allDepartments }
+}
+
+async function fetchActionTrackerTasks(
+  supabase: ReturnType<typeof createClient>,
+  week: number,
+  year: number,
+  deptFilter: string
+): Promise<ActionTrackerTasksResult> {
+  let query = supabase
+    .from("tasks")
+    .select("*")
+    .eq("category", "weekly_action")
+    .eq("week_number", week)
+    .eq("year", year)
+    .order("department", { ascending: true })
+
+  if (deptFilter !== "all") {
+    query = query.eq("department", deptFilter)
+  }
+
+  const { data, error } = await query
+  if (error) throw new Error(error.message)
+  return { tasks: data || [] }
+}
+
 export default function ActionTrackerPortal() {
   const currentOfficeWeek = getCurrentOfficeWeek()
-  const [tasks, setTasks] = useState<ActionTask[]>([])
-  const [loading, setLoading] = useState(true)
   const searchParams = useSearchParams()
+  const queryClient = useQueryClient()
+  const supabase = createClient()
+
   const [expandedDepts, setExpandedDepts] = useState<Set<string>>(new Set())
-  const [profile, setProfile] = useState<any>(null)
-  const [allDepartments, setAllDepartments] = useState<string[]>([])
 
   const [week, setWeek] = useState(() => {
     const w = searchParams.get("week")
@@ -76,58 +129,24 @@ export default function ActionTrackerPortal() {
   const [deptFilter, setDeptFilter] = useState("all")
   const [searchQuery, setSearchQuery] = useState("")
 
-  const supabase = createClient()
+  const { data: metaData } = useQuery({
+    queryKey: QUERY_KEYS.actionTrackerMetadata(),
+    queryFn: () => fetchActionTrackerMetadata(supabase),
+  })
 
-  useEffect(() => {
-    const fetchMetadata = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (user) {
-        const { data: p } = await supabase.from("profiles").select("*").eq("id", user.id).single()
-        setProfile(p)
-      }
-      const { data: depts } = await supabase.from("profiles").select("department").not("department", "is", null)
-      if (depts) {
-        setAllDepartments(
-          Array.from(new Set(depts.map((d) => d.department)))
-            .filter(Boolean)
-            .sort() as string[]
-        )
-      }
-    }
-    fetchMetadata()
-  }, [])
+  const profile = metaData?.profile ?? null
+  const allDepartments = metaData?.allDepartments ?? []
 
-  const loadTasks = async () => {
-    setLoading(true)
-    try {
-      let query = supabase
-        .from("tasks")
-        .select("*")
-        .eq("category", "weekly_action")
-        .eq("week_number", week)
-        .eq("year", year)
-        .order("department", { ascending: true })
+  const {
+    data: tasksData,
+    isLoading: loading,
+    refetch: refetchTasks,
+  } = useQuery({
+    queryKey: QUERY_KEYS.actionTrackerTasks({ week, year, deptFilter }),
+    queryFn: () => fetchActionTrackerTasks(supabase, week, year, deptFilter),
+  })
 
-      if (deptFilter !== "all") {
-        query = query.eq("department", deptFilter)
-      }
-
-      const { data, error } = await query
-      if (error) throw error
-      setTasks(data || [])
-    } catch (error) {
-      log.error({ err: String(error) }, "error")
-      toast.error("Failed to load actions")
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    loadTasks()
-  }, [week, year, deptFilter])
+  const tasks = tasksData?.tasks ?? []
 
   const handleStatusChange = async (taskId: string, newStatus: string) => {
     const task = tasks.find((t) => t.id === taskId)
@@ -147,7 +166,7 @@ export default function ActionTrackerPortal() {
 
       if (error) throw error
       toast.success("Status updated")
-      setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t)))
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.actionTrackerTasks({ week, year, deptFilter }) })
     } catch (error) {
       log.error({ err: String(error) }, "error")
       toast.error("Failed to update status")
@@ -295,7 +314,13 @@ export default function ActionTrackerPortal() {
                 </SelectContent>
               </Select>
             </div>
-            <Button variant="outline" size="icon" onClick={loadTasks} disabled={loading} className="h-10 w-10 shrink-0">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => refetchTasks()}
+              disabled={loading}
+              className="h-10 w-10 shrink-0"
+            >
               <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
             </Button>
           </div>
@@ -316,9 +341,8 @@ export default function ActionTrackerPortal() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-muted-foreground h-32 text-center">
-                  <Loader2 className="mx-auto mb-2 h-6 w-6 animate-spin" />
-                  Loading departmental actions...
+                <TableCell colSpan={5} className="p-4">
+                  <TableSkeleton rows={4} cols={4} />
                 </TableCell>
               </TableRow>
             ) : deptsPresent.length === 0 ? (

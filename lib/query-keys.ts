@@ -33,4 +33,47 @@ export const QUERY_KEYS = {
   payments: (filters?: Record<string, unknown>) => (filters ? ["payments", filters] : ["payments"]),
   notifications: () => ["notifications"],
   search: (q: string) => ["search", q],
+
+  // Weekly reports
+  weeklyReports: (filters?: Record<string, unknown>) => (filters ? ["weekly-reports", filters] : ["weekly-reports"]),
+  adminWeeklyReports: (filters?: Record<string, unknown>) =>
+    filters ? ["admin-weekly-reports", filters] : ["admin-weekly-reports"],
+  adminWeeklyReportLockState: (week: number, year: number) => ["admin-weekly-report-lock", week, year],
+
+  // Action tracker
+  actionTrackerMetadata: () => ["action-tracker-metadata"],
+  actionTrackerTasks: (filters?: Record<string, unknown>) =>
+    filters ? ["action-tracker-tasks", filters] : ["action-tracker-tasks"],
+  adminActionTrackerTasks: (filters?: Record<string, unknown>) =>
+    filters ? ["admin-action-tracker-tasks", filters] : ["admin-action-tracker-tasks"],
+
+  // Suspension
+  suspension: (userId: string) => ["suspension", userId],
+
+  // Job description / profile data
+  jobDescription: (userId: string) => ["job-description", userId],
+  profileEdit: (userId: string) => ["profile-edit", userId],
+
+  // Admin assets
+  adminAssetTypes: () => ["admin-asset-types"],
+
+  // Admin fleet
+  adminFleetResources: () => ["admin-fleet-resources"],
+  adminFleetBookings: (status?: string) => (status ? ["admin-fleet-bookings", status] : ["admin-fleet-bookings"]),
+
+  // Dev login logs
+  devLoginLogs: () => ["dev-login-logs"],
+
+  // Pending applications
+  pendingApplications: () => ["pending-applications"],
+
+  // Performance
+  performanceCreateData: () => ["performance-create-data"],
+
+  // Leave queue and relievers
+  leaveQueue: () => ["leave-queue"],
+  leaveRelievers: () => ["leave-relievers"],
+
+  // Admin employees
+  adminEmployees: (filters?: Record<string, unknown>) => (filters ? ["admin-employees", filters] : ["admin-employees"]),
 } as const

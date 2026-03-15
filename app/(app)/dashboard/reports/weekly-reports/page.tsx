@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, Fragment } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -55,22 +56,71 @@ import {
   type WeeklyReport,
 } from "@/lib/export-utils"
 import { format } from "date-fns"
+import { QUERY_KEYS } from "@/lib/query-keys"
+import { TableSkeleton } from "@/components/ui/query-states"
 
 import { logger } from "@/lib/logger"
 
 const log = logger("dashboard-reports-weekly-reports")
 
+interface UserProfile {
+  id: string
+  department: string | null
+  role: string
+  is_department_lead: boolean
+}
+
+async function fetchProfileAndDepts(supabase: ReturnType<typeof createClient>) {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { profile: null, allDepartments: [] }
+
+  const { data: p } = await supabase
+    .from("profiles")
+    .select("id, department, role, is_department_lead")
+    .eq("id", user.id)
+    .single()
+
+  const { data: depts } = await supabase.from("profiles").select("department").not("department", "is", null)
+  const uniqueDepts = Array.from(new Set(depts?.map((d: any) => d.department).filter(Boolean))) as string[]
+
+  return { profile: p as UserProfile | null, allDepartments: uniqueDepts.sort() }
+}
+
+async function fetchReports(
+  supabase: ReturnType<typeof createClient>,
+  profile: UserProfile | null,
+  weekFilter: number,
+  yearFilter: number,
+  deptFilter: string
+): Promise<WeeklyReport[]> {
+  if (!profile) return []
+
+  let query = supabase
+    .from("weekly_reports")
+    .select("*, profiles:user_id ( first_name, last_name )")
+    .eq("status", "submitted")
+    .eq("week_number", weekFilter)
+    .eq("year", yearFilter)
+    .order("department", { ascending: true })
+
+  const effectiveDept = profile?.is_department_lead ? profile.department || "all" : deptFilter
+  if (effectiveDept !== "all") {
+    query = query.eq("department", effectiveDept)
+  }
+
+  const { data, error } = await query
+  if (error) throw new Error(error.message)
+  return sortReportsByDepartment(data || [])
+}
 
 export default function WeeklyReportsPortal() {
   const currentOfficeWeek = getCurrentOfficeWeek()
-  const [reports, setReports] = useState<WeeklyReport[]>([])
-  const [loading, setLoading] = useState(true)
-  const [profile, setProfile] = useState<any>(null)
   const [searchQuery, setSearchQuery] = useState("")
   const [deptFilter, setDeptFilter] = useState("all")
   const [yearFilter, setYearFilter] = useState(currentOfficeWeek.year)
   const [weekFilter, setWeekFilter] = useState(currentOfficeWeek.week)
-  const [allDepartments, setAllDepartments] = useState<string[]>([])
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [selectedReportParams, setSelectedReportParams] = useState<any>(null)
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
@@ -81,15 +131,34 @@ export default function WeeklyReportsPortal() {
   const [isFilteredWeekLocked, setIsFilteredWeekLocked] = useState(false)
 
   const supabase = createClient()
+  const queryClient = useQueryClient()
 
+  const { data: profileData } = useQuery({
+    queryKey: ["portal-weekly-reports-profile"],
+    queryFn: () => fetchProfileAndDepts(supabase),
+  })
+
+  const profile = profileData?.profile ?? null
+  const allDepartments = profileData?.allDepartments ?? []
+
+  // Set dept filter for dept leads on initial load
   useEffect(() => {
-    fetchInitialData()
-  }, [])
+    if (profile?.is_department_lead && profile.department) {
+      setDeptFilter(profile.department || "all")
+    }
+  }, [profile?.id])
 
-  useEffect(() => {
-    if (profile) loadReports()
-  }, [profile, weekFilter, yearFilter, deptFilter])
+  const {
+    data: reports = [],
+    isLoading: loading,
+    refetch: refetchReports,
+  } = useQuery({
+    queryKey: QUERY_KEYS.weeklyReports({ week: weekFilter, year: yearFilter, dept: deptFilter }),
+    queryFn: () => fetchReports(supabase, profile, weekFilter, yearFilter, deptFilter),
+    enabled: !!profile,
+  })
 
+  // Check lock state for the filtered week
   useEffect(() => {
     const loadFilteredWeekLock = async () => {
       const state = await fetchWeeklyReportLockState(supabase, weekFilter, yearFilter)
@@ -97,59 +166,6 @@ export default function WeeklyReportsPortal() {
     }
     loadFilteredWeekLock()
   }, [weekFilter, yearFilter])
-
-  async function fetchInitialData() {
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (user) {
-        const { data: p } = await supabase
-          .from("profiles")
-          .select("id, department, role, is_department_lead")
-          .eq("id", user.id)
-          .single()
-        setProfile(p)
-
-        const { data: depts } = await supabase.from("profiles").select("department").not("department", "is", null)
-        const uniqueDepts = Array.from(new Set(depts?.map((d) => d.department).filter(Boolean))) as string[]
-        setAllDepartments(uniqueDepts.sort())
-
-        if (p?.is_department_lead) {
-          setDeptFilter(p.department || "all")
-        }
-      }
-    } catch (error) {
-      log.error("Error fetching initial data:", error)
-    }
-  }
-
-  async function loadReports() {
-    setLoading(true)
-    try {
-      let query = supabase
-        .from("weekly_reports")
-        .select("*, profiles:user_id ( first_name, last_name )")
-        .eq("status", "submitted")
-        .eq("week_number", weekFilter)
-        .eq("year", yearFilter)
-        .order("department", { ascending: true })
-
-      const effectiveDept = profile?.is_department_lead ? profile.department || "all" : deptFilter
-      if (effectiveDept !== "all") {
-        query = query.eq("department", effectiveDept)
-      }
-
-      const { data, error } = await query
-      if (error) throw error
-      setReports(sortReportsByDepartment(data || []))
-    } catch (error) {
-      log.error("Error loading reports:", error)
-      toast.error("Failed to load reports")
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const handleDelete = async (id: string) => {
     const target = reports.find((r) => r.id === id)
@@ -165,7 +181,9 @@ export default function WeeklyReportsPortal() {
       const { error } = await supabase.from("weekly_reports").delete().eq("id", id)
       if (error) throw error
       toast.success("Report deleted")
-      loadReports()
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.weeklyReports({ week: weekFilter, year: yearFilter, dept: deptFilter }),
+      })
     } catch (error) {
       toast.error("Failed to delete report")
     }
@@ -312,7 +330,13 @@ export default function WeeklyReportsPortal() {
                 </SelectContent>
               </Select>
             </div>
-            <Button variant="outline" size="icon" onClick={loadReports} disabled={loading} className="shrink-0">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => refetchReports()}
+              disabled={loading}
+              className="shrink-0"
+            >
               <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
             </Button>
           </div>
@@ -517,7 +541,11 @@ export default function WeeklyReportsPortal() {
           setIsDialogOpen(false)
           setSelectedReportParams(null)
         }}
-        onSuccess={() => loadReports()}
+        onSuccess={() =>
+          queryClient.invalidateQueries({
+            queryKey: QUERY_KEYS.weeklyReports({ week: weekFilter, year: yearFilter, dept: deptFilter }),
+          })
+        }
         initialData={selectedReportParams}
       />
 

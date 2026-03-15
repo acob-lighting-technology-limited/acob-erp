@@ -42,10 +42,13 @@ import {
   type ActionItem,
 } from "@/lib/export-utils"
 
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
+import { TableSkeleton } from "@/components/ui/query-states"
+
 import { logger } from "@/lib/logger"
 
 const log = logger("reports-action-tracker-action-tracker-co")
-
 
 interface ActionTask {
   id: string
@@ -68,6 +71,35 @@ interface ActionTrackerContentProps {
   canGlobalEdit?: boolean
 }
 
+async function fetchAdminActionTrackerTasks(
+  supabase: ReturnType<typeof createClient>,
+  weekFilter: number,
+  yearFilter: number,
+  deptFilter: string,
+  scopedDepartments: string[]
+): Promise<ActionTask[]> {
+  let query = supabase
+    .from("tasks")
+    .select("*")
+    .eq("category", "weekly_action")
+    .eq("week_number", weekFilter)
+    .eq("year", yearFilter)
+    .order("department", { ascending: true })
+    .order("created_at", { ascending: true })
+
+  if (scopedDepartments.length > 0) {
+    query = query.in("department", scopedDepartments)
+  }
+
+  if (deptFilter !== "all") {
+    query = query.eq("department", deptFilter)
+  }
+
+  const { data, error } = await query
+  if (error) throw new Error(error.message)
+  return data || []
+}
+
 export function ActionTrackerContent({
   initialDepartments,
   scopedDepartments = [],
@@ -75,9 +107,8 @@ export function ActionTrackerContent({
   canGlobalEdit = false,
 }: ActionTrackerContentProps) {
   const currentOfficeWeek = getCurrentOfficeWeek()
-  const [tasks, setTasks] = useState<ActionTask[]>([])
-  const [loading, setLoading] = useState(true)
   const searchParams = useSearchParams()
+  const queryClient = useQueryClient()
   const [expandedDepts, setExpandedDepts] = useState<Set<string>>(new Set())
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingTask, setEditingTask] = useState<ActionTask | null>(null)
@@ -99,40 +130,16 @@ export function ActionTrackerContent({
   const supabase = createClient()
   const canMutateTask = (task: ActionTask) => canGlobalEdit || editableDepartments.includes(task.department)
 
-  const loadTasks = async () => {
-    setLoading(true)
-    try {
-      let query = supabase
-        .from("tasks")
-        .select("*")
-        .eq("category", "weekly_action")
-        .eq("week_number", weekFilter)
-        .eq("year", yearFilter)
-        .order("department", { ascending: true })
-        .order("created_at", { ascending: true })
+  const {
+    data: tasks = [],
+    isLoading: loading,
+    refetch: refetchTasks,
+  } = useQuery({
+    queryKey: QUERY_KEYS.adminActionTrackerTasks({ weekFilter, yearFilter, deptFilter, scopedDepartments }),
+    queryFn: () => fetchAdminActionTrackerTasks(supabase, weekFilter, yearFilter, deptFilter, scopedDepartments),
+  })
 
-      if (scopedDepartments.length > 0) {
-        query = query.in("department", scopedDepartments)
-      }
-
-      if (deptFilter !== "all") {
-        query = query.eq("department", deptFilter)
-      }
-
-      const { data, error } = await query
-      if (error) throw error
-      setTasks(data || [])
-    } catch (error) {
-      log.error("Error loading tasks:", error)
-      toast.error("Failed to load actions")
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    loadTasks()
-  }, [weekFilter, yearFilter, deptFilter])
+  const tasksQueryKey = QUERY_KEYS.adminActionTrackerTasks({ weekFilter, yearFilter, deptFilter, scopedDepartments })
 
   const handleStatusChange = async (taskId: string, newStatus: string) => {
     const targetTask = tasks.find((task) => task.id === taskId)
@@ -143,7 +150,10 @@ export function ActionTrackerContent({
 
     // Optimistic update
     const previousTasks = [...tasks]
-    setTasks(tasks.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t)))
+    queryClient.setQueryData(
+      tasksQueryKey,
+      tasks.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t))
+    )
 
     try {
       const { error } = await supabase
@@ -155,7 +165,7 @@ export function ActionTrackerContent({
       toast.success("Status updated")
     } catch (error) {
       log.error({ err: String(error) }, "error")
-      setTasks(previousTasks)
+      queryClient.setQueryData(tasksQueryKey, previousTasks)
       toast.error("Failed to update status")
     }
   }
@@ -171,7 +181,7 @@ export function ActionTrackerContent({
       const { error } = await supabase.from("tasks").delete().eq("id", id)
       if (error) throw error
       toast.success("Action deleted")
-      loadTasks()
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminActionTrackerTasks() })
     } catch (error) {
       toast.error("Failed to delete")
     }
@@ -392,7 +402,13 @@ export function ActionTrackerContent({
                 </SelectContent>
               </Select>
             </div>
-            <Button variant="outline" size="icon" onClick={loadTasks} disabled={loading} className="h-10 w-10 shrink-0">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => refetchTasks()}
+              disabled={loading}
+              className="h-10 w-10 shrink-0"
+            >
               <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
             </Button>
           </div>
@@ -413,11 +429,8 @@ export function ActionTrackerContent({
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={5} className="h-32 text-center">
-                  <div className="text-muted-foreground flex items-center justify-center gap-2">
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                    Auditing actions...
-                  </div>
+                <TableCell colSpan={5} className="p-4">
+                  <TableSkeleton rows={4} cols={4} />
                 </TableCell>
               </TableRow>
             ) : deptsPresent.length === 0 ? (
@@ -622,7 +635,7 @@ export function ActionTrackerContent({
       <ActionFormDialog
         isOpen={isFormOpen}
         onClose={() => setIsFormOpen(false)}
-        onComplete={loadTasks}
+        onComplete={() => queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminActionTrackerTasks() })}
         departments={canGlobalEdit ? initialDepartments : editableDepartments}
         editingAction={editingTask}
         defaultWeek={weekFilter}

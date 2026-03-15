@@ -1,6 +1,8 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useMemo, useRef, useState } from "react"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -25,6 +27,41 @@ import { PageHeader, PageWrapper } from "@/components/layout"
 import { toast } from "sonner"
 import { CalendarDays, ChevronDown, ChevronRight, Clock, Plus, Upload } from "lucide-react"
 import type { LeaveBalance, LeaveRequest, LeaveType } from "./page"
+
+async function fetchLeaveData(currentUserId: string) {
+  const [requestRes, queueRes, typesRes, relieversRes] = await Promise.all([
+    fetch("/api/hr/leave/requests"),
+    fetch("/api/hr/leave/queue"),
+    fetch("/api/hr/leave/types"),
+    fetch("/api/hr/leave/relievers"),
+  ])
+
+  const [requestPayload, queuePayload, typesPayload, relieversPayload] = await Promise.all([
+    requestRes.json().catch(() => ({})),
+    queueRes.json().catch(() => ({})),
+    typesRes.json().catch(() => ({})),
+    relieversRes.json().catch(() => ({})),
+  ])
+
+  const errors: string[] = []
+
+  if (!requestRes.ok) errors.push(`requests: ${requestPayload.error || requestRes.statusText}`)
+  if (!queueRes.ok) errors.push(`queue: ${queuePayload.error || queueRes.statusText}`)
+  if (!typesRes.ok) errors.push(`types: ${typesPayload.error || typesRes.statusText}`)
+  if (!relieversRes.ok) errors.push(`relievers: ${relieversPayload.error || relieversRes.statusText}`)
+
+  if (errors.length > 0) throw new Error(`Leave data partial failure -> ${errors.join(" | ")}`)
+
+  const ownedRequests = (requestPayload.data || []).filter((row: LeaveRequest) => row.user_id === currentUserId)
+
+  return {
+    requests: ownedRequests as LeaveRequest[],
+    balances: (requestPayload.balances || []) as LeaveBalance[],
+    approverQueue: (queuePayload.data || []) as LeaveRequest[],
+    leaveTypes: (typesPayload.data || []) as LeaveType[],
+    relieverOptions: (relieversPayload.data || []) as { value: string; label: string }[],
+  }
+}
 
 interface LeaveContentProps {
   currentUserId: string
@@ -100,11 +137,26 @@ export function LeaveContent({
   initialBalances,
   initialLeaveTypes,
 }: LeaveContentProps) {
-  const [requests, setRequests] = useState<LeaveRequest[]>(initialRequests)
-  const [balances, setBalances] = useState<LeaveBalance[]>(initialBalances)
-  const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>(initialLeaveTypes)
-  const [approverQueue, setApproverQueue] = useState<LeaveRequest[]>([])
-  const [relieverOptions, setRelieverOptions] = useState<{ value: string; label: string }[]>([])
+  const queryClient = useQueryClient()
+
+  const { data: leaveData } = useQuery({
+    queryKey: QUERY_KEYS.leaveRequests({ userId: currentUserId }),
+    queryFn: () => fetchLeaveData(currentUserId),
+    initialData: {
+      requests: initialRequests,
+      balances: initialBalances,
+      approverQueue: [],
+      leaveTypes: initialLeaveTypes,
+      relieverOptions: [],
+    },
+  })
+
+  const requests = leaveData.requests
+  const balances = leaveData.balances
+  const leaveTypes = leaveData.leaveTypes
+  const approverQueue = leaveData.approverQueue
+  const relieverOptions = leaveData.relieverOptions
+
   const [open, setOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [uploadingEvidenceFor, setUploadingEvidenceFor] = useState<string | null>(null)
@@ -213,66 +265,9 @@ export function LeaveContent({
     setOpen(true)
   }
 
-  async function fetchRelieverOptions() {
-    const response = await fetch("/api/hr/leave/relievers")
-    const payload = await response.json()
-    if (!response.ok) throw new Error(payload.error || "Failed to load relievers")
-    setRelieverOptions(payload.data || [])
+  function invalidateLeaveData() {
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.leaveRequests({ userId: currentUserId }) })
   }
-
-  async function refreshData() {
-    const [requestRes, queueRes, typesRes, relieversRes] = await Promise.all([
-      fetch("/api/hr/leave/requests"),
-      fetch("/api/hr/leave/queue"),
-      fetch("/api/hr/leave/types"),
-      fetch("/api/hr/leave/relievers"),
-    ])
-
-    const [requestPayload, queuePayload, typesPayload, relieversPayload] = await Promise.all([
-      requestRes.json().catch(() => ({})),
-      queueRes.json().catch(() => ({})),
-      typesRes.json().catch(() => ({})),
-      relieversRes.json().catch(() => ({})),
-    ])
-
-    const errors: string[] = []
-
-    if (requestRes.ok) {
-      const ownedRequests = (requestPayload.data || []).filter((row: LeaveRequest) => row.user_id === currentUserId)
-      setRequests(ownedRequests)
-      setBalances(requestPayload.balances || [])
-    } else {
-      errors.push(`requests: ${requestPayload.error || requestRes.statusText}`)
-    }
-
-    if (queueRes.ok) {
-      setApproverQueue(queuePayload.data || [])
-    } else {
-      errors.push(`queue: ${queuePayload.error || queueRes.statusText}`)
-    }
-
-    if (typesRes.ok) {
-      setLeaveTypes(typesPayload.data || [])
-    } else {
-      errors.push(`types: ${typesPayload.error || typesRes.statusText}`)
-    }
-
-    if (relieversRes.ok) {
-      setRelieverOptions(relieversPayload.data || [])
-    } else {
-      errors.push(`relievers: ${relieversPayload.error || relieversRes.statusText}`)
-    }
-
-    if (errors.length > 0) {
-      throw new Error(`Leave data partial failure -> ${errors.join(" | ")}`)
-    }
-  }
-
-  useEffect(() => {
-    refreshData().catch((error) => {
-      toast.error(error instanceof Error ? error.message : "Failed to load leave data")
-    })
-  }, [])
 
   async function handleSubmitRequest(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -298,7 +293,7 @@ export function LeaveContent({
       )
       setOpen(false)
       resetRequestForm()
-      await refreshData()
+      invalidateLeaveData()
     } catch (error) {
       const message = error instanceof Error ? error.message : "An unexpected error occurred"
       toast.error(message)
@@ -319,7 +314,7 @@ export function LeaveContent({
       if (!response.ok) throw new Error(payload.error || "Failed to delete leave request")
 
       toast.success(payload.message || "Leave request deleted successfully")
-      await refreshData()
+      invalidateLeaveData()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to delete leave request")
     } finally {
@@ -337,7 +332,7 @@ export function LeaveContent({
       const payload = await response.json()
       if (!response.ok) throw new Error(payload.error || "Failed to process action")
       toast.success(payload.message || "Action completed")
-      await refreshData()
+      invalidateLeaveData()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to process action")
     }
@@ -363,7 +358,7 @@ export function LeaveContent({
       const payload = await response.json()
       if (!response.ok) throw new Error(payload.error || "Failed to upload evidence")
       toast.success(payload.message || "Evidence uploaded")
-      await refreshData()
+      invalidateLeaveData()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to upload evidence")
     } finally {
