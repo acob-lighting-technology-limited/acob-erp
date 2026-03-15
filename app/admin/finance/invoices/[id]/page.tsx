@@ -1,10 +1,11 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { useParams, useRouter } from "next/navigation"
+import { useParams } from "next/navigation"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
 import { createClient } from "@/lib/supabase/client"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
@@ -12,11 +13,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Download, Send, Printer, CheckCircle, Pencil, FileText } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
+import { PageLoader } from "@/components/ui/query-states"
 
 import { logger } from "@/lib/logger"
 
 const log = logger("finance-invoices")
-
 
 interface Invoice {
   id: string
@@ -56,59 +57,43 @@ const statusColors: Record<string, string> = {
   cancelled: "secondary",
 }
 
+interface InvoicePageData {
+  invoice: Invoice
+  items: InvoiceItem[]
+}
+
+async function fetchInvoiceDetail(id: string): Promise<InvoicePageData> {
+  const supabase = createClient()
+  const [{ data: invoiceData, error: invoiceError }, { data: itemsData, error: itemsError }] = await Promise.all([
+    supabase.from("invoices").select("*").eq("id", id).single(),
+    supabase.from("invoice_items").select("*").eq("invoice_id", id).order("created_at"),
+  ])
+  if (invoiceError) throw new Error(invoiceError.message)
+  if (itemsError) throw new Error(itemsError.message)
+  return { invoice: invoiceData, items: itemsData || [] }
+}
+
 export default function InvoiceDetailPage() {
   const params = useParams()
-  const router = useRouter()
-  const [invoice, setInvoice] = useState<Invoice | null>(null)
-  const [items, setItems] = useState<InvoiceItem[]>([])
-  const [loading, setLoading] = useState(true)
+  const id = params.id as string
+  const queryClient = useQueryClient()
 
-  useEffect(() => {
-    fetchInvoice()
-  }, [params.id])
+  const { data, isLoading } = useQuery({
+    queryKey: QUERY_KEYS.adminInvoiceDetail(id),
+    queryFn: () => fetchInvoiceDetail(id),
+  })
 
-  async function fetchInvoice() {
-    try {
-      const supabase = createClient()
-
-      const { data: invoiceData, error: invoiceError } = await supabase
-        .from("invoices")
-        .select("*")
-        .eq("id", params.id)
-        .single()
-
-      if (invoiceError) throw invoiceError
-
-      const { data: itemsData, error: itemsError } = await supabase
-        .from("invoice_items")
-        .select("*")
-        .eq("invoice_id", params.id)
-        .order("created_at")
-
-      if (itemsError) throw itemsError
-
-      setInvoice(invoiceData)
-      setItems(itemsData || [])
-    } catch (error) {
-      log.error("Error fetching invoice:", error)
-      toast.error("Failed to load invoice")
-    } finally {
-      setLoading(false)
-    }
-  }
+  const invoice = data?.invoice
+  const items = data?.items ?? []
 
   async function markAsSent() {
     if (!invoice) return
-
     try {
       const supabase = createClient()
-
       const { error } = await supabase.from("invoices").update({ status: "sent" }).eq("id", invoice.id)
-
       if (error) throw error
-
       toast.success("Invoice marked as sent")
-      fetchInvoice()
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminInvoiceDetail(id) })
     } catch (error) {
       log.error("Error updating invoice:", error)
       toast.error("Failed to update invoice")
@@ -117,23 +102,15 @@ export default function InvoiceDetailPage() {
 
   async function markAsPaid() {
     if (!invoice) return
-
     try {
       const supabase = createClient()
-
       const { error } = await supabase
         .from("invoices")
-        .update({
-          status: "paid",
-          amount_paid: invoice.total_amount,
-          balance_due: 0,
-        })
+        .update({ status: "paid", amount_paid: invoice.total_amount, balance_due: 0 })
         .eq("id", invoice.id)
-
       if (error) throw error
-
       toast.success("Invoice marked as paid")
-      fetchInvoice()
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminInvoiceDetail(id) })
     } catch (error) {
       log.error("Error updating invoice:", error)
       toast.error("Failed to update invoice")
@@ -141,38 +118,15 @@ export default function InvoiceDetailPage() {
   }
 
   function formatCurrency(amount: number, currency: string = "NGN") {
-    return new Intl.NumberFormat("en-NG", {
-      style: "currency",
-      currency: currency,
-    }).format(amount)
+    return new Intl.NumberFormat("en-NG", { style: "currency", currency }).format(amount)
   }
 
   function formatDate(date: string) {
-    return new Date(date).toLocaleDateString("en-NG", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    })
+    return new Date(date).toLocaleDateString("en-NG", { year: "numeric", month: "long", day: "numeric" })
   }
 
-  if (loading) {
-    return (
-      <div className="flex h-96 items-center justify-center">
-        <div className="border-primary h-8 w-8 animate-spin rounded-full border-4 border-t-transparent"></div>
-      </div>
-    )
-  }
-
-  if (!invoice) {
-    return (
-      <div className="container mx-auto p-6 text-center">
-        <h1 className="text-2xl font-bold">Invoice not found</h1>
-        <Link href="/admin/finance/invoices">
-          <Button className="mt-4">Back to Invoices</Button>
-        </Link>
-      </div>
-    )
-  }
+  if (isLoading) return <PageLoader />
+  if (!invoice) return null
 
   return (
     <AdminTablePage

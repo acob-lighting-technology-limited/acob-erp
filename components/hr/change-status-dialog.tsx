@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import { useQuery } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -75,17 +77,28 @@ const suspensionReasonOptions = [
   { value: "temporary_access_hold", label: "Temporary Access Hold" },
 ]
 
+async function fetchEmployeeStatusBlockers(employeeId: string): Promise<SeparationBlockers | null> {
+  const response = await fetch(`/api/v1/hr/employees/${employeeId}/status`, { method: "GET" })
+  if (!response.ok) throw new Error("Failed to load offboarding blockers")
+  const result = await response.json()
+  return result.blockers || null
+}
+
+async function fetchActiveLeaveTypes(): Promise<LeaveTypeOption[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase.from("leave_types").select("id, name").eq("is_active", true).order("name")
+  if (error) throw new Error(error.message)
+  return (data || []) as LeaveTypeOption[]
+}
+
 export function ChangeStatusContent({ employee, onSuccess, onCancel }: ChangeStatusContentProps) {
   const [status, setStatus] = useState<EmploymentStatus>(employee.employment_status)
   const [reasonCode, setReasonCode] = useState("")
   const [suspensionEndDate, setSuspensionEndDate] = useState("")
   const [separationDate, setSeparationDate] = useState("")
   const [isLoading, setIsLoading] = useState(false)
-  const [blockers, setBlockers] = useState<SeparationBlockers | null>(null)
-  const [isFetchingCounts, setIsFetchingCounts] = useState(false)
-  const [leaveTypeOptions, setLeaveTypeOptions] = useState<LeaveTypeOption[]>([])
   const [selectedLeaveTypeId, setSelectedLeaveTypeId] = useState("")
-  const [isLoadingLeaveTypes, setIsLoadingLeaveTypes] = useState(false)
+  const [localBlockersOverride, setLocalBlockersOverride] = useState<SeparationBlockers | null>(null)
   const router = useRouter()
 
   useEffect(() => {
@@ -94,50 +107,22 @@ export function ChangeStatusContent({ employee, onSuccess, onCancel }: ChangeSta
     setSuspensionEndDate("")
     setSeparationDate("")
     setSelectedLeaveTypeId("")
+    setLocalBlockersOverride(null)
   }, [employee.id, employee.employment_status])
 
-  useEffect(() => {
-    if (employee.id) {
-      const fetchCounts = async () => {
-        setIsFetchingCounts(true)
-        try {
-          const response = await fetch(`/api/v1/hr/employees/${employee.id}/status`, { method: "GET" })
-          if (!response.ok) throw new Error("Failed to load offboarding blockers")
-          const result = await response.json()
-          setBlockers(result.blockers || null)
-        } catch (error) {
-          console.error("Error fetching offboarding counts:", error)
-        } finally {
-          setIsFetchingCounts(false)
-        }
-      }
-      fetchCounts()
-    }
-  }, [employee.id])
+  const { data: queryBlockers, isFetching: isFetchingCounts } = useQuery({
+    queryKey: QUERY_KEYS.hrEmployeeStatusBlockers(employee.id),
+    queryFn: () => fetchEmployeeStatusBlockers(employee.id),
+    enabled: Boolean(employee.id),
+  })
 
-  useEffect(() => {
-    const fetchLeaveTypes = async () => {
-      if (status !== "on_leave") return
-      setIsLoadingLeaveTypes(true)
-      try {
-        const supabase = createClient()
-        const { data, error } = await supabase
-          .from("leave_types")
-          .select("id, name")
-          .eq("is_active", true)
-          .order("name")
-        if (error) throw error
-        setLeaveTypeOptions((data || []) as LeaveTypeOption[])
-      } catch (error) {
-        console.error("Error fetching leave types:", error)
-        toast.error("Failed to load leave options")
-      } finally {
-        setIsLoadingLeaveTypes(false)
-      }
-    }
+  const blockers = localBlockersOverride ?? queryBlockers ?? null
 
-    fetchLeaveTypes()
-  }, [status])
+  const { data: leaveTypeOptions = [], isFetching: isLoadingLeaveTypes } = useQuery({
+    queryKey: QUERY_KEYS.hrLeaveTypesActive(),
+    queryFn: fetchActiveLeaveTypes,
+    enabled: status === "on_leave",
+  })
 
   const handleSubmit = async () => {
     if (status === "suspended" && !reasonCode) {
@@ -194,7 +179,7 @@ export function ChangeStatusContent({ employee, onSuccess, onCancel }: ChangeSta
       if (!response.ok) {
         const error = await response.json()
         if (response.status === 409 && error?.blockers) {
-          setBlockers(error.blockers)
+          setLocalBlockersOverride(error.blockers)
         }
         throw new Error(error.error || "Failed to update status")
       }

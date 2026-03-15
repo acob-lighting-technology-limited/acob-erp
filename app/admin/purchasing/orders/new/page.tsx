@@ -1,7 +1,9 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { useQuery } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
 import { createClient } from "@/lib/supabase/client"
 import { PageHeader, PageWrapper } from "@/components/layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -35,11 +37,23 @@ interface POItem {
   amount: number
 }
 
+interface NewPOFormData {
+  suppliers: Supplier[]
+  products: Product[]
+}
+
+async function fetchNewPOFormData(): Promise<NewPOFormData> {
+  const supabase = createClient()
+  const [{ data: sups }, { data: prods }] = await Promise.all([
+    supabase.from("suppliers").select("id, name, code").eq("is_active", true).order("name"),
+    supabase.from("products").select("id, name, sku, unit_cost").eq("status", "active").order("name"),
+  ])
+  return { suppliers: sups || [], products: prods || [] }
+}
+
 export default function NewPurchaseOrderPage() {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
-  const [suppliers, setSuppliers] = useState<Supplier[]>([])
-  const [products, setProducts] = useState<Product[]>([])
   const [formData, setFormData] = useState({
     supplier_id: "",
     order_date: new Date().toISOString().split("T")[0],
@@ -51,21 +65,13 @@ export default function NewPurchaseOrderPage() {
     { id: crypto.randomUUID(), product_id: "", product_name: "", quantity: 1, unit_price: 0, amount: 0 },
   ])
 
-  useEffect(() => {
-    fetchData()
-  }, [])
+  const { data: formOptions } = useQuery({
+    queryKey: QUERY_KEYS.adminNewPurchaseOrderForm(),
+    queryFn: fetchNewPOFormData,
+  })
 
-  async function fetchData() {
-    const supabase = createClient()
-    const { data: sups } = await supabase.from("suppliers").select("id, name, code").eq("is_active", true).order("name")
-    const { data: prods } = await supabase
-      .from("products")
-      .select("id, name, sku, unit_cost")
-      .eq("status", "active")
-      .order("name")
-    setSuppliers(sups || [])
-    setProducts(prods || [])
-  }
+  const suppliers = formOptions?.suppliers ?? []
+  const products = formOptions?.products ?? []
 
   function addItem() {
     setItems([

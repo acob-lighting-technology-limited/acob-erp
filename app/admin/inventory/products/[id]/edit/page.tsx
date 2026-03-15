@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
+import { useQuery } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
 import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -12,18 +14,56 @@ import { Save } from "lucide-react"
 import { toast } from "sonner"
 import { PageHeader } from "@/components/layout/page-header"
 import { FormFieldGroup } from "@/components/ui/patterns"
+import { PageLoader } from "@/components/ui/query-states"
 
 interface Category {
   id: string
   name: string
 }
 
+interface ProductEditData {
+  product: {
+    sku: string
+    name: string
+    description: string
+    category_id: string
+    unit_cost: number
+    selling_price: number
+    quantity_on_hand: number
+    reorder_level: number
+    status: string
+  }
+  categories: Category[]
+}
+
+async function fetchProductEditData(id: string): Promise<ProductEditData> {
+  const supabase = createClient()
+  const [{ data: product, error: productError }, { data: cats }] = await Promise.all([
+    supabase.from("products").select("*").eq("id", id).single(),
+    supabase.from("product_categories").select("id, name").order("name"),
+  ])
+  if (productError) throw new Error(productError.message)
+  return {
+    product: {
+      sku: product.sku,
+      name: product.name,
+      description: product.description || "",
+      category_id: product.category_id || "",
+      unit_cost: product.unit_cost,
+      selling_price: product.selling_price,
+      quantity_on_hand: product.quantity_on_hand,
+      reorder_level: product.reorder_level,
+      status: product.status,
+    },
+    categories: cats || [],
+  }
+}
+
 export default function EditProductPage() {
   const params = useParams()
   const router = useRouter()
+  const id = params.id as string
   const [saving, setSaving] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [categories, setCategories] = useState<Category[]>([])
   const [formData, setFormData] = useState({
     sku: "",
     name: "",
@@ -36,39 +76,16 @@ export default function EditProductPage() {
     status: "active",
   })
 
+  const { data: editData, isLoading } = useQuery({
+    queryKey: QUERY_KEYS.adminProductEditForm(id),
+    queryFn: () => fetchProductEditData(id),
+  })
+
   useEffect(() => {
-    fetchData()
-  }, [params.id])
+    if (editData) setFormData(editData.product)
+  }, [editData])
 
-  async function fetchData() {
-    try {
-      const supabase = createClient()
-      const [{ data: product }, { data: cats }] = await Promise.all([
-        supabase.from("products").select("*").eq("id", params.id).single(),
-        supabase.from("product_categories").select("id, name").order("name"),
-      ])
-
-      if (product) {
-        setFormData({
-          sku: product.sku,
-          name: product.name,
-          description: product.description || "",
-          category_id: product.category_id || "",
-          unit_cost: product.unit_cost,
-          selling_price: product.selling_price,
-          quantity_on_hand: product.quantity_on_hand,
-          reorder_level: product.reorder_level,
-          status: product.status,
-        })
-      }
-      setCategories(cats || [])
-    } catch (error) {
-      toast.error("Failed to load product")
-      router.push("/admin/inventory/products")
-    } finally {
-      setLoading(false)
-    }
-  }
+  const categories = editData?.categories ?? []
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -88,11 +105,11 @@ export default function EditProductPage() {
           reorder_level: formData.reorder_level,
           status: formData.status,
         })
-        .eq("id", params.id)
+        .eq("id", id)
 
       if (error) throw error
       toast.success("Product updated")
-      router.push(`/admin/inventory/products/${params.id}`)
+      router.push(`/admin/inventory/products/${id}`)
     } catch (error: any) {
       toast.error(error.message || "Failed to update")
     } finally {
@@ -100,19 +117,13 @@ export default function EditProductPage() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="container mx-auto flex min-h-[400px] items-center justify-center p-6">
-        <div className="border-primary h-8 w-8 animate-spin rounded-full border-4 border-t-transparent"></div>
-      </div>
-    )
-  }
+  if (isLoading) return <PageLoader />
 
   return (
     <div className="container mx-auto space-y-6 p-6">
       <PageHeader
         title="Edit Product"
-        backLink={{ href: `/admin/inventory/products/${params.id}`, label: "Back to Product" }}
+        backLink={{ href: `/admin/inventory/products/${id}`, label: "Back to Product" }}
         actions={
           <Button onClick={handleSubmit} disabled={saving}>
             <Save className="mr-2 h-4 w-4" />

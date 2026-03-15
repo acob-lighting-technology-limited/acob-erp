@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
 import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -69,7 +71,6 @@ import { logger } from "@/lib/logger"
 
 const log = logger("employees-admin-employee-content")
 
-
 export interface Employee {
   id: string
   first_name: string
@@ -107,11 +108,17 @@ interface AdminEmployeeContentProps {
   userProfile: UserProfile
 }
 
+async function fetchAllEmployees(): Promise<Employee[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase.from("profiles").select("*").order("last_name", { ascending: true })
+  if (error) throw new Error(error.message)
+  return data || []
+}
+
 export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmployeeContentProps) {
   const { departments: DEPARTMENTS } = useDepartments()
   const searchParams = useSearchParams()
-  const [employee, setEmployees] = useState<Employee[]>(initialEmployees)
-  const [isLoading, setIsLoading] = useState(false)
+  const queryClient = useQueryClient()
   const [searchQuery, setSearchQuery] = useState("")
   const [departmentFilter, setDepartmentFilter] = useState<string[]>([])
   const [employeeFilter, setEmployeeFilter] = useState<string[]>([])
@@ -220,6 +227,12 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
   const supabase = createClient()
   const canManageUsers = ["developer", "super_admin", "admin"].includes(userProfile?.role || "")
 
+  const { data: employee = initialEmployees } = useQuery({
+    queryKey: QUERY_KEYS.adminEmployees(),
+    queryFn: fetchAllEmployees,
+    initialData: initialEmployees.length > 0 ? initialEmployees : undefined,
+  })
+
   // Handle userId from search params (for edit dialog)
   useEffect(() => {
     const userId = searchParams?.get("userId")
@@ -230,25 +243,6 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
       }
     }
   }, [searchParams, employee, isEditDialogOpen])
-
-  const loadData = async () => {
-    setIsLoading(true)
-    try {
-      // Fetch employees - all leads can view users; mutation is restricted to HR lead/admin/super admin.
-      const query = supabase.from("profiles").select("*").order("last_name", { ascending: true })
-
-      const { data, error } = await query
-
-      if (error) throw error
-
-      setEmployees(data || [])
-    } catch (error: any) {
-      log.error("Error loading employee:", error)
-      toast.error("Failed to load employee")
-    } finally {
-      setIsLoading(false)
-    }
-  }
 
   const handleEditEmployee = async (employee: Employee) => {
     if (!canManageUsers) {
@@ -657,7 +651,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
 
       toast.success("Employee updated successfully")
       setIsEditDialogOpen(false)
-      loadData()
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminEmployees() })
     } catch (error: any) {
       log.error("Error updating employee:", error)
       toast.error("Failed to update employee")
@@ -728,7 +722,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         role: "employee",
         admin_domains: [],
       })
-      loadData()
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminEmployees() })
     } catch (error: any) {
       log.error("Error creating user:", error)
       toast.error(error.message || "Failed to create user")
@@ -1073,17 +1067,6 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
     }
 
     return []
-  }
-
-  if (isLoading) {
-    return (
-      <div className="from-background via-background to-muted/20 flex min-h-screen w-full items-center justify-center bg-gradient-to-br">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="text-primary h-8 w-8 animate-spin" />
-          <p className="text-muted-foreground text-sm">Loading employee...</p>
-        </div>
-      </div>
-    )
   }
 
   return (

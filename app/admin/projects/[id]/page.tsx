@@ -1,7 +1,9 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useParams, useRouter } from "next/navigation"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -34,11 +36,11 @@ import Link from "next/link"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { PageHeader } from "@/components/layout/page-header"
 import { EmptyState, FormFieldGroup } from "@/components/ui/patterns"
+import { PageLoader } from "@/components/ui/query-states"
 
 import { logger } from "@/lib/logger"
 
 const log = logger("projects")
-
 
 interface Project {
   id: string
@@ -85,16 +87,57 @@ interface ProjectItem {
   notes?: string
 }
 
+interface ProjectPageData {
+  project: Project
+  employees: employee[]
+  members: ProjectMember[]
+  items: ProjectItem[]
+}
+
+async function fetchAdminProjectDetail(projectId: string): Promise<ProjectPageData> {
+  const supabase = createClient()
+  const [
+    { data: projectData, error: projectError },
+    { data: employeesData, error: employeesError },
+    { data: membersData, error: membersError },
+    { data: itemsData, error: itemsError },
+  ] = await Promise.all([
+    supabase
+      .from("projects")
+      .select(`*, project_manager:profiles!projects_project_manager_id_fkey (id, first_name, last_name, company_email)`)
+      .eq("id", projectId)
+      .single(),
+    supabase
+      .from("profiles")
+      .select("id, first_name, last_name, company_email, department")
+      .order("last_name", { ascending: true }),
+    supabase
+      .from("project_members")
+      .select(
+        `id, user_id, role, assigned_at, user:profiles!project_members_user_id_fkey (id, first_name, last_name, company_email, department)`
+      )
+      .eq("project_id", projectId)
+      .eq("is_active", true)
+      .order("assigned_at", { ascending: false }),
+    supabase.from("project_items").select("*").eq("project_id", projectId).order("created_at", { ascending: false }),
+  ])
+  if (projectError) throw new Error(projectError.message)
+  if (employeesError) throw new Error(employeesError.message)
+  if (membersError) throw new Error(membersError.message)
+  if (itemsError) throw new Error(itemsError.message)
+  return {
+    project: projectData,
+    employees: employeesData || [],
+    members: (membersData as any) || [],
+    items: itemsData || [],
+  }
+}
+
 export default function AdminProjectDetailPage() {
   const params = useParams()
   const router = useRouter()
   const projectId = params.id as string
-
-  const [project, setProject] = useState<Project | null>(null)
-  const [employee, setemployee] = useState<employee[]>([])
-  const [members, setMembers] = useState<ProjectMember[]>([])
-  const [items, setItems] = useState<ProjectItem[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const queryClient = useQueryClient()
 
   // Member dialog states
   const [isMemberDialogOpen, setIsMemberDialogOpen] = useState(false)
@@ -127,116 +170,16 @@ export default function AdminProjectDetailPage() {
 
   const supabase = createClient()
 
-  useEffect(() => {
-    if (projectId) {
-      log.debug("📂 Loading project detail page for ID:", projectId)
-      loadProjectData()
-    }
-  }, [projectId])
+  const { data: pageData, isLoading } = useQuery({
+    queryKey: QUERY_KEYS.adminProjectDetail(projectId),
+    queryFn: () => fetchAdminProjectDetail(projectId),
+    enabled: Boolean(projectId),
+  })
 
-  const loadProjectData = async () => {
-    try {
-      log.debug("🔄 Starting to load project data...")
-
-      // Check auth first
-      const {
-        data: { user },
-        error: authError,
-      } = await supabase.auth.getUser()
-      log.debug({ userId: user?.id, authErr: authError?.message ?? null }, "👤 Current user")
-
-      if (authError || !user) {
-        log.error("❌ Auth error, redirecting...", authError)
-        router.push("/auth/login")
-        return
-      }
-
-      await Promise.all([loadProject(), loademployee(), loadMembers(), loadItems()])
-      log.debug("✅ All project data loaded successfully")
-    } catch (error) {
-      log.error("❌ Error loading project data:", error)
-      log.error("Error details:", JSON.stringify(error, null, 2))
-      toast.error("Failed to load project data")
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const loadProject = async () => {
-    log.debug("📋 Loading project details...")
-    const { data, error } = await supabase
-      .from("projects")
-      .select(
-        `
-        *,
-        project_manager:profiles!projects_project_manager_id_fkey (
-          id,
-          first_name,
-          last_name,
-          company_email
-        )
-      `
-      )
-      .eq("id", projectId)
-      .single()
-
-    log.debug("Project result:", { data, error })
-    if (error) throw error
-    setProject(data)
-  }
-
-  const loademployee = async () => {
-    log.debug("👥 Loading employee...")
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("id, first_name, last_name, company_email, department")
-      .order("last_name", { ascending: true })
-
-    log.debug("employee result:", { count: data?.length, error })
-    if (error) throw error
-    setemployee(data || [])
-  }
-
-  const loadMembers = async () => {
-    log.debug("👨‍👩‍👧‍👦 Loading project members...")
-    const { data, error } = await supabase
-      .from("project_members")
-      .select(
-        `
-        id,
-        user_id,
-        role,
-        assigned_at,
-        user:profiles!project_members_user_id_fkey (
-          id,
-          first_name,
-          last_name,
-          company_email,
-          department
-        )
-      `
-      )
-      .eq("project_id", projectId)
-      .eq("is_active", true)
-      .order("assigned_at", { ascending: false })
-
-    log.debug("Members result:", { count: data?.length, error })
-    if (error) throw error
-    setMembers((data as any) || [])
-  }
-
-  const loadItems = async () => {
-    log.debug("📦 Loading project items...")
-    const { data, error } = await supabase
-      .from("project_items")
-      .select("*")
-      .eq("project_id", projectId)
-      .order("created_at", { ascending: false })
-
-    log.debug("Items result:", { count: data?.length, error })
-    if (error) throw error
-    setItems(data || [])
-  }
+  const project = pageData?.project ?? null
+  const employee = pageData?.employees ?? []
+  const members = pageData?.members ?? []
+  const items = pageData?.items ?? []
 
   const handleAddMember = async () => {
     if (isAddingMember) return // Prevent duplicate submissions
@@ -278,7 +221,7 @@ export default function AdminProjectDetailPage() {
       toast.success("Member added successfully")
       setIsMemberDialogOpen(false)
       setMemberForm({ user_id: "", role: "member" })
-      loadMembers()
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminProjectDetail(projectId) })
     } catch (error) {
       log.error("Error adding member:", error)
       toast.error("Failed to add member")
@@ -313,7 +256,7 @@ export default function AdminProjectDetailPage() {
 
       toast.success("Member removed successfully")
       setMemberToDelete(null)
-      loadMembers()
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminProjectDetail(projectId) })
     } catch (error) {
       log.error("Error removing member:", error)
       toast.error("Failed to remove member")
@@ -387,7 +330,7 @@ export default function AdminProjectDetailPage() {
       }
 
       setIsItemDialogOpen(false)
-      loadItems()
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminProjectDetail(projectId) })
     } catch (error) {
       log.error("Error saving item:", error)
       toast.error("Failed to save item")
@@ -407,7 +350,7 @@ export default function AdminProjectDetailPage() {
 
       toast.success("Item deleted successfully")
       setItemToDelete(null)
-      loadItems()
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminProjectDetail(projectId) })
     } catch (error) {
       log.error("Error deleting item:", error)
       toast.error("Failed to delete item")
@@ -433,9 +376,7 @@ export default function AdminProjectDetailPage() {
 
   const availableemployee = employee.filter((s) => !members.some((m) => m.user_id === s.id))
 
-  if (isLoading) {
-    return null // loading.tsx will handle the loading state
-  }
+  if (isLoading) return <PageLoader />
 
   if (!project) {
     return (

@@ -1,20 +1,21 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { useParams, useRouter } from "next/navigation"
+import { useParams } from "next/navigation"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
 import { createClient } from "@/lib/supabase/client"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Printer, FileText, CheckCircle } from "lucide-react"
+import { Printer, CheckCircle } from "lucide-react"
 import { toast } from "sonner"
 import { PageHeader } from "@/components/layout/page-header"
+import { PageLoader } from "@/components/ui/query-states"
 
 import { logger } from "@/lib/logger"
 
 const log = logger("finance-bills")
-
 
 interface Bill {
   id: string
@@ -39,38 +40,29 @@ interface BillItem {
   amount: number
 }
 
+async function fetchBill(id: string): Promise<Bill> {
+  const supabase = createClient()
+  const { data, error } = await supabase.from("bills").select("*, items:bill_items(*)").eq("id", id).single()
+  if (error) throw new Error(error.message)
+  return data
+}
+
 export default function BillDetailPage() {
   const params = useParams()
-  const router = useRouter()
-  const [bill, setBill] = useState<Bill | null>(null)
-  const [loading, setLoading] = useState(true)
+  const id = params.id as string
+  const queryClient = useQueryClient()
 
-  useEffect(() => {
-    fetchBill()
-  }, [params.id])
-
-  async function fetchBill() {
-    try {
-      const supabase = createClient()
-      const { data, error } = await supabase.from("bills").select("*, items:bill_items(*)").eq("id", params.id).single()
-
-      if (error) throw error
-      setBill(data)
-    } catch (error) {
-      log.error("Error:", error)
-      toast.error("Bill not found")
-      router.push("/admin/finance/bills")
-    } finally {
-      setLoading(false)
-    }
-  }
+  const { data: bill, isLoading } = useQuery({
+    queryKey: QUERY_KEYS.adminBillDetail(id),
+    queryFn: () => fetchBill(id),
+  })
 
   async function markAsPaid() {
     try {
       const supabase = createClient()
-      await supabase.from("bills").update({ status: "paid" }).eq("id", params.id)
+      await supabase.from("bills").update({ status: "paid" }).eq("id", id)
       toast.success("Marked as paid")
-      fetchBill()
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminBillDetail(id) })
     } catch (error) {
       toast.error("Failed to update")
     }
@@ -84,14 +76,7 @@ export default function BillDetailPage() {
     return new Date(date).toLocaleDateString("en-NG", { year: "numeric", month: "long", day: "numeric" })
   }
 
-  if (loading) {
-    return (
-      <div className="container mx-auto flex min-h-[400px] items-center justify-center p-6">
-        <div className="border-primary h-8 w-8 animate-spin rounded-full border-4 border-t-transparent"></div>
-      </div>
-    )
-  }
-
+  if (isLoading) return <PageLoader />
   if (!bill) return null
 
   const statusColors: Record<string, string> = {

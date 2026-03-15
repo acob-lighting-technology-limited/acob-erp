@@ -1,7 +1,8 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
 import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -10,11 +11,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Printer, CheckCircle, Package } from "lucide-react"
 import { toast } from "sonner"
 import { PageHeader } from "@/components/layout/page-header"
+import { PageLoader } from "@/components/ui/query-states"
 
 import { logger } from "@/lib/logger"
 
 const log = logger("purchasing-orders")
-
 
 interface PurchaseOrder {
   id: string
@@ -39,68 +40,54 @@ interface POItem {
   amount: number
 }
 
+async function fetchPurchaseOrderDetail(id: string): Promise<PurchaseOrder> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from("purchase_orders")
+    .select("*, supplier:suppliers(name), items:purchase_order_items(*, product:products(name))")
+    .eq("id", id)
+    .single()
+
+  if (error) throw new Error(error.message)
+
+  return {
+    ...data,
+    supplier_name: data.supplier?.name,
+    items: data.items?.map((i: any) => ({ ...i, product_name: i.product?.name })) || [],
+  }
+}
+
+function formatCurrency(amount: number, currency: string = "NGN") {
+  return new Intl.NumberFormat("en-NG", { style: "currency", currency }).format(amount)
+}
+
+function formatDate(date: string) {
+  return new Date(date).toLocaleDateString("en-NG", { year: "numeric", month: "long", day: "numeric" })
+}
+
 export default function PurchaseOrderDetailPage() {
   const params = useParams()
   const router = useRouter()
-  const [order, setOrder] = useState<PurchaseOrder | null>(null)
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
+  const id = params.id as string
 
-  useEffect(() => {
-    fetchOrder()
-  }, [params.id])
-
-  async function fetchOrder() {
-    try {
-      const supabase = createClient()
-      const { data, error } = await supabase
-        .from("purchase_orders")
-        .select("*, supplier:suppliers(name), items:purchase_order_items(*, product:products(name))")
-        .eq("id", params.id)
-        .single()
-
-      if (error) throw error
-      const orderWithNames = {
-        ...data,
-        supplier_name: data.supplier?.name,
-        items: data.items?.map((i: any) => ({ ...i, product_name: i.product?.name })) || [],
-      }
-      setOrder(orderWithNames)
-    } catch (error) {
-      log.error("Error:", error)
-      toast.error("Order not found")
-      router.push("/admin/purchasing/orders")
-    } finally {
-      setLoading(false)
-    }
-  }
+  const { data: order, isLoading } = useQuery({
+    queryKey: QUERY_KEYS.adminPurchaseOrderDetail(id),
+    queryFn: () => fetchPurchaseOrderDetail(id),
+  })
 
   async function updateStatus(status: string) {
     try {
       const supabase = createClient()
-      await supabase.from("purchase_orders").update({ status }).eq("id", params.id)
+      await supabase.from("purchase_orders").update({ status }).eq("id", id)
       toast.success(`Status updated to ${status}`)
-      fetchOrder()
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminPurchaseOrderDetail(id) })
     } catch (error) {
       toast.error("Failed to update")
     }
   }
 
-  function formatCurrency(amount: number, currency: string = "NGN") {
-    return new Intl.NumberFormat("en-NG", { style: "currency", currency }).format(amount)
-  }
-
-  function formatDate(date: string) {
-    return new Date(date).toLocaleDateString("en-NG", { year: "numeric", month: "long", day: "numeric" })
-  }
-
-  if (loading) {
-    return (
-      <div className="container mx-auto flex min-h-[400px] items-center justify-center p-6">
-        <div className="border-primary h-8 w-8 animate-spin rounded-full border-4 border-t-transparent"></div>
-      </div>
-    )
-  }
-
+  if (isLoading) return <PageLoader />
   if (!order) return null
 
   const statusColors: Record<string, string> = {

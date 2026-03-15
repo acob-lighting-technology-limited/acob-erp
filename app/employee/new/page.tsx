@@ -1,9 +1,11 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
+import { useQuery } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
 import { createClient } from "@/lib/supabase/client"
 import { Loader2, CheckCircle2, User, Building2, MapPin, Mail, Phone, Briefcase } from "lucide-react"
 
@@ -18,7 +20,6 @@ import { PageHeader } from "@/components/layout/page-header"
 import { logger } from "@/lib/logger"
 
 const log = logger("employee-new")
-
 
 // Validation Schema
 const formSchema = z.object({
@@ -38,26 +39,22 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>
 
+async function fetchDepartmentNames(): Promise<string[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase.from("departments").select("name").order("name")
+  if (error) throw new Error(error.message)
+  return (data || []).map((d) => d.name)
+}
+
 export default function EmployeeOnboardingForm() {
-  const [departments, setDepartments] = useState<string[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSuccess, setIsSuccess] = useState(false)
   const supabase = createClient()
 
-  useEffect(() => {
-    async function fetchDepartments() {
-      const { data, error } = await supabase.from("departments").select("name").order("name")
-      if (error) {
-        log.error("Failed to load departments:", error)
-        toast.error("Could not load departments. Please refresh the page.")
-        return
-      }
-      if (data) {
-        setDepartments(data.map((d) => d.name))
-      }
-    }
-    fetchDepartments()
-  }, [])
+  const { data: departments = [] } = useQuery({
+    queryKey: QUERY_KEYS.employeeOnboardingDepartments(),
+    queryFn: fetchDepartmentNames,
+  })
 
   const {
     register,

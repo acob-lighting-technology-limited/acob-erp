@@ -1,6 +1,8 @@
 "use client"
 
 import { useState, useMemo, useCallback, useEffect, useRef } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
 import DOMPurify from "dompurify"
 import { PromptDialog } from "@/components/ui/prompt-dialog"
 import { toast } from "sonner"
@@ -156,6 +158,7 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
   const [linkDialogOpen, setLinkDialogOpen] = useState(false)
 
   const supabase = createClient()
+  const queryClient = useQueryClient()
   const currentUserDept = (currentUser?.department || "").trim()
   const currentUserName = (currentUser?.full_name || "").trim()
   const isCurrentUserAdminHr =
@@ -309,26 +312,25 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
     [currentUser?.id, supabase]
   )
 
-  const fetchSchedules = useCallback(async () => {
-    try {
+  const { data: schedulesData } = useQuery({
+    queryKey: QUERY_KEYS.adminReminderSchedules(mode),
+    queryFn: async () => {
       const allowedTypes =
         mode === "communications" ? (["admin_broadcast"] as const) : (["meeting", "knowledge_sharing"] as const)
-
       const { data, error } = await supabase
         .from("reminder_schedules")
         .select("*")
         .eq("is_active", true)
         .in("reminder_type", [...allowedTypes])
         .order("created_at", { ascending: false })
-      if (!error && data) setActiveSchedules(data)
-    } catch {
-      // ignore
-    }
-  }, [supabase, mode])
+      if (error) throw new Error(error.message)
+      return data || []
+    },
+  })
 
   useEffect(() => {
-    fetchSchedules()
-  }, [fetchSchedules])
+    if (schedulesData) setActiveSchedules(schedulesData)
+  }, [schedulesData])
 
   // ── Computed ────────────────────────────────────────────────────────────────
   const filteredEmployees = useMemo(() => {
@@ -509,7 +511,7 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
             : `✅ Recurring every ${capitalize(recurringDay)} at ${recurringTime}`,
           { id: toastId }
         )
-        fetchSchedules()
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminReminderSchedules(mode) })
       } catch (err: any) {
         console.error("[Schedule Error]", err)
         toast.error(err.message || "Failed to save schedule", { id: toastId })
@@ -626,7 +628,7 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
       return
     }
     toast.success("Schedule deactivated")
-    fetchSchedules()
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminReminderSchedules(mode) })
   }
 
   // ── Render ──────────────────────────────────────────────────────────────────

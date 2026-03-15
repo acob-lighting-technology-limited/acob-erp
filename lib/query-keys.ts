@@ -123,6 +123,38 @@ export const QUERY_KEYS = {
   appJobDescription: () => ["app-job-description"],
   appNotifications: () => ["app-notifications"],
 
+  // Admin purchasing detail pages
+  adminSupplierDetail: (id: string) => ["admin-supplier-detail", id],
+  adminPurchaseOrderDetail: (id: string) => ["admin-purchase-order-detail", id],
+  adminReceiptsList: () => ["admin-receipts-list"],
+  adminNewPurchaseOrderForm: () => ["admin-new-purchase-order-form"],
+
+  // Admin inventory detail pages
+  adminProductDetail: (id: string) => ["admin-product-detail", id],
+  adminProductEditForm: (id: string) => ["admin-product-edit-form", id],
+  adminProductCategories: () => ["admin-product-categories"],
+
+  // Admin finance detail pages
+  adminBillDetail: (id: string) => ["admin-bill-detail", id],
+  adminInvoiceDetail: (id: string) => ["admin-invoice-detail", id],
+  adminPaymentDetail: (id: string) => ["admin-payment-detail", id],
+
+  // Admin assets pages
+  adminAssetIssues: () => ["admin-asset-issues"],
+
+  // Admin projects
+  adminProjectDetail: (id: string) => ["admin-project-detail", id],
+
+  // Settings
+  adminCurrentUserRole: () => ["admin-current-user-role"],
+
+  // Employee onboarding form
+  employeeOnboardingDepartments: () => ["employee-onboarding-departments"],
+
+  // HR change-status dialog
+  hrEmployeeStatusBlockers: (employeeId: string) => ["hr-employee-status-blockers", employeeId],
+  hrLeaveTypesActive: () => ["hr-leave-types-active"],
+
   // Components
   feedbackViewer: () => ["feedback-viewer-filter"],
   paymentsTable: (filters?: Record<string, unknown>) => (filters ? ["payments-table", filters] : ["payments-table"]),
@@ -130,4 +162,7 @@ export const QUERY_KEYS = {
   weeklyReportDialog: (week: number, year: number) => ["weekly-report-dialog", week, year],
   adminWeeklySummaryMail: (filters?: Record<string, unknown>) =>
     filters ? ["admin-weekly-summary-mail", filters] : ["admin-weekly-summary-mail"],
+
+  // Communications
+  adminReminderSchedules: (mode: string) => ["admin-reminder-schedules", mode],
 } as const
