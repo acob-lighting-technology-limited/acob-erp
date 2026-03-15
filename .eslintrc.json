@@ -7,11 +7,14 @@
 
     // Unused vars should be fixed; keeping as warn to avoid blocking builds
     // during the cleanup period.
-    "@typescript-eslint/no-unused-vars": ["warn", {
-      "argsIgnorePattern": "^_",
-      "varsIgnorePattern": "^_",
-      "caughtErrorsIgnorePattern": "^_"
-    }],
+    "@typescript-eslint/no-unused-vars": [
+      "warn",
+      {
+        "argsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_",
+        "caughtErrorsIgnorePattern": "^_"
+      }
+    ],
 
     // Stale closures in hooks are a real bug class — must be visible.
     // Keeping as "warn" rather than "error" to avoid false positives on
@@ -25,6 +28,15 @@
     "@next/next/no-img-element": "warn",
 
     // prefer-const is safe to enforce strictly.
-    "prefer-const": "error"
+    "prefer-const": "error",
+
+    // Prevent fetch() inside useEffect — use useQuery from @tanstack/react-query instead.
+    "no-restricted-syntax": [
+      "warn",
+      {
+        "selector": "CallExpression[callee.name='useEffect'] > ArrowFunctionExpression > BlockStatement > ExpressionStatement > CallExpression[callee.object.name='fetch']",
+        "message": "Do not fetch data inside useEffect. Use useQuery from @tanstack/react-query instead."
+      }
+    ]
   }
 }
