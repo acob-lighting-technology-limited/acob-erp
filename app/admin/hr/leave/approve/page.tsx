@@ -119,7 +119,7 @@ export default function LeaveApprovePage() {
     }
 
     // Open the appropriate dialog
-    overrideEvidenceRef.current = needsOverride
+    overrideEvidenceRef.current = needsOverride ?? false
     setActionDialog({
       open: true,
       id,
