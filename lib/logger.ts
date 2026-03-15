@@ -5,11 +5,12 @@
  *
  * Usage:
  *   import { logger } from "@/lib/logger"
-
-const log = logger("lib-logger")
  *   const log = logger("approve-user")
- *   log.info({ userId }, "User approved")
- *   log.error({ err }, "Approval failed")
+ *
+ *   // All three call forms are accepted:
+ *   log.info("Simple message")
+ *   log.info({ userId }, "User approved")          // pino-style structured
+ *   log.error("Approval failed", err)              // legacy (msg, extra) style
  */
 
 type LogLevel = "debug" | "info" | "warn" | "error"
@@ -31,39 +32,52 @@ function write(level: LogLevel, ns: string, data: Record<string, unknown>, msg: 
     // Structured JSON — readable by Vercel log drains and external log aggregators
     const line = JSON.stringify(entry)
     if (level === "error") {
-      log.error(line)
+      console.error(line)
     } else if (level === "warn") {
-      log.warn(line)
+      console.warn(line)
     } else {
-      log.debug(line)
+      console.log(line)
     }
   } else {
     // Human-readable in dev: [LEVEL] ns: msg {extra}
     const extras = Object.keys(data).length ? ` ${JSON.stringify(data)}` : ""
     const text = `[${level.toUpperCase()}] ${ns}: ${msg}${extras}`
-    if (level === "error") log.error(text)
-    else if (level === "warn") log.warn(text)
-    else log.debug(text)
+    if (level === "error") console.error(text)
+    else if (level === "warn") console.warn(text)
+    else console.log(text)
   }
 }
 
 export interface Logger {
+  /** Structured form: log.debug({ key: val }, "message") */
   debug(data: Record<string, unknown>, msg: string): void
+  /** Simple form: log.debug("message") */
   debug(msg: string): void
+  /** Legacy two-arg form: log.debug("message", extraData) */
+  debug(msg: string, extra: unknown): void
+
   info(data: Record<string, unknown>, msg: string): void
   info(msg: string): void
+  info(msg: string, extra: unknown): void
+
   warn(data: Record<string, unknown>, msg: string): void
   warn(msg: string): void
+  warn(msg: string, extra: unknown): void
+
   error(data: Record<string, unknown>, msg: string): void
   error(msg: string): void
+  error(msg: string, extra: unknown): void
 }
 
 function makeLevel(level: LogLevel, ns: string) {
-  return (dataOrMsg: Record<string, unknown> | string, msg?: string) => {
+  return (dataOrMsg: Record<string, unknown> | string, msgOrExtra?: string | unknown) => {
     if (typeof dataOrMsg === "string") {
-      write(level, ns, {}, dataOrMsg)
+      // log.x("msg") or log.x("msg", extra)
+      const extra = msgOrExtra !== undefined ? { extra: msgOrExtra } : {}
+      write(level, ns, extra as Record<string, unknown>, dataOrMsg)
     } else {
-      write(level, ns, dataOrMsg, msg ?? "")
+      // log.x({ data }, "msg")
+      write(level, ns, dataOrMsg, typeof msgOrExtra === "string" ? msgOrExtra : "")
     }
   }
 }

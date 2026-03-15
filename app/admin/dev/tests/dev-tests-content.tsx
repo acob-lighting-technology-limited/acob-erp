@@ -28,6 +28,9 @@ import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 import { PageHeader, PageWrapper } from "@/components/layout"
 import { applyAssignableStatusFilter } from "@/lib/workforce/assignment-policy"
+import { logger } from "@/lib/logger"
+
+const log = logger("dev-tests")
 
 // ── Shared Types ──────────────────────────────────────────────────────────────
 type StepResult = {

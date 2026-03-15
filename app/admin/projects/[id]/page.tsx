@@ -143,7 +143,7 @@ export default function AdminProjectDetailPage() {
         data: { user },
         error: authError,
       } = await supabase.auth.getUser()
-      log.debug("👤 Current user:", user?.id, authError ? `Error: ${authError.message}` : "✅")
+      log.debug({ userId: user?.id, authErr: authError?.message ?? null }, "👤 Current user")
 
       if (authError || !user) {
         log.error("❌ Auth error, redirecting...", authError)

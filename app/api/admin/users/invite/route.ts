@@ -206,7 +206,7 @@ export async function POST(request: Request) {
       action: existingUser ? "update" : "create",
       entityType: "profile",
       entityId: userId,
-      actorId: user.id,
+      context: { actorId: user.id, source: "api" as const },
       newValues: {
         company_email: emailNormalized,
         ...(roleToApply ? { role: roleToApply } : {}),

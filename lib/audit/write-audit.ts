@@ -43,8 +43,8 @@ export async function writeAuditLog(
       throw auditError
     }
 
-    const log = options?.logger || ((message: string, details?: unknown) => log.error(message, details))
-    log("audit write failed (fail-open)", {
+    const fallbackLog = options?.logger || ((message: string, details?: unknown) => log.error(message, details))
+    fallbackLog("audit write failed (fail-open)", {
       error,
       payload: {
         action: payload.action,

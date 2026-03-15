@@ -219,7 +219,7 @@ export async function POST(req: Request) {
       action: "create",
       entityType: "profile",
       entityId: authUserId!,
-      actorId: caller.id,
+      context: { actorId: caller.id, source: "api" as const },
       newValues: {
         employee_number: employeeId,
         company_email: pendingUser.company_email,

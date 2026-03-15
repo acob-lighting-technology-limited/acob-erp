@@ -167,7 +167,7 @@ export async function GET(request: NextRequest) {
 
       // Related assets — one extra batch query to resolve asset details from IDs
       if (profileAssetAssignments && profileAssetAssignments.length > 0) {
-        const assetIds = [...new Set(profileAssetAssignments.map((aa) => aa.asset_id))]
+        const assetIds = Array.from(new Set(profileAssetAssignments.map((aa) => aa.asset_id)))
         const assignedToMap = new Map(profileAssetAssignments.map((aa) => [aa.asset_id, aa.assigned_to]))
 
         const { data: relatedAssets } = await supabase

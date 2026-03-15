@@ -138,7 +138,7 @@ export function ActionTrackerContent({ initialDepartments, scopedDepartments = [
       if (error) throw error
       toast.success("Status updated")
     } catch (error) {
-      log.error(error)
+      log.error({ err: String(error) }, "error")
       setTasks(previousTasks)
       toast.error("Failed to update status")
     }

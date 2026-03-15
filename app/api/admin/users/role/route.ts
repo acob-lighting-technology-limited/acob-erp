@@ -153,7 +153,7 @@ export async function POST(request: Request) {
       action: "update",
       entityType: "profile",
       entityId: targetUserId,
-      actorId: user.id,
+      context: { actorId: user.id, source: "api" as const },
       newValues: { role: targetRole, admin_domains: targetRole === "admin" ? adminDomains : null, ...(employmentStatus ? { employment_status: employmentStatus } : {}) },
       oldValues: { role: targetProfile.role },
       metadata: { source: "admin-users-role" },

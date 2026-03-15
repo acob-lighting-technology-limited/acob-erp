@@ -29,7 +29,7 @@ declare global {
 // Load pptxgenjs via a script tag (the correct browser usage pattern).
 // The UMD bundle sets window.PptxGenJS as a side effect, bypassing all webpack issues.
 // This avoids the "JSZip is not defined" error that occurs when webpack processes the UMD bundle.
-const loadPptxGenJS = (): Promise<typeof window.PptxGenJS> => {
+const loadPptxGenJS = (): Promise<NonNullable<typeof window.PptxGenJS>> => {
   return new Promise((resolve, reject) => {
     // Already loaded
     if (typeof window.PptxGenJS === "function") {
