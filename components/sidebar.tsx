@@ -24,6 +24,7 @@ import {
   CreditCard,
   Calendar,
   Clock,
+  Car,
   Target,
   Wrench,
   FileBarChart,
@@ -75,6 +76,7 @@ const navigation = [
 const hrNavigation = [
   { name: "Leave", href: "/dashboard/leave", icon: Calendar },
   { name: "Attendance", href: "/dashboard/attendance", icon: Clock },
+  { name: "Fleet", href: "/dashboard/fleet", icon: Car },
   { name: "Goals", href: "/dashboard/goals", icon: Target },
 ]
 
@@ -132,6 +134,29 @@ export function Sidebar({ user, profile, canAccessAdmin }: SidebarProps) {
     router.push("/auth/login")
   }
 
+  const routeAliases: Record<string, string[]> = {
+    "/dashboard/payments": ["/payments", "/dashboard/payments"],
+    "/dashboard/projects": ["/projects", "/dashboard/projects"],
+    "/notification": ["/notification", "/dashboard/notifications"],
+  }
+
+  const isNavItemActive = (href: string): boolean => {
+    if (!pathname) return false
+
+    const aliases = routeAliases[href]
+    if (aliases && aliases.some((alias) => pathname === alias || pathname.startsWith(`${alias}/`))) {
+      return true
+    }
+
+    if (href === "/profile") {
+      return pathname === "/profile" || pathname === "/dashboard/profile" || pathname.startsWith("/dashboard/profile/")
+    }
+
+    return pathname === href || pathname.startsWith(`${href}/`)
+  }
+
+  const isLead = Boolean(profile?.lead_departments && profile.lead_departments.length > 0)
+
   const SidebarContent = () => (
     <>
       {/* Empty space for logo (moved to navbar) */}
@@ -173,7 +198,7 @@ export function Sidebar({ user, profile, canAccessAdmin }: SidebarProps) {
                     : user?.email?.split("@")[0]}
                 </p>
                 <p className="text-muted-foreground truncate text-xs whitespace-nowrap">
-                  {profile?.department || "employee Member"}
+                  {`${profile?.department || "employee Member"}${isLead ? " (Lead)" : ""}`}
                 </p>
                 {profile?.role && (
                   <Badge
@@ -187,40 +212,13 @@ export function Sidebar({ user, profile, canAccessAdmin }: SidebarProps) {
             )}
           </AnimatePresence>
         </div>
-
-        {/* Leading Departments */}
-        <AnimatePresence mode="wait">
-          {!isCollapsed && profile?.lead_departments && profile.lead_departments.length > 0 && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              className="shrink-0 overflow-hidden"
-            >
-              <div className="pt-2 text-xs">
-                <p className="text-muted-foreground mb-1">Leading:</p>
-                <div className="flex flex-wrap gap-1">
-                  {profile?.lead_departments?.map((dept) => (
-                    <Badge key={dept} variant="outline" className="text-xs">
-                      {dept}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
 
       {/* Navigation */}
       <nav className="scrollbar-custom flex-1 space-y-0.5 overflow-y-auto px-2.5 py-3">
         {/* Regular Navigation */}
         {navigation.map((item) => {
-          const isHomeItem = item.href === "/profile"
-          const isActive = isHomeItem
-            ? pathname === "/profile" || pathname === "/dashboard/profile"
-            : pathname === item.href
+          const isActive = isNavItemActive(item.href)
           return (
             <Link
               key={item.name}

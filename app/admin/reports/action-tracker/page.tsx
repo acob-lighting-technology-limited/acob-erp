@@ -31,7 +31,12 @@ export default async function ActionTrackerPage() {
 
   return (
     <Suspense fallback={<div className="flex justify-center py-20">Loading Tracker...</div>}>
-      <ActionTrackerContent initialDepartments={departments} scopedDepartments={scope.managedDepartments || []} />
+      <ActionTrackerContent
+        initialDepartments={departments}
+        scopedDepartments={[]}
+        editableDepartments={scope.isAdminLike ? [] : scope.managedDepartments || []}
+        canGlobalEdit={scope.isAdminLike}
+      />
     </Suspense>
   )
 }

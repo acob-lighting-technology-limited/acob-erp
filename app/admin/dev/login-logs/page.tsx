@@ -1,8 +1,11 @@
 import { PageHeader, PageWrapper } from "@/components/layout"
 import { ScrollText } from "lucide-react"
 import { DevLoginLogsContent } from "./dev-login-logs-content"
+import { requireAdminSectionAccess } from "@/lib/admin/rbac"
 
-export default function DevLoginLogsPage() {
+export default async function DevLoginLogsPage() {
+  await requireAdminSectionAccess("dev")
+
   return (
     <PageWrapper maxWidth="full" background="gradient">
       <PageHeader

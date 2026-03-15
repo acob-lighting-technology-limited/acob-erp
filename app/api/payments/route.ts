@@ -9,6 +9,14 @@ const log = logger("payments")
 
 export const dynamic = "force-dynamic"
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+const normalizeDepartmentId = (value: unknown): string | null => {
+  const raw = typeof value === "string" ? value.trim() : ""
+  if (!raw || !UUID_REGEX.test(raw)) return null
+  return raw
+}
+
 // Helper function to create Supabase client
 function createClient() {
   const cookieStore = cookies()
@@ -81,7 +89,7 @@ export async function GET(request: Request) {
         query = query.eq("department_id", departmentId)
       }
     } else {
-      const deptId = (profile as any)?.department_id || null
+      const deptId = normalizeDepartmentId((profile as any)?.department_id)
       if (deptId) {
         query = query.eq("department_id", deptId)
       } else {
@@ -202,7 +210,7 @@ export async function POST(request: Request) {
         }
       }
     } else {
-      let userDepartmentId = (profile as any)?.department_id || null
+      let userDepartmentId = normalizeDepartmentId((profile as any)?.department_id)
       if (!userDepartmentId) {
         const rawDept = String((profile as any)?.department || "").trim()
         const deptCandidates = rawDept.toLowerCase() === "finance" ? ["Accounts", rawDept] : [rawDept]

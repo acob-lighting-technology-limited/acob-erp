@@ -58,14 +58,22 @@ interface ActionTask {
   week_number: number
   year: number
   original_week?: number
+  work_item_number?: string
 }
 
 interface ActionTrackerContentProps {
   initialDepartments: string[]
   scopedDepartments?: string[]
+  editableDepartments?: string[]
+  canGlobalEdit?: boolean
 }
 
-export function ActionTrackerContent({ initialDepartments, scopedDepartments = [] }: ActionTrackerContentProps) {
+export function ActionTrackerContent({
+  initialDepartments,
+  scopedDepartments = [],
+  editableDepartments = [],
+  canGlobalEdit = false,
+}: ActionTrackerContentProps) {
   const currentOfficeWeek = getCurrentOfficeWeek()
   const [tasks, setTasks] = useState<ActionTask[]>([])
   const [loading, setLoading] = useState(true)
@@ -89,13 +97,15 @@ export function ActionTrackerContent({ initialDepartments, scopedDepartments = [
   const [searchQuery, setSearchQuery] = useState("")
 
   const supabase = createClient()
+  const canMutateTask = (task: ActionTask) => canGlobalEdit || editableDepartments.includes(task.department)
 
   const loadTasks = async () => {
     setLoading(true)
     try {
       let query = supabase
-        .from("action_items")
+        .from("tasks")
         .select("*")
+        .eq("category", "weekly_action")
         .eq("week_number", weekFilter)
         .eq("year", yearFilter)
         .order("department", { ascending: true })
@@ -125,13 +135,19 @@ export function ActionTrackerContent({ initialDepartments, scopedDepartments = [
   }, [weekFilter, yearFilter, deptFilter])
 
   const handleStatusChange = async (taskId: string, newStatus: string) => {
+    const targetTask = tasks.find((task) => task.id === taskId)
+    if (targetTask && !canMutateTask(targetTask)) {
+      toast.error("You can only edit actions in your departments")
+      return
+    }
+
     // Optimistic update
     const previousTasks = [...tasks]
     setTasks(tasks.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t)))
 
     try {
       const { error } = await supabase
-        .from("action_items")
+        .from("tasks")
         .update({ status: newStatus, updated_at: new Date().toISOString() })
         .eq("id", taskId)
 
@@ -145,9 +161,14 @@ export function ActionTrackerContent({ initialDepartments, scopedDepartments = [
   }
 
   const handleDelete = async (id: string) => {
+    const targetTask = tasks.find((task) => task.id === id)
+    if (targetTask && !canMutateTask(targetTask)) {
+      toast.error("You can only delete actions in your departments")
+      return
+    }
     if (!confirm("Are you sure you want to delete this action?")) return
     try {
-      const { error } = await supabase.from("action_items").delete().eq("id", id)
+      const { error } = await supabase.from("tasks").delete().eq("id", id)
       if (error) throw error
       toast.success("Action deleted")
       loadTasks()
@@ -157,6 +178,10 @@ export function ActionTrackerContent({ initialDepartments, scopedDepartments = [
   }
 
   const handleEdit = (task: ActionTask) => {
+    if (!canMutateTask(task)) {
+      toast.error("You can only edit actions in your departments")
+      return
+    }
     setEditingTask(task)
     setIsFormOpen(true)
   }
@@ -525,6 +550,7 @@ export function ActionTrackerContent({ initialDepartments, scopedDepartments = [
                                       <TableCell>
                                         <Select
                                           value={task.status}
+                                          disabled={!canMutateTask(task)}
                                           onValueChange={(val) => handleStatusChange(task.id, val)}
                                         >
                                           <SelectTrigger
@@ -559,10 +585,15 @@ export function ActionTrackerContent({ initialDepartments, scopedDepartments = [
                                             </Button>
                                           </DropdownMenuTrigger>
                                           <DropdownMenuContent align="end">
-                                            <DropdownMenuItem onClick={() => handleEdit(task)} className="gap-2">
+                                            <DropdownMenuItem
+                                              disabled={!canMutateTask(task)}
+                                              onClick={() => handleEdit(task)}
+                                              className="gap-2"
+                                            >
                                               <Edit2 className="h-4 w-4" /> Edit
                                             </DropdownMenuItem>
                                             <DropdownMenuItem
+                                              disabled={!canMutateTask(task)}
                                               onClick={() => handleDelete(task.id)}
                                               className="text-destructive gap-2"
                                             >
@@ -592,7 +623,7 @@ export function ActionTrackerContent({ initialDepartments, scopedDepartments = [
         isOpen={isFormOpen}
         onClose={() => setIsFormOpen(false)}
         onComplete={loadTasks}
-        departments={initialDepartments}
+        departments={canGlobalEdit ? initialDepartments : editableDepartments}
         editingAction={editingTask}
         defaultWeek={weekFilter}
         defaultYear={yearFilter}

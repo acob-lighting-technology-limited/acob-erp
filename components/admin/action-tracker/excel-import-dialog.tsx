@@ -17,8 +17,7 @@ import { toast } from "sonner"
 import { FileSpreadsheet, Loader2, Upload } from "lucide-react"
 import * as XLSX from "xlsx"
 import { createClient } from "@/lib/supabase/client"
-
-import { getCurrentISOWeek } from "@/lib/utils"
+import { getCurrentOfficeWeek } from "@/lib/meeting-week"
 
 interface ExcelImportDialogProps {
   isOpen: boolean
@@ -28,10 +27,11 @@ interface ExcelImportDialogProps {
 }
 
 export function ExcelImportDialog({ isOpen, onClose, onComplete, departments }: ExcelImportDialogProps) {
+  const currentOfficeWeek = getCurrentOfficeWeek()
   const [file, setFile] = useState<File | null>(null)
   const [isUploading, setIsUploading] = useState(false)
-  const [week, setWeek] = useState(getCurrentISOWeek()) // Approximate current week
-  const [year, setYear] = useState(new Date().getFullYear())
+  const [week, setWeek] = useState(currentOfficeWeek.week)
+  const [year, setYear] = useState(currentOfficeWeek.year)
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -104,10 +104,14 @@ export function ExcelImportDialog({ isOpen, onClose, onComplete, departments }: 
             year: year,
             assigned_by: user.id,
             status: "pending",
+            source_type: "action_item",
+            category: "weekly_action",
+            assignment_type: "department",
+            priority: priority,
           }
         })
 
-        const { error } = await supabase.from("action_items").insert(tasksToInsert)
+        const { error } = await supabase.from("tasks").insert(tasksToInsert)
 
         if (error) throw error
 

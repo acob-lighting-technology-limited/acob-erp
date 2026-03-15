@@ -35,6 +35,21 @@ function describeError(error: unknown): string {
   return "Unknown error"
 }
 
+function generateFallbackHelpDeskTicketNumber() {
+  const epochMillis = Date.now().toString()
+  const randomSuffix = Math.floor(Math.random() * 1000)
+    .toString()
+    .padStart(3, "0")
+  return `HD-${epochMillis}${randomSuffix}`
+}
+
+function isTicketNumberConflict(error: any) {
+  if (!error) return false
+  const code = String(error.code || "")
+  const text = `${String(error.message || "")} ${String(error.details || "")}`.toLowerCase()
+  return code === "23505" && text.includes("help_desk_tickets_ticket_number_key")
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { supabase, user, profile } = await getAuthContext()
@@ -105,8 +120,6 @@ export async function POST(request: NextRequest) {
     const description = String(body?.description || "").trim()
     const serviceDepartment = String(body?.service_department || "").trim()
     const requestType = body?.request_type === "procurement" ? "procurement" : "support"
-    const categoryId = body?.category_id ? String(body.category_id) : null
-    const category = body?.category ? String(body.category).trim() : null
     const priority = body?.priority ? String(body.priority).toLowerCase() : "medium"
 
     if (!title || !serviceDepartment) {
@@ -131,51 +144,12 @@ export async function POST(request: NextRequest) {
     const submittedAt = new Date()
     const slaTarget = getSlaTarget(priority as any, submittedAt)
     const approvalRequired = requestType === "procurement"
-    let supportMode: "open_queue" | "lead_review_required" | null = null
+    const supportMode: "open_queue" | "lead_review_required" | null = requestType === "support" ? "open_queue" : null
 
-    let selectedCategory: any = null
-    if (categoryId) {
-      const { data: categoryRow, error: categoryError } = await supabase
-        .from("help_desk_categories")
-        .select("id, service_department, request_type, code, name, support_mode, is_active")
-        .eq("id", categoryId)
-        .eq("is_active", true)
-        .single()
-
-      if (categoryError || !categoryRow) {
-        return NextResponse.json({ error: "Invalid help desk category" }, { status: 400 })
-      }
-      if (categoryRow.service_department !== serviceDepartment || categoryRow.request_type !== requestType) {
-        return NextResponse.json({ error: "Category does not match selected department/type" }, { status: 400 })
-      }
-      selectedCategory = categoryRow
-      supportMode = requestType === "support" ? categoryRow.support_mode || "open_queue" : null
-    } else if (requestType === "support") {
-      // Backward-compatible fallback: if no support categories exist for this department yet,
-      // allow creating the ticket with a default open queue mode.
-      const { count: availableSupportCategories } = await supabase
-        .from("help_desk_categories")
-        .select("id", { count: "exact", head: true })
-        .eq("is_active", true)
-        .eq("service_department", serviceDepartment)
-        .eq("request_type", "support")
-
-      if ((availableSupportCategories || 0) > 0) {
-        return NextResponse.json({ error: "Support category is required" }, { status: 400 })
-      }
-
-      supportMode = "open_queue"
-    }
-
-    const initialStatus = approvalRequired
-      ? "pending_approval"
-      : supportMode === "lead_review_required"
-        ? "pending_lead_review"
-        : "department_queue"
+    const initialStatus = approvalRequired ? "pending_approval" : "department_queue"
     const initialHandlingMode = approvalRequired ? "individual" : "queue"
 
-    const commonCategoryValue =
-      category || selectedCategory?.name || (requestType === "support" && !selectedCategory ? "General Support" : null)
+    const commonCategoryValue = requestType === "procurement" ? "Procurement" : "Support"
 
     const modernInsertPayload = {
       title,
@@ -183,7 +157,7 @@ export async function POST(request: NextRequest) {
       service_department: serviceDepartment,
       request_type: requestType,
       category: commonCategoryValue,
-      category_id: selectedCategory?.id || null,
+      category_id: null,
       priority,
       status: initialStatus,
       requester_id: user.id,
@@ -214,11 +188,24 @@ export async function POST(request: NextRequest) {
       paused_at: approvalRequired ? submittedAt.toISOString() : null,
     }
 
-    let { data: created, error: createError } = await supabase
-      .from("help_desk_tickets")
-      .insert(modernInsertPayload)
-      .select("*")
-      .single()
+    const insertTicketWithCollisionRetry = async (payload: Record<string, any>) => {
+      let attemptPayload = payload
+      let lastError: any = null
+
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        const { data, error } = await supabase.from("help_desk_tickets").insert(attemptPayload).select("*").single()
+
+        if (!error) return { data, error: null as any }
+        lastError = error
+
+        if (!isTicketNumberConflict(error)) break
+        attemptPayload = { ...payload, ticket_number: generateFallbackHelpDeskTicketNumber() }
+      }
+
+      return { data: null as any, error: lastError }
+    }
+
+    let { data: created, error: createError } = await insertTicketWithCollisionRetry(modernInsertPayload)
 
     const schemaDriftError =
       !!createError &&
@@ -228,11 +215,7 @@ export async function POST(request: NextRequest) {
         createError.message.includes("invalid input value"))
 
     if (schemaDriftError) {
-      ;({ data: created, error: createError } = await supabase
-        .from("help_desk_tickets")
-        .insert(legacyInsertPayload)
-        .select("*")
-        .single())
+      ;({ data: created, error: createError } = await insertTicketWithCollisionRetry(legacyInsertPayload))
     }
 
     if (createError) throw createError
@@ -301,11 +284,7 @@ export async function POST(request: NextRequest) {
         p_user_id: firstApprover.id,
         p_type: approvalRequired ? "approval_request" : "task_assigned",
         p_category: approvalRequired ? "approvals" : "tasks",
-        p_title: approvalRequired
-          ? "Procurement ticket needs approval"
-          : supportMode === "lead_review_required"
-            ? "Support ticket needs lead review"
-            : "New help desk ticket in your queue",
+        p_title: approvalRequired ? "Procurement ticket needs approval" : "New help desk ticket in your queue",
         p_message: `${created.ticket_number} - ${created.title}`,
         p_priority: priority === "urgent" ? "urgent" : priority === "high" ? "high" : "normal",
         p_link_url: "/admin/help-desk",

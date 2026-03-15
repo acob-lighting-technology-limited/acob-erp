@@ -29,6 +29,7 @@ async function getAdminAssetsData() {
 
   const userProfile: UserProfile = {
     role: scope.role,
+    admin_domains: scope.adminDomains,
     is_department_lead: scope.isDepartmentLead,
     lead_departments: scope.leadDepartments,
     managed_departments: scope.managedDepartments,
@@ -59,7 +60,7 @@ async function getAdminAssetsData() {
   // Fetch current assignments for all assets
   const { data: assignmentsData } = await dataClient
     .from("asset_assignments")
-    .select("asset_id, assigned_to, department, office_location")
+    .select("asset_id, assigned_to, department, office_location, assignment_type")
     .eq("is_current", true)
 
   // Fetch user details for assignments
@@ -118,6 +119,7 @@ async function getAdminAssetsData() {
             assigned_to: assignment.assigned_to,
             department: assignment.department,
             office_location: assignment.office_location,
+            assignment_type: assignment.assignment_type,
             user: assignment.assigned_to ? assignmentUsersMap.get(assignment.assigned_to) : null,
           }
         : undefined,

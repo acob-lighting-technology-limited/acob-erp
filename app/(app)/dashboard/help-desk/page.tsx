@@ -25,7 +25,11 @@ async function getData() {
     .or(`requester_id.eq.${user.id},assigned_to.eq.${user.id},created_by.eq.${user.id}`)
     .order("created_at", { ascending: false })
 
-  const { data: profile } = await dataClient.from("profiles").select("department").eq("id", user.id).maybeSingle()
+  const { data: profile } = await dataClient
+    .from("profiles")
+    .select("department, role, is_department_lead")
+    .eq("id", user.id)
+    .maybeSingle()
   const { data: departmentRows } = await dataClient
     .from("departments")
     .select("name")
@@ -39,6 +43,9 @@ async function getData() {
   return {
     userId: user.id,
     userDepartment: profile?.department || null,
+    canReviewPendingApprovals: Boolean(
+      profile?.is_department_lead || ["developer", "admin", "super_admin"].includes(String(profile?.role || ""))
+    ),
     initialDepartments: (departmentRows || []).map((row: any) => String(row.name || "").trim()).filter(Boolean),
     tickets: tickets || [],
     loadError: error ? `Failed to load help desk tickets: ${error.message}` : null,
@@ -56,6 +63,7 @@ export default async function PortalHelpDeskPage() {
     <HelpDeskContent
       userId={data.userId}
       userDepartment={(data as any).userDepartment}
+      canReviewPendingApprovals={(data as any).canReviewPendingApprovals}
       initialDepartments={(data as any).initialDepartments || []}
       initialTickets={data.tickets as any}
       initialError={(data as any).loadError}

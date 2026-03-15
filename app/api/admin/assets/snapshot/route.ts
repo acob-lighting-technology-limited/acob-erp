@@ -41,7 +41,7 @@ export async function GET() {
 
   const { data: assignmentsData } = await dataClient
     .from("asset_assignments")
-    .select("asset_id, assigned_to, department, office_location")
+    .select("asset_id, assigned_to, department, office_location, assignment_type")
     .eq("is_current", true)
 
   const assignedUserIds = (assignmentsData || []).map((a: any) => a.assigned_to).filter(Boolean)
@@ -95,6 +95,7 @@ export async function GET() {
             assigned_to: assignment.assigned_to,
             department: assignment.department,
             office_location: assignment.office_location,
+            assignment_type: assignment.assignment_type,
             user: assignment.assigned_to ? assignmentUsersMap.get(assignment.assigned_to) : null,
           }
         : undefined,

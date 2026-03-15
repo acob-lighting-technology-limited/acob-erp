@@ -147,8 +147,9 @@ export function WeeklyReportAdminDialog({
       }
 
       const { data } = await supabase
-        .from("action_items")
+        .from("tasks")
         .select("title, status")
+        .eq("category", "weekly_action")
         .eq("department", formData.department)
         .eq("week_number", formData.week_number)
         .eq("year", formData.year)
@@ -165,8 +166,9 @@ export function WeeklyReportAdminDialog({
     const fetchCurrent = async () => {
       if (!formData.department) return
       const { data } = await supabase
-        .from("action_items")
+        .from("tasks")
         .select("*")
+        .eq("category", "weekly_action")
         .eq("department", formData.department)
         .eq("week_number", formData.week_number)
         .eq("year", formData.year)
@@ -279,13 +281,23 @@ export function WeeklyReportAdminDialog({
               })
           })
         await supabase
-          .from("action_items")
+          .from("tasks")
           .delete()
           .eq("department", formData.department)
           .eq("week_number", formData.week_number)
           .eq("year", formData.year)
+          .eq("category", "weekly_action")
           .eq("status", "pending")
-        if (payload.length > 0) await supabase.from("action_items").insert(payload)
+        if (payload.length > 0) {
+          const enrichedPayload = payload.map((p: any) => ({
+            ...p,
+            source_type: "action_item",
+            category: "weekly_action",
+            assignment_type: "department",
+            priority: "medium",
+          }))
+          await supabase.from("tasks").insert(enrichedPayload)
+        }
       }
       onSuccess()
       onClose()

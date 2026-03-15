@@ -3,6 +3,8 @@ import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 import { getOneDriveService } from "@/lib/onedrive"
 import { logger } from "@/lib/logger"
+import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
+import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 
 const log = logger("payments-documents")
 
@@ -25,6 +27,61 @@ function createClient() {
   })
 }
 
+function normalizeDepartment(value: string | null | undefined): string {
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase()
+  if (normalized === "finance") return "accounts"
+  return normalized
+}
+
+function isFinanceDepartment(value: string | null | undefined): boolean {
+  return normalizeDepartment(value) === "accounts"
+}
+
+async function assertPaymentAccess(supabase: ReturnType<typeof createClient>, userId: string, paymentId: string) {
+  const scope = await resolveAdminScope(supabase as any, userId)
+  const { data: profile } = await supabase.from("profiles").select("department").eq("id", userId).single()
+  const dataClient = getServiceRoleClientOrFallback(supabase as any)
+
+  const { data: payment } = await dataClient
+    .from("department_payments")
+    .select("department:departments(name)")
+    .eq("id", paymentId)
+    .single()
+
+  const paymentDepartment = Array.isArray((payment as any)?.department)
+    ? (payment as any)?.department?.[0]?.name
+    : (payment as any)?.department?.name
+
+  if (!paymentDepartment) {
+    return { allowed: false as const, status: 404, error: "Payment not found" }
+  }
+
+  if (scope) {
+    const scopedDepartments = getDepartmentScope(scope, "finance")
+    if (scopedDepartments) {
+      const inScope = scopedDepartments.some(
+        (dept) => normalizeDepartment(dept) === normalizeDepartment(paymentDepartment)
+      )
+      if (!inScope) {
+        return { allowed: false as const, status: 403, error: "Forbidden: outside your finance scope" }
+      }
+    }
+    return { allowed: true as const }
+  }
+
+  if (!isFinanceDepartment(profile?.department)) {
+    return { allowed: false as const, status: 403, error: "Forbidden: finance access required" }
+  }
+
+  if (normalizeDepartment(profile?.department) !== normalizeDepartment(paymentDepartment)) {
+    return { allowed: false as const, status: 403, error: "Forbidden: Department mismatch" }
+  }
+
+  return { allowed: true as const }
+}
+
 // GET /api/payments/[id]/documents - List all documents for a payment
 export async function GET(request: Request, { params }: { params: { id: string } }) {
   try {
@@ -39,6 +96,11 @@ export async function GET(request: Request, { params }: { params: { id: string }
 
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const access = await assertPaymentAccess(supabase, user.id, paymentId)
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.error }, { status: access.status })
     }
 
     let query = supabase
@@ -75,6 +137,11 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const access = await assertPaymentAccess(supabase, user.id, paymentId)
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.error }, { status: access.status })
     }
 
     const formData = await request.formData()

@@ -36,7 +36,7 @@ export function ActionTrackerExportDialog({ isOpen, onClose, departments }: Expo
     setIsExporting(true)
     try {
       const supabase = createClient()
-      let query = supabase.from("action_items").select("*").eq("year", year)
+      let query = supabase.from("tasks").select("*").eq("category", "weekly_action").eq("year", year)
 
       // Time range filtering
       if (period === "week") {

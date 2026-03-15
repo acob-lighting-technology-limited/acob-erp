@@ -29,6 +29,23 @@ function toWorkflowRejectionStage(stageCode: string) {
   return "hr"
 }
 
+function humanStage(stageCode: string) {
+  switch (stageCode) {
+    case "pending_reliever":
+      return "Reliever"
+    case "pending_department_lead":
+      return "Department Lead"
+    case "pending_admin_hr_lead":
+      return "Admin & HR Lead"
+    case "pending_hcs":
+      return "HCS"
+    case "pending_md":
+      return "MD"
+    default:
+      return stageCode.replaceAll("_", " ")
+  }
+}
+
 export async function POST(request: NextRequest) {
   const rl = rateLimit(`leave-approve:${getClientId(request)}`, { limit: 30, windowSec: 600 })
   if (!rl.allowed) {
@@ -63,8 +80,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Comments are required when rejecting a leave request" }, { status: 400 })
     }
 
-    const { data: actorProfile } = await supabase.from("profiles").select("id, role").eq("id", user.id).single()
+    const { data: actorProfile } = await supabase
+      .from("profiles")
+      .select("id, role, full_name, company_email")
+      .eq("id", user.id)
+      .single()
     const isHRAdmin = ["developer", "admin", "super_admin"].includes(actorProfile?.role)
+    const actorName = actorProfile?.full_name || actorProfile?.company_email || "An approver"
 
     const { data: leaveRequest, error: fetchError } = await supabase
       .from("leave_requests")
@@ -156,6 +178,19 @@ export async function POST(request: NextRequest) {
         emailEvent: "rejected",
       })
 
+      // If a different reliever had already been attached, tell them the commitment is no longer active.
+      if (leaveRequest.reliever_id && leaveRequest.reliever_id !== leaveRequest.user_id) {
+        await notifyUsers(supabaseAdmin, {
+          userIds: [leaveRequest.reliever_id],
+          title: "Reliever commitment released",
+          message: "This leave request was rejected, so your reliever commitment for it is no longer active.",
+          actorId: user.id,
+          linkUrl: "/dashboard/leave",
+          entityId: leave_request_id,
+          emailEvent: "approval_required",
+        })
+      }
+
       return NextResponse.json({ message: "Leave request rejected" })
     }
 
@@ -245,12 +280,24 @@ export async function POST(request: NextRequest) {
       await notifyUsers(supabaseAdmin, {
         userIds: [leaveRequest.user_id],
         title: "Leave approved - proceed on leave",
-        message: `Your leave has been approved. Start: ${leaveRequest.start_date}, Resume: ${leaveRequest.resume_date}.`,
+        message: `${actorName} completed final approval. Start: ${leaveRequest.start_date}, Resume: ${leaveRequest.resume_date}.`,
         actorId: user.id,
         linkUrl: "/dashboard/leave",
         entityId: leave_request_id,
         emailEvent: "approved",
       })
+
+      if (leaveRequest.reliever_id && leaveRequest.reliever_id !== leaveRequest.user_id) {
+        await notifyUsers(supabaseAdmin, {
+          userIds: [leaveRequest.reliever_id],
+          title: "Reliever commitment is now active",
+          message: `This leave is fully approved (${leaveRequest.start_date} to ${leaveRequest.end_date}). You cannot request overlapping leave during this period.`,
+          actorId: user.id,
+          linkUrl: "/dashboard/leave",
+          entityId: leave_request_id,
+          emailEvent: "approval_required",
+        })
+      }
 
       return NextResponse.json({ message: "Final approval recorded and leave approved" })
     }
@@ -290,6 +337,16 @@ export async function POST(request: NextRequest) {
     if (updateError) {
       return NextResponse.json({ error: `Failed to advance leave request: ${updateError.message}` }, { status: 500 })
     }
+
+    await notifyUsers(supabaseAdmin, {
+      userIds: [leaveRequest.user_id],
+      title: `${humanStage(stageCode)} approved your leave request`,
+      message: `${actorName} approved at ${humanStage(stageCode)} stage. Next: ${humanStage(nextStage.stage_code)}.`,
+      actorId: user.id,
+      linkUrl: "/dashboard/leave",
+      entityId: leave_request_id,
+      emailEvent: "approval_required",
+    })
 
     await notifyUsers(supabaseAdmin, {
       userIds: [nextStage.approver_user_id],

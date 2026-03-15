@@ -31,8 +31,14 @@ async function getAdminEmployeeData() {
     managed_departments: scope.managedDepartments,
   }
 
-  // Fetch employees - all leads can view users; mutation is restricted in the UI and backend.
+  // Fetch employees. Department leads are scoped to their managed departments.
   let query = dataClient.from("profiles").select("*").order("last_name", { ascending: true })
+  if (!scope.isAdminLike) {
+    query =
+      scope.managedDepartments.length > 0
+        ? query.in("department", scope.managedDepartments)
+        : query.eq("id", "__none__")
+  }
 
   const { data: employeeData, error: employeeError } = await query
 
