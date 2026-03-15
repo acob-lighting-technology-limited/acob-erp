@@ -1,6 +1,9 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState, useEffect } from "react"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
+import { PageLoader, QueryError } from "@/components/ui/query-states"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Switch } from "@/components/ui/switch"
@@ -42,44 +45,71 @@ const MODULE_LABELS: Record<string, string> = {
   system: "System",
 }
 
+async function fetchNotificationSettings(): Promise<NotificationSettingsResponse> {
+  const response = await fetch("/api/settings/notifications", { cache: "no-store" })
+  const payload = (await response.json()) as NotificationSettingsResponse & { error?: string }
+  if (!response.ok) throw new Error(payload.error || "Failed to load notification settings")
+  return {
+    ...payload,
+    modules: Array.isArray(payload.modules)
+      ? payload.modules.map((module) => ({
+          ...module,
+          system_in_app_enabled: module.system_in_app_enabled !== false,
+          system_email_enabled: module.system_email_enabled !== false,
+          system_in_app_mandatory: module.system_in_app_mandatory === true,
+          system_email_mandatory: module.system_email_mandatory === true,
+        }))
+      : [],
+  }
+}
+
 export default function NotificationSettingsPage() {
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
+  const queryClient = useQueryClient()
   const [globalInApp, setGlobalInApp] = useState(true)
   const [globalEmail, setGlobalEmail] = useState(true)
   const [modules, setModules] = useState<ModuleSetting[]>([])
 
+  const {
+    data,
+    isLoading: loading,
+    isError,
+    refetch,
+  } = useQuery({
+    queryKey: QUERY_KEYS.notifications(),
+    queryFn: fetchNotificationSettings,
+  })
+
+  // Sync local state when data loads
   useEffect(() => {
-    void loadSettings()
-  }, [])
-
-  async function loadSettings() {
-    setLoading(true)
-    try {
-      const response = await fetch("/api/settings/notifications", { cache: "no-store" })
-      const payload = (await response.json()) as NotificationSettingsResponse & { error?: string }
-      if (!response.ok) throw new Error(payload.error || "Failed to load notification settings")
-
-      setGlobalInApp(payload.global.in_app_enabled)
-      setGlobalEmail(payload.global.email_enabled)
-      setModules(
-        Array.isArray(payload.modules)
-          ? payload.modules.map((module) => ({
-              ...module,
-              system_in_app_enabled: module.system_in_app_enabled !== false,
-              system_email_enabled: module.system_email_enabled !== false,
-              system_in_app_mandatory: module.system_in_app_mandatory === true,
-              system_email_mandatory: module.system_email_mandatory === true,
-            }))
-          : []
-      )
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to load notification settings"
-      toast.error(message)
-    } finally {
-      setLoading(false)
+    if (data) {
+      setGlobalInApp(data.global.in_app_enabled)
+      setGlobalEmail(data.global.email_enabled)
+      setModules(data.modules)
     }
-  }
+  }, [data])
+
+  const { mutate: saveSettingsMutate, isPending: saving } = useMutation({
+    mutationFn: async (body: {
+      global: { in_app_enabled: boolean; email_enabled: boolean }
+      modules: { notification_key: string; in_app_enabled: boolean | null; email_enabled: boolean | null }[]
+    }) => {
+      const response = await fetch("/api/settings/notifications", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      })
+      const payload = (await response.json().catch(() => ({}))) as { error?: string }
+      if (!response.ok) throw new Error(payload.error || "Failed to save notification settings")
+      return payload
+    },
+    onSuccess: () => {
+      toast.success("Notification preferences saved")
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.notifications() })
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : "Failed to save notification settings")
+    },
+  })
 
   function updateModule(key: string, field: "user_in_app_enabled" | "user_email_enabled", value: boolean) {
     setModules((prev) =>
@@ -90,36 +120,15 @@ export default function NotificationSettingsPage() {
     )
   }
 
-  async function saveSettings() {
-    setSaving(true)
-    try {
-      const response = await fetch("/api/settings/notifications", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          global: {
-            in_app_enabled: globalInApp,
-            email_enabled: globalEmail,
-          },
-          modules: modules.map((module) => ({
-            notification_key: module.notification_key,
-            in_app_enabled: module.user_in_app_enabled,
-            email_enabled: module.user_email_enabled,
-          })),
-        }),
-      })
-
-      const payload = (await response.json().catch(() => ({}))) as { error?: string }
-      if (!response.ok) throw new Error(payload.error || "Failed to save notification settings")
-
-      toast.success("Notification preferences saved")
-      await loadSettings()
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to save notification settings"
-      toast.error(message)
-    } finally {
-      setSaving(false)
-    }
+  function saveSettings() {
+    saveSettingsMutate({
+      global: { in_app_enabled: globalInApp, email_enabled: globalEmail },
+      modules: modules.map((module) => ({
+        notification_key: module.notification_key,
+        in_app_enabled: module.user_in_app_enabled,
+        email_enabled: module.user_email_enabled,
+      })),
+    })
   }
 
   const sortedModules = useMemo(
@@ -131,6 +140,9 @@ export default function NotificationSettingsPage() {
       }),
     [modules]
   )
+
+  if (loading) return <PageLoader />
+  if (isError) return <QueryError message="Could not load notification settings." onRetry={refetch} />
 
   return (
     <PageWrapper maxWidth="full" background="gradient">

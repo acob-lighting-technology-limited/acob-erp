@@ -1,24 +1,14 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
-import {
-  Search,
-  Loader2,
-  User,
-  Laptop,
-  Package,
-  ClipboardList,
-  FileText,
-  MessageSquare,
-  Building2,
-  X,
-} from "lucide-react"
+import { useState, useEffect } from "react"
+import { useQuery } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
+import { Search, Loader2, User, Laptop, Package, ClipboardList, FileText, MessageSquare, X } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
-import Link from "next/link"
 import { useRouter } from "next/navigation"
 
 interface SearchResult {
@@ -53,11 +43,17 @@ const typeLabels = {
   feedback: "Feedback",
 }
 
+async function performSearch(q: string): Promise<SearchResult[]> {
+  const response = await fetch(`/api/search?q=${encodeURIComponent(q)}`)
+  if (!response.ok) throw new Error("Search failed")
+  const data = await response.json()
+  return data.results || []
+}
+
 export function UniversalSearch({ isAdminMode = false }: UniversalSearchProps) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState("")
-  const [results, setResults] = useState<SearchResult[]>([])
-  const [loading, setLoading] = useState(false)
+  const [debouncedQuery, setDebouncedQuery] = useState("")
   const router = useRouter()
 
   // Keyboard shortcut: Ctrl+K or Cmd+K
@@ -76,45 +72,26 @@ export function UniversalSearch({ isAdminMode = false }: UniversalSearchProps) {
     return () => window.removeEventListener("keydown", handleKeyDown)
   }, [])
 
-  // Search function with debounce
-  const performSearch = useCallback(async (searchQuery: string) => {
-    if (!searchQuery.trim()) {
-      setResults([])
-      return
-    }
-
-    setLoading(true)
-    try {
-      const response = await fetch(`/api/search?q=${encodeURIComponent(searchQuery)}`)
-      if (!response.ok) throw new Error("Search failed")
-      const data = await response.json()
-      setResults(data.results || [])
-    } catch (error) {
-      console.error("Search error:", error)
-      setResults([])
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  // Debounce search
+  // Debounce query
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (open && query) {
-        performSearch(query)
-      } else {
-        setResults([])
-      }
+      setDebouncedQuery(query)
     }, 300)
-
     return () => clearTimeout(timer)
-  }, [query, open, performSearch])
+  }, [query])
+
+  const { data: results = [], isFetching: loading } = useQuery({
+    queryKey: QUERY_KEYS.search(debouncedQuery),
+    queryFn: () => performSearch(debouncedQuery),
+    enabled: open && debouncedQuery.trim().length > 0,
+    staleTime: 30 * 1000,
+  })
 
   const handleResultClick = (result: SearchResult) => {
     router.push(result.href)
     setOpen(false)
     setQuery("")
-    setResults([])
+    setDebouncedQuery("")
   }
 
   return (
@@ -172,7 +149,7 @@ export function UniversalSearch({ isAdminMode = false }: UniversalSearchProps) {
                   className="absolute top-1/2 right-1 h-7 w-7 -translate-y-1/2"
                   onClick={() => {
                     setQuery("")
-                    setResults([])
+                    setDebouncedQuery("")
                   }}
                 >
                   <X className="h-4 w-4" />

@@ -1,6 +1,8 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useMemo, useRef, useState } from "react"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
 import { toast } from "sonner"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -112,11 +114,11 @@ export function HelpDeskContent({
   initialTickets,
   initialError,
 }: HelpDeskContentProps) {
+  const queryClient = useQueryClient()
   const [tickets, setTickets] = useState<HelpDeskTicket[]>(initialTickets)
   const [isSaving, setIsSaving] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
-  const [pendingApprovals, setPendingApprovals] = useState<HelpDeskTicket[]>([])
-  const [availableDepartments, setAvailableDepartments] = useState<string[]>(initialDepartments || [])
+  const [availableDepartments] = useState<string[]>(initialDepartments || [])
   const [viewTicketId, setViewTicketId] = useState<string | null>(null)
   const [viewTicketOpen, setViewTicketOpen] = useState(false)
   const [viewTicketLoading, setViewTicketLoading] = useState(false)
@@ -132,41 +134,34 @@ export function HelpDeskContent({
     request_type: "support",
   })
 
+  // Show initial error from server
+  if (initialError) {
+    toast.error(initialError)
+  }
+
+  const pendingApprovalsPath = canReviewPendingApprovals
+    ? "/api/help-desk/tickets?scope=department&status=pending_approval"
+    : "/api/help-desk/tickets?scope=mine&status=pending_approval"
+
+  const { data: pendingApprovalsData } = useQuery({
+    queryKey: QUERY_KEYS.tickets({
+      scope: canReviewPendingApprovals ? "department" : "mine",
+      status: "pending_approval",
+    }),
+    queryFn: async () => {
+      const res = await fetch(pendingApprovalsPath, { cache: "no-store" })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(buildFetchDebugLabel("Pending approvals load", res.status, json))
+      return json.data || []
+    },
+  })
+  const pendingApprovals: HelpDeskTicket[] = pendingApprovalsData || []
+
   const myOpenTickets = useMemo(
     () => tickets.filter((t) => !["resolved", "closed", "cancelled"].includes(t.status)).length,
     [tickets]
   )
   const pendingReviewCount = pendingApprovals.length
-
-  useEffect(() => {
-    if (initialError) {
-      toast.error(initialError)
-    }
-  }, [initialError])
-
-  useEffect(() => {
-    const loadSupportData = async () => {
-      const pendingApprovalsPath = canReviewPendingApprovals
-        ? "/api/help-desk/tickets?scope=department&status=pending_approval"
-        : "/api/help-desk/tickets?scope=mine&status=pending_approval"
-
-      const pendingRes = await fetch(pendingApprovalsPath, { cache: "no-store" })
-
-      const pendingJson = await pendingRes.json().catch(() => ({}))
-
-      if (pendingRes.ok) {
-        setPendingApprovals(pendingJson.data || [])
-      } else {
-        setPendingApprovals([])
-        toast.error(buildFetchDebugLabel("Pending approvals load", pendingRes.status, pendingJson))
-      }
-    }
-
-    loadSupportData().catch((error) => {
-      setPendingApprovals([])
-      toast.error(`Failed to load help desk setup data: ${error instanceof Error ? error.message : "Unknown error"}`)
-    })
-  }, [canReviewPendingApprovals])
 
   const departmentOptions = useMemo(() => {
     const options = new Set<string>()
@@ -180,13 +175,6 @@ export function HelpDeskContent({
     return Array.from(options).filter((department) => Boolean(department))
   }, [availableDepartments, form.service_department, tickets])
 
-  useEffect(() => {
-    if (form.service_department && userDepartment && form.service_department === userDepartment) {
-      const fallbackDepartment = departmentOptions.find((department) => department !== userDepartment) || ""
-      setForm((prev) => ({ ...prev, service_department: fallbackDepartment }))
-    }
-  }, [departmentOptions, form.service_department, userDepartment])
-
   async function refreshTickets() {
     const res = await fetch("/api/help-desk/tickets?scope=mine", { cache: "no-store" })
     const json = await res.json()
@@ -195,6 +183,12 @@ export function HelpDeskContent({
       return
     }
     setTickets(json.data || [])
+    queryClient.invalidateQueries({
+      queryKey: QUERY_KEYS.tickets({
+        scope: canReviewPendingApprovals ? "department" : "mine",
+        status: "pending_approval",
+      }),
+    })
   }
 
   async function createTicket(e: React.FormEvent) {

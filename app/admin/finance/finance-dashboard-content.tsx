@@ -1,6 +1,8 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useQuery } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
+import { PageLoader, QueryError, EmptyState as QEmptyState } from "@/components/ui/query-states"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { DollarSign, CreditCard, Clock, CheckCircle, AlertCircle, Package, ShoppingCart } from "lucide-react"
@@ -18,51 +20,34 @@ interface FinanceStats {
   overduePayments: number
 }
 
+async function fetchPayments(): Promise<any[]> {
+  const response = await fetch("/api/payments")
+  if (!response.ok) throw new Error("Failed to load finance data")
+  const payload = await response.json()
+  return payload.data || []
+}
+
 export function FinanceDashboardContent() {
-  const [stats, setStats] = useState<FinanceStats>({
-    totalPayments: 0,
-    pendingPayments: 0,
-    paidPayments: 0,
-    totalAmount: 0,
-    recurringPayments: 0,
-    overduePayments: 0,
+  const {
+    data: allPayments = [],
+    isLoading: loading,
+    isError,
+    refetch,
+  } = useQuery({
+    queryKey: QUERY_KEYS.payments(),
+    queryFn: fetchPayments,
   })
-  const [recentPayments, setRecentPayments] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    fetchFinanceData()
-  }, [])
-
-  async function fetchFinanceData() {
-    try {
-      const response = await fetch("/api/payments")
-      if (!response.ok) throw new Error("Failed to load finance data")
-      const payload = await response.json()
-      const allPayments: any[] = payload.data || []
-
-      const pendingCount = allPayments.filter((p) => p.status === "pending" || p.status === "due").length
-      const paidCount = allPayments.filter((p) => p.status === "paid").length
-      const recurringCount = allPayments.filter((p) => p.payment_type === "recurring").length
-      const overdueCount = allPayments.filter((p) => p.status === "overdue").length
-      const totalAmt = allPayments.reduce((sum, p) => sum + (p.amount || 0), 0)
-
-      setStats({
-        totalPayments: allPayments.length,
-        pendingPayments: pendingCount,
-        paidPayments: paidCount,
-        totalAmount: totalAmt,
-        recurringPayments: recurringCount,
-        overduePayments: overdueCount,
-      })
-
-      setRecentPayments(allPayments.slice(0, 5))
-    } catch (error) {
-      console.error("Error fetching finance data:", error)
-    } finally {
-      setLoading(false)
-    }
+  const stats: FinanceStats = {
+    totalPayments: allPayments.length,
+    pendingPayments: allPayments.filter((p: any) => p.status === "pending" || p.status === "due").length,
+    paidPayments: allPayments.filter((p: any) => p.status === "paid").length,
+    totalAmount: allPayments.reduce((sum: number, p: any) => sum + (p.amount || 0), 0),
+    recurringPayments: allPayments.filter((p: any) => p.payment_type === "recurring").length,
+    overduePayments: allPayments.filter((p: any) => p.status === "overdue").length,
   }
+
+  const recentPayments = allPayments.slice(0, 5)
 
   function formatCurrency(amount: number, currency: string = "NGN") {
     return new Intl.NumberFormat("en-NG", {
@@ -185,9 +170,9 @@ export function FinanceDashboardContent() {
         <Card>
           <CardContent className="pt-6">
             {loading ? (
-              <div className="flex items-center justify-center py-8">
-                <div className="border-primary h-8 w-8 animate-spin rounded-full border-4 border-t-transparent"></div>
-              </div>
+              <PageLoader />
+            ) : isError ? (
+              <QEmptyState message="Could not load payment data." />
             ) : recentPayments.length === 0 ? (
               <EmptyState
                 title="No payments found"

@@ -1,6 +1,9 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState, useEffect } from "react"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
+import { PageLoader, QueryError } from "@/components/ui/query-states"
 import Link from "next/link"
 import { Plus, Trash2 } from "lucide-react"
 import { toast } from "sonner"
@@ -64,18 +67,63 @@ interface FlowHealth {
   is_configured: boolean
 }
 
-export default function LeaveSettingsPage() {
-  const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([])
-  const [policies, setPolicies] = useState<LeavePolicy[]>([])
-  const [holidays, setHolidays] = useState<any[]>([])
-  const [slas, setSlas] = useState<any[]>([])
-  const [dataQuality, setDataQuality] = useState<any[]>([])
+async function fetchLeaveSettingsData() {
+  const [typesRes, policyRes, holidayRes, slaRes, qualityRes, flowRes] = await Promise.all([
+    fetch("/api/hr/leave/types"),
+    fetch("/api/hr/leave/policies"),
+    fetch("/api/hr/leave/holidays"),
+    fetch("/api/hr/leave/sla"),
+    fetch("/api/hr/leave/data-quality"),
+    fetch("/api/hr/leave/flow"),
+  ])
+  if (!typesRes.ok) throw new Error("Failed to load leave types")
 
+  const [typesPayload, policyPayload, holidayPayload, slaPayload, qualityPayload, flowPayload] = await Promise.all([
+    typesRes.json(),
+    policyRes.json(),
+    holidayRes.json(),
+    slaRes.json(),
+    qualityRes.json(),
+    flowRes.json(),
+  ])
+  return { typesPayload, policyPayload, holidayPayload, slaPayload, qualityPayload, flowPayload }
+}
+
+export default function LeaveSettingsPage() {
+  const queryClient = useQueryClient()
+
+  const {
+    data: settingsData,
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery({
+    queryKey: QUERY_KEYS.leavePolicies(),
+    queryFn: fetchLeaveSettingsData,
+  })
+
+  // Read-only derived data from query
+  const leaveTypes: LeaveType[] = settingsData?.typesPayload?.data || []
+  const policies: LeavePolicy[] = settingsData?.policyPayload?.data || []
+  const holidays: any[] = settingsData?.holidayPayload?.data || []
+  const slas: any[] = settingsData?.slaPayload?.data || []
+  const dataQuality: any[] = settingsData?.qualityPayload?.data || []
+  const flowHealth: FlowHealth | null = settingsData?.flowPayload?.data?.health || null
+  const canEditFlow: boolean = Boolean(settingsData?.flowPayload?.permissions?.can_edit)
+
+  // Local editable state for flow configuration
   const [flowRoles, setFlowRoles] = useState<FlowRole[]>([])
   const [flowRoutes, setFlowRoutes] = useState<FlowRoute[]>([])
   const [flowAssignments, setFlowAssignments] = useState<FlowAssignment[]>([])
-  const [flowHealth, setFlowHealth] = useState<FlowHealth | null>(null)
-  const [canEditFlow, setCanEditFlow] = useState(false)
+
+  // Sync local state when data loads
+  useEffect(() => {
+    if (settingsData) {
+      setFlowRoles(settingsData.flowPayload?.data?.roles || [])
+      setFlowRoutes(settingsData.flowPayload?.data?.routes || [])
+      setFlowAssignments(settingsData.flowPayload?.data?.assignments || [])
+    }
+  }, [settingsData])
 
   const [previewUserId, setPreviewUserId] = useState("")
   const [previewRelieverId, setPreviewRelieverId] = useState("")
@@ -98,38 +146,8 @@ export default function LeaveSettingsPage() {
     is_business_day: false,
   })
 
-  useEffect(() => {
-    void loadData()
-  }, [])
-
-  async function loadData() {
-    const [typesRes, policyRes, holidayRes, slaRes, qualityRes, flowRes] = await Promise.all([
-      fetch("/api/hr/leave/types"),
-      fetch("/api/hr/leave/policies"),
-      fetch("/api/hr/leave/holidays"),
-      fetch("/api/hr/leave/sla"),
-      fetch("/api/hr/leave/data-quality"),
-      fetch("/api/hr/leave/flow"),
-    ])
-
-    const typesPayload = await typesRes.json()
-    const policyPayload = await policyRes.json()
-    const holidayPayload = await holidayRes.json()
-    const slaPayload = await slaRes.json()
-    const qualityPayload = await qualityRes.json()
-    const flowPayload = await flowRes.json()
-
-    setLeaveTypes(typesPayload.data || [])
-    setPolicies(policyPayload.data || [])
-    setHolidays(holidayPayload.data || [])
-    setSlas(slaPayload.data || [])
-    setDataQuality(qualityPayload.data || [])
-
-    setFlowRoles(flowPayload?.data?.roles || [])
-    setFlowRoutes(flowPayload?.data?.routes || [])
-    setFlowAssignments(flowPayload?.data?.assignments || [])
-    setFlowHealth(flowPayload?.data?.health || null)
-    setCanEditFlow(Boolean(flowPayload?.permissions?.can_edit))
+  function loadData() {
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.leavePolicies() })
   }
 
   async function savePolicy() {
@@ -258,6 +276,9 @@ export default function LeaveSettingsPage() {
       },
     ])
   }
+
+  if (isLoading) return <PageLoader />
+  if (isError) return <QueryError message="Could not load leave settings." onRetry={refetch} />
 
   return (
     <div className="container mx-auto space-y-6 p-6">

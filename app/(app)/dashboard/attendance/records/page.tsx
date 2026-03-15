@@ -1,18 +1,14 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { createClient } from "@/lib/supabase/client"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { useQuery } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
+import { TableSkeleton, QueryError } from "@/components/ui/query-states"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Clock, Calendar } from "lucide-react"
 import { PageHeader } from "@/components/layout/page-header"
 import { StatCard } from "@/components/ui/stat-card"
 import { EmptyState } from "@/components/ui/patterns"
-
-import { logger } from "@/lib/logger"
-
-const log = logger("dashboard-attendance-records")
-
 
 interface AttendanceRecord {
   id: string
@@ -23,31 +19,25 @@ interface AttendanceRecord {
   status: string
 }
 
+async function fetchAttendanceRecords(): Promise<AttendanceRecord[]> {
+  const endDate = new Date().toISOString().split("T")[0]
+  const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]
+  const response = await fetch(`/api/hr/attendance/records?start_date=${startDate}&end_date=${endDate}`)
+  if (!response.ok) throw new Error("Failed to load attendance records")
+  const data = await response.json()
+  return data.records || []
+}
+
 export default function AttendanceRecordsPage() {
-  const [loading, setLoading] = useState(true)
-  const [records, setRecords] = useState<AttendanceRecord[]>([])
-
-  useEffect(() => {
-    fetchRecords()
-  }, [])
-
-  async function fetchRecords() {
-    try {
-      // Get last 30 days
-      const endDate = new Date().toISOString().split("T")[0]
-      const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]
-
-      const response = await fetch(`/api/hr/attendance/records?start_date=${startDate}&end_date=${endDate}`)
-      const data = await response.json()
-      if (data.records) {
-        setRecords(data.records)
-      }
-    } catch (error) {
-      log.error("Error fetching records:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
+  const {
+    data: records = [],
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery({
+    queryKey: QUERY_KEYS.attendance(),
+    queryFn: fetchAttendanceRecords,
+  })
 
   function formatDate(dateString: string) {
     return new Date(dateString).toLocaleDateString("en-US", {
@@ -100,8 +90,10 @@ export default function AttendanceRecordsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {loading ? (
-            <div className="py-8 text-center">Loading...</div>
+          {isLoading ? (
+            <TableSkeleton rows={5} cols={5} />
+          ) : isError ? (
+            <QueryError message="Could not load attendance records." onRetry={refetch} />
           ) : records.length === 0 ? (
             <EmptyState
               title="No attendance records found"

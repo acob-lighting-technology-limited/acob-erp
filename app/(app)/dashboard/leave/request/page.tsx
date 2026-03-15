@@ -1,6 +1,8 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
+import { useQuery, useMutation } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { PageHeader, PageWrapper } from "@/components/layout"
@@ -20,6 +22,20 @@ type LeaveTypeOption = {
   eligibility_reason?: string | null
 }
 
+async function fetchLeaveTypes(): Promise<LeaveTypeOption[]> {
+  const response = await fetch("/api/hr/leave/types")
+  const payload = await response.json()
+  if (!response.ok) throw new Error(payload.error || "Failed to load leave types")
+  return payload.data || []
+}
+
+async function fetchRelievers(): Promise<{ value: string; label: string }[]> {
+  const response = await fetch("/api/hr/leave/relievers")
+  const payload = await response.json()
+  if (!response.ok) throw new Error(payload.error || "Failed to load relievers")
+  return payload.data || []
+}
+
 function clampDays(nextValue: number, maxDays?: number | null) {
   const normalized = Number.isFinite(nextValue) && nextValue > 0 ? Math.floor(nextValue) : 1
   if (maxDays && maxDays > 0) {
@@ -30,10 +46,6 @@ function clampDays(nextValue: number, maxDays?: number | null) {
 
 export default function LeaveRequestPage() {
   const router = useRouter()
-  const [loading, setLoading] = useState(false)
-  const [loadingTypes, setLoadingTypes] = useState(true)
-  const [leaveTypes, setLeaveTypes] = useState<LeaveTypeOption[]>([])
-  const [relieverOptions, setRelieverOptions] = useState<{ value: string; label: string }[]>([])
   const [formData, setFormData] = useState({
     leave_type_id: "",
     start_date: "",
@@ -41,6 +53,16 @@ export default function LeaveRequestPage() {
     reliever_identifier: "",
     reason: "",
     handover_note: "",
+  })
+
+  const { data: leaveTypes = [], isLoading: loadingTypes } = useQuery({
+    queryKey: QUERY_KEYS.leaveTypes(),
+    queryFn: fetchLeaveTypes,
+  })
+
+  const { data: relieverOptions = [] } = useQuery({
+    queryKey: ["leave-relievers"],
+    queryFn: fetchRelievers,
   })
 
   const selectedLeaveType = useMemo(
@@ -63,58 +85,29 @@ export default function LeaveRequestPage() {
     return resume.toISOString().slice(0, 10)
   })()
 
-  useEffect(() => {
-    const loadRelievers = async () => {
-      const response = await fetch("/api/hr/leave/relievers")
-      const payload = await response.json()
-      if (!response.ok) throw new Error(payload.error || "Failed to load relievers")
-      setRelieverOptions(payload.data || [])
-    }
-
-    const loadLeaveTypes = async () => {
-      const response = await fetch("/api/hr/leave/types")
-      const payload = await response.json()
-      if (!response.ok) throw new Error(payload.error || "Failed to load leave types")
-      setLeaveTypes(payload.data || [])
-    }
-
-    Promise.all([loadRelievers(), loadLeaveTypes()])
-      .catch((error) => {
-        toast.error(error instanceof Error ? error.message : "Failed to load leave setup")
-      })
-      .finally(() => {
-        setLoadingTypes(false)
-      })
-  }, [])
-
-  useEffect(() => {
-    setFormData((prev) => ({
-      ...prev,
-      days_count: clampDays(prev.days_count, selectedLeaveType?.max_days),
-    }))
-  }, [selectedLeaveType?.id, selectedLeaveType?.max_days])
-
-  async function handleSubmit(event: React.FormEvent) {
-    event.preventDefault()
-    setLoading(true)
-
-    try {
+  const { mutate: submitRequest, isPending: loading } = useMutation({
+    mutationFn: async (body: typeof formData) => {
       const response = await fetch("/api/hr/leave/requests", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(body),
       })
-
       const payload = await response.json()
       if (!response.ok) throw new Error(payload.error || "Failed to submit leave request")
-
+      return payload
+    },
+    onSuccess: () => {
       toast.success("Leave request submitted")
       router.push("/dashboard/leave")
-    } catch (error) {
+    },
+    onError: (error) => {
       toast.error(error instanceof Error ? error.message : "An error occurred")
-    } finally {
-      setLoading(false)
-    }
+    },
+  })
+
+  function handleSubmit(event: React.FormEvent) {
+    event.preventDefault()
+    submitRequest(formData)
   }
 
   return (

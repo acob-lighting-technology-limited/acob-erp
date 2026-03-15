@@ -1,6 +1,8 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState, useEffect } from "react"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { PageLoader, QueryError } from "@/components/ui/query-states"
 import { Switch } from "@/components/ui/switch"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -27,39 +29,54 @@ const MODULE_LABELS: Record<string, string> = {
   system: "System",
 }
 
+async function fetchMailPolicies(): Promise<PolicyRow[]> {
+  const response = await fetch("/api/admin/settings/mail", { cache: "no-store" })
+  const payload = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(payload.error || "Failed to load mail policies")
+  return Array.isArray(payload.policies)
+    ? payload.policies.map((row: Partial<PolicyRow> & { notification_key: string }) => ({
+        ...row,
+        in_app_enabled: row.in_app_enabled !== false,
+        email_enabled: row.email_enabled !== false,
+        in_app_mandatory: row.in_app_mandatory === true,
+        email_mandatory: row.email_mandatory === true,
+      }))
+    : []
+}
+
 export function MailPolicySettings() {
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
+  const queryClient = useQueryClient()
   const [policies, setPolicies] = useState<PolicyRow[]>([])
 
-  useEffect(() => {
-    void loadPolicies()
-  }, [])
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ["mail-policies"],
+    queryFn: fetchMailPolicies,
+  })
 
-  async function loadPolicies() {
-    setLoading(true)
-    try {
-      const response = await fetch("/api/admin/settings/mail", { cache: "no-store" })
+  // Sync local state when data loads
+  useEffect(() => {
+    if (data) setPolicies(data)
+  }, [data])
+
+  const { mutate: savePoliciesMutate, isPending: saving } = useMutation({
+    mutationFn: async (body: { policies: PolicyRow[] }) => {
+      const response = await fetch("/api/admin/settings/mail", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      })
       const payload = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(payload.error || "Failed to load mail policies")
-      setPolicies(
-        Array.isArray(payload.policies)
-          ? payload.policies.map((row: Partial<PolicyRow> & { notification_key: string }) => ({
-              ...row,
-              in_app_enabled: row.in_app_enabled !== false,
-              email_enabled: row.email_enabled !== false,
-              in_app_mandatory: row.in_app_mandatory === true,
-              email_mandatory: row.email_mandatory === true,
-            }))
-          : []
-      )
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to load mail policies"
-      toast.error(message)
-    } finally {
-      setLoading(false)
-    }
-  }
+      if (!response.ok) throw new Error(payload.error || "Failed to save mail policies")
+      return payload
+    },
+    onSuccess: () => {
+      toast.success("Mail policies updated")
+      queryClient.invalidateQueries({ queryKey: ["mail-policies"] })
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : "Failed to save mail policies")
+    },
+  })
 
   function updatePolicy(
     key: string,
@@ -88,26 +105,8 @@ export function MailPolicySettings() {
     )
   }
 
-  async function savePolicies() {
-    setSaving(true)
-    try {
-      const response = await fetch("/api/admin/settings/mail", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ policies }),
-      })
-
-      const payload = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(payload.error || "Failed to save mail policies")
-
-      toast.success("Mail policies updated")
-      await loadPolicies()
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to save mail policies"
-      toast.error(message)
-    } finally {
-      setSaving(false)
-    }
+  function savePolicies() {
+    savePoliciesMutate({ policies })
   }
 
   const rows = useMemo(
@@ -120,9 +119,8 @@ export function MailPolicySettings() {
     [policies]
   )
 
-  if (loading) {
-    return <div className="text-muted-foreground text-sm">Loading mail policies...</div>
-  }
+  if (isLoading) return <PageLoader />
+  if (isError) return <QueryError message="Could not load mail policies." onRetry={refetch} />
 
   return (
     <div className="space-y-4">
