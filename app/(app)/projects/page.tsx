@@ -2,6 +2,11 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { ProjectsContent } from "./projects-content"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("projects")
+
+
 export interface Project {
   id: string
   project_name: string
@@ -43,7 +48,7 @@ async function getProjectsData() {
     .eq("is_active", true)
 
   if (memberError) {
-    console.error("Error loading member projects:", memberError)
+    log.error("Error loading member projects:", memberError)
   }
 
   const projectIds = memberProjects?.map((m) => m.project_id) || []
@@ -76,7 +81,7 @@ async function getProjectsData() {
     .order("created_at", { ascending: false })
 
   if (error) {
-    console.error("Error loading projects:", error)
+    log.error("Error loading projects:", error)
   }
 
   return {

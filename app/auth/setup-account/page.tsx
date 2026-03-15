@@ -17,6 +17,11 @@ import { formValidation } from "@/lib/validation"
 import { useSearchParams, useRouter } from "next/navigation"
 import { toast } from "sonner"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("auth-setup-account")
+
+
 function SetupAccountContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -100,7 +105,7 @@ function SetupAccountContent() {
       setEmailSent(true)
       toast.success("Setup link sent! Check your inbox.")
     } catch (error: unknown) {
-      console.error("Setup Account Error:", error)
+      log.error("Setup Account Error:", error)
       const message = error instanceof Error ? error.message : "Failed to send setup email"
       toast.error(message)
     } finally {
@@ -171,7 +176,7 @@ function SetupAccountContent() {
       setIsRecoveryMode(true)
       toast.success("Code verified! Now create your password.")
     } catch (err: any) {
-      console.error("OTP Verification Error:", err)
+      log.error("OTP Verification Error:", err)
       toast.error(err.message || "Invalid or expired code. Please try again.")
       setOtpDigits(["", "", "", "", "", ""])
       otpRefs.current[0]?.focus()

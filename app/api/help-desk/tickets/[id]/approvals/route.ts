@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server"
 import { appendAuditLog, appendHelpDeskEvent, getAuthContext, resolveLeadForDepartment } from "@/lib/help-desk/server"
 import { sendHelpDeskMail } from "@/lib/help-desk/mailer"
 import { applyAssignableStatusFilter } from "@/lib/workforce/assignment-policy"
+import { logger } from "@/lib/logger"
+
+const log = logger("help-desk-tickets-approvals")
 
 const STAGE_ORDER = [
   "requester_department_lead",
@@ -137,7 +140,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
           ticketNumber: ticket.ticket_number,
         })
       } catch (mailError) {
-        console.error("Help desk mail error (rejected):", mailError)
+        log.error({ err: String(mailError) }, "Help desk mail error (rejected):")
       }
     } else {
       const upcomingStage = nextStage(approvalStage)
@@ -180,7 +183,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
             ticketNumber: ticket.ticket_number,
           })
         } catch (mailError) {
-          console.error("Help desk mail error (final approval):", mailError)
+          log.error({ err: String(mailError) }, "Help desk mail error (final approval):")
         }
       } else {
         finalStatus = "pending_approval"
@@ -245,7 +248,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
               ctaPath: "/admin/help-desk",
             })
           } catch (mailError) {
-            console.error("Help desk mail error (next approver):", mailError)
+            log.error({ err: String(mailError) }, "Help desk mail error (next approver):")
           }
         }
       }
@@ -287,7 +290,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       },
     })
   } catch (error) {
-    console.error("Error in POST /api/help-desk/tickets/[id]/approvals:", error)
+    log.error({ err: String(error) }, "Error in POST /api/help-desk/tickets/[id]/approvals:")
     return NextResponse.json({ error: "Failed to process approval decision" }, { status: 500 })
   }
 }

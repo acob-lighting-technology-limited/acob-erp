@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { areRequiredDocumentsVerified, getLeavePolicy } from "@/lib/hr/leave-workflow"
+import { logger } from "@/lib/logger"
+
+const log = logger("hr-leave-queue")
 
 const LEGACY_SLA_STAGE_MAP: Record<string, string> = {
   pending_reliever: "reliever_pending",
@@ -255,7 +258,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ data: enriched, history })
   } catch (error) {
-    console.error("Error in GET /api/hr/leave/queue:", error)
+    log.error({ err: String(error) }, "Error in GET /api/hr/leave/queue:")
     return NextResponse.json({ error: "An error occurred" }, { status: 500 })
   }
 }

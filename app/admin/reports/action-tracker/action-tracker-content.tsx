@@ -42,6 +42,11 @@ import {
   type ActionItem,
 } from "@/lib/export-utils"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("reports-action-tracker-action-tracker-co")
+
+
 interface ActionTask {
   id: string
   title: string
@@ -118,7 +123,7 @@ export function ActionTrackerContent({
       if (error) throw error
       setTasks(data || [])
     } catch (error) {
-      console.error("Error loading tasks:", error)
+      log.error("Error loading tasks:", error)
       toast.error("Failed to load actions")
     } finally {
       setLoading(false)
@@ -149,7 +154,7 @@ export function ActionTrackerContent({
       if (error) throw error
       toast.success("Status updated")
     } catch (error) {
-      console.error(error)
+      log.error({ err: String(error) }, "error")
       setTasks(previousTasks)
       toast.error("Failed to update status")
     }

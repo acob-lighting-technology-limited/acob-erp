@@ -1,8 +1,17 @@
 import { createClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
 import crypto from "crypto"
+import { rateLimit, getClientId } from "@/lib/rate-limit"
+import { logger } from "@/lib/logger"
+
+const log = logger("setup-password")
 
 export async function POST(req: Request) {
+  const rl = rateLimit(`setup-password:${getClientId(req)}`, { limit: 5, windowSec: 900 })
+  if (!rl.allowed) {
+    return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 })
+  }
+
   try {
     const { token, password } = await req.json()
 
@@ -61,13 +70,13 @@ export async function POST(req: Request) {
       .eq("id", profile.id)
 
     if (updateError) {
-      console.error("Failed to clear setup token:", updateError)
+      log.error({ err: updateError }, "Failed to clear setup token")
       // We don't return error here because the password was already updated successfully
     }
 
     return NextResponse.json({ success: true, message: "Account activated successfully" })
   } catch (error: any) {
-    console.error("Setup password error:", error)
+    log.error({ err: String(error) }, "Setup password error")
     return NextResponse.json({ error: "An unexpected error occurred" }, { status: 500 })
   }
 }

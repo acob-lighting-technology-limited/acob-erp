@@ -18,6 +18,11 @@ import { Label } from "@/components/ui/label"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { normalizeAuditAction } from "@/lib/audit/core"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("audit-logs-admin-audit-logs-content")
+
+
 export interface AuditLog {
   id: string
   user_id: string
@@ -173,7 +178,7 @@ export function AdminAuditLogsContent({
         .limit(500)
 
       if (logsError) {
-        console.error("Audit logs error details:", logsError)
+        log.error("Audit logs error details:", logsError)
 
         // Check if table doesn't exist
         if (logsError.message.includes("relation") && logsError.message.includes("does not exist")) {
@@ -667,8 +672,8 @@ export function AdminAuditLogsContent({
           }
 
           // ENRICHMENT: Inject human-readable labels into the JSON blobs for the details view
-          let enrichedNewValues = new_values ? { ...new_values } : null
-          let enrichedOldValues = old_values ? { ...old_values } : null
+          const enrichedNewValues = new_values ? { ...new_values } : null
+          const enrichedOldValues = old_values ? { ...old_values } : null
 
           // 1. Resolve Department Name
           let dName = null
@@ -775,14 +780,14 @@ export function AdminAuditLogsContent({
           }
         })
 
-        console.log("Loaded audit logs count:", logsWithUsers.length)
+        log.debug("Loaded audit logs count:", logsWithUsers.length)
         setLogs(logsWithUsers as any)
       } else {
-        console.log("No audit logs found")
+        log.debug("No audit logs found")
         setLogs([])
       }
     } catch (error: any) {
-      console.error("Error loading audit logs:", error)
+      log.error("Error loading audit logs:", error)
       toast.error("Failed to refresh audit logs")
     } finally {
       setIsLoading(false)
@@ -1381,7 +1386,7 @@ export function AdminAuditLogsContent({
       saveAs(data, `audit-logs-export-${new Date().toISOString().split("T")[0]}.xlsx`)
       toast.success("Audit logs exported to Excel successfully")
     } catch (error: any) {
-      console.error("Error exporting to Excel:", error)
+      log.error("Error exporting to Excel:", error)
       toast.error("Failed to export to Excel")
     }
   }
@@ -1426,7 +1431,7 @@ export function AdminAuditLogsContent({
       doc.save(`audit-logs-export-${new Date().toISOString().split("T")[0]}.pdf`)
       toast.success("Audit logs exported to PDF successfully")
     } catch (error: any) {
-      console.error("Error exporting to PDF:", error)
+      log.error("Error exporting to PDF:", error)
       toast.error("Failed to export to PDF")
     }
   }
@@ -1523,7 +1528,7 @@ export function AdminAuditLogsContent({
       saveAs(blob, `audit-logs-export-${new Date().toISOString().split("T")[0]}.docx`)
       toast.success("Audit logs exported to Word successfully")
     } catch (error: any) {
-      console.error("Error exporting to Word:", error)
+      log.error("Error exporting to Word:", error)
       toast.error("Failed to export to Word")
     }
   }

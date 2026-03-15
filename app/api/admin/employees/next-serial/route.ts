@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { logger } from "@/lib/logger"
+
+const log = logger("admin-employees-next-serial")
 
 export const dynamic = "force-dynamic"
 
@@ -27,13 +30,13 @@ export async function GET() {
     const { data, error } = await supabase.rpc("get_next_employee_serial")
 
     if (error) {
-      console.error("Error fetching next serial:", error)
+      log.error({ err: String(error) }, "Error fetching next serial:")
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
     return NextResponse.json({ serial: data })
   } catch (error) {
-    console.error("Internal error fetching next serial:", error)
+    log.error({ err: String(error) }, "Internal error fetching next serial:")
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

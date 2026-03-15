@@ -15,6 +15,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import Link from "next/link"
 import { PageHeader } from "@/components/layout/page-header"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("employee-new")
+
+
 // Validation Schema
 const formSchema = z.object({
   first_name: z.string().min(2, "First name must be at least 2 characters"),
@@ -43,7 +48,7 @@ export default function EmployeeOnboardingForm() {
     async function fetchDepartments() {
       const { data, error } = await supabase.from("departments").select("name").order("name")
       if (error) {
-        console.error("Failed to load departments:", error)
+        log.error("Failed to load departments:", error)
         toast.error("Could not load departments. Please refresh the page.")
         return
       }
@@ -117,7 +122,7 @@ export default function EmployeeOnboardingForm() {
       const { error } = await supabase.from("pending_users").insert([record])
 
       if (error) {
-        console.error("Supabase Insert Error:", error)
+        log.error("Supabase Insert Error:", error)
         throw error
       }
 
@@ -126,7 +131,7 @@ export default function EmployeeOnboardingForm() {
         description: "Your details have been sent to HR for review.",
       })
     } catch (error: any) {
-      console.error("Submission Error:", error)
+      log.error("Submission Error:", error)
       toast.error("Submission Failed", {
         description: error.message || "An unexpected error occurred.",
       })

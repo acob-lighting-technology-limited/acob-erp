@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { logger } from "@/lib/logger"
+
+const log = logger("v1-hr-performance-reviews")
 
 export async function GET(request: NextRequest) {
   try {
@@ -58,13 +61,13 @@ export async function GET(request: NextRequest) {
     const { data: reviews, error } = await query
 
     if (error) {
-      console.error("Error fetching performance reviews:", error)
+      log.error({ err: String(error) }, "Error fetching performance reviews:")
       return NextResponse.json({ error: "Failed to fetch performance reviews" }, { status: 500 })
     }
 
     return NextResponse.json({ data: reviews })
   } catch (error) {
-    console.error("Error in GET /api/hr/performance/reviews:", error)
+    log.error({ err: String(error) }, "Error in GET /api/hr/performance/reviews:")
     return NextResponse.json({ error: "An error occurred" }, { status: 500 })
   }
 }
@@ -142,7 +145,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error("Error creating performance review:", error)
+      log.error({ err: String(error) }, "Error creating performance review:")
       return NextResponse.json({ error: "Failed to create performance review" }, { status: 500 })
     }
 
@@ -151,7 +154,7 @@ export async function POST(request: NextRequest) {
       message: "Performance review created successfully",
     })
   } catch (error) {
-    console.error("Error in POST /api/hr/performance/reviews:", error)
+    log.error({ err: String(error) }, "Error in POST /api/hr/performance/reviews:")
     return NextResponse.json({ error: "An error occurred" }, { status: 500 })
   }
 }

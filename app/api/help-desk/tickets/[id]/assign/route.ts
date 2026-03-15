@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server"
 import { appendAuditLog, appendHelpDeskEvent, getAuthContext } from "@/lib/help-desk/server"
 import { sendHelpDeskMail } from "@/lib/help-desk/mailer"
 import { getUnassignableReason } from "@/lib/workforce/assignment-policy"
+import { logger } from "@/lib/logger"
+
+const log = logger("help-desk-tickets-assign")
 
 function managesDepartmentStrict(profile: any, department: string | null | undefined) {
   if (!profile?.is_department_lead || !department) return false
@@ -168,13 +171,13 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
           ticketNumber: ticket.ticket_number,
         })
       } catch (mailError) {
-        console.error("Help desk mail error (assign):", mailError)
+        log.error({ err: String(mailError) }, "Help desk mail error (assign):")
       }
     }
 
     return NextResponse.json({ data: updated })
   } catch (error) {
-    console.error("Error in POST /api/help-desk/tickets/[id]/assign:", error)
+    log.error({ err: String(error) }, "Error in POST /api/help-desk/tickets/[id]/assign:")
     return NextResponse.json({ error: "Failed to assign ticket" }, { status: 500 })
   }
 }

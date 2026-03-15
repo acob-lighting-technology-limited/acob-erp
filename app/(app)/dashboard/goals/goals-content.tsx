@@ -22,6 +22,11 @@ import {
 } from "@/components/ui/dialog"
 import type { Goal } from "./page"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("dashboard-goals-goals-content")
+
+
 interface GoalsContentProps {
   initialGoals: Goal[]
   userId: string
@@ -47,7 +52,7 @@ export function GoalsContent({ initialGoals, userId }: GoalsContentProps) {
         setGoals(data.goals)
       }
     } catch (error) {
-      console.error("Error fetching goals:", error)
+      log.error("Error fetching goals:", error)
     }
   }
 

@@ -56,6 +56,11 @@ import {
 } from "@/lib/export-utils"
 import { format } from "date-fns"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("dashboard-reports-weekly-reports")
+
+
 export default function WeeklyReportsPortal() {
   const currentOfficeWeek = getCurrentOfficeWeek()
   const [reports, setReports] = useState<WeeklyReport[]>([])
@@ -115,7 +120,7 @@ export default function WeeklyReportsPortal() {
         }
       }
     } catch (error) {
-      console.error("Error fetching initial data:", error)
+      log.error("Error fetching initial data:", error)
     }
   }
 
@@ -139,7 +144,7 @@ export default function WeeklyReportsPortal() {
       if (error) throw error
       setReports(sortReportsByDepartment(data || []))
     } catch (error) {
-      console.error("Error loading reports:", error)
+      log.error("Error loading reports:", error)
       toast.error("Failed to load reports")
     } finally {
       setLoading(false)

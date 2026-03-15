@@ -28,6 +28,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { StatCard } from "@/components/ui/stat-card"
 import { EmptyState } from "@/components/ui/patterns"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("dashboard-tasks-management-tasks-content")
+
+
 export interface Task {
   id: string
   title: string
@@ -195,7 +200,7 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
       setTasks((tasksWithUsers as any) || [])
       setFilteredTasks((tasksWithUsers as any) || [])
     } catch (error: any) {
-      console.error("Error loading tasks:", error)
+      log.error("Error loading tasks:", error)
       const errorMessage = error?.message || error?.toString() || "Failed to load tasks"
       toast.error(`Failed to load tasks: ${errorMessage}`)
     }
@@ -223,7 +228,7 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
       if (error) throw error
       setTaskUpdates((data as any) || [])
     } catch (error) {
-      console.error("Error loading task updates:", error)
+      log.error("Error loading task updates:", error)
     }
   }
 
@@ -252,7 +257,7 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
       setNewComment("")
       await loadTaskUpdates(selectedTask.id)
     } catch (error) {
-      console.error("Error adding comment:", error)
+      log.error("Error adding comment:", error)
       toast.error("Failed to add comment")
     } finally {
       setIsSaving(false)
@@ -303,7 +308,7 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
         setSelectedTask({ ...updatedTask, user_completed: true })
       }
     } catch (error) {
-      console.error("Error marking task as done:", error)
+      log.error("Error marking task as done:", error)
       toast.error("Failed to mark task as done")
     } finally {
       setIsSaving(false)
@@ -354,7 +359,7 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
       await loadTaskUpdates(selectedTask.id)
       setNewStatus(status)
     } catch (error) {
-      console.error("Error updating status:", error)
+      log.error("Error updating status:", error)
       toast.error("Failed to update status")
     } finally {
       setIsSaving(false)

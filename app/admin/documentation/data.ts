@@ -4,6 +4,11 @@ import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
 import { resolveOneDriveAccessScope } from "@/lib/onedrive/access"
 import type { Documentation, UserProfile, employeeMember } from "./admin-documentation-content"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("documentation-data")
+
+
 export async function getAdminDocumentationData() {
   const supabase = await createClient()
   const dataClient = getServiceRoleClientOrFallback(supabase as any)
@@ -56,7 +61,7 @@ export async function getAdminDocumentationData() {
   const { data: docsData, error: docsError } = await docsQuery
 
   if (docsError) {
-    console.error("Documentation error:", docsError)
+    log.error("Documentation error:", docsError)
     return {
       documentation: [],
       employee: [],

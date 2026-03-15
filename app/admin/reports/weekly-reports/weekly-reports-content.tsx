@@ -63,6 +63,11 @@ import { Label } from "@/components/ui/label"
 import { Fragment } from "react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("reports-weekly-reports-weekly-reports-co")
+
+
 interface TrackerStatus {
   id: string
   department: string
@@ -167,7 +172,7 @@ export function WeeklyReportsContent({
         setTrackingData(actions || [])
       }
     } catch (error) {
-      console.error("Error loading reports:", error)
+      log.error("Error loading reports:", error)
       toast.error("Failed to load reports")
     } finally {
       setLoading(false)
@@ -359,7 +364,7 @@ export function WeeklyReportsContent({
       await pres.writeFile({ fileName: `${report.department}_W${report.week_number}_Report.pptx` })
       toast.success("PowerPoint generated successfully")
     } catch (error) {
-      console.error("PPT Error:", error)
+      log.error("PPT Error:", error)
       toast.error("Failed to generate PowerPoint")
     }
   }

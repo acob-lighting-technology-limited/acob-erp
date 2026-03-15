@@ -2,6 +2,9 @@ import { createClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
 import { createClient as createServiceClient } from "@supabase/supabase-js"
 import { canAccessAdminSection, resolveAdminScope } from "@/lib/admin/rbac"
+import { logger } from "@/lib/logger"
+
+const log = logger("import-csv")
 
 export async function POST(request: Request) {
   try {
@@ -28,7 +31,7 @@ export async function POST(request: Request) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
 
-    console.log("[v0] Starting CSV import via admin API...")
+    log.info("Starting CSV import via admin API")
 
     // Fetch CSV data from the provided URL
     const csvUrl =
@@ -109,12 +112,12 @@ export async function POST(request: Request) {
 
     const records = parseCsv(csvText)
 
-    console.log(`[v0] Parsed ${records.length} records from CSV`)
+    log.info({ count: records.length }, "Parsed records from CSV")
 
     // Filter and import only company emails
     let importedCount = 0
     let skippedCount = 0
-    let errors: string[] = []
+    const errors: string[] = []
 
     const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "")
     const get = (rec: any, headers: string[]): string => {
@@ -144,7 +147,7 @@ export async function POST(request: Request) {
       const isCompanyEmail = email.includes("@org.acoblighting.com") || email.includes("@acoblighting.com")
       if (!isCompanyEmail) {
         if (!lastName || !firstName) {
-          console.log(`[v0] Skipping record without name to generate email: ${email}`)
+          log.warn({ email }, "Skipping record without name to generate email")
           skippedCount++
           continue
         }
@@ -214,13 +217,13 @@ export async function POST(request: Request) {
               .eq("id", existingUser.id)
 
             if (updateErr) {
-              console.log(`[v0] Update error for ${email}:`, updateErr.message)
+              log.error({ email, err: updateErr.message }, "Update error")
               errors.push(`${email}: ${updateErr.message}`)
             } else {
-              console.log(`[v0] Updated profile for: ${email}`)
+              log.info({ email }, "Updated existing profile")
             }
           } else {
-            console.log(`[v0] User already exists with full data: ${email}`)
+            log.info({ email }, "User already exists with full data, skipping")
           }
           continue
         }
@@ -233,7 +236,7 @@ export async function POST(request: Request) {
         })
 
         if (authError) {
-          console.log(`[v0] Auth error for ${email}:`, authError.message)
+          log.error({ email, err: authError.message }, "Auth user creation error")
           errors.push(`${email}: ${authError.message}`)
           continue
         }
@@ -256,16 +259,16 @@ export async function POST(request: Request) {
         })
 
         if (profileError) {
-          console.log(`[v0] Profile error for ${email}:`, profileError.message)
+          log.error({ email, err: profileError.message }, "Profile insert error")
           errors.push(`${email}: ${profileError.message}`)
           continue
         }
 
-        console.log(`[v0] Successfully imported: ${email}`)
+        log.info({ email }, "Successfully imported")
         importedCount++
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error"
-        console.log(`[v0] Error processing ${email}:`, errorMessage)
+        log.error({ email, err: errorMessage }, "Error processing record")
         errors.push(`${email}: ${errorMessage}`)
       }
     }
@@ -278,7 +281,7 @@ export async function POST(request: Request) {
       errorCount: errors.length,
     }
 
-    console.log(`[v0] Import complete. Imported: ${importedCount}, Skipped: ${skippedCount}, Errors: ${errors.length}`)
+    log.info({ imported: importedCount, skipped: skippedCount, errors: errors.length }, "Import complete")
 
     return NextResponse.json(
       {
@@ -289,7 +292,7 @@ export async function POST(request: Request) {
       { status: 200 }
     )
   } catch (error) {
-    console.error("[v0] CSV import failed:", error)
+    log.error({ err: String(error) }, "CSV import failed")
     return NextResponse.json(
       {
         success: false,

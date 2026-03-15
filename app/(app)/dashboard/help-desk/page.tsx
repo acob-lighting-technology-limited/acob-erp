@@ -3,6 +3,11 @@ import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { HelpDeskContent } from "./help-desk-content"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("dashboard-help-desk")
+
+
 async function getData() {
   const supabase = await createClient()
   const dataClient = getServiceRoleClientOrFallback(supabase as any)
@@ -32,7 +37,7 @@ async function getData() {
     .order("name", { ascending: true })
 
   if (error) {
-    console.error("Error loading help desk tickets:", error)
+    log.error("Error loading help desk tickets:", error)
   }
 
   return {

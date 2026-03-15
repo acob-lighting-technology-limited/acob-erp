@@ -5,6 +5,11 @@
 
 import { createClient } from "@/lib/supabase/client"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("lib-notifications")
+
+
 interface CreateNotificationParams {
   userId: string
   type:
@@ -52,7 +57,7 @@ export async function createNotification(params: CreateNotificationParams) {
     })
 
     if (error) {
-      console.error("RPC Error creating notification:", error)
+      log.error("RPC Error creating notification:", error)
       // Fallback to direct insertion if RPC fails
       const { data: insertData, error: insertError } = await supabase
         .from("notifications")
@@ -80,7 +85,7 @@ export async function createNotification(params: CreateNotificationParams) {
 
     return data
   } catch (error) {
-    console.error("Error creating notification:", error)
+    log.error("Error creating notification:", error)
     throw error
   }
 }

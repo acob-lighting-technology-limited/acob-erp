@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server"
 import { canLeadDepartment, getAuthContext, isAdminRole } from "@/lib/help-desk/server"
+import { logger } from "@/lib/logger"
+
+const log = logger("help-desk-dashboard")
 
 export async function GET() {
   try {
@@ -79,7 +82,7 @@ export async function GET() {
       },
     })
   } catch (error) {
-    console.error("Error in GET /api/help-desk/dashboard:", error)
+    log.error({ err: String(error) }, "Error in GET /api/help-desk/dashboard:")
     return NextResponse.json({ error: "Failed to load dashboard" }, { status: 500 })
   }
 }

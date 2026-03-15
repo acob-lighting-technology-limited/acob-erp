@@ -3,6 +3,33 @@ import { NextResponse, type NextRequest } from "next/server"
 import { canManageMaintenanceMode, parseMaintenanceMode } from "@/lib/maintenance"
 import type { EmploymentStatus } from "@/types/database"
 
+// ---------------------------------------------------------------------------
+// Maintenance-mode in-memory cache (30 s TTL).
+// Avoids a DB round-trip on every authenticated request.
+// ---------------------------------------------------------------------------
+interface MaintenanceCache {
+  value: boolean
+  expiresAt: number
+}
+let _maintenanceCache: MaintenanceCache | null = null
+
+async function getMaintenanceMode(supabase: ReturnType<typeof createServerClient>): Promise<boolean> {
+  const now = Date.now()
+  if (_maintenanceCache && now < _maintenanceCache.expiresAt) {
+    return _maintenanceCache.value
+  }
+
+  const { data: settings } = await supabase
+    .from("system_settings")
+    .select("value")
+    .eq("key", "maintenance_mode")
+    .single()
+
+  const { enabled } = parseMaintenanceMode(settings?.value)
+  _maintenanceCache = { value: enabled, expiresAt: now + 30_000 }
+  return enabled
+}
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
@@ -34,13 +61,8 @@ export async function updateSession(request: NextRequest) {
   const pathname = request.nextUrl.pathname
   const intendedPath = `${request.nextUrl.pathname}${request.nextUrl.search}`
 
-  // Check maintenance mode
-  const { data: settings } = await supabase
-    .from("system_settings")
-    .select("value")
-    .eq("key", "maintenance_mode")
-    .single()
-  const { enabled: isMaintenanceMode } = parseMaintenanceMode(settings?.value)
+  // Check maintenance mode (cached — no DB hit within 30 s window)
+  const isMaintenanceMode = await getMaintenanceMode(supabase)
 
   // If maintenance has been disabled, users should not remain stuck on /maintenance.
   if (!isMaintenanceMode && pathname.startsWith("/maintenance")) {
@@ -129,17 +151,27 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // Check employment status for authenticated users (Normal flow if maintenance is OFF)
+  // Check employment status for authenticated users (Normal flow if maintenance is OFF).
+  // Prefer JWT user_metadata (set by syncEmploymentStatusToAuth) to avoid a DB query.
+  // Falls back to a DB query only when metadata is absent (e.g. legacy sessions).
   if (user && !isMaintenanceMode) {
     // Allow access to logout and suspension page without status check
     const allowedPaths = ["/auth/logout", "/suspended", "/auth/login"]
     const isAllowedPath = allowedPaths.some((path) => pathname.startsWith(path))
 
     if (!isAllowedPath) {
-      // Fetch employment status from profile
-      const { data: profile } = await supabase.from("profiles").select("employment_status").eq("id", user.id).single()
+      // Prefer JWT metadata — zero DB round-trip for most requests
+      let status = user.user_metadata?.employment_status as EmploymentStatus | undefined
 
-      const status = profile?.employment_status as EmploymentStatus | undefined
+      // Fallback for legacy sessions that pre-date the metadata sync
+      if (!status) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("employment_status")
+          .eq("id", user.id)
+          .single()
+        status = profile?.employment_status as EmploymentStatus | undefined
+      }
 
       // Handle suspended employees - redirect to suspension notice page
       if (status === "suspended") {

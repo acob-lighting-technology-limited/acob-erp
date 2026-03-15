@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from "react"
 import { createBrowserClient } from "@supabase/ssr"
+import { logger } from "@/lib/logger"
+
+const log = logger("use-departments")
 
 /**
  * Fetches departments directly from the `departments` table so the UI
@@ -10,20 +13,37 @@ import { createBrowserClient } from "@supabase/ssr"
  * Returns a sorted list of department *names* (strings) which is the
  * shape every consumer currently expects.
  *
- * Results are cached in a module-level variable so repeated mounts in
- * the same page lifecycle don't re-fetch.
+ * Results are cached in a module-level variable with a 5-minute TTL.
+ * This is safe in browser context (per-tab module scope) and avoids
+ * redundant fetches on the same page. Use `refetch()` to invalidate.
  */
 
-let cachedDepartments: string[] | null = null
+interface DepartmentCache {
+  names: string[]
+  expiresAt: number
+}
+let _deptCache: DepartmentCache | null = null
+
+function getCached(): string[] | null {
+  if (_deptCache && Date.now() < _deptCache.expiresAt) return _deptCache.names
+  _deptCache = null
+  return null
+}
+
+function setCache(names: string[]) {
+  _deptCache = { names, expiresAt: Date.now() + 5 * 60_000 }
+}
 
 export function useDepartments() {
-  const [departments, setDepartments] = useState<string[]>(cachedDepartments ?? [])
-  const [isLoading, setIsLoading] = useState(!cachedDepartments)
+  const cached = getCached()
+  const [departments, setDepartments] = useState<string[]>(cached ?? [])
+  const [isLoading, setIsLoading] = useState(!cached)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (cachedDepartments) {
-      setDepartments(cachedDepartments)
+    const hit = getCached()
+    if (hit) {
+      setDepartments(hit)
       setIsLoading(false)
       return
     }
@@ -47,12 +67,13 @@ export function useDepartments() {
         if (cancelled) return
 
         const names = (data ?? []).map((d) => d.name)
-        cachedDepartments = names
+        setCache(names)
         setDepartments(names)
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (!cancelled) {
-          console.error("Failed to fetch departments:", err)
-          setError(err.message ?? "Failed to fetch departments")
+          const msg = err instanceof Error ? err.message : "Failed to fetch departments"
+          log.error({ err: String(err) }, "Failed to fetch departments")
+          setError(msg)
         }
       } finally {
         if (!cancelled) setIsLoading(false)
@@ -69,7 +90,7 @@ export function useDepartments() {
   const refetch = async () => {
     setIsLoading(true)
     setError(null)
-    cachedDepartments = null
+    _deptCache = null
 
     try {
       const supabase = createBrowserClient(
@@ -86,11 +107,12 @@ export function useDepartments() {
       if (dbError) throw dbError
 
       const names = (data ?? []).map((d) => d.name)
-      cachedDepartments = names
+      setCache(names)
       setDepartments(names)
-    } catch (err: any) {
-      console.error("Failed to fetch departments:", err)
-      setError(err.message ?? "Failed to fetch departments")
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to fetch departments"
+      log.error({ err: String(err) }, "Failed to fetch departments")
+      setError(msg)
     } finally {
       setIsLoading(false)
     }

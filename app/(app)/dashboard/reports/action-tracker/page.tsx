@@ -39,6 +39,11 @@ import {
 import { StatCard } from "@/components/ui/stat-card"
 import { EmptyState } from "@/components/ui/patterns"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("dashboard-reports-action-tracker")
+
+
 interface ActionTask {
   id: string
   title: string
@@ -113,7 +118,7 @@ export default function ActionTrackerPortal() {
       if (error) throw error
       setTasks(data || [])
     } catch (error) {
-      console.error(error)
+      log.error({ err: String(error) }, "error")
       toast.error("Failed to load actions")
     } finally {
       setLoading(false)
@@ -144,7 +149,7 @@ export default function ActionTrackerPortal() {
       toast.success("Status updated")
       setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t)))
     } catch (error) {
-      console.error(error)
+      log.error({ err: String(error) }, "error")
       toast.error("Failed to update status")
     }
   }

@@ -33,6 +33,11 @@ import {
   Settings,
 } from "lucide-react"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("notification-admin-notification-content")
+
+
 export interface DynamicNotification {
   id: string
   type: "info" | "warning" | "success" | "error"
@@ -88,7 +93,7 @@ export function AdminNotificationContent({ initialNotifications }: AdminNotifica
       router.refresh()
       toast.success("Notifications refreshed")
     } catch (error: any) {
-      console.error("Error loading notifications:", error)
+      log.error("Error loading notifications:", error)
       toast.error("Failed to refresh notifications")
     } finally {
       setIsLoading(false)

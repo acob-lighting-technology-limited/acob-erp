@@ -7,7 +7,11 @@ import {
   getDepartmentCodeByName,
   isAdminRole,
 } from "@/lib/correspondence/server"
+import type { CorrespondenceDirection } from "@/types/correspondence"
+import { logger } from "@/lib/logger"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
+
+const log = logger("correspondence-records")
 
 export async function GET(request: NextRequest) {
   try {
@@ -52,7 +56,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ data: filtered })
   } catch (error) {
-    console.error("Error in GET /api/correspondence/records:", error)
+    log.error({ err: String(error) }, "Error in GET /api/correspondence/records:")
     return NextResponse.json({ error: "Failed to fetch correspondence records" }, { status: 500 })
   }
 }
@@ -187,12 +191,12 @@ export async function POST(request: NextRequest) {
         }
       }
     } catch (notifyError) {
-      console.error("Correspondence notification error:", notifyError)
+      log.error({ err: String(notifyError) }, "Correspondence notification error:")
     }
 
     return NextResponse.json({ data: created }, { status: 201 })
   } catch (error) {
-    console.error("Error in POST /api/correspondence/records:", error)
+    log.error({ err: String(error) }, "Error in POST /api/correspondence/records:")
     const details = error as { message?: string; details?: string; hint?: string; code?: string }
     return NextResponse.json(
       {

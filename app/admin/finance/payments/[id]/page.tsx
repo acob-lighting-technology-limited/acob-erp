@@ -65,6 +65,11 @@ import {
 } from "date-fns"
 import { EmptyState, FormFieldGroup } from "@/components/ui/patterns"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("finance-payments")
+
+
 interface Department {
   id: string
   name: string
@@ -353,7 +358,7 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
         setCategories(data.data || [])
       }
     } catch (error) {
-      console.error("Error fetching aux data", error)
+      log.error("Error fetching aux data", error)
     }
   }
 
@@ -368,7 +373,7 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
         toast.error("Failed to fetch payment details")
       }
     } catch (error) {
-      console.error("Error:", error)
+      log.error("Error:", error)
       toast.error("Error fetching payment")
     } finally {
       setLoading(false)
@@ -496,7 +501,7 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
         window.URL.revokeObjectURL(blobUrl)
       }, 100)
     } catch (error) {
-      console.error("Error downloading file:", error)
+      log.error("Error downloading file:", error)
       throw error
     }
   }
@@ -514,10 +519,10 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
         toast.success("Document downloaded successfully")
       } else {
         toast.error("Could not get secure document URL")
-        if (error) console.error("Error signing URL:", error)
+        if (error) log.error("Error signing URL:", error)
       }
     } catch (error) {
-      console.error("Error downloading document:", error)
+      log.error("Error downloading document:", error)
       toast.error("Error downloading document")
     }
   }
@@ -1317,7 +1322,7 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
                           await new Promise((resolve) => setTimeout(resolve, 100))
                           await handleViewDocument(e, item.doc)
                         } catch (error) {
-                          console.error("Error in print dialog:", error)
+                          log.error("Error in print dialog:", error)
                           setPrintDialogOpen(false)
                         }
                       }}

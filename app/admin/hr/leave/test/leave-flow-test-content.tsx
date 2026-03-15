@@ -13,6 +13,9 @@ import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 import { applyAssignableStatusFilter } from "@/lib/workforce/assignment-policy"
+import { logger } from "@/lib/logger"
+
+const log = logger("leave-flow-test")
 
 type StepResult = {
   step: string
@@ -93,7 +96,7 @@ export function LeaveFlowTestContent() {
       setLeaveTypes(typeOptions)
     }
 
-    load().catch(console.error)
+    load().catch((err) => log.error({ err: String(err) }, "load failed"))
   }, [])
 
   async function runTest() {

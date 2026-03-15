@@ -13,6 +13,11 @@ import { toast } from "sonner"
 import { PageHeader } from "@/components/layout/page-header"
 import { FormFieldGroup } from "@/components/ui/patterns"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("hr-performance-create")
+
+
 interface User {
   id: string
   first_name: string
@@ -78,7 +83,7 @@ export default function CreateReviewPage() {
       const cyclesData = await cyclesResponse.json()
       if (cyclesData.cycles) setCycles(cyclesData.cycles)
     } catch (error) {
-      console.error("Error fetching data:", error)
+      log.error("Error fetching data:", error)
     } finally {
       setLoading(false)
     }

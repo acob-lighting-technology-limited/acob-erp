@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getAuthContext, isAdminRole } from "@/lib/correspondence/server"
+import { logger } from "@/lib/logger"
+
+const log = logger("correspondence-department-codes")
 
 export async function GET() {
   try {
@@ -18,7 +21,7 @@ export async function GET() {
 
     return NextResponse.json({ data: data || [] })
   } catch (error) {
-    console.error("Error in GET /api/correspondence/department-codes:", error)
+    log.error({ err: String(error) }, "Error in GET /api/correspondence/department-codes:")
     return NextResponse.json({ error: "Failed to fetch department codes" }, { status: 500 })
   }
 }
@@ -63,7 +66,7 @@ export async function PATCH(request: NextRequest) {
 
     return NextResponse.json({ data })
   } catch (error) {
-    console.error("Error in PATCH /api/correspondence/department-codes:", error)
+    log.error({ err: String(error) }, "Error in PATCH /api/correspondence/department-codes:")
     return NextResponse.json({ error: "Failed to update department code" }, { status: 500 })
   }
 }

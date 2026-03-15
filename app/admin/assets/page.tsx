@@ -5,6 +5,11 @@ import { AdminAssetsContent, type Asset, type Employee, type UserProfile } from 
 import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
 import { listAssignableProfiles } from "@/lib/workforce/assignment-policy"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("assets")
+
+
 async function getAdminAssetsData() {
   const supabase = await createClient()
 
@@ -48,7 +53,7 @@ async function getAdminAssetsData() {
   }
 
   if (assetsError) {
-    console.error("Error loading assets:", assetsError)
+    log.error("Error loading assets:", assetsError)
     return { assets: [], employees: [], departments: [], userProfile, loadError: "Failed to load admin assets" }
   }
 

@@ -1,7 +1,17 @@
 import { createClient } from "@/lib/supabase/server"
 import { resolveAdminScope } from "@/lib/admin/rbac"
+import type { SupabaseClient } from "@supabase/supabase-js"
 import type { CorrespondenceRecord, CorrespondenceStatus } from "@/types/correspondence"
 import { writeAuditLog } from "@/lib/audit/write-audit"
+
+/** Minimal profile shape used across correspondence access-control helpers */
+interface ProfileLike {
+  role?: string | null
+  department?: string | null
+  is_department_lead?: boolean | null
+  lead_departments?: string[] | null
+  managed_departments?: string[] | null
+}
 
 export const CORRESPONDENCE_STATUSES: CorrespondenceStatus[] = [
   "draft",
@@ -35,7 +45,7 @@ export async function getAuthContext() {
       .select("id, role, department, lead_departments, is_department_lead, first_name, last_name, full_name")
       .eq("id", user.id)
       .single(),
-    resolveAdminScope(supabase as any, user.id),
+    resolveAdminScope(supabase as unknown as SupabaseClient, user.id),
   ])
 
   const managedDepartments = scope?.managedDepartments ?? []
@@ -52,7 +62,7 @@ export async function getAuthContext() {
   }
 }
 
-export function canAccessDepartment(profile: any, department?: string | null): boolean {
+export function canAccessDepartment(profile: ProfileLike | null | undefined, department?: string | null): boolean {
   if (!department) return false
   if (isAdminRole(profile?.role)) return true
   if (!profile?.is_department_lead) return false
@@ -66,7 +76,7 @@ export function canAccessDepartment(profile: any, department?: string | null): b
   return managedDepartments.includes(department) || profile?.department === department
 }
 
-export function canAccessRecord(profile: any, userId: string, record: Partial<CorrespondenceRecord>): boolean {
+export function canAccessRecord(profile: ProfileLike | null | undefined, userId: string, record: Partial<CorrespondenceRecord>): boolean {
   if (isAdminRole(profile?.role)) return true
   if (record.originator_id === userId) return true
   if (record.responsible_officer_id === userId) return true
@@ -108,7 +118,7 @@ export async function appendCorrespondenceAuditLog(params: {
 }) {
   const supabase = await createClient()
   await writeAuditLog(
-    supabase as any,
+    supabase as unknown as SupabaseClient,
     {
       action: params.action,
       entityType: "correspondence_record",

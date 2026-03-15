@@ -8,6 +8,9 @@ import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 import { getOneDriveService } from "@/lib/onedrive"
 import { isPathAllowed, resolveOneDriveAccessScope } from "@/lib/onedrive/access"
+import { logger } from "@/lib/logger"
+
+const log = logger("onedrive-download")
 
 export const dynamic = "force-dynamic"
 
@@ -78,7 +81,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ data: { downloadUrl } })
   } catch (error: unknown) {
-    console.error("Error getting download URL:", error)
+    log.error({ err: String(error) }, "Error getting download URL:")
     const message = error instanceof Error ? error.message : "Failed to get download URL"
     return NextResponse.json({ error: message }, { status: 500 })
   }

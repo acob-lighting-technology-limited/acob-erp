@@ -9,6 +9,11 @@ import { useToast } from "@/hooks/use-toast"
 import type { AttendanceRecord } from "./page"
 import { PageHeader, PageWrapper } from "@/components/layout"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("dashboard-attendance-attendance-content")
+
+
 interface AttendanceContentProps {
   initialTodayRecord: AttendanceRecord | null
   initialRecentRecords: AttendanceRecord[]
@@ -31,7 +36,7 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
         setRecentRecords(data.data.slice(0, 7))
       }
     } catch (error) {
-      console.error("Error fetching attendance:", error)
+      log.error("Error fetching attendance:", error)
     }
   }
 

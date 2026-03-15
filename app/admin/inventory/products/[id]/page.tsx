@@ -11,6 +11,11 @@ import Link from "next/link"
 import { toast } from "sonner"
 import { PageHeader } from "@/components/layout/page-header"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("inventory-products")
+
+
 interface Product {
   id: string
   sku: string
@@ -51,7 +56,7 @@ export default function ProductDetailPage() {
         category_name: data.category?.name,
       })
     } catch (error) {
-      console.error("Error:", error)
+      log.error("Error:", error)
       toast.error("Product not found")
       router.push("/admin/inventory/products")
     } finally {

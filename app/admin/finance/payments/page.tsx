@@ -4,6 +4,11 @@ import { PaymentsTable } from "@/components/payments/payments-table"
 import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("finance-payments")
+
+
 interface Payment {
   id: string
   department_id: string
@@ -85,7 +90,7 @@ async function getPaymentsData() {
   const { data: payments, error: paymentsError } = await paymentsQuery
 
   if (paymentsError) {
-    console.error("Error loading payments:", paymentsError)
+    log.error("Error loading payments:", paymentsError)
   }
 
   let departmentsQuery = dataClient.from("departments").select("id, name").order("name")

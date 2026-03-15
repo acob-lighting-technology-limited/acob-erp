@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { rateLimit, getClientId } from "@/lib/rate-limit"
+import { logger } from "@/lib/logger"
+
+const log = logger("hr-attendance-clock-in")
 
 export async function POST(request: NextRequest) {
+  const rl = rateLimit(`clock-in:${getClientId(request)}`, { limit: 5, windowSec: 300 })
+  if (!rl.allowed) {
+    return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 })
+  }
+
   try {
     const supabase = await createClient()
 
@@ -39,7 +48,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error("Error clocking in:", error)
+      log.error({ err: String(error) }, "Error clocking in:")
       return NextResponse.json({ error: "Failed to clock in" }, { status: 500 })
     }
 
@@ -48,7 +57,7 @@ export async function POST(request: NextRequest) {
       message: "Clocked in successfully",
     })
   } catch (error) {
-    console.error("Error in POST /api/hr/attendance/clock-in:", error)
+    log.error({ err: String(error) }, "Error in POST /api/hr/attendance/clock-in:")
     return NextResponse.json({ error: "An error occurred" }, { status: 500 })
   }
 }

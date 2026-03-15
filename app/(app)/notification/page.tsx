@@ -2,6 +2,11 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { NotificationContent } from "./notification-content"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("notification")
+
+
 export interface Notification {
   id: string
   user_id: string
@@ -38,7 +43,7 @@ async function getNotificationData() {
     .order("created_at", { ascending: false })
 
   if (error) {
-    console.error("Error loading notifications:", error)
+    log.error("Error loading notifications:", error)
   }
 
   return {

@@ -17,6 +17,11 @@ import { toast } from "sonner"
 import { EmptyState } from "@/components/ui/patterns"
 import { Skeleton } from "@/components/ui/skeleton"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("inventory-categories")
+
+
 interface Category {
   id: string
   name: string
@@ -63,7 +68,7 @@ export default function CategoriesPage() {
 
       setCategories(catsWithCounts)
     } catch (error) {
-      console.error("Error fetching categories:", error)
+      log.error("Error fetching categories:", error)
       toast.error("Failed to load categories")
     } finally {
       setLoading(false)

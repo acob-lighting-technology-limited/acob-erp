@@ -32,6 +32,11 @@ import { createClient } from "@/lib/supabase/client"
 import { getCurrentOfficeWeek } from "@/lib/meeting-week"
 import { writeAuditLogClient } from "@/lib/audit/client"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("reports-mail-weekly-summary-content")
+
+
 type Employee = {
   id: string
   full_name: string
@@ -119,7 +124,7 @@ export function WeeklySummaryContent({ employees, currentUser }: Props) {
           { failOpen: true }
         )
       } catch (error) {
-        console.error("[weekly-report] Failed to write audit log", error)
+        log.error("[weekly-report] Failed to write audit log", error)
       }
     },
     [currentUser?.department, currentUser?.id, supabase]
@@ -446,7 +451,7 @@ export function WeeklySummaryContent({ employees, currentUser }: Props) {
         },
       })
     } catch (err: any) {
-      console.error("[Weekly Report Error]", err)
+      log.error("[Weekly Report Error]", err)
       toast.error(err.message || "Failed to send weekly report", { id: toastId })
     } finally {
       setIsSending(false)

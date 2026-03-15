@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { buildResolvedRouteSnapshot, classifyRequesterKind } from "@/lib/hr/leave-routing"
+import { logger } from "@/lib/logger"
+
+const log = logger("hr-leave-flow-preview")
 
 function canViewFlow(role?: string | null) {
   return ["developer", "super_admin", "admin"].includes(role || "")
@@ -52,7 +55,7 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (error) {
-    console.error("Error in GET /api/hr/leave/flow/preview:", error)
+    log.error({ err: String(error) }, "Error in GET /api/hr/leave/flow/preview:")
     return NextResponse.json({ error: error instanceof Error ? error.message : "An error occurred" }, { status: 500 })
   }
 }

@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { StatCard } from "@/components/ui/stat-card"
 import { EmptyState } from "@/components/ui/patterns"
+import { PromptDialog } from "@/components/ui/prompt-dialog"
 
 interface LeaveItem {
   id: string
@@ -61,6 +62,13 @@ export default function LeaveApprovePage() {
   const [allPendingQueue, setAllPendingQueue] = useState<LeaveItem[]>([])
   const [history, setHistory] = useState<LeaveItem[]>([])
 
+  const [rejectPrompt, setRejectPrompt] = useState<{ open: boolean; id: string } | null>(null)
+  const [overridePrompt, setOverridePrompt] = useState<{
+    open: boolean
+    id: string
+    missingDocs: string[]
+  } | null>(null)
+
   useEffect(() => {
     void loadData()
   }, [])
@@ -90,30 +98,7 @@ export default function LeaveApprovePage() {
     }
   }
 
-  async function handleAction(id: string, action: "approve" | "reject") {
-    const target = myQueue.find((item) => item.id === id) || history.find((item) => item.id === id)
-    const needsOverride = action === "approve" && target && target.evidence_complete === false
-
-    let comments = action === "reject" ? window.prompt("Rejection reason") || "" : ""
-    let overrideEvidence = false
-
-    if (needsOverride) {
-      comments =
-        window.prompt(
-          `Evidence is incomplete (${(target?.missing_documents || []).join(", ")}). Enter override reason to proceed:`
-        ) || ""
-      if (!comments.trim()) {
-        toast.error("Override reason is required when evidence is incomplete")
-        return
-      }
-      overrideEvidence = true
-    }
-
-    if (action === "reject" && !comments.trim()) {
-      toast.error("Rejection reason is required")
-      return
-    }
-
+  async function submitAction(id: string, action: "approve" | "reject", comments: string, overrideEvidence: boolean) {
     try {
       const response = await fetch("/api/hr/leave/approve", {
         method: "POST",
@@ -129,6 +114,23 @@ export default function LeaveApprovePage() {
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to process action")
     }
+  }
+
+  function handleAction(id: string, action: "approve" | "reject") {
+    const target = myQueue.find((item) => item.id === id) || history.find((item) => item.id === id)
+    const needsOverride = action === "approve" && target && target.evidence_complete === false
+
+    if (action === "reject") {
+      setRejectPrompt({ open: true, id })
+      return
+    }
+
+    if (needsOverride) {
+      setOverridePrompt({ open: true, id, missingDocs: target?.missing_documents || [] })
+      return
+    }
+
+    void submitAction(id, "approve", "", false)
   }
 
   function expectedApproverLabel(item: LeaveItem) {
@@ -154,6 +156,7 @@ export default function LeaveApprovePage() {
   }
 
   return (
+    <>
     <AdminTablePage
       title="Leave Approvals"
       description="HR final endorsement dashboard with full leave history"
@@ -389,5 +392,47 @@ export default function LeaveApprovePage() {
         </TabsContent>
       </Tabs>
     </AdminTablePage>
+
+    <PromptDialog
+      open={rejectPrompt?.open ?? false}
+      onOpenChange={(open) => !open && setRejectPrompt(null)}
+      title="Reject Leave Request"
+      description="Provide a reason for rejecting this leave request."
+      label="Rejection Reason"
+      placeholder="Enter rejection reason..."
+      inputType="textarea"
+      required
+      confirmLabel="Reject"
+      confirmVariant="destructive"
+      onConfirm={(reason) => {
+        const id = rejectPrompt!.id
+        setRejectPrompt(null)
+        void submitAction(id, "reject", reason, false)
+      }}
+      onCancel={() => setRejectPrompt(null)}
+    />
+
+    <PromptDialog
+      open={overridePrompt?.open ?? false}
+      onOpenChange={(open) => !open && setOverridePrompt(null)}
+      title="Override Evidence Check"
+      description={
+        overridePrompt?.missingDocs.length
+          ? `Evidence is incomplete (${overridePrompt.missingDocs.join(", ")}). Provide an override reason to proceed.`
+          : "Evidence is incomplete. Provide an override reason to proceed."
+      }
+      label="Override Reason"
+      placeholder="Enter override reason..."
+      inputType="textarea"
+      required
+      confirmLabel="Approve with Override"
+      onConfirm={(reason) => {
+        const id = overridePrompt!.id
+        setOverridePrompt(null)
+        void submitAction(id, "approve", reason, true)
+      }}
+      onCancel={() => setOverridePrompt(null)}
+    />
+    </>
   )
 }

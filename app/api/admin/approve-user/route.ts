@@ -1,13 +1,24 @@
 import { createClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
 import { createClient as createServerClient } from "@/lib/supabase/server"
+import { rateLimit, getClientId } from "@/lib/rate-limit"
+import { logger } from "@/lib/logger"
 import { renderWelcomeEmail } from "@/lib/email-templates/welcome"
 import { renderInternalNotificationEmail } from "@/lib/email-templates/internal-notification"
 import { resolveActiveLeadRecipients, sendNotificationEmail } from "@/lib/notifications/email-gateway"
 import { isSystemNotificationChannelEnabled, resolveChannelEligibleUserIds } from "@/lib/notifications/delivery-policy"
 import { withSubjectPrefix } from "@/lib/notifications/subject-policy"
+import { syncEmploymentStatusToAuth } from "@/lib/supabase/admin"
+import { writeAuditLog } from "@/lib/audit/write-audit"
+
+const log = logger("approve-user")
 
 export async function POST(req: Request) {
+  const rl = rateLimit(`approve-user:${getClientId(req)}`, { limit: 20, windowSec: 600 })
+  if (!rl.allowed) {
+    return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 })
+  }
+
   // 1. Verify Caller is an Admin
   const supabase = await createServerClient()
   const {
@@ -23,13 +34,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Forbidden: Admin access required" }, { status: 403 })
   }
 
-  console.log("--- Starting Approval Process ---")
+  log.info({ callerId: caller.id }, "Starting approval process")
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
     if (!supabaseUrl || !supabaseServiceKey) {
-      console.error("CRITICAL ERROR: Missing Supabase environment variables")
+      log.error("Missing Supabase environment variables")
       return NextResponse.json({ error: "System configuration error: Missing database keys" }, { status: 500 })
     }
 
@@ -63,7 +74,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: `Missing required user data: ${missingFields.join(", ")}` }, { status: 422 })
     }
 
-    // 2. Determine Employee ID with Retry Logic for Race Conditions
+    // 2. Determine Employee ID — use DB sequence for atomic, collision-free generation
     let employeeId = manualEmployeeId
     const currentYear = new Date().getFullYear()
 
@@ -78,42 +89,13 @@ export async function POST(req: Request) {
     }
 
     if (!employeeId) {
-      let retryCount = 0
-      const maxRetries = 3
-      while (retryCount < maxRetries) {
-        const { data: lastProfile } = await supabaseAdmin
-          .from("profiles")
-          .select("employee_number")
-          .not("employee_number", "is", null)
-          .order("employee_number", { ascending: false })
-          .limit(1)
-          .single()
-
-        let nextIdNumber = 1
-        if (lastProfile && lastProfile.employee_number) {
-          const parts = lastProfile.employee_number.split("/")
-          if (parts.length === 3) {
-            const lastNum = parseInt(parts[2], 10)
-            if (!isNaN(lastNum)) nextIdNumber = lastNum + retryCount + 1
-          }
-        }
-        employeeId = `ACOB/${currentYear}/${nextIdNumber.toString().padStart(3, "0")}`
-
-        // Check if this ID is already taken
-        const { data: exists } = await supabaseAdmin
-          .from("profiles")
-          .select("id")
-          .eq("employee_number", employeeId)
-          .single()
-        if (!exists) break
-        retryCount++
+      // next_employee_number() calls nextval() on a sequence — fully atomic, no race condition
+      const { data: seqRow, error: seqError } = await supabaseAdmin
+        .rpc("next_employee_number")
+      if (seqError || !seqRow) {
+        throw new Error(`Failed to generate employee number: ${seqError?.message ?? "unknown error"}`)
       }
-
-      if (retryCount >= maxRetries) {
-        throw new Error(
-          "Failed to generate a unique employee ID after multiple attempts. Please try again or specify an ID manually."
-        )
-      }
+      employeeId = seqRow as string
     }
 
     const tempPassword = `Welcome${currentYear}!`
@@ -155,93 +137,34 @@ export async function POST(req: Request) {
       }
     }
 
-    // 4. Upsert Profile Record with Retry for Employee ID
-    let profileError = null
-    let retryUpsert = 0
-    const maxUpsertRetries = 3
+    // 4 & 5. Atomically upsert profile + delete from pending_users in one DB transaction.
+    // If either step fails, both roll back — no ghost users, no orphaned profiles.
+    const { error: approvalError } = await supabaseAdmin.rpc("atomic_complete_user_approval", {
+      p_auth_user_id:        authUserId,
+      p_pending_user_id:     pendingUserId,
+      p_employee_number:     employeeId,
+      p_first_name:          pendingUser.first_name,
+      p_last_name:           pendingUser.last_name,
+      p_other_names:         pendingUser.other_names ?? null,
+      p_department:          pendingUser.department,
+      p_company_role:        pendingUser.company_role,
+      p_company_email:       pendingUser.company_email,
+      p_personal_email:      pendingUser.personal_email,
+      p_phone_number:        pendingUser.phone_number ?? null,
+      p_additional_phone:    pendingUser.additional_phone_number ?? null,
+      p_residential_address: pendingUser.residential_address ?? null,
+      p_office_location:     pendingUser.office_location ?? null,
+      p_employment_date:     hireDate ?? null,
+    })
 
-    while (retryUpsert < maxUpsertRetries) {
-      // If employeeId is NOT manually set and we are retrying, regenerate it
-      if (!manualEmployeeId && retryUpsert > 0) {
-        const { data: lastProfile } = await supabaseAdmin
-          .from("profiles")
-          .select("employee_number")
-          .not("employee_number", "is", null)
-          .order("employee_number", { ascending: false })
-          .limit(1)
-          .single()
-
-        let nextIdNumber = 1
-        if (lastProfile && lastProfile.employee_number) {
-          const parts = lastProfile.employee_number.split("/")
-          if (parts.length === 3) {
-            const lastNum = parseInt(parts[2], 10)
-            if (!isNaN(lastNum)) nextIdNumber = lastNum + retryUpsert + 1
-          }
-        }
-        employeeId = `ACOB/${currentYear}/${nextIdNumber.toString().padStart(3, "0")}`
-      }
-
-      const { error } = await supabaseAdmin.from("profiles").upsert(
-        {
-          id: authUserId,
-          first_name: pendingUser.first_name,
-          last_name: pendingUser.last_name,
-          other_names: pendingUser.other_names,
-          department: pendingUser.department,
-          company_role: pendingUser.company_role,
-          role: "employee",
-          employment_status: "active",
-          employee_number: employeeId,
-          company_email: pendingUser.company_email,
-          personal_email: pendingUser.personal_email,
-          phone_number: pendingUser.phone_number,
-          additional_phone: pendingUser.additional_phone_number,
-          residential_address: pendingUser.residential_address,
-          office_location: pendingUser.office_location,
-          employment_date: hireDate || new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          setup_token: null,
-          setup_token_expires_at: null,
-          must_reset_password: false,
-        },
-        { onConflict: "id" }
-      )
-
-      if (!error) {
-        profileError = null
-        break
-      }
-
-      // Check for employee_number unique constraint violation
-      // Postgres error code 23505 is unique_violation
-      if (error && error.code === "23505" && error.message.includes("profiles_employee_number_key")) {
-        console.warn(`Employee ID collision for ${employeeId}, retrying...`)
-        retryUpsert++
-        profileError = error
-        continue
-      } else {
-        // Other errors are fatal
-        profileError = error
-        break
-      }
-    }
-
-    if (profileError) {
+    if (approvalError) {
       // Clean up orphaned auth user if we just created one
       if (!existingProfile && authUserId) {
         await supabaseAdmin.auth.admin
           .deleteUser(authUserId)
-          .catch((e) => console.error("Failed to clean up orphaned auth user:", e))
+          .catch((e) => log.error({ err: String(e) }, "Failed to clean up orphaned auth user"))
       }
-      throw new Error(`Profile creation failed: ${profileError.message}`)
-    }
-
-    // 5. Delete from Pending Users
-    const { error: deleteError } = await supabaseAdmin.from("pending_users").delete().eq("id", pendingUserId)
-    if (deleteError) {
-      console.error("CRITICAL ERROR: Failed to delete pending user record after profile creation", deleteError)
-      // We don't throw because the profile is already created, but this is a serious data integrity issue
+      throw new Error(`Profile creation failed: ${approvalError.message}`)
     }
 
     // 6. Send Welcome Email
@@ -255,7 +178,7 @@ export async function POST(req: Request) {
         })
       }
     } catch (emailError) {
-      console.error("Failed to send welcome email:", emailError)
+      log.error({ err: String(emailError) }, "Failed to send welcome email")
     }
 
     // 7. Send Internal Confirmation Email to Department Leads
@@ -284,12 +207,32 @@ export async function POST(req: Request) {
         }
       }
     } catch (emailError) {
-      console.error("Failed to send stakeholder notification emails:", emailError)
+      log.error({ err: String(emailError) }, "Failed to send stakeholder notification emails")
     }
+
+    // Sync employment_status into JWT metadata so middleware doesn't need a DB query
+    await syncEmploymentStatusToAuth(authUserId!, "active")
+
+    // Audit: new employee onboarding is a critical action
+    const supabaseForAudit = await createServerClient()
+    await writeAuditLog(supabaseForAudit, {
+      action: "create",
+      entityType: "profile",
+      entityId: authUserId!,
+      context: { actorId: caller.id, source: "api" as const },
+      newValues: {
+        employee_number: employeeId,
+        company_email: pendingUser.company_email,
+        department: pendingUser.department,
+        role: "employee",
+        employment_status: "active",
+      },
+      metadata: { source: "approve-user", pending_user_id: pendingUserId },
+    }, { failOpen: true })
 
     return NextResponse.json({ success: true, employeeId })
   } catch (error: any) {
-    console.error("Approval Process Error:", error)
+    log.error({ err: String(error) }, "Approval process failed")
     // Redact internal error details from the client
     const message = error.message?.includes("Auth creation failed")
       ? error.message

@@ -1,6 +1,17 @@
 import { createClient } from "@/lib/supabase/server"
 import { resolveAdminScope } from "@/lib/admin/rbac"
 import { writeAuditLog } from "@/lib/audit/write-audit"
+import { BUSINESS_HOUR_START, BUSINESS_HOUR_END, HELP_DESK_SLA } from "@/lib/org-config"
+import type { SupabaseClient } from "@supabase/supabase-js"
+
+/** Minimal profile shape used in help-desk access-control helpers */
+interface ProfileLike {
+  role?: string | null
+  department?: string | null
+  is_department_lead?: boolean | null
+  lead_departments?: string[] | null
+  managed_departments?: string[] | null
+}
 
 export const HELP_DESK_PRIORITIES = ["low", "medium", "high", "urgent"] as const
 export const HELP_DESK_STATUSES = [
@@ -37,7 +48,7 @@ export function addBusinessHours(baseDate: Date, hours: number): Date {
     if (day === 0 || day === 6) continue
 
     const hour = date.getHours()
-    if (hour >= 9 && hour < 18) {
+    if (hour >= BUSINESS_HOUR_START && hour < BUSINESS_HOUR_END) {
       remainingHours -= 1
     }
   }
@@ -61,10 +72,11 @@ export function addBusinessDays(baseDate: Date, days: number): Date {
 }
 
 export function getSlaTarget(priority: HelpDeskPriority, submittedAt: Date): Date {
-  if (priority === "urgent") return addBusinessHours(submittedAt, 4)
-  if (priority === "high") return addBusinessHours(submittedAt, 24)
-  if (priority === "medium") return addBusinessDays(submittedAt, 3)
-  return addBusinessDays(submittedAt, 7)
+  const budget = HELP_DESK_SLA[priority as keyof typeof HELP_DESK_SLA]
+  if (!budget) return addBusinessDays(submittedAt, HELP_DESK_SLA.low.value)
+  return budget.unit === "business_hours"
+    ? addBusinessHours(submittedAt, budget.value)
+    : addBusinessDays(submittedAt, budget.value)
 }
 
 export function isAdminRole(role?: string | null): boolean {
@@ -75,7 +87,7 @@ export function isLeadRole(profile?: { is_department_lead?: boolean } | null): b
   return Boolean(profile?.is_department_lead)
 }
 
-export function canLeadDepartment(profile: any, department: string): boolean {
+export function canLeadDepartment(profile: ProfileLike | null | undefined, department: string): boolean {
   if (isAdminRole(profile?.role)) return true
   if (!profile?.is_department_lead) return false
 
@@ -87,7 +99,7 @@ export function canLeadDepartment(profile: any, department: string): boolean {
   return managedDepartments.includes(department) || profile?.department === department
 }
 
-export function canWorkDepartment(profile: any, department: string): boolean {
+export function canWorkDepartment(profile: ProfileLike | null | undefined, department: string): boolean {
   return isAdminRole(profile?.role) || profile?.department === department || canLeadDepartment(profile, department)
 }
 
@@ -117,7 +129,7 @@ export async function getAuthContext() {
     .select("id, role, department, is_department_lead, lead_departments, first_name, last_name, full_name")
     .eq("id", user.id)
     .single()
-  const scope = await resolveAdminScope(supabase as any, user.id)
+  const scope = await resolveAdminScope(supabase as unknown as SupabaseClient, user.id)
   const managedDepartments = scope?.managedDepartments ?? []
 
   return {
@@ -163,7 +175,7 @@ export async function appendAuditLog(params: {
 }) {
   const supabase = await createClient()
   await writeAuditLog(
-    supabase as any,
+    supabase as unknown as SupabaseClient,
     {
       action: params.action,
       entityType: "help_desk_ticket",

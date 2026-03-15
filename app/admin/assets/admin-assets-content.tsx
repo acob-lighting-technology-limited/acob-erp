@@ -68,6 +68,11 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { StatCard } from "@/components/ui/stat-card"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("assets-admin-assets-content")
+
+
 export interface Asset {
   id: string
   unique_code: string
@@ -355,7 +360,7 @@ export function AdminAssetsContent({
       if (!response.ok) {
         const payload = (await response.json().catch(() => null)) as { error?: string } | null
         // Fallback to hardcoded types if table doesn't exist yet
-        console.warn("Could not load asset types from API:", payload?.error || response.status)
+        log.warn("Could not load asset types from API:", payload?.error || response.status)
         return
       }
 
@@ -373,7 +378,7 @@ export function AdminAssetsContent({
         )
       }
     } catch (error) {
-      console.error("Error loading asset types:", error)
+      log.error("Error loading asset types:", error)
     }
   }
 
@@ -431,7 +436,7 @@ export function AdminAssetsContent({
       // Auto-select the newly created asset type
       setAssetForm({ ...assetForm, asset_type: code })
     } catch (error: any) {
-      console.error("Error creating asset type:", error)
+      log.error("Error creating asset type:", error)
       toast.error("Failed to create asset type: " + (error.message || "Unknown error"))
     } finally {
       setIsCreatingAssetType(false)
@@ -455,7 +460,7 @@ export function AdminAssetsContent({
       setAssets(payload.assets || [])
       setEmployees(payload.employees || [])
     } catch (error: any) {
-      console.error("Error loading data:", error)
+      log.error("Error loading data:", error)
       toast.error("Failed to refresh data")
     } finally {
       setIsLoading(false)
@@ -507,7 +512,7 @@ export function AdminAssetsContent({
         setCurrentAssignment(null)
       }
     } catch (error) {
-      console.error("Error loading assignment:", error)
+      log.error("Error loading assignment:", error)
       setCurrentAssignment(null)
     }
   }
@@ -657,7 +662,7 @@ export function AdminAssetsContent({
       setSelectedAsset(asset)
       setIsHistoryOpen(true)
     } catch (error: any) {
-      console.error("Error loading asset history:", error)
+      log.error("Error loading asset history:", error)
       toast.error(`Failed to load history: ${error.message}`)
     }
   }
@@ -673,7 +678,7 @@ export function AdminAssetsContent({
       if (error) throw error
       setAssetIssues(data || [])
     } catch (error: any) {
-      console.error("Error loading asset issues:", error)
+      log.error("Error loading asset issues:", error)
       toast.error("Failed to load asset issues")
     }
   }
@@ -704,7 +709,7 @@ export function AdminAssetsContent({
       await loadAssetIssues(selectedAsset.id)
       await loadData() // Refresh to update issue counts
     } catch (error: any) {
-      console.error("Error adding issue:", error)
+      log.error("Error adding issue:", error)
       toast.error("Failed to add issue")
     } finally {
       setIsAddingIssue(false)
@@ -723,7 +728,7 @@ export function AdminAssetsContent({
       }
       await loadData() // Refresh to update issue counts
     } catch (error: any) {
-      console.error("Error toggling issue:", error)
+      log.error("Error toggling issue:", error)
       toast.error("Failed to update issue")
     }
   }
@@ -740,7 +745,7 @@ export function AdminAssetsContent({
       }
       await loadData() // Refresh to update issue counts
     } catch (error: any) {
-      console.error("Error deleting issue:", error)
+      log.error("Error deleting issue:", error)
       toast.error("Failed to delete issue")
     }
   }
@@ -769,7 +774,7 @@ export function AdminAssetsContent({
           .single()
 
         if (assignmentFetchError && assignmentFetchError.code !== "PGRST116") {
-          console.error("Error fetching current assignment:", assignmentFetchError)
+          log.error("Error fetching current assignment:", assignmentFetchError)
         }
 
         if (data) {
@@ -924,7 +929,7 @@ export function AdminAssetsContent({
       setIsAssetDialogOpen(false)
       loadData()
     } catch (error: any) {
-      console.error("Error saving asset:", error)
+      log.error("Error saving asset:", error)
       toast.error(`Failed to save asset: ${error.message}`)
     } finally {
       setIsSaving(false)
@@ -1017,7 +1022,7 @@ export function AdminAssetsContent({
       setIsAssignDialogOpen(false)
       loadData()
     } catch (error: any) {
-      console.error("Error assigning asset:", error)
+      log.error("Error assigning asset:", error)
       toast.error(`Failed: ${error.message}`)
     } finally {
       setIsAssigning(false)
@@ -1080,7 +1085,7 @@ export function AdminAssetsContent({
       setAssetToDelete(null)
       loadData()
     } catch (error: any) {
-      console.error("Error archiving asset:", error)
+      log.error("Error archiving asset:", error)
       const errorMessage = error?.message || error?.toString() || "Failed to archive asset"
       toast.error(`Failed to archive asset: ${errorMessage}`)
     } finally {
@@ -1106,7 +1111,7 @@ export function AdminAssetsContent({
       toast.success("Asset restored successfully")
       await loadData()
     } catch (error: any) {
-      console.error("Error restoring asset:", error)
+      log.error("Error restoring asset:", error)
       toast.error(`Failed to restore asset: ${error?.message || "Unknown error"}`)
     } finally {
       setIsDeleting(false)
@@ -1294,7 +1299,7 @@ export function AdminAssetsContent({
       saveAs(data, `assets-export-${new Date().toISOString().split("T")[0]}.xlsx`)
       toast.success("Assets exported to Excel successfully")
     } catch (error: any) {
-      console.error("Error exporting to Excel:", error)
+      log.error("Error exporting to Excel:", error)
       toast.error("Failed to export to Excel")
     }
   }
@@ -1401,7 +1406,7 @@ export function AdminAssetsContent({
       toast.success("Assets exported to PDF successfully")
       setExportDialogOpen(false)
     } catch (error: any) {
-      console.error("Error exporting to PDF:", error)
+      log.error("Error exporting to PDF:", error)
       toast.error("Failed to export to PDF")
     }
   }
@@ -1595,7 +1600,7 @@ export function AdminAssetsContent({
       toast.success("Assets exported to Word successfully")
       setExportDialogOpen(false)
     } catch (error: any) {
-      console.error("Error exporting to Word:", error)
+      log.error("Error exporting to Word:", error)
       toast.error("Failed to export to Word")
     }
   }
@@ -1696,7 +1701,7 @@ export function AdminAssetsContent({
       toast.success("Employee Assets Report exported to Excel successfully")
       setEmployeeReportDialogOpen(false)
     } catch (error: any) {
-      console.error("Error exporting Employee Report to Excel:", error)
+      log.error("Error exporting Employee Report to Excel:", error)
       toast.error("Failed to export Employee Report to Excel")
     }
   }
@@ -1755,7 +1760,7 @@ export function AdminAssetsContent({
       toast.success("Employee Assets Report exported to PDF successfully")
       setEmployeeReportDialogOpen(false)
     } catch (error: any) {
-      console.error("Error exporting Employee Report to PDF:", error)
+      log.error("Error exporting Employee Report to PDF:", error)
       toast.error("Failed to export Employee Report to PDF")
     }
   }
@@ -1854,7 +1859,7 @@ export function AdminAssetsContent({
       toast.success("Employee Assets Report exported to Word successfully")
       setEmployeeReportDialogOpen(false)
     } catch (error: any) {
-      console.error("Error exporting Employee Report to Word:", error)
+      log.error("Error exporting Employee Report to Word:", error)
       toast.error("Failed to export Employee Report to Word")
     }
   }

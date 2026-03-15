@@ -7,6 +7,11 @@ import { MessageSquare, AlertCircle, Clock, CheckCircle, XCircle } from "lucide-
 import { StatCard } from "@/components/ui/stat-card"
 import { PageHeader, PageWrapper } from "@/components/layout"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("feedback")
+
+
 export default async function AdminFeedbackPage() {
   const supabase = await createClient()
   const dataClient = getServiceRoleClientOrFallback(supabase as any)
@@ -36,7 +41,7 @@ export default async function AdminFeedbackPage() {
   const { data: feedbackData, error: feedbackError } = await feedbackQuery
 
   if (feedbackError) {
-    console.error("Error fetching feedback:", feedbackError)
+    log.error("Error fetching feedback:", feedbackError)
   }
 
   // Fetch profiles for all user_ids in feedback
@@ -58,7 +63,7 @@ export default async function AdminFeedbackPage() {
       const { data: profilesData, error: profilesError } = await profilesQuery
 
       if (profilesError) {
-        console.error("Error fetching profiles:", profilesError)
+        log.error("Error fetching profiles:", profilesError)
       }
 
       // Merge profiles with feedback

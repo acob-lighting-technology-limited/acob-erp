@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { logger } from "@/lib/logger"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import {
   areRequiredDocumentsVerified,
@@ -17,6 +18,8 @@ import {
   notifyStageApprover,
   stageCodeForRole,
 } from "@/lib/hr/leave-routing"
+
+const log = logger("leave-requests")
 
 function isRelieverStage(request: any) {
   const stage = request.current_stage_code || request.approval_stage
@@ -235,10 +238,22 @@ export async function GET(request: NextRequest) {
       approvalsByRequest.set(approval.leave_request_id, rows)
     }
 
+    // Pre-fetch all leave policies in parallel (one per unique leave_type_id)
+    // instead of fetching inside the map (which would be N sequential queries).
+    const uniqueLeaveTypeIds = Array.from(new Set(requestRows.map((r: any) => r.leave_type_id).filter(Boolean)))
+    const policyEntries = await Promise.all(
+      uniqueLeaveTypeIds.map(async (ltId) => {
+        const policy = await getLeavePolicy(supabase, ltId as string)
+        return [ltId, policy] as const
+      })
+    )
+    const policyMap = new Map(policyEntries)
+
+    // Check evidence completeness for all requests in parallel
     const enriched = await Promise.all(
       requestRows.map(async (leaveRequest: any) => {
-        const policy = await getLeavePolicy(supabase, leaveRequest.leave_type_id)
-        const requiredDocs = policy.required_documents || []
+        const policy = policyMap.get(leaveRequest.leave_type_id) ?? { required_documents: [] }
+        const requiredDocs = (policy as any).required_documents || []
         const evidence = await areRequiredDocumentsVerified(supabase, leaveRequest.id, requiredDocs)
         return {
           ...leaveRequest,
@@ -290,7 +305,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ data: enriched, balances: balances || [], reliever_commitments: relieverCommitments })
   } catch (error) {
-    console.error("Error in GET /api/hr/leave/requests:", error)
+    log.error({ err: String(error) }, "Unhandled error in GET")
     return NextResponse.json({ error: "An error occurred" }, { status: 500 })
   }
 }
@@ -508,7 +523,7 @@ export async function POST(request: NextRequest) {
           : "Leave request created successfully",
     })
   } catch (error) {
-    console.error("Error in POST /api/hr/leave/requests:", error)
+    log.error({ err: String(error) }, "Unhandled error in POST")
     const message = error instanceof Error ? error.message : "An error occurred"
     const status =
       message.startsWith("LEAVE_APPROVER_NOT_CONFIGURED:") ||
@@ -769,7 +784,7 @@ export async function PUT(request: NextRequest) {
       message: "Leave request updated successfully",
     })
   } catch (error) {
-    console.error("Error in PUT /api/hr/leave/requests:", error)
+    log.error({ err: String(error) }, "Unhandled error in PUT")
     const message = error instanceof Error ? error.message : "An error occurred"
     const status =
       message.startsWith("LEAVE_APPROVER_NOT_CONFIGURED:") ||
@@ -818,7 +833,7 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ message: "Leave request deleted successfully" })
   } catch (error) {
-    console.error("Error in DELETE /api/hr/leave/requests:", error)
+    log.error({ err: String(error) }, "Unhandled error in DELETE")
     return NextResponse.json({ error: "An error occurred" }, { status: 500 })
   }
 }

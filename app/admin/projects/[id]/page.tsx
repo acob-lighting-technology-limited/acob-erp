@@ -35,6 +35,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { PageHeader } from "@/components/layout/page-header"
 import { EmptyState, FormFieldGroup } from "@/components/ui/patterns"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("projects")
+
+
 interface Project {
   id: string
   project_name: string
@@ -124,33 +129,33 @@ export default function AdminProjectDetailPage() {
 
   useEffect(() => {
     if (projectId) {
-      console.log("📂 Loading project detail page for ID:", projectId)
+      log.debug("📂 Loading project detail page for ID:", projectId)
       loadProjectData()
     }
   }, [projectId])
 
   const loadProjectData = async () => {
     try {
-      console.log("🔄 Starting to load project data...")
+      log.debug("🔄 Starting to load project data...")
 
       // Check auth first
       const {
         data: { user },
         error: authError,
       } = await supabase.auth.getUser()
-      console.log("👤 Current user:", user?.id, authError ? `Error: ${authError.message}` : "✅")
+      log.debug({ userId: user?.id, authErr: authError?.message ?? null }, "👤 Current user")
 
       if (authError || !user) {
-        console.error("❌ Auth error, redirecting...", authError)
+        log.error("❌ Auth error, redirecting...", authError)
         router.push("/auth/login")
         return
       }
 
       await Promise.all([loadProject(), loademployee(), loadMembers(), loadItems()])
-      console.log("✅ All project data loaded successfully")
+      log.debug("✅ All project data loaded successfully")
     } catch (error) {
-      console.error("❌ Error loading project data:", error)
-      console.error("Error details:", JSON.stringify(error, null, 2))
+      log.error("❌ Error loading project data:", error)
+      log.error("Error details:", JSON.stringify(error, null, 2))
       toast.error("Failed to load project data")
     } finally {
       setIsLoading(false)
@@ -158,7 +163,7 @@ export default function AdminProjectDetailPage() {
   }
 
   const loadProject = async () => {
-    console.log("📋 Loading project details...")
+    log.debug("📋 Loading project details...")
     const { data, error } = await supabase
       .from("projects")
       .select(
@@ -175,25 +180,25 @@ export default function AdminProjectDetailPage() {
       .eq("id", projectId)
       .single()
 
-    console.log("Project result:", { data, error })
+    log.debug("Project result:", { data, error })
     if (error) throw error
     setProject(data)
   }
 
   const loademployee = async () => {
-    console.log("👥 Loading employee...")
+    log.debug("👥 Loading employee...")
     const { data, error } = await supabase
       .from("profiles")
       .select("id, first_name, last_name, company_email, department")
       .order("last_name", { ascending: true })
 
-    console.log("employee result:", { count: data?.length, error })
+    log.debug("employee result:", { count: data?.length, error })
     if (error) throw error
     setemployee(data || [])
   }
 
   const loadMembers = async () => {
-    console.log("👨‍👩‍👧‍👦 Loading project members...")
+    log.debug("👨‍👩‍👧‍👦 Loading project members...")
     const { data, error } = await supabase
       .from("project_members")
       .select(
@@ -215,20 +220,20 @@ export default function AdminProjectDetailPage() {
       .eq("is_active", true)
       .order("assigned_at", { ascending: false })
 
-    console.log("Members result:", { count: data?.length, error })
+    log.debug("Members result:", { count: data?.length, error })
     if (error) throw error
     setMembers((data as any) || [])
   }
 
   const loadItems = async () => {
-    console.log("📦 Loading project items...")
+    log.debug("📦 Loading project items...")
     const { data, error } = await supabase
       .from("project_items")
       .select("*")
       .eq("project_id", projectId)
       .order("created_at", { ascending: false })
 
-    console.log("Items result:", { count: data?.length, error })
+    log.debug("Items result:", { count: data?.length, error })
     if (error) throw error
     setItems(data || [])
   }
@@ -275,7 +280,7 @@ export default function AdminProjectDetailPage() {
       setMemberForm({ user_id: "", role: "member" })
       loadMembers()
     } catch (error) {
-      console.error("Error adding member:", error)
+      log.error("Error adding member:", error)
       toast.error("Failed to add member")
     } finally {
       setIsAddingMember(false)
@@ -310,7 +315,7 @@ export default function AdminProjectDetailPage() {
       setMemberToDelete(null)
       loadMembers()
     } catch (error) {
-      console.error("Error removing member:", error)
+      log.error("Error removing member:", error)
       toast.error("Failed to remove member")
     } finally {
       setIsRemovingMember(false)
@@ -384,7 +389,7 @@ export default function AdminProjectDetailPage() {
       setIsItemDialogOpen(false)
       loadItems()
     } catch (error) {
-      console.error("Error saving item:", error)
+      log.error("Error saving item:", error)
       toast.error("Failed to save item")
     } finally {
       setIsSavingItem(false)
@@ -404,7 +409,7 @@ export default function AdminProjectDetailPage() {
       setItemToDelete(null)
       loadItems()
     } catch (error) {
-      console.error("Error deleting item:", error)
+      log.error("Error deleting item:", error)
       toast.error("Failed to delete item")
     } finally {
       setIsDeletingItem(false)

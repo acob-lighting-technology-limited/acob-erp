@@ -13,6 +13,11 @@ import { toast } from "sonner"
 import { PageHeader } from "@/components/layout/page-header"
 import { EmptyState } from "@/components/ui/patterns"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("purchasing-suppliers")
+
+
 interface Supplier {
   id: string
   name: string
@@ -61,7 +66,7 @@ export default function SupplierDetailPage() {
       setSupplier(sup)
       setOrders(pos || [])
     } catch (error) {
-      console.error("Error:", error)
+      log.error("Error:", error)
       toast.error("Supplier not found")
       router.push("/admin/purchasing/suppliers")
     } finally {

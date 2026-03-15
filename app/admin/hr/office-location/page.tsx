@@ -16,6 +16,11 @@ import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { applyAssignableStatusFilter } from "@/lib/workforce/assignment-policy"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("hr-office-location")
+
+
 interface LocationEmployee {
   id: string
   first_name: string | null
@@ -72,7 +77,7 @@ export default function OfficeLocationsPage() {
       setLocationEmployees(byLocation)
       setLocations(rows)
     } catch (error) {
-      console.error("Error fetching office locations:", error)
+      log.error("Error fetching office locations:", error)
       toast.error("Failed to load office locations")
     } finally {
       setLoading(false)

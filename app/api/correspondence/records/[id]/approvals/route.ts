@@ -7,6 +7,9 @@ import {
   getAuthContext,
   isAdminRole,
 } from "@/lib/correspondence/server"
+import { logger } from "@/lib/logger"
+
+const log = logger("correspondence-records-approvals")
 
 const APPROVAL_DECISIONS = ["approved", "rejected", "returned_for_correction"]
 
@@ -150,12 +153,12 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         p_rich_content: { decision, reference_number: record.reference_number },
       })
     } catch (notifyError) {
-      console.error("Correspondence approval notification error:", notifyError)
+      log.error({ err: String(notifyError) }, "Correspondence approval notification error:")
     }
 
     return NextResponse.json({ data: { record: updatedRecord, approval: targetApproval } })
   } catch (error) {
-    console.error("Error in POST /api/correspondence/records/[id]/approvals:", error)
+    log.error({ err: String(error) }, "Error in POST /api/correspondence/records/[id]/approvals:")
     return NextResponse.json({ error: "Failed to process approval" }, { status: 500 })
   }
 }

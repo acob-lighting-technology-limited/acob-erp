@@ -16,6 +16,11 @@ import { Plus, Pencil, Trash2, Warehouse } from "lucide-react"
 import { EmptyState, FormFieldGroup } from "@/components/ui/patterns"
 import { toast } from "sonner"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("inventory-warehouses")
+
+
 interface WarehouseData {
   id: string
   name: string
@@ -43,7 +48,7 @@ export default function WarehousesPage() {
       if (error && error.code !== "42P01") throw error
       setWarehouses(data || [])
     } catch (error) {
-      console.error("Error:", error)
+      log.error("Error:", error)
       toast.error("Failed to load warehouses")
     } finally {
       setLoading(false)

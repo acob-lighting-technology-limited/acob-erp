@@ -2,6 +2,9 @@ import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 import { canAccessAdminSection, resolveAdminScope } from "@/lib/admin/rbac"
+import { logger } from "@/lib/logger"
+
+const log = logger("v1-hr-departments")
 
 export const dynamic = "force-dynamic"
 
@@ -42,7 +45,7 @@ export async function GET() {
 
     return NextResponse.json({ data: departments })
   } catch (error) {
-    console.error("Error fetching departments:", error)
+    log.error({ err: String(error) }, "Error fetching departments:")
     return NextResponse.json({ error: "Failed to fetch departments" }, { status: 500 })
   }
 }
@@ -86,7 +89,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ data: department }, { status: 201 })
   } catch (error) {
-    console.error("Error creating department:", error)
+    log.error({ err: String(error) }, "Error creating department:")
     return NextResponse.json({ error: "Failed to create department" }, { status: 500 })
   }
 }

@@ -2,6 +2,9 @@ import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
+import { logger } from "@/lib/logger"
+
+const log = logger("departments")
 
 export const dynamic = "force-dynamic"
 
@@ -58,7 +61,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
 
     return NextResponse.json({ data: department })
   } catch (error) {
-    console.error("Error fetching department:", error)
+    log.error({ err: String(error) }, "Error fetching department:")
     return NextResponse.json({ error: "Failed to fetch department" }, { status: 500 })
   }
 }
@@ -105,7 +108,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
 
     return NextResponse.json({ data: department })
   } catch (error) {
-    console.error("Error updating department:", error)
+    log.error({ err: String(error) }, "Error updating department:")
     return NextResponse.json({ error: "Failed to update department" }, { status: 500 })
   }
 }
@@ -162,7 +165,7 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
 
     return NextResponse.json({ success: true, soft_deleted: true })
   } catch (error) {
-    console.error("Error soft deleting department:", error)
+    log.error({ err: String(error) }, "Error soft deleting department:")
     return NextResponse.json({ error: "Failed to deactivate department" }, { status: 500 })
   }
 }

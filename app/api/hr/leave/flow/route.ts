@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { logger } from "@/lib/logger"
+
+const log = logger("hr-leave-flow")
 
 function canViewFlow(role?: string | null) {
   return ["developer", "super_admin", "admin"].includes(role || "")
@@ -49,7 +52,7 @@ export async function GET() {
       },
     })
   } catch (error) {
-    console.error("Error in GET /api/hr/leave/flow:", error)
+    log.error({ err: String(error) }, "Error in GET /api/hr/leave/flow:")
     return NextResponse.json({ error: "An error occurred" }, { status: 500 })
   }
 }
@@ -116,7 +119,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ message: "Leave flow configuration saved" })
   } catch (error) {
-    console.error("Error in POST /api/hr/leave/flow:", error)
+    log.error({ err: String(error) }, "Error in POST /api/hr/leave/flow:")
     return NextResponse.json({ error: "An error occurred" }, { status: 500 })
   }
 }

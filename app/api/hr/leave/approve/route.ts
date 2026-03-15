@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createClient as createAdminClient } from "@supabase/supabase-js"
+import { rateLimit, getClientId } from "@/lib/rate-limit"
 import {
   areRequiredDocumentsVerified,
   getLeavePolicy,
@@ -8,6 +9,9 @@ import {
   syncAttendanceForApprovedLeave,
 } from "@/lib/hr/leave-workflow"
 import { getRouteStageByOrder, stageCodeForRole } from "@/lib/hr/leave-routing"
+import { logger } from "@/lib/logger"
+
+const log = logger("hr-leave-approve")
 
 function normalizeAction(body: { action?: string; status?: string }) {
   if (body.action === "approve" || body.status === "approved") return "approved"
@@ -43,6 +47,11 @@ function humanStage(stageCode: string) {
 }
 
 export async function POST(request: NextRequest) {
+  const rl = rateLimit(`leave-approve:${getClientId(request)}`, { limit: 30, windowSec: 600 })
+  if (!rl.allowed) {
+    return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 })
+  }
+
   try {
     const supabase = await createClient()
 
@@ -351,7 +360,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ message: "Approval recorded" })
   } catch (error) {
-    console.error("Error in POST /api/hr/leave/approve:", error)
+    log.error({ err: String(error) }, "Error in POST /api/hr/leave/approve:")
     return NextResponse.json({ error: error instanceof Error ? error.message : "An error occurred" }, { status: 500 })
   }
 }

@@ -1,5 +1,8 @@
 import { createClient } from "@/lib/supabase/server"
 import { NextRequest, NextResponse } from "next/server"
+import { logger } from "@/lib/logger"
+
+const log = logger("v1-hr-employees-suspensions")
 
 // Force dynamic rendering to allow cookies/auth
 export const dynamic = "force-dynamic"
@@ -38,7 +41,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       .order("created_at", { ascending: false })
 
     if (error) {
-      console.error("Error fetching suspensions:", error)
+      log.error({ err: String(error) }, "Error fetching suspensions:")
       return NextResponse.json({ error: "Failed to fetch suspension history" }, { status: 500 })
     }
 
@@ -65,7 +68,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     return NextResponse.json({ suspensions: enhancedSuspensions })
   } catch (error) {
-    console.error("Error fetching suspensions:", error)
+    log.error({ err: String(error) }, "Error fetching suspensions:")
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

@@ -11,6 +11,11 @@ import { Download, RefreshCw } from "lucide-react"
 import { toast } from "sonner"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
+import { logger } from "@/lib/logger"
+
+const log = logger("dev-login-logs-dev-login-logs-content")
+
+
 type DevLoginLogRow = {
   id: string
   email: string
@@ -68,7 +73,7 @@ export function DevLoginLogsContent() {
 
       setRows((payload?.data || []) as DevLoginLogRow[])
     } catch (error: any) {
-      console.error(error)
+      log.error(error)
       toast.error("Failed to load developer login logs")
       setErrorMessage(error?.message || "Unknown error while loading dev login logs.")
       setRows([])

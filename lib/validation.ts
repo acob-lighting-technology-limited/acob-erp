@@ -1,5 +1,6 @@
 import { z } from "zod"
 import { NextRequest, NextResponse } from "next/server"
+import { ORG_EMAIL_DOMAINS } from "@/lib/org-config"
 
 /**
  * API Validation Middleware
@@ -188,7 +189,7 @@ export const formValidation = {
    */
   isCompanyEmail: (email: string): boolean => {
     if (!email) return false
-    const allowedDomains = ["acoblighting.com", "org.acoblighting.com"]
+    const allowedDomains = ORG_EMAIL_DOMAINS
     return allowedDomains.some((domain) => email.toLowerCase().endsWith(`@${domain}`))
   },
 }
