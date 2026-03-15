@@ -15,6 +15,36 @@
 /** Public URL of the employee web-mail / portal login page. */
 export const PORTAL_URL = "https://acoblighting.com/mail"
 
+/**
+ * Organisation-wide constants grouped by domain.
+ * These values were previously hardcoded across multiple files.
+ * Update here to propagate everywhere.
+ */
+export const ORG = {
+  /** Public-facing mail portal URL */
+  MAIL_PORTAL_URL: "https://acoblighting.com/mail",
+
+  /** Department names used in routing and escalation logic */
+  DEPARTMENTS: {
+    CORPORATE_SERVICES: "Corporate Services",
+    EXECUTIVE_MANAGEMENT: "Executive Management",
+  },
+
+  /** Business hours (24-hour format) */
+  BUSINESS_HOURS: {
+    START: 9,
+    END: 18,
+  },
+
+  /** SLA durations in business hours by priority */
+  SLA_HOURS: {
+    urgent: 4,
+    high: 8,
+    normal: 24,
+    low: 72,
+  },
+} as const
+
 /** Support email address shown in error pages and emails. */
 export const SUPPORT_EMAIL = "ict@acoblighting.com"
 
