@@ -1,7 +1,9 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
+import { QUERY_KEYS } from "@/lib/query-keys"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -14,12 +16,24 @@ import Link from "next/link"
 import { toast } from "sonner"
 import { StatCard } from "@/components/ui/stat-card"
 import { EmptyState } from "@/components/ui/empty-state"
-import { Skeleton } from "@/components/ui/skeleton"
+import { TableSkeleton } from "@/components/ui/query-states"
 
 import { logger } from "@/lib/logger"
 
 const log = logger("finance-invoices")
 
+async function fetchInvoicesList(): Promise<Invoice[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase.from("invoices").select("*").order("created_at", { ascending: false })
+  if (error) {
+    if (error.code === "42P01") {
+      log.debug("Invoices table does not exist yet")
+      return []
+    }
+    throw new Error(error.message)
+  }
+  return data || []
+}
 
 interface Invoice {
   id: string
@@ -45,39 +59,13 @@ const statusColors: Record<string, string> = {
 }
 
 export default function InvoicesPage() {
-  const [invoices, setInvoices] = useState<Invoice[]>([])
-  const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
 
-  useEffect(() => {
-    fetchInvoices()
-  }, [])
-
-  async function fetchInvoices() {
-    try {
-      const supabase = createClient()
-
-      const { data, error } = await supabase.from("invoices").select("*").order("created_at", { ascending: false })
-
-      if (error) {
-        // Table might not exist yet - that's okay
-        if (error.code === "42P01") {
-          log.debug("Invoices table does not exist yet")
-          setInvoices([])
-          return
-        }
-        throw error
-      }
-
-      setInvoices(data || [])
-    } catch (error) {
-      log.error("Error fetching invoices:", error)
-      toast.error("Failed to load invoices")
-    } finally {
-      setLoading(false)
-    }
-  }
+  const { data: invoices = [], isLoading: loading } = useQuery({
+    queryKey: QUERY_KEYS.adminInvoices(),
+    queryFn: fetchInvoicesList,
+  })
 
   function formatCurrency(amount: number, currency: string = "NGN") {
     return new Intl.NumberFormat("en-NG", {
@@ -193,18 +181,7 @@ export default function InvoicesPage() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="space-y-3">
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="flex items-center gap-4">
-                  <Skeleton className="h-4 w-24" />
-                  <Skeleton className="h-4 w-40" />
-                  <Skeleton className="h-4 w-24" />
-                  <Skeleton className="h-4 w-24" />
-                  <Skeleton className="h-4 w-20" />
-                  <Skeleton className="h-5 w-16" />
-                </div>
-              ))}
-            </div>
+            <TableSkeleton rows={5} cols={6} />
           ) : filteredInvoices.length === 0 ? (
             <EmptyState
               icon={FileText}

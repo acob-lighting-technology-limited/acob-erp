@@ -1,7 +1,9 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
+import { QUERY_KEYS } from "@/lib/query-keys"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -14,12 +16,12 @@ import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { Plus, Pencil, Trash2, Warehouse } from "lucide-react"
 import { EmptyState, FormFieldGroup } from "@/components/ui/patterns"
+import { TableSkeleton } from "@/components/ui/query-states"
 import { toast } from "sonner"
 
 import { logger } from "@/lib/logger"
 
 const log = logger("inventory-warehouses")
-
 
 interface WarehouseData {
   id: string
@@ -30,30 +32,23 @@ interface WarehouseData {
   created_at: string
 }
 
+async function fetchWarehousesList(): Promise<WarehouseData[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase.from("warehouses").select("*").order("name")
+  if (error && error.code !== "42P01") throw new Error(error.message)
+  return data || []
+}
+
 export default function WarehousesPage() {
-  const [warehouses, setWarehouses] = useState<WarehouseData[]>([])
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editing, setEditing] = useState<WarehouseData | null>(null)
   const [formData, setFormData] = useState({ name: "", code: "", address: "", is_active: true })
 
-  useEffect(() => {
-    fetchWarehouses()
-  }, [])
-
-  async function fetchWarehouses() {
-    try {
-      const supabase = createClient()
-      const { data, error } = await supabase.from("warehouses").select("*").order("name")
-      if (error && error.code !== "42P01") throw error
-      setWarehouses(data || [])
-    } catch (error) {
-      log.error("Error:", error)
-      toast.error("Failed to load warehouses")
-    } finally {
-      setLoading(false)
-    }
-  }
+  const { data: warehouses = [], isLoading: loading } = useQuery({
+    queryKey: QUERY_KEYS.adminWarehouses(),
+    queryFn: fetchWarehousesList,
+  })
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -84,7 +79,7 @@ export default function WarehousesPage() {
       setIsDialogOpen(false)
       setEditing(null)
       setFormData({ name: "", code: "", address: "", is_active: true })
-      fetchWarehouses()
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminWarehouses() })
     } catch (error: any) {
       toast.error(error.message || "Failed to save")
     }
@@ -97,7 +92,7 @@ export default function WarehousesPage() {
       const { error } = await supabase.from("warehouses").delete().eq("id", wh.id)
       if (error) throw error
       toast.success("Deleted")
-      fetchWarehouses()
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminWarehouses() })
     } catch (error: any) {
       toast.error(error.message)
     }
@@ -204,9 +199,7 @@ export default function WarehousesPage() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="border-primary h-8 w-8 animate-spin rounded-full border-4 border-t-transparent"></div>
-            </div>
+            <TableSkeleton rows={5} cols={4} />
           ) : warehouses.length === 0 ? (
             <EmptyState title="No warehouses yet" icon={Warehouse} description="Add your first warehouse location." />
           ) : (

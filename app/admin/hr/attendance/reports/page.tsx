@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -12,11 +13,17 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { StatCard } from "@/components/ui/stat-card"
 import { EmptyState } from "@/components/ui/patterns"
 import { BarChart3, Download, FileText, Users } from "lucide-react"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 import { logger } from "@/lib/logger"
 
 const log = logger("hr-attendance-reports")
 
+async function fetchDepartmentsList(): Promise<{ id: string; name: string }[]> {
+  const supabase = createClient()
+  const { data } = await supabase.from("departments").select("id, name").order("name")
+  return data || []
+}
 
 interface AttendanceReport {
   user_id: string
@@ -32,22 +39,16 @@ interface AttendanceReport {
 export default function AttendanceReportsPage() {
   const [loading, setLoading] = useState(false)
   const [reports, setReports] = useState<AttendanceReport[]>([])
-  const [departments, setDepartments] = useState<{ id: string; name: string }[]>([])
   const [filters, setFilters] = useState({
     department_id: "all",
     start_date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
     end_date: new Date().toISOString().split("T")[0],
   })
 
-  useEffect(() => {
-    fetchDepartments()
-  }, [])
-
-  async function fetchDepartments() {
-    const supabase = createClient()
-    const { data } = await supabase.from("departments").select("id, name").order("name")
-    if (data) setDepartments(data)
-  }
+  const { data: departments = [] } = useQuery({
+    queryKey: QUERY_KEYS.adminAttendanceReports(),
+    queryFn: fetchDepartmentsList,
+  })
 
   async function generateReport() {
     setLoading(true)

@@ -1,7 +1,9 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
+import { QUERY_KEYS } from "@/lib/query-keys"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -27,11 +29,74 @@ import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { StatCard } from "@/components/ui/stat-card"
 import { EmptyState } from "@/components/ui/patterns"
 import { ASSIGNABLE_ROLES } from "@/lib/role-management"
+import { TableSkeleton } from "@/components/ui/query-states"
 
 import { logger } from "@/lib/logger"
 
 const log = logger("settings-roles")
 
+const DEFAULT_ROLES: Role[] = [
+  {
+    id: "1",
+    name: "super_admin",
+    description: "Full system access",
+    permissions: [
+      "users.view",
+      "users.manage",
+      "roles.manage",
+      "hr.view",
+      "hr.manage",
+      "finance.view",
+      "finance.manage",
+      "inventory.view",
+      "inventory.manage",
+      "purchasing.view",
+      "purchasing.manage",
+      "settings.manage",
+      "reports.view",
+    ],
+    is_system: true,
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: "2",
+    name: "developer",
+    description: "Developer-level access (matches Super Admin)",
+    permissions: [
+      "users.view",
+      "users.manage",
+      "roles.manage",
+      "hr.view",
+      "hr.manage",
+      "finance.view",
+      "finance.manage",
+      "inventory.view",
+      "inventory.manage",
+      "purchasing.view",
+      "purchasing.manage",
+      "settings.manage",
+      "reports.view",
+    ],
+    is_system: true,
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: "3",
+    name: "admin",
+    description: "Administrative access",
+    permissions: ["users.view", "users.manage", "hr.view", "hr.manage", "finance.view", "reports.view"],
+    is_system: true,
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: "4",
+    name: "employee",
+    description: "Standard employee access",
+    permissions: ["hr.view"],
+    is_system: true,
+    created_at: new Date().toISOString(),
+  },
+]
 
 interface Role {
   id: string
@@ -69,9 +134,31 @@ const defaultPermissions = [
   { key: "reports.view", label: "View Reports" },
 ]
 
+async function fetchRolesData(): Promise<Role[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase.from("roles").select("*").order("name")
+
+  if (error) {
+    if (error.code === "42P01" || error.message?.includes("relation")) {
+      return DEFAULT_ROLES
+    }
+    throw new Error(error.message)
+  }
+
+  const { data: profiles } = await supabase.from("profiles").select("role")
+  const roleCounts = new Map<string, number>()
+  profiles?.forEach((p) => {
+    roleCounts.set(p.role, (roleCounts.get(p.role) || 0) + 1)
+  })
+
+  return (data || []).map((r) => ({
+    ...r,
+    user_count: roleCounts.get(r.name) || 0,
+  }))
+}
+
 export default function RolesPage() {
-  const [roles, setRoles] = useState<Role[]>([])
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingRole, setEditingRole] = useState<Role | null>(null)
   const [formData, setFormData] = useState({ name: "", description: "", permissions: [] as string[] })
@@ -85,116 +172,10 @@ export default function RolesPage() {
   const [addUserWarning, setAddUserWarning] = useState<string | null>(null)
   const [addingUser, setAddingUser] = useState(false)
 
-  useEffect(() => {
-    fetchRoles()
-  }, [])
-
-  async function fetchRoles() {
-    try {
-      const supabase = createClient()
-      const { data, error } = await supabase.from("roles").select("*").order("name")
-
-      if (error) {
-        if (error.code === "42P01") {
-          // Table doesn't exist, use default roles
-          setRoles([
-            {
-              id: "1",
-              name: "super_admin",
-              description: "Full system access",
-              permissions: defaultPermissions.map((p) => p.key),
-              is_system: true,
-              created_at: new Date().toISOString(),
-            },
-            {
-              id: "2",
-              name: "developer",
-              description: "Developer-level access (matches Super Admin)",
-              permissions: defaultPermissions.map((p) => p.key),
-              is_system: true,
-              created_at: new Date().toISOString(),
-            },
-            {
-              id: "3",
-              name: "admin",
-              description: "Administrative access",
-              permissions: ["users.view", "users.manage", "hr.view", "hr.manage", "finance.view", "reports.view"],
-              is_system: true,
-              created_at: new Date().toISOString(),
-            },
-            {
-              id: "4",
-              name: "employee",
-              description: "Standard employee access",
-              permissions: ["hr.view"],
-              is_system: true,
-              created_at: new Date().toISOString(),
-            },
-          ])
-          return
-        }
-        throw error
-      }
-
-      // Get user counts per role
-      const { data: profiles } = await supabase.from("profiles").select("role")
-      const roleCounts = new Map<string, number>()
-      profiles?.forEach((p) => {
-        roleCounts.set(p.role, (roleCounts.get(p.role) || 0) + 1)
-      })
-
-      const rolesWithCounts = (data || []).map((r) => ({
-        ...r,
-        user_count: roleCounts.get(r.name) || 0,
-      }))
-
-      setRoles(rolesWithCounts)
-    } catch (error: any) {
-      log.error("Error loading roles:", error)
-      // If table missing, fallback to defaults
-      if (error?.code === "42P01" || error?.message?.includes("relation")) {
-        setRoles([
-          {
-            id: "1",
-            name: "super_admin",
-            description: "Full system access",
-            permissions: defaultPermissions.map((p) => p.key),
-            is_system: true,
-            created_at: new Date().toISOString(),
-          },
-          {
-            id: "2",
-            name: "developer",
-            description: "Developer-level access (matches Super Admin)",
-            permissions: defaultPermissions.map((p) => p.key),
-            is_system: true,
-            created_at: new Date().toISOString(),
-          },
-          {
-            id: "3",
-            name: "admin",
-            description: "Administrative access",
-            permissions: ["users.view", "users.manage", "hr.view", "hr.manage", "finance.view", "reports.view"],
-            is_system: true,
-            created_at: new Date().toISOString(),
-          },
-          {
-            id: "4",
-            name: "employee",
-            description: "Standard employee access",
-            permissions: ["hr.view"],
-            is_system: true,
-            created_at: new Date().toISOString(),
-          },
-        ])
-        toast.warning("Roles table not found, using defaults")
-      } else {
-        toast.error(`Failed to load roles: ${error.message || "Unknown error"}`)
-      }
-    } finally {
-      setLoading(false)
-    }
-  }
+  const { data: roles = DEFAULT_ROLES, isLoading: loading } = useQuery({
+    queryKey: QUERY_KEYS.adminRolesSettings(),
+    queryFn: fetchRolesData,
+  })
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -222,7 +203,7 @@ export default function RolesPage() {
       setIsDialogOpen(false)
       setEditingRole(null)
       setFormData({ name: "", description: "", permissions: [] })
-      fetchRoles()
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminRolesSettings() })
     } catch (error: any) {
       toast.error(error.message || "Failed to save")
     }
@@ -239,7 +220,7 @@ export default function RolesPage() {
       const { error } = await supabase.from("roles").delete().eq("id", role.id)
       if (error) throw error
       toast.success("Deleted")
-      fetchRoles()
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminRolesSettings() })
     } catch (error: any) {
       toast.error(error.message)
     }
@@ -336,7 +317,8 @@ export default function RolesPage() {
       setSelectedUserId("")
       setAddUserWarning(null)
       setIsAddUserInlineOpen(false)
-      await Promise.all([fetchRoles(), openRoleUsers(selectedRoleName)])
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminRolesSettings() })
+      await openRoleUsers(selectedRoleName)
     } catch (error: any) {
       toast.error(error?.message || "Failed to add user")
     } finally {
@@ -438,9 +420,7 @@ export default function RolesPage() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="border-primary h-8 w-8 animate-spin rounded-full border-4 border-t-transparent"></div>
-            </div>
+            <TableSkeleton rows={5} cols={5} />
           ) : visibleRoles.length === 0 ? (
             <EmptyState title="No roles defined" icon={Shield} />
           ) : (

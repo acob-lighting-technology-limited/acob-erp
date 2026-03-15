@@ -1,7 +1,9 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
+import { QUERY_KEYS } from "@/lib/query-keys"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -16,6 +18,7 @@ import { getAssignableRolesForActor } from "@/lib/role-management"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { StatCard } from "@/components/ui/stat-card"
 import { EmptyState, FormFieldGroup, ListToolbar } from "@/components/ui/patterns"
+import { TableSkeleton } from "@/components/ui/query-states"
 
 // Allowlist of valid roles for validation
 const ALLOWED_ROLES = ["developer", "super_admin", "admin", "employee", "visitor"] as const
@@ -57,18 +60,56 @@ import { logger } from "@/lib/logger"
 
 const log = logger("settings-users")
 
+interface UsersSettingsData {
+  users: User[]
+  currentUserRole: string
+}
+
+async function fetchUsersSettingsData(): Promise<UsersSettingsData> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, company_email, first_name, last_name, role, admin_domains, department, employment_status, created_at")
+    .order("created_at", { ascending: false })
+
+  if (error) throw new Error(error.message)
+
+  const users = (data || []).map((u: any) => ({
+    ...u,
+    email: u.company_email,
+    is_active: u.employment_status === "active",
+    employment_status: u.employment_status || "active",
+  }))
+
+  const {
+    data: { user: currentUser },
+  } = await supabase.auth.getUser()
+  let currentUserRole = ""
+  if (currentUser?.id) {
+    const { data: me } = await supabase.from("profiles").select("role").eq("id", currentUser.id).single()
+    currentUserRole = me?.role || ""
+  }
+
+  return { users, currentUserRole }
+}
 
 export default function UsersPage() {
+  const queryClient = useQueryClient()
   const searchParams = useSearchParams()
-  const [users, setUsers] = useState<User[]>([])
-  const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [roleFilter, setRoleFilter] = useState<string>("all")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [formData, setFormData] = useState({ role: "", employment_status: "active", admin_domains: [] as string[] })
-  const [currentUserRole, setCurrentUserRole] = useState<string>("")
   const ADMIN_DOMAIN_OPTIONS = ["hr", "finance", "assets", "reports", "tasks", "projects", "communications"] as const
+
+  const { data: settingsData, isLoading: loading } = useQuery({
+    queryKey: QUERY_KEYS.adminUsersSettings(),
+    queryFn: fetchUsersSettingsData,
+  })
+
+  const users: User[] = settingsData?.users ?? []
+  const currentUserRole: string = settingsData?.currentUserRole ?? ""
 
   useEffect(() => {
     const roleParam = searchParams.get("role")
@@ -77,47 +118,6 @@ export default function UsersPage() {
       setRoleFilter(roleParam)
     }
   }, [searchParams])
-
-  useEffect(() => {
-    fetchUsers()
-  }, [])
-
-  async function fetchUsers() {
-    try {
-      const supabase = createClient()
-      const { data, error } = await supabase
-        .from("profiles")
-        .select(
-          "id, company_email, first_name, last_name, role, admin_domains, department, employment_status, created_at"
-        )
-        .order("created_at", { ascending: false })
-
-      if (error) throw error
-
-      // Map company_email to email and employment_status to is_active for the UI
-      const mappedUsers = (data || []).map((u: any) => ({
-        ...u,
-        email: u.company_email,
-        is_active: u.employment_status === "active",
-        employment_status: u.employment_status || "active",
-      }))
-
-      setUsers(mappedUsers)
-
-      const {
-        data: { user: currentUser },
-      } = await supabase.auth.getUser()
-      if (currentUser?.id) {
-        const { data: me } = await supabase.from("profiles").select("role").eq("id", currentUser.id).single()
-        setCurrentUserRole(me?.role || "")
-      }
-    } catch (error) {
-      log.error("Error:", error)
-      toast.error("Failed to load users")
-    } finally {
-      setLoading(false)
-    }
-  }
 
   async function handleUpdateRole(e: React.FormEvent) {
     e.preventDefault()
@@ -143,7 +143,7 @@ export default function UsersPage() {
 
       toast.success("User updated")
       setIsDialogOpen(false)
-      fetchUsers()
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminUsersSettings() })
     } catch (error: any) {
       toast.error(error.message || "Failed to update")
     }
@@ -246,7 +246,7 @@ export default function UsersPage() {
 
       toast.success(`User role updated to ${roleFilter}`)
       setIsAddUserDialogOpen(false)
-      fetchUsers()
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminUsersSettings() })
     } catch (error: any) {
       log.error("Error adding user to role:", error)
       toast.error(error.message || "Failed to update role")
@@ -322,9 +322,7 @@ export default function UsersPage() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="border-primary h-8 w-8 animate-spin rounded-full border-4 border-t-transparent"></div>
-            </div>
+            <TableSkeleton rows={5} cols={6} />
           ) : filtered.length === 0 ? (
             <EmptyState title="No users found" icon={Users} />
           ) : (

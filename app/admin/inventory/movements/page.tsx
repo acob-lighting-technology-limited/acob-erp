@@ -1,7 +1,9 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
+import { QUERY_KEYS } from "@/lib/query-keys"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { StatCard } from "@/components/ui/stat-card"
@@ -10,12 +12,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { ArrowUpDown, ArrowUp, ArrowDown, Filter, Boxes } from "lucide-react"
-import { toast } from "sonner"
+import { TableSkeleton } from "@/components/ui/query-states"
 
 import { logger } from "@/lib/logger"
 
 const log = logger("inventory-movements")
-
 
 interface StockMovement {
   id: string
@@ -43,47 +44,35 @@ const typeIcons: Record<string, any> = {
   transfer: ArrowUpDown,
 }
 
+async function fetchMovementsList(): Promise<StockMovement[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from("stock_movements")
+    .select("*, product:products(name), created_by:profiles(first_name, last_name)")
+    .order("created_at", { ascending: false })
+    .limit(100)
+
+  if (error) {
+    if (error.code === "42P01") {
+      return []
+    }
+    throw new Error(error.message)
+  }
+
+  return (data || []).map((m: any) => ({
+    ...m,
+    product_name: m.product?.name,
+    created_by_name: m.created_by ? `${m.created_by.first_name} ${m.created_by.last_name}` : null,
+  }))
+}
+
 export default function MovementsPage() {
-  const [movements, setMovements] = useState<StockMovement[]>([])
-  const [loading, setLoading] = useState(true)
   const [typeFilter, setTypeFilter] = useState<string>("all")
 
-  useEffect(() => {
-    fetchMovements()
-  }, [])
-
-  async function fetchMovements() {
-    try {
-      const supabase = createClient()
-
-      const { data, error } = await supabase
-        .from("stock_movements")
-        .select("*, product:products(name), created_by:profiles(first_name, last_name)")
-        .order("created_at", { ascending: false })
-        .limit(100)
-
-      if (error) {
-        if (error.code === "42P01") {
-          setMovements([])
-          return
-        }
-        throw error
-      }
-
-      const movementsWithNames = (data || []).map((m: any) => ({
-        ...m,
-        product_name: m.product?.name,
-        created_by_name: m.created_by ? `${m.created_by.first_name} ${m.created_by.last_name}` : null,
-      }))
-
-      setMovements(movementsWithNames)
-    } catch (error) {
-      log.error("Error:", error)
-      toast.error("Failed to load movements")
-    } finally {
-      setLoading(false)
-    }
-  }
+  const { data: movements = [], isLoading: loading } = useQuery({
+    queryKey: QUERY_KEYS.adminInventoryMovements(),
+    queryFn: fetchMovementsList,
+  })
 
   function formatDate(date: string) {
     return new Date(date).toLocaleDateString("en-NG", {
@@ -154,9 +143,7 @@ export default function MovementsPage() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="border-primary h-8 w-8 animate-spin rounded-full border-4 border-t-transparent"></div>
-            </div>
+            <TableSkeleton rows={5} cols={5} />
           ) : filteredMovements.length === 0 ? (
             <EmptyState title="No movements yet" description="Stock movements will appear here." icon={ArrowUpDown} />
           ) : (

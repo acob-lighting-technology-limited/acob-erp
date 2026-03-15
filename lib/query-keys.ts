@@ -76,4 +76,58 @@ export const QUERY_KEYS = {
 
   // Admin employees
   adminEmployees: (filters?: Record<string, unknown>) => (filters ? ["admin-employees", filters] : ["admin-employees"]),
+
+  // Admin HR pages
+  adminDepartmentsPage: () => ["admin-departments-page"],
+  adminHrDashboard: () => ["admin-hr-dashboard"],
+  adminAttendanceReports: (filters?: Record<string, unknown>) =>
+    filters ? ["admin-attendance-reports", filters] : ["admin-attendance-reports"],
+  adminLeaveSettings: () => ["admin-leave-settings"],
+  adminOfficeLocations: () => ["admin-office-locations"],
+  adminEmployeeDetail: (userId: string) => ["admin-employee-detail", userId],
+  adminJobDescriptions: (filters?: Record<string, unknown>) =>
+    filters ? ["admin-job-descriptions", filters] : ["admin-job-descriptions"],
+  adminAuditLogs: (filters?: Record<string, unknown>) =>
+    filters ? ["admin-audit-logs", filters] : ["admin-audit-logs"],
+
+  // Finance pages
+  adminBills: () => ["admin-bills"],
+  adminInvoices: () => ["admin-invoices"],
+  adminFinanceReports: () => ["admin-finance-reports"],
+
+  // Settings pages
+  adminUsersSettings: () => ["admin-users-settings"],
+  adminRolesSettings: () => ["admin-roles-settings"],
+
+  // Inventory pages
+  adminInventoryDashboard: () => ["admin-inventory-dashboard"],
+  adminProducts: (filters?: Record<string, unknown>) => (filters ? ["admin-products", filters] : ["admin-products"]),
+  adminCategories: () => ["admin-categories"],
+  adminWarehouses: () => ["admin-warehouses"],
+  adminInventoryMovements: (filters?: Record<string, unknown>) =>
+    filters ? ["admin-inventory-movements", filters] : ["admin-inventory-movements"],
+
+  // Purchasing pages
+  adminPurchasingDashboard: () => ["admin-purchasing-dashboard"],
+  adminPurchaseOrders: (filters?: Record<string, unknown>) =>
+    filters ? ["admin-purchase-orders", filters] : ["admin-purchase-orders"],
+  adminSuppliers: () => ["admin-suppliers"],
+
+  // App pages
+  appDocumentation: () => ["app-documentation"],
+  appAssets: () => ["app-assets"],
+  appProjects: () => ["app-projects"],
+  appProjectDetail: (id: string) => ["app-project-detail", id],
+  appTasks: () => ["app-tasks"],
+  appPaymentDetail: (id: string) => ["app-payment-detail", id],
+  appJobDescription: () => ["app-job-description"],
+  appNotifications: () => ["app-notifications"],
+
+  // Components
+  feedbackViewer: () => ["feedback-viewer-filter"],
+  paymentsTable: (filters?: Record<string, unknown>) => (filters ? ["payments-table", filters] : ["payments-table"]),
+  notificationBell: () => ["notification-bell"],
+  weeklyReportDialog: (week: number, year: number) => ["weekly-report-dialog", week, year],
+  adminWeeklySummaryMail: (filters?: Record<string, unknown>) =>
+    filters ? ["admin-weekly-summary-mail", filters] : ["admin-weekly-summary-mail"],
 } as const

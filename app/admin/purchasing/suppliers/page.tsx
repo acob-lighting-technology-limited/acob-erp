@@ -1,7 +1,9 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
+import { QUERY_KEYS } from "@/lib/query-keys"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -15,11 +17,11 @@ import { toast } from "sonner"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { StatCard } from "@/components/ui/stat-card"
 import { EmptyState, FormFieldGroup, ListToolbar, StatusBadge } from "@/components/ui/patterns"
+import { TableSkeleton } from "@/components/ui/query-states"
 
 import { logger } from "@/lib/logger"
 
 const log = logger("purchasing-suppliers")
-
 
 interface Supplier {
   id: string
@@ -33,9 +35,20 @@ interface Supplier {
   created_at: string
 }
 
+async function fetchSuppliersList(): Promise<Supplier[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase.from("suppliers").select("*").order("name")
+  if (error) {
+    if (error.code === "42P01") {
+      return []
+    }
+    throw new Error(error.message)
+  }
+  return data || []
+}
+
 export default function SuppliersPage() {
-  const [suppliers, setSuppliers] = useState<Supplier[]>([])
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
   const [searchQuery, setSearchQuery] = useState("")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Supplier | null>(null)
@@ -49,23 +62,10 @@ export default function SuppliersPage() {
     is_active: true,
   })
 
-  useEffect(() => {
-    fetchSuppliers()
-  }, [])
-
-  async function fetchSuppliers() {
-    try {
-      const supabase = createClient()
-      const { data, error } = await supabase.from("suppliers").select("*").order("name")
-      if (error && error.code !== "42P01") throw error
-      setSuppliers(data || [])
-    } catch (error) {
-      log.error("Error:", error)
-      toast.error("Failed to load suppliers")
-    } finally {
-      setLoading(false)
-    }
-  }
+  const { data: suppliers = [], isLoading: loading } = useQuery({
+    queryKey: QUERY_KEYS.adminSuppliers(),
+    queryFn: fetchSuppliersList,
+  })
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -94,7 +94,7 @@ export default function SuppliersPage() {
       setIsDialogOpen(false)
       setEditing(null)
       setFormData({ name: "", code: "", email: "", phone: "", address: "", contact_person: "", is_active: true })
-      fetchSuppliers()
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminSuppliers() })
     } catch (error: any) {
       toast.error(error.message || "Failed to save")
     }
@@ -107,7 +107,7 @@ export default function SuppliersPage() {
       const { error } = await supabase.from("suppliers").delete().eq("id", s.id)
       if (error) throw error
       toast.success("Deleted")
-      fetchSuppliers()
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminSuppliers() })
     } catch (error: any) {
       toast.error(error.message)
     }
@@ -271,9 +271,7 @@ export default function SuppliersPage() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="border-primary h-8 w-8 animate-spin rounded-full border-4 border-t-transparent"></div>
-            </div>
+            <TableSkeleton rows={5} cols={5} />
           ) : filtered.length === 0 ? (
             <EmptyState
               title="No suppliers yet"

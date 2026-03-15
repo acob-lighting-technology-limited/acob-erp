@@ -1,7 +1,9 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
+import { QUERY_KEYS } from "@/lib/query-keys"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -15,12 +17,11 @@ import { Textarea } from "@/components/ui/textarea"
 import { Plus, Pencil, Trash2, Boxes } from "lucide-react"
 import { toast } from "sonner"
 import { EmptyState } from "@/components/ui/patterns"
-import { Skeleton } from "@/components/ui/skeleton"
+import { TableSkeleton } from "@/components/ui/query-states"
 
 import { logger } from "@/lib/logger"
 
 const log = logger("inventory-categories")
-
 
 interface Category {
   id: string
@@ -30,50 +31,40 @@ interface Category {
   created_at: string
 }
 
+async function fetchCategoriesList(): Promise<Category[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase.from("product_categories").select("*").order("name")
+
+  if (error) {
+    if (error.code === "42P01") {
+      return []
+    }
+    throw new Error(error.message)
+  }
+
+  const catsWithCounts = await Promise.all(
+    (data || []).map(async (cat) => {
+      const { count } = await supabase
+        .from("products")
+        .select("*", { count: "exact", head: true })
+        .eq("category_id", cat.id)
+      return { ...cat, product_count: count || 0 }
+    })
+  )
+
+  return catsWithCounts
+}
+
 export default function CategoriesPage() {
-  const [categories, setCategories] = useState<Category[]>([])
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingCategory, setEditingCategory] = useState<Category | null>(null)
   const [formData, setFormData] = useState({ name: "", description: "" })
 
-  useEffect(() => {
-    fetchCategories()
-  }, [])
-
-  async function fetchCategories() {
-    try {
-      const supabase = createClient()
-
-      const { data, error } = await supabase.from("product_categories").select("*").order("name")
-
-      if (error) {
-        if (error.code === "42P01") {
-          setCategories([])
-          return
-        }
-        throw error
-      }
-
-      // Get product counts
-      const catsWithCounts = await Promise.all(
-        (data || []).map(async (cat) => {
-          const { count } = await supabase
-            .from("products")
-            .select("*", { count: "exact", head: true })
-            .eq("category_id", cat.id)
-          return { ...cat, product_count: count || 0 }
-        })
-      )
-
-      setCategories(catsWithCounts)
-    } catch (error) {
-      log.error("Error fetching categories:", error)
-      toast.error("Failed to load categories")
-    } finally {
-      setLoading(false)
-    }
-  }
+  const { data: categories = [], isLoading: loading } = useQuery({
+    queryKey: QUERY_KEYS.adminCategories(),
+    queryFn: fetchCategoriesList,
+  })
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -99,7 +90,7 @@ export default function CategoriesPage() {
       setIsDialogOpen(false)
       setEditingCategory(null)
       setFormData({ name: "", description: "" })
-      fetchCategories()
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminCategories() })
     } catch (error: any) {
       toast.error(error.message || "Failed to save category")
     }
@@ -113,7 +104,7 @@ export default function CategoriesPage() {
       const { error } = await supabase.from("product_categories").delete().eq("id", cat.id)
       if (error) throw error
       toast.success("Category deleted")
-      fetchCategories()
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminCategories() })
     } catch (error: any) {
       toast.error(error.message || "Failed to delete")
     }
@@ -201,15 +192,7 @@ export default function CategoriesPage() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="space-y-3">
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="flex items-center gap-4">
-                  <Skeleton className="h-4 w-32" />
-                  <Skeleton className="h-4 w-48" />
-                  <Skeleton className="h-5 w-12" />
-                </div>
-              ))}
-            </div>
+            <TableSkeleton rows={5} cols={3} />
           ) : categories.length === 0 ? (
             <EmptyState
               icon={Boxes}

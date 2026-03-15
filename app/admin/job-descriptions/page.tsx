@@ -1,6 +1,8 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
+import { useQuery } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -38,6 +40,35 @@ import { logger } from "@/lib/logger"
 
 const log = logger("job-descriptions")
 
+interface JobDescriptionsData {
+  profiles: Profile[]
+  userProfile: UserProfile | null
+}
+
+async function fetchJobDescriptionsData(): Promise<JobDescriptionsData> {
+  const supabase = createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { profiles: [], userProfile: null }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role, is_department_lead, lead_departments")
+    .eq("id", user.id)
+    .single()
+
+  let query = supabase.from("profiles").select("*").order("last_name", { ascending: true })
+
+  if (profile?.is_department_lead && profile.lead_departments) {
+    query = query.in("department", profile.lead_departments)
+  }
+
+  const { data, error } = await query
+  if (error) throw new Error(error.message)
+
+  return { profiles: data || [], userProfile: profile }
+}
 
 interface Profile {
   id: string
@@ -60,9 +91,6 @@ interface UserProfile {
 }
 
 export default function AdminJobDescriptionsPage() {
-  const [profiles, setProfiles] = useState<Profile[]>([])
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [departmentFilter, setDepartmentFilter] = useState("all")
   const [employeeFilter, setemployeeFilter] = useState("all")
@@ -72,50 +100,12 @@ export default function AdminJobDescriptionsPage() {
   const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null)
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
 
-  const supabase = createClient()
+  const { data, isLoading } = useQuery({
+    queryKey: QUERY_KEYS.adminJobDescriptions(),
+    queryFn: fetchJobDescriptionsData,
+  })
 
-  useEffect(() => {
-    loadData()
-  }, [])
-
-  const loadData = async () => {
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (!user) return
-
-      // Get user profile
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role, is_department_lead, lead_departments")
-        .eq("id", user.id)
-        .single()
-
-      setUserProfile(profile)
-
-      // Fetch profiles based on role
-      let query = supabase.from("profiles").select("*").order("last_name", { ascending: true })
-
-      // Role-based filtering
-      if (profile?.is_department_lead && profile.lead_departments) {
-        // Leads can only see their department's employee
-        query = query.in("department", profile.lead_departments)
-      }
-      // super_admin and admin can see all profiles (no filter needed)
-
-      const { data, error } = await query
-
-      if (error) throw error
-
-      setProfiles(data || [])
-    } catch (error: any) {
-      log.error("Error loading profiles:", error)
-      toast.error("Failed to load job descriptions")
-    } finally {
-      setIsLoading(false)
-    }
-  }
+  const profiles = data?.profiles ?? []
 
   const handleViewJobDescription = (profile: Profile) => {
     setSelectedProfile(profile)
