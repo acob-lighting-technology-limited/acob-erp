@@ -10,6 +10,7 @@ import {
 } from "@/lib/hr/leave-workflow"
 import { getRouteStageByOrder, stageCodeForRole } from "@/lib/hr/leave-routing"
 import { logger } from "@/lib/logger"
+import { writeAuditLog } from "@/lib/audit/write-audit"
 
 const log = logger("hr-leave-approve")
 
@@ -191,6 +192,18 @@ export async function POST(request: NextRequest) {
         })
       }
 
+      await writeAuditLog(
+        supabase,
+        {
+          action: "reject",
+          entityType: "leave_request",
+          entityId: leave_request_id,
+          newValues: { status: "rejected", stage: stageCode, reason: comments },
+          context: { actorId: user.id, source: "api", route: "/api/hr/leave/approve" },
+        },
+        { failOpen: true }
+      )
+
       return NextResponse.json({ message: "Leave request rejected" })
     }
 
@@ -299,6 +312,18 @@ export async function POST(request: NextRequest) {
         })
       }
 
+      await writeAuditLog(
+        supabase,
+        {
+          action: "approve",
+          entityType: "leave_request",
+          entityId: leave_request_id,
+          newValues: { status: "approved", final: true, stage: stageCode },
+          context: { actorId: user.id, source: "api", route: "/api/hr/leave/approve" },
+        },
+        { failOpen: true }
+      )
+
       return NextResponse.json({ message: "Final approval recorded and leave approved" })
     }
 
@@ -357,6 +382,18 @@ export async function POST(request: NextRequest) {
       entityId: leave_request_id,
       emailEvent: "approval_required",
     })
+
+    await writeAuditLog(
+      supabase,
+      {
+        action: "approve",
+        entityType: "leave_request",
+        entityId: leave_request_id,
+        newValues: { stage: stageCode, next_stage: nextStage?.stage_code },
+        context: { actorId: user.id, source: "api", route: "/api/hr/leave/approve" },
+      },
+      { failOpen: true }
+    )
 
     return NextResponse.json({ message: "Approval recorded" })
   } catch (error) {

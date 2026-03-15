@@ -3,6 +3,7 @@ import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 import { resolveAdminScope } from "@/lib/admin/rbac"
 import { logger } from "@/lib/logger"
+import { writeAuditLog } from "@/lib/audit/write-audit"
 
 const log = logger("payments-categories")
 
@@ -85,6 +86,18 @@ export async function POST(request: Request) {
     const { data: category, error } = await supabase.from("payment_categories").insert({ name }).select().single()
 
     if (error) throw error
+
+    await writeAuditLog(
+      supabase as any,
+      {
+        action: "create",
+        entityType: "payment_category",
+        entityId: category.id,
+        newValues: { name },
+        context: { actorId: user.id, source: "api", route: "/api/payments/categories" },
+      },
+      { failOpen: true }
+    )
 
     return NextResponse.json({ data: category }, { status: 201 })
   } catch (error) {

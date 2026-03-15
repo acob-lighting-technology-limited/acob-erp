@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import { createClient as createServiceClient } from "@supabase/supabase-js"
 import { canAccessAdminSection, resolveAdminScope } from "@/lib/admin/rbac"
 import { logger } from "@/lib/logger"
+import { writeAuditLog } from "@/lib/audit/write-audit"
 
 const log = logger("import-csv")
 
@@ -282,6 +283,18 @@ export async function POST(request: Request) {
     }
 
     log.info({ imported: importedCount, skipped: skippedCount, errors: errors.length }, "Import complete")
+
+    await writeAuditLog(
+      supabase,
+      {
+        action: "create",
+        entityType: "user",
+        entityId: "bulk-import",
+        newValues: { imported: importedCount, skipped: skippedCount, total: records.length, errors: errors.length },
+        context: { actorId: user.id, source: "api", route: "/api/admin/import-csv" },
+      },
+      { failOpen: true }
+    )
 
     return NextResponse.json(
       {

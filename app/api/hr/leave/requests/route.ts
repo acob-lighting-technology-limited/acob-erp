@@ -18,6 +18,7 @@ import {
   notifyStageApprover,
   stageCodeForRole,
 } from "@/lib/hr/leave-routing"
+import { writeAuditLog } from "@/lib/audit/write-audit"
 
 const log = logger("leave-requests")
 
@@ -494,6 +495,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: dbMessage }, { status: 500 })
     }
 
+    await writeAuditLog(
+      supabase,
+      {
+        action: "create",
+        entityType: "leave_request",
+        entityId: newRequest.id,
+        newValues: { leave_type_id, start_date, end_date: endDate, days_count: effectiveDays, status: initialStatus },
+        context: { actorId: user.id, source: "api", route: "/api/hr/leave/requests" },
+      },
+      { failOpen: true }
+    )
+
     const requesterName = requester.full_name || `${requester.first_name || ""} ${requester.last_name || ""}`.trim()
 
     if (initialStatus === "pending") {
@@ -775,6 +788,23 @@ export async function PUT(request: NextRequest) {
 
     if (error) return NextResponse.json({ error: "Failed to update leave request" }, { status: 500 })
 
+    await writeAuditLog(
+      supabase,
+      {
+        action: "update",
+        entityType: "leave_request",
+        entityId: id,
+        newValues: {
+          leave_type_id: targetLeaveTypeId,
+          start_date: targetStartDate,
+          end_date: endDate,
+          days_count: targetDays,
+        },
+        context: { actorId: user.id, source: "api", route: "/api/hr/leave/requests" },
+      },
+      { failOpen: true }
+    )
+
     return NextResponse.json({
       data: {
         ...updatedRequest,
@@ -830,6 +860,18 @@ export async function DELETE(request: NextRequest) {
 
     const { error } = await supabase.from("leave_requests").delete().eq("id", id)
     if (error) return NextResponse.json({ error: "Failed to delete leave request" }, { status: 500 })
+
+    await writeAuditLog(
+      supabase,
+      {
+        action: "delete",
+        entityType: "leave_request",
+        entityId: id,
+        oldValues: { status: existingRequest.status, stage: existingRequest.current_stage_code },
+        context: { actorId: user.id, source: "api", route: "/api/hr/leave/requests" },
+      },
+      { failOpen: true }
+    )
 
     return NextResponse.json({ message: "Leave request deleted successfully" })
   } catch (error) {

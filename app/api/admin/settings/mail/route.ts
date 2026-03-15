@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { NOTIFICATION_KEYS, isNotificationKey } from "@/lib/notifications/delivery-policy"
+import { writeAuditLog } from "@/lib/audit/write-audit"
 
 type PolicyUpdatePayload = {
   notification_key: string
@@ -102,6 +103,18 @@ export async function PUT(request: NextRequest) {
     })
 
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+
+    await writeAuditLog(
+      supabase,
+      {
+        action: "update",
+        entityType: "notification_policy",
+        entityId: "bulk",
+        newValues: { updated_keys: payload.map((r) => r.notification_key) },
+        context: { actorId: auth.user!.id, source: "api", route: "/api/admin/settings/mail" },
+      },
+      { failOpen: true }
+    )
 
     return NextResponse.json({ ok: true })
   } catch (error) {

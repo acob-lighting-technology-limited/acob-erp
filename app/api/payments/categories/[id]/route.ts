@@ -3,6 +3,7 @@ import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 import { resolveAdminScope } from "@/lib/admin/rbac"
 import { logger } from "@/lib/logger"
+import { writeAuditLog } from "@/lib/audit/write-audit"
 
 const log = logger("payments-categories")
 
@@ -64,6 +65,18 @@ export async function PUT(request: Request, { params }: { params: { id: string }
 
     if (error) throw error
 
+    await writeAuditLog(
+      supabase as any,
+      {
+        action: "update",
+        entityType: "payment_category",
+        entityId: params.id,
+        newValues: { name },
+        context: { actorId: user.id, source: "api", route: `/api/payments/categories/${params.id}` },
+      },
+      { failOpen: true }
+    )
+
     return NextResponse.json({ data: category })
   } catch (error) {
     log.error({ err: String(error) }, "Error updating payment category:")
@@ -92,6 +105,17 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
     const { error } = await supabase.from("payment_categories").delete().eq("id", params.id)
 
     if (error) throw error
+
+    await writeAuditLog(
+      supabase as any,
+      {
+        action: "delete",
+        entityType: "payment_category",
+        entityId: params.id,
+        context: { actorId: user.id, source: "api", route: `/api/payments/categories/${params.id}` },
+      },
+      { failOpen: true }
+    )
 
     return NextResponse.json({ success: true })
   } catch (error) {

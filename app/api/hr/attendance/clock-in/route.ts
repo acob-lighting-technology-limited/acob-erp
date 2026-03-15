@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { rateLimit, getClientId } from "@/lib/rate-limit"
 import { logger } from "@/lib/logger"
+import { writeAuditLog } from "@/lib/audit/write-audit"
 
 const log = logger("hr-attendance-clock-in")
 
@@ -51,6 +52,18 @@ export async function POST(request: NextRequest) {
       log.error({ err: String(error) }, "Error clocking in:")
       return NextResponse.json({ error: "Failed to clock in" }, { status: 500 })
     }
+
+    await writeAuditLog(
+      supabase,
+      {
+        action: "create",
+        entityType: "attendance_record",
+        entityId: record.id,
+        newValues: { date: today, clock_in: record.clock_in, status: "present" },
+        context: { actorId: user.id, source: "api", route: "/api/hr/attendance/clock-in" },
+      },
+      { failOpen: true }
+    )
 
     return NextResponse.json({
       data: record,

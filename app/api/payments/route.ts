@@ -4,6 +4,7 @@ import { NextResponse } from "next/server"
 import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { logger } from "@/lib/logger"
+import { writeAuditLog } from "@/lib/audit/write-audit"
 
 const log = logger("payments")
 
@@ -258,6 +259,18 @@ export async function POST(request: Request) {
       .single()
 
     if (error) throw error
+
+    await writeAuditLog(
+      supabase as any,
+      {
+        action: "create",
+        entityType: "payment",
+        entityId: payment.id,
+        newValues: { amount: payment.amount, department_id: payment.department_id, status: payment.status },
+        context: { actorId: user.id, source: "api", route: "/api/payments" },
+      },
+      { failOpen: true }
+    )
 
     return NextResponse.json({ data: payment }, { status: 201 })
   } catch (error: any) {

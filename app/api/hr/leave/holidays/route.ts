@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { writeAuditLog } from "@/lib/audit/write-audit"
 
 async function assertHR(supabase: any, userId: string) {
   const { data } = await supabase.from("profiles").select("role").eq("id", userId).single()
@@ -49,6 +50,19 @@ export async function POST(request: NextRequest) {
       .select()
 
     if (error) return NextResponse.json({ error: "Failed to save holidays" }, { status: 500 })
+
+    await writeAuditLog(
+      supabase,
+      {
+        action: "create",
+        entityType: "holiday",
+        entityId: Array.isArray(data) && data[0]?.id ? data[0].id : "bulk",
+        newValues: { count: Array.isArray(data) ? data.length : 1 },
+        context: { actorId: user.id, source: "api", route: "/api/hr/leave/holidays" },
+      },
+      { failOpen: true }
+    )
+
     return NextResponse.json({ data, message: "Holidays saved" })
   } catch {
     return NextResponse.json({ error: "An error occurred" }, { status: 500 })

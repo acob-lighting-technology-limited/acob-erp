@@ -2,6 +2,7 @@
 import { assertNoFleetOverlap, canManageFleet } from "@/lib/fleet-booking"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
+import { writeAuditLog } from "@/lib/audit/write-audit"
 
 export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -63,6 +64,18 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       .single()
 
     if (error) return NextResponse.json({ error: error.message || "Failed to review booking" }, { status: 500 })
+
+    await writeAuditLog(
+      supabase,
+      {
+        action: action === "approve" ? "approve" : "reject",
+        entityType: "fleet_booking",
+        entityId: bookingId,
+        newValues: { status: nextStatus, admin_note: adminNote },
+        context: { actorId: user.id, source: "api", route: `/api/admin/hr/fleet/bookings/${bookingId}/review` },
+      },
+      { failOpen: true }
+    )
 
     return NextResponse.json({ data })
   } catch (error) {

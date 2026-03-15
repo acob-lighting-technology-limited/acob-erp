@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { logger } from "@/lib/logger"
+import { writeAuditLog } from "@/lib/audit/write-audit"
 
 const log = logger("hr-attendance-clock-out")
 
@@ -57,6 +58,18 @@ export async function POST(request: NextRequest) {
       log.error({ err: String(error) }, "Error clocking out:")
       return NextResponse.json({ error: "Failed to clock out" }, { status: 500 })
     }
+
+    await writeAuditLog(
+      supabase,
+      {
+        action: "update",
+        entityType: "attendance_record",
+        entityId: record.id,
+        newValues: { clock_out: clockOutTime, total_hours: workHours },
+        context: { actorId: user.id, source: "api", route: "/api/hr/attendance/clock-out" },
+      },
+      { failOpen: true }
+    )
 
     return NextResponse.json({
       data: updatedRecord,

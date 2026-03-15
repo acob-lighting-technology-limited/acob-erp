@@ -10,6 +10,7 @@ import {
 } from "@/lib/fleet-booking"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
+import { writeAuditLog } from "@/lib/audit/write-audit"
 
 export async function GET() {
   try {
@@ -192,6 +193,23 @@ export async function POST(request: NextRequest) {
         throw new Error("Failed to save attachment metadata")
       }
     }
+
+    await writeAuditLog(
+      supabase,
+      {
+        action: "create",
+        entityType: "fleet_booking",
+        entityId: booking.id,
+        newValues: {
+          resource_id: booking.resource_id,
+          start_at: booking.start_at,
+          end_at: booking.end_at,
+          status: booking.status,
+        },
+        context: { actorId: user.id, source: "api", route: "/api/fleet/bookings" },
+      },
+      { failOpen: true }
+    )
 
     return NextResponse.json({ data: booking }, { status: 201 })
   } catch (error) {

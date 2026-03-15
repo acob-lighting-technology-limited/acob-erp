@@ -3,6 +3,7 @@ import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
+import { writeAuditLog } from "@/lib/audit/write-audit"
 
 function createClient() {
   const cookieStore = cookies()
@@ -194,6 +195,18 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
+    await writeAuditLog(
+      supabase as any,
+      {
+        action: "update",
+        entityType: "payment",
+        entityId: id,
+        newValues: body,
+        context: { actorId: user.id, source: "api", route: `/api/payments/${id}` },
+      },
+      { failOpen: true }
+    )
+
     return NextResponse.json({ data: updatedPayment })
   } catch (error: any) {
     return NextResponse.json({ error: error?.message || "Internal Server Error" }, { status: 500 })
@@ -248,6 +261,17 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
+
+    await writeAuditLog(
+      supabase as any,
+      {
+        action: "delete",
+        entityType: "payment",
+        entityId: id,
+        context: { actorId: user.id, source: "api", route: `/api/payments/${id}` },
+      },
+      { failOpen: true }
+    )
 
     return NextResponse.json({ success: true })
   } catch (error: any) {

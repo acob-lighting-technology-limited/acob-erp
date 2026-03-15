@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { canAccessAdminSection, resolveAdminScope } from "@/lib/admin/rbac"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
+import { writeAuditLog } from "@/lib/audit/write-audit"
 
 interface CreateAssetTypePayload {
   label?: string
@@ -95,6 +96,18 @@ export async function POST(request: NextRequest) {
     }
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
+
+  await writeAuditLog(
+    supabase,
+    {
+      action: "create",
+      entityType: "asset_type",
+      entityId: data.id,
+      newValues: { label, code, requires_serial_model: requiresSerialModel },
+      context: { actorId: user.id, source: "api", route: "/api/admin/assets/types" },
+    },
+    { failOpen: true }
+  )
 
   return NextResponse.json({ data }, { status: 201 })
 }

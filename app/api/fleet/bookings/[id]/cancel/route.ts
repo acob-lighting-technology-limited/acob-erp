@@ -1,5 +1,6 @@
 ﻿import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { writeAuditLog } from "@/lib/audit/write-audit"
 
 export async function PATCH(_: Request, { params }: { params: { id: string } }) {
   try {
@@ -44,6 +45,18 @@ export async function PATCH(_: Request, { params }: { params: { id: string } }) 
     if (updateError) {
       return NextResponse.json({ error: "Failed to cancel booking" }, { status: 500 })
     }
+
+    await writeAuditLog(
+      supabase,
+      {
+        action: "update",
+        entityType: "fleet_booking",
+        entityId: booking.id,
+        newValues: { status: "cancelled" },
+        context: { actorId: user.id, source: "api", route: `/api/fleet/bookings/${bookingId}/cancel` },
+      },
+      { failOpen: true }
+    )
 
     return NextResponse.json({ message: "Booking cancelled" })
   } catch (error) {

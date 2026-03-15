@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { areRequiredDocumentsVerified, getLeavePolicy, notifyUsers } from "@/lib/hr/leave-workflow"
 import { logger } from "@/lib/logger"
+import { writeAuditLog } from "@/lib/audit/write-audit"
 
 const log = logger("hr-leave-evidence-verify")
 
@@ -60,6 +61,18 @@ export async function POST(request: NextRequest) {
         })
       }
     }
+
+    await writeAuditLog(
+      supabase,
+      {
+        action: status === "verified" ? "approve" : "reject",
+        entityType: "leave_evidence",
+        entityId: evidence_id,
+        newValues: { status, notes: notes || null, leave_request_id: data.leave_request_id },
+        context: { actorId: user.id, source: "api", route: "/api/hr/leave/evidence/verify" },
+      },
+      { failOpen: true }
+    )
 
     return NextResponse.json({ data, message: `Evidence ${status}` })
   } catch (error) {

@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server"
 import { createClient as createAdminClient } from "@supabase/supabase-js"
 import { DEFAULT_MAINTENANCE_MESSAGE, canManageMaintenanceMode, parseMaintenanceMode } from "@/lib/maintenance"
 import { logger } from "@/lib/logger"
+import { writeAuditLog } from "@/lib/audit/write-audit"
 
 const log = logger("dev-maintenance")
 
@@ -103,6 +104,18 @@ export async function PUT(request: NextRequest) {
     if (upsertError) {
       return NextResponse.json({ error: `Failed to update maintenance mode: ${upsertError.message}` }, { status: 500 })
     }
+
+    await writeAuditLog(
+      supabase,
+      {
+        action: "update",
+        entityType: "system_setting",
+        entityId: "maintenance_mode",
+        newValues: { enabled, message },
+        context: { actorId: user.id, source: "api", route: "/api/dev/maintenance" },
+      },
+      { failOpen: true }
+    )
 
     return NextResponse.json({
       data: {
