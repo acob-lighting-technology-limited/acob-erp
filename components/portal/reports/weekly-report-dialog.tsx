@@ -169,19 +169,13 @@ export function WeeklyReportDialog({ isOpen, onClose, onSuccess, initialData }: 
     }
     setSaving(true)
     try {
-      let reportId = id
-      if (id) {
-        const { error } = await supabase.from("weekly_reports").update(formData).eq("id", id)
-        if (error) throw error
-      } else {
-        const { data: newReport, error } = await supabase
-          .from("weekly_reports")
-          .insert([formData])
-          .select("id")
-          .single()
-        if (error) throw error
-        reportId = newReport.id
-      }
+      const { data: savedReport, error: reportError } = await supabase
+        .from("weekly_reports")
+        .upsert(formData, { onConflict: "department,week_number,year" })
+        .select("id")
+        .single()
+      if (reportError) throw reportError
+      const reportId = savedReport.id
 
       if (!isNextWeekActive) {
         const payload: any[] = []

@@ -188,7 +188,6 @@ export default async function LeavePage() {
   return (
     <LeaveContent
       currentUserId={leaveData.currentUserId}
-      currentUserRole={leaveData.currentUserRole}
       initialRequests={leaveData.requests}
       initialBalances={leaveData.balances}
       initialLeaveTypes={leaveData.leaveTypes}

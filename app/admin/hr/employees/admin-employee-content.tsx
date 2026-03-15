@@ -77,11 +77,6 @@ import {
   getAssignableRolesForActor,
 } from "@/lib/role-management"
 
-import { logger } from "@/lib/logger"
-
-const log = logger("hr-employees-admin-employee-content")
-
-
 export interface Employee {
   id: string
   employee_number: string | null
@@ -120,8 +115,6 @@ interface AdminEmployeeContentProps {
   initialEmployees: Employee[]
   userProfile: UserProfile
 }
-
-type DepartmentLeadConflict = Pick<Employee, "id" | "first_name" | "last_name" | "company_email" | "department">
 
 export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmployeeContentProps) {
   const { departments: DEPARTMENTS } = useDepartments()
@@ -234,7 +227,6 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
     job_description: "",
   })
   const [showMoreOptions, setShowMoreOptions] = useState(false)
-  const [leadConflictProfile, setLeadConflictProfile] = useState<DepartmentLeadConflict | null>(null)
 
   const supabase = createClient()
   const canManageUsers = ["developer", "super_admin", "admin"].includes(userProfile?.role || "")
@@ -254,11 +246,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
     setIsLoading(true)
     try {
       // Fetch employees - all leads can view users; mutation is restricted to HR lead/admin/super admin.
-      let query = supabase.from("profiles").select("*").order("last_name", { ascending: true })
-      if (!["developer", "admin", "super_admin"].includes(userProfile?.role || "")) {
-        const scopedDepartments = userProfile.managed_departments ?? []
-        query = scopedDepartments.length > 0 ? query.in("department", scopedDepartments) : query.eq("id", "__none__")
-      }
+      const query = supabase.from("profiles").select("*").order("last_name", { ascending: true })
 
       const { data, error } = await query
 
@@ -266,7 +254,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
 
       setEmployees(data || [])
     } catch (error: any) {
-      log.error("Error loading employees:", error)
+      console.error("Error loading employees:", error)
       toast.error("Failed to load employees")
     } finally {
       setIsLoading(false)
@@ -347,7 +335,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
       setModalViewMode("edit")
       setIsViewDialogOpen(true)
     } catch (error: any) {
-      log.error("Error loading employees for edit:", error)
+      console.error("Error loading employees for edit:", error)
       toast.error("Failed to load employees details")
     }
   }
@@ -372,7 +360,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         }
       }
     } catch (error: any) {
-      log.error("Error loading profile for signature:", error)
+      console.error("Error loading profile for signature:", error)
       toast.error("Failed to load profile data")
     }
   }
@@ -401,7 +389,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         documentation: payload.related?.documentation || [],
       })
     } catch (error: any) {
-      log.error("Error loading employees details:", error)
+      console.error("Error loading employees details:", error)
       toast.error("Failed to load employees details")
     }
   }
@@ -460,7 +448,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
       setAssignedItems(assigned)
       return assigned
     } catch (error: any) {
-      log.error("Error checking assigned items:", error)
+      console.error("Error checking assigned items:", error)
       toast.error("Failed to check assigned items")
       return null
     }
@@ -477,8 +465,8 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
     setIsDeleteDialogOpen(false)
   }
 
-  const handleSaveEmployee = async (forceLeadReplacement = false) => {
-    if (isSaving) return
+  const handleSaveEmployee = async () => {
+    if (isSaving) return // Prevent duplicate submissions
     setIsSaving(true)
     try {
       if (!canManageUsers) {
@@ -502,6 +490,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         return
       }
 
+      // Check if user can assign this role
       if (userProfile && !canAssignRoles(userProfile.role, editForm.role)) {
         toast.error("You don't have permission to assign this role")
         setIsSaving(false)
@@ -577,7 +566,6 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         setIsSaving(false)
         return
       }
-
       if (editForm.role === "admin" && editForm.admin_domains.length === 0) {
         toast.error("Admin role requires at least one admin domain")
         setIsSaving(false)
@@ -585,51 +573,18 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
       }
 
       const isLead = editForm.is_department_lead
-      let targetDepartmentId: string | null = null
 
-      if (isLead) {
-        const { data: departmentRow, error: departmentError } = await supabase
-          .from("departments")
-          .select("id")
-          .eq("name", editForm.department)
-          .maybeSingle()
-
-        if (departmentError) throw departmentError
-        if (!departmentRow?.id) {
-          toast.error("The selected department could not be found")
-          setIsSaving(false)
-          return
-        }
-
-        targetDepartmentId = departmentRow.id
-
-        const { data: existingLeadRows, error: existingLeadError } = await supabase
-          .from("profiles")
-          .select("id, first_name, last_name, company_email, department")
-          .eq("department", editForm.department)
-          .eq("is_department_lead", true)
-          .neq("id", selectedEmployee.id)
-          .limit(1)
-
-        if (existingLeadError) throw existingLeadError
-
-        const existingLead = existingLeadRows?.[0] || null
-        if (existingLead && !forceLeadReplacement) {
-          setLeadConflictProfile(existingLead as DepartmentLeadConflict)
-          setIsSaving(false)
-          return
-        }
-      }
-
+      // Build update object with all fields
       const updateData: any = {
         role: editForm.role,
         admin_domains: editForm.role === "admin" ? editForm.admin_domains : null,
         department: editForm.department,
         office_location: editForm.office_location || null,
         company_role: editForm.company_role || null,
-        is_department_lead: false,
-        lead_departments: [],
+        is_department_lead: isLead,
+        lead_departments: isLead ? editForm.lead_departments : [],
         updated_at: new Date().toISOString(),
+        // Always include expanded fields if they exist in form state
         first_name: editForm.first_name || null,
         last_name: editForm.last_name || null,
         other_names: editForm.other_names || null,
@@ -646,29 +601,15 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
       }
 
       const { error } = await supabase.from("profiles").update(updateData).eq("id", selectedEmployee.id)
+
       if (error) throw error
 
-      if (isLead && targetDepartmentId) {
-        const { error: assignLeadError } = await supabase.rpc("assign_department_lead", {
-          p_department_id: targetDepartmentId,
-          p_new_lead_id: selectedEmployee.id,
-        })
+      toast.success("Employee updated successfully")
 
-        if (assignLeadError) throw assignLeadError
-      } else if (selectedEmployee.is_department_lead) {
-        const { error: clearDepartmentHeadError } = await supabase
-          .from("departments")
-          .update({ department_head_id: null, updated_at: new Date().toISOString() })
-          .eq("department_head_id", selectedEmployee.id)
-
-        if (clearDepartmentHeadError) throw clearDepartmentHeadError
-      }
-
-      setLeadConflictProfile(null)
-      toast.success(isLead ? "Department lead updated successfully" : "Employee updated successfully")
-
+      // If we're in the unified view modal, switch back to profile mode and refresh data
       if (isViewDialogOpen) {
         setModalViewMode("profile")
+        // Refresh the viewEmployeeProfile to show updated data immediately
         const { data: updatedProfile } = await supabase
           .from("profiles")
           .select("*")
@@ -682,7 +623,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
 
       loadData()
     } catch (error: any) {
-      log.error("Error updating employees:", error)
+      console.error("Error updating employees:", error)
       toast.error(error?.message || "Failed to update employees member")
     } finally {
       setIsSaving(false)
@@ -771,7 +712,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
       })
       loadData()
     } catch (error: any) {
-      log.error("Error creating user:", error)
+      console.error("Error creating user:", error)
       toast.error(error.message || "Failed to create user")
     } finally {
       setIsCreatingUser(false)
@@ -898,7 +839,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
       toast.success("Employees exported to Excel successfully")
       setExportEmployeeDialogOpen(false)
     } catch (error: any) {
-      log.error("Error exporting employees to Excel:", error)
+      console.error("Error exporting employees to Excel:", error)
       toast.error("Failed to export employees to Excel")
     }
   }
@@ -1029,7 +970,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
       toast.success("Employees exported to PDF successfully")
       setExportEmployeeDialogOpen(false)
     } catch (error: any) {
-      log.error("Error exporting employees to PDF:", error)
+      console.error("Error exporting employees to PDF:", error)
       toast.error("Failed to export employees to PDF")
     }
   }
@@ -1114,7 +1055,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
       saveAs(blob, `employees-export-${new Date().toISOString().split("T")[0]}.docx`)
       toast.success("Employee exported to Word successfully")
     } catch (error: any) {
-      log.error("Error exporting employees to Word:", error)
+      console.error("Error exporting employees to Word:", error)
       toast.error("Failed to export employees to Word")
     }
   }
@@ -2721,7 +2662,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
             </div>
             <div className="flex flex-wrap items-center justify-end gap-2">
               {modalViewMode === "edit" ? (
-                <Button onClick={() => handleSaveEmployee()} loading={isSaving}>
+                <Button onClick={handleSaveEmployee} loading={isSaving}>
                   Save Changes
                 </Button>
               ) : (
@@ -2755,53 +2696,6 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                 Close
               </Button>
             </div>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog
-        open={Boolean(leadConflictProfile)}
-        onOpenChange={(open) => {
-          if (!open) setLeadConflictProfile(null)
-        }}
-      >
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-amber-500" />
-              Replace Department Lead?
-            </DialogTitle>
-            <DialogDescription>
-              This department already has a lead. Saving will automatically demote the current lead and assign this user
-              instead.
-            </DialogDescription>
-          </DialogHeader>
-
-          {leadConflictProfile && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-              <p className="font-medium">Current lead</p>
-              <p>
-                {formatName(leadConflictProfile.first_name)} {formatName(leadConflictProfile.last_name)}
-              </p>
-              <p>{leadConflictProfile.company_email}</p>
-              <p>{leadConflictProfile.department}</p>
-            </div>
-          )}
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setLeadConflictProfile(null)} disabled={isSaving}>
-              Cancel
-            </Button>
-            <Button onClick={() => handleSaveEmployee(true)} disabled={isSaving}>
-              {isSaving ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Replacing...
-                </>
-              ) : (
-                "Replace Lead"
-              )}
-            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

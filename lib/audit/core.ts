@@ -65,15 +65,24 @@ function coerceString(value: unknown): string | undefined {
 }
 
 function generateRequestId(): string {
-  try {
-    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-      return crypto.randomUUID()
-    }
-  } catch {
-    // ignore fallback
+  // crypto.randomUUID() is available in Node 18+, all modern browsers,
+  // and Next.js Edge Runtime — no Math.random() fallback needed.
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID()
   }
-
-  return `${Date.now()}-${Math.random().toString(16).slice(2)}`
+  // Last-resort fallback using cryptographically-secure random bytes.
+  // Math.random() is intentionally NOT used here because it is not
+  // cryptographically secure and could produce collisions under load.
+  if (typeof crypto !== "undefined" && typeof crypto.getRandomValues === "function") {
+    const buf = new Uint8Array(16)
+    crypto.getRandomValues(buf)
+    buf[6] = (buf[6] & 0x0f) | 0x40 // version 4
+    buf[8] = (buf[8] & 0x3f) | 0x80 // variant bits
+    const hex = Array.from(buf).map((b) => b.toString(16).padStart(2, "0")).join("")
+    return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`
+  }
+  // Should never reach here in a supported runtime.
+  throw new Error("No cryptographically secure random source available")
 }
 
 export function normalizeAuditAction(action: string): { action: AuditAction; event?: string } {

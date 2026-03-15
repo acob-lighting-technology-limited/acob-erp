@@ -7,11 +7,9 @@ const log = logger("supabase-admin")
 /**
  * Sync employment_status into the user's auth metadata so middleware
  * can read it from the JWT without an extra DB query on every request.
+ * Call this whenever employment_status changes in the profiles table.
  */
-export async function syncEmploymentStatusToAuth(
-  userId: string,
-  employmentStatus: string
-): Promise<void> {
+export async function syncEmploymentStatusToAuth(userId: string, employmentStatus: string): Promise<void> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!url || !key) {

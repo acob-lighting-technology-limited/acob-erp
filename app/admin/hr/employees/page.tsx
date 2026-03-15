@@ -4,11 +4,6 @@ import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { AdminEmployeeContent, type Employee, type UserProfile } from "./admin-employee-content"
 import { resolveAdminScope } from "@/lib/admin/rbac"
 
-import { logger } from "@/lib/logger"
-
-const log = logger("hr-employees")
-
-
 async function getAdminEmployeeData() {
   const supabase = await createClient()
   const dataClient = getServiceRoleClientOrFallback(supabase as any)
@@ -31,19 +26,13 @@ async function getAdminEmployeeData() {
     managed_departments: scope.managedDepartments,
   }
 
-  // Fetch employees. Department leads are scoped to their managed departments.
-  let query = dataClient.from("profiles").select("*").order("last_name", { ascending: true })
-  if (!scope.isAdminLike) {
-    query =
-      scope.managedDepartments.length > 0
-        ? query.in("department", scope.managedDepartments)
-        : query.eq("id", "__none__")
-  }
+  // Fetch employees - all leads can view users; mutation is restricted in the UI and backend.
+  const query = dataClient.from("profiles").select("*").order("last_name", { ascending: true })
 
   const { data: employeeData, error: employeeError } = await query
 
   if (employeeError) {
-    log.error("Error loading employees:", employeeError)
+    console.error("Error loading employees:", employeeError)
     return { employees: [], userProfile }
   }
 

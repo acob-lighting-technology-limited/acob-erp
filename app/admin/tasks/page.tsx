@@ -44,7 +44,7 @@ async function getAdminTasksData() {
   }
 
   // Build query based on role - exclude weekly action tracker items
-  let tasksQuery = dataClient
+  const tasksQuery = dataClient
     .from("tasks")
     .select("*")
     .neq("category", "weekly_action")

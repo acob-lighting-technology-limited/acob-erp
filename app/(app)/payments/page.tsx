@@ -3,11 +3,6 @@ import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { PaymentsTable } from "@/components/payments/payments-table"
 
-import { logger } from "@/lib/logger"
-
-const log = logger("payments")
-
-
 interface Payment {
   id: string
   department_id: string
@@ -49,14 +44,6 @@ interface Category {
   name: string
 }
 
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-
-const normalizeDepartmentId = (value: unknown): string | null => {
-  const raw = typeof value === "string" ? value.trim() : ""
-  if (!raw || !UUID_REGEX.test(raw)) return null
-  return raw
-}
-
 async function getPaymentsData() {
   const supabase = await createClient()
   const dataClient = getServiceRoleClientOrFallback(supabase as any)
@@ -73,11 +60,12 @@ async function getPaymentsData() {
   // Fetch user profile with department info
   const { data: profile } = await dataClient
     .from("profiles")
-    .select("department, department_id, role, lead_departments")
+    .select("department, department_id")
     .eq("id", user.id)
     .single()
 
   let currentUserDepartmentId: string | null = null
+  const isAdmin = false
 
   const resolveDepartmentCandidates = (department: string | null | undefined): string[] => {
     const raw = String(department || "").trim()
@@ -87,7 +75,7 @@ async function getPaymentsData() {
   }
 
   if (profile) {
-    currentUserDepartmentId = normalizeDepartmentId((profile as any).department_id)
+    currentUserDepartmentId = (profile as any).department_id || null
     if (!currentUserDepartmentId) {
       const candidates = resolveDepartmentCandidates(profile.department)
       if (candidates.length > 0) {
@@ -117,15 +105,15 @@ async function getPaymentsData() {
     .order("created_at", { ascending: false })
 
   // Always filter by user's department on the user-facing page
-  paymentsQuery = currentUserDepartmentId
-    ? paymentsQuery.eq("department_id", currentUserDepartmentId)
-    : paymentsQuery.eq("department_id", "__none__")
+  if (currentUserDepartmentId) {
+    paymentsQuery = paymentsQuery.eq("department_id", currentUserDepartmentId)
+  }
 
   const { data: payments, error: paymentsError } = await paymentsQuery
   let loadError: string | null = null
 
   if (paymentsError) {
-    log.error("Error loading payments:", paymentsError)
+    console.error("Error loading payments:", paymentsError)
     loadError = "Failed to load payments"
   }
 
@@ -146,7 +134,7 @@ async function getPaymentsData() {
     currentUser: {
       id: user.id,
       department_id: currentUserDepartmentId,
-      isAdmin: false,
+      isAdmin: false, // User-facing page - hides admin controls
     },
   }
 }

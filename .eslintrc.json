@@ -1,21 +1,30 @@
 {
   "extends": ["next/core-web-vitals", "next/typescript"],
   "rules": {
-    // Graduated from "off" — warn so violations surface in editor/CI without blocking builds.
-    // Target: tighten to "error" incrementally as the codebase is cleaned up.
+    // Warn instead of silently allowing `any` — violations should be fixed
+    // progressively. Switch to "error" once the codebase is clean.
     "@typescript-eslint/no-explicit-any": "warn",
-    "@typescript-eslint/no-unused-vars": [
-      "warn",
-      {
-        "argsIgnorePattern": "^_",
-        "varsIgnorePattern": "^_",
-        "caughtErrorsIgnorePattern": "^_"
-      }
-    ],
+
+    // Unused vars should be fixed; keeping as warn to avoid blocking builds
+    // during the cleanup period.
+    "@typescript-eslint/no-unused-vars": ["warn", {
+      "argsIgnorePattern": "^_",
+      "varsIgnorePattern": "^_",
+      "caughtErrorsIgnorePattern": "^_"
+    }],
+
+    // Stale closures in hooks are a real bug class — must be visible.
+    // Keeping as "warn" rather than "error" to avoid false positives on
+    // intentionally stable refs / dispatch functions.
     "react-hooks/exhaustive-deps": "warn",
+
+    // Unescaped entities in JSX cause rendering bugs — warn to catch them.
     "react/no-unescaped-entities": "warn",
+
+    // Using <img> instead of next/image skips optimisation — warn.
     "@next/next/no-img-element": "warn",
-    // Warn for now — several files have let→const violations that need sweeping up first
-    "prefer-const": "warn"
+
+    // prefer-const is safe to enforce strictly.
+    "prefer-const": "error"
   }
 }

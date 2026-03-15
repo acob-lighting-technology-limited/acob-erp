@@ -1,5 +1,6 @@
 import { notifyUsers } from "@/lib/hr/leave-workflow"
 import { applyAssignableStatusFilter } from "@/lib/workforce/assignment-policy"
+import { DEPT_EXECUTIVE_MANAGEMENT, DEPT_CORPORATE_SERVICES } from "@/config/constants"
 
 type SupabaseClient = any
 
@@ -15,8 +16,8 @@ export interface ResolvedRouteStage {
 
 const DEPARTMENT_NAMES = {
   adminHr: "Admin & HR",
-  md: "Executive Management",
-  hcs: "Corporate Services",
+  md: DEPT_EXECUTIVE_MANAGEMENT,
+  hcs: DEPT_CORPORATE_SERVICES,
 } as const
 
 function hasLeadForDepartment(profile: any, departmentName: string) {

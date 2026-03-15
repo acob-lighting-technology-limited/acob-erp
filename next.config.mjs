@@ -1,40 +1,69 @@
 import path from "path"
 
-const supabaseHost = process.env.NEXT_PUBLIC_SUPABASE_URL
-  ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).host
-  : "*.supabase.co"
-
-const cspDirectives = [
-  `default-src 'self'`,
-  // Next.js requires unsafe-inline for its runtime; unsafe-eval needed for some libs (xlsx, jspdf)
-  // cdn.jsdelivr.net loads pptxgenjs UMD bundle dynamically (see lib/export-utils.ts)
-  `script-src 'self' 'unsafe-inline' 'unsafe-eval' https://va.vercel-scripts.com https://cdn.jsdelivr.net`,
-  `style-src 'self' 'unsafe-inline'`,
-  `img-src 'self' data: blob: https://${supabaseHost}`,
-  `font-src 'self'`,
-  `connect-src 'self' https://${supabaseHost} wss://${supabaseHost} https://va.vercel-scripts.com`,
-  `worker-src 'self' blob:`,
-  `frame-src 'none'`,
-  `object-src 'none'`,
-  ...(process.env.NODE_ENV === "production" ? [`upgrade-insecure-requests`] : []),
-].join("; ")
+// ---------------------------------------------------------------------------
+// Security headers applied to all routes
+// ---------------------------------------------------------------------------
+const supabaseHost = "https://itqegqxeqkeogwrvlzlj.supabase.co"
 
 const securityHeaders = [
-  { key: "X-DNS-Prefetch-Control", value: "on" },
-  { key: "X-Frame-Options", value: "DENY" },
+  // Prevent browsers from sniffing a different MIME type than declared
   { key: "X-Content-Type-Options", value: "nosniff" },
+
+  // Block page from being framed by other origins (clickjacking protection)
+  { key: "X-Frame-Options", value: "SAMEORIGIN" },
+
+  // Enforce HTTPS for 1 year, including subdomains
+  { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
+
+  // Restrict browser feature access
+  {
+    key: "Permissions-Policy",
+    value: "camera=(), microphone=(), geolocation=(), interest-cohort=()",
+  },
+
+  // Referrer information limited to same-origin
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
-  { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
-  { key: "Content-Security-Policy", value: cspDirectives },
+
+  // Content Security Policy
+  // Sources:
+  //   - 'self'                    : App origin
+  //   - supabaseHost              : Supabase API & storage
+  //   - va.vercel-scripts.com     : Vercel Web Analytics script
+  //   - vitals.vercel-insights.com: Vercel Speed Insights beacon
+  //
+  // Note: 'unsafe-inline' is required for:
+  //   - style-src: Tailwind CSS + Radix UI inject inline styles at runtime.
+  //     Remove once CSS-in-JS is eliminated or a nonce/hash approach is used.
+  //   - script-src: Next.js inlines small hydration scripts. Remove when
+  //     Next.js supports nonce-based CSP out of the box (tracked roadmap item).
+  {
+    key: "Content-Security-Policy",
+    value: [
+      "default-src 'self'",
+      // Scripts: self + Next.js inline hydration + Vercel Analytics
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://va.vercel-scripts.com",
+      // Styles: self + inline (Tailwind/Radix)
+      "style-src 'self' 'unsafe-inline'",
+      // Images: self + data URIs (avatar initials) + Supabase storage
+      `img-src 'self' data: blob: ${supabaseHost}`,
+      // Fonts: self-hosted Geist font only
+      "font-src 'self'",
+      // API calls: self + Supabase
+      `connect-src 'self' ${supabaseHost} wss://itqegqxeqkeogwrvlzlj.supabase.co https://vitals.vercel-insights.com`,
+      // No frames from external origins
+      "frame-src 'none'",
+      // No plugins
+      "object-src 'none'",
+      // Base URI restricted to self
+      "base-uri 'self'",
+      // Form submissions only to self
+      "form-action 'self'",
+    ].join("; "),
+  },
 ]
 
 const nextConfig = {
   transpilePackages: ["xlsx", "jspdf", "jspdf-autotable", "docx", "file-saver"],
-
-  async headers() {
-    return [{ source: "/(.*)", headers: securityHeaders }]
-  },
 
   // Ensure build fails on TypeScript errors (matches Vercel behavior)
   typescript: {
@@ -44,6 +73,16 @@ const nextConfig = {
   // Ensure build fails on ESLint errors (matches Vercel behavior)
   eslint: {
     ignoreDuringBuilds: false,
+  },
+
+  async headers() {
+    return [
+      {
+        // Apply security headers to all routes
+        source: "/(.*)",
+        headers: securityHeaders,
+      },
+    ]
   },
 
   webpack: (config, { isServer }) => {

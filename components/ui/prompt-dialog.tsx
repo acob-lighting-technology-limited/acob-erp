@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import { Button } from "@/components/ui/button"
 import {
   Dialog,
   DialogContent,
@@ -9,31 +10,30 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 
-export interface PromptDialogProps {
+interface PromptDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   title: string
-  description?: string | React.ReactNode
+  description?: string
   label?: string
   placeholder?: string
+  /** Use "textarea" for multi-line input (e.g. rejection reasons) */
   inputType?: "text" | "textarea" | "url"
   required?: boolean
   confirmLabel?: string
   cancelLabel?: string
-  confirmVariant?: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link"
+  confirmVariant?: "default" | "destructive"
   onConfirm: (value: string) => void
   onCancel?: () => void
 }
 
 /**
- * Accessible Dialog-based replacement for window.prompt().
- * Supports text, textarea, and URL input types.
- * Auto-focuses the input on open; Ctrl/Cmd+Enter confirms.
+ * A proper modal replacement for window.prompt().
+ * Supports single-line and multi-line text input.
  */
 export function PromptDialog({
   open,
@@ -43,7 +43,7 @@ export function PromptDialog({
   label,
   placeholder,
   inputType = "text",
-  required = false,
+  required = true,
   confirmLabel = "Confirm",
   cancelLabel = "Cancel",
   confirmVariant = "default",
@@ -51,25 +51,22 @@ export function PromptDialog({
   onCancel,
 }: PromptDialogProps) {
   const [value, setValue] = useState("")
-  const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null)
+  const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null)
 
-  // Reset value whenever dialog opens
-  useEffect(() => {
-    if (open) setValue("")
-  }, [open])
-
-  // Auto-focus input when dialog opens
+  // Reset value when dialog opens
   useEffect(() => {
     if (open) {
-      const t = setTimeout(() => inputRef.current?.focus(), 50)
+      setValue("")
+      // Focus input on next tick after dialog animation
+      const t = setTimeout(() => inputRef.current?.focus(), 80)
       return () => clearTimeout(t)
     }
   }, [open])
 
   function handleConfirm() {
     if (required && !value.trim()) return
-    onConfirm(value)
-    setValue("")
+    onConfirm(value.trim())
+    onOpenChange(false)
   }
 
   function handleCancel() {
@@ -79,7 +76,7 @@ export function PromptDialog({
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
-    if (e.key === "Enter" && (inputType !== "textarea" || e.ctrlKey || e.metaKey)) {
+    if (e.key === "Enter" && inputType !== "textarea") {
       e.preventDefault()
       handleConfirm()
     }
@@ -88,10 +85,8 @@ export function PromptDialog({
     }
   }
 
-  const isDisabled = required && !value.trim()
-
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) handleCancel() }}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
@@ -99,8 +94,7 @@ export function PromptDialog({
         </DialogHeader>
 
         <div className="space-y-2 py-2">
-          {label && <Label htmlFor="prompt-input">{label}{required && <span className="text-destructive ml-1">*</span>}</Label>}
-
+          {label && <Label htmlFor="prompt-input">{label}</Label>}
           {inputType === "textarea" ? (
             <Textarea
               id="prompt-input"
@@ -116,23 +110,24 @@ export function PromptDialog({
             <Input
               id="prompt-input"
               ref={inputRef as React.RefObject<HTMLInputElement>}
-              type={inputType === "url" ? "url" : "text"}
+              type={inputType}
               value={value}
               onChange={(e) => setValue(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder={placeholder}
             />
           )}
-          {inputType === "textarea" && (
-            <p className="text-muted-foreground text-xs">Press Ctrl+Enter to confirm</p>
-          )}
         </div>
 
-        <DialogFooter className="gap-2">
+        <DialogFooter className="gap-2 sm:gap-0">
           <Button variant="outline" onClick={handleCancel}>
             {cancelLabel}
           </Button>
-          <Button variant={confirmVariant} onClick={handleConfirm} disabled={isDisabled}>
+          <Button
+            variant={confirmVariant}
+            onClick={handleConfirm}
+            disabled={required && !value.trim()}
+          >
             {confirmLabel}
           </Button>
         </DialogFooter>

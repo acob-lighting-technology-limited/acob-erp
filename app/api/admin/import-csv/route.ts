@@ -231,7 +231,7 @@ export async function POST(request: Request) {
         // Create auth user
         const { data: authData, error: authError } = await serviceSupabase.auth.admin.createUser({
           email,
-          password: Math.random().toString(36).slice(-12),
+          password: crypto.randomUUID().replace(/-/g, ""),
           email_confirm: true,
         })
 

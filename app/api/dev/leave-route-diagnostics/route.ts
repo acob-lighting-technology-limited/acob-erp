@@ -11,11 +11,12 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createClient as createAdminClient } from "@supabase/supabase-js"
+import { DEPT_EXECUTIVE_MANAGEMENT, DEPT_CORPORATE_SERVICES } from "@/config/constants"
 
 const DEPARTMENT_NAMES: Record<string, string> = {
   admin_hr_lead: "Admin & HR",
-  md: "Executive Management",
-  hcs: "Corporate Services",
+  md: DEPT_EXECUTIVE_MANAGEMENT,
+  hcs: DEPT_CORPORATE_SERVICES,
 }
 
 type DiagRow = {

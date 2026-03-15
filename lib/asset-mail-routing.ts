@@ -1,4 +1,5 @@
 import { isAssignableEmploymentStatus } from "@/lib/workforce/assignment-policy"
+import { DEPT_EXECUTIVE_MANAGEMENT, DEPT_CORPORATE_SERVICES } from "@/config/constants"
 
 export type AssetMailRoutingProfile = {
   id: string
@@ -48,12 +49,12 @@ export function resolveAssetMailSpecialRecipients(profiles: AssetMailRoutingProf
   )
 
   const hcs = activeProfiles.find(
-    (profile) => profileLeadsDepartment(profile, "Corporate Services") || profile.department === "Corporate Services"
+    (profile) => profileLeadsDepartment(profile, DEPT_CORPORATE_SERVICES) || profile.department === DEPT_CORPORATE_SERVICES
   )
 
   const md = activeProfiles.find(
     (profile) =>
-      profileLeadsDepartment(profile, "Executive Management") || profile.department === "Executive Management"
+      profileLeadsDepartment(profile, DEPT_EXECUTIVE_MANAGEMENT) || profile.department === DEPT_EXECUTIVE_MANAGEMENT
   )
 
   return { hcs, md }

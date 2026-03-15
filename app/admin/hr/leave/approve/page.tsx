@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Clock, History, CalendarCheck2, CheckCircle2, AlertCircle } from "lucide-react"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
@@ -56,18 +56,28 @@ const STAGE_LABELS: Record<string, string> = {
   cancelled: "Cancelled",
 }
 
+interface ActionDialogState {
+  open: boolean
+  id: string
+  action: "approve" | "reject"
+  /** Set when approve requires evidence override */
+  missingDocuments: string[]
+}
+
 export default function LeaveApprovePage() {
   const [loading, setLoading] = useState(true)
   const [myQueue, setMyQueue] = useState<LeaveItem[]>([])
   const [allPendingQueue, setAllPendingQueue] = useState<LeaveItem[]>([])
   const [history, setHistory] = useState<LeaveItem[]>([])
 
-  const [rejectPrompt, setRejectPrompt] = useState<{ open: boolean; id: string } | null>(null)
-  const [overridePrompt, setOverridePrompt] = useState<{
-    open: boolean
-    id: string
-    missingDocs: string[]
-  } | null>(null)
+  const [actionDialog, setActionDialog] = useState<ActionDialogState>({
+    open: false,
+    id: "",
+    action: "reject",
+    missingDocuments: [],
+  })
+  // Ref to carry "overrideEvidence" flag from the dialog into submitAction
+  const overrideEvidenceRef = useRef(false)
 
   useEffect(() => {
     void loadData()
@@ -98,6 +108,26 @@ export default function LeaveApprovePage() {
     }
   }
 
+  function handleAction(id: string, action: "approve" | "reject") {
+    const target = myQueue.find((item) => item.id === id) || history.find((item) => item.id === id)
+    const needsOverride = action === "approve" && target && target.evidence_complete === false
+
+    if (action === "approve" && !needsOverride) {
+      // No prompt needed — submit directly
+      void submitAction(id, "approve", "", false)
+      return
+    }
+
+    // Open the appropriate dialog
+    overrideEvidenceRef.current = needsOverride ?? false
+    setActionDialog({
+      open: true,
+      id,
+      action,
+      missingDocuments: needsOverride ? (target?.missing_documents || []) : [],
+    })
+  }
+
   async function submitAction(id: string, action: "approve" | "reject", comments: string, overrideEvidence: boolean) {
     try {
       const response = await fetch("/api/hr/leave/approve", {
@@ -114,23 +144,6 @@ export default function LeaveApprovePage() {
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to process action")
     }
-  }
-
-  function handleAction(id: string, action: "approve" | "reject") {
-    const target = myQueue.find((item) => item.id === id) || history.find((item) => item.id === id)
-    const needsOverride = action === "approve" && target && target.evidence_complete === false
-
-    if (action === "reject") {
-      setRejectPrompt({ open: true, id })
-      return
-    }
-
-    if (needsOverride) {
-      setOverridePrompt({ open: true, id, missingDocs: target?.missing_documents || [] })
-      return
-    }
-
-    void submitAction(id, "approve", "", false)
   }
 
   function expectedApproverLabel(item: LeaveItem) {
@@ -155,8 +168,33 @@ export default function LeaveApprovePage() {
     history: history.length,
   }
 
+  const isOverride = actionDialog.missingDocuments.length > 0
+
   return (
     <>
+    <PromptDialog
+      open={actionDialog.open}
+      onOpenChange={(open) => setActionDialog((s) => ({ ...s, open }))}
+      title={
+        isOverride
+          ? "Override Incomplete Evidence"
+          : "Rejection Reason"
+      }
+      description={
+        isOverride
+          ? `Evidence is incomplete (${actionDialog.missingDocuments.join(", ")}). Provide an override reason to proceed with approval.`
+          : "Please provide a reason for rejecting this leave request."
+      }
+      label={isOverride ? "Override reason" : "Rejection reason"}
+      placeholder={isOverride ? "Explain why evidence requirement is being waived…" : "Enter rejection reason…"}
+      inputType="textarea"
+      required
+      confirmLabel={isOverride ? "Approve with Override" : "Reject"}
+      confirmVariant={isOverride ? "default" : "destructive"}
+      onConfirm={(value) => {
+        void submitAction(actionDialog.id, actionDialog.action, value, overrideEvidenceRef.current)
+      }}
+    />
     <AdminTablePage
       title="Leave Approvals"
       description="HR final endorsement dashboard with full leave history"
@@ -392,47 +430,6 @@ export default function LeaveApprovePage() {
         </TabsContent>
       </Tabs>
     </AdminTablePage>
-
-    <PromptDialog
-      open={rejectPrompt?.open ?? false}
-      onOpenChange={(open) => !open && setRejectPrompt(null)}
-      title="Reject Leave Request"
-      description="Provide a reason for rejecting this leave request."
-      label="Rejection Reason"
-      placeholder="Enter rejection reason..."
-      inputType="textarea"
-      required
-      confirmLabel="Reject"
-      confirmVariant="destructive"
-      onConfirm={(reason) => {
-        const id = rejectPrompt!.id
-        setRejectPrompt(null)
-        void submitAction(id, "reject", reason, false)
-      }}
-      onCancel={() => setRejectPrompt(null)}
-    />
-
-    <PromptDialog
-      open={overridePrompt?.open ?? false}
-      onOpenChange={(open) => !open && setOverridePrompt(null)}
-      title="Override Evidence Check"
-      description={
-        overridePrompt?.missingDocs.length
-          ? `Evidence is incomplete (${overridePrompt.missingDocs.join(", ")}). Provide an override reason to proceed.`
-          : "Evidence is incomplete. Provide an override reason to proceed."
-      }
-      label="Override Reason"
-      placeholder="Enter override reason..."
-      inputType="textarea"
-      required
-      confirmLabel="Approve with Override"
-      onConfirm={(reason) => {
-        const id = overridePrompt!.id
-        setOverridePrompt(null)
-        void submitAction(id, "approve", reason, true)
-      }}
-      onCancel={() => setOverridePrompt(null)}
-    />
     </>
   )
 }
