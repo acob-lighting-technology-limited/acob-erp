@@ -620,6 +620,7 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
+    <>
     <PageWrapper maxWidth="full" background="gradient">
       <PageHeader
         title={mode === "communications" ? "Broadcast Communications" : "Meeting Reminders"}
@@ -1547,5 +1548,6 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
       }}
       onCancel={() => setLinkPromptOpen(false)}
     />
+    </>
   )
 }
