@@ -133,7 +133,23 @@ export async function GET(request: NextRequest) {
     const userId = searchParams.get("user_id")
     const all = searchParams.get("all") === "true"
 
-    let query = supabase.from("leave_requests").select("*").order("created_at", { ascending: false })
+    let query = supabase
+      .from("leave_requests")
+      .select(
+        `
+        *,
+        user:profiles!leave_requests_user_id_profiles_fkey (
+          id, full_name, first_name, last_name, company_email, department
+        ),
+        leave_type:leave_types!leave_requests_leave_type_id_fkey (
+          id, name, color, requires_evidence
+        ),
+        approvals:leave_approvals (
+          id, approver_id, status, stage_code, approved_at, comments
+        )
+      `
+      )
+      .order("created_at", { ascending: false })
 
     if (status) query = query.eq("status", status)
 
