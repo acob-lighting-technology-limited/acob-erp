@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useMemo, useCallback, useEffect } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { PageWrapper, PageHeader } from "@/components/layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -31,11 +32,11 @@ import {
 import { createClient } from "@/lib/supabase/client"
 import { getCurrentOfficeWeek } from "@/lib/meeting-week"
 import { writeAuditLogClient } from "@/lib/audit/client"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 import { logger } from "@/lib/logger"
 
 const log = logger("reports-mail-weekly-summary-content")
-
 
 type Employee = {
   id: string
@@ -97,9 +98,7 @@ export function WeeklySummaryContent({ employees, currentUser }: Props) {
   const [isSending, setIsSending] = useState(false)
   const [sendResult, setSendResult] = useState<any>(null)
 
-  // Active schedules from DB
-  const [activeSchedules, setActiveSchedules] = useState<any[]>([])
-  const [loadingSchedules, setLoadingSchedules] = useState(false)
+  const queryClient = useQueryClient()
 
   const logMailAudit = useCallback(
     async (params: { action: string; entityId: string; metadata?: Record<string, unknown> }) => {
@@ -131,25 +130,25 @@ export function WeeklySummaryContent({ employees, currentUser }: Props) {
   )
 
   // ── Fetch active schedules ──────────────────────────────────────────────────
-  const fetchSchedules = useCallback(async () => {
-    setLoadingSchedules(true)
-    try {
+  const { data: activeSchedules = [], isLoading: loadingSchedules } = useQuery({
+    queryKey: QUERY_KEYS.adminWeeklySummaryMail(),
+    queryFn: async () => {
       const { data, error } = await supabase
         .from("weekly_report_schedules")
         .select("*")
         .eq("is_active", true)
         .order("created_at", { ascending: false })
-      if (!error && data) setActiveSchedules(data)
-    } catch {
-      /* ignore */
-    } finally {
-      setLoadingSchedules(false)
-    }
-  }, [supabase])
+      if (error) {
+        if (error.code === "42P01") return []
+        throw new Error(error.message)
+      }
+      return data || []
+    },
+  })
 
-  useEffect(() => {
-    fetchSchedules()
-  }, [fetchSchedules])
+  const fetchSchedules = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminWeeklySummaryMail() })
+  }, [queryClient])
 
   // ── Computed ────────────────────────────────────────────────────────────────
   const filteredEmployees = useMemo(() => {

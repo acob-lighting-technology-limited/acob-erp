@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -21,7 +21,6 @@ import { normalizeAuditAction } from "@/lib/audit/core"
 import { logger } from "@/lib/logger"
 
 const log = logger("audit-logs-admin-audit-logs-content")
-
 
 export interface AuditLog {
   id: string
