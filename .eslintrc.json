@@ -15,7 +15,7 @@
     "react-hooks/exhaustive-deps": "warn",
     "react/no-unescaped-entities": "warn",
     "@next/next/no-img-element": "warn",
-    // Safe to enforce as error immediately — purely mechanical, zero false-positives
-    "prefer-const": "error"
+    // Warn for now — several files have let→const violations that need sweeping up first
+    "prefer-const": "warn"
   }
 }

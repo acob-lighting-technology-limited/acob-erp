@@ -124,7 +124,7 @@ export async function POST(request: NextRequest) {
   }
 
   const dataClient = getServiceRoleClientOrFallback(supabase as any)
-  let createdCodes: string[] = []
+  const createdCodes: string[] = []
 
   try {
     if (mode === "update") {

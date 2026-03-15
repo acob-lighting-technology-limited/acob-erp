@@ -117,7 +117,7 @@ export async function POST(request: Request) {
     // Filter and import only company emails
     let importedCount = 0
     let skippedCount = 0
-    let errors: string[] = []
+    const errors: string[] = []
 
     const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "")
     const get = (rec: any, headers: string[]): string => {
