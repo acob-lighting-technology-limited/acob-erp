@@ -1,10 +1,20 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useMemo } from "react"
 import { useDepartments } from "@/hooks/use-departments"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -24,7 +34,6 @@ interface AdminDashboardProps {
 export function AdminDashboard({ users, currentUserId, feedbackByUserId = {} }: AdminDashboardProps) {
   const { departments: dbDepartments } = useDepartments()
   const DEPARTMENTS = useMemo(() => ["All Departments", ...dbDepartments], [dbDepartments])
-  const [filteredUsers, setFilteredUsers] = useState(users)
   const [selectedDepartment, setSelectedDepartment] = useState("All Departments")
 
   const [searchTerm, setSearchTerm] = useState("")
@@ -70,8 +79,7 @@ export function AdminDashboard({ users, currentUserId, feedbackByUserId = {} }: 
     }
   }
 
-  // Real-time filtering with useEffect
-  useEffect(() => {
+  const filteredUsers = useMemo(() => {
     let filtered = users
 
     if (selectedDepartment !== "All Departments") {
@@ -87,8 +95,7 @@ export function AdminDashboard({ users, currentUserId, feedbackByUserId = {} }: 
       )
     }
 
-    filtered = applySort(filtered)
-    setFilteredUsers(filtered)
+    return applySort(filtered)
   }, [users, selectedDepartment, searchTerm, sortKey, sortDir])
 
   const copyToClipboard = (text: string, label: string) => {
@@ -183,10 +190,6 @@ export function AdminDashboard({ users, currentUserId, feedbackByUserId = {} }: 
   }
 
   const handleImportCSV = async () => {
-    if (!confirm("This will import employee data from CSV. Continue?")) {
-      return
-    }
-
     setIsImporting(true)
     toast.loading("Importing employee data...", { id: "import" })
 
@@ -238,6 +241,7 @@ export function AdminDashboard({ users, currentUserId, feedbackByUserId = {} }: 
     }
   }
 
+  const [showImportConfirm, setShowImportConfirm] = useState(false)
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [detailsUser, setDetailsUser] = useState<any | null>(null)
 
@@ -256,7 +260,13 @@ export function AdminDashboard({ users, currentUserId, feedbackByUserId = {} }: 
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-2">
-            <Button onClick={handleImportCSV} variant="default" size="sm" disabled={isImporting} className="bg-primary">
+            <Button
+              onClick={() => setShowImportConfirm(true)}
+              variant="default"
+              size="sm"
+              disabled={isImporting}
+              className="bg-primary"
+            >
               <Upload className="mr-2 h-4 w-4" />
               {isImporting ? "Importing..." : "Import CSV"}
             </Button>
@@ -328,7 +338,6 @@ export function AdminDashboard({ users, currentUserId, feedbackByUserId = {} }: 
                   setSearchTerm("")
                   setSortKey(null)
                   setSortDir("asc")
-                  setFilteredUsers(applySort(users))
                 }}
               >
                 Clear Filters
@@ -610,6 +619,29 @@ export function AdminDashboard({ users, currentUserId, feedbackByUserId = {} }: 
           }}
         />
       )}
+
+      {/* Import CSV confirmation */}
+      <AlertDialog open={showImportConfirm} onOpenChange={setShowImportConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Import Employee Data</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will import employee data from CSV. Existing records may be updated. Continue?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setShowImportConfirm(false)
+                handleImportCSV()
+              }}
+            >
+              Import
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

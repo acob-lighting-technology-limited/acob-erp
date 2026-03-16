@@ -2,6 +2,9 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { PaymentsTable } from "@/components/payments/payments-table"
+import { logger } from "@/lib/logger"
+
+const log = logger("payments-page")
 
 interface Payment {
   id: string
@@ -113,7 +116,7 @@ async function getPaymentsData() {
   let loadError: string | null = null
 
   if (paymentsError) {
-    console.error("Error loading payments:", paymentsError)
+    log.error({ err: paymentsError }, "Error loading payments")
     loadError = "Failed to load payments"
   }
 

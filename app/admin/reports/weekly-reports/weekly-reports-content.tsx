@@ -65,6 +65,16 @@ import { format } from "date-fns"
 import { Label } from "@/components/ui/label"
 import { Fragment } from "react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 import { logger } from "@/lib/logger"
 
@@ -161,6 +171,7 @@ export function WeeklyReportsContent({
   )
   const [meetingGraceHours, setMeetingGraceHours] = useState(24)
   const [savingMeetingWindow, setSavingMeetingWindow] = useState(false)
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
 
   const supabase = createClient()
   const queryClient = useQueryClient()
@@ -234,7 +245,6 @@ export function WeeklyReportsContent({
         return
       }
     }
-    if (!confirm("Are you sure? Admin delete is permanent.")) return
     try {
       const { error } = await supabase.from("weekly_reports").delete().eq("id", id)
       if (error) throw error
@@ -706,7 +716,7 @@ export function WeeklyReportsContent({
                               <DropdownMenuItem
                                 disabled={!canMutateReport(report)}
                                 className="text-red-600 focus:bg-red-50 focus:text-red-600"
-                                onClick={() => handleDelete(report.id)}
+                                onClick={() => setPendingDeleteId(report.id)}
                               >
                                 <Trash2 className="mr-2 h-4 w-4" /> Purge Record
                               </DropdownMenuItem>
@@ -777,6 +787,27 @@ export function WeeklyReportsContent({
         onSuccess={() => queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminWeeklyReports() })}
         currentUser={currentUser}
       />
+
+      <AlertDialog open={pendingDeleteId !== null} onOpenChange={(open) => !open && setPendingDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Report</AlertDialogTitle>
+            <AlertDialogDescription>Are you sure? This action cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (pendingDeleteId) handleDelete(pendingDeleteId)
+                setPendingDeleteId(null)
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog
         open={pptxModeDialogOpen}

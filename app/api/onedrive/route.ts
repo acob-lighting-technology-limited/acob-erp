@@ -15,8 +15,8 @@ const log = logger("onedrive")
 export const dynamic = "force-dynamic"
 
 // Helper function to create Supabase client for auth check
-function createClient() {
-  const cookieStore = cookies()
+async function createClient() {
+  const cookieStore = await cookies()
 
   return createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
     cookies: {
@@ -48,7 +48,7 @@ function normalizePath(path: string): string {
  */
 export async function GET(request: Request) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     // Check authentication
     const {
@@ -131,7 +131,7 @@ export async function GET(request: Request) {
  */
 export async function POST(request: Request) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     // Check authentication
     const {

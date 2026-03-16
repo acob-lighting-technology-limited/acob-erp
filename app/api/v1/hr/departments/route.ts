@@ -9,8 +9,8 @@ const log = logger("v1-hr-departments")
 export const dynamic = "force-dynamic"
 
 // Helper function to create Supabase client
-function createClient() {
-  const cookieStore = cookies()
+async function createClient() {
+  const cookieStore = await cookies()
 
   return createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
     cookies: {
@@ -33,7 +33,7 @@ function createClient() {
 // GET /api/departments - Get all departments
 export async function GET() {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     const { data: departments, error } = await supabase
       .from("departments")
@@ -53,7 +53,7 @@ export async function GET() {
 // POST /api/departments - Create a new department (admin only)
 export async function POST(request: Request) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     // Check if user is admin
     const {

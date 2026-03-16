@@ -1,6 +1,9 @@
 "use client"
 
 import { useState, useMemo, useCallback, useEffect, useRef } from "react"
+import { logger } from "@/lib/logger"
+
+const log = logger("communications-composer")
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import DOMPurify from "dompurify"
@@ -306,7 +309,7 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
           { failOpen: true }
         )
       } catch (error) {
-        console.error("[communications-mail] Failed to write audit log", error)
+        log.error({ err: String(error) }, "Failed to write audit log")
       }
     },
     [currentUser?.id, supabase]
@@ -513,7 +516,7 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
         )
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminReminderSchedules(mode) })
       } catch (err: any) {
-        console.error("[Schedule Error]", err)
+        log.error({ err: String(err) }, "Schedule error")
         toast.error(err.message || "Failed to save schedule", { id: toastId })
       }
       return
@@ -614,7 +617,7 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
         },
       })
     } catch (err: any) {
-      console.error("[Meeting Reminder Error]", err)
+      log.error({ err: String(err) }, "Meeting reminder error")
       toast.error(err.message || "Failed to send", { id: toastId })
     } finally {
       setIsSending(false)

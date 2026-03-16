@@ -1,6 +1,9 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { logger } from "@/lib/logger"
+
+const log = logger("hr-change-status-dialog")
 import { useRouter } from "next/navigation"
 import { useQuery } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
@@ -190,7 +193,7 @@ export function ChangeStatusContent({ employee, onSuccess, onCancel }: ChangeSta
       router.refresh()
       onSuccess?.()
     } catch (error) {
-      console.error("Error updating status:", error)
+      log.error("Error updating status:", error)
       toast.error(error instanceof Error ? error.message : "Failed to update status")
     } finally {
       setIsLoading(false)

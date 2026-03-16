@@ -10,8 +10,8 @@ const log = logger("payments-categories")
 export const dynamic = "force-dynamic"
 
 // Helper function to create Supabase client
-function createClient() {
-  const cookieStore = cookies()
+async function createClient() {
+  const cookieStore = await cookies()
 
   return createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
     cookies: {
@@ -34,7 +34,7 @@ function createClient() {
 // PUT /api/payments/categories/[id] - Update a payment category
 export async function PUT(request: Request, { params }: { params: { id: string } }) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     // Check if user is authenticated
     const {
@@ -87,7 +87,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
 // DELETE /api/payments/categories/[id] - Delete a payment category
 export async function DELETE(request: Request, { params }: { params: { id: string } }) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     // Check if user is authenticated
     const {

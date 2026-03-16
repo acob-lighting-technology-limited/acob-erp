@@ -69,7 +69,9 @@ async function importCSVData() {
         // Create auth user
         const { data: authData, error: authError } = await supabase.auth.admin.createUser({
           email,
-          password: Math.random().toString(36).slice(-12),
+          password: Buffer.from(crypto.getRandomValues(new Uint8Array(16)))
+            .toString("base64url")
+            .slice(0, 16),
           email_confirm: true,
         })
 

@@ -12,6 +12,16 @@ import { Badge } from "@/components/ui/badge"
 import { StatCard } from "@/components/ui/stat-card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { Plus, Pencil, Trash2, Warehouse } from "lucide-react"
@@ -44,6 +54,7 @@ export default function WarehousesPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editing, setEditing] = useState<WarehouseData | null>(null)
   const [formData, setFormData] = useState({ name: "", code: "", address: "", is_active: true })
+  const [pendingDelete, setPendingDelete] = useState<WarehouseData | null>(null)
 
   const { data: warehouses = [], isLoading: loading } = useQuery({
     queryKey: QUERY_KEYS.adminWarehouses(),
@@ -86,7 +97,6 @@ export default function WarehousesPage() {
   }
 
   async function handleDelete(wh: WarehouseData) {
-    if (!confirm(`Delete "${wh.name}"?`)) return
     try {
       const supabase = createClient()
       const { error } = await supabase.from("warehouses").delete().eq("id", wh.id)
@@ -230,7 +240,7 @@ export default function WarehousesPage() {
                           <Button variant="ghost" size="icon" onClick={() => openEdit(wh)}>
                             <Pencil className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleDelete(wh)}>
+                          <Button variant="ghost" size="icon" onClick={() => setPendingDelete(wh)}>
                             <Trash2 className="text-destructive h-4 w-4" />
                           </Button>
                         </div>
@@ -243,6 +253,29 @@ export default function WarehousesPage() {
           )}
         </CardContent>
       </Card>
+
+      <AlertDialog open={pendingDelete !== null} onOpenChange={(open) => !open && setPendingDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Warehouse</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingDelete ? `Delete "${pendingDelete.name}"?` : "Are you sure?"} This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (pendingDelete) handleDelete(pendingDelete)
+                setPendingDelete(null)
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AdminTablePage>
   )
 }

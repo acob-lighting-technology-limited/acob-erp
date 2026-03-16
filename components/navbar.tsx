@@ -28,7 +28,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react"
-import { ProfessionalNotificationBell } from "@/components/professional-notification-bell"
+import { NotificationBell } from "@/components/notification-bell"
 import { UniversalSearch } from "@/components/universal-search"
 import Image from "next/image"
 import { useSidebarSafe } from "@/components/sidebar-context"
@@ -252,13 +252,13 @@ export function Navbar({ user, canAccessAdmin = false, isAdminMode = false }: Na
             {isAdminMode && !isMaintenancePage && <UniversalSearch isAdminMode />}
           </div>
           <div className="hidden items-center gap-4 overflow-visible md:flex">
-            {!isMaintenancePage && <ProfessionalNotificationBell isAdmin={isAdminMode} />}
+            {!isMaintenancePage && <NotificationBell isAdmin={isAdminMode} />}
             <ThemeToggle />
             {accountMenu}
           </div>
 
           <div className="flex items-center gap-2 overflow-visible md:hidden">
-            {!isMaintenancePage && <ProfessionalNotificationBell isAdmin={isAdminMode} />}
+            {!isMaintenancePage && <NotificationBell isAdmin={isAdminMode} />}
             <ThemeToggle />
             {accountMenu}
           </div>

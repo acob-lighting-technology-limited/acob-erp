@@ -17,6 +17,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Label } from "@/components/ui/label"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { normalizeAuditAction } from "@/lib/audit/core"
+import { getAuditActionColor } from "@/lib/audit/action-colors"
+import { getNormalizedEntityTypeDisplay } from "@/lib/audit/entity-type-display"
 
 import { logger } from "@/lib/logger"
 
@@ -135,8 +137,8 @@ export function AdminAuditLogsContent({
 
   const [logs, setLogs] = useState<AuditLog[]>(initialLogs)
   const [totalCount, setTotalCount] = useState<number>(initialTotalCount)
-  const [employee] = useState<employeeMember[]>(initialemployee)
-  const [departments] = useState<string[]>(initialDepartments)
+  const employee = initialemployee
+  const departments = initialDepartments
   const [isLoading, setIsLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [actionFilter, setActionFilter] = useState("all")
@@ -867,32 +869,7 @@ export function AdminAuditLogsContent({
     return matchesSearch && matchesAction && matchesEntity && matchesDate && matchesDepartment && matchesemployee
   })
 
-  const getActionColor = (action: string) => {
-    switch (action) {
-      case "create":
-        return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-      case "update":
-        return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
-      case "delete":
-        return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
-      case "assign":
-        return "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400"
-      case "unassign":
-        return "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400"
-      case "approve":
-        return "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400"
-      case "reject":
-        return "bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-400"
-      case "dispatch":
-        return "bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-400"
-      case "send":
-        return "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400"
-      case "status_change":
-        return "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
-      default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
-    }
-  }
+  // getActionColor is now provided by the shared lib/audit/action-colors module (getAuditActionColor)
 
   const getActionDisplay = (log: AuditLog): string => {
     const eventLabel =
@@ -902,82 +879,7 @@ export function AdminAuditLogsContent({
     return eventLabel.toUpperCase()
   }
 
-  // Normalize entity types to consistent categories for display
-  const getNormalizedEntityType = (entityType: string): string => {
-    const type = (entityType || "unknown").toLowerCase()
-
-    // Assets category
-    if (type === "asset" || type === "assets" || type === "asset_assignment" || type === "asset_assignments") {
-      return "Assets"
-    }
-
-    // Employee category
-    if (
-      type === "profile" ||
-      type === "profiles" ||
-      type === "user" ||
-      type === "pending_user" ||
-      type === "admin_action"
-    ) {
-      return "Employees"
-    }
-
-    // Tasks category
-    if (type === "task" || type === "tasks" || type === "task_assignment" || type === "task_assignments") {
-      return "Tasks"
-    }
-
-    // Projects category
-    if (type === "project" || type === "projects" || type === "project_members" || type === "project_updates") {
-      return "Projects"
-    }
-
-    // Finance category
-    if (
-      type === "department_payments" ||
-      type === "payment_documents" ||
-      type === "payment_categories" ||
-      type === "starlink_payments"
-    ) {
-      return "Finance"
-    }
-
-    // Leave/HR category
-    if (type === "leave_requests" || type === "leave_approvals" || type === "leave_balances") {
-      return "Leave"
-    }
-
-    // Departments category
-    if (type === "departments" || type === "department") {
-      return "Departments"
-    }
-
-    // Feedback category
-    if (type === "feedback") {
-      return "Feedback"
-    }
-
-    // Documentation
-    if (type === "user_documentation" || type === "documentation") {
-      return "Documentation"
-    }
-
-    // Devices (legacy)
-    if (type === "device" || type === "devices" || type === "device_assignment" || type === "device_assignments") {
-      return "Devices"
-    }
-
-    // Management/Sync
-    if (type === "management") {
-      return "System"
-    }
-
-    // Default - capitalize the type
-    return type
-      .split("_")
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(" ")
-  }
+  // getNormalizedEntityType is now provided by lib/audit/entity-type-display (getNormalizedEntityTypeDisplay)
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-US", {
@@ -1357,7 +1259,7 @@ export function AdminAuditLogsContent({
       const dataToExport = filteredLogs.map((log, index) => ({
         "#": index + 1,
         Action: getActionDisplay(log),
-        Module: getNormalizedEntityType(log.entity_type),
+        Module: getNormalizedEntityTypeDisplay(log.entity_type),
         Object: getObjectIdentifier(log),
         Target: getTargetDescription(log),
         "Dept/Location": getDepartmentLocation(log),
@@ -1410,7 +1312,7 @@ export function AdminAuditLogsContent({
       const dataToExport = filteredLogs.map((log, index) => [
         index + 1,
         getActionDisplay(log),
-        getNormalizedEntityType(log.entity_type),
+        getNormalizedEntityTypeDisplay(log.entity_type),
         getObjectIdentifier(log),
         getTargetDescription(log),
         getDepartmentLocation(log),
@@ -1485,7 +1387,7 @@ export function AdminAuditLogsContent({
               children: [
                 new TableCell({ children: [new Paragraph((index + 1).toString())] }),
                 new TableCell({ children: [new Paragraph(getActionDisplay(log))] }),
-                new TableCell({ children: [new Paragraph(getNormalizedEntityType(log.entity_type))] }),
+                new TableCell({ children: [new Paragraph(getNormalizedEntityTypeDisplay(log.entity_type))] }),
                 new TableCell({ children: [new Paragraph(getObjectIdentifier(log))] }),
                 new TableCell({ children: [new Paragraph(getTargetDescription(log))] }),
                 new TableCell({ children: [new Paragraph(getDepartmentLocation(log))] }),
@@ -1852,11 +1754,11 @@ export function AdminAuditLogsContent({
                     <TableRow key={log.id}>
                       <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
                       <TableCell>
-                        <Badge className={getActionColor(log.action)}>{getActionDisplay(log)}</Badge>
+                        <Badge className={getAuditActionColor(log.action)}>{getActionDisplay(log)}</Badge>
                       </TableCell>
                       <TableCell>
                         <span className="text-foreground text-sm font-medium">
-                          {getNormalizedEntityType(log.entity_type)}
+                          {getNormalizedEntityTypeDisplay(log.entity_type)}
                         </span>
                       </TableCell>
                       <TableCell>
@@ -1897,9 +1799,9 @@ export function AdminAuditLogsContent({
                   <div className="flex items-start justify-between">
                     <div className="flex-1 space-y-2">
                       <div className="flex flex-wrap items-center gap-3">
-                        <Badge className={getActionColor(log.action)}>{getActionDisplay(log)}</Badge>
+                        <Badge className={getAuditActionColor(log.action)}>{getActionDisplay(log)}</Badge>
                         <span className="text-foreground text-sm font-medium">
-                          {getNormalizedEntityType(log.entity_type)}
+                          {getNormalizedEntityTypeDisplay(log.entity_type)}
                         </span>
                         <span className="text-primary font-mono text-sm">{getObjectIdentifier(log)}</span>
                         <span className="text-muted-foreground">→</span>
@@ -1996,12 +1898,12 @@ export function AdminAuditLogsContent({
                 <div className="space-y-2">
                   <Label className="text-sm font-semibold">Action</Label>
                   <div>
-                    <Badge className={getActionColor(selectedLog.action)}>{getActionDisplay(selectedLog)}</Badge>
+                    <Badge className={getAuditActionColor(selectedLog.action)}>{getActionDisplay(selectedLog)}</Badge>
                   </div>
                 </div>
                 <div className="space-y-2">
                   <Label className="text-sm font-semibold">Entity Type</Label>
-                  <div className="text-sm font-medium">{getNormalizedEntityType(selectedLog.entity_type)}</div>
+                  <div className="text-sm font-medium">{getNormalizedEntityTypeDisplay(selectedLog.entity_type)}</div>
                 </div>
               </div>
 

@@ -12,6 +12,9 @@ import { Loader2, Sparkles } from "lucide-react"
 import { getCurrentOfficeWeek } from "@/lib/meeting-week"
 import { fetchWeeklyReportLockState, type WeeklyReportLockState } from "@/lib/weekly-report-lock"
 import { sanitizeReportText } from "@/lib/export-utils"
+import { logger } from "@/lib/logger"
+
+const log = logger("portal-weekly-report-dialog")
 
 interface WeeklyReport {
   id: string
@@ -149,7 +152,7 @@ export function WeeklyReportDialog({ isOpen, onClose, onSuccess, initialData }: 
         .eq("year", year)
       setCurrentActions(current || [])
     } catch (error) {
-      console.error(error)
+      log.error("Failed to load actions:", error)
     } finally {
       setLoading(false)
     }

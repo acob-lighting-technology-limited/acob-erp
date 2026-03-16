@@ -1,6 +1,9 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { logger } from "@/lib/logger"
+
+const log = logger("payments-table")
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import Link from "next/link"
@@ -583,7 +586,7 @@ export function PaymentsTable({
       toast.success("Payments exported to Excel successfully")
       setExportDialogOpen(false)
     } catch (error: any) {
-      console.error("Error exporting to Excel:", error)
+      log.error("Error exporting to Excel:", error)
       toast.error("Failed to export to Excel")
     }
   }
@@ -648,7 +651,7 @@ export function PaymentsTable({
       toast.success("Payments exported to PDF successfully")
       setExportDialogOpen(false)
     } catch (error: any) {
-      console.error("Error exporting to PDF:", error)
+      log.error("Error exporting to PDF:", error)
       toast.error("Failed to export to PDF")
     }
   }
@@ -677,7 +680,7 @@ export function PaymentsTable({
         window.URL.revokeObjectURL(blobUrl)
       }, 100)
     } catch (error) {
-      console.error("Error downloading file:", error)
+      log.error("Error downloading file:", error)
       throw error
     }
   }
@@ -1022,7 +1025,12 @@ export function PaymentsTable({
                     <div className="flex items-center justify-end gap-1">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" onClick={(e) => e.stopPropagation()}>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            aria-label="Print payment"
+                            onClick={(e) => e.stopPropagation()}
+                          >
                             <Printer className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
@@ -1046,6 +1054,7 @@ export function PaymentsTable({
                       <Button
                         variant="ghost"
                         size="icon"
+                        aria-label="View payment details"
                         onClick={(e) => {
                           e.stopPropagation()
                           router.push(`${basePath}/${payment.id}`)

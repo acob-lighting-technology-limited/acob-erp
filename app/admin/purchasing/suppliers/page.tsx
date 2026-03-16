@@ -9,6 +9,16 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { Plus, Pencil, Trash2, Users, Search, Eye, Building2, CheckCircle2, Ban } from "lucide-react"
@@ -52,6 +62,7 @@ export default function SuppliersPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Supplier | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<Supplier | null>(null)
   const [formData, setFormData] = useState({
     name: "",
     code: "",
@@ -101,7 +112,6 @@ export default function SuppliersPage() {
   }
 
   async function handleDelete(s: Supplier) {
-    if (!confirm(`Delete "${s.name}"?`)) return
     try {
       const supabase = createClient()
       const { error } = await supabase.from("suppliers").delete().eq("id", s.id)
@@ -311,7 +321,7 @@ export default function SuppliersPage() {
                           <Button variant="ghost" size="icon" onClick={() => openEdit(s)}>
                             <Pencil className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleDelete(s)}>
+                          <Button variant="ghost" size="icon" onClick={() => setPendingDelete(s)}>
                             <Trash2 className="text-destructive h-4 w-4" />
                           </Button>
                         </div>
@@ -324,6 +334,29 @@ export default function SuppliersPage() {
           )}
         </CardContent>
       </Card>
+
+      <AlertDialog open={pendingDelete !== null} onOpenChange={(open) => !open && setPendingDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Supplier</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingDelete ? `Delete "${pendingDelete.name}"?` : "Are you sure?"} This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (pendingDelete) handleDelete(pendingDelete)
+                setPendingDelete(null)
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AdminTablePage>
   )
 }

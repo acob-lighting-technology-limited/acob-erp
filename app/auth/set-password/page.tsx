@@ -88,7 +88,7 @@ export default function SetPasswordPage() {
 
       // Redirect to dashboard after 2 seconds
       setTimeout(() => {
-        window.location.href = "/profile"
+        router.replace("/profile")
       }, 2000)
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Failed to set password"

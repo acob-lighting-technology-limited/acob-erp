@@ -5,8 +5,8 @@ import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 
-function createClient() {
-  const cookieStore = cookies()
+async function createClient() {
+  const cookieStore = await cookies()
 
   return createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
     cookies: {
@@ -47,7 +47,7 @@ function isFinanceDepartment(value: string | null | undefined): boolean {
 // GET /api/payments/[id] - Get a single payment
 export async function GET(request: Request, { params }: { params: { id: string } }) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
     const { id } = params
 
     const {
@@ -107,7 +107,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
 // PATCH /api/payments/[id] - Update a payment
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
     const { id } = params
     const body = await request.json()
 
@@ -216,7 +216,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 // DELETE /api/payments/[id] - Delete a payment
 export async function DELETE(request: Request, { params }: { params: { id: string } }) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
     const { id } = params
 
     const {

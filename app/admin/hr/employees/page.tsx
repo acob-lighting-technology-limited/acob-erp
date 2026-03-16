@@ -3,6 +3,9 @@ import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { AdminEmployeeContent, type Employee, type UserProfile } from "./admin-employee-content"
 import { resolveAdminScope } from "@/lib/admin/rbac"
+import { logger } from "@/lib/logger"
+
+const log = logger("admin-employees")
 
 async function getAdminEmployeeData() {
   const supabase = await createClient()
@@ -32,7 +35,7 @@ async function getAdminEmployeeData() {
   const { data: employeeData, error: employeeError } = await query
 
   if (employeeError) {
-    console.error("Error loading employees:", employeeError)
+    log.error({ err: employeeError }, "Error loading employees")
     return { employees: [], userProfile }
   }
 

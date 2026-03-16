@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useMemo } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
 import { QUERY_KEYS } from "@/lib/query-keys"
@@ -78,7 +78,6 @@ async function fetchFeedbackFilterData(): Promise<FeedbackFilterData> {
 }
 
 export function FeedbackViewerClient({ feedback }: FeedbackViewerClientProps) {
-  const [filteredFeedback, setFilteredFeedback] = useState(feedback)
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedType, setSelectedType] = useState("all")
   const [selectedStatus, setSelectedStatus] = useState("all")
@@ -101,8 +100,7 @@ export function FeedbackViewerClient({ feedback }: FeedbackViewerClientProps) {
   const employees = filterData?.employees ?? []
   const departments = filterData?.departments ?? []
 
-  // Real-time filtering with useEffect
-  useEffect(() => {
+  const filteredFeedback = useMemo(() => {
     let filtered = feedback
 
     // Search filter
@@ -138,7 +136,7 @@ export function FeedbackViewerClient({ feedback }: FeedbackViewerClientProps) {
     }
 
     // Sort by name
-    filtered = filtered.sort((a, b) => {
+    return [...filtered].sort((a, b) => {
       const lastNameA = formatName(a.profiles?.last_name || "").toLowerCase()
       const lastNameB = formatName(b.profiles?.last_name || "").toLowerCase()
 
@@ -148,8 +146,6 @@ export function FeedbackViewerClient({ feedback }: FeedbackViewerClientProps) {
         return lastNameB.localeCompare(lastNameA)
       }
     })
-
-    setFilteredFeedback(filtered)
   }, [feedback, searchQuery, selectedType, selectedStatus, departmentFilter, employeeFilter, nameSortOrder])
 
   const getTypeColor = (type: string) => {

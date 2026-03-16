@@ -7,6 +7,16 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { FeedbackForm } from "@/components/feedback-form"
@@ -20,7 +30,6 @@ import { logger } from "@/lib/logger"
 
 const log = logger("feedback-feedback-content")
 
-
 interface FeedbackContentProps {
   initialFeedback: Feedback[]
   userId: string
@@ -32,6 +41,7 @@ export function FeedbackContent({ initialFeedback, userId }: FeedbackContentProp
   const [isSubmitOpen, setIsSubmitOpen] = useState(false)
   const [selectedFeedback, setSelectedFeedback] = useState<Feedback | null>(null)
   const [showEditModal, setShowEditModal] = useState(false)
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
 
   const filteredFeedback = useMemo(() => {
     if (!searchQuery) return userFeedback
@@ -81,7 +91,6 @@ export function FeedbackContent({ initialFeedback, userId }: FeedbackContentProp
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this feedback?")) return
     const supabase = createClient()
 
     try {
@@ -211,7 +220,7 @@ export function FeedbackContent({ initialFeedback, userId }: FeedbackContentProp
                         <Button variant="ghost" size="sm" onClick={() => handleEdit(item)}>
                           <Edit2 className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={() => handleDelete(item.id)}>
+                        <Button variant="ghost" size="sm" onClick={() => setPendingDeleteId(item.id)}>
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
@@ -244,6 +253,29 @@ export function FeedbackContent({ initialFeedback, userId }: FeedbackContentProp
           onSave={handleSaveEdit}
         />
       )}
+
+      <AlertDialog open={pendingDeleteId !== null} onOpenChange={(open) => !open && setPendingDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Feedback</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this feedback? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (pendingDeleteId) handleDelete(pendingDeleteId)
+                setPendingDeleteId(null)
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppTablePage>
   )
 }

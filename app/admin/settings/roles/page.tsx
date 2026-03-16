@@ -20,6 +20,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Plus, Pencil, Trash2, Shield, Users } from "lucide-react"
@@ -171,6 +181,7 @@ export default function RolesPage() {
   const [selectedUserId, setSelectedUserId] = useState("")
   const [addUserWarning, setAddUserWarning] = useState<string | null>(null)
   const [addingUser, setAddingUser] = useState(false)
+  const [pendingDelete, setPendingDelete] = useState<Role | null>(null)
 
   const { data: roles = DEFAULT_ROLES, isLoading: loading } = useQuery({
     queryKey: QUERY_KEYS.adminRolesSettings(),
@@ -214,7 +225,6 @@ export default function RolesPage() {
       toast.error("Cannot delete system roles")
       return
     }
-    if (!confirm(`Delete role "${role.name}"?`)) return
     try {
       const supabase = createClient()
       const { error } = await supabase.from("roles").delete().eq("id", role.id)
@@ -468,7 +478,7 @@ export default function RolesPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => handleDelete(role)}
+                          onClick={() => setPendingDelete(role)}
                           disabled={role.is_system}
                         >
                           <Trash2 className="text-destructive h-4 w-4" />
@@ -484,6 +494,29 @@ export default function RolesPage() {
       </Card>
 
       <DepartmentLeadsManager />
+
+      <AlertDialog open={pendingDelete !== null} onOpenChange={(open) => !open && setPendingDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Role</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingDelete ? `Delete role "${pendingDelete.name}"?` : "Are you sure?"} This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (pendingDelete) handleDelete(pendingDelete)
+                setPendingDelete(null)
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog open={roleUsersOpen} onOpenChange={setRoleUsersOpen}>
         <DialogContent className="max-h-[90vh] w-[95vw] max-w-3xl overflow-y-auto">

@@ -14,6 +14,16 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { AlertCircle, CheckCircle2, Trash2, Search, Package, Calendar, User, Filter } from "lucide-react"
 import { SearchableSelect } from "@/components/ui/searchable-select"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { StatCard } from "@/components/ui/stat-card"
 import { EmptyState, ListToolbar } from "@/components/ui/patterns"
@@ -148,6 +158,7 @@ export default function AssetIssuesPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("unresolved")
   const [assetTypeFilter, setAssetTypeFilter] = useState("all")
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
   const queryClient = useQueryClient()
 
   const { data: issues = [], isLoading: loading } = useQuery({
@@ -169,7 +180,6 @@ export default function AssetIssuesPage() {
   }
 
   const handleDeleteIssue = async (issueId: string) => {
-    if (!confirm("Are you sure you want to delete this issue?")) return
     try {
       const supabase = createClient()
       const { error } = await supabase.from("asset_issues").delete().eq("id", issueId)
@@ -430,7 +440,7 @@ export default function AssetIssuesPage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleDeleteIssue(issue.id)}
+                          onClick={() => setPendingDeleteId(issue.id)}
                           className="text-destructive hover:text-destructive h-8 w-8 p-0"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -444,6 +454,29 @@ export default function AssetIssuesPage() {
           )}
         </CardContent>
       </Card>
+
+      <AlertDialog open={pendingDeleteId !== null} onOpenChange={(open) => !open && setPendingDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Issue</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this issue? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (pendingDeleteId) handleDeleteIssue(pendingDeleteId)
+                setPendingDeleteId(null)
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AdminTablePage>
   )
 }

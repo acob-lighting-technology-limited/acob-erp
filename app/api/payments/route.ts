@@ -19,8 +19,8 @@ const normalizeDepartmentId = (value: unknown): string | null => {
 }
 
 // Helper function to create Supabase client
-function createClient() {
-  const cookieStore = cookies()
+async function createClient() {
+  const cookieStore = await cookies()
 
   return createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
     cookies: {
@@ -43,7 +43,7 @@ function createClient() {
 // GET /api/payments - Get payments (filtered by department if not admin)
 export async function GET(request: Request) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
     const { searchParams } = new URL(request.url)
 
     const departmentId = searchParams.get("department_id")
@@ -131,7 +131,7 @@ export async function GET(request: Request) {
 // POST /api/payments - Create a new payment
 export async function POST(request: Request) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     // Get current user
     const {

@@ -12,6 +12,9 @@ import { Input } from "@/components/ui/input"
 import { Slider } from "@/components/ui/slider"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "sonner"
+import { logger } from "@/lib/logger"
+
+const log = logger("watermark-studio")
 import { MediaPreview } from "@/components/media-preview"
 import { PositionGrid } from "@/components/position-grid"
 import { ImageGallery } from "@/components/image-gallery"
@@ -297,7 +300,7 @@ export function WatermarkStudio() {
         })
       }
     } catch (error) {
-      console.error("[v0] Error processing media:", error)
+      log.error("Error processing media:", error)
       toast.error("Processing failed", {
         description: error instanceof Error ? error.message : "An error occurred while processing.",
       })

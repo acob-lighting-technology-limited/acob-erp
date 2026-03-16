@@ -223,7 +223,12 @@ export function DepartmentDocumentsBrowser({
               <TableCell className="text-right">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label="More options"
+                      className="h-8 w-8 opacity-0 group-hover:opacity-100"
+                    >
                       <MoreHorizontal className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
@@ -289,7 +294,7 @@ export function DepartmentDocumentsBrowser({
             <div className="absolute top-2 right-2 opacity-0 transition-opacity group-hover:opacity-100">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                  <Button variant="secondary" size="icon" className="h-7 w-7">
+                  <Button variant="secondary" size="icon" aria-label="More options" className="h-7 w-7">
                     <MoreHorizontal className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
@@ -357,7 +362,7 @@ export function DepartmentDocumentsBrowser({
                   </TabsTrigger>
                 </TabsList>
               </Tabs>
-              <Button variant="outline" size="icon" onClick={handleRefresh} disabled={loading}>
+              <Button variant="outline" size="icon" aria-label="Refresh" onClick={handleRefresh} disabled={loading}>
                 <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
               </Button>
             </div>

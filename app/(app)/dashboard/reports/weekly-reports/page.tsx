@@ -38,6 +38,16 @@ import {
 import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { WeeklyReportDialog } from "@/components/dashboard/reports/weekly-report-dialog"
 import { EmptyState, FormFieldGroup } from "@/components/ui/patterns"
 import {
@@ -129,6 +139,7 @@ export default function WeeklyReportsPortal() {
     { kind: "single"; report: WeeklyReport } | { kind: "all" } | null
   >(null)
   const [isFilteredWeekLocked, setIsFilteredWeekLocked] = useState(false)
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
 
   const supabase = createClient()
   const queryClient = useQueryClient()
@@ -176,7 +187,6 @@ export default function WeeklyReportsPortal() {
         return
       }
     }
-    if (!confirm("Are you sure? Delete is permanent.")) return
     try {
       const { error } = await supabase.from("weekly_reports").delete().eq("id", id)
       if (error) throw error
@@ -470,7 +480,7 @@ export default function WeeklyReportsPortal() {
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
                                   className="cursor-pointer gap-2 text-red-600"
-                                  onClick={() => handleDelete(report.id)}
+                                  onClick={() => setPendingDeleteId(report.id)}
                                 >
                                   <Trash2 className="h-4 w-4" /> Delete Report
                                 </DropdownMenuItem>
@@ -548,6 +558,27 @@ export default function WeeklyReportsPortal() {
         }
         initialData={selectedReportParams}
       />
+
+      <AlertDialog open={pendingDeleteId !== null} onOpenChange={(open) => !open && setPendingDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Report</AlertDialogTitle>
+            <AlertDialogDescription>Are you sure? This action cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (pendingDeleteId) handleDelete(pendingDeleteId)
+                setPendingDeleteId(null)
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog
         open={pptxModeDialogOpen}

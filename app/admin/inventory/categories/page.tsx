@@ -12,6 +12,16 @@ import { Badge } from "@/components/ui/badge"
 import { StatCard } from "@/components/ui/stat-card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Plus, Pencil, Trash2, Boxes } from "lucide-react"
@@ -60,6 +70,7 @@ export default function CategoriesPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingCategory, setEditingCategory] = useState<Category | null>(null)
   const [formData, setFormData] = useState({ name: "", description: "" })
+  const [pendingDelete, setPendingDelete] = useState<Category | null>(null)
 
   const { data: categories = [], isLoading: loading } = useQuery({
     queryKey: QUERY_KEYS.adminCategories(),
@@ -97,8 +108,6 @@ export default function CategoriesPage() {
   }
 
   async function handleDelete(cat: Category) {
-    if (!confirm(`Delete "${cat.name}"?`)) return
-
     try {
       const supabase = createClient()
       const { error } = await supabase.from("product_categories").delete().eq("id", cat.id)
@@ -232,7 +241,7 @@ export default function CategoriesPage() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => handleDelete(cat)}
+                            onClick={() => setPendingDelete(cat)}
                             disabled={(cat.product_count ?? 0) > 0}
                           >
                             <Trash2 className="text-destructive h-4 w-4" />
@@ -247,6 +256,29 @@ export default function CategoriesPage() {
           )}
         </CardContent>
       </Card>
+
+      <AlertDialog open={pendingDelete !== null} onOpenChange={(open) => !open && setPendingDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Category</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingDelete ? `Delete "${pendingDelete.name}"?` : "Are you sure?"} This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (pendingDelete) handleDelete(pendingDelete)
+                setPendingDelete(null)
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AdminTablePage>
   )
 }

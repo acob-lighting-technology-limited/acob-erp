@@ -1,525 +1,329 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import { logger } from "@/lib/logger"
+
+const log = logger("notification-bell")
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Bell, AlertCircle, CheckCircle, Info, Clock, X, CheckCheck } from "lucide-react"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Input } from "@/components/ui/input"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu"
+import {
+  Bell,
+  CheckCheck,
+  X,
+  Search,
+  Settings,
+  AlertCircle,
+  CheckCircle,
+  Info,
+  User,
+  Package,
+  MessageSquare,
+  FileText,
+  AlertTriangle,
+  Clock,
+  ChevronRight,
+  Trash2,
+} from "lucide-react"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
+import { createClient } from "@/lib/supabase/client"
+import { toast } from "sonner"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 interface Notification {
   id: string
-  type: "info" | "warning" | "success" | "error"
+  user_id: string
+  type: string
+  category: string
+  priority: string
   title: string
   message: string
-  timestamp?: string
-  link?: string
-  linkText?: string
-  read?: boolean
-  createdAt?: string
+  data?: any
+  action_url?: string | null
+  actor_name?: string
+  actor_avatar?: string
+  read: boolean
+  read_at?: string
+  created_at: string
 }
 
 interface NotificationBellProps {
   isAdmin?: boolean
 }
 
-const notificationIcons = {
-  info: Info,
-  warning: AlertCircle,
-  success: CheckCircle,
-  error: AlertCircle,
+// Notification type icons
+const typeIcons = {
+  task_assigned: User,
+  task_updated: AlertCircle,
+  task_completed: CheckCircle,
+  mention: MessageSquare,
+  feedback: MessageSquare,
+  asset_assigned: Package,
+  approval_request: FileText,
+  approval_granted: CheckCircle,
+  system: Settings,
+  announcement: AlertTriangle,
 }
 
-const notificationColors = {
-  info: "border-l-blue-500 bg-blue-50/50 dark:bg-blue-950/10",
-  warning: "border-l-yellow-500 bg-yellow-50/50 dark:bg-yellow-950/10",
-  success: "border-l-green-500 bg-green-50/50 dark:bg-green-950/10",
-  error: "border-l-red-500 bg-red-50/50 dark:bg-red-950/10",
+// Category icons
+const categoryIcons = {
+  tasks: User,
+  assets: Package,
+  feedback: MessageSquare,
+  approvals: FileText,
+  system: Settings,
+  mentions: MessageSquare,
 }
 
-const notificationIconColors = {
-  info: "text-blue-600 dark:text-blue-400",
-  warning: "text-yellow-600 dark:text-yellow-400",
-  success: "text-green-600 dark:text-green-400",
-  error: "text-red-600 dark:text-red-400",
+// Priority colors
+const priorityColors = {
+  low: "text-gray-500",
+  normal: "text-blue-500",
+  high: "text-orange-500",
+  urgent: "text-red-500",
 }
 
-// Format relative time (e.g., "2 minutes ago", "1 hour ago")
-function formatRelativeTime(dateString?: string): string {
-  if (!dateString) return "Just now"
+// Format relative time
+function formatRelativeTime(dateString: string): string {
+  const date = new Date(dateString)
+  const now = new Date()
+  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
 
-  try {
-    const date = new Date(dateString)
-    const now = new Date()
-    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
-
-    if (diffInSeconds < 60) return "Just now"
-    if (diffInSeconds < 3600) {
-      const minutes = Math.floor(diffInSeconds / 60)
-      return `${minutes} minute${minutes > 1 ? "s" : ""} ago`
-    }
-    if (diffInSeconds < 86400) {
-      const hours = Math.floor(diffInSeconds / 3600)
-      return `${hours} hour${hours > 1 ? "s" : ""} ago`
-    }
-    if (diffInSeconds < 604800) {
-      const days = Math.floor(diffInSeconds / 86400)
-      return `${days} day${days > 1 ? "s" : ""} ago`
-    }
-
-    return date.toLocaleDateString("en-US", { month: "short", day: "numeric" })
-  } catch {
-    return "Just now"
+  if (diffInSeconds < 60) return "Just now"
+  if (diffInSeconds < 3600) {
+    const minutes = Math.floor(diffInSeconds / 60)
+    return `${minutes}m ago`
   }
+  if (diffInSeconds < 86400) {
+    const hours = Math.floor(diffInSeconds / 3600)
+    return `${hours}h ago`
+  }
+  if (diffInSeconds < 604800) {
+    const days = Math.floor(diffInSeconds / 86400)
+    return `${days}d ago`
+  }
+  if (diffInSeconds < 2592000) {
+    const weeks = Math.floor(diffInSeconds / 604800)
+    return `${weeks}w ago`
+  }
+
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+}
+
+// Get initials from name
+function getInitials(name?: string): string {
+  if (!name) return "?"
+  const parts = name.split(" ")
+  if (parts.length >= 2) {
+    return `${parts[0][0]}${parts[1][0]}`.toUpperCase()
+  }
+  return name.substring(0, 2).toUpperCase()
 }
 
 export function NotificationBell({ isAdmin = false }: NotificationBellProps) {
   const router = useRouter()
-  const [notifications, setNotifications] = useState<Notification[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [isOpen, setIsOpen] = useState(false)
-  const [readIds, setReadIds] = useState<Set<string>>(new Set())
-  const intervalRef = useRef<NodeJS.Timeout | null>(null)
-  const lastFetchRef = useRef<Date>(new Date())
+  const supabase = createClient()
+  const queryClient = useQueryClient()
 
+  // State
+  const [isOpen, setIsOpen] = useState(false)
+  const [activeTab, setActiveTab] = useState("all")
+  const [searchQuery, setSearchQuery] = useState("")
+
+  // Real-time subscription ref
+  const subscriptionRef = useRef<any>(null)
+
+  const { data: notifications = [], isLoading } = useQuery({
+    queryKey: QUERY_KEYS.notificationBell(),
+    queryFn: async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) return []
+
+      const { data, error } = await supabase
+        .from("notifications")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(50)
+
+      if (error) throw new Error(error.message)
+      return data || []
+    },
+  })
+
+  const loadNotifications = () => {
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.notificationBell() })
+  }
+
+  // Setup real-time subscription
   useEffect(() => {
-    // Only create client on client side
-    if (typeof window === "undefined") {
-      setIsLoading(false)
-      return
+    loadNotifications()
+
+    // Subscribe to real-time updates
+    const setupSubscription = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) return
+
+      subscriptionRef.current = supabase
+        .channel("notifications")
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "notifications",
+            filter: `user_id=eq.${user.id}`,
+          },
+          (payload) => {
+            // Invalidate query to refetch updated notifications
+            queryClient.invalidateQueries({ queryKey: QUERY_KEYS.notificationBell() })
+
+            // Show toast for new notification
+            if (payload.eventType === "INSERT") {
+              toast.info(payload.new.title, {
+                description: payload.new.message,
+                action: payload.new.action_url
+                  ? {
+                      label: "View",
+                      onClick: () => router.push(payload.new.action_url),
+                    }
+                  : undefined,
+              })
+            }
+          }
+        )
+        .subscribe()
     }
 
-    // Lazy import to avoid SSR issues
-    import("@/lib/supabase/client")
-      .then(({ createClient }) => {
-        const supabase = createClient()
-        loadNotifications(supabase)
-
-        // Set up polling every 30 seconds
-        intervalRef.current = setInterval(() => {
-          loadNotifications(supabase)
-        }, 30000)
-      })
-      .catch((error) => {
-        console.error("Error initializing Supabase client:", error)
-        setIsLoading(false)
-      })
+    setupSubscription()
 
     return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current)
+      if (subscriptionRef.current) {
+        subscriptionRef.current.unsubscribe()
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAdmin])
+  }, [supabase, router])
 
-  // Refresh when dropdown opens and update timestamps periodically
+  // Refresh when dropdown opens
   useEffect(() => {
-    if (isOpen && typeof window !== "undefined") {
-      import("@/lib/supabase/client").then(({ createClient }) => {
-        const supabase = createClient()
-        loadNotifications(supabase)
-      })
-
-      // Update relative timestamps every minute while open
-      const timestampInterval = setInterval(() => {
-        setNotifications((prev) =>
-          prev.map((n) => ({
-            ...n,
-            timestamp: formatRelativeTime(n.createdAt),
-          }))
-        )
-      }, 60000)
-
-      return () => clearInterval(timestampInterval)
+    if (isOpen) {
+      loadNotifications()
     }
-  }, [isOpen, isAdmin])
+  }, [isOpen])
 
-  const loadNotifications = async (supabase: any) => {
+  // Mark as read
+  const markAsRead = async (notificationId: string) => {
+    try {
+      const { error } = await supabase
+        .from("notifications")
+        .update({ read: true, read_at: new Date().toISOString() })
+        .eq("id", notificationId)
+
+      if (error) throw error
+
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.notificationBell() })
+    } catch (error: any) {
+      log.error("Error marking as read:", error)
+    }
+  }
+
+  // Mark all as read
+  const markAllAsRead = async () => {
     try {
       const {
         data: { user },
       } = await supabase.auth.getUser()
       if (!user) return
 
-      const notificationList: Notification[] = []
-      const now = new Date()
+      const { error } = await supabase.rpc("mark_notifications_read", {
+        p_user_id: user.id,
+        p_notification_ids: null,
+      })
 
-      if (isAdmin) {
-        // Admin notifications
-        // Pending user approvals
-        const { count: pendingUsersCount } = await supabase
-          .from("pending_users")
-          .select("*", { count: "exact", head: true })
-          .eq("status", "pending")
+      if (error) throw error
 
-        if (pendingUsersCount && pendingUsersCount > 0) {
-          notificationList.push({
-            id: "pending-users",
-            type: "warning",
-            title: "Pending User Approvals",
-            message: `${pendingUsersCount} user${pendingUsersCount > 1 ? "s" : ""} waiting for approval`,
-            timestamp: formatRelativeTime(now.toISOString()),
-            createdAt: now.toISOString(),
-            link: "/admin/hr/employees",
-            linkText: "Review Employees",
-            read: readIds.has("pending-users"),
-          })
-        }
-
-        // Open feedback
-        const { count: openFeedbackCount } = await supabase
-          .from("feedback")
-          .select("*", { count: "exact", head: true })
-          .eq("status", "open")
-
-        if (openFeedbackCount && openFeedbackCount > 0) {
-          notificationList.push({
-            id: "open-feedback",
-            type: "info",
-            title: "Open Feedback",
-            message: `${openFeedbackCount} open feedback item${openFeedbackCount > 1 ? "s" : ""} need attention`,
-            timestamp: formatRelativeTime(now.toISOString()),
-            createdAt: now.toISOString(),
-            link: "/admin/feedback",
-            linkText: "View Feedback",
-            read: readIds.has("open-feedback"),
-          })
-        }
-
-        // Urgent tasks
-        const { count: urgentTasksCount } = await supabase
-          .from("tasks")
-          .select("*", { count: "exact", head: true })
-          .eq("priority", "urgent")
-          .in("status", ["pending", "in_progress"])
-
-        if (urgentTasksCount && urgentTasksCount > 0) {
-          notificationList.push({
-            id: "urgent-tasks",
-            type: "error",
-            title: "Urgent Tasks",
-            message: `${urgentTasksCount} urgent task${urgentTasksCount > 1 ? "s" : ""} need immediate attention`,
-            timestamp: formatRelativeTime(now.toISOString()),
-            createdAt: now.toISOString(),
-            link: "/admin/tasks",
-            linkText: "View Tasks",
-            read: readIds.has("urgent-tasks"),
-          })
-        }
-
-        // Overdue tasks
-        const today = new Date().toISOString().split("T")[0]
-        const { data: overdueTasks } = await supabase
-          .from("tasks")
-          .select("id", { count: "exact", head: false })
-          .lt("due_date", today)
-          .in("status", ["pending", "in_progress"])
-
-        if (overdueTasks && overdueTasks.length > 0) {
-          notificationList.push({
-            id: "overdue-tasks",
-            type: "error",
-            title: "Overdue Tasks",
-            message: `${overdueTasks.length} overdue task${overdueTasks.length > 1 ? "s" : ""} need to be completed`,
-            timestamp: formatRelativeTime(now.toISOString()),
-            createdAt: now.toISOString(),
-            link: "/admin/tasks",
-            linkText: "View Tasks",
-            read: readIds.has("overdue-tasks"),
-          })
-        }
-
-        // Overdue payments
-        try {
-          const { data: overduePayments } = await supabase
-            .from("department_payments")
-            .select("id")
-            .lt("next_payment_due", now.toISOString())
-            .eq("status", "due")
-
-          if (overduePayments && overduePayments.length > 0) {
-            notificationList.push({
-              id: "overdue-payments",
-              type: "error",
-              title: "Overdue Payments",
-              message: `${overduePayments.length} payment${overduePayments.length > 1 ? "s" : ""} past due date`,
-              timestamp: formatRelativeTime(now.toISOString()),
-              createdAt: now.toISOString(),
-              link: "/admin/finance/payments",
-              linkText: "View Payments",
-              read: readIds.has("overdue-payments"),
-            })
-          }
-        } catch (e) {
-          // Table might not exist, ignore
-        }
-
-        // Payments due soon (within 7 days)
-        try {
-          const sevenDaysFromNow = new Date()
-          sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7)
-          const { data: dueSoonPayments } = await supabase
-            .from("department_payments")
-            .select("id")
-            .gte("next_payment_due", now.toISOString())
-            .lte("next_payment_due", sevenDaysFromNow.toISOString())
-            .eq("status", "due")
-
-          if (dueSoonPayments && dueSoonPayments.length > 0) {
-            notificationList.push({
-              id: "due-soon-payments",
-              type: "warning",
-              title: "Payments Due Soon",
-              message: `${dueSoonPayments.length} payment${dueSoonPayments.length > 1 ? "s" : ""} due within 7 days`,
-              timestamp: formatRelativeTime(now.toISOString()),
-              createdAt: now.toISOString(),
-              link: "/admin/finance/payments",
-              linkText: "View Payments",
-              read: readIds.has("due-soon-payments"),
-            })
-          }
-        } catch (e) {
-          // Table might not exist, ignore
-        }
-
-        // Pending leave requests
-        try {
-          const { count: pendingLeaveCount } = await supabase
-            .from("leave_requests")
-            .select("*", { count: "exact", head: true })
-            .eq("status", "pending")
-
-          if (pendingLeaveCount && pendingLeaveCount > 0) {
-            notificationList.push({
-              id: "pending-leave",
-              type: "warning",
-              title: "Pending Leave Requests",
-              message: `${pendingLeaveCount} leave request${pendingLeaveCount > 1 ? "s" : ""} awaiting approval`,
-              timestamp: formatRelativeTime(now.toISOString()),
-              createdAt: now.toISOString(),
-              link: "/admin/hr/leave/approve",
-              linkText: "Review Requests",
-              read: readIds.has("pending-leave"),
-            })
-          }
-        } catch (e) {
-          // Table might not exist, ignore
-        }
-
-        // Unresolved asset issues
-        try {
-          const { count: assetIssuesCount } = await supabase
-            .from("asset_issues")
-            .select("*", { count: "exact", head: true })
-            .in("status", ["open", "in_progress"])
-
-          if (assetIssuesCount && assetIssuesCount > 0) {
-            notificationList.push({
-              id: "asset-issues",
-              type: "warning",
-              title: "Unresolved Asset Issues",
-              message: `${assetIssuesCount} asset issue${assetIssuesCount > 1 ? "s" : ""} need attention`,
-              timestamp: formatRelativeTime(now.toISOString()),
-              createdAt: now.toISOString(),
-              link: "/admin/assets/issues",
-              linkText: "View Issues",
-              read: readIds.has("asset-issues"),
-            })
-          }
-        } catch (e) {
-          // Table might not exist, ignore
-        }
-
-        // Assets in maintenance
-        try {
-          const { count: maintenanceCount } = await supabase
-            .from("assets")
-            .select("*", { count: "exact", head: true })
-            .eq("status", "maintenance")
-
-          if (maintenanceCount && maintenanceCount > 0) {
-            notificationList.push({
-              id: "assets-maintenance",
-              type: "info",
-              title: "Assets in Maintenance",
-              message: `${maintenanceCount} asset${maintenanceCount > 1 ? "s" : ""} currently in maintenance`,
-              timestamp: formatRelativeTime(now.toISOString()),
-              createdAt: now.toISOString(),
-              link: "/admin/assets",
-              linkText: "View Assets",
-              read: readIds.has("assets-maintenance"),
-            })
-          }
-        } catch (e) {
-          // Table might not exist, ignore
-        }
-      } else {
-        // User notifications
-        // Pending tasks
-        const { data: assignedTasks } = await supabase
-          .from("tasks")
-          .select("*")
-          .eq("assigned_to", user.id)
-          .in("status", ["pending", "in_progress"])
-
-        if (assignedTasks && assignedTasks.length > 0) {
-          const pendingTasks = assignedTasks.filter((t: any) => t.status === "pending")
-          if (pendingTasks.length > 0) {
-            notificationList.push({
-              id: "pending-tasks",
-              type: "info",
-              title: "Pending Tasks",
-              message: `${pendingTasks.length} pending task${pendingTasks.length > 1 ? "s" : ""} assigned to you`,
-              timestamp: formatRelativeTime(now.toISOString()),
-              createdAt: now.toISOString(),
-              link: "/tasks",
-              linkText: "View Tasks",
-              read: readIds.has("pending-tasks"),
-            })
-          }
-
-          // Urgent tasks
-          const urgentTasks = assignedTasks.filter((t: any) => t.priority === "urgent")
-          if (urgentTasks.length > 0) {
-            notificationList.push({
-              id: "urgent-tasks",
-              type: "error",
-              title: "Urgent Tasks",
-              message: `${urgentTasks.length} urgent task${urgentTasks.length > 1 ? "s" : ""} need immediate attention`,
-              timestamp: formatRelativeTime(now.toISOString()),
-              createdAt: now.toISOString(),
-              link: "/tasks",
-              linkText: "View Tasks",
-              read: readIds.has("urgent-tasks"),
-            })
-          }
-
-          // Overdue tasks
-          const today = new Date().toISOString().split("T")[0]
-          const overdueTasks = assignedTasks.filter((t: any) => t.due_date && t.due_date < today)
-          if (overdueTasks.length > 0) {
-            notificationList.push({
-              id: "overdue-tasks",
-              type: "error",
-              title: "Overdue Tasks",
-              message: `${overdueTasks.length} overdue task${overdueTasks.length > 1 ? "s" : ""} need to be completed`,
-              timestamp: formatRelativeTime(now.toISOString()),
-              createdAt: now.toISOString(),
-              link: "/tasks",
-              linkText: "View Tasks",
-              read: readIds.has("overdue-tasks"),
-            })
-          }
-
-          // Tasks due soon
-          const threeDaysFromNow = new Date()
-          threeDaysFromNow.setDate(threeDaysFromNow.getDate() + 3)
-          const dueSoonTasks = assignedTasks.filter(
-            (t: any) => t.due_date && t.due_date >= today && t.due_date <= threeDaysFromNow.toISOString().split("T")[0]
-          )
-          if (dueSoonTasks.length > 0) {
-            notificationList.push({
-              id: "due-soon-tasks",
-              type: "warning",
-              title: "Tasks Due Soon",
-              message: `${dueSoonTasks.length} task${dueSoonTasks.length > 1 ? "s" : ""} due within 3 days`,
-              timestamp: formatRelativeTime(now.toISOString()),
-              createdAt: now.toISOString(),
-              link: "/tasks",
-              linkText: "View Tasks",
-              read: readIds.has("due-soon-tasks"),
-            })
-          }
-        }
-
-        // User's pending leave requests
-        try {
-          const { count: myPendingLeave } = await supabase
-            .from("leave_requests")
-            .select("*", { count: "exact", head: true })
-            .eq("user_id", user.id)
-            .eq("status", "pending")
-
-          if (myPendingLeave && myPendingLeave > 0) {
-            notificationList.push({
-              id: "my-pending-leave",
-              type: "info",
-              title: "Leave Requests Pending",
-              message: `${myPendingLeave} leave request${myPendingLeave > 1 ? "s" : ""} awaiting approval`,
-              timestamp: formatRelativeTime(now.toISOString()),
-              createdAt: now.toISOString(),
-              link: "/dashboard/leave",
-              linkText: "View Requests",
-              read: readIds.has("my-pending-leave"),
-            })
-          }
-        } catch (e) {
-          // Table might not exist, ignore
-        }
-
-        // User's recently approved leave
-        try {
-          const sevenDaysAgo = new Date()
-          sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-          const { count: approvedLeave } = await supabase
-            .from("leave_requests")
-            .select("*", { count: "exact", head: true })
-            .eq("user_id", user.id)
-            .eq("status", "approved")
-            .gte("updated_at", sevenDaysAgo.toISOString())
-
-          if (approvedLeave && approvedLeave > 0) {
-            notificationList.push({
-              id: "approved-leave",
-              type: "success",
-              title: "Leave Approved",
-              message: `${approvedLeave} leave request${approvedLeave > 1 ? "s" : ""} recently approved`,
-              timestamp: formatRelativeTime(now.toISOString()),
-              createdAt: now.toISOString(),
-              link: "/dashboard/leave",
-              linkText: "View Details",
-              read: readIds.has("approved-leave"),
-            })
-          }
-        } catch (e) {
-          // Table might not exist, ignore
-        }
-      }
-
-      setNotifications(notificationList)
-      lastFetchRef.current = now
-    } catch (error) {
-      console.error("Error loading notifications:", error)
-    } finally {
-      setIsLoading(false)
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.notificationBell() })
+      toast.success("All notifications marked as read")
+    } catch (error: any) {
+      log.error("Error marking all as read:", error)
+      toast.error("Failed to mark all as read")
     }
   }
 
-  const unreadCount = notifications.filter((n) => !readIds.has(n.id)).length
+  // Delete notification
+  const deleteNotification = async (notificationId: string) => {
+    try {
+      const { error } = await supabase.from("notifications").delete().eq("id", notificationId)
 
-  const markAsRead = (id: string) => {
-    setReadIds((prev) => {
-      const newSet = new Set(Array.from(prev))
-      newSet.add(id)
-      return newSet
-    })
+      if (error) throw error
+
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.notificationBell() })
+    } catch (error: any) {
+      log.error("Error deleting notification:", error)
+      toast.error("Failed to delete notification")
+    }
   }
 
-  const markAllAsRead = () => {
-    setReadIds(new Set(Array.from(notifications.map((n) => n.id))))
+  // Handle notification click
+  const handleNotificationClick = async (notification: Notification) => {
+    // Mark as read if not already
+    if (!notification.read) {
+      await markAsRead(notification.id)
+    }
+
+    // Navigate if there's a link
+    if (notification.action_url) {
+      setIsOpen(false)
+      router.push(notification.action_url)
+    }
   }
 
-  const dismissNotification = (id: string) => {
-    setNotifications((prev) => prev.filter((n) => n.id !== id))
-    setReadIds((prev) => {
-      const newSet = new Set(prev)
-      newSet.delete(id)
-      return newSet
-    })
+  // Filter notifications
+  const filteredNotifications = notifications.filter((n) => {
+    // Tab filter
+    if (activeTab === "unread" && n.read) return false
+    if (activeTab !== "all" && activeTab !== "unread" && n.category !== activeTab) return false
+
+    // Search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase()
+      return (
+        n.title.toLowerCase().includes(query) ||
+        n.message.toLowerCase().includes(query) ||
+        n.actor_name?.toLowerCase().includes(query)
+      )
+    }
+
+    return true
+  })
+
+  // Calculate counts
+  const unreadCount = notifications.filter((n) => !n.read).length
+  const categoryCounts = {
+    all: notifications.length,
+    unread: unreadCount,
+    tasks: notifications.filter((n) => n.category === "tasks").length,
+    assets: notifications.filter((n) => n.category === "assets").length,
+    feedback: notifications.filter((n) => n.category === "feedback").length,
+    approvals: notifications.filter((n) => n.category === "approvals").length,
+    mentions: notifications.filter((n) => n.category === "mentions").length,
+    system: notifications.filter((n) => n.category === "system").length,
   }
 
   if (isLoading) {
@@ -532,137 +336,247 @@ export function NotificationBell({ isAdmin = false }: NotificationBellProps) {
         <Button
           variant="ghost"
           size="icon"
+          aria-label="Notifications"
           className="hover:bg-muted relative h-10 w-10 rounded-full transition-colors"
         >
           <Bell className="h-5 w-5" />
           {unreadCount > 0 && (
             <Badge
               variant="destructive"
-              className="absolute -top-1 -right-1 flex h-5 w-5 animate-pulse items-center justify-center p-0 text-xs font-semibold"
+              className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center p-0 text-[10px] font-bold"
             >
-              {unreadCount > 9 ? "9+" : unreadCount}
+              {unreadCount > 99 ? "99+" : unreadCount}
             </Badge>
           )}
         </Button>
       </DropdownMenuTrigger>
+
       <DropdownMenuContent
         align="end"
-        className="w-96 border-2 p-0 shadow-lg"
+        className="w-[calc(100vw-2rem)] border-2 p-0 shadow-xl sm:w-[460px]"
         onCloseAutoFocus={(e) => e.preventDefault()}
       >
         {/* Header */}
-        <div className="bg-muted/50 flex items-center justify-between border-b p-4">
+        <div className="bg-muted/30 flex items-center justify-between border-b p-3">
           <div className="flex items-center gap-2">
-            <h3 className="text-sm font-semibold">Notifications</h3>
+            <Bell className="text-foreground h-5 w-5" />
+            <h3 className="text-base font-semibold">Notifications</h3>
             {unreadCount > 0 && (
-              <Badge variant="secondary" className="text-xs font-medium">
+              <Badge variant="secondary" className="px-2 text-xs font-semibold">
                 {unreadCount} new
               </Badge>
             )}
           </div>
-          {notifications.length > 0 && unreadCount > 0 && (
-            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={markAllAsRead}>
-              <CheckCheck className="mr-1 h-3 w-3" />
-              Mark all read
-            </Button>
-          )}
-        </div>
 
-        {/* Notifications List */}
-        <ScrollArea className="h-[400px]">
-          {notifications.length > 0 ? (
-            <div className="space-y-0.5 p-1.5">
-              {notifications.map((notification) => {
-                const Icon = notificationIcons[notification.type]
-                const isRead = readIds.has(notification.id)
+          <div className="flex items-center gap-2">
+            {unreadCount > 0 && (
+              <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={markAllAsRead}>
+                <CheckCheck className="mr-1 h-4 w-4" />
+                Mark all read
+              </Button>
+            )}
 
-                return (
-                  <div
-                    key={notification.id}
-                    className={cn(
-                      "group hover:bg-muted/50 relative cursor-pointer rounded-md border-l-2 px-3 py-2 transition-all duration-200",
-                      notificationColors[notification.type],
-                      isRead && "opacity-60"
-                    )}
-                    onClick={() => {
-                      if (notification.link) {
-                        markAsRead(notification.id)
-                        setIsOpen(false)
-                        router.push(notification.link)
-                      }
-                    }}
-                  >
-                    {/* Dismiss button */}
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="hover:bg-destructive/10 absolute top-1.5 right-1.5 h-5 w-5 opacity-0 transition-opacity group-hover:opacity-100"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        dismissNotification(notification.id)
-                      }}
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
-
-                    <div className="flex items-center gap-2 pr-6">
-                      {/* Icon */}
-                      <div
-                        className={cn(
-                          "bg-background/50 shrink-0 rounded p-1.5",
-                          notificationIconColors[notification.type]
-                        )}
-                      >
-                        <Icon className="h-3.5 w-3.5" />
-                      </div>
-
-                      {/* Content - Compact single/two row layout */}
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between gap-2">
-                          <h4 className={cn("truncate text-sm font-medium", !isRead && "font-semibold")}>
-                            {notification.title}
-                          </h4>
-                          {notification.timestamp && (
-                            <span className="text-muted-foreground shrink-0 text-xs whitespace-nowrap">
-                              {notification.timestamp}
-                            </span>
-                          )}
-                        </div>
-                        <div className="mt-0.5 flex items-center justify-between gap-2">
-                          <p className="text-muted-foreground flex-1 truncate text-xs">{notification.message}</p>
-                          {notification.link && <span className="text-primary shrink-0 text-xs font-medium">→</span>}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center px-4 py-16">
-              <div className="bg-muted mb-4 rounded-full p-4">
-                <Bell className="text-muted-foreground h-8 w-8 opacity-50" />
-              </div>
-              <p className="text-foreground mb-1 text-sm font-medium">No notifications</p>
-              <p className="text-muted-foreground text-center text-xs">
-                You're all caught up! We'll notify you when something important happens.
-              </p>
-            </div>
-          )}
-        </ScrollArea>
-
-        {/* Footer */}
-        {notifications.length > 0 && (
-          <div className="bg-muted/30 border-t p-2">
-            <Link
-              href={isAdmin ? "/admin/notification" : "/notification"}
-              onClick={() => setIsOpen(false)}
-              className="text-primary block w-full py-2 text-center text-xs font-medium hover:underline"
-            >
-              View all notifications →
+            <Link href={isAdmin ? "/admin/notification" : "/notification"}>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Notification settings"
+                className="h-8 w-8"
+                onClick={() => setIsOpen(false)}
+              >
+                <Settings className="h-4 w-4" />
+              </Button>
             </Link>
           </div>
-        )}
+        </div>
+
+        {/* Search */}
+        <div className="border-b p-2.5">
+          <div className="relative">
+            <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+            <Input
+              placeholder="Search notifications..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="h-8 pl-9"
+            />
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="h-auto w-full justify-start rounded-none border-b bg-transparent p-0">
+            <TabsTrigger
+              value="all"
+              className="data-[state=active]:border-primary rounded-none border-b-2 border-transparent px-3 py-2 data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+            >
+              All{" "}
+              {categoryCounts.all > 0 && (
+                <Badge variant="secondary" className="ml-2 px-1.5 text-xs">
+                  {categoryCounts.all}
+                </Badge>
+              )}
+            </TabsTrigger>
+
+            <TabsTrigger
+              value="unread"
+              className="data-[state=active]:border-primary rounded-none border-b-2 border-transparent px-3 py-2 data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+            >
+              Unread{" "}
+              {categoryCounts.unread > 0 && (
+                <Badge variant="destructive" className="ml-2 px-1.5 text-xs">
+                  {categoryCounts.unread}
+                </Badge>
+              )}
+            </TabsTrigger>
+
+            {categoryCounts.mentions > 0 && (
+              <TabsTrigger
+                value="mentions"
+                className="data-[state=active]:border-primary rounded-none border-b-2 border-transparent px-3 py-2 data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+              >
+                <MessageSquare className="mr-1 h-4 w-4" />
+                Mentions{" "}
+                {categoryCounts.mentions > 0 && (
+                  <Badge variant="secondary" className="ml-2 px-1.5 text-xs">
+                    {categoryCounts.mentions}
+                  </Badge>
+                )}
+              </TabsTrigger>
+            )}
+          </TabsList>
+
+          <TabsContent value={activeTab} className="mt-0">
+            <ScrollArea className="h-[430px]">
+              {filteredNotifications.length > 0 ? (
+                <div className="divide-y">
+                  {filteredNotifications.map((notification) => {
+                    const Icon = typeIcons[notification.type as keyof typeof typeIcons] || Info
+
+                    return (
+                      <div
+                        key={notification.id}
+                        className={cn(
+                          "group hover:bg-muted/30 relative cursor-pointer px-3 py-2.5 transition-all",
+                          !notification.read && "bg-blue-50/30 dark:bg-blue-950/10"
+                        )}
+                        onClick={() => handleNotificationClick(notification)}
+                      >
+                        <div className="flex gap-2.5">
+                          {/* Actor Avatar or Icon */}
+                          {notification.actor_avatar || notification.actor_name ? (
+                            <Avatar className="h-8 w-8 shrink-0">
+                              {notification.actor_avatar && (
+                                <AvatarImage src={notification.actor_avatar} alt={notification.actor_name} />
+                              )}
+                              <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
+                                {getInitials(notification.actor_name)}
+                              </AvatarFallback>
+                            </Avatar>
+                          ) : (
+                            <div
+                              className={cn(
+                                "flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
+                                "bg-muted",
+                                priorityColors[notification.priority as keyof typeof priorityColors]
+                              )}
+                            >
+                              <Icon className="h-4 w-4" />
+                            </div>
+                          )}
+
+                          {/* Content */}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1">
+                                <p className={cn("text-sm leading-tight", !notification.read && "font-semibold")}>
+                                  {notification.title}
+                                </p>
+                                <p className="text-muted-foreground mt-0.5 line-clamp-2 text-xs leading-snug">
+                                  {notification.message}
+                                </p>
+
+                                {/* Link indicator */}
+                                {notification.action_url && (
+                                  <div className="text-primary mt-0.5 flex items-center gap-1 text-xs font-medium">
+                                    View details
+                                    <ChevronRight className="h-3 w-3" />
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                <span className="text-muted-foreground text-xs whitespace-nowrap">
+                                  {formatRelativeTime(notification.created_at)}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Action buttons (hidden, show on hover) */}
+                            <div className="mt-1.5 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                              {!notification.read && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 px-2 text-[11px]"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    markAsRead(notification.id)
+                                  }}
+                                >
+                                  <CheckCheck className="mr-1 h-3 w-3" />
+                                  Mark read
+                                </Button>
+                              )}
+
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-destructive hover:text-destructive hover:bg-destructive/10 h-6 px-2 text-[11px]"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  deleteNotification(notification.id)
+                                }}
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center px-4 py-16">
+                  <div className="bg-muted mb-4 rounded-full p-4">
+                    <Bell className="text-muted-foreground h-12 w-12 opacity-50" />
+                  </div>
+                  <p className="text-foreground mb-1 text-sm font-semibold">
+                    {searchQuery ? "No matching notifications" : "No notifications"}
+                  </p>
+                  <p className="text-muted-foreground max-w-sm text-center text-xs">
+                    {searchQuery
+                      ? "Try adjusting your search terms"
+                      : "You're all caught up! We'll notify you when something important happens."}
+                  </p>
+                </div>
+              )}
+            </ScrollArea>
+          </TabsContent>
+        </Tabs>
+
+        {/* Footer */}
+        <DropdownMenuSeparator className="my-0" />
+        <div className="bg-muted/20 p-3">
+          <Link
+            href={isAdmin ? "/admin/notification" : "/notification"}
+            onClick={() => setIsOpen(false)}
+            className="text-primary block w-full py-1 text-center text-xs font-medium hover:underline"
+          >
+            View all notifications →
+          </Link>
+        </div>
       </DropdownMenuContent>
     </DropdownMenu>
   )

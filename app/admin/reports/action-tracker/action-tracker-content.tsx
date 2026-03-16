@@ -33,6 +33,16 @@ import {
 } from "lucide-react"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { ActionFormDialog } from "@/components/admin/action-tracker/action-form-dialog"
 import {
   exportActionTrackerToPDF,
@@ -126,6 +136,7 @@ export function ActionTrackerContent({
     return d || "all"
   })
   const [searchQuery, setSearchQuery] = useState("")
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
 
   const supabase = createClient()
   const canMutateTask = (task: ActionTask) => canGlobalEdit || editableDepartments.includes(task.department)
@@ -176,7 +187,6 @@ export function ActionTrackerContent({
       toast.error("You can only delete actions in your departments")
       return
     }
-    if (!confirm("Are you sure you want to delete this action?")) return
     try {
       const { error } = await supabase.from("tasks").delete().eq("id", id)
       if (error) throw error
@@ -607,7 +617,7 @@ export function ActionTrackerContent({
                                             </DropdownMenuItem>
                                             <DropdownMenuItem
                                               disabled={!canMutateTask(task)}
-                                              onClick={() => handleDelete(task.id)}
+                                              onClick={() => setPendingDeleteId(task.id)}
                                               className="text-destructive gap-2"
                                             >
                                               <Trash2 className="h-4 w-4" /> Delete
@@ -641,6 +651,29 @@ export function ActionTrackerContent({
         defaultWeek={weekFilter}
         defaultYear={yearFilter}
       />
+
+      <AlertDialog open={pendingDeleteId !== null} onOpenChange={(open) => !open && setPendingDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Action</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this action? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (pendingDeleteId) handleDelete(pendingDeleteId)
+                setPendingDeleteId(null)
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AdminTablePage>
   )
 }

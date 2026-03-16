@@ -10,6 +10,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
@@ -60,6 +70,7 @@ export function PendingApplicationsModal({ onEmployeeCreated }: PendingApplicati
   const [isOpen, setIsOpen] = useState(false)
   const [selectedUser, setSelectedUser] = useState<PendingUser | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
+  const [pendingReject, setPendingReject] = useState(false)
   const [employeeId, setEmployeeId] = useState("")
   const [hireDate, setHireDate] = useState(new Date().toISOString().split("T")[0])
 
@@ -162,7 +173,6 @@ export function PendingApplicationsModal({ onEmployeeCreated }: PendingApplicati
 
   const handleReject = async () => {
     if (!selectedUser) return
-    if (!confirm("Are you sure you want to reject this application? This cannot be undone.")) return
 
     setIsProcessing(true)
     try {
@@ -359,7 +369,7 @@ export function PendingApplicationsModal({ onEmployeeCreated }: PendingApplicati
                 <div className="bg-background border-border absolute right-0 bottom-0 left-0 z-10 flex justify-end gap-3 border-t p-6">
                   <Button
                     variant="outline"
-                    onClick={handleReject}
+                    onClick={() => setPendingReject(true)}
                     disabled={isProcessing}
                     className="h-10 px-6 font-semibold"
                   >
@@ -390,6 +400,29 @@ export function PendingApplicationsModal({ onEmployeeCreated }: PendingApplicati
           </main>
         </div>
       </DialogContent>
+
+      <AlertDialog open={pendingReject} onOpenChange={(open) => !open && setPendingReject(false)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reject Application</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to reject this application? This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                setPendingReject(false)
+                handleReject()
+              }}
+            >
+              Reject
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   )
 }
