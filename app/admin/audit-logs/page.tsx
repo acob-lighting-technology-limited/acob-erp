@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import { AdminAuditLogsContent, type AuditLog, type employeeMember, type UserProfile } from "./admin-audit-logs-content"
+import { AdminAuditLogsContent, type AuditLog, type UserProfile } from "./admin-audit-logs-content"
+import type { EmployeeMember as employeeMember } from "./types"
 import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
 import { normalizeAuditAction } from "@/lib/audit/core"
 import { normalizeAuditLogRows } from "@/lib/audit/normalize"
