@@ -3,7 +3,7 @@ import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 import { getOneDriveService } from "@/lib/onedrive"
 import { logger } from "@/lib/logger"
-import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
+import { getDepartmentScope, resolveAdminScope, normalizeDepartmentName } from "@/lib/admin/rbac"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 
 const log = logger("payments-documents")
@@ -28,11 +28,7 @@ async function createClient() {
 }
 
 function normalizeDepartment(value: string | null | undefined): string {
-  const normalized = String(value || "")
-    .trim()
-    .toLowerCase()
-  if (normalized === "finance") return "accounts"
-  return normalized
+  return normalizeDepartmentName(String(value || "").trim()).toLowerCase()
 }
 
 function isFinanceDepartment(value: string | null | undefined): boolean {

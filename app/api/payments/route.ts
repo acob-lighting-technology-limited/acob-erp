@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
-import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
+import { getDepartmentScope, resolveAdminScope, normalizeDepartmentName } from "@/lib/admin/rbac"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { logger } from "@/lib/logger"
 import { writeAuditLog } from "@/lib/audit/write-audit"
@@ -95,7 +95,7 @@ export async function GET(request: Request) {
         query = query.eq("department_id", deptId)
       } else {
         const rawDept = String((profile as any)?.department || "").trim()
-        const deptCandidates = rawDept.toLowerCase() === "finance" ? ["Accounts", rawDept] : [rawDept]
+        const deptCandidates = Array.from(new Set([normalizeDepartmentName(rawDept), rawDept].filter(Boolean)))
         const { data: userDept } = await dataClient
           .from("departments")
           .select("id")
@@ -214,7 +214,7 @@ export async function POST(request: Request) {
       let userDepartmentId = normalizeDepartmentId((profile as any)?.department_id)
       if (!userDepartmentId) {
         const rawDept = String((profile as any)?.department || "").trim()
-        const deptCandidates = rawDept.toLowerCase() === "finance" ? ["Accounts", rawDept] : [rawDept]
+        const deptCandidates = Array.from(new Set([normalizeDepartmentName(rawDept), rawDept].filter(Boolean)))
         const { data: userDept } = await dataClient
           .from("departments")
           .select("id")

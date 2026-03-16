@@ -84,12 +84,17 @@ function unique(values: string[]): string[] {
   )
 }
 
-function normalizeDepartmentName(value: string): string {
+/**
+ * Canonical department name normaliser.
+ * Maps legacy "Finance" label → "Accounts" to match the DB value.
+ * Single source of truth — import from here, do not copy locally.
+ */
+export function normalizeDepartmentName(value: string): string {
   if (value.toLowerCase() === "finance") return "Accounts"
   return value
 }
 
-function normalizeDepartmentList(values: string[]): string[] {
+export function normalizeDepartmentList(values: string[]): string[] {
   return unique(values.map(normalizeDepartmentName))
 }
 

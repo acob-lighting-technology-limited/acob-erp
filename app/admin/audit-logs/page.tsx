@@ -3,12 +3,12 @@ import { createClient } from "@/lib/supabase/server"
 import { AdminAuditLogsContent, type AuditLog, type employeeMember, type UserProfile } from "./admin-audit-logs-content"
 import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
 import { normalizeAuditAction } from "@/lib/audit/core"
+import { normalizeAuditLogRows } from "@/lib/audit/normalize"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 
 import { logger } from "@/lib/logger"
 
 const log = logger("audit-logs")
-
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -82,47 +82,9 @@ async function getAuditLogsData(): Promise<AuditLogsData> {
   let departments: string[] = []
 
   if (logsData && logsData.length > 0) {
-    // 1. Pre-process logs to parse JSON columns
-    const parsedLogs = logsData.map((log) => {
-      let new_values = log.new_values
-      let old_values = log.old_values
-
-      if (typeof new_values === "string") {
-        try {
-          new_values = JSON.parse(new_values)
-        } catch {
-          new_values = null
-        }
-      }
-      if (typeof old_values === "string") {
-        try {
-          old_values = JSON.parse(old_values)
-        } catch {
-          old_values = null
-        }
-      }
-
-      // Fall back to metadata if new_values is null/undefined/empty
-      if ((!new_values || Object.keys(new_values || {}).length === 0) && log.metadata?.new_values) {
-        new_values = log.metadata.new_values
-      }
-      if ((!old_values || Object.keys(old_values || {}).length === 0) && log.metadata?.old_values) {
-        old_values = log.metadata.old_values
-      }
-
-      // Ensure we have objects
-      new_values = new_values || {}
-      old_values = old_values || {}
-
-      return {
-        ...log,
-        new_values,
-        old_values,
-        entity_type: (log.entity_type || log.table_name || "unknown").toLowerCase(),
-        action: log.action || log.operation || "unknown",
-        entity_id: log.entity_id || log.record_id,
-      }
-    })
+    // 1. Pre-process logs to parse JSON columns and normalise field aliases
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const parsedLogs = normalizeAuditLogRows(logsData as any)
 
     // 2. Collect all relevant IDs
     const actorIds = new Set(parsedLogs.map((l) => l.user_id).filter(Boolean))
@@ -154,7 +116,8 @@ async function getAuditLogsData(): Promise<AuditLogsData> {
         const possibleAssetId = log.entity_id
         if (possibleAssetId && UUID_RE.test(possibleAssetId)) assetIds.add(possibleAssetId)
 
-        if (log.new_values.asset_id && UUID_RE.test(log.new_values.asset_id)) assetIds.add(log.new_values.asset_id)
+        const assetIdFromValues = typeof log.new_values.asset_id === "string" ? log.new_values.asset_id : null
+        if (assetIdFromValues && UUID_RE.test(assetIdFromValues)) assetIds.add(assetIdFromValues)
       }
     })
 
