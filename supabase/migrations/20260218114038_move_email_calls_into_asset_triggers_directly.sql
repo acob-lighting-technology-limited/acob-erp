@@ -28,7 +28,7 @@ DECLARE
     v_notification_title text;
     v_notification_message text;
     v_notification_id uuid;
-    v_service_key TEXT := 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml0cWVncXhlcWtlb2d3cnZsemxqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MTY0MjQ1NywiZXhwIjoyMDc3MjE4NDU3fQ.uUEg9q9jT9IsERFmmhmYMxdIr_xgakdf52EmMEZbf50';
+    v_service_key TEXT := current_setting('app.service_role_key', true);
     v_webhook_secret TEXT := 'acob_notification_trigger_secret_2026';
 BEGIN
     IF TG_OP = 'INSERT' AND NEW.assigned_to IS NOT NULL THEN
@@ -127,7 +127,7 @@ DECLARE
     v_notification_title text;
     v_notification_message text;
     v_notification_id uuid;
-    v_service_key TEXT := 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml0cWVncXhlcWtlb2d3cnZsemxqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MTY0MjQ1NywiZXhwIjoyMDc3MjE4NDU3fQ.uUEg9q9jT9IsERFmmhmYMxdIr_xgakdf52EmMEZbf50';
+    v_service_key TEXT := current_setting('app.service_role_key', true);
     v_webhook_secret TEXT := 'acob_notification_trigger_secret_2026';
 BEGIN
     -- Only fire when is_current changes from TRUE to FALSE (closing an assignment)

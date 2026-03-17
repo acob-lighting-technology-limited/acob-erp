@@ -2,7 +2,7 @@ CREATE OR REPLACE FUNCTION public.process_notification_queue()
 RETURNS void AS $$
 DECLARE
   r RECORD;
-  v_service_key TEXT := 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml0cWVncXhlcWtlb2d3cnZsemxqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MTY0MjQ1NywiZXhwIjoyMDc3MjE4NDU3fQ.uUEg9q9jT9IsERFmmhmYMxdIr_xgakdf52EmMEZbf50';
+  v_service_key TEXT := current_setting('app.service_role_key', true);
   v_webhook_secret TEXT := 'b6393118aded6b24ca849be194414535';
 BEGIN
   FOR r IN 
