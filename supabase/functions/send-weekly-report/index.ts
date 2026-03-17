@@ -26,6 +26,7 @@ const RESEND_MAX_REQ_PER_SEC = 2
 const SEND_INTERVAL_MS = Math.ceil(1000 / RESEND_MAX_REQ_PER_SEC) + 100 // ~0.6s with safety margin
 const MAX_429_RETRIES = 5
 const DEFAULT_SENDER = "ACOB Internal Systems <notifications@acoblighting.com>"
+const MEETING_DOCS_BUCKET = "meeting_documents"
 
 const OFFICE_WEEK_ANCHOR_MONTH_INDEX = 0
 const OFFICE_WEEK_ANCHOR_DAY = 12
@@ -188,6 +189,32 @@ async function fetchLogoBytes(url: string): Promise<Uint8Array | null> {
     return new Uint8Array(await res.arrayBuffer())
   } catch {
     return null
+  }
+}
+
+async function resolveStoredMeetingDocument(
+  supabase: ReturnType<typeof createClient>,
+  documentId: string
+): Promise<{ base64: string; filename: string } | null> {
+  const { data: doc, error } = await supabase
+    .from("meeting_week_documents")
+    .select("id, file_path, file_name")
+    .eq("id", documentId)
+    .eq("is_current", true)
+    .single()
+
+  if (error || !doc?.file_path) return null
+
+  const { data: blob, error: downloadError } = await supabase.storage.from(MEETING_DOCS_BUCKET).download(doc.file_path)
+  if (downloadError || !blob) return null
+
+  const bytes = new Uint8Array(await blob.arrayBuffer())
+  let binary = ""
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
+
+  return {
+    base64: btoa(binary),
+    filename: doc.file_name || "meeting-document.pdf",
   }
 }
 
@@ -769,6 +796,9 @@ serve(async (req) => {
       skipActionTracker: bodySkipActionTracker,
       weeklyReportFilename,
       actionTrackerFilename,
+      weeklyReportDocumentId,
+      actionTrackerDocumentId,
+      additionalDocumentIds,
       preparedByName,
       requestedByUserId,
     } = body
@@ -817,7 +847,11 @@ serve(async (req) => {
     if (weeklyReportBase64) includeWeeklyReport = true
     if (actionTrackerBase64) includeActionTracker = true
 
-    if (!includeWeeklyReport && !includeActionTracker) {
+    const requestedAdditionalDocumentIds = Array.isArray(additionalDocumentIds)
+      ? additionalDocumentIds.map((id: unknown) => String(id)).filter(Boolean)
+      : []
+
+    if (!includeWeeklyReport && !includeActionTracker && requestedAdditionalDocumentIds.length === 0) {
       throw new Error("No attachments selected")
     }
 
@@ -832,6 +866,45 @@ serve(async (req) => {
     if (actionTrackerBase64) {
       console.log("[weekly-report] Using client-provided action tracker PDF")
       trackerPdfBase64 = actionTrackerBase64
+    }
+
+    let resolvedWeeklyReportFilename = weeklyReportFilename
+    let resolvedActionTrackerFilename = actionTrackerFilename
+
+    if (!reportPdfBase64 && weeklyReportDocumentId) {
+      const stored = await resolveStoredMeetingDocument(supabase, String(weeklyReportDocumentId))
+      if (stored) {
+        reportPdfBase64 = stored.base64
+        resolvedWeeklyReportFilename = resolvedWeeklyReportFilename || stored.filename
+        includeWeeklyReport = true
+        console.log("[weekly-report] Using stored weekly report document", weeklyReportDocumentId)
+      }
+    }
+
+    if (!trackerPdfBase64 && actionTrackerDocumentId) {
+      const stored = await resolveStoredMeetingDocument(supabase, String(actionTrackerDocumentId))
+      if (stored) {
+        trackerPdfBase64 = stored.base64
+        resolvedActionTrackerFilename = resolvedActionTrackerFilename || stored.filename
+        includeActionTracker = true
+        console.log("[weekly-report] Using stored action tracker document", actionTrackerDocumentId)
+      }
+    }
+
+    const additionalAttachments: { filename: string; content: string }[] = []
+    if (requestedAdditionalDocumentIds.length > 0) {
+      const seenIds = new Set<string>()
+      for (const docId of requestedAdditionalDocumentIds) {
+        if (seenIds.has(docId)) continue
+        seenIds.add(docId)
+        const stored = await resolveStoredMeetingDocument(supabase, docId)
+        if (stored) {
+          additionalAttachments.push({
+            filename: stored.filename || `meeting-document-${docId}.pdf`,
+            content: stored.base64,
+          })
+        }
+      }
     }
 
     if ((includeWeeklyReport && !reportPdfBase64) || (includeActionTracker && !trackerPdfBase64)) {
@@ -904,15 +977,18 @@ serve(async (req) => {
     const attachments: { filename: string; content: string }[] = []
     if (includeWeeklyReport && reportPdfBase64) {
       attachments.push({
-        filename: weeklyReportFilename || `ACOB_Weekly_Reports_W${meetingWeek}_${meetingYear}.pdf`,
+        filename: resolvedWeeklyReportFilename || `ACOB_Weekly_Reports_W${meetingWeek}_${meetingYear}.pdf`,
         content: reportPdfBase64,
       })
     }
     if (includeActionTracker && trackerPdfBase64) {
       attachments.push({
-        filename: actionTrackerFilename || `ACOB_Action_Tracker_W${meetingWeek}_${meetingYear}.pdf`,
+        filename: resolvedActionTrackerFilename || `ACOB_Action_Tracker_W${meetingWeek}_${meetingYear}.pdf`,
         content: trackerPdfBase64,
       })
+    }
+    for (const attachment of additionalAttachments) {
+      attachments.push(attachment)
     }
     if (attachments.length === 0) throw new Error("No attachments to send")
 

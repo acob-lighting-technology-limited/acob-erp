@@ -485,6 +485,7 @@ serve(async (req) => {
       duration,
       knowledgeSharingDepartment,
       knowledgeSharingPresenter,
+      kssRosterStatus,
       requestedByUserId,
     } = body as {
       type: ReminderType
@@ -499,6 +500,7 @@ serve(async (req) => {
       duration?: string
       knowledgeSharingDepartment?: string
       knowledgeSharingPresenter?: KnowledgePresenter
+      kssRosterStatus?: string
       requestedByUserId?: string
     }
 
@@ -512,6 +514,9 @@ serve(async (req) => {
 
     if (type === "meeting") {
       const normalizedAgenda = normalizeMeetingAgenda(agenda, knowledgeSharingPresenter, knowledgeSharingDepartment)
+      if (kssRosterStatus === "missing") {
+        console.warn("[meeting-reminder] KSS roster missing for recurring schedule; sending without roster enrichment")
+      }
 
       subject = withSubjectPrefix("Meetings", "Reminder for General Weekly Meeting")
       html = buildMeetingReminderHtml(
@@ -563,6 +568,9 @@ serve(async (req) => {
           subject,
           meeting_date: meetingDate || null,
           meeting_time: meetingTime || null,
+          knowledge_sharing_department: knowledgeSharingDepartment || null,
+          knowledge_sharing_presenter: knowledgeSharingPresenter?.full_name || null,
+          kss_roster_status: kssRosterStatus || null,
           prepared_by: meetingPreparedByName || null,
         },
       })
