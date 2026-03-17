@@ -4,24 +4,16 @@ import { useState } from "react"
 import { useParams } from "next/navigation"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
+import { Badge } from "@/components/ui/badge"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import {
-  FolderKanban,
-  Calendar,
-  MapPin,
-  User,
-  Users,
-  Zap,
   ArrowLeft,
-  MessageSquare,
-  Send,
+  Users,
   Package,
   ClipboardList,
+  MessageSquare,
   CheckCircle2,
   Clock,
   AlertCircle,
@@ -30,93 +22,25 @@ import {
 import Link from "next/link"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { PageHeader } from "@/components/layout/page-header"
-import { EmptyState } from "@/components/ui/patterns"
 import { PageLoader } from "@/components/ui/query-states"
-
+import { ProjectOverviewCards } from "@/components/projects/project-overview-cards"
+import { ProjectMembersReadTab } from "@/components/projects/project-members-read-tab"
+import { ProjectItemsReadTab } from "@/components/projects/project-items-read-tab"
+import { ProjectTasksTab } from "@/components/projects/project-tasks-tab"
+import { ProjectActivityTab } from "@/components/projects/project-activity-tab"
+import {
+  type ProjectDetailData,
+  getProjectStatusColor,
+  getProjectPriorityColor,
+  getProjectItemStatusColor,
+  formatProjectDate,
+  formatProjectDateTime,
+} from "@/components/projects/project-detail-helpers"
 import { logger } from "@/lib/logger"
 
 const log = logger("projects")
 
-interface Project {
-  id: string
-  project_name: string
-  location: string
-  deployment_start_date: string
-  deployment_end_date: string
-  capacity_w?: number
-  technology_type?: string
-  description?: string
-  status: string
-  created_at: string
-  project_manager?: {
-    first_name: string
-    last_name: string
-    company_email: string
-  }
-  created_by_user?: {
-    first_name: string
-    last_name: string
-  }
-}
-
-interface ProjectMember {
-  id: string
-  user: {
-    first_name: string
-    last_name: string
-    company_email: string
-    department: string
-  }
-  role: string
-  assigned_at: string
-}
-
-interface ProjectItem {
-  id: string
-  item_name: string
-  description?: string
-  quantity: number
-  unit?: string
-  status: string
-  notes?: string
-}
-
-interface ProjectUpdate {
-  id: string
-  content?: string
-  update_type: string
-  created_at: string
-  user?: {
-    first_name: string
-    last_name: string
-  }
-}
-
-interface Task {
-  id: string
-  title: string
-  description?: string
-  priority: string
-  status: string
-  progress: number
-  due_date?: string
-  task_start_date?: string
-  task_end_date?: string
-  assigned_to_user: {
-    first_name: string
-    last_name: string
-  }
-}
-
-interface ProjectData {
-  project: Project
-  members: ProjectMember[]
-  items: ProjectItem[]
-  updates: ProjectUpdate[]
-  tasks: Task[]
-}
-
-async function fetchProjectData(projectId: string): Promise<ProjectData> {
+async function fetchProjectData(projectId: string): Promise<ProjectDetailData> {
   const supabase = createClient()
 
   const [projectResult, membersResult, itemsResult, updatesResult, tasksResult] = await Promise.allSettled([
@@ -173,13 +97,33 @@ async function fetchProjectData(projectId: string): Promise<ProjectData> {
   }
 
   return {
-    project: projectResult.value.data as unknown as Project,
-    members:
-      (membersResult.status === "fulfilled" ? (membersResult.value.data as unknown as ProjectMember[]) : null) ?? [],
-    items: (itemsResult.status === "fulfilled" ? (itemsResult.value.data as ProjectItem[]) : null) ?? [],
-    updates:
-      (updatesResult.status === "fulfilled" ? (updatesResult.value.data as unknown as ProjectUpdate[]) : null) ?? [],
-    tasks: (tasksResult.status === "fulfilled" ? (tasksResult.value.data as unknown as Task[]) : null) ?? [],
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    project: projectResult.value.data as any,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    members: (membersResult.status === "fulfilled" ? (membersResult.value.data as any) : null) ?? [],
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    items: (itemsResult.status === "fulfilled" ? (itemsResult.value.data as any) : null) ?? [],
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    updates: (updatesResult.status === "fulfilled" ? (updatesResult.value.data as any) : null) ?? [],
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    tasks: (tasksResult.status === "fulfilled" ? (tasksResult.value.data as any) : null) ?? [],
+  }
+}
+
+const getStatusIcon = (status: string) => {
+  switch (status) {
+    case "planning":
+      return <Clock className="h-3 w-3" />
+    case "active":
+      return <CheckCircle2 className="h-3 w-3" />
+    case "on_hold":
+      return <Pause className="h-3 w-3" />
+    case "completed":
+      return <CheckCircle2 className="h-3 w-3" />
+    case "cancelled":
+      return <AlertCircle className="h-3 w-3" />
+    default:
+      return <Clock className="h-3 w-3" />
   }
 }
 
@@ -207,7 +151,6 @@ export default function ProjectDetailPage() {
 
   const handleAddComment = async () => {
     if (!newComment.trim()) return
-
     setIsSaving(true)
     try {
       const {
@@ -221,7 +164,6 @@ export default function ProjectDetailPage() {
         update_type: "comment",
         content: newComment,
       })
-
       if (error) throw error
 
       toast.success("Comment added successfully")
@@ -233,88 +175,6 @@ export default function ProjectDetailPage() {
     } finally {
       setIsSaving(false)
     }
-  }
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "planning":
-        return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
-      case "active":
-        return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-      case "on_hold":
-        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
-      case "completed":
-        return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
-      case "cancelled":
-        return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
-      default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
-    }
-  }
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "planning":
-        return <Clock className="h-3 w-3" />
-      case "active":
-        return <CheckCircle2 className="h-3 w-3" />
-      case "on_hold":
-        return <Pause className="h-3 w-3" />
-      case "completed":
-        return <CheckCircle2 className="h-3 w-3" />
-      case "cancelled":
-        return <AlertCircle className="h-3 w-3" />
-      default:
-        return <Clock className="h-3 w-3" />
-    }
-  }
-
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case "urgent":
-        return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
-      case "high":
-        return "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400"
-      case "medium":
-        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
-      case "low":
-        return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-      default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
-    }
-  }
-
-  const getItemStatusColor = (status: string) => {
-    switch (status) {
-      case "pending":
-        return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
-      case "ordered":
-        return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
-      case "received":
-        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
-      case "installed":
-        return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-      default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
-    }
-  }
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    })
-  }
-
-  const formatDateTime = (dateString: string) => {
-    return new Date(dateString).toLocaleString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    })
   }
 
   if (isLoading) return <PageLoader />
@@ -346,100 +206,23 @@ export default function ProjectDetailPage() {
         description={project.description || "Project details and progress"}
         backLink={{ href: "/projects", label: "Back to Projects" }}
         actions={
-          <Badge className={`${getStatusColor(project.status)} flex items-center gap-1`}>
+          <Badge className={`${getProjectStatusColor(project.status)} flex items-center gap-1`}>
             {getStatusIcon(project.status)}
             {project.status.replace("_", " ")}
           </Badge>
         }
       />
 
-      {/* Project Overview Cards */}
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-muted-foreground text-sm font-medium">Location</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2">
-              <MapPin className="text-muted-foreground h-5 w-5" />
-              <p className="text-lg font-semibold">{project.location}</p>
-            </div>
-          </CardContent>
-        </Card>
+      <ProjectOverviewCards
+        location={project.location}
+        deploymentStartDate={project.deployment_start_date}
+        deploymentEndDate={project.deployment_end_date}
+        projectManager={project.project_manager}
+        capacityW={project.capacity_w}
+        technologyType={project.technology_type}
+        formatDate={formatProjectDate}
+      />
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-muted-foreground text-sm font-medium">Duration</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2">
-              <Calendar className="text-muted-foreground h-5 w-5" />
-              <div className="text-sm">
-                <p className="font-semibold">{formatDate(project.deployment_start_date)}</p>
-                <p className="text-muted-foreground">to {formatDate(project.deployment_end_date)}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-muted-foreground text-sm font-medium">Project Manager</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2">
-              <User className="text-muted-foreground h-5 w-5" />
-              <div className="text-sm">
-                {project.project_manager ? (
-                  <>
-                    <p className="font-semibold">
-                      {project.project_manager.first_name} {project.project_manager.last_name}
-                    </p>
-                    <p className="text-muted-foreground text-xs">{project.project_manager.company_email}</p>
-                  </>
-                ) : (
-                  <p className="text-muted-foreground">Not assigned</p>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Optional Fields */}
-      {(project.capacity_w || project.technology_type) && (
-        <div className="grid gap-4 md:grid-cols-2">
-          {project.capacity_w && (
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-muted-foreground text-sm font-medium">Capacity</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center gap-2">
-                  <Zap className="h-5 w-5 text-yellow-500" />
-                  <p className="text-lg font-semibold">{project.capacity_w.toLocaleString()} W</p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {project.technology_type && (
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-muted-foreground text-sm font-medium">Technology Type</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center gap-2">
-                  <FolderKanban className="text-muted-foreground h-5 w-5" />
-                  <p className="text-lg font-semibold">{project.technology_type}</p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      )}
-
-      {/* Tabs for different sections */}
       <Tabs defaultValue="members" className="space-y-4">
         <TabsList>
           <TabsTrigger value="members" className="flex items-center gap-2">
@@ -460,199 +243,32 @@ export default function ProjectDetailPage() {
           </TabsTrigger>
         </TabsList>
 
-        {/* Members Tab */}
         <TabsContent value="members" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Project Members</CardTitle>
-              <CardDescription>Team members assigned to this project</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {members.length === 0 ? (
-                <EmptyState
-                  title="No members assigned to this project yet"
-                  description="Assign members to start collaboration on this project."
-                  icon={Users}
-                  className="border-0"
-                />
-              ) : (
-                <div className="space-y-3">
-                  {members.map((member) => (
-                    <div key={member.id} className="flex items-center justify-between rounded-lg border p-3">
-                      <div className="flex items-center gap-3">
-                        <div className="bg-primary/10 flex h-10 w-10 items-center justify-center rounded-full">
-                          <User className="text-primary h-5 w-5" />
-                        </div>
-                        <div>
-                          <p className="font-medium">
-                            {member.user.first_name} {member.user.last_name}
-                          </p>
-                          <p className="text-muted-foreground text-sm">{member.user.company_email}</p>
-                          <p className="text-muted-foreground text-xs">{member.user.department}</p>
-                        </div>
-                      </div>
-                      <Badge variant="outline">{member.role}</Badge>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <ProjectMembersReadTab members={members} />
         </TabsContent>
 
-        {/* Items Tab */}
         <TabsContent value="items" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Project Items</CardTitle>
-              <CardDescription>Equipment and materials for this project</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {items.length === 0 ? (
-                <EmptyState
-                  title="No items added to this project yet"
-                  description="Project equipment and materials will appear here."
-                  icon={Package}
-                  className="border-0"
-                />
-              ) : (
-                <div className="space-y-3">
-                  {items.map((item) => (
-                    <div key={item.id} className="rounded-lg border p-3">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="mb-1 flex items-center gap-2">
-                            <p className="font-medium">{item.item_name}</p>
-                            <Badge className={getItemStatusColor(item.status)}>{item.status}</Badge>
-                          </div>
-                          {item.description && <p className="text-muted-foreground mb-2 text-sm">{item.description}</p>}
-                          <div className="flex items-center gap-4 text-sm">
-                            <span className="text-muted-foreground">
-                              Quantity: <span className="text-foreground font-medium">{item.quantity}</span>
-                              {item.unit && ` ${item.unit}`}
-                            </span>
-                          </div>
-                          {item.notes && <p className="text-muted-foreground mt-2 text-xs">Note: {item.notes}</p>}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <ProjectItemsReadTab items={items} getItemStatusColor={getProjectItemStatusColor} />
         </TabsContent>
 
-        {/* Tasks Tab */}
         <TabsContent value="tasks" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Project Tasks</CardTitle>
-              <CardDescription>Tasks associated with this project</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {tasks.length === 0 ? (
-                <EmptyState
-                  title="No tasks assigned to this project yet"
-                  description="Task assignments linked to this project will appear here."
-                  icon={ClipboardList}
-                  className="border-0"
-                />
-              ) : (
-                <div className="space-y-3">
-                  {tasks.map((task) => (
-                    <Link key={task.id} href={`/tasks`}>
-                      <div className="hover:bg-accent cursor-pointer rounded-lg border p-3 transition-colors">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="mb-1 flex items-center gap-2">
-                              <p className="font-medium">{task.title}</p>
-                              <Badge className={getStatusColor(task.status)}>{task.status.replace("_", " ")}</Badge>
-                              <Badge className={getPriorityColor(task.priority)}>{task.priority}</Badge>
-                            </div>
-                            {task.description && (
-                              <p className="text-muted-foreground mb-2 line-clamp-2 text-sm">{task.description}</p>
-                            )}
-                            <div className="flex items-center gap-4 text-sm">
-                              <span className="text-muted-foreground">
-                                Assigned to:{" "}
-                                <span className="text-foreground font-medium">
-                                  {task.assigned_to_user.first_name} {task.assigned_to_user.last_name}
-                                </span>
-                              </span>
-                              {task.task_start_date && task.task_end_date && (
-                                <span className="text-muted-foreground">
-                                  {formatDate(task.task_start_date)} - {formatDate(task.task_end_date)}
-                                </span>
-                              )}
-                              <span className="text-muted-foreground">
-                                Progress: <span className="text-foreground font-medium">{task.progress}%</span>
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <ProjectTasksTab
+            tasks={tasks}
+            getStatusColor={getProjectStatusColor}
+            getPriorityColor={getProjectPriorityColor}
+            formatDate={formatProjectDate}
+          />
         </TabsContent>
 
-        {/* Activity Tab */}
         <TabsContent value="activity" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Activity & Comments</CardTitle>
-              <CardDescription>Project updates and team communication</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Add Comment */}
-              <div className="flex gap-2">
-                <Textarea
-                  placeholder="Add a comment..."
-                  value={newComment}
-                  onChange={(e) => setNewComment(e.target.value)}
-                  className="flex-1"
-                />
-                <Button onClick={handleAddComment} disabled={isSaving || !newComment.trim()}>
-                  <Send className="h-4 w-4" />
-                </Button>
-              </div>
-
-              {/* Activity Timeline */}
-              <div className="space-y-4">
-                {updates.length === 0 ? (
-                  <EmptyState
-                    title="No activity yet"
-                    description="Be the first to post a project comment."
-                    icon={MessageSquare}
-                    className="border-0"
-                  />
-                ) : (
-                  updates.map((update) => (
-                    <div key={update.id} className="flex gap-3 rounded-lg border p-3">
-                      <div className="bg-primary/10 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full">
-                        <MessageSquare className="text-primary h-4 w-4" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="mb-1 flex items-center gap-2">
-                          <p className="text-sm font-medium">
-                            {update.user ? `${update.user.first_name} ${update.user.last_name}` : "Unknown User"}
-                          </p>
-                          <span className="text-muted-foreground text-xs">{formatDateTime(update.created_at)}</span>
-                        </div>
-                        {update.content && (
-                          <p className="text-muted-foreground text-sm whitespace-pre-wrap">{update.content}</p>
-                        )}
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </CardContent>
-          </Card>
+          <ProjectActivityTab
+            updates={updates}
+            newComment={newComment}
+            isSaving={isSaving}
+            onCommentChange={setNewComment}
+            onAddComment={handleAddComment}
+            formatDateTime={formatProjectDateTime}
+          />
         </TabsContent>
       </Tabs>
     </div>
