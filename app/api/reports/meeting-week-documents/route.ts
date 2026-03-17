@@ -3,6 +3,7 @@ import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 import { resolveAdminScope, getDepartmentScope, normalizeDepartmentName } from "@/lib/admin/rbac"
 import { writeAuditLog } from "@/lib/audit/write-audit"
+import { REPORT_DOC_MAX_SIZE_BYTES, formatLimitMb } from "@/lib/reports/document-upload-limits"
 import { logger } from "@/lib/logger"
 
 const log = logger("api-reports-meeting-week-documents")
@@ -42,13 +43,25 @@ function sanitizeName(name: string): string {
   return String(name || "file").replace(/[^a-zA-Z0-9._-]/g, "_")
 }
 
-function canManageKssDepartment(
-  scope: NonNullable<Awaited<ReturnType<typeof resolveAdminScope>>>,
-  department: string
-): boolean {
-  const scopedDepartments = getDepartmentScope(scope, "general")
-  if (scopedDepartments === null) return true
-  return scopedDepartments.some((dept) => normalizeDepartment(dept) === normalizeDepartment(department))
+function dateStamp(input = new Date()): string {
+  const y = input.getFullYear()
+  const m = String(input.getMonth() + 1).padStart(2, "0")
+  const d = String(input.getDate()).padStart(2, "0")
+  return `${y}-${m}-${d}`
+}
+
+function resolveExtension(file: File): string {
+  const raw = file.name || ""
+  const dotIdx = raw.lastIndexOf(".")
+  if (dotIdx > -1) return raw.slice(dotIdx + 1).toLowerCase()
+  if (file.type === "application/pdf") return "pdf"
+  if (file.type === "application/vnd.ms-powerpoint") return "ppt"
+  if (file.type === "application/vnd.openxmlformats-officedocument.presentationml.presentation") return "pptx"
+  return "bin"
+}
+
+function hasGlobalReportsWriteAccess(scope: NonNullable<Awaited<ReturnType<typeof resolveAdminScope>>>): boolean {
+  return getDepartmentScope(scope, "general") === null
 }
 
 function parseDocumentType(value: unknown): DocumentType | null {
@@ -122,6 +135,9 @@ export async function POST(request: Request) {
 
     const scope = await resolveAdminScope(supabase as any, user.id)
     if (!scope) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    if (!hasGlobalReportsWriteAccess(scope)) {
+      return NextResponse.json({ error: "Only reports admins can upload meeting documents" }, { status: 403 })
+    }
 
     const formData = await request.formData()
     const file = formData.get("file") as File | null
@@ -134,6 +150,12 @@ export async function POST(request: Request) {
     const department = rawDept ? normalizeDepartment(rawDept) : null
 
     if (!file) return NextResponse.json({ error: "file is required" }, { status: 400 })
+    if (file.size > REPORT_DOC_MAX_SIZE_BYTES) {
+      return NextResponse.json(
+        { error: `File exceeds max size of ${formatLimitMb(REPORT_DOC_MAX_SIZE_BYTES)}` },
+        { status: 400 }
+      )
+    }
     if (!Number.isFinite(meetingWeek) || meetingWeek < 1 || meetingWeek > 53) {
       return NextResponse.json({ error: "meetingWeek must be between 1 and 53" }, { status: 400 })
     }
@@ -155,9 +177,6 @@ export async function POST(request: Request) {
           { status: 400 }
         )
       }
-      if (!canManageKssDepartment(scope, department)) {
-        return NextResponse.json({ error: "Forbidden: outside your department scope" }, { status: 403 })
-      }
       if (!KSS_ALLOWED.has(file.type)) {
         return NextResponse.json({ error: "Knowledge Sharing Session file must be PPT/PPTX/PDF" }, { status: 400 })
       }
@@ -165,14 +184,25 @@ export async function POST(request: Request) {
       if (file.type !== "application/pdf") {
         return NextResponse.json({ error: "Minutes and action points must be PDF" }, { status: 400 })
       }
-      const scopedDepartments = getDepartmentScope(scope, "general")
-      if (scopedDepartments !== null) {
-        return NextResponse.json({ error: "Only reports admins can upload minutes/action points" }, { status: 403 })
+    }
+
+    let normalizedFileName = file.name
+    if (documentType === "knowledge_sharing_session") {
+      const { data: presenter, error: presenterError } = await supabase
+        .from("profiles")
+        .select("id, full_name")
+        .eq("id", presenterId)
+        .single()
+      if (presenterError || !presenter?.full_name) {
+        return NextResponse.json({ error: "Presenter not found" }, { status: 400 })
       }
+      const ext = resolveExtension(file)
+      const submitted = dateStamp()
+      normalizedFileName = `Knowledge Sharing Session - ${department} - ${presenter.full_name} - Week ${meetingWeek} ${meetingYear} - Submitted ${submitted}.${ext}`
     }
 
     const deptPath = department ? sanitizeName(department) : "all"
-    const safeName = sanitizeName(file.name)
+    const safeName = sanitizeName(normalizedFileName)
     const filePath = `${meetingYear}/week-${meetingWeek}/${documentType}/${deptPath}/${Date.now()}-${safeName}`
 
     const { error: uploadError } = await supabase.storage.from(BUCKET).upload(filePath, file, {
@@ -215,7 +245,7 @@ export async function POST(request: Request) {
         department,
         presenter_id: documentType === "knowledge_sharing_session" ? presenterId : null,
         notes,
-        file_name: file.name,
+        file_name: normalizedFileName,
         file_path: filePath,
         mime_type: file.type,
         file_size: file.size,
@@ -278,6 +308,9 @@ export async function PATCH(request: Request) {
 
     const scope = await resolveAdminScope(supabase as any, user.id)
     if (!scope) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    if (!hasGlobalReportsWriteAccess(scope)) {
+      return NextResponse.json({ error: "Only reports admins can update meeting documents" }, { status: 403 })
+    }
 
     const body = await request.json()
     const id = String(body?.id || "")
@@ -294,21 +327,6 @@ export async function PATCH(request: Request) {
       .single()
 
     if (fetchError || !doc) return NextResponse.json({ error: "Document not found" }, { status: 404 })
-
-    const scopedDepartments = getDepartmentScope(scope, "general")
-    const isGlobal = scopedDepartments === null
-    if (!isGlobal) {
-      if (doc.document_type !== "knowledge_sharing_session") {
-        return NextResponse.json(
-          { error: "Only reports admins can update non-Knowledge Sharing Session documents" },
-          { status: 403 }
-        )
-      }
-      const inScope = (scopedDepartments || []).some(
-        (dept) => normalizeDepartment(dept) === normalizeDepartment(doc.department || "")
-      )
-      if (!inScope) return NextResponse.json({ error: "Forbidden: outside your department scope" }, { status: 403 })
-    }
 
     if (makeCurrent) {
       const { error: clearError } = await supabase
@@ -364,6 +382,70 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ data: updated })
   } catch (error) {
     log.error({ err: String(error) }, "PATCH /api/reports/meeting-week-documents failed")
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const supabase = await createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+    const scope = await resolveAdminScope(supabase as any, user.id)
+    if (!scope) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    if (!hasGlobalReportsWriteAccess(scope)) {
+      return NextResponse.json({ error: "Only reports admins can delete meeting documents" }, { status: 403 })
+    }
+
+    const { searchParams } = new URL(request.url)
+    const id = String(searchParams.get("id") || "")
+    if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 })
+
+    const { data: doc, error: fetchError } = await supabase
+      .from("meeting_week_documents")
+      .select("id, meeting_week, meeting_year, document_type, department, file_path")
+      .eq("id", id)
+      .single()
+
+    if (fetchError || !doc) return NextResponse.json({ error: "Document not found" }, { status: 404 })
+
+    if (doc.file_path) {
+      await supabase.storage.from(BUCKET).remove([doc.file_path])
+    }
+
+    const { error: deleteError } = await supabase.from("meeting_week_documents").delete().eq("id", id)
+    if (deleteError) return NextResponse.json({ error: deleteError.message }, { status: 500 })
+
+    await writeAuditLog(
+      supabase as any,
+      {
+        action: "delete",
+        entityType: "mail_summary",
+        entityId: id,
+        metadata: {
+          event: "meeting_week_document_deleted",
+          meeting_week: doc.meeting_week,
+          meeting_year: doc.meeting_year,
+          document_type: doc.document_type,
+          department: doc.department,
+        },
+        context: {
+          actorId: user.id,
+          source: "api",
+          route: "/api/reports/meeting-week-documents",
+          department: doc.department,
+        },
+      },
+      { failOpen: true }
+    )
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    log.error({ err: String(error) }, "DELETE /api/reports/meeting-week-documents failed")
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })
   }
 }

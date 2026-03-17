@@ -29,13 +29,8 @@ function normalizeDepartment(value: string): string {
   return normalizeDepartmentName(String(value || "").trim())
 }
 
-function canManageDepartment(
-  scope: NonNullable<Awaited<ReturnType<typeof resolveAdminScope>>>,
-  department: string
-): boolean {
-  const scopedDepartments = getDepartmentScope(scope, "general")
-  if (scopedDepartments === null) return true
-  return scopedDepartments.some((dept) => normalizeDepartment(dept) === normalizeDepartment(department))
+function hasGlobalReportsWriteAccess(scope: NonNullable<Awaited<ReturnType<typeof resolveAdminScope>>>): boolean {
+  return getDepartmentScope(scope, "general") === null
 }
 
 export async function GET(request: Request) {
@@ -86,6 +81,9 @@ export async function POST(request: Request) {
 
     const scope = await resolveAdminScope(supabase as any, user.id)
     if (!scope) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    if (!hasGlobalReportsWriteAccess(scope)) {
+      return NextResponse.json({ error: "Only reports admins can create KSS roster entries" }, { status: 403 })
+    }
 
     const body = await request.json()
     const meetingWeek = Number(body?.meetingWeek)
@@ -102,10 +100,6 @@ export async function POST(request: Request) {
     }
     if (!department) {
       return NextResponse.json({ error: "department is required" }, { status: 400 })
-    }
-
-    if (!canManageDepartment(scope, department)) {
-      return NextResponse.json({ error: "Forbidden: outside your department scope" }, { status: 403 })
     }
 
     const { data: saved, error } = await supabase
@@ -170,6 +164,9 @@ export async function PATCH(request: Request) {
 
     const scope = await resolveAdminScope(supabase as any, user.id)
     if (!scope) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    if (!hasGlobalReportsWriteAccess(scope)) {
+      return NextResponse.json({ error: "Only reports admins can update KSS roster entries" }, { status: 403 })
+    }
 
     const body = await request.json()
     const id = String(body?.id || "")
@@ -185,17 +182,9 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Roster entry not found" }, { status: 404 })
     }
 
-    if (!canManageDepartment(scope, existing.department)) {
-      return NextResponse.json({ error: "Forbidden: outside your department scope" }, { status: 403 })
-    }
-
     const patch: Record<string, unknown> = {}
     if (typeof body?.department === "string" && body.department.trim()) {
-      const normalized = normalizeDepartment(body.department)
-      if (!canManageDepartment(scope, normalized)) {
-        return NextResponse.json({ error: "Forbidden: outside your department scope" }, { status: 403 })
-      }
-      patch.department = normalized
+      patch.department = normalizeDepartment(body.department)
     }
     if (body?.presenterId !== undefined) patch.presenter_id = body.presenterId ? String(body.presenterId) : null
     if (body?.notes !== undefined) patch.notes = body.notes ? String(body.notes) : null
@@ -239,6 +228,64 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ data: updated })
   } catch (error) {
     log.error({ err: String(error) }, "PATCH /api/reports/kss-roster failed")
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const supabase = await createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+    const scope = await resolveAdminScope(supabase as any, user.id)
+    if (!scope) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    if (!hasGlobalReportsWriteAccess(scope)) {
+      return NextResponse.json({ error: "Only reports admins can delete KSS roster entries" }, { status: 403 })
+    }
+
+    const { searchParams } = new URL(request.url)
+    const id = String(searchParams.get("id") || "")
+    if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 })
+
+    const { data: existing, error: fetchError } = await supabase
+      .from("kss_weekly_roster")
+      .select("id, department")
+      .eq("id", id)
+      .single()
+
+    if (fetchError || !existing) {
+      return NextResponse.json({ error: "Roster entry not found" }, { status: 404 })
+    }
+    const { error } = await supabase.from("kss_weekly_roster").delete().eq("id", id)
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+    await writeAuditLog(
+      supabase as any,
+      {
+        action: "delete",
+        entityType: "communications_mail",
+        entityId: id,
+        metadata: {
+          event: "kss_roster_deleted",
+          department: existing.department,
+        },
+        context: {
+          actorId: user.id,
+          source: "api",
+          route: "/api/reports/kss-roster",
+          department: existing.department,
+        },
+      },
+      { failOpen: true }
+    )
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    log.error({ err: String(error) }, "DELETE /api/reports/kss-roster failed")
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })
   }
 }

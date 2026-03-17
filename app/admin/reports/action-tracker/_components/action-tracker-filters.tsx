@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Search, RefreshCw } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { getCurrentOfficeWeek } from "@/lib/meeting-week"
 
 interface ActionTrackerFiltersProps {
   searchQuery: string
@@ -34,6 +35,15 @@ export function ActionTrackerFilters({
   loading,
   onRefresh,
 }: ActionTrackerFiltersProps) {
+  const currentOfficeWeek = getCurrentOfficeWeek()
+  const weekOptions = Array.from({ length: 53 }, (_, i) => i + 1)
+  const yearOptions = [
+    currentOfficeWeek.year - 1,
+    currentOfficeWeek.year,
+    currentOfficeWeek.year + 1,
+    currentOfficeWeek.year + 2,
+  ]
+
   return (
     <div className="flex flex-wrap items-end gap-3">
       <div className="relative min-w-[200px] flex-1">
@@ -46,25 +56,39 @@ export function ActionTrackerFilters({
         />
       </div>
       <div className="flex items-end gap-2">
-        <div className="w-24">
+        <div className="w-[140px]">
           <Label className="text-muted-foreground mb-1.5 block px-1 text-[10px] font-bold tracking-wider uppercase">
             Week
           </Label>
-          <Input
-            type="number"
-            value={weekFilter}
-            onChange={(e) => onWeekChange(parseInt(e.target.value) || weekFilter)}
-          />
+          <Select value={String(weekFilter)} onValueChange={(v) => onWeekChange(Number(v))}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {weekOptions.map((w) => (
+                <SelectItem key={w} value={String(w)}>
+                  Week {w}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
-        <div className="w-28">
+        <div className="w-[120px]">
           <Label className="text-muted-foreground mb-1.5 block px-1 text-[10px] font-bold tracking-wider uppercase">
             Year
           </Label>
-          <Input
-            type="number"
-            value={yearFilter}
-            onChange={(e) => onYearChange(parseInt(e.target.value) || yearFilter)}
-          />
+          <Select value={String(yearFilter)} onValueChange={(v) => onYearChange(Number(v))}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {yearOptions.map((y) => (
+                <SelectItem key={y} value={String(y)}>
+                  {y}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <div className="w-52">
           <Label className="text-muted-foreground mb-1.5 block px-1 text-[10px] font-bold tracking-wider uppercase">

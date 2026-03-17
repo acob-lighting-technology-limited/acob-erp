@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { RefreshCw, Search } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { FormFieldGroup } from "@/components/ui/patterns"
+import { getCurrentOfficeWeek } from "@/lib/meeting-week"
 
 interface WeeklyReportFiltersProps {
   searchQuery: string
@@ -37,6 +38,15 @@ export function WeeklyReportFilters({
   loading,
   onRefresh,
 }: WeeklyReportFiltersProps) {
+  const currentOfficeWeek = getCurrentOfficeWeek()
+  const weekOptions = Array.from({ length: 53 }, (_, i) => i + 1)
+  const yearOptions = [
+    currentOfficeWeek.year - 1,
+    currentOfficeWeek.year,
+    currentOfficeWeek.year + 1,
+    currentOfficeWeek.year + 2,
+  ]
+
   return (
     <div className="mb-6 flex flex-col items-end justify-between gap-4 md:flex-row">
       <div className="w-full max-w-md flex-1">
@@ -53,21 +63,35 @@ export function WeeklyReportFilters({
         </FormFieldGroup>
       </div>
       <div className="flex w-full flex-wrap items-end gap-3 md:w-auto">
-        <div className="w-24">
+        <div className="w-[140px]">
           <Label className="mb-1.5 block text-xs font-semibold">Week</Label>
-          <Input
-            type="number"
-            value={weekFilter}
-            onChange={(e) => onWeekChange(parseInt(e.target.value) || weekFilter)}
-          />
+          <Select value={String(weekFilter)} onValueChange={(v) => onWeekChange(Number(v))}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {weekOptions.map((w) => (
+                <SelectItem key={w} value={String(w)}>
+                  Week {w}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
-        <div className="w-28">
+        <div className="w-[120px]">
           <Label className="mb-1.5 block text-xs font-semibold">Year</Label>
-          <Input
-            type="number"
-            value={yearFilter}
-            onChange={(e) => onYearChange(parseInt(e.target.value) || yearFilter)}
-          />
+          <Select value={String(yearFilter)} onValueChange={(v) => onYearChange(Number(v))}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {yearOptions.map((y) => (
+                <SelectItem key={y} value={String(y)}>
+                  {y}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <div className="min-w-[12rem] flex-1 md:flex-none">
           <Label className="mb-1.5 block text-xs font-semibold">Department</Label>

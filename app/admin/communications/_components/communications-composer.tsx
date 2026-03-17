@@ -27,6 +27,7 @@ import { RecipientSelector } from "./RecipientSelector"
 import { SchedulingOptions } from "./SchedulingOptions"
 import { SendSummary } from "./SendSummary"
 import { ReminderTypeSelector } from "./ReminderTypeSelector"
+import { getOfficeWeekFromDate } from "@/lib/meeting-week"
 
 type Employee = {
   id: string
@@ -161,10 +162,14 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
 
   useEffect(() => {
     if (meetingPreparedByOptions.length > 0 && !meetingPreparedByOptions.some((p) => p.id === meetingPreparedById)) {
+      const rafiatPreferred = meetingPreparedByOptions.find((p) => (p.full_name || "").toLowerCase().includes("rafiat"))
       const preferred =
-        isCurrentUserAdminHr && currentUserName && meetingPreparedByOptions.some((p) => p.full_name === currentUserName)
+        rafiatPreferred?.id ||
+        (isCurrentUserAdminHr &&
+        currentUserName &&
+        meetingPreparedByOptions.some((p) => p.full_name === currentUserName)
           ? meetingPreparedByOptions.find((p) => p.full_name === currentUserName)?.id
-          : meetingPreparedByOptions[0].id
+          : meetingPreparedByOptions[0].id)
       setMeetingPreparedById(preferred || meetingPreparedByOptions[0].id)
     }
   }, [currentUserName, isCurrentUserAdminHr, meetingPreparedById, meetingPreparedByOptions])
@@ -184,6 +189,48 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
       setBroadcastPreparedById(preferred || broadcastPreparedByOptions[0].id)
     }
   }, [broadcastPreparedById, broadcastPreparedByOptions, currentUserName])
+
+  useEffect(() => {
+    if (reminderType !== "meeting") return
+    if (!meetingDate) return
+    // Respect manual selection; only auto-fill when both fields are untouched.
+    if (knowledgeDepartment !== "none" || knowledgePresenterId !== "none") return
+
+    const [year, month, day] = meetingDate.split("-").map((part) => Number(part))
+    if (!year || !month || !day) return
+    const officeWeek = getOfficeWeekFromDate(new Date(year, month - 1, day))
+
+    let cancelled = false
+    const autoFillFromRoster = async () => {
+      try {
+        const res = await fetch(`/api/reports/kss-roster?week=${officeWeek.week}&year=${officeWeek.year}`)
+        const payload = await res.json()
+        if (!res.ok) return
+
+        const roster = Array.isArray(payload?.data) ? payload.data : []
+        const picked = roster.find((entry: { is_active?: boolean }) => entry?.is_active !== false) ?? roster[0]
+        if (!picked || cancelled) return
+
+        if (typeof picked.department === "string" && picked.department.trim()) {
+          setKnowledgeDepartment(picked.department)
+        }
+
+        const presenterId = typeof picked.presenter_id === "string" ? picked.presenter_id : null
+        if (presenterId && employees.some((emp) => emp.id === presenterId)) {
+          setKnowledgePresenterId(presenterId)
+        } else {
+          setKnowledgePresenterId("none")
+        }
+      } catch {
+        // Fail silently; form still works with manual selection.
+      }
+    }
+
+    autoFillFromRoster()
+    return () => {
+      cancelled = true
+    }
+  }, [employees, knowledgeDepartment, knowledgePresenterId, meetingDate, reminderType])
 
   // ── Query: active schedules ───────────────────────────────────────────────
   const { data: schedulesData } = useQuery({

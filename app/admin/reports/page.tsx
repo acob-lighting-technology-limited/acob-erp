@@ -27,7 +27,7 @@ export default function AdminReportsPage() {
     {
       title: "Knowledge Sharing Session",
       description: "Upload weekly Knowledge Sharing Session files and capture department/presenter details.",
-      href: "/admin/reports/meeting-documents",
+      href: "/admin/reports/kss",
       icon: Presentation,
       color: "text-indigo-600 dark:text-indigo-400",
       bgColor: "bg-indigo-100 dark:bg-indigo-900/30",
@@ -35,7 +35,7 @@ export default function AdminReportsPage() {
     {
       title: "Minutes of Meeting",
       description: "Upload and store weekly Minutes of Meeting PDFs for reference and mailing.",
-      href: "/admin/reports/meeting-documents",
+      href: "/admin/reports/minutes-of-meeting",
       icon: FileText,
       color: "text-amber-600 dark:text-amber-400",
       bgColor: "bg-amber-100 dark:bg-amber-900/30",
@@ -43,7 +43,7 @@ export default function AdminReportsPage() {
     {
       title: "Action Points (Manual)",
       description: "Upload and keep the manual Action Points PDF for each meeting week.",
-      href: "/admin/reports/meeting-documents",
+      href: "/admin/reports/action-points-manual",
       icon: ClipboardList,
       color: "text-rose-600 dark:text-rose-400",
       bgColor: "bg-rose-100 dark:bg-rose-900/30",

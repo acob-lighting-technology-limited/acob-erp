@@ -5,22 +5,12 @@ import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Textarea } from "@/components/ui/textarea"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
 import { PageHeader, PageWrapper } from "@/components/layout"
-import { FileCode2, Plus } from "lucide-react"
+import { FileCode2 } from "lucide-react"
 import type { CorrespondenceRecord } from "@/types/correspondence"
+import { CorrespondenceStats } from "@/components/correspondence/correspondence-stats"
+import { CreateReferenceDialog } from "@/components/correspondence/create-reference-dialog"
+import { CorrespondenceTable } from "@/components/correspondence/correspondence-table"
 
 interface DepartmentCodeOption {
   department_name: string
@@ -40,7 +30,6 @@ interface PortalCorrespondenceContentProps {
 export function PortalCorrespondenceContent({
   currentViewerName,
   currentViewerDepartment,
-  currentViewerRole,
   isDepartmentLead,
   initialRecords,
   departmentCodes,
@@ -68,15 +57,17 @@ export function PortalCorrespondenceContent({
     metadata_text: "",
   })
 
-  const stats = useMemo(() => {
-    return {
+  const stats = useMemo(
+    () => ({
       total: records.length,
       open: records.filter((r) => ["open", "draft", "under_review", "assigned_action_pending"].includes(r.status))
         .length,
       closed: records.filter((r) => ["closed", "sent", "filed"].includes(r.status)).length,
       incoming: records.filter((r) => r.direction === "incoming").length,
-    }
-  }, [records])
+    }),
+    [records]
+  )
+
   const isLead = Boolean(isDepartmentLead)
   const pendingRecords = useMemo(
     () => records.filter((r) => ["open", "under_review", "assigned_action_pending"].includes(r.status)),
@@ -91,12 +82,10 @@ export function PortalCorrespondenceContent({
 
   async function createRecord(e: React.FormEvent) {
     e.preventDefault()
-
     if (!form.subject.trim()) {
       toast.error("Subject is required")
       return
     }
-
     if (!form.department_name) {
       toast.error("Department is required")
       return
@@ -120,12 +109,8 @@ export function PortalCorrespondenceContent({
           metadata,
         }),
       })
-
       const body = await res.json()
-      if (!res.ok) {
-        throw new Error(body.error || "Failed to create correspondence")
-      }
-
+      if (!res.ok) throw new Error(body.error || "Failed to create correspondence")
       toast.success("Correspondence created")
       setCreateOpen(false)
       setForm({
@@ -154,12 +139,8 @@ export function PortalCorrespondenceContent({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status }),
       })
-
       const body = await res.json()
-      if (!res.ok) {
-        throw new Error(body.error || "Failed to update status")
-      }
-
+      if (!res.ok) throw new Error(body.error || "Failed to update status")
       toast.success("Status updated")
       await refreshRecords()
     } catch (error: any) {
@@ -173,17 +154,10 @@ export function PortalCorrespondenceContent({
       const res = await fetch(`/api/correspondence/records/${recordId}/dispatch`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          final_status: "sent",
-          dispatch_method: "email",
-        }),
+        body: JSON.stringify({ final_status: "sent", dispatch_method: "email" }),
       })
-
       const body = await res.json()
-      if (!res.ok) {
-        throw new Error(body.error || "Failed to dispatch correspondence")
-      }
-
+      if (!res.ok) throw new Error(body.error || "Failed to dispatch correspondence")
       toast.success("Correspondence dispatched")
       await refreshRecords()
     } catch (error: any) {
@@ -199,7 +173,6 @@ export function PortalCorrespondenceContent({
       toast.error("Select an incoming reference first")
       return
     }
-
     setLinkingId(recordId)
     try {
       const res = await fetch(`/api/correspondence/records/${recordId}/link-response`, {
@@ -207,12 +180,8 @@ export function PortalCorrespondenceContent({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ incoming_reference_id: incomingReferenceId }),
       })
-
       const body = await res.json()
-      if (!res.ok) {
-        throw new Error(body.error || "Failed to link response")
-      }
-
+      if (!res.ok) throw new Error(body.error || "Failed to link response")
       toast.success("Outgoing reference linked to incoming correspondence")
       await refreshRecords()
     } catch (error: any) {
@@ -241,158 +210,20 @@ export function PortalCorrespondenceContent({
                 Pending ({pendingRecords.length})
               </Button>
             )}
-            <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Create Reference
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-3xl">
-                <DialogHeader>
-                  <DialogTitle>Create Reference</DialogTitle>
-                  <DialogDescription>Fill the correspondence details and submit.</DialogDescription>
-                </DialogHeader>
-                <form className="grid gap-4 md:grid-cols-2" onSubmit={createRecord}>
-                  <div className="space-y-2">
-                    <Label>Department</Label>
-                    <Select
-                      value={form.department_name}
-                      onValueChange={(value) => setForm((prev) => ({ ...prev, department_name: value }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select department" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {departmentCodes.map((dept) => (
-                          <SelectItem key={dept.department_name} value={dept.department_name}>
-                            {dept.department_name} ({dept.department_code})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2 md:col-span-2">
-                    <Label>Subject</Label>
-                    <Input
-                      value={form.subject}
-                      onChange={(e) => setForm((prev) => ({ ...prev, subject: e.target.value }))}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Recipient</Label>
-                    <Input
-                      value={form.recipient_name}
-                      onChange={(e) => setForm((prev) => ({ ...prev, recipient_name: e.target.value }))}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Sender</Label>
-                    <Input
-                      value={form.sender_name}
-                      onChange={(e) => setForm((prev) => ({ ...prev, sender_name: e.target.value }))}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Letter Type</Label>
-                    <Select
-                      value={form.letter_type}
-                      onValueChange={(value) => setForm((prev) => ({ ...prev, letter_type: value }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="internal">Internal</SelectItem>
-                        <SelectItem value="external">External</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Category</Label>
-                    <Select
-                      value={form.category}
-                      onValueChange={(value) => setForm((prev) => ({ ...prev, category: value }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="approval">Approval</SelectItem>
-                        <SelectItem value="notice">Notice</SelectItem>
-                        <SelectItem value="contract">Contract</SelectItem>
-                        <SelectItem value="invoice">Invoice</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Due Date (Optional)</Label>
-                    <Input
-                      type="date"
-                      value={form.due_date}
-                      onChange={(e) => setForm((prev) => ({ ...prev, due_date: e.target.value }))}
-                    />
-                  </div>
-
-                  <div className="space-y-2 md:col-span-2">
-                    <Label>Notes (Optional)</Label>
-                    <Textarea
-                      rows={3}
-                      value={form.metadata_text}
-                      onChange={(e) => setForm((prev) => ({ ...prev, metadata_text: e.target.value }))}
-                    />
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <Button type="submit" disabled={isSaving}>
-                      {isSaving ? "Saving..." : "Create Reference"}
-                    </Button>
-                  </div>
-                </form>
-              </DialogContent>
-            </Dialog>
+            <CreateReferenceDialog
+              open={createOpen}
+              onOpenChange={setCreateOpen}
+              form={form}
+              onFormChange={setForm}
+              onSubmit={createRecord}
+              isSaving={isSaving}
+              departmentCodes={departmentCodes}
+            />
           </>
         }
       />
-      <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4 md:gap-4">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">Total Records</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-lg font-bold sm:text-2xl">{stats.total}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">Open</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-lg font-bold sm:text-2xl">{stats.open}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">Closed / Finalized</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-lg font-bold sm:text-2xl">{stats.closed}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">Incoming</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-lg font-bold sm:text-2xl">{stats.incoming}</p>
-          </CardContent>
-        </Card>
-      </div>
+
+      <CorrespondenceStats {...stats} />
 
       {isLead && pendingRecords.length > 0 && (
         <Card ref={pendingRef}>
@@ -413,86 +244,17 @@ export function PortalCorrespondenceContent({
         </Card>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>My References</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Reference</TableHead>
-                <TableHead>Direction</TableHead>
-                <TableHead>Department</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Subject</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {records.map((record) => (
-                <TableRow key={record.id}>
-                  <TableCell className="font-medium">{record.reference_number}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{record.direction}</Badge>
-                  </TableCell>
-                  <TableCell>{record.department_name || record.assigned_department_name || "-"}</TableCell>
-                  <TableCell>
-                    <Badge>{record.status}</Badge>
-                  </TableCell>
-                  <TableCell>{record.subject}</TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap items-center gap-2">
-                      {record.status === "draft" && (
-                        <Button size="sm" variant="outline" onClick={() => updateStatus(record.id, "under_review")}>
-                          Send for Review
-                        </Button>
-                      )}
-                      {record.status === "approved" && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => dispatchRecord(record.id)}
-                          disabled={dispatchingId === record.id}
-                        >
-                          {dispatchingId === record.id ? "Dispatching..." : "Dispatch"}
-                        </Button>
-                      )}
-                      {record.direction === "outgoing" && (
-                        <>
-                          <Select
-                            value={linkReference[record.id] || ""}
-                            onValueChange={(value) => setLinkReference((prev) => ({ ...prev, [record.id]: value }))}
-                          >
-                            <SelectTrigger className="w-[210px]">
-                              <SelectValue placeholder="Link incoming reference" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {incomingOptions.map((incoming) => (
-                                <SelectItem key={incoming.id} value={incoming.id}>
-                                  {incoming.reference_number}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => linkResponse(record.id)}
-                            disabled={linkingId === record.id}
-                          >
-                            {linkingId === record.id ? "Linking..." : "Link"}
-                          </Button>
-                        </>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      <CorrespondenceTable
+        records={records}
+        incomingOptions={incomingOptions}
+        linkReference={linkReference}
+        onLinkReferenceChange={(id, value) => setLinkReference((prev) => ({ ...prev, [id]: value }))}
+        dispatchingId={dispatchingId}
+        linkingId={linkingId}
+        onUpdateStatus={updateStatus}
+        onDispatch={dispatchRecord}
+        onLinkResponse={linkResponse}
+      />
     </PageWrapper>
   )
 }
