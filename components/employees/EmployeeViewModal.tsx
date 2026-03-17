@@ -174,6 +174,22 @@ export function EmployeeViewModal({
           </DialogDescription>
         </DialogHeader>
         <div className="min-h-0 flex-1 overflow-hidden px-5 py-4 sm:px-6">
+          {/* Loading skeleton — shown while the profile fetch is in flight */}
+          {!viewEmployeeProfile && (
+            <div className="space-y-4 py-2">
+              <div className="bg-muted h-6 w-2/5 animate-pulse rounded" />
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {[...Array(6)].map((_, i) => (
+                  <div key={i} className="space-y-2">
+                    <div className="bg-muted h-3 w-1/3 animate-pulse rounded" />
+                    <div className="bg-muted h-5 w-full animate-pulse rounded" />
+                  </div>
+                ))}
+              </div>
+              <div className="bg-muted h-4 w-1/4 animate-pulse rounded" />
+              <div className="bg-muted h-20 w-full animate-pulse rounded" />
+            </div>
+          )}
           {viewEmployeeProfile && modalViewMode === "profile" && (
             <ScrollArea className="h-full pr-4">
               <div className="space-y-4">

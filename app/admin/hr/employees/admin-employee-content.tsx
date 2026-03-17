@@ -345,8 +345,11 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
     try {
       setSelectedEmployee(employee)
       setModalViewMode("profile") // Always reset to profile when opening fresh
-      setIsViewDialogOpen(true)
+      // Clear stale profile immediately so the modal never shows the previous
+      // employee's data while the new fetch is in flight.
+      setViewEmployeeProfile(null)
       setViewEmployeeData({ tasks: [], assets: [], documentation: [] })
+      setIsViewDialogOpen(true)
 
       const response = await fetch(`/api/admin/hr/employees/${employee.id}/overview`, { cache: "no-store" })
       const payload = (await response.json().catch(() => ({}))) as {

@@ -322,8 +322,11 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
     try {
       setSelectedEmployee(employee)
       setModalViewMode("profile")
-      setIsViewDialogOpen(true)
+      // Clear stale profile immediately so the modal never shows the previous
+      // employee's data while the new fetch is in flight.
+      setViewEmployeeProfile(null)
       setViewEmployeeData({ tasks: [], assets: [], documentation: [] })
+      setIsViewDialogOpen(true)
 
       const { data: profileData } = await supabase.from("profiles").select("*").eq("id", employee.id).single()
 
