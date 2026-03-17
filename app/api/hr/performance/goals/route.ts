@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { logger } from "@/lib/logger"
+import { writeAuditLog } from "@/lib/audit/write-audit"
 
 const log = logger("performance-goals")
 
@@ -109,6 +110,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Failed to create goal" }, { status: 500 })
     }
 
+    await writeAuditLog(
+      supabase,
+      {
+        action: "create",
+        entityType: "goal",
+        entityId: goal.id,
+        newValues: { user_id, review_cycle_id, title, priority: priority || "medium" },
+        context: { actorId: user.id, source: "api", route: "/api/hr/performance/goals" },
+      },
+      { failOpen: true }
+    )
+
     return NextResponse.json({
       data: goal,
       message: "Goal created successfully",
@@ -145,6 +158,18 @@ export async function PUT(request: NextRequest) {
       log.error({ err: error }, "Error updating goal")
       return NextResponse.json({ error: "Failed to update goal" }, { status: 500 })
     }
+
+    await writeAuditLog(
+      supabase,
+      {
+        action: "update",
+        entityType: "goal",
+        entityId: id,
+        newValues: updates,
+        context: { actorId: user.id, source: "api", route: "/api/hr/performance/goals" },
+      },
+      { failOpen: true }
+    )
 
     return NextResponse.json({
       data: goal,

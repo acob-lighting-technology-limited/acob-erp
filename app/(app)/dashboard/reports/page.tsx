@@ -1,7 +1,7 @@
 "use client"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { LayoutDashboard, FileBarChart, ClipboardList, FileText, ChevronRight, ArrowLeft } from "lucide-react"
+import { FileBarChart, ClipboardList, FileText, ChevronRight, ArrowLeft, Presentation } from "lucide-react"
 import Link from "next/link"
 import { PageWrapper, PageHeader } from "@/components/layout"
 import { Button } from "@/components/ui/button"
@@ -23,6 +23,30 @@ export default function PortalReportsPage() {
       icon: ClipboardList,
       color: "text-blue-600 dark:text-blue-400",
       bgColor: "bg-blue-100 dark:bg-blue-900/30",
+    },
+    {
+      title: "Knowledge Sharing Session",
+      description: "Upload weekly Knowledge Sharing Session files and track who presented by department.",
+      href: "/dashboard/reports/kss",
+      icon: Presentation,
+      color: "text-indigo-600 dark:text-indigo-400",
+      bgColor: "bg-indigo-100 dark:bg-indigo-900/30",
+    },
+    {
+      title: "Minutes of Meeting",
+      description: "Upload and access weekly Minutes of Meeting PDFs for future reference.",
+      href: "/dashboard/reports/minutes-of-meeting",
+      icon: FileText,
+      color: "text-amber-600 dark:text-amber-400",
+      bgColor: "bg-amber-100 dark:bg-amber-900/30",
+    },
+    {
+      title: "Action Points (Manual)",
+      description: "Upload and access the manual Action Points PDF for each meeting week.",
+      href: "/dashboard/reports/action-points-manual",
+      icon: ClipboardList,
+      color: "text-rose-600 dark:text-rose-400",
+      bgColor: "bg-rose-100 dark:bg-rose-900/30",
     },
   ]
 
@@ -66,19 +90,6 @@ export default function PortalReportsPage() {
             </Card>
           </Link>
         ))}
-
-        {/* Placeholder for future reports */}
-        <Card className="bg-muted/30 border-dashed">
-          <CardContent className="flex h-full flex-col items-center justify-center py-12 text-center">
-            <div className="bg-background mb-4 flex h-12 w-12 items-center justify-center rounded-full border shadow-sm">
-              <LayoutDashboard className="text-muted-foreground h-6 w-6" />
-            </div>
-            <h3 className="text-lg font-semibold">More Reports Coming Soon</h3>
-            <p className="text-muted-foreground mt-2 max-w-sm text-sm">
-              We are working on integrating more reporting and analytics tools into this dashboard.
-            </p>
-          </CardContent>
-        </Card>
       </div>
     </PageWrapper>
   )

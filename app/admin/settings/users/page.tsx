@@ -1,133 +1,58 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { createClient } from "@/lib/supabase/client"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Users, Search, Filter, Shield, Pencil, UserPlus } from "lucide-react"
+import { Users, Search, Filter, Shield, UserPlus } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
-import { getAssignableRolesForActor } from "@/lib/role-management"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { StatCard } from "@/components/ui/stat-card"
-import { EmptyState, FormFieldGroup, ListToolbar } from "@/components/ui/patterns"
-
-// Allowlist of valid roles for validation
-const ALLOWED_ROLES = ["developer", "super_admin", "admin", "employee", "visitor"] as const
-type AllowedRole = (typeof ALLOWED_ROLES)[number]
-
-function isValidRole(role: string): role is AllowedRole {
-  return ALLOWED_ROLES.includes(role as AllowedRole)
-}
-
-function getRoleOptions(currentUserRole: string): AllowedRole[] {
-  return getAssignableRolesForActor(currentUserRole).filter((role): role is AllowedRole => isValidRole(role))
-}
-
-interface User {
-  id: string
-  email: string | null
-  first_name: string | null
-  last_name: string | null
-  role: string
-  admin_domains?: string[] | null
-  department: string | null
-  is_active: boolean
-  employment_status: string
-  created_at: string
-  last_sign_in?: string | null
-}
-
-const roleColors: Record<string, string> = {
-  developer: "destructive",
-  super_admin: "destructive",
-  admin: "default",
-  employee: "secondary",
-  visitor: "secondary",
-}
-
+import { ListToolbar } from "@/components/ui/patterns"
 import { useSearchParams } from "next/navigation"
-
 import { logger } from "@/lib/logger"
+import { isValidRole } from "./_lib/role-helpers"
+import { fetchUsersSettingsData, fetchAllUsersForPicker, formatDate, type User } from "./_lib/queries"
+import { EditUserDialog } from "./_components/edit-user-dialog"
+import { AddUserToRoleDialog } from "./_components/add-user-to-role-dialog"
+import { UsersTable } from "./_components/users-table"
 
 const log = logger("settings-users")
 
-
 export default function UsersPage() {
+  const queryClient = useQueryClient()
   const searchParams = useSearchParams()
-  const [users, setUsers] = useState<User[]>([])
-  const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [roleFilter, setRoleFilter] = useState<string>("all")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [formData, setFormData] = useState({ role: "", employment_status: "active", admin_domains: [] as string[] })
-  const [currentUserRole, setCurrentUserRole] = useState<string>("")
-  const ADMIN_DOMAIN_OPTIONS = ["hr", "finance", "assets", "reports", "tasks", "projects", "communications"] as const
+
+  const { data: settingsData, isLoading: loading } = useQuery({
+    queryKey: QUERY_KEYS.adminUsersSettings(),
+    queryFn: fetchUsersSettingsData,
+  })
+
+  const users: User[] = settingsData?.users ?? []
+  const currentUserRole: string = settingsData?.currentUserRole ?? ""
 
   useEffect(() => {
     const roleParam = searchParams.get("role")
-    // Validate role param against allowlist before using
     if (roleParam && (roleParam === "all" || isValidRole(roleParam))) {
       setRoleFilter(roleParam)
     }
   }, [searchParams])
 
-  useEffect(() => {
-    fetchUsers()
-  }, [])
-
-  async function fetchUsers() {
-    try {
-      const supabase = createClient()
-      const { data, error } = await supabase
-        .from("profiles")
-        .select(
-          "id, company_email, first_name, last_name, role, admin_domains, department, employment_status, created_at"
-        )
-        .order("created_at", { ascending: false })
-
-      if (error) throw error
-
-      // Map company_email to email and employment_status to is_active for the UI
-      const mappedUsers = (data || []).map((u: any) => ({
-        ...u,
-        email: u.company_email,
-        is_active: u.employment_status === "active",
-        employment_status: u.employment_status || "active",
-      }))
-
-      setUsers(mappedUsers)
-
-      const {
-        data: { user: currentUser },
-      } = await supabase.auth.getUser()
-      if (currentUser?.id) {
-        const { data: me } = await supabase.from("profiles").select("role").eq("id", currentUser.id).single()
-        setCurrentUserRole(me?.role || "")
-      }
-    } catch (error) {
-      log.error("Error:", error)
-      toast.error("Failed to load users")
-    } finally {
-      setLoading(false)
-    }
-  }
-
   async function handleUpdateRole(e: React.FormEvent) {
     e.preventDefault()
     if (!editingUser) return
-
     try {
       if (formData.role === "admin" && formData.admin_domains.length === 0) {
         throw new Error("Admin role requires at least one domain")
       }
-
       const response = await fetch("/api/admin/users/role", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -140,10 +65,9 @@ export default function UsersPage() {
       })
       const result = await response.json()
       if (!response.ok) throw new Error(result.error || "Failed to update")
-
       toast.success("User updated")
       setIsDialogOpen(false)
-      fetchUsers()
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminUsersSettings() })
     } catch (error: any) {
       toast.error(error.message || "Failed to update")
     }
@@ -151,7 +75,6 @@ export default function UsersPage() {
 
   function openEdit(user: User) {
     setEditingUser(user)
-    // Initialize with the user's actual employment_status, not a derived value
     setFormData({
       role: user.role,
       employment_status: user.employment_status || (user.is_active ? "active" : "suspended"),
@@ -160,24 +83,9 @@ export default function UsersPage() {
     setIsDialogOpen(true)
   }
 
-  function toggleAdminDomain(domain: string, checked: boolean) {
-    setFormData((prev) => ({
-      ...prev,
-      admin_domains: checked
-        ? Array.from(new Set([...prev.admin_domains, domain]))
-        : prev.admin_domains.filter((d) => d !== domain),
-    }))
-  }
-
-  function formatDate(date: string) {
-    return new Date(date).toLocaleDateString("en-NG", { year: "numeric", month: "short", day: "numeric" })
-  }
-
   const filtered = users.filter((u) => {
     const name = `${u.first_name || ""} ${u.last_name || ""} ${u.email || ""}`.toLowerCase()
-    const matchesSearch = name.includes(searchQuery.toLowerCase())
-    const matchesRole = roleFilter === "all" || u.role === roleFilter
-    return matchesSearch && matchesRole
+    return name.includes(searchQuery.toLowerCase()) && (roleFilter === "all" || u.role === roleFilter)
   })
 
   const stats = {
@@ -193,28 +101,8 @@ export default function UsersPage() {
   const [availableUsers, setAvailableUsers] = useState<User[]>([])
   const [addUserWarning, setAddUserWarning] = useState<string | null>(null)
 
-  // Fetch all users for the "Add User" dialog (to pick from)
-  async function fetchAllUsers() {
-    const supabase = createClient()
-    const { data } = await supabase
-      .from("profiles")
-      .select("id, company_email, first_name, last_name, role, department, employment_status, created_at")
-      .order("first_name")
-
-    if (data) {
-      // Map company_email to email for the UI
-      const mappedUsers = data.map((u: any) => ({
-        ...u,
-        email: u.company_email,
-        is_active: u.employment_status === "active",
-        employment_status: u.employment_status || "active",
-      }))
-      setAvailableUsers(mappedUsers)
-    }
-  }
-
   function openAddUserDialog() {
-    fetchAllUsers()
+    fetchAllUsersForPicker().then(setAvailableUsers)
     setAddUserWarning(null)
     setUserToAdd("")
     setIsAddUserDialogOpen(true)
@@ -224,7 +112,6 @@ export default function UsersPage() {
     setUserToAdd(userId)
     const user = availableUsers.find((u) => u.id === userId)
     if (!user) return
-
     if (user.role === roleFilter) {
       setAddUserWarning(`${user.first_name} is already a ${roleFilter}.`)
     } else {
@@ -234,7 +121,6 @@ export default function UsersPage() {
 
   async function handleAddUserToRole() {
     if (!userToAdd || roleFilter === "all") return
-
     try {
       const response = await fetch("/api/admin/users/role", {
         method: "POST",
@@ -243,10 +129,9 @@ export default function UsersPage() {
       })
       const result = await response.json()
       if (!response.ok) throw new Error(result.error || "Failed to update role")
-
       toast.success(`User role updated to ${roleFilter}`)
       setIsAddUserDialogOpen(false)
-      fetchUsers()
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminUsersSettings() })
     } catch (error: any) {
       log.error("Error adding user to role:", error)
       toast.error(error.message || "Failed to update role")
@@ -315,188 +200,28 @@ export default function UsersPage() {
         />
       }
     >
-      <Card>
-        <CardHeader>
-          <CardTitle>All Users</CardTitle>
-          <CardDescription>{filtered.length} users</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="border-primary h-8 w-8 animate-spin rounded-full border-4 border-t-transparent"></div>
-            </div>
-          ) : filtered.length === 0 ? (
-            <EmptyState title="No users found" icon={Users} />
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Department</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Joined</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell className="font-medium">
-                      {user.first_name || user.last_name
-                        ? `${user.first_name || ""} ${user.last_name || ""}`.trim()
-                        : "—"}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{user.email || "—"}</TableCell>
-                    <TableCell>
-                      <Badge variant={roleColors[user.role] as any} className="capitalize">
-                        {user.role?.replace("_", " ")}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{user.department || "—"}</TableCell>
-                    <TableCell>
-                      <Badge variant={user.is_active ? "default" : "secondary"}>
-                        {user.employment_status === "separated" ? "Separated" : user.is_active ? "Active" : "Inactive"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-sm">{formatDate(user.created_at)}</TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" onClick={() => openEdit(user)}>
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+      <UsersTable users={filtered} loading={loading} onEdit={openEdit} formatDate={formatDate} />
 
-      {/* Edit Role Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-h-[90vh] w-[95vw] max-w-lg overflow-y-auto">
-          <form onSubmit={handleUpdateRole}>
-            <DialogHeader>
-              <DialogTitle>Edit User</DialogTitle>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <FormFieldGroup label="User">
-                <p className="text-muted-foreground text-sm">{editingUser?.email}</p>
-              </FormFieldGroup>
-              <FormFieldGroup label="Role">
-                <Select
-                  value={formData.role}
-                  onValueChange={(v) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      role: v,
-                      admin_domains: v === "admin" ? prev.admin_domains : [],
-                    }))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {getRoleOptions(currentUserRole).map((role) => (
-                      <SelectItem key={role} value={role}>
-                        {role === "super_admin" ? "Super Admin" : role.charAt(0).toUpperCase() + role.slice(1)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </FormFieldGroup>
-              {formData.role === "admin" && (
-                <FormFieldGroup label="Admin Domains">
-                  <div className="grid grid-cols-2 gap-2">
-                    {ADMIN_DOMAIN_OPTIONS.map((domain) => {
-                      const checked = formData.admin_domains.includes(domain)
-                      return (
-                        <label
-                          key={domain}
-                          className="flex cursor-pointer items-center gap-2 rounded-md border p-2 text-sm capitalize"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={(e) => toggleAdminDomain(domain, e.target.checked)}
-                          />
-                          {domain}
-                        </label>
-                      )
-                    })}
-                  </div>
-                  <p className="text-muted-foreground text-xs">At least one domain is required for admin users.</p>
-                </FormFieldGroup>
-              )}
-              <FormFieldGroup label="Employment Status">
-                <div className="flex justify-end">
-                  <Select
-                    value={formData.employment_status}
-                    onValueChange={(v) => setFormData({ ...formData, employment_status: v })}
-                  >
-                    <SelectTrigger className="w-32">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="suspended">Suspended</SelectItem>
-                      <SelectItem value="separated">Separated</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </FormFieldGroup>
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button type="submit">Save Changes</Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <EditUserDialog
+        open={isDialogOpen}
+        onOpenChange={setIsDialogOpen}
+        editingUser={editingUser}
+        formData={formData}
+        onFormDataChange={setFormData}
+        onSubmit={handleUpdateRole}
+        currentUserRole={currentUserRole}
+      />
 
-      {/* Add User to Role Dialog */}
-      <Dialog open={isAddUserDialogOpen} onOpenChange={setIsAddUserDialogOpen}>
-        <DialogContent className="max-h-[90vh] w-[95vw] max-w-lg overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Add User to {roleFilter.replace("_", " ")}</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <FormFieldGroup label="Select User">
-              <Select value={userToAdd} onValueChange={handleUserSelect}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Search or select a user..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableUsers.map((u) => (
-                    <SelectItem key={u.id} value={u.id}>
-                      {u.first_name || u.last_name ? `${u.first_name || ""} ${u.last_name || ""}` : u.email} ({u.role})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </FormFieldGroup>
-            {addUserWarning && (
-              <div className="rounded-md bg-yellow-100 p-3 text-sm text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200">
-                {addUserWarning}
-              </div>
-            )}
-            <div className="text-muted-foreground text-xs">Note: Users can only have one role at a time.</div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAddUserDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleAddUserToRole} disabled={!userToAdd}>
-              Confirm
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <AddUserToRoleDialog
+        open={isAddUserDialogOpen}
+        onOpenChange={setIsAddUserDialogOpen}
+        roleFilter={roleFilter}
+        userToAdd={userToAdd}
+        onUserSelect={handleUserSelect}
+        availableUsers={availableUsers}
+        addUserWarning={addUserWarning}
+        onConfirm={handleAddUserToRole}
+      />
     </AdminTablePage>
   )
 }

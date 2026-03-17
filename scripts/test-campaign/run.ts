@@ -986,7 +986,7 @@ async function runRlsNegativeTests(ctx: CampaignContext, personas: Record<Person
     return
   }
 
-  const random = Math.random().toString(36).slice(2, 10)
+  const random = Buffer.from(crypto.getRandomValues(new Uint8Array(6))).toString("hex")
 
   const deptInsert = await employeeClient
     .from("departments")

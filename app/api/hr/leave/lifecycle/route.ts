@@ -8,6 +8,7 @@ import {
   toISODate,
 } from "@/lib/hr/leave-workflow"
 import { logger } from "@/lib/logger"
+import { writeAuditLog } from "@/lib/audit/write-audit"
 
 const log = logger("hr-leave-lifecycle")
 
@@ -110,6 +111,18 @@ export async function POST(request: NextRequest) {
         "clear"
       )
 
+      await writeAuditLog(
+        supabase,
+        {
+          action: "update",
+          entityType: "leave_request",
+          entityId: leave_request_id,
+          newValues: { status: "cancelled", reason },
+          context: { actorId: user.id, source: "api", route: "/api/hr/leave/lifecycle" },
+        },
+        { failOpen: true }
+      )
+
       return NextResponse.json({ message: "Approved leave cancelled" })
     }
 
@@ -152,6 +165,18 @@ export async function POST(request: NextRequest) {
       if (extensionError || !extensionRequest) {
         return NextResponse.json({ error: "Failed to create extension request" }, { status: 500 })
       }
+
+      await writeAuditLog(
+        supabase,
+        {
+          action: "create",
+          entityType: "leave_request",
+          entityId: extensionRequest.id,
+          newValues: { request_kind: "extension", original_request_id: leaveRequest.id, extension_days: days },
+          context: { actorId: user.id, source: "api", route: "/api/hr/leave/lifecycle" },
+        },
+        { failOpen: true }
+      )
 
       return NextResponse.json({ message: "Extension request submitted", data: extensionRequest })
     }
@@ -197,6 +222,18 @@ export async function POST(request: NextRequest) {
         const clearFrom = toISODate(addDays(earlyDate, 1))
         await syncAttendanceForApprovedLeave(supabase, leaveRequest.user_id, clearFrom, leaveRequest.end_date, "clear")
       }
+
+      await writeAuditLog(
+        supabase,
+        {
+          action: "update",
+          entityType: "leave_request",
+          entityId: leave_request_id,
+          newValues: { early_return_date, new_end_date: newEndDate, days_restored: delta },
+          context: { actorId: user.id, source: "api", route: "/api/hr/leave/lifecycle" },
+        },
+        { failOpen: true }
+      )
 
       return NextResponse.json({ message: "Early return processed" })
     }

@@ -34,13 +34,16 @@ const securityHeaders = [
   // Note: 'unsafe-inline' is required for:
   //   - style-src: Tailwind CSS + Radix UI inject inline styles at runtime.
   //     Remove once CSS-in-JS is eliminated or a nonce/hash approach is used.
-  //   - script-src: Next.js inlines small hydration scripts. Remove when
-  //     Next.js supports nonce-based CSP out of the box (tracked roadmap item).
+  //   - script-src 'unsafe-inline': Next.js inlines small hydration scripts.
+  //     Remove once Next.js supports nonce-based CSP (tracked roadmap item).
+  //   - script-src 'unsafe-eval': Required by xlsx, jspdf, and docx packages
+  //     which use eval() internally for formula parsing / rendering. Cannot be
+  //     removed until those libs ship eval-free builds or are replaced.
   {
     key: "Content-Security-Policy",
     value: [
       "default-src 'self'",
-      // Scripts: self + Next.js inline hydration + Vercel Analytics
+      // Scripts: self + Next.js inline hydration + xlsx/jspdf eval + Vercel Analytics
       "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://va.vercel-scripts.com",
       // Styles: self + inline (Tailwind/Radix)
       "style-src 'self' 'unsafe-inline'",

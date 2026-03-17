@@ -9,6 +9,16 @@ import { Trash2, Edit2 } from "lucide-react"
 import { toast } from "sonner"
 import { FeedbackEditModal } from "./feedback-edit-modal"
 import { writeAuditLogClient } from "@/lib/audit/client"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 interface UserFeedbackListProps {
   feedback: any[]
@@ -18,6 +28,7 @@ export function UserFeedbackList({ feedback }: UserFeedbackListProps) {
   const [feedbackList, setFeedbackList] = useState(feedback)
   const [selectedFeedback, setSelectedFeedback] = useState<any>(null)
   const [showEditModal, setShowEditModal] = useState(false)
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
 
   const getTypeColor = (type: string) => {
     switch (type) {
@@ -50,8 +61,6 @@ export function UserFeedbackList({ feedback }: UserFeedbackListProps) {
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this feedback?")) return
-
     const supabase = createClient()
 
     try {
@@ -139,7 +148,12 @@ export function UserFeedbackList({ feedback }: UserFeedbackListProps) {
                   <Button variant="ghost" size="sm" onClick={() => handleEdit(item)}>
                     <Edit2 className="h-4 w-4" />
                   </Button>
-                  <Button variant="ghost" size="sm" onClick={() => handleDelete(item.id)}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setPendingDeleteId(item.id)}
+                    aria-label="Delete feedback"
+                  >
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
@@ -168,6 +182,29 @@ export function UserFeedbackList({ feedback }: UserFeedbackListProps) {
           onSave={handleSaveEdit}
         />
       )}
+
+      <AlertDialog open={pendingDeleteId !== null} onOpenChange={(open) => !open && setPendingDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Feedback</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this feedback? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (pendingDeleteId) handleDelete(pendingDeleteId)
+                setPendingDeleteId(null)
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   )
 }

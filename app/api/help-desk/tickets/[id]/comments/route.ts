@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
-import { appendHelpDeskEvent, canLeadDepartment, getAuthContext, isAdminRole } from "@/lib/help-desk/server"
+import {
+  appendAuditLog,
+  appendHelpDeskEvent,
+  canLeadDepartment,
+  getAuthContext,
+  isAdminRole,
+} from "@/lib/help-desk/server"
 import { logger } from "@/lib/logger"
 
 const log = logger("help-desk-tickets-comments")
@@ -105,6 +111,16 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       oldStatus: ticket.status,
       newStatus: ticket.status,
       details: { visibility: commentVisibility },
+    })
+
+    await appendAuditLog({
+      actorId: user.id,
+      action: "help_desk_comment_added",
+      entityId: ticket.id,
+      department: ticket.service_department,
+      route: "/api/help-desk/tickets/[id]/comments",
+      critical: false,
+      newValues: { visibility: commentVisibility },
     })
 
     return NextResponse.json({ data: created }, { status: 201 })

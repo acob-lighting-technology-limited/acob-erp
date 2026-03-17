@@ -1,7 +1,8 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
+import { QUERY_KEYS } from "@/lib/query-keys"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Package, Boxes, Warehouse, ArrowUpDown, AlertTriangle, TrendingUp } from "lucide-react"
@@ -13,6 +14,26 @@ import { logger } from "@/lib/logger"
 
 const log = logger("inventory")
 
+async function fetchInventoryStats(): Promise<InventoryStats> {
+  const supabase = createClient()
+  const { data: products, error: prodError } = await supabase.from("products").select("*")
+  if (prodError && prodError.code !== "42P01") log.error("Error fetching products:", prodError)
+  const { data: categories, error: catError } = await supabase.from("product_categories").select("*")
+  if (catError && catError.code !== "42P01") log.error("Error fetching categories:", catError)
+  const { data: warehouses, error: whError } = await supabase.from("warehouses").select("*")
+  if (whError && whError.code !== "42P01") log.error("Error fetching warehouses:", whError)
+
+  const allProducts = products || []
+  const lowStock = allProducts.filter((p: any) => p.quantity_on_hand <= (p.reorder_level || 10))
+  const totalVal = allProducts.reduce((sum: number, p: any) => sum + (p.unit_cost || 0) * (p.quantity_on_hand || 0), 0)
+  return {
+    totalProducts: allProducts.length,
+    totalCategories: categories?.length || 0,
+    totalWarehouses: warehouses?.length || 0,
+    lowStockItems: lowStock.length,
+    totalValue: totalVal,
+  }
+}
 
 interface InventoryStats {
   totalProducts: number
@@ -23,52 +44,12 @@ interface InventoryStats {
 }
 
 export default function InventoryDashboard() {
-  const [stats, setStats] = useState<InventoryStats>({
-    totalProducts: 0,
-    totalCategories: 0,
-    totalWarehouses: 0,
-    lowStockItems: 0,
-    totalValue: 0,
+  const {
+    data: stats = { totalProducts: 0, totalCategories: 0, totalWarehouses: 0, lowStockItems: 0, totalValue: 0 },
+  } = useQuery({
+    queryKey: QUERY_KEYS.adminInventoryDashboard(),
+    queryFn: fetchInventoryStats,
   })
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    fetchInventoryData()
-  }, [])
-
-  async function fetchInventoryData() {
-    try {
-      const supabase = createClient()
-
-      const { data: products, error: prodError } = await supabase.from("products").select("*")
-      if (prodError && prodError.code !== "42P01") log.error("Error fetching products:", prodError)
-
-      const { data: categories, error: catError } = await supabase.from("product_categories").select("*")
-      if (catError && catError.code !== "42P01") log.error("Error fetching categories:", catError)
-
-      const { data: warehouses, error: whError } = await supabase.from("warehouses").select("*")
-      if (whError && whError.code !== "42P01") log.error("Error fetching warehouses:", whError)
-
-      const allProducts = products || []
-      const lowStock = allProducts.filter((p: any) => p.quantity_on_hand <= (p.reorder_level || 10))
-      const totalVal = allProducts.reduce(
-        (sum: number, p: any) => sum + (p.unit_cost || 0) * (p.quantity_on_hand || 0),
-        0
-      )
-
-      setStats({
-        totalProducts: allProducts.length,
-        totalCategories: categories?.length || 0,
-        totalWarehouses: warehouses?.length || 0,
-        lowStockItems: lowStock.length,
-        totalValue: totalVal,
-      })
-    } catch (error) {
-      log.error("Error fetching inventory data:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
 
   function formatCurrency(amount: number) {
     return new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" }).format(amount)

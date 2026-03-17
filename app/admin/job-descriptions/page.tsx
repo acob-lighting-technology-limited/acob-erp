@@ -1,43 +1,51 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+import { useState } from "react"
+import { useQuery } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { SearchableSelect } from "@/components/ui/searchable-select"
 import { createClient } from "@/lib/supabase/client"
-import { toast } from "sonner"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { StatCard } from "@/components/ui/stat-card"
-import {
-  Briefcase,
-  Search,
-  Filter,
-  Eye,
-  User,
-  Calendar,
-  Building2,
-  CheckCircle,
-  XCircle,
-  List,
-  LayoutGrid,
-  Printer,
-  ArrowUp,
-  ArrowDown,
-} from "lucide-react"
+import { Briefcase, User, Calendar, CheckCircle, XCircle, List, LayoutGrid } from "lucide-react"
 import type { UserRole } from "@/types/database"
-import { getRoleDisplayName, getRoleBadgeColor } from "@/lib/permissions"
 import { formatName } from "@/lib/utils"
 import { EmptyState } from "@/components/ui/patterns"
+import { JobDescriptionFilterBar } from "./_components/job-description-filter-bar"
+import { JobDescriptionListView } from "./_components/job-description-list-view"
+import { JobDescriptionCardView } from "./_components/job-description-card-view"
+import { JobDescriptionDialog } from "./_components/job-description-dialog"
 
-import { logger } from "@/lib/logger"
+interface JobDescriptionsData {
+  profiles: Profile[]
+  userProfile: UserProfile | null
+}
 
-const log = logger("job-descriptions")
+async function fetchJobDescriptionsData(): Promise<JobDescriptionsData> {
+  const supabase = createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { profiles: [], userProfile: null }
 
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role, is_department_lead, lead_departments")
+    .eq("id", user.id)
+    .single()
+
+  let query = supabase.from("profiles").select("*").order("last_name", { ascending: true })
+
+  if (profile?.is_department_lead && profile.lead_departments) {
+    query = query.in("department", profile.lead_departments)
+  }
+
+  const { data, error } = await query
+  if (error) throw new Error(error.message)
+
+  return { profiles: data || [], userProfile: profile }
+}
 
 interface Profile {
   id: string
@@ -60,62 +68,21 @@ interface UserProfile {
 }
 
 export default function AdminJobDescriptionsPage() {
-  const [profiles, setProfiles] = useState<Profile[]>([])
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [departmentFilter, setDepartmentFilter] = useState("all")
-  const [employeeFilter, setemployeeFilter] = useState("all")
+  const [employeeFilter, setEmployeeFilter] = useState("all")
   const [statusFilter, setStatusFilter] = useState("all")
   const [nameSortOrder, setNameSortOrder] = useState<"asc" | "desc">("asc")
   const [viewMode, setViewMode] = useState<"list" | "card">("list")
   const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null)
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
 
-  const supabase = createClient()
+  const { data } = useQuery({
+    queryKey: QUERY_KEYS.adminJobDescriptions(),
+    queryFn: fetchJobDescriptionsData,
+  })
 
-  useEffect(() => {
-    loadData()
-  }, [])
-
-  const loadData = async () => {
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (!user) return
-
-      // Get user profile
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role, is_department_lead, lead_departments")
-        .eq("id", user.id)
-        .single()
-
-      setUserProfile(profile)
-
-      // Fetch profiles based on role
-      let query = supabase.from("profiles").select("*").order("last_name", { ascending: true })
-
-      // Role-based filtering
-      if (profile?.is_department_lead && profile.lead_departments) {
-        // Leads can only see their department's employee
-        query = query.in("department", profile.lead_departments)
-      }
-      // super_admin and admin can see all profiles (no filter needed)
-
-      const { data, error } = await query
-
-      if (error) throw error
-
-      setProfiles(data || [])
-    } catch (error: any) {
-      log.error("Error loading profiles:", error)
-      toast.error("Failed to load job descriptions")
-    } finally {
-      setIsLoading(false)
-    }
-  }
+  const profiles = data?.profiles ?? []
 
   const handleViewJobDescription = (profile: Profile) => {
     setSelectedProfile(profile)
@@ -131,25 +98,18 @@ export default function AdminJobDescriptionsPage() {
         profile.company_role?.toLowerCase().includes(searchQuery.toLowerCase())
 
       const matchesDepartment = departmentFilter === "all" || profile.department === departmentFilter
-
-      const matchesemployee = employeeFilter === "all" || profile.id === employeeFilter
-
+      const matchesEmployee = employeeFilter === "all" || profile.id === employeeFilter
       const matchesStatus =
         statusFilter === "all" ||
         (statusFilter === "completed" && profile.job_description) ||
         (statusFilter === "pending" && !profile.job_description)
 
-      return matchesSearch && matchesDepartment && matchesemployee && matchesStatus
+      return matchesSearch && matchesDepartment && matchesEmployee && matchesStatus
     })
     .sort((a, b) => {
       const lastNameA = formatName(a.last_name).toLowerCase()
       const lastNameB = formatName(b.last_name).toLowerCase()
-
-      if (nameSortOrder === "asc") {
-        return lastNameA.localeCompare(lastNameB)
-      } else {
-        return lastNameB.localeCompare(lastNameA)
-      }
+      return nameSortOrder === "asc" ? lastNameA.localeCompare(lastNameB) : lastNameB.localeCompare(lastNameA)
     })
 
   const departments = Array.from(new Set(profiles.map((p) => p.department).filter(Boolean))) as string[]
@@ -164,25 +124,6 @@ export default function AdminJobDescriptionsPage() {
         new Date(p.job_description_updated_at).getMonth() === new Date().getMonth() &&
         new Date(p.job_description_updated_at).getFullYear() === new Date().getFullYear()
     ).length,
-  }
-
-  const formatDate = (dateString: string | null) => {
-    if (!dateString) return "Never"
-    return new Date(dateString).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    })
-  }
-
-  const handlePrint = () => {
-    window.print()
-  }
-
-  const getCompletionColor = (hasDescription: boolean) => {
-    return hasDescription
-      ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-      : "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400"
   }
 
   return (
@@ -239,194 +180,31 @@ export default function AdminJobDescriptionsPage() {
         </div>
       }
       filters={
-        <Card className="border-2">
-          <CardContent className="p-3 sm:p-6">
-            <div className="flex flex-col gap-4 md:flex-row">
-              <div className="relative flex-1">
-                <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform" />
-                <Input
-                  placeholder="Search employee..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-              <SearchableSelect
-                value={departmentFilter}
-                onValueChange={setDepartmentFilter}
-                placeholder="All Departments"
-                searchPlaceholder="Search departments..."
-                icon={<Building2 className="h-4 w-4" />}
-                className="w-full md:w-48"
-                options={[
-                  { value: "all", label: "All Departments" },
-                  ...departments.map((dept) => ({
-                    value: dept,
-                    label: dept,
-                    icon: <Building2 className="h-3 w-3" />,
-                  })),
-                ]}
-              />
-              <SearchableSelect
-                value={employeeFilter}
-                onValueChange={setemployeeFilter}
-                placeholder="All employee"
-                searchPlaceholder="Search employee..."
-                icon={<User className="h-4 w-4" />}
-                className="w-full md:w-48"
-                options={[
-                  { value: "all", label: "All employee" },
-                  ...profiles.map((member) => ({
-                    value: member.id,
-                    label: `${formatName(member.first_name)} ${formatName(member.last_name)} - ${member.department}`,
-                    icon: <User className="h-3 w-3" />,
-                  })),
-                ]}
-              />
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-full md:w-48">
-                  <SelectValue placeholder="All Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </CardContent>
-        </Card>
+        <JobDescriptionFilterBar
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          departmentFilter={departmentFilter}
+          onDepartmentChange={setDepartmentFilter}
+          employeeFilter={employeeFilter}
+          onEmployeeChange={setEmployeeFilter}
+          statusFilter={statusFilter}
+          onStatusChange={setStatusFilter}
+          departments={departments}
+          profiles={profiles}
+        />
       }
       filtersInCard={false}
     >
-      {/* employee List */}
       {filteredProfiles.length > 0 ? (
         viewMode === "list" ? (
-          <Card className="border-2">
-            <CardContent className="p-3 sm:p-6">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-12">#</TableHead>
-                    <TableHead>
-                      <div className="flex items-center gap-2">
-                        <span>Name</span>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setNameSortOrder(nameSortOrder === "asc" ? "desc" : "asc")}
-                          className="h-6 w-6 p-0"
-                        >
-                          {nameSortOrder === "asc" ? (
-                            <ArrowUp className="h-3 w-3" />
-                          ) : (
-                            <ArrowDown className="h-3 w-3" />
-                          )}
-                        </Button>
-                      </div>
-                    </TableHead>
-                    <TableHead>Department</TableHead>
-                    <TableHead>Company Role</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Last Updated</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredProfiles.map((profile, index) => (
-                    <TableRow key={profile.id}>
-                      <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
-                      <TableCell className="font-medium">
-                        {formatName(profile.last_name)}, {formatName(profile.first_name)}
-                      </TableCell>
-                      <TableCell>{profile.department}</TableCell>
-                      <TableCell>{profile.company_role || "-"}</TableCell>
-                      <TableCell>
-                        <Badge className={getRoleBadgeColor(profile.role)}>{getRoleDisplayName(profile.role)}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={getCompletionColor(!!profile.job_description)}>
-                          {profile.job_description ? "Completed" : "Pending"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
-                        {formatDate(profile.job_description_updated_at)}
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleViewJobDescription(profile)}
-                          className="gap-2"
-                          disabled={!profile.job_description}
-                        >
-                          <Eye className="h-4 w-4" />
-                          View
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+          <JobDescriptionListView
+            profiles={filteredProfiles}
+            nameSortOrder={nameSortOrder}
+            onToggleSort={() => setNameSortOrder(nameSortOrder === "asc" ? "desc" : "asc")}
+            onView={handleViewJobDescription}
+          />
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {filteredProfiles.map((profile) => (
-              <Card key={profile.id} className="border-2 transition-shadow hover:shadow-lg">
-                <CardHeader className="from-primary/5 to-background border-b bg-gradient-to-r">
-                  <div className="flex items-start justify-between">
-                    <div className="flex flex-1 items-start gap-3">
-                      <div className="bg-primary/10 rounded-lg p-2">
-                        <User className="text-primary h-5 w-5" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <CardTitle className="text-lg">
-                          {formatName(profile.last_name)}, {formatName(profile.first_name)}
-                        </CardTitle>
-                        <div className="mt-2 flex items-center gap-2">
-                          <Badge className={getCompletionColor(!!profile.job_description)}>
-                            {profile.job_description ? "Completed" : "Pending"}
-                          </Badge>
-                          <Badge className={getRoleBadgeColor(profile.role)}>{getRoleDisplayName(profile.role)}</Badge>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-3 p-4">
-                  <div className="text-muted-foreground flex items-center gap-2 text-sm">
-                    <Building2 className="h-4 w-4" />
-                    <span>{profile.department}</span>
-                  </div>
-
-                  {profile.company_role && (
-                    <div className="text-muted-foreground flex items-center gap-2 text-sm">
-                      <Briefcase className="h-4 w-4" />
-                      <span>{profile.company_role}</span>
-                    </div>
-                  )}
-
-                  <div className="text-muted-foreground flex items-center gap-2 text-sm">
-                    <Calendar className="h-4 w-4" />
-                    <span>Updated: {formatDate(profile.job_description_updated_at)}</span>
-                  </div>
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleViewJobDescription(profile)}
-                    className="w-full gap-2"
-                    disabled={!profile.job_description}
-                  >
-                    <Eye className="h-4 w-4" />
-                    {profile.job_description ? "View Description" : "No Description"}
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+          <JobDescriptionCardView profiles={filteredProfiles} onView={handleViewJobDescription} />
         )
       ) : (
         <Card className="border-2">
@@ -443,90 +221,8 @@ export default function AdminJobDescriptionsPage() {
           </CardContent>
         </Card>
       )}
-      {/* View Job Description Dialog */}
-      <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-        <DialogContent className="max-h-[80vh] max-w-3xl overflow-y-auto">
-          <style
-            dangerouslySetInnerHTML={{
-              __html: `
-            @media print {
-              body {
-                background: white !important;
-              }
-              .no-print {
-                display: none !important;
-              }
-            }
-          `,
-            }}
-          />
-          <DialogHeader className="no-print">
-            <div className="flex items-center justify-between">
-              <DialogTitle className="text-2xl">
-                {selectedProfile?.first_name} {selectedProfile?.last_name}'s Job Description
-              </DialogTitle>
-              {selectedProfile?.job_description && (
-                <Button onClick={handlePrint} variant="outline" size="sm" className="gap-2">
-                  <Printer className="h-4 w-4" />
-                  Print
-                </Button>
-              )}
-            </div>
-            <DialogDescription>
-              <div className="mt-2 flex flex-wrap items-center gap-3">
-                <span className="text-sm">{selectedProfile?.department}</span>
-                {selectedProfile?.company_role && <span className="text-sm">" {selectedProfile.company_role}</span>}
-                <Badge className={getRoleBadgeColor(selectedProfile?.role || "employee")}>
-                  {getRoleDisplayName(selectedProfile?.role || "employee")}
-                </Badge>
-                <span className="text-sm">
-                  Last updated: {formatDate(selectedProfile?.job_description_updated_at || null)}
-                </span>
-              </div>
-            </DialogDescription>
-          </DialogHeader>
 
-          {/* Print Letterhead - Hidden on screen, visible when printing */}
-          <div className="hidden print:mb-8 print:block print:border-b print:pb-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <img src="/acob-logo.webp" alt="ACOB Lighting" className="h-16 w-auto" />
-              </div>
-              <div className="text-right text-sm">
-                {selectedProfile?.first_name && selectedProfile?.last_name && (
-                  <p className="mb-1 font-semibold">
-                    {formatName(selectedProfile.first_name)} {formatName(selectedProfile.last_name)}
-                  </p>
-                )}
-                {selectedProfile?.company_email && <p className="mb-1">{selectedProfile.company_email}</p>}
-                {selectedProfile?.department && <p className="mb-1">{selectedProfile.department}</p>}
-                {selectedProfile?.phone_number && <p className="mb-1">{selectedProfile.phone_number}</p>}
-                <p className="mt-2">
-                  {new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-4 print:mt-0">
-            {selectedProfile?.job_description ? (
-              <div className="prose dark:prose-invert max-w-none">
-                <div className="bg-muted/50 rounded-lg p-6 whitespace-pre-wrap print:rounded-none print:bg-transparent print:p-0">
-                  <h2 className="mb-4 text-xl font-bold print:mb-2">Job Description</h2>
-                  <div className="whitespace-pre-wrap">{selectedProfile.job_description}</div>
-                </div>
-              </div>
-            ) : (
-              <EmptyState
-                title="No job description has been added yet"
-                description="This employee has not submitted a role description."
-                icon={XCircle}
-                className="border-0"
-              />
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+      <JobDescriptionDialog profile={selectedProfile} isOpen={isViewDialogOpen} onOpenChange={setIsViewDialogOpen} />
     </AdminTablePage>
   )
 }

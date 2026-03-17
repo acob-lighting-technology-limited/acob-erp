@@ -10,6 +10,7 @@ import { isSystemNotificationChannelEnabled, resolveChannelEligibleUserIds } fro
 import { withSubjectPrefix } from "@/lib/notifications/subject-policy"
 import { syncEmploymentStatusToAuth } from "@/lib/supabase/admin"
 import { writeAuditLog } from "@/lib/audit/write-audit"
+import { ORG } from "@/config/constants"
 
 const log = logger("approve-user")
 
@@ -90,8 +91,7 @@ export async function POST(req: Request) {
 
     if (!employeeId) {
       // next_employee_number() calls nextval() on a sequence — fully atomic, no race condition
-      const { data: seqRow, error: seqError } = await supabaseAdmin
-        .rpc("next_employee_number")
+      const { data: seqRow, error: seqError } = await supabaseAdmin.rpc("next_employee_number")
       if (seqError || !seqRow) {
         throw new Error(`Failed to generate employee number: ${seqError?.message ?? "unknown error"}`)
       }
@@ -99,7 +99,7 @@ export async function POST(req: Request) {
     }
 
     const tempPassword = `Welcome${currentYear}!`
-    const portalUrl = "https://acoblighting.com/mail"
+    const portalUrl = ORG.MAIL_PORTAL_URL
 
     // 3. Create or Update Auth User
     // First check if user already exists
@@ -140,21 +140,21 @@ export async function POST(req: Request) {
     // 4 & 5. Atomically upsert profile + delete from pending_users in one DB transaction.
     // If either step fails, both roll back — no ghost users, no orphaned profiles.
     const { error: approvalError } = await supabaseAdmin.rpc("atomic_complete_user_approval", {
-      p_auth_user_id:        authUserId,
-      p_pending_user_id:     pendingUserId,
-      p_employee_number:     employeeId,
-      p_first_name:          pendingUser.first_name,
-      p_last_name:           pendingUser.last_name,
-      p_other_names:         pendingUser.other_names ?? null,
-      p_department:          pendingUser.department,
-      p_company_role:        pendingUser.company_role,
-      p_company_email:       pendingUser.company_email,
-      p_personal_email:      pendingUser.personal_email,
-      p_phone_number:        pendingUser.phone_number ?? null,
-      p_additional_phone:    pendingUser.additional_phone_number ?? null,
+      p_auth_user_id: authUserId,
+      p_pending_user_id: pendingUserId,
+      p_employee_number: employeeId,
+      p_first_name: pendingUser.first_name,
+      p_last_name: pendingUser.last_name,
+      p_other_names: pendingUser.other_names ?? null,
+      p_department: pendingUser.department,
+      p_company_role: pendingUser.company_role,
+      p_company_email: pendingUser.company_email,
+      p_personal_email: pendingUser.personal_email,
+      p_phone_number: pendingUser.phone_number ?? null,
+      p_additional_phone: pendingUser.additional_phone_number ?? null,
       p_residential_address: pendingUser.residential_address ?? null,
-      p_office_location:     pendingUser.office_location ?? null,
-      p_employment_date:     hireDate ?? null,
+      p_office_location: pendingUser.office_location ?? null,
+      p_employment_date: hireDate ?? null,
     })
 
     if (approvalError) {
@@ -215,20 +215,24 @@ export async function POST(req: Request) {
 
     // Audit: new employee onboarding is a critical action
     const supabaseForAudit = await createServerClient()
-    await writeAuditLog(supabaseForAudit, {
-      action: "create",
-      entityType: "profile",
-      entityId: authUserId!,
-      context: { actorId: caller.id, source: "api" as const },
-      newValues: {
-        employee_number: employeeId,
-        company_email: pendingUser.company_email,
-        department: pendingUser.department,
-        role: "employee",
-        employment_status: "active",
+    await writeAuditLog(
+      supabaseForAudit,
+      {
+        action: "create",
+        entityType: "profile",
+        entityId: authUserId!,
+        context: { actorId: caller.id, source: "api" as const },
+        newValues: {
+          employee_number: employeeId,
+          company_email: pendingUser.company_email,
+          department: pendingUser.department,
+          role: "employee",
+          employment_status: "active",
+        },
+        metadata: { source: "approve-user", pending_user_id: pendingUserId },
       },
-      metadata: { source: "approve-user", pending_user_id: pendingUserId },
-    }, { failOpen: true })
+      { failOpen: true }
+    )
 
     return NextResponse.json({ success: true, employeeId })
   } catch (error: any) {

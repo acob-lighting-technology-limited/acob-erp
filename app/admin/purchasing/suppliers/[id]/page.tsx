@@ -1,7 +1,8 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
+import { useQuery } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
 import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -9,14 +10,13 @@ import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Pencil, Phone, Mail, MapPin, ShoppingCart } from "lucide-react"
 import Link from "next/link"
-import { toast } from "sonner"
 import { PageHeader } from "@/components/layout/page-header"
 import { EmptyState } from "@/components/ui/patterns"
+import { PageLoader } from "@/components/ui/query-states"
 
 import { logger } from "@/lib/logger"
 
 const log = logger("purchasing-suppliers")
-
 
 interface Supplier {
   id: string
@@ -38,60 +38,50 @@ interface PurchaseOrder {
   status: string
 }
 
+interface SupplierPageData {
+  supplier: Supplier
+  orders: PurchaseOrder[]
+}
+
+async function fetchSupplierDetail(id: string): Promise<SupplierPageData> {
+  const supabase = createClient()
+  const [{ data: sup, error: supError }, { data: pos }] = await Promise.all([
+    supabase.from("suppliers").select("*").eq("id", id).single(),
+    supabase
+      .from("purchase_orders")
+      .select("id, po_number, order_date, total_amount, status")
+      .eq("supplier_id", id)
+      .order("order_date", { ascending: false })
+      .limit(10),
+  ])
+
+  if (supError || !sup) throw new Error(supError?.message ?? "Supplier not found")
+
+  return { supplier: sup, orders: pos || [] }
+}
+
+function formatCurrency(amount: number) {
+  return new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" }).format(amount)
+}
+
+function formatDate(date: string) {
+  return new Date(date).toLocaleDateString("en-NG", { year: "numeric", month: "short", day: "numeric" })
+}
+
 export default function SupplierDetailPage() {
   const params = useParams()
   const router = useRouter()
-  const [supplier, setSupplier] = useState<Supplier | null>(null)
-  const [orders, setOrders] = useState<PurchaseOrder[]>([])
-  const [loading, setLoading] = useState(true)
+  const id = params.id as string
 
-  useEffect(() => {
-    fetchData()
-  }, [params.id])
+  const { data, isLoading } = useQuery({
+    queryKey: QUERY_KEYS.adminSupplierDetail(id),
+    queryFn: () => fetchSupplierDetail(id),
+  })
 
-  async function fetchData() {
-    try {
-      const supabase = createClient()
-      const [{ data: sup }, { data: pos }] = await Promise.all([
-        supabase.from("suppliers").select("*").eq("id", params.id).single(),
-        supabase
-          .from("purchase_orders")
-          .select("id, po_number, order_date, total_amount, status")
-          .eq("supplier_id", params.id)
-          .order("order_date", { ascending: false })
-          .limit(10),
-      ])
+  if (isLoading) return <PageLoader />
+  if (!data) return null
 
-      if (!sup) throw new Error("Not found")
-      setSupplier(sup)
-      setOrders(pos || [])
-    } catch (error) {
-      log.error("Error:", error)
-      toast.error("Supplier not found")
-      router.push("/admin/purchasing/suppliers")
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  function formatCurrency(amount: number) {
-    return new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" }).format(amount)
-  }
-
-  function formatDate(date: string) {
-    return new Date(date).toLocaleDateString("en-NG", { year: "numeric", month: "short", day: "numeric" })
-  }
-
-  if (loading) {
-    return (
-      <div className="container mx-auto flex min-h-[400px] items-center justify-center p-6">
-        <div className="border-primary h-8 w-8 animate-spin rounded-full border-4 border-t-transparent"></div>
-      </div>
-    )
-  }
-
-  if (!supplier) return null
-
+  const { supplier, orders } = data
   const totalSpent = orders.reduce((sum, o) => sum + o.total_amount, 0)
 
   return (

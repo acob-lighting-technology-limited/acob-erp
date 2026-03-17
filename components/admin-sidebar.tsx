@@ -27,7 +27,7 @@ import {
   ShieldEllipsis,
   FlaskConical,
 } from "lucide-react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
@@ -296,6 +296,8 @@ export function AdminSidebar({ user, profile }: AdminSidebarProps) {
     router.push("/auth/login")
   }
 
+  const adminDomains = useMemo(() => normalizeAdminDomains(profile?.admin_domains), [profile?.admin_domains])
+
   const canAccessRoute = (requiredRoles: string[], href: string) => {
     if (!profile?.role) return false
     if (profile.is_department_lead && profile.role !== "admin") {
@@ -304,7 +306,6 @@ export function AdminSidebar({ user, profile }: AdminSidebarProps) {
     if (!requiredRoles.includes(profile.role)) return false
     if (profile.role !== "admin") return true
 
-    const adminDomains = normalizeAdminDomains(profile.admin_domains)
     if (href === "/admin") return true
     const mappedDomain = getDomainForAdminPath(href)
     return Boolean(mappedDomain && adminDomains.includes(mappedDomain))

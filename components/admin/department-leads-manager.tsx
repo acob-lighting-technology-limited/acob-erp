@@ -1,12 +1,14 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
+import { TableSkeleton, QueryError } from "@/components/ui/query-states"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { User, Building, Pencil, AlertCircle } from "lucide-react"
+import { User, Building, AlertCircle } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -40,93 +42,93 @@ interface Profile {
   is_department_lead: boolean
 }
 
+async function fetchDepartmentsWithLeads(): Promise<Department[]> {
+  const supabase = createClient()
+  const { data: depts, error: deptsError } = await supabase
+    .from("departments")
+    .select("*")
+    .eq("is_active", true)
+    .order("name")
+  if (deptsError) throw deptsError
+
+  const { data: leads, error: leadsError } = await supabase
+    .from("profiles")
+    .select("id, first_name, last_name, company_email, department, role")
+    .eq("is_department_lead", true)
+  if (leadsError) throw leadsError
+
+  return depts.map((d) => {
+    const lead = leads.find((l) => l.department === d.name)
+    return {
+      id: d.id,
+      name: d.name,
+      lead_id: lead ? lead.id : null,
+      lead_name: lead ? `${lead.first_name || ""} ${lead.last_name || ""}`.trim() : null,
+      lead_email: lead ? lead.company_email : null,
+    }
+  })
+}
+
 export function DepartmentLeadsManager() {
-  const [departments, setDepartments] = useState<Department[]>([])
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
   const [selectedDept, setSelectedDept] = useState<Department | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [users, setUsers] = useState<Profile[]>([])
   const [selectedUserId, setSelectedUserId] = useState<string>("")
   const [confirmWarning, setConfirmWarning] = useState<string | null>(null)
-  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  useEffect(() => {
-    fetchData()
-  }, [])
+  const {
+    data: departments = [],
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery({
+    queryKey: ["department-leads"],
+    queryFn: fetchDepartmentsWithLeads,
+  })
 
-  async function fetchData() {
-    setLoading(true)
-    try {
+  const { mutate: assignLead, isPending: isSubmitting } = useMutation({
+    mutationFn: async ({ deptId, userId }: { deptId: string; userId: string }) => {
       const supabase = createClient()
-
-      // 1. Fetch departments
-      const { data: depts, error: deptsError } = await supabase
-        .from("departments")
-        .select("*")
-        .eq("is_active", true)
-        .order("name")
-
-      if (deptsError) throw deptsError
-
-      // 2. Fetch leads for these departments
-      // Strategy: Find active profiles where is_department_lead is true
-      const { data: leads, error: leadsError } = await supabase
-        .from("profiles")
-        .select("id, first_name, last_name, company_email, department, role")
-        .eq("is_department_lead", true)
-
-      if (leadsError) throw leadsError
-
-      // Map leads to departments
-      // Note: profiles.department currently stores the name (text), not ID.
-      // But we should try to match by name for now as the table shows department name usage.
-
-      const mappedDepts = depts.map((d) => {
-        // Find lead whose department name matches this department name
-        const lead = leads.find((l) => l.department === d.name)
-        return {
-          id: d.id,
-          name: d.name,
-          lead_id: lead ? lead.id : null,
-          lead_name: lead ? `${lead.first_name || ""} ${lead.last_name || ""}`.trim() : null,
-          lead_email: lead ? lead.company_email : null,
-        }
+      const { error } = await supabase.rpc("assign_department_lead", {
+        p_department_id: deptId,
+        p_new_lead_id: userId,
       })
-
-      setDepartments(mappedDepts)
-    } catch (error) {
-      console.error("Error fetching data:", error)
-      toast.error("Failed to load department leads")
-    } finally {
-      setLoading(false)
-    }
-  }
+      if (error) throw error
+    },
+    onSuccess: () => {
+      const user = users.find((u) => u.id === selectedUserId)
+      toast.success(`${user?.first_name || "User"} assigned as lead for ${selectedDept?.name}`)
+      setIsDialogOpen(false)
+      queryClient.invalidateQueries({ queryKey: ["department-leads"] })
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Failed to assign lead")
+    },
+  })
 
   async function openAssignDialog(dept: Department) {
     setSelectedDept(dept)
     setSelectedUserId("")
     setConfirmWarning(null)
 
-    // Fetch potential leads from active users (excluding visitors).
     try {
       const supabase = createClient()
       const baseQuery = supabase
         .from("profiles")
         .select("id, first_name, last_name, company_email, role, department, is_department_lead")
-        .neq("role", "visitor") // Exclude visitors
+        .neq("role", "visitor")
         .order("first_name")
       const { data, error } = await applyAssignableStatusFilter(baseQuery, { allowLegacyNullStatus: false })
 
       if (error) {
-        console.error("Error fetching potential leads:", error)
         toast.error("Failed to load potential leads. Please try again.")
         return
       }
 
       setUsers(data as Profile[])
       setIsDialogOpen(true)
-    } catch (err) {
-      console.error("Unexpected error in openAssignDialog:", err)
+    } catch {
       toast.error("An unexpected error occurred.")
     }
   }
@@ -137,40 +139,15 @@ export function DepartmentLeadsManager() {
     if (!user) return
 
     let warning = null
-
-    // Check if user is already a lead for another department
     if (user.is_department_lead && user.department !== selectedDept?.name) {
-      warning = `⚠️ ${user.first_name || "User"} is currently the lead for "${user.department}". Assigning them here will remove them as lead of "${user.department}" (that department will have no lead), and make them lead of "${selectedDept?.name}" instead. Each person can only lead one department.`
+      warning = `\u26A0\uFE0F ${user.first_name || "User"} is currently the lead for "${user.department}". Assigning them here will remove them as lead of "${user.department}" (that department will have no lead), and make them lead of "${selectedDept?.name}" instead. Each person can only lead one department.`
     }
     setConfirmWarning(warning)
   }
 
-  async function handleAssign() {
+  function handleAssign() {
     if (!selectedDept || !selectedUserId) return
-    setIsSubmitting(true)
-
-    try {
-      const supabase = createClient()
-      const user = users.find((u) => u.id === selectedUserId)
-
-      // Use RPC for atomic demote/promote/assign operation
-      // This ensures data consistency (atomic transaction)
-      const { error } = await supabase.rpc("assign_department_lead", {
-        p_department_id: selectedDept.id,
-        p_new_lead_id: selectedUserId,
-      })
-
-      if (error) throw error
-
-      toast.success(`${user?.first_name || "User"} assigned as lead for ${selectedDept.name}`)
-      setIsDialogOpen(false)
-      fetchData() // Refresh list
-    } catch (error: any) {
-      console.error("Error assigning lead:", error)
-      toast.error(error.message || "Failed to assign lead")
-    } finally {
-      setIsSubmitting(false)
-    }
+    assignLead({ deptId: selectedDept.id, userId: selectedUserId })
   }
 
   return (
@@ -185,8 +162,10 @@ export function DepartmentLeadsManager() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {loading ? (
-          <div className="flex justify-center py-4">Loading...</div>
+        {isLoading ? (
+          <TableSkeleton rows={5} cols={5} />
+        ) : isError ? (
+          <QueryError message="Could not load department leads." onRetry={refetch} />
         ) : (
           <Table>
             <TableHeader>
@@ -213,7 +192,7 @@ export function DepartmentLeadsManager() {
                       <span className="text-muted-foreground italic">No Lead Assigned</span>
                     )}
                   </TableCell>
-                  <TableCell className="text-muted-foreground">{dept.lead_email || "—"}</TableCell>
+                  <TableCell className="text-muted-foreground">{dept.lead_email || "\u2014"}</TableCell>
                   <TableCell className="text-right">
                     <Button variant="outline" size="sm" onClick={() => openAssignDialog(dept)}>
                       <User className="mr-2 h-4 w-4" />

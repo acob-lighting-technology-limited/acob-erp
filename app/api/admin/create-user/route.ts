@@ -10,6 +10,7 @@ import {
 } from "@/lib/role-management"
 import { formValidation } from "@/lib/validation"
 import { logger } from "@/lib/logger"
+import { writeAuditLog } from "@/lib/audit/write-audit"
 
 const log = logger("admin-create-user")
 
@@ -236,6 +237,18 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       )
     }
+
+    await writeAuditLog(
+      supabase,
+      {
+        action: "create",
+        entityType: "user",
+        entityId: authData.user.id,
+        newValues: { email, department, role: targetRole, employee_number: employeeNumber || null },
+        context: { actorId: user.id, source: "api", route: "/api/admin/create-user" },
+      },
+      { failOpen: true }
+    )
 
     return NextResponse.json(
       {

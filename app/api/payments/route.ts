@@ -1,9 +1,10 @@
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
-import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
+import { getDepartmentScope, resolveAdminScope, normalizeDepartmentName } from "@/lib/admin/rbac"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { logger } from "@/lib/logger"
+import { writeAuditLog } from "@/lib/audit/write-audit"
 
 const log = logger("payments")
 
@@ -18,8 +19,8 @@ const normalizeDepartmentId = (value: unknown): string | null => {
 }
 
 // Helper function to create Supabase client
-function createClient() {
-  const cookieStore = cookies()
+async function createClient() {
+  const cookieStore = await cookies()
 
   return createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
     cookies: {
@@ -42,7 +43,7 @@ function createClient() {
 // GET /api/payments - Get payments (filtered by department if not admin)
 export async function GET(request: Request) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
     const { searchParams } = new URL(request.url)
 
     const departmentId = searchParams.get("department_id")
@@ -94,7 +95,7 @@ export async function GET(request: Request) {
         query = query.eq("department_id", deptId)
       } else {
         const rawDept = String((profile as any)?.department || "").trim()
-        const deptCandidates = rawDept.toLowerCase() === "finance" ? ["Accounts", rawDept] : [rawDept]
+        const deptCandidates = Array.from(new Set([normalizeDepartmentName(rawDept), rawDept].filter(Boolean)))
         const { data: userDept } = await dataClient
           .from("departments")
           .select("id")
@@ -130,7 +131,7 @@ export async function GET(request: Request) {
 // POST /api/payments - Create a new payment
 export async function POST(request: Request) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     // Get current user
     const {
@@ -213,7 +214,7 @@ export async function POST(request: Request) {
       let userDepartmentId = normalizeDepartmentId((profile as any)?.department_id)
       if (!userDepartmentId) {
         const rawDept = String((profile as any)?.department || "").trim()
-        const deptCandidates = rawDept.toLowerCase() === "finance" ? ["Accounts", rawDept] : [rawDept]
+        const deptCandidates = Array.from(new Set([normalizeDepartmentName(rawDept), rawDept].filter(Boolean)))
         const { data: userDept } = await dataClient
           .from("departments")
           .select("id")
@@ -258,6 +259,18 @@ export async function POST(request: Request) {
       .single()
 
     if (error) throw error
+
+    await writeAuditLog(
+      supabase as any,
+      {
+        action: "create",
+        entityType: "payment",
+        entityId: payment.id,
+        newValues: { amount: payment.amount, department_id: payment.department_id, status: payment.status },
+        context: { actorId: user.id, source: "api", route: "/api/payments" },
+      },
+      { failOpen: true }
+    )
 
     return NextResponse.json({ data: payment }, { status: 201 })
   } catch (error: any) {

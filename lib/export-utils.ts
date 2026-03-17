@@ -19,35 +19,12 @@ import {
 } from "docx"
 import { formatOfficeDateWithOrdinal, getOfficeWeekMonday } from "./meeting-week"
 
-// Augment the global Window interface so TypeScript knows about the PptxGenJS UMD global.
-declare global {
-  interface Window {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    PptxGenJS?: new (...args: any[]) => any
-  }
-}
-
-// Load pptxgenjs via a script tag (the correct browser usage pattern).
-// The UMD bundle sets window.PptxGenJS as a side effect, bypassing all webpack issues.
-// This avoids the "JSZip is not defined" error that occurs when webpack processes the UMD bundle.
-const loadPptxGenJS = (): Promise<NonNullable<typeof window.PptxGenJS>> => {
-  return new Promise((resolve, reject) => {
-    // Already loaded
-    if (typeof window.PptxGenJS === "function") {
-      return resolve(window.PptxGenJS)
-    }
-    const script = document.createElement("script")
-    script.src = "https://cdn.jsdelivr.net/npm/pptxgenjs@4/dist/pptxgen.bundle.js"
-    script.onload = () => {
-      if (typeof window.PptxGenJS === "function") {
-        resolve(window.PptxGenJS)
-      } else {
-        reject(new Error("PptxGenJS not found on window after script load"))
-      }
-    }
-    script.onerror = () => reject(new Error("Failed to load pptxgenjs from CDN"))
-    document.head.appendChild(script)
-  })
+// Load pptxgenjs from the installed npm package via dynamic import.
+// Dynamic import keeps it out of the SSR bundle (it requires browser APIs).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const loadPptxGenJS = async (): Promise<new (...args: any[]) => any> => {
+  const mod = await import("pptxgenjs")
+  return mod.default ?? mod
 }
 
 export interface WeeklyReport {

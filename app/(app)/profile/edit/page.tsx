@@ -1,90 +1,80 @@
 "use client"
 
-import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import { useQuery } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
 import { ProfileForm } from "@/components/profile-form"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { ArrowLeft } from "lucide-react"
-import { toast } from "sonner"
+import { QUERY_KEYS } from "@/lib/query-keys"
+import { PageLoader } from "@/components/ui/query-states"
 
 import { logger } from "@/lib/logger"
 
 const log = logger("profile-edit")
 
+interface ProfileEditData {
+  user: { id: string; email: string | undefined }
+  profile: Record<string, unknown>
+}
+
+async function fetchProfileEditData(supabase: ReturnType<typeof createClient>): Promise<ProfileEditData> {
+  const {
+    data: { user: authUser },
+    error: userError,
+  } = await supabase.auth.getUser()
+  if (userError || !authUser) throw new Error("Not authenticated")
+
+  const { data: profileData, error: profileError } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", authUser.id)
+    .single()
+
+  if (profileError && profileError.code !== "PGRST116") {
+    throw new Error(profileError.message)
+  }
+
+  if (!profileData) {
+    const { data: newProfile, error: insertError } = await supabase
+      .from("profiles")
+      .insert({
+        id: authUser.id,
+        company_email: authUser.email,
+        first_name: "",
+        last_name: "",
+        other_names: "",
+        department: "",
+        company_role: "",
+        phone_number: "",
+        additional_phone: "",
+        residential_address: "",
+        office_location: "",
+      })
+      .select()
+      .single()
+
+    if (insertError) throw new Error(insertError.message)
+    return { user: { id: authUser.id, email: authUser.email ?? undefined }, profile: newProfile }
+  }
+
+  return { user: { id: authUser.id, email: authUser.email ?? undefined }, profile: profileData }
+}
 
 export default function EditProfilePage() {
   const router = useRouter()
   const supabase = createClient()
-  const [user, setUser] = useState<any>(null)
-  const [profile, setProfile] = useState<any>(null)
 
-  useEffect(() => {
-    loadUserData()
-  }, [])
+  const { data, isLoading, isError } = useQuery({
+    queryKey: QUERY_KEYS.profileEdit("me"),
+    queryFn: () => fetchProfileEditData(supabase),
+    retry: false,
+  })
 
-  const loadUserData = async () => {
-    try {
-      // Get current user
-      const {
-        data: { user: authUser },
-        error: userError,
-      } = await supabase.auth.getUser()
-      if (userError || !authUser) {
-        toast.error("Please log in to edit your profile")
-        router.push("/auth/login")
-        return
-      }
+  if (isLoading) return <PageLoader />
 
-      setUser(authUser)
-
-      // Load profile
-      const { data: profileData, error: profileError } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", authUser.id)
-        .single()
-
-      if (profileError && profileError.code !== "PGRST116") {
-        throw profileError
-      }
-
-      if (!profileData) {
-        // Create a basic profile if it doesn't exist
-        const { data: newProfile, error: insertError } = await supabase
-          .from("profiles")
-          .insert({
-            id: authUser.id,
-            company_email: authUser.email,
-            first_name: "",
-            last_name: "",
-            other_names: "",
-            department: "",
-            company_role: "",
-            phone_number: "",
-            additional_phone: "",
-            residential_address: "",
-            office_location: "",
-          })
-          .select()
-          .single()
-
-        if (insertError) {
-          throw insertError
-        }
-
-        setProfile(newProfile)
-      } else {
-        setProfile(profileData)
-      }
-    } catch (error: any) {
-      log.error("Error loading user data:", error)
-      toast.error("Failed to load profile data")
-    }
-  }
-
-  if (!user || !profile) {
+  if (isError || !data) {
     return (
       <div className="bg-background min-h-screen">
         <div className="mx-auto max-w-4xl p-6">
@@ -100,6 +90,8 @@ export default function EditProfilePage() {
       </div>
     )
   }
+
+  const { user, profile } = data
 
   return (
     <div className="bg-background min-h-screen">

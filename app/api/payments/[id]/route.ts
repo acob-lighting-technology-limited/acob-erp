@@ -1,11 +1,12 @@
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
-import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
+import { getDepartmentScope, resolveAdminScope, normalizeDepartmentName } from "@/lib/admin/rbac"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
+import { writeAuditLog } from "@/lib/audit/write-audit"
 
-function createClient() {
-  const cookieStore = cookies()
+async function createClient() {
+  const cookieStore = await cookies()
 
   return createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
     cookies: {
@@ -31,22 +32,17 @@ function getRelatedDepartmentName(payment: any): string | null {
 }
 
 function normalizeDepartment(value: string | null | undefined): string {
-  const normalized = String(value || "")
-    .trim()
-    .toLowerCase()
-  if (normalized === "finance") return "accounts"
-  return normalized
+  return normalizeDepartmentName(String(value || "").trim()).toLowerCase()
 }
 
 function isFinanceDepartment(value: string | null | undefined): boolean {
-  const normalized = normalizeDepartment(value)
-  return normalized === "accounts"
+  return normalizeDepartment(value) === "accounts"
 }
 
 // GET /api/payments/[id] - Get a single payment
 export async function GET(request: Request, { params }: { params: { id: string } }) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
     const { id } = params
 
     const {
@@ -106,7 +102,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
 // PATCH /api/payments/[id] - Update a payment
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
     const { id } = params
     const body = await request.json()
 
@@ -194,6 +190,18 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
+    await writeAuditLog(
+      supabase as any,
+      {
+        action: "update",
+        entityType: "payment",
+        entityId: id,
+        newValues: body,
+        context: { actorId: user.id, source: "api", route: `/api/payments/${id}` },
+      },
+      { failOpen: true }
+    )
+
     return NextResponse.json({ data: updatedPayment })
   } catch (error: any) {
     return NextResponse.json({ error: error?.message || "Internal Server Error" }, { status: 500 })
@@ -203,7 +211,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 // DELETE /api/payments/[id] - Delete a payment
 export async function DELETE(request: Request, { params }: { params: { id: string } }) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
     const { id } = params
 
     const {
@@ -248,6 +256,17 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
+
+    await writeAuditLog(
+      supabase as any,
+      {
+        action: "delete",
+        entityType: "payment",
+        entityId: id,
+        context: { actorId: user.id, source: "api", route: `/api/payments/${id}` },
+      },
+      { failOpen: true }
+    )
 
     return NextResponse.json({ success: true })
   } catch (error: any) {

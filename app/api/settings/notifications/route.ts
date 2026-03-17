@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { NOTIFICATION_KEYS, isNotificationKey } from "@/lib/notifications/delivery-policy"
+import { writeAuditLog } from "@/lib/audit/write-audit"
 
 type ModulePreferencePayload = {
   notification_key: string
@@ -198,6 +199,18 @@ export async function PUT(request: NextRequest) {
         if (error) return NextResponse.json({ error: error.message }, { status: 400 })
       }
     }
+
+    await writeAuditLog(
+      supabase,
+      {
+        action: "update",
+        entityType: "notification_preference",
+        entityId: user.id,
+        newValues: { modules_updated: modules.length, global_updated: !!globalPrefs },
+        context: { actorId: user.id, source: "api", route: "/api/settings/notifications" },
+      },
+      { failOpen: true }
+    )
 
     return NextResponse.json({ ok: true })
   } catch (error) {

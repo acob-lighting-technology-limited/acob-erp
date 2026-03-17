@@ -3,14 +3,15 @@ import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 import { resolveAdminScope } from "@/lib/admin/rbac"
 import { logger } from "@/lib/logger"
+import { writeAuditLog } from "@/lib/audit/write-audit"
 
 const log = logger("payments-categories")
 
 export const dynamic = "force-dynamic"
 
 // Helper function to create Supabase client
-function createClient() {
-  const cookieStore = cookies()
+async function createClient() {
+  const cookieStore = await cookies()
 
   return createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
     cookies: {
@@ -33,7 +34,7 @@ function createClient() {
 // GET /api/payments/categories - Get all payment categories
 export async function GET() {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
     const {
       data: { user },
     } = await supabase.auth.getUser()
@@ -60,7 +61,7 @@ export async function GET() {
 // POST /api/payments/categories - Create a new payment category
 export async function POST(request: Request) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     // Check if user is authenticated
     const {
@@ -85,6 +86,18 @@ export async function POST(request: Request) {
     const { data: category, error } = await supabase.from("payment_categories").insert({ name }).select().single()
 
     if (error) throw error
+
+    await writeAuditLog(
+      supabase as any,
+      {
+        action: "create",
+        entityType: "payment_category",
+        entityId: category.id,
+        newValues: { name },
+        context: { actorId: user.id, source: "api", route: "/api/payments/categories" },
+      },
+      { failOpen: true }
+    )
 
     return NextResponse.json({ data: category }, { status: 201 })
   } catch (error) {

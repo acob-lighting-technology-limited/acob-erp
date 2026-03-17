@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import { AdminAuditLogsContent, type AuditLog, type employeeMember, type UserProfile } from "./admin-audit-logs-content"
+import { AdminAuditLogsContent, type AuditLog, type UserProfile } from "./admin-audit-logs-content"
+import type { EmployeeMember as employeeMember } from "./types"
 import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
 import { normalizeAuditAction } from "@/lib/audit/core"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
@@ -8,9 +9,6 @@ import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { logger } from "@/lib/logger"
 
 const log = logger("audit-logs")
-
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 type AuditLogsData =
   | { kind: "redirect"; redirect: string }
@@ -35,10 +33,13 @@ async function getAuditLogsData(): Promise<AuditLogsData> {
     return { kind: "redirect", redirect: "/auth/login" }
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const scope = await resolveAdminScope(supabase as any, user.id)
   if (!scope) {
     return { kind: "redirect", redirect: "/dashboard" }
   }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const dataClient = getServiceRoleClientOrFallback(supabase as any)
   const departmentScope = getDepartmentScope(scope, "general")
 
@@ -48,279 +49,82 @@ async function getAuditLogsData(): Promise<AuditLogsData> {
     managed_departments: scope.managedDepartments,
   }
 
-  // Fetch audit logs - Filter out internal system logs to prevent them from eclipsing user actions
-  let logsQuery = dataClient
-    .from("audit_logs")
-    .select("*")
-    .not("action", "in", '("sync","migrate","update_schema","migration")')
-    .order("created_at", { ascending: false })
-    .limit(500)
-  if (departmentScope) {
-    logsQuery =
-      departmentScope.length > 0 ? logsQuery.in("department", departmentScope) : logsQuery.eq("id", "__none__")
-  }
-  const { data: logsData, error: logsError } = await logsQuery
+  // Single enriched RPC call (replaces 13 sequential queries)
+  const { data: rpcRows, error: rpcError } = await dataClient.rpc("get_audit_logs_enriched", {
+    p_limit: 500,
+    p_offset: 0,
+    p_hidden_actions: ["sync", "migrate", "update_schema", "migration"],
+    p_department_filter: departmentScope ?? null,
+  })
 
-  if (logsError) {
-    log.error("Audit logs error:", logsError)
+  if (rpcError) {
+    log.error("get_audit_logs_enriched RPC error:", rpcError)
     return { kind: "data", logs: [], totalCount: 0, employee: [], departments: [], userProfile }
   }
 
-  let countQuery = dataClient
-    .from("audit_logs")
-    .select("id", { count: "exact", head: true })
-    .not("action", "in", '("sync","migrate","update_schema","migration")')
-  if (departmentScope) {
-    countQuery =
-      departmentScope.length > 0 ? countQuery.in("department", departmentScope) : countQuery.eq("id", "__none__")
-  }
-  const { count } = await countQuery
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rows = (rpcRows ?? []) as any[]
+  const totalCount = rows.length > 0 ? Number(rows[0].total_count ?? rows.length) : 0
 
-  let logs: AuditLog[] = []
-  const totalCount = count || 0
-  let employee: employeeMember[] = []
-  let departments: string[] = []
-
-  if (logsData && logsData.length > 0) {
-    // 1. Pre-process logs to parse JSON columns
-    const parsedLogs = logsData.map((log) => {
-      let new_values = log.new_values
-      let old_values = log.old_values
-
-      if (typeof new_values === "string") {
-        try {
-          new_values = JSON.parse(new_values)
-        } catch {
-          new_values = null
-        }
-      }
-      if (typeof old_values === "string") {
-        try {
-          old_values = JSON.parse(old_values)
-        } catch {
-          old_values = null
-        }
-      }
-
-      // Fall back to metadata if new_values is null/undefined/empty
-      if ((!new_values || Object.keys(new_values || {}).length === 0) && log.metadata?.new_values) {
-        new_values = log.metadata.new_values
-      }
-      if ((!old_values || Object.keys(old_values || {}).length === 0) && log.metadata?.old_values) {
-        old_values = log.metadata.old_values
-      }
-
-      // Ensure we have objects
-      new_values = new_values || {}
-      old_values = old_values || {}
-
-      return {
-        ...log,
-        new_values,
-        old_values,
-        entity_type: (log.entity_type || log.table_name || "unknown").toLowerCase(),
-        action: log.action || log.operation || "unknown",
-        entity_id: log.entity_id || log.record_id,
-      }
-    })
-
-    // 2. Collect all relevant IDs
-    const actorIds = new Set(parsedLogs.map((l) => l.user_id).filter(Boolean))
-    const assetIds = new Set<string>()
-    const potentialUserIds = new Set<string>()
-
-    parsedLogs.forEach((log) => {
-      // Collect IDs from JSON blobs
-      const targets = [
-        log.new_values.assigned_to,
-        log.old_values.assigned_to,
-        log.new_values.user_id,
-        log.old_values.user_id,
-        log.new_values.target_user_id,
-        log.old_values.target_user_id,
-        // For profiles/users table, the record_id itself is a user ID
-        log.entity_type === "profile" || log.entity_type === "profiles" || log.entity_type === "user"
-          ? log.entity_id
-          : null,
-      ]
-
-      targets.forEach((id) => {
-        if (id && typeof id === "string" && UUID_RE.test(id)) potentialUserIds.add(id)
-      })
-
-      // Collect Asset IDs
-      if (log.entity_type.includes("asset")) {
-        // Try to get asset_id from entity_id (if it's an asset) or from values
-        const possibleAssetId = log.entity_id
-        if (possibleAssetId && UUID_RE.test(possibleAssetId)) assetIds.add(possibleAssetId)
-
-        if (log.new_values.asset_id && UUID_RE.test(log.new_values.asset_id)) assetIds.add(log.new_values.asset_id)
-      }
-    })
-
-    // 3. Fetch current asset assignments
-    const assetAssignmentsMap = new Map()
-    if (assetIds.size > 0) {
-      const { data: assignments, error: assignmentsError } = await dataClient
-        .from("asset_assignments")
-        .select("asset_id, assigned_to, assignment_type")
-        .in("asset_id", Array.from(assetIds))
-        .eq("is_current", true)
-
-      if (assignmentsError) {
-        log.error("Error fetching asset assignments for audit logs:", assignmentsError)
-      } else {
-        assignments?.forEach((a) => {
-          assetAssignmentsMap.set(a.asset_id, a)
-          if (a.assigned_to) potentialUserIds.add(a.assigned_to)
-        })
-      }
-    }
-
-    // 4. Fetch all users
-    const allUserIds = Array.from(new Set([...Array.from(actorIds), ...Array.from(potentialUserIds)]))
-    let usersData: any[] = []
-
-    if (allUserIds.length > 0) {
-      let usersQuery = dataClient
-        .from("profiles")
-        .select("id, first_name, last_name, company_email, employee_number, department")
-        .in("id", allUserIds)
-      if (departmentScope) {
-        usersQuery =
-          departmentScope.length > 0 ? usersQuery.in("department", departmentScope) : usersQuery.eq("id", "__none__")
-      }
-      const { data, error: usersError } = await usersQuery
-
-      if (usersError) {
-        log.error("Error fetching users for audit logs:", usersError)
-      } else {
-        usersData = data || []
-      }
-    }
-
-    const usersMap = new Map(usersData.map((u) => [u.id, u]))
-
-    // 5. Build final logs
-    logs = parsedLogs.map((log) => {
-      const department = log.department || log.new_values.department || log.old_values.department || null
-      const changed_fields = log.changed_fields || []
-
-      // Determine related asset info
-      let assetInfo = null
-      let assetId = null
-
-      if (log.entity_type.includes("asset")) {
-        // Clearer logic to determine the relevant asset ID
-        if (log.entity_type.includes("assignment")) {
-          assetId = log.new_values.asset_id || log.old_values.asset_id || log.entity_id
-        } else {
-          assetId = log.entity_id
-        }
-
-        const assignment = assetId ? assetAssignmentsMap.get(assetId) : null
-
-        // Base info from logs
-        const baseInfo = {
-          unique_code: log.new_values.unique_code || log.old_values.unique_code,
-          serial_number: log.new_values.serial_number || log.old_values.serial_number,
-          asset_name: log.new_values.asset_name || log.old_values.asset_name,
-        }
-
-        // Merge with assignment info, PREFERRING historical values from the log
-        if (baseInfo.unique_code || assignment) {
-          const historicalAssignedTo = log.new_values.assigned_to || log.old_values.assigned_to
-          const targetAssignedTo = historicalAssignedTo || assignment?.assigned_to
-
-          assetInfo = {
-            ...baseInfo,
-            assignment_type:
-              log.new_values.assignment_type || log.old_values.assignment_type || assignment?.assignment_type,
-            assigned_to: targetAssignedTo,
-            assigned_to_user: targetAssignedTo ? usersMap.get(targetAssignedTo) || null : null,
-          }
-        }
-      }
-
-      // Determine Target User
-      let targetUser = null
-
-      // Priority 1: Explicit target in log (most accurate for historical events)
-      // Check for assigned_to in new_values (common in asset assignment logs)
-      // Check for target_user_id (standard audit log field)
-      const targetId = log.new_values.assigned_to || log.new_values.target_user_id
-
-      if (targetId && usersMap.has(targetId)) {
-        targetUser = usersMap.get(targetId)
-      }
-      // Priority 2: For asset assignments, if we can't find it in new_values, maybe it's in assetInfo
-      // BUT we must be careful not to use *current* assignment for *old* logs.
-      // We only use assetInfo.assigned_to_user if the log action suggests it might be relevant AND it matches?
-      // Actually, relying on current assignment for old logs is what caused the bug.
-      // Better to check if the log provides a hint.
-      // If the log is "ASSIGN" or "REASSIGN" and we have no targetId, it's better to show nothing than the wrong person.
-      // However, for the "Unassigned" bug case, the log *had* no target.
-      // If we fixed the bug, FUTURE logs will have targetId.
-      // Past logs for "Unassigned" actions are just broken.
-      // We will NOT default to current user to avoid "history rewriting".
-
-      // Priority 3: Entity is the user (for profile updates)
-      else if (
-        (log.entity_type === "profile" || log.entity_type === "profiles" || log.entity_type === "user") &&
-        usersMap.has(log.entity_id)
-      ) {
-        targetUser = usersMap.get(log.entity_id)
-      }
-
-      const rawAction = log.action || log.operation || "update"
+  // Map RPC rows → AuditLog shape expected by the client component
+  const logs: AuditLog[] = rows.map(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (row: any) => {
+      const rawAction = row.action || "update"
       const normalizedAction = normalizeAuditAction(rawAction).action
       const metadata = {
-        ...(log.metadata || {}),
-        ...(log.metadata?.event ? {} : rawAction !== normalizedAction ? { event: rawAction } : {}),
+        ...(row.metadata || {}),
+        ...(row.metadata?.event ? {} : rawAction !== normalizedAction ? { event: rawAction } : {}),
       }
 
       return {
-        ...log,
-        id: log.id,
-        user_id: log.user_id,
+        id: row.id,
+        user_id: row.user_id,
         action: normalizedAction,
-        entity_type: log.entity_type,
-        entity_id: log.entity_id,
-        old_values: log.old_values,
-        new_values: log.new_values,
+        entity_type: (row.entity_type || "unknown").toLowerCase(),
+        entity_id: row.entity_id ?? null,
+        old_values: row.old_values ?? {},
+        new_values: row.new_values ?? {},
         metadata,
-        created_at: log.created_at,
-        department,
-        changed_fields,
-        user: log.user_id ? usersMap.get(log.user_id) || null : null,
-        asset_info: assetInfo,
-        target_user: targetUser || null,
+        created_at: row.created_at,
+        department: row.department ?? null,
+        changed_fields: row.changed_fields ?? [],
+        user: row.user_data ?? null,
+        target_user: row.target_user_data ?? null,
+        task_info: row.task_info ?? null,
+        asset_info: row.asset_info ?? null,
+        payment_info: row.payment_info ?? null,
+        document_info: row.document_info ?? null,
+        department_info: row.department_info ?? null,
+        category_info: row.category_info ?? null,
+        leave_request_info: row.leave_request_info ?? null,
+        device_info: row.device_info ?? null,
       }
-    }) as AuditLog[]
-  }
+    }
+  )
 
-  // Load employee for filter
+  // Employees for filter dropdown
   let employeeQuery = dataClient
     .from("profiles")
     .select("id, first_name, last_name, department")
     .order("last_name", { ascending: true })
-
   if (departmentScope) {
     employeeQuery =
       departmentScope.length > 0 ? employeeQuery.in("department", departmentScope) : employeeQuery.eq("id", "__none__")
   }
-
   const { data: employeeData } = await employeeQuery
-  employee = employeeData || []
+  const employee = (employeeData ?? []) as employeeMember[]
 
-  // Get unique departments from audit logs department column and employee profiles
-  const logDepartments = logsData?.map((log: any) => log.department).filter(Boolean) || []
+  // Departments
+  let departments: string[]
   if (departmentScope) {
     departments = [...departmentScope].sort()
   } else {
-    const employeeDepartments = employeeData?.map((s: any) => s.department).filter(Boolean) || []
-    departments = Array.from(new Set([...employeeDepartments, ...logDepartments])) as string[]
-    departments.sort()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const employeeDepartments = employee.map((s) => s.department).filter(Boolean)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const logDepartments = rows.map((r: any) => r.department).filter(Boolean)
+    departments = Array.from(new Set([...employeeDepartments, ...logDepartments])).sort() as string[]
   }
 
   return { kind: "data", logs, totalCount, employee, departments, userProfile }

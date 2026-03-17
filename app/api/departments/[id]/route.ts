@@ -10,8 +10,8 @@ const log = logger("departments")
 export const dynamic = "force-dynamic"
 
 // Helper function to create Supabase client
-function createClient() {
-  const cookieStore = cookies()
+async function createClient() {
+  const cookieStore = await cookies()
 
   return createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
     cookies: {
@@ -34,7 +34,7 @@ function createClient() {
 // GET /api/departments/[id] - Get a single department
 export async function GET(request: Request, { params }: { params: { id: string } }) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
     const {
       data: { user },
     } = await supabase.auth.getUser()
@@ -70,7 +70,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
 // PUT /api/departments/[id] - Update a department (admin-like only)
 export async function PUT(request: Request, { params }: { params: { id: string } }) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     // Check if user is admin
     const {
@@ -129,7 +129,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
 // DELETE /api/departments/[id] - Soft delete a department (admin-like only)
 export async function DELETE(request: Request, { params }: { params: { id: string } }) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     // Check if user is admin
     const {

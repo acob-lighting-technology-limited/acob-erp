@@ -1,7 +1,9 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
+import { QUERY_KEYS } from "@/lib/query-keys"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,16 +12,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Plus, ShoppingCart, Search, Filter, Eye } from "lucide-react"
 import Link from "next/link"
-import { toast } from "sonner"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { StatCard } from "@/components/ui/stat-card"
 import { EmptyState } from "@/components/ui/empty-state"
-import { Skeleton } from "@/components/ui/skeleton"
+import { TableSkeleton } from "@/components/ui/query-states"
 
 import { logger } from "@/lib/logger"
 
 const log = logger("purchasing-orders")
-
 
 interface PurchaseOrder {
   id: string
@@ -42,39 +42,34 @@ const statusColors: Record<string, string> = {
   cancelled: "destructive",
 }
 
+async function fetchPurchaseOrdersList(): Promise<PurchaseOrder[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from("purchase_orders")
+    .select("*, supplier:suppliers(name)")
+    .order("created_at", { ascending: false })
+
+  if (error) {
+    if (error.code === "42P01") {
+      return []
+    }
+    throw new Error(error.message)
+  }
+
+  return (data || []).map((o: any) => ({
+    ...o,
+    supplier_name: o.supplier?.name,
+  }))
+}
+
 export default function PurchaseOrdersPage() {
-  const [orders, setOrders] = useState<PurchaseOrder[]>([])
-  const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
 
-  useEffect(() => {
-    fetchOrders()
-  }, [])
-
-  async function fetchOrders() {
-    try {
-      const supabase = createClient()
-      const { data, error } = await supabase
-        .from("purchase_orders")
-        .select("*, supplier:suppliers(name)")
-        .order("created_at", { ascending: false })
-
-      if (error && error.code !== "42P01") throw error
-
-      const ordersWithSupplier = (data || []).map((o: any) => ({
-        ...o,
-        supplier_name: o.supplier?.name,
-      }))
-
-      setOrders(ordersWithSupplier)
-    } catch (error) {
-      log.error("Error:", error)
-      toast.error("Failed to load orders")
-    } finally {
-      setLoading(false)
-    }
-  }
+  const { data: orders = [], isLoading: loading } = useQuery({
+    queryKey: QUERY_KEYS.adminPurchaseOrders(),
+    queryFn: fetchPurchaseOrdersList,
+  })
 
   function formatCurrency(amount: number, currency: string = "NGN") {
     return new Intl.NumberFormat("en-NG", { style: "currency", currency }).format(amount)
@@ -173,18 +168,7 @@ export default function PurchaseOrdersPage() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="space-y-3">
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="flex items-center gap-4">
-                  <Skeleton className="h-4 w-20" />
-                  <Skeleton className="h-4 w-32" />
-                  <Skeleton className="h-4 w-24" />
-                  <Skeleton className="h-4 w-24" />
-                  <Skeleton className="h-4 w-20" />
-                  <Skeleton className="h-5 w-16" />
-                </div>
-              ))}
-            </div>
+            <TableSkeleton rows={5} cols={6} />
           ) : filtered.length === 0 ? (
             <EmptyState
               icon={ShoppingCart}

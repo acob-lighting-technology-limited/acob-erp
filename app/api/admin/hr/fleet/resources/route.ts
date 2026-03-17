@@ -2,6 +2,7 @@
 import { canManageFleet } from "@/lib/fleet-booking"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
+import { writeAuditLog } from "@/lib/audit/write-audit"
 
 export async function GET() {
   try {
@@ -73,6 +74,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.message || "Failed to create resource" }, { status })
     }
 
+    await writeAuditLog(
+      supabase,
+      {
+        action: "create",
+        entityType: "fleet_resource",
+        entityId: data.id,
+        newValues: { name, resource_type: resourceType },
+        context: { actorId: user.id, source: "api", route: "/api/admin/hr/fleet/resources" },
+      },
+      { failOpen: true }
+    )
+
     return NextResponse.json({ data }, { status: 201 })
   } catch (error) {
     const message = error instanceof Error ? error.message : "Internal server error"
@@ -129,6 +142,18 @@ export async function PATCH(request: NextRequest) {
       .single()
 
     if (error) return NextResponse.json({ error: error.message || "Failed to update resource" }, { status: 500 })
+
+    await writeAuditLog(
+      supabase,
+      {
+        action: "update",
+        entityType: "fleet_resource",
+        entityId: id,
+        newValues: patch,
+        context: { actorId: user.id, source: "api", route: "/api/admin/hr/fleet/resources" },
+      },
+      { failOpen: true }
+    )
 
     return NextResponse.json({ data })
   } catch (error) {

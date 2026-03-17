@@ -1,17 +1,18 @@
 "use client"
 
-import { Fragment, useEffect, useState } from "react"
+import { Fragment, useState } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Skeleton } from "@/components/ui/skeleton"
+import { TableSkeleton } from "@/components/ui/query-states"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { EmptyState } from "@/components/ui/empty-state"
+import { QUERY_KEYS } from "@/lib/query-keys"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { StatCard } from "@/components/ui/stat-card"
 import { ChevronDown, ChevronUp, Mail, MapPin, Pencil, Users } from "lucide-react"
-import { toast } from "sonner"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { applyAssignableStatusFilter } from "@/lib/workforce/assignment-policy"
@@ -20,6 +21,39 @@ import { logger } from "@/lib/logger"
 
 const log = logger("hr-office-location")
 
+interface OfficeLocationsData {
+  locations: OfficeLocationRow[]
+  locationEmployees: Record<string, LocationEmployee[]>
+}
+
+async function fetchOfficeLocations(): Promise<OfficeLocationsData> {
+  const supabase = createClient()
+  const { data, error } = await applyAssignableStatusFilter(
+    supabase
+      .from("profiles")
+      .select("id, first_name, last_name, company_email, additional_email, company_role, office_location"),
+    { allowLegacyNullStatus: false }
+  )
+
+  if (error) throw new Error(error.message)
+
+  const byLocation: Record<string, LocationEmployee[]> = {}
+  for (const profile of (data || []) as LocationEmployee[]) {
+    const locationName = profile.office_location?.trim() || "Unassigned"
+    if (!byLocation[locationName]) byLocation[locationName] = []
+    byLocation[locationName].push(profile)
+  }
+
+  const rows = Object.entries(byLocation)
+    .map(([name, members]) => ({
+      id: name.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+      name,
+      employee_count: members.length,
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name))
+
+  return { locations: rows, locationEmployees: byLocation }
+}
 
 interface LocationEmployee {
   id: string
@@ -38,51 +72,15 @@ interface OfficeLocationRow {
 }
 
 export default function OfficeLocationsPage() {
-  const [locations, setLocations] = useState<OfficeLocationRow[]>([])
-  const [locationEmployees, setLocationEmployees] = useState<Record<string, LocationEmployee[]>>({})
   const [expandedLocations, setExpandedLocations] = useState<Set<string>>(new Set())
-  const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    fetchLocations()
-  }, [])
+  const { data, isLoading: loading } = useQuery({
+    queryKey: QUERY_KEYS.adminOfficeLocations(),
+    queryFn: fetchOfficeLocations,
+  })
 
-  async function fetchLocations() {
-    try {
-      const supabase = createClient()
-      const { data, error } = await applyAssignableStatusFilter(
-        supabase
-          .from("profiles")
-          .select("id, first_name, last_name, company_email, additional_email, company_role, office_location"),
-        { allowLegacyNullStatus: false }
-      )
-
-      if (error) throw error
-
-      const byLocation: Record<string, LocationEmployee[]> = {}
-      for (const profile of (data || []) as LocationEmployee[]) {
-        const locationName = profile.office_location?.trim() || "Unassigned"
-        if (!byLocation[locationName]) byLocation[locationName] = []
-        byLocation[locationName].push(profile)
-      }
-
-      const rows = Object.entries(byLocation)
-        .map(([name, members]) => ({
-          id: name.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
-          name,
-          employee_count: members.length,
-        }))
-        .sort((a, b) => a.name.localeCompare(b.name))
-
-      setLocationEmployees(byLocation)
-      setLocations(rows)
-    } catch (error) {
-      log.error("Error fetching office locations:", error)
-      toast.error("Failed to load office locations")
-    } finally {
-      setLoading(false)
-    }
-  }
+  const locations = data?.locations ?? []
+  const locationEmployees = data?.locationEmployees ?? {}
 
   function toggleLocationRow(locationId: string) {
     setExpandedLocations((prev) => {
@@ -117,15 +115,7 @@ export default function OfficeLocationsPage() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="space-y-3">
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="flex items-center gap-4">
-                  <Skeleton className="h-4 w-10" />
-                  <Skeleton className="h-4 w-52" />
-                  <Skeleton className="h-4 w-24" />
-                </div>
-              ))}
-            </div>
+            <TableSkeleton rows={5} cols={3} />
           ) : locations.length === 0 ? (
             <EmptyState
               icon={MapPin}

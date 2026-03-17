@@ -1,7 +1,8 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
+import { QUERY_KEYS } from "@/lib/query-keys"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { ShoppingCart, Users, FileText, Package, AlertTriangle, Clock } from "lucide-react"
@@ -13,7 +14,6 @@ import { logger } from "@/lib/logger"
 
 const log = logger("purchasing")
 
-
 interface PurchasingStats {
   totalSuppliers: number
   activeOrders: number
@@ -21,42 +21,28 @@ interface PurchasingStats {
   totalOrderValue: number
 }
 
-export default function PurchasingDashboard() {
-  const [stats, setStats] = useState<PurchasingStats>({
-    totalSuppliers: 0,
-    activeOrders: 0,
-    pendingReceipts: 0,
-    totalOrderValue: 0,
-  })
-  const [loading, setLoading] = useState(true)
+async function fetchPurchasingStats(): Promise<PurchasingStats> {
+  const supabase = createClient()
+  const { data: suppliers } = await supabase.from("suppliers").select("*")
+  const { data: orders } = await supabase.from("purchase_orders").select("*")
 
-  useEffect(() => {
-    fetchPurchasingData()
-  }, [])
+  const activeOrders = (orders || []).filter((o: any) => o.status === "pending" || o.status === "approved")
+  const pendingReceipts = (orders || []).filter((o: any) => o.status === "approved").length
+  const totalValue = (orders || []).reduce((sum: number, o: any) => sum + (o.total_amount || 0), 0)
 
-  async function fetchPurchasingData() {
-    try {
-      const supabase = createClient()
-
-      const { data: suppliers } = await supabase.from("suppliers").select("*")
-      const { data: orders } = await supabase.from("purchase_orders").select("*")
-
-      const activeOrders = (orders || []).filter((o: any) => o.status === "pending" || o.status === "approved")
-      const pendingReceipts = (orders || []).filter((o: any) => o.status === "approved").length
-      const totalValue = (orders || []).reduce((sum: number, o: any) => sum + (o.total_amount || 0), 0)
-
-      setStats({
-        totalSuppliers: suppliers?.length || 0,
-        activeOrders: activeOrders.length,
-        pendingReceipts,
-        totalOrderValue: totalValue,
-      })
-    } catch (error) {
-      log.error("Error:", error)
-    } finally {
-      setLoading(false)
-    }
+  return {
+    totalSuppliers: suppliers?.length || 0,
+    activeOrders: activeOrders.length,
+    pendingReceipts,
+    totalOrderValue: totalValue,
   }
+}
+
+export default function PurchasingDashboard() {
+  const { data: stats = { totalSuppliers: 0, activeOrders: 0, pendingReceipts: 0, totalOrderValue: 0 } } = useQuery({
+    queryKey: QUERY_KEYS.adminPurchasingDashboard(),
+    queryFn: fetchPurchasingStats,
+  })
 
   function formatCurrency(amount: number) {
     return new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" }).format(amount)

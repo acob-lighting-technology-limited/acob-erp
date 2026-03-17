@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -12,63 +13,83 @@ import { formatName } from "@/lib/utils"
 import { PageHeader, PageWrapper } from "@/components/layout"
 import { writeAuditLogClient } from "@/lib/audit/client"
 import { EmptyState } from "@/components/ui/patterns"
+import { QUERY_KEYS } from "@/lib/query-keys"
+import { PageLoader } from "@/components/ui/query-states"
 
 import { logger } from "@/lib/logger"
 
 const log = logger("job-description")
 
-
-export default function JobDescriptionPage() {
-  const [jobDescription, setJobDescription] = useState("")
-  const [lastUpdated, setLastUpdated] = useState<string | null>(null)
-  const [isEditing, setIsEditing] = useState(false)
-  const [isSaving, setIsSaving] = useState(false)
-  const [profile, setProfile] = useState<{
+interface JobDescriptionData {
+  jobDescription: string
+  lastUpdated: string | null
+  profile: {
     first_name: string | null
     last_name: string | null
     company_email: string | null
     department: string | null
     phone_number: string | null
-  } | null>(null)
+    id: string
+  } | null
+}
+
+async function fetchJobDescriptionData(): Promise<JobDescriptionData> {
   const supabase = createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { jobDescription: "", lastUpdated: null, profile: null }
 
-  useEffect(() => {
-    loadJobDescription()
-  }, [])
+  const { data: profileData, error } = await supabase
+    .from("profiles")
+    .select(
+      "first_name, last_name, company_email, department, phone_number, job_description, job_description_updated_at"
+    )
+    .eq("id", user.id)
+    .single()
 
-  const loadJobDescription = async () => {
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (!user) return
+  if (error) throw new Error(error.message)
 
-      const { data: profileData, error } = await supabase
-        .from("profiles")
-        .select(
-          "first_name, last_name, company_email, department, phone_number, job_description, job_description_updated_at"
-        )
-        .eq("id", user.id)
-        .single()
-
-      if (error) throw error
-
-      if (profileData) {
-        setJobDescription(profileData.job_description || "")
-        setLastUpdated(profileData.job_description_updated_at)
-        setIsEditing(!profileData.job_description) // Auto-edit if empty
-        setProfile({
+  return {
+    jobDescription: profileData?.job_description || "",
+    lastUpdated: profileData?.job_description_updated_at || null,
+    profile: profileData
+      ? {
           first_name: profileData.first_name,
           last_name: profileData.last_name,
           company_email: profileData.company_email,
           department: profileData.department,
           phone_number: profileData.phone_number,
-        })
-      }
-    } catch (error) {
-      log.error("Error loading job description:", error)
-      toast.error("Failed to load job description")
-    }
+          id: user.id,
+        }
+      : null,
+  }
+}
+
+export default function JobDescriptionPage() {
+  const queryClient = useQueryClient()
+  const [isEditing, setIsEditing] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [editText, setEditText] = useState("")
+
+  const { data, isLoading } = useQuery({
+    queryKey: QUERY_KEYS.appJobDescription(),
+    queryFn: fetchJobDescriptionData,
+  })
+
+  const jobDescription = data?.jobDescription ?? ""
+  const lastUpdated = data?.lastUpdated ?? null
+  const profile = data?.profile ?? null
+
+  const supabase = createClient()
+
+  function openEdit() {
+    setEditText(jobDescription)
+    setIsEditing(true)
+  }
+
+  function cancelEdit() {
+    setIsEditing(false)
   }
 
   const handleSave = async () => {
@@ -82,7 +103,7 @@ export default function JobDescriptionPage() {
       const { error } = await supabase
         .from("profiles")
         .update({
-          job_description: jobDescription,
+          job_description: editText,
           job_description_updated_at: new Date().toISOString(),
         })
         .eq("id", user.id)
@@ -95,7 +116,7 @@ export default function JobDescriptionPage() {
           action: "update",
           entityType: "job_description",
           entityId: user.id,
-          newValues: { job_description: jobDescription },
+          newValues: { job_description: editText },
           context: {
             source: "ui",
             route: "/job-description",
@@ -108,7 +129,7 @@ export default function JobDescriptionPage() {
 
       toast.success("Job description saved successfully")
       setIsEditing(false)
-      setLastUpdated(new Date().toISOString())
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.appJobDescription() })
     } catch (error) {
       log.error("Error saving job description:", error)
       toast.error("Failed to save job description")
@@ -130,6 +151,8 @@ export default function JobDescriptionPage() {
   const handlePrint = () => {
     window.print()
   }
+
+  if (isLoading) return <PageLoader />
 
   return (
     <>
@@ -158,7 +181,7 @@ export default function JobDescriptionPage() {
                     <Printer className="h-4 w-4" />
                     Print
                   </Button>
-                  <Button onClick={() => setIsEditing(true)} variant="outline" className="gap-2">
+                  <Button onClick={openEdit} variant="outline" className="gap-2">
                     <Edit2 className="h-4 w-4" />
                     Edit
                   </Button>
@@ -218,8 +241,8 @@ export default function JobDescriptionPage() {
             {isEditing ? (
               <div className="space-y-4">
                 <Textarea
-                  value={jobDescription}
-                  onChange={(e) => setJobDescription(e.target.value)}
+                  value={editText}
+                  onChange={(e) => setEditText(e.target.value)}
                   placeholder="Enter your job description here...&#10;&#10;Example:&#10;• Manage daily operations of the department&#10;• Coordinate with team members on project deliverables&#10;• Review and approve departmental reports&#10;• Ensure compliance with company policies"
                   className="min-h-[400px] text-base"
                 />
@@ -232,14 +255,7 @@ export default function JobDescriptionPage() {
                     {isSaving ? "Saving..." : "Save"}
                   </Button>
                   {jobDescription && (
-                    <Button
-                      onClick={() => {
-                        setIsEditing(false)
-                        loadJobDescription()
-                      }}
-                      variant="outline"
-                      disabled={isSaving}
-                    >
+                    <Button onClick={cancelEdit} variant="outline" disabled={isSaving}>
                       Cancel
                     </Button>
                   )}
@@ -255,7 +271,7 @@ export default function JobDescriptionPage() {
                     description="Add your job description to help others understand your role."
                     icon={Briefcase}
                     action={
-                      <Button onClick={() => setIsEditing(true)} className="gap-2">
+                      <Button onClick={openEdit} className="gap-2">
                         <Edit2 className="h-4 w-4" />
                         Add Job Description
                       </Button>
@@ -285,7 +301,7 @@ export default function JobDescriptionPage() {
                 <p className="mb-1 font-medium">Why add a job description?</p>
                 <p>
                   Your job description helps your managers and HR understand your role better, ensuring you get the
-                  right support and resources. It's also useful during performance reviews and role transitions.
+                  right support and resources. It&apos;s also useful during performance reviews and role transitions.
                 </p>
               </div>
             </div>

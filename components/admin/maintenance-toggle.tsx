@@ -4,6 +4,9 @@ import { useState, useEffect } from "react"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
+import { logger } from "@/lib/logger"
+
+const log = logger("admin-maintenance-toggle")
 
 export function MaintenanceToggle() {
   const [enabled, setEnabled] = useState(false)
@@ -57,7 +60,7 @@ export function MaintenanceToggle() {
       setEnabled(Boolean(payload.data?.enabled))
       toast.success(payload.message || (checked ? "Maintenance mode enabled" : "Maintenance mode disabled"))
     } catch (error) {
-      console.error("Error toggling maintenance mode:", error)
+      log.error("Error toggling maintenance mode:", error)
       toast.error(error instanceof Error ? error.message : "Failed to update maintenance mode")
       // Revert state
       setEnabled(!checked)

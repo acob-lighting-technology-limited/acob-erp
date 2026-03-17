@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { logger } from "@/lib/logger"
+import { writeAuditLog } from "@/lib/audit/write-audit"
 
 const log = logger("hr-performance-reviews")
 
@@ -148,6 +149,18 @@ export async function POST(request: NextRequest) {
       log.error({ err: String(error) }, "Error creating performance review:")
       return NextResponse.json({ error: "Failed to create performance review" }, { status: 500 })
     }
+
+    await writeAuditLog(
+      supabase,
+      {
+        action: "create",
+        entityType: "performance_review",
+        entityId: review.id,
+        newValues: { user_id, review_cycle_id, overall_rating, status: "draft" },
+        context: { actorId: user.id, source: "api", route: "/api/hr/performance/reviews" },
+      },
+      { failOpen: true }
+    )
 
     return NextResponse.json({
       data: review,

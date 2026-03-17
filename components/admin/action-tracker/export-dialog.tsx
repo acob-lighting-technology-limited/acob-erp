@@ -1,6 +1,9 @@
 "use client"
 
 import { useState } from "react"
+import { logger } from "@/lib/logger"
+
+const log = logger("action-tracker-export-dialog")
 import {
   Dialog,
   DialogContent,
@@ -85,7 +88,7 @@ export function ActionTrackerExportDialog({ isOpen, onClose, departments }: Expo
       toast.success("Export completed")
       onClose()
     } catch (error: any) {
-      console.error("Export Error:", error)
+      log.error("Export error:", error)
       toast.error("Export failed")
     } finally {
       setIsExporting(false)

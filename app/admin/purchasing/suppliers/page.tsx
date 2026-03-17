@@ -1,12 +1,24 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
+import { QUERY_KEYS } from "@/lib/query-keys"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { Plus, Pencil, Trash2, Users, Search, Eye, Building2, CheckCircle2, Ban } from "lucide-react"
@@ -15,11 +27,11 @@ import { toast } from "sonner"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { StatCard } from "@/components/ui/stat-card"
 import { EmptyState, FormFieldGroup, ListToolbar, StatusBadge } from "@/components/ui/patterns"
+import { TableSkeleton } from "@/components/ui/query-states"
 
 import { logger } from "@/lib/logger"
 
 const log = logger("purchasing-suppliers")
-
 
 interface Supplier {
   id: string
@@ -33,12 +45,24 @@ interface Supplier {
   created_at: string
 }
 
+async function fetchSuppliersList(): Promise<Supplier[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase.from("suppliers").select("*").order("name")
+  if (error) {
+    if (error.code === "42P01") {
+      return []
+    }
+    throw new Error(error.message)
+  }
+  return data || []
+}
+
 export default function SuppliersPage() {
-  const [suppliers, setSuppliers] = useState<Supplier[]>([])
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
   const [searchQuery, setSearchQuery] = useState("")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Supplier | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<Supplier | null>(null)
   const [formData, setFormData] = useState({
     name: "",
     code: "",
@@ -49,23 +73,10 @@ export default function SuppliersPage() {
     is_active: true,
   })
 
-  useEffect(() => {
-    fetchSuppliers()
-  }, [])
-
-  async function fetchSuppliers() {
-    try {
-      const supabase = createClient()
-      const { data, error } = await supabase.from("suppliers").select("*").order("name")
-      if (error && error.code !== "42P01") throw error
-      setSuppliers(data || [])
-    } catch (error) {
-      log.error("Error:", error)
-      toast.error("Failed to load suppliers")
-    } finally {
-      setLoading(false)
-    }
-  }
+  const { data: suppliers = [], isLoading: loading } = useQuery({
+    queryKey: QUERY_KEYS.adminSuppliers(),
+    queryFn: fetchSuppliersList,
+  })
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -94,20 +105,19 @@ export default function SuppliersPage() {
       setIsDialogOpen(false)
       setEditing(null)
       setFormData({ name: "", code: "", email: "", phone: "", address: "", contact_person: "", is_active: true })
-      fetchSuppliers()
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminSuppliers() })
     } catch (error: any) {
       toast.error(error.message || "Failed to save")
     }
   }
 
   async function handleDelete(s: Supplier) {
-    if (!confirm(`Delete "${s.name}"?`)) return
     try {
       const supabase = createClient()
       const { error } = await supabase.from("suppliers").delete().eq("id", s.id)
       if (error) throw error
       toast.success("Deleted")
-      fetchSuppliers()
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminSuppliers() })
     } catch (error: any) {
       toast.error(error.message)
     }
@@ -271,9 +281,7 @@ export default function SuppliersPage() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="border-primary h-8 w-8 animate-spin rounded-full border-4 border-t-transparent"></div>
-            </div>
+            <TableSkeleton rows={5} cols={5} />
           ) : filtered.length === 0 ? (
             <EmptyState
               title="No suppliers yet"
@@ -313,7 +321,7 @@ export default function SuppliersPage() {
                           <Button variant="ghost" size="icon" onClick={() => openEdit(s)}>
                             <Pencil className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleDelete(s)}>
+                          <Button variant="ghost" size="icon" onClick={() => setPendingDelete(s)}>
                             <Trash2 className="text-destructive h-4 w-4" />
                           </Button>
                         </div>
@@ -326,6 +334,29 @@ export default function SuppliersPage() {
           )}
         </CardContent>
       </Card>
+
+      <AlertDialog open={pendingDelete !== null} onOpenChange={(open) => !open && setPendingDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Supplier</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingDelete ? `Delete "${pendingDelete.name}"?` : "Are you sure?"} This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (pendingDelete) handleDelete(pendingDelete)
+                setPendingDelete(null)
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AdminTablePage>
   )
 }

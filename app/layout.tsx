@@ -13,6 +13,7 @@ import { resolveAdminScope } from "@/lib/admin/rbac"
 import { NProgressProvider } from "@/components/nprogress-provider"
 import { NProgressHandler } from "@/components/nprogress-handler"
 import { ClientErrorMonitor } from "@/components/telemetry/client-error-monitor"
+import { QueryProvider } from "@/providers/query-provider"
 import "./globals.css"
 
 export const metadata: Metadata = {
@@ -58,14 +59,16 @@ export default function RootLayout({
         <Suspense fallback={null}>
           {/* Theme follows system preference automatically (light/dark mode) */}
           <ThemeProvider attribute="class" defaultTheme="system" enableSystem enableColorScheme storageKey="acob-theme">
-            <SidebarProvider>
-              <NProgressProvider />
-              <NProgressHandler />
-              <ClientErrorMonitor />
-              <HeaderWrapperWithData />
-              {children}
-              <Toaster />
-            </SidebarProvider>
+            <QueryProvider>
+              <SidebarProvider>
+                <NProgressProvider />
+                <NProgressHandler />
+                <ClientErrorMonitor />
+                <HeaderWrapperWithData />
+                {children}
+                <Toaster />
+              </SidebarProvider>
+            </QueryProvider>
           </ThemeProvider>
         </Suspense>
         <Analytics />

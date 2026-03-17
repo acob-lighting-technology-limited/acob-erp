@@ -1,6 +1,9 @@
 ﻿"use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
+import { TableSkeleton, QueryError } from "@/components/ui/query-states"
 import { CalendarClock, Car, Paperclip, Plus } from "lucide-react"
 import { toast } from "sonner"
 import { PageHeader, PageWrapper } from "@/components/layout"
@@ -77,13 +80,23 @@ function toLocalDateTimeInput(value?: string) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
+async function fetchFleetResources(): Promise<FleetResource[]> {
+  const res = await fetch("/api/fleet/resources")
+  if (!res.ok) throw new Error("Failed to load fleet resources")
+  const payload = await res.json()
+  return payload.data || []
+}
+
+async function fetchFleetBookings(): Promise<{ bookings: FleetBooking[]; schedule: FleetSchedule[] }> {
+  const res = await fetch("/api/fleet/bookings")
+  if (!res.ok) throw new Error("Failed to load fleet bookings")
+  const payload = await res.json()
+  return { bookings: payload.data || [], schedule: payload.resource_schedule || [] }
+}
+
 export function FleetContent() {
-  const [resources, setResources] = useState<FleetResource[]>([])
-  const [bookings, setBookings] = useState<FleetBooking[]>([])
-  const [schedule, setSchedule] = useState<FleetSchedule[]>([])
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
   const [open, setOpen] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
   const [cancelingId, setCancelingId] = useState<string | null>(null)
 
   const [resourceId, setResourceId] = useState("")
@@ -93,6 +106,30 @@ export function FleetContent() {
   const [files, setFiles] = useState<File[]>([])
 
   const canSubmit = resourceId && startAt && endAt && reason.trim().length >= 10
+
+  const {
+    data: resources = [],
+    isLoading: resourcesLoading,
+    isError: resourcesError,
+  } = useQuery({
+    queryKey: QUERY_KEYS.fleetResources(),
+    queryFn: fetchFleetResources,
+  })
+
+  const {
+    data: bookingsData,
+    isLoading: bookingsLoading,
+    isError: bookingsError,
+    refetch,
+  } = useQuery({
+    queryKey: QUERY_KEYS.fleetBookings(),
+    queryFn: fetchFleetBookings,
+  })
+
+  const bookings = bookingsData?.bookings ?? []
+  const schedule = bookingsData?.schedule ?? []
+  const loading = resourcesLoading || bookingsLoading
+  const isError = resourcesError || bookingsError
 
   const selectedResourceSchedule = useMemo(() => {
     if (!resourceId) return []
@@ -112,56 +149,14 @@ export function FleetContent() {
     })
   }, [resourceId, startAt, endAt, selectedResourceSchedule])
 
-  async function loadData() {
-    setLoading(true)
-    try {
-      const [resourcesRes, bookingsRes] = await Promise.all([
-        fetch("/api/fleet/resources"),
-        fetch("/api/fleet/bookings"),
-      ])
-      const resourcesPayload = await resourcesRes.json()
-      const bookingsPayload = await bookingsRes.json()
-
-      if (!resourcesRes.ok) throw new Error(resourcesPayload.error || "Failed to load resources")
-      if (!bookingsRes.ok) throw new Error(bookingsPayload.error || "Failed to load bookings")
-
-      setResources(resourcesPayload.data || [])
-      setBookings(bookingsPayload.data || [])
-      setSchedule(bookingsPayload.resource_schedule || [])
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to load fleet booking data")
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    void loadData()
-  }, [])
-
-  async function handleSubmit() {
-    if (!canSubmit) {
-      toast.error("Please complete all required fields. Reason must be at least 10 characters.")
-      return
-    }
-
-    setSubmitting(true)
-    try {
-      const formData = new FormData()
-      formData.append("resource_id", resourceId)
-      formData.append("start_at", new Date(startAt).toISOString())
-      formData.append("end_at", new Date(endAt).toISOString())
-      formData.append("reason", reason.trim())
-      files.forEach((file) => formData.append("attachments", file))
-
-      const response = await fetch("/api/fleet/bookings", {
-        method: "POST",
-        body: formData,
-      })
-
+  const { mutate: submitBooking, isPending: submitting } = useMutation({
+    mutationFn: async (formData: FormData) => {
+      const response = await fetch("/api/fleet/bookings", { method: "POST", body: formData })
       const payload = await response.json()
       if (!response.ok) throw new Error(payload.error || "Failed to submit booking")
-
+      return payload
+    },
+    onSuccess: () => {
       toast.success("Booking application submitted")
       setOpen(false)
       setResourceId("")
@@ -169,12 +164,25 @@ export function FleetContent() {
       setEndAt("")
       setReason("")
       setFiles([])
-      await loadData()
-    } catch (error) {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.fleetBookings() })
+    },
+    onError: (error) => {
       toast.error(error instanceof Error ? error.message : "Failed to submit booking")
-    } finally {
-      setSubmitting(false)
+    },
+  })
+
+  function handleSubmit() {
+    if (!canSubmit) {
+      toast.error("Please complete all required fields. Reason must be at least 10 characters.")
+      return
     }
+    const formData = new FormData()
+    formData.append("resource_id", resourceId)
+    formData.append("start_at", new Date(startAt).toISOString())
+    formData.append("end_at", new Date(endAt).toISOString())
+    formData.append("reason", reason.trim())
+    files.forEach((file) => formData.append("attachments", file))
+    submitBooking(formData)
   }
 
   async function handleCancel(bookingId: string) {
@@ -186,7 +194,7 @@ export function FleetContent() {
       const payload = await response.json()
       if (!response.ok) throw new Error(payload.error || "Failed to cancel booking")
       toast.success("Booking cancelled")
-      await loadData()
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.fleetBookings() })
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to cancel booking")
     } finally {
@@ -215,8 +223,9 @@ export function FleetContent() {
             </Button>
           </CardHeader>
           <CardContent className="space-y-3">
-            {loading ? <p className="text-muted-foreground text-sm">Loading bookings...</p> : null}
-            {!loading && bookings.length === 0 ? (
+            {loading ? <TableSkeleton rows={3} cols={2} /> : null}
+            {isError ? <QueryError message="Could not load fleet data." onRetry={refetch} /> : null}
+            {!loading && !isError && bookings.length === 0 ? (
               <p className="text-muted-foreground text-sm">No fleet booking applications yet.</p>
             ) : null}
             {bookings.map((booking) => (

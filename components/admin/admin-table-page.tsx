@@ -3,7 +3,7 @@ import type { LucideIcon } from "lucide-react"
 import { PageHeader, PageWrapper } from "@/components/layout"
 import { Card, CardContent } from "@/components/ui/card"
 
-interface AdminTablePageProps {
+export interface TablePageProps {
   title: string
   description?: string
   icon?: LucideIcon
@@ -16,18 +16,18 @@ interface AdminTablePageProps {
   children: ReactNode
 }
 
-export function AdminTablePage({
+export function TablePage({
   title,
   description,
   icon,
   actions,
-  backLinkHref = "/admin",
-  backLinkLabel = "Back to Admin",
+  backLinkHref,
+  backLinkLabel,
   stats,
   filters,
   filtersInCard = true,
   children,
-}: AdminTablePageProps) {
+}: TablePageProps) {
   const backLink = backLinkHref ? { href: backLinkHref, label: backLinkLabel } : undefined
 
   return (
@@ -45,5 +45,20 @@ export function AdminTablePage({
       ) : null}
       {children}
     </PageWrapper>
+  )
+}
+
+export function AdminTablePage(
+  props: Omit<TablePageProps, "backLinkHref" | "backLinkLabel"> & {
+    backLinkHref?: string | null
+    backLinkLabel?: string
+  }
+) {
+  return (
+    <TablePage
+      backLinkHref={props.backLinkHref ?? "/admin"}
+      backLinkLabel={props.backLinkLabel ?? "Back to Admin"}
+      {...props}
+    />
   )
 }

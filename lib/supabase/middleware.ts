@@ -165,11 +165,7 @@ export async function updateSession(request: NextRequest) {
 
       // Fallback for legacy sessions that pre-date the metadata sync
       if (!status) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("employment_status")
-          .eq("id", user.id)
-          .single()
+        const { data: profile } = await supabase.from("profiles").select("employment_status").eq("id", user.id).single()
         status = profile?.employment_status as EmploymentStatus | undefined
       }
 
@@ -192,6 +188,18 @@ export async function updateSession(request: NextRequest) {
 
         return NextResponse.redirect(url)
       }
+    }
+  }
+
+  // CSRF: validate Origin header for state-changing requests
+  const method = request.method.toUpperCase()
+  if (!["GET", "HEAD", "OPTIONS"].includes(method)) {
+    const origin = request.headers.get("origin")
+    const host = request.headers.get("host")
+    const allowedOrigins = [process.env.NEXT_PUBLIC_SITE_URL, `https://${host}`, `http://${host}`].filter(Boolean)
+
+    if (origin && !allowedOrigins.some((o) => origin.startsWith(o!))) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
   }
 

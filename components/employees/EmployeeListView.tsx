@@ -1,0 +1,298 @@
+"use client"
+
+import { cn, formatName } from "@/lib/utils"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { EmployeeStatusBadge } from "@/components/hr/employee-status-badge"
+import { ArrowUp, ArrowDown, ArrowUpDown, Mail, Building2, UserCog, Phone, MapPin, Shield, Users } from "lucide-react"
+import type { UserRole } from "@/types/database"
+import type { Employee } from "@/app/admin/hr/employees/admin-employee-content"
+
+interface EmployeeListViewProps {
+  employees: Employee[]
+  viewMode: "list" | "card"
+  sortConfig: { key: string; direction: "asc" | "desc" }
+  onSortChange: (updated: { key: string; direction: "asc" | "desc" }) => void
+  onViewDetails: (employee: Employee) => void
+  hasActiveFilters: boolean
+  getRoleBadgeColor: (role: UserRole) => string
+  getRoleDisplayName: (role: UserRole) => string
+}
+
+export function EmployeeListView({
+  employees,
+  viewMode,
+  sortConfig,
+  onSortChange,
+  onViewDetails,
+  hasActiveFilters,
+  getRoleBadgeColor,
+  getRoleDisplayName,
+}: EmployeeListViewProps) {
+  if (employees.length === 0) {
+    return (
+      <Card className="border-2">
+        <CardContent className="p-12 text-center">
+          <Users className="text-muted-foreground mx-auto mb-4 h-16 w-16" />
+          <h3 className="text-foreground mb-2 text-xl font-semibold">No Employee Found</h3>
+          <p className="text-muted-foreground">
+            {hasActiveFilters ? "No employees matches your filters" : "No employees members found"}
+          </p>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (viewMode === "list") {
+    return (
+      <Card className="border-2">
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-12">#</TableHead>
+                <TableHead>
+                  <div className="flex items-center gap-2">
+                    <span>Emp. No.</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        onSortChange({
+                          key: "employee_number",
+                          direction:
+                            sortConfig.key === "employee_number" && sortConfig.direction === "asc" ? "desc" : "asc",
+                        })
+                      }
+                      className="h-6 w-6 p-0"
+                    >
+                      {sortConfig.key === "employee_number" ? (
+                        sortConfig.direction === "asc" ? (
+                          <ArrowUp className="h-3 w-3" />
+                        ) : (
+                          <ArrowDown className="h-3 w-3" />
+                        )
+                      ) : (
+                        <ArrowUpDown className="text-muted-foreground/30 h-3 w-3" />
+                      )}
+                    </Button>
+                  </div>
+                </TableHead>
+                <TableHead>
+                  <div className="flex items-center gap-2">
+                    <span>Name</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        onSortChange({
+                          key: "last_name",
+                          direction: sortConfig.key === "last_name" && sortConfig.direction === "asc" ? "desc" : "asc",
+                        })
+                      }
+                      className="h-6 w-6 p-0"
+                    >
+                      {sortConfig.key === "last_name" ? (
+                        sortConfig.direction === "asc" ? (
+                          <ArrowUp className="h-3 w-3" />
+                        ) : (
+                          <ArrowDown className="h-3 w-3" />
+                        )
+                      ) : (
+                        <ArrowUpDown className="text-muted-foreground/30 h-3 w-3" />
+                      )}
+                    </Button>
+                  </div>
+                </TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Department</TableHead>
+                <TableHead>Role</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {employees.map((member, index) => (
+                <TableRow
+                  key={member.id}
+                  className={cn(
+                    member.employment_status === "separated" && "opacity-60",
+                    member.is_department_lead && "border-l-2 border-l-amber-500/70"
+                  )}
+                >
+                  <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
+                  <TableCell>
+                    <span className="text-muted-foreground font-mono text-sm">{member.employee_number || "-"}</span>
+                  </TableCell>
+                  <TableCell>
+                    <div className="whitespace-nowrap">
+                      <span
+                        className={cn(
+                          "text-foreground font-medium",
+                          member.employment_status === "separated" && "text-muted-foreground line-through"
+                        )}
+                      >
+                        {formatName(member.last_name)}, {formatName(member.first_name)}
+                      </span>
+                      {member.is_department_lead && (
+                        <div className="mt-0.5 flex items-center gap-1 text-xs text-amber-700 dark:text-amber-400">
+                          <Shield className="h-3 w-3" />
+                          <span>Dept Lead</span>
+                        </div>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="text-muted-foreground flex flex-col gap-1 text-sm">
+                      <div className="flex items-center gap-2">
+                        <Mail className="h-3 w-3" />
+                        <span className="max-w-[200px] truncate">{member.company_email}</span>
+                      </div>
+                      {member.additional_email && (
+                        <div className="pl-5 text-xs">
+                          <span className="text-muted-foreground/80 max-w-[200px] truncate">
+                            {member.additional_email}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="text-foreground text-sm">{member.department || "-"}</div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap gap-1">
+                      <Badge className={getRoleBadgeColor(member.role)}>{getRoleDisplayName(member.role)}</Badge>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-muted-foreground text-sm">{member.company_role || "-"}</span>
+                  </TableCell>
+                  <TableCell>
+                    <EmployeeStatusBadge status={member.employment_status || "active"} size="sm" />
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-1 sm:gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 text-xs sm:h-auto sm:text-sm"
+                        onClick={() => onViewDetails(member)}
+                      >
+                        <span className="hidden sm:inline">View</span>
+                        <span className="sm:hidden">👁</span>
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </Card>
+    )
+  }
+
+  // Card view
+  return (
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      {employees.map((member) => (
+        <Card
+          key={member.id}
+          className={`border-2 transition-shadow hover:shadow-lg ${member.employment_status === "separated" ? "opacity-60" : ""}`}
+        >
+          <CardHeader className="from-primary/5 to-background border-b bg-linear-to-r">
+            <div className="flex items-start justify-between">
+              <div className="flex flex-1 items-start gap-3">
+                <div className="bg-primary/10 rounded-lg p-2">
+                  <Users className="text-primary h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <CardTitle
+                    className={cn(
+                      "text-lg",
+                      member.employment_status === "separated" && "text-muted-foreground line-through"
+                    )}
+                  >
+                    {member.first_name} {member.last_name}
+                  </CardTitle>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <Badge className={getRoleBadgeColor(member.role)}>{getRoleDisplayName(member.role)}</Badge>
+                    <EmployeeStatusBadge status={member.employment_status || "active"} size="sm" />
+                    {member.is_department_lead && member.lead_departments && member.lead_departments.length > 0 && (
+                      <Badge variant="outline" className="text-xs">
+                        {member.lead_departments.length} Dept
+                        {member.lead_departments.length > 1 ? "s" : ""}
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3 p-4">
+            <div className="text-muted-foreground flex items-center gap-2 text-sm">
+              <Mail className="h-4 w-4" />
+              <div className="flex min-w-0 flex-col">
+                <span className="truncate">{member.company_email}</span>
+                {member.additional_email && (
+                  <span className="text-muted-foreground/80 truncate text-xs">{member.additional_email}</span>
+                )}
+              </div>
+            </div>
+
+            <div className="text-muted-foreground flex items-center gap-2 text-sm">
+              <Building2 className="h-4 w-4" />
+              <span>{member.department || "-"}</span>
+            </div>
+
+            {member.company_role && (
+              <div className="text-muted-foreground flex items-center gap-2 text-sm">
+                <UserCog className="h-4 w-4" />
+                <span>{member.company_role}</span>
+              </div>
+            )}
+
+            {member.phone_number && (
+              <div className="text-muted-foreground flex items-center gap-2 text-sm">
+                <Phone className="h-4 w-4" />
+                <span>{member.phone_number}</span>
+              </div>
+            )}
+
+            {member.office_location && (
+              <div className="text-muted-foreground flex items-center gap-2 text-sm">
+                <MapPin className="h-4 w-4" />
+                <span>{member.office_location}</span>
+              </div>
+            )}
+
+            {member.is_department_lead && member.lead_departments.length > 0 && (
+              <div className="border-t pt-2">
+                <p className="text-muted-foreground mb-1 text-xs">Leading:</p>
+                <div className="flex flex-wrap gap-1">
+                  {member.lead_departments.map((dept, idx) => (
+                    <span
+                      key={idx}
+                      className="rounded bg-blue-100 px-2 py-1 text-xs text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
+                    >
+                      {dept}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="mt-2 flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => onViewDetails(member)} className="flex-1">
+                View Profile
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  )
+}

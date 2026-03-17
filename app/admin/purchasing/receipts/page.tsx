@@ -1,7 +1,8 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { useQuery } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -9,12 +10,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Package } from "lucide-react"
 import { StatCard } from "@/components/ui/stat-card"
 import { EmptyState } from "@/components/ui/patterns"
-import { toast } from "sonner"
+import { TableSkeleton } from "@/components/ui/query-states"
 
 import { logger } from "@/lib/logger"
 
 const log = logger("purchasing-receipts")
-
 
 interface Receipt {
   id: string
@@ -26,42 +26,31 @@ interface Receipt {
   created_at: string
 }
 
+async function fetchReceipts(): Promise<Receipt[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from("goods_receipts")
+    .select("*, purchase_order:purchase_orders(po_number, supplier:suppliers(name))")
+    .order("created_at", { ascending: false })
+
+  if (error && error.code !== "42P01") throw new Error(error.message)
+
+  return (data || []).map((r: any) => ({
+    ...r,
+    po_number: r.purchase_order?.po_number,
+    supplier_name: r.purchase_order?.supplier?.name,
+  }))
+}
+
+function formatDate(date: string) {
+  return new Date(date).toLocaleDateString("en-NG", { year: "numeric", month: "short", day: "numeric" })
+}
+
 export default function ReceiptsPage() {
-  const [receipts, setReceipts] = useState<Receipt[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    fetchReceipts()
-  }, [])
-
-  async function fetchReceipts() {
-    try {
-      const supabase = createClient()
-      const { data, error } = await supabase
-        .from("goods_receipts")
-        .select("*, purchase_order:purchase_orders(po_number, supplier:suppliers(name))")
-        .order("created_at", { ascending: false })
-
-      if (error && error.code !== "42P01") throw error
-
-      const receiptsData = (data || []).map((r: any) => ({
-        ...r,
-        po_number: r.purchase_order?.po_number,
-        supplier_name: r.purchase_order?.supplier?.name,
-      }))
-
-      setReceipts(receiptsData)
-    } catch (error) {
-      log.error("Error:", error)
-      toast.error("Failed to load receipts")
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  function formatDate(date: string) {
-    return new Date(date).toLocaleDateString("en-NG", { year: "numeric", month: "short", day: "numeric" })
-  }
+  const { data: receipts = [], isLoading } = useQuery({
+    queryKey: QUERY_KEYS.adminReceiptsList(),
+    queryFn: fetchReceipts,
+  })
 
   const stats = {
     total: receipts.length,
@@ -88,10 +77,8 @@ export default function ReceiptsPage() {
           <CardDescription>{receipts.length} receipts</CardDescription>
         </CardHeader>
         <CardContent>
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="border-primary h-8 w-8 animate-spin rounded-full border-4 border-t-transparent"></div>
-            </div>
+          {isLoading ? (
+            <TableSkeleton rows={5} cols={5} />
           ) : receipts.length === 0 ? (
             <EmptyState
               title="No receipts yet"

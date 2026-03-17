@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getAuthContext, isAdminRole } from "@/lib/correspondence/server"
 import { logger } from "@/lib/logger"
+import { writeAuditLog } from "@/lib/audit/write-audit"
 
 const log = logger("correspondence-department-codes")
 
@@ -63,6 +64,18 @@ export async function PATCH(request: NextRequest) {
       .single()
 
     if (error) throw error
+
+    await writeAuditLog(
+      supabase,
+      {
+        action: "update",
+        entityType: "correspondence_department_code",
+        entityId: data.id,
+        newValues: { department_name: departmentName, department_code: departmentCode, is_active: isActive },
+        context: { actorId: user.id, source: "api", route: "/api/correspondence/department-codes" },
+      },
+      { failOpen: true }
+    )
 
     return NextResponse.json({ data })
   } catch (error) {

@@ -1,7 +1,9 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
+import { QUERY_KEYS } from "@/lib/query-keys"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,16 +12,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Plus, Package, Search, Filter, Eye, Pencil } from "lucide-react"
 import Link from "next/link"
-import { toast } from "sonner"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { StatCard } from "@/components/ui/stat-card"
 import { EmptyState } from "@/components/ui/empty-state"
-import { Skeleton } from "@/components/ui/skeleton"
+import { TableSkeleton } from "@/components/ui/query-states"
 
 import { logger } from "@/lib/logger"
 
 const log = logger("inventory-products")
-
 
 interface Product {
   id: string
@@ -42,47 +42,32 @@ const statusColors: Record<string, string> = {
   discontinued: "destructive",
 }
 
+async function fetchProductsList(): Promise<Product[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase.from("products").select("*, category:product_categories(name)").order("name")
+
+  if (error) {
+    if (error.code === "42P01") {
+      log.debug("Products table does not exist yet")
+      return []
+    }
+    throw new Error(error.message)
+  }
+
+  return (data || []).map((p: any) => ({
+    ...p,
+    category_name: p.category?.name,
+  }))
+}
+
 export default function ProductsPage() {
-  const [products, setProducts] = useState<Product[]>([])
-  const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
 
-  useEffect(() => {
-    fetchProducts()
-  }, [])
-
-  async function fetchProducts() {
-    try {
-      const supabase = createClient()
-
-      const { data, error } = await supabase
-        .from("products")
-        .select("*, category:product_categories(name)")
-        .order("name")
-
-      if (error) {
-        if (error.code === "42P01") {
-          log.debug("Products table does not exist yet")
-          setProducts([])
-          return
-        }
-        throw error
-      }
-
-      const productsWithCategory = (data || []).map((p: any) => ({
-        ...p,
-        category_name: p.category?.name,
-      }))
-
-      setProducts(productsWithCategory)
-    } catch (error) {
-      log.error("Error fetching products:", error)
-      toast.error("Failed to load products")
-    } finally {
-      setLoading(false)
-    }
-  }
+  const { data: products = [], isLoading: loading } = useQuery({
+    queryKey: QUERY_KEYS.adminProducts(),
+    queryFn: fetchProductsList,
+  })
 
   function formatCurrency(amount: number) {
     return new Intl.NumberFormat("en-NG", {
@@ -183,18 +168,7 @@ export default function ProductsPage() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="space-y-3">
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="flex items-center gap-4">
-                  <Skeleton className="h-4 w-20" />
-                  <Skeleton className="h-4 w-32" />
-                  <Skeleton className="h-4 w-24" />
-                  <Skeleton className="h-4 w-24" />
-                  <Skeleton className="h-4 w-24" />
-                  <Skeleton className="h-4 w-16" />
-                </div>
-              ))}
-            </div>
+            <TableSkeleton rows={5} cols={6} />
           ) : filteredProducts.length === 0 ? (
             <EmptyState
               icon={Package}

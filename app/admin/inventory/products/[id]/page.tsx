@@ -1,20 +1,20 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { useParams, useRouter } from "next/navigation"
+import { useParams } from "next/navigation"
+import { useQuery } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
 import { createClient } from "@/lib/supabase/client"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Pencil, Package } from "lucide-react"
 import Link from "next/link"
-import { toast } from "sonner"
 import { PageHeader } from "@/components/layout/page-header"
+import { PageLoader } from "@/components/ui/query-states"
 
 import { logger } from "@/lib/logger"
 
 const log = logger("inventory-products")
-
 
 interface Product {
   id: string
@@ -31,51 +31,31 @@ interface Product {
   created_at: string
 }
 
+async function fetchProduct(id: string): Promise<Product> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from("products")
+    .select("*, category:product_categories(name)")
+    .eq("id", id)
+    .single()
+  if (error) throw new Error(error.message)
+  return { ...data, category_name: data.category?.name }
+}
+
 export default function ProductDetailPage() {
   const params = useParams()
-  const router = useRouter()
-  const [product, setProduct] = useState<Product | null>(null)
-  const [loading, setLoading] = useState(true)
+  const id = params.id as string
 
-  useEffect(() => {
-    fetchProduct()
-  }, [params.id])
-
-  async function fetchProduct() {
-    try {
-      const supabase = createClient()
-      const { data, error } = await supabase
-        .from("products")
-        .select("*, category:product_categories(name)")
-        .eq("id", params.id)
-        .single()
-
-      if (error) throw error
-      setProduct({
-        ...data,
-        category_name: data.category?.name,
-      })
-    } catch (error) {
-      log.error("Error:", error)
-      toast.error("Product not found")
-      router.push("/admin/inventory/products")
-    } finally {
-      setLoading(false)
-    }
-  }
+  const { data: product, isLoading } = useQuery({
+    queryKey: QUERY_KEYS.adminProductDetail(id),
+    queryFn: () => fetchProduct(id),
+  })
 
   function formatCurrency(amount: number) {
     return new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" }).format(amount)
   }
 
-  if (loading) {
-    return (
-      <div className="container mx-auto flex min-h-[400px] items-center justify-center p-6">
-        <div className="border-primary h-8 w-8 animate-spin rounded-full border-4 border-t-transparent"></div>
-      </div>
-    )
-  }
-
+  if (isLoading) return <PageLoader />
   if (!product) return null
 
   const margin =

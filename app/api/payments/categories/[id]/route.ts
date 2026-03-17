@@ -3,14 +3,15 @@ import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 import { resolveAdminScope } from "@/lib/admin/rbac"
 import { logger } from "@/lib/logger"
+import { writeAuditLog } from "@/lib/audit/write-audit"
 
 const log = logger("payments-categories")
 
 export const dynamic = "force-dynamic"
 
 // Helper function to create Supabase client
-function createClient() {
-  const cookieStore = cookies()
+async function createClient() {
+  const cookieStore = await cookies()
 
   return createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
     cookies: {
@@ -33,7 +34,7 @@ function createClient() {
 // PUT /api/payments/categories/[id] - Update a payment category
 export async function PUT(request: Request, { params }: { params: { id: string } }) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     // Check if user is authenticated
     const {
@@ -64,6 +65,18 @@ export async function PUT(request: Request, { params }: { params: { id: string }
 
     if (error) throw error
 
+    await writeAuditLog(
+      supabase as any,
+      {
+        action: "update",
+        entityType: "payment_category",
+        entityId: params.id,
+        newValues: { name },
+        context: { actorId: user.id, source: "api", route: `/api/payments/categories/${params.id}` },
+      },
+      { failOpen: true }
+    )
+
     return NextResponse.json({ data: category })
   } catch (error) {
     log.error({ err: String(error) }, "Error updating payment category:")
@@ -74,7 +87,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
 // DELETE /api/payments/categories/[id] - Delete a payment category
 export async function DELETE(request: Request, { params }: { params: { id: string } }) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     // Check if user is authenticated
     const {
@@ -92,6 +105,17 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
     const { error } = await supabase.from("payment_categories").delete().eq("id", params.id)
 
     if (error) throw error
+
+    await writeAuditLog(
+      supabase as any,
+      {
+        action: "delete",
+        entityType: "payment_category",
+        entityId: params.id,
+        context: { actorId: user.id, source: "api", route: `/api/payments/categories/${params.id}` },
+      },
+      { failOpen: true }
+    )
 
     return NextResponse.json({ success: true })
   } catch (error) {

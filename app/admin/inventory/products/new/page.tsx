@@ -1,7 +1,9 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { useQuery } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
 import { createClient } from "@/lib/supabase/client"
 import { PageHeader, PageWrapper } from "@/components/layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -18,16 +20,21 @@ import { logger } from "@/lib/logger"
 
 const log = logger("inventory-products-new")
 
-
 interface Category {
   id: string
   name: string
 }
 
+async function fetchProductCategories(): Promise<Category[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase.from("product_categories").select("id, name").order("name")
+  if (error && error.code !== "42P01") throw new Error(error.message)
+  return data || []
+}
+
 export default function NewProductPage() {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
-  const [categories, setCategories] = useState<Category[]>([])
   const [formData, setFormData] = useState({
     sku: "",
     name: "",
@@ -40,24 +47,10 @@ export default function NewProductPage() {
     status: "active",
   })
 
-  useEffect(() => {
-    fetchCategories()
-  }, [])
-
-  async function fetchCategories() {
-    try {
-      const supabase = createClient()
-      const { data, error } = await supabase.from("product_categories").select("id, name").order("name")
-
-      if (error && error.code !== "42P01") {
-        log.error("Error fetching categories:", error)
-      }
-
-      setCategories(data || [])
-    } catch (error) {
-      log.error("Error:", error)
-    }
-  }
+  const { data: categories = [] } = useQuery({
+    queryKey: QUERY_KEYS.adminProductCategories(),
+    queryFn: fetchProductCategories,
+  })
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()

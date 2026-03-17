@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
+import { useQuery } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
 import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -12,13 +14,39 @@ import { Save } from "lucide-react"
 import { toast } from "sonner"
 import { PageHeader } from "@/components/layout/page-header"
 import { FormFieldGroup } from "@/components/ui/patterns"
+import { PageLoader } from "@/components/ui/query-states"
+
+interface SupplierFormData {
+  name: string
+  code: string
+  email: string
+  phone: string
+  address: string
+  contact_person: string
+  is_active: boolean
+}
+
+async function fetchSupplier(id: string): Promise<SupplierFormData> {
+  const supabase = createClient()
+  const { data, error } = await supabase.from("suppliers").select("*").eq("id", id).single()
+  if (error) throw new Error(error.message)
+  return {
+    name: data.name,
+    code: data.code,
+    email: data.email || "",
+    phone: data.phone || "",
+    address: data.address || "",
+    contact_person: data.contact_person || "",
+    is_active: data.is_active,
+  }
+}
 
 export default function EditSupplierPage() {
   const params = useParams()
   const router = useRouter()
+  const id = params.id as string
   const [saving, setSaving] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<SupplierFormData>({
     name: "",
     code: "",
     email: "",
@@ -28,31 +56,14 @@ export default function EditSupplierPage() {
     is_active: true,
   })
 
-  useEffect(() => {
-    fetchSupplier()
-  }, [params.id])
+  const { data: supplierData, isLoading } = useQuery({
+    queryKey: QUERY_KEYS.adminSupplierDetail(id),
+    queryFn: () => fetchSupplier(id),
+  })
 
-  async function fetchSupplier() {
-    try {
-      const supabase = createClient()
-      const { data, error } = await supabase.from("suppliers").select("*").eq("id", params.id).single()
-      if (error) throw error
-      setFormData({
-        name: data.name,
-        code: data.code,
-        email: data.email || "",
-        phone: data.phone || "",
-        address: data.address || "",
-        contact_person: data.contact_person || "",
-        is_active: data.is_active,
-      })
-    } catch (error) {
-      toast.error("Supplier not found")
-      router.push("/admin/purchasing/suppliers")
-    } finally {
-      setLoading(false)
-    }
-  }
+  useEffect(() => {
+    if (supplierData) setFormData(supplierData)
+  }, [supplierData])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -70,11 +81,11 @@ export default function EditSupplierPage() {
           contact_person: formData.contact_person || null,
           is_active: formData.is_active,
         })
-        .eq("id", params.id)
+        .eq("id", id)
 
       if (error) throw error
       toast.success("Supplier updated")
-      router.push(`/admin/purchasing/suppliers/${params.id}`)
+      router.push(`/admin/purchasing/suppliers/${id}`)
     } catch (error: any) {
       toast.error(error.message || "Failed to update")
     } finally {
@@ -82,19 +93,13 @@ export default function EditSupplierPage() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="container mx-auto flex min-h-[400px] items-center justify-center p-6">
-        <div className="border-primary h-8 w-8 animate-spin rounded-full border-4 border-t-transparent"></div>
-      </div>
-    )
-  }
+  if (isLoading) return <PageLoader />
 
   return (
     <div className="container mx-auto max-w-2xl space-y-6 p-6">
       <PageHeader
         title="Edit Supplier"
-        backLink={{ href: `/admin/purchasing/suppliers/${params.id}`, label: "Back to Supplier" }}
+        backLink={{ href: `/admin/purchasing/suppliers/${id}`, label: "Back to Supplier" }}
         actions={
           <Button onClick={handleSubmit} disabled={saving}>
             <Save className="mr-2 h-4 w-4" />

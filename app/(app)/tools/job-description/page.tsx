@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -12,64 +13,85 @@ import { formatName } from "@/lib/utils"
 import { writeAuditLogClient } from "@/lib/audit/client"
 import { PageHeader } from "@/components/layout"
 import { EmptyState } from "@/components/ui/patterns"
+import { QUERY_KEYS } from "@/lib/query-keys"
+import { PageLoader } from "@/components/ui/query-states"
 
 import { logger } from "@/lib/logger"
 
 const log = logger("tools-job-description")
 
+interface JobDescriptionData {
+  job_description: string
+  job_description_updated_at: string | null
+  first_name: string | null
+  last_name: string | null
+  company_email: string | null
+  department: string | null
+  phone_number: string | null
+  userId: string
+}
+
+async function fetchJobDescription(supabase: ReturnType<typeof createClient>): Promise<JobDescriptionData> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) throw new Error("Not authenticated")
+
+  const { data: profileData, error } = await supabase
+    .from("profiles")
+    .select(
+      "first_name, last_name, company_email, department, phone_number, job_description, job_description_updated_at"
+    )
+    .eq("id", user.id)
+    .single()
+
+  if (error) throw new Error(error.message)
+
+  return {
+    job_description: profileData.job_description || "",
+    job_description_updated_at: profileData.job_description_updated_at,
+    first_name: profileData.first_name,
+    last_name: profileData.last_name,
+    company_email: profileData.company_email,
+    department: profileData.department,
+    phone_number: profileData.phone_number,
+    userId: user.id,
+  }
+}
 
 export default function JobDescriptionPage() {
+  const supabase = createClient()
+  const queryClient = useQueryClient()
+
+  const { data: profileData, isLoading } = useQuery({
+    queryKey: QUERY_KEYS.jobDescription("me"),
+    queryFn: () => fetchJobDescription(supabase),
+  })
+
   const [jobDescription, setJobDescription] = useState("")
-  const [lastUpdated, setLastUpdated] = useState<string | null>(null)
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
-  const [profile, setProfile] = useState<{
-    first_name: string | null
-    last_name: string | null
-    company_email: string | null
-    department: string | null
-    phone_number: string | null
-  } | null>(null)
-  const supabase = createClient()
 
+  // Sync local state when data loads
   useEffect(() => {
-    loadJobDescription()
-  }, [])
-
-  const loadJobDescription = async () => {
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (!user) return
-
-      const { data: profileData, error } = await supabase
-        .from("profiles")
-        .select(
-          "first_name, last_name, company_email, department, phone_number, job_description, job_description_updated_at"
-        )
-        .eq("id", user.id)
-        .single()
-
-      if (error) throw error
-
-      if (profileData) {
-        setJobDescription(profileData.job_description || "")
-        setLastUpdated(profileData.job_description_updated_at)
-        setIsEditing(!profileData.job_description) // Auto-edit if empty
-        setProfile({
-          first_name: profileData.first_name,
-          last_name: profileData.last_name,
-          company_email: profileData.company_email,
-          department: profileData.department,
-          phone_number: profileData.phone_number,
-        })
-      }
-    } catch (error) {
-      log.error("Error loading job description:", error)
-      toast.error("Failed to load job description")
+    if (profileData) {
+      setJobDescription(profileData.job_description)
+      setIsEditing(!profileData.job_description) // Auto-edit if empty
     }
-  }
+  }, [profileData])
+
+  if (isLoading) return <PageLoader />
+
+  const lastUpdated = profileData?.job_description_updated_at ?? null
+  const profile = profileData
+    ? {
+        first_name: profileData.first_name,
+        last_name: profileData.last_name,
+        company_email: profileData.company_email,
+        department: profileData.department,
+        phone_number: profileData.phone_number,
+      }
+    : null
 
   const handleSave = async () => {
     setIsSaving(true)
@@ -108,7 +130,7 @@ export default function JobDescriptionPage() {
 
       toast.success("Job description saved successfully")
       setIsEditing(false)
-      setLastUpdated(new Date().toISOString())
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.jobDescription("me") })
     } catch (error) {
       log.error("Error saving job description:", error)
       toast.error("Failed to save job description")
@@ -240,7 +262,7 @@ export default function JobDescriptionPage() {
                       <Button
                         onClick={() => {
                           setIsEditing(false)
-                          loadJobDescription()
+                          setJobDescription(profileData?.job_description ?? "")
                         }}
                         variant="outline"
                         disabled={isSaving}

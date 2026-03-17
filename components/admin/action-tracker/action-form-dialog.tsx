@@ -1,6 +1,9 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { logger } from "@/lib/logger"
+
+const log = logger("action-tracker-form-dialog")
 import {
   Dialog,
   DialogContent,
@@ -198,7 +201,7 @@ export function ActionFormDialog({
               )
             )
           } catch (notifError) {
-            console.error("Failed to send action notifications:", notifError)
+            log.error("Failed to send action notifications:", notifError)
           }
         }
       }

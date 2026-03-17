@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -12,11 +13,12 @@ import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { PageHeader } from "@/components/layout/page-header"
 import { FormFieldGroup } from "@/components/ui/patterns"
+import { QUERY_KEYS } from "@/lib/query-keys"
+import { PageLoader } from "@/components/ui/query-states"
 
 import { logger } from "@/lib/logger"
 
 const log = logger("hr-performance-create")
-
 
 interface User {
   id: string
@@ -31,12 +33,44 @@ interface ReviewCycle {
   review_type: string
 }
 
+interface PerformanceCreateData {
+  users: User[]
+  cycles: ReviewCycle[]
+}
+
+async function fetchPerformanceCreateData(supabase: ReturnType<typeof createClient>): Promise<PerformanceCreateData> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) throw new Error("Not authenticated")
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role, is_department_lead, department_id")
+    .eq("id", user.id)
+    .single()
+
+  let usersQuery = supabase.from("profiles").select("id, first_name, last_name, department_id").neq("id", user.id)
+
+  if (profile?.is_department_lead && !["developer", "admin", "super_admin"].includes(profile.role)) {
+    usersQuery = usersQuery.eq("department_id", profile.department_id)
+  }
+
+  const { data: usersData } = await usersQuery
+
+  const cyclesResponse = await fetch("/api/hr/performance/cycles")
+  const cyclesData = await cyclesResponse.json()
+
+  return {
+    users: usersData || [],
+    cycles: cyclesData.cycles || [],
+  }
+}
+
 export default function CreateReviewPage() {
   const router = useRouter()
-  const [loading, setLoading] = useState(true)
+  const supabase = createClient()
   const [saving, setSaving] = useState(false)
-  const [users, setUsers] = useState<User[]>([])
-  const [cycles, setCycles] = useState<ReviewCycle[]>([])
   const [formData, setFormData] = useState({
     user_id: "",
     review_cycle_id: "",
@@ -48,46 +82,13 @@ export default function CreateReviewPage() {
     manager_comments: "",
   })
 
-  useEffect(() => {
-    fetchData()
-  }, [])
+  const { data, isLoading: loading } = useQuery({
+    queryKey: QUERY_KEYS.performanceCreateData(),
+    queryFn: () => fetchPerformanceCreateData(supabase),
+  })
 
-  async function fetchData() {
-    try {
-      const supabase = createClient()
-
-      // Fetch department users (for leads) or all users (for admins)
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (!user) return
-
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role, is_department_lead, department_id")
-        .eq("id", user.id)
-        .single()
-
-      let usersQuery = supabase.from("profiles").select("id, first_name, last_name, department_id").neq("id", user.id)
-
-      // If lead, only show department users
-      if (profile?.is_department_lead && !["developer", "admin", "super_admin"].includes(profile.role)) {
-        usersQuery = usersQuery.eq("department_id", profile.department_id)
-      }
-
-      const { data: usersData } = await usersQuery
-      if (usersData) setUsers(usersData)
-
-      // Fetch active review cycles
-      const cyclesResponse = await fetch("/api/hr/performance/cycles")
-      const cyclesData = await cyclesResponse.json()
-      if (cyclesData.cycles) setCycles(cyclesData.cycles)
-    } catch (error) {
-      log.error("Error fetching data:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
+  const users = data?.users ?? []
+  const cycles = data?.cycles ?? []
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -100,10 +101,10 @@ export default function CreateReviewPage() {
         body: JSON.stringify(formData),
       })
 
-      const data = await response.json()
+      const responseData = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to create review")
+        throw new Error(responseData.error || "Failed to create review")
       }
 
       toast.success("Performance review created successfully")
@@ -139,9 +140,7 @@ export default function CreateReviewPage() {
     )
   }
 
-  if (loading) {
-    return <div className="container mx-auto p-6 text-center">Loading...</div>
-  }
+  if (loading) return <PageLoader />
 
   return (
     <div className="container mx-auto max-w-2xl p-6">

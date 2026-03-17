@@ -82,7 +82,7 @@ export function ThemeToggle({ direction = "down" }: ThemeToggleProps) {
   // Don't render anything until mounted to avoid hydration mismatch
   if (!mounted) {
     return (
-      <Button variant="ghost" size="icon" className="group relative overflow-hidden">
+      <Button variant="ghost" size="icon" aria-label="Toggle theme" className="group relative overflow-hidden">
         <div className="relative z-10 flex h-full w-full items-center justify-center">
           <Sun className="h-[1.2rem] w-[1.2rem]" />
         </div>
@@ -97,6 +97,7 @@ export function ThemeToggle({ direction = "down" }: ThemeToggleProps) {
         variant="ghost"
         size="icon"
         data-theme-toggle
+        aria-label="Toggle theme"
         onClick={() => setIsOpen(!isOpen)}
         className="group relative overflow-hidden"
       >

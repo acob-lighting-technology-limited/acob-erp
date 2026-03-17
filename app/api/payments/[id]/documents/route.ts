@@ -3,13 +3,13 @@ import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 import { getOneDriveService } from "@/lib/onedrive"
 import { logger } from "@/lib/logger"
-import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
+import { getDepartmentScope, resolveAdminScope, normalizeDepartmentName } from "@/lib/admin/rbac"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 
 const log = logger("payments-documents")
 
-function createClient() {
-  const cookieStore = cookies()
+async function createClient() {
+  const cookieStore = await cookies()
 
   return createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
     cookies: {
@@ -28,18 +28,18 @@ function createClient() {
 }
 
 function normalizeDepartment(value: string | null | undefined): string {
-  const normalized = String(value || "")
-    .trim()
-    .toLowerCase()
-  if (normalized === "finance") return "accounts"
-  return normalized
+  return normalizeDepartmentName(String(value || "").trim()).toLowerCase()
 }
 
 function isFinanceDepartment(value: string | null | undefined): boolean {
   return normalizeDepartment(value) === "accounts"
 }
 
-async function assertPaymentAccess(supabase: ReturnType<typeof createClient>, userId: string, paymentId: string) {
+async function assertPaymentAccess(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  paymentId: string
+) {
   const scope = await resolveAdminScope(supabase as any, userId)
   const { data: profile } = await supabase.from("profiles").select("department").eq("id", userId).single()
   const dataClient = getServiceRoleClientOrFallback(supabase as any)
@@ -85,7 +85,7 @@ async function assertPaymentAccess(supabase: ReturnType<typeof createClient>, us
 // GET /api/payments/[id]/documents - List all documents for a payment
 export async function GET(request: Request, { params }: { params: { id: string } }) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
     const { id: paymentId } = params
     const { searchParams } = new URL(request.url)
     const includeArchived = searchParams.get("includeArchived") === "true"
@@ -128,7 +128,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
 // POST /api/payments/[id]/documents - Upload a new document (with optional replacement)
 export async function POST(request: Request, { params }: { params: { id: string } }) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
     const { id: paymentId } = params
 
     const {

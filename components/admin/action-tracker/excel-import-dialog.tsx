@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { logger } from "@/lib/logger"
 import {
   Dialog,
   DialogContent,
@@ -18,6 +19,8 @@ import { FileSpreadsheet, Loader2, Upload } from "lucide-react"
 import * as XLSX from "xlsx"
 import { createClient } from "@/lib/supabase/client"
 import { getCurrentOfficeWeek } from "@/lib/meeting-week"
+
+const log = logger("action-tracker-excel-import-dialog")
 
 interface ExcelImportDialogProps {
   isOpen: boolean
@@ -119,7 +122,7 @@ export function ExcelImportDialog({ isOpen, onClose, onComplete, departments }: 
         onComplete()
         onClose()
       } catch (error: any) {
-        console.error("Import error:", error)
+        log.error("Import error:", error)
         toast.error(`Failed to import: ${error.message}`)
       } finally {
         setIsUploading(false)

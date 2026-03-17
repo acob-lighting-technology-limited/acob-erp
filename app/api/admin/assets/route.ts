@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { canAccessAdminSection, resolveAdminScope } from "@/lib/admin/rbac"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
+import { writeAuditLog } from "@/lib/audit/write-audit"
 
 type AssignmentType = "individual" | "department" | "office"
 
@@ -275,6 +276,18 @@ export async function POST(request: NextRequest) {
       quantity === 1
         ? `Asset created successfully: ${createdCodes[0]}`
         : `${quantity} assets created successfully (${createdCodes[0]} - ${createdCodes[createdCodes.length - 1]})`
+
+    await writeAuditLog(
+      supabase,
+      {
+        action: "create",
+        entityType: "asset",
+        entityId: createdCodes[0] || "bulk",
+        newValues: { asset_type: form.asset_type, quantity, createdCodes },
+        context: { actorId: user.id, source: "api", route: "/api/admin/assets" },
+      },
+      { failOpen: true }
+    )
 
     return NextResponse.json({ message, createdCodes, createdCount: createdCodes.length })
   } catch (error: any) {

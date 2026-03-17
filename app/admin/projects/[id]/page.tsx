@@ -1,23 +1,10 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useParams, useRouter } from "next/navigation"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+import { useState } from "react"
+import { useParams } from "next/navigation"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { SearchableSelect } from "@/components/ui/searchable-select"
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -29,84 +16,48 @@ import {
 } from "@/components/ui/alert-dialog"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
-import { ArrowLeft, Plus, Edit, Trash2, Users, Package, User, UserPlus, X } from "lucide-react"
+import { ArrowLeft, Users, Package } from "lucide-react"
 import Link from "next/link"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { PageHeader } from "@/components/layout/page-header"
-import { EmptyState, FormFieldGroup } from "@/components/ui/patterns"
+import { PageLoader } from "@/components/ui/query-states"
+import { ProjectSummaryCard } from "@/components/projects/project-summary-card"
+import { MembersTab } from "@/components/projects/members-tab"
+import { ItemsTab } from "@/components/projects/items-tab"
+import { AddMemberDialog, type MemberForm } from "@/components/projects/add-member-dialog"
+import { ItemDialog, type ItemForm } from "@/components/projects/item-dialog"
+import { fetchAdminProjectDetail, type ProjectMember, type ProjectItem } from "@/components/projects/project-data"
 
 import { logger } from "@/lib/logger"
 
 const log = logger("projects")
 
-
-interface Project {
-  id: string
-  project_name: string
-  location: string
-  deployment_start_date: string
-  deployment_end_date: string
-  capacity_w?: number
-  technology_type?: string
-  description?: string
-  status: string
-  project_manager_id?: string | null
-  project_manager?: {
-    id: string
-    first_name: string
-    last_name: string
-    company_email?: string | null
-  } | null
-}
-
-interface employee {
-  id: string
-  first_name: string
-  last_name: string
-  company_email: string
-  department: string
-}
-
-interface ProjectMember {
-  id: string
-  user_id: string
-  role: string
-  assigned_at: string
-  user: employee
-}
-
-interface ProjectItem {
-  id: string
-  item_name: string
-  description?: string
-  quantity: number
-  unit?: string
-  status: string
-  notes?: string
+const getItemStatusColor = (status: string) => {
+  switch (status) {
+    case "pending":
+      return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
+    case "ordered":
+      return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
+    case "received":
+      return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
+    case "installed":
+      return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+    default:
+      return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
+  }
 }
 
 export default function AdminProjectDetailPage() {
   const params = useParams()
-  const router = useRouter()
   const projectId = params.id as string
+  const queryClient = useQueryClient()
 
-  const [project, setProject] = useState<Project | null>(null)
-  const [employee, setemployee] = useState<employee[]>([])
-  const [members, setMembers] = useState<ProjectMember[]>([])
-  const [items, setItems] = useState<ProjectItem[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-
-  // Member dialog states
   const [isMemberDialogOpen, setIsMemberDialogOpen] = useState(false)
-  const [memberForm, setMemberForm] = useState({
-    user_id: "",
-    role: "member",
-  })
+  const [memberForm, setMemberForm] = useState<MemberForm>({ user_id: "", role: "member" })
 
-  // Item dialog states
   const [isItemDialogOpen, setIsItemDialogOpen] = useState(false)
   const [selectedItem, setSelectedItem] = useState<ProjectItem | null>(null)
-  const [itemForm, setItemForm] = useState({
+  const [itemForm, setItemForm] = useState<ItemForm>({
     item_name: "",
     description: "",
     quantity: "1",
@@ -115,11 +66,9 @@ export default function AdminProjectDetailPage() {
     notes: "",
   })
 
-  // Delete dialogs
   const [memberToDelete, setMemberToDelete] = useState<ProjectMember | null>(null)
   const [itemToDelete, setItemToDelete] = useState<ProjectItem | null>(null)
 
-  // Loading states
   const [isAddingMember, setIsAddingMember] = useState(false)
   const [isRemovingMember, setIsRemovingMember] = useState(false)
   const [isSavingItem, setIsSavingItem] = useState(false)
@@ -127,158 +76,50 @@ export default function AdminProjectDetailPage() {
 
   const supabase = createClient()
 
-  useEffect(() => {
-    if (projectId) {
-      log.debug("📂 Loading project detail page for ID:", projectId)
-      loadProjectData()
-    }
-  }, [projectId])
+  const { data: pageData, isLoading } = useQuery({
+    queryKey: QUERY_KEYS.adminProjectDetail(projectId),
+    queryFn: () => fetchAdminProjectDetail(projectId),
+    enabled: Boolean(projectId),
+  })
 
-  const loadProjectData = async () => {
-    try {
-      log.debug("🔄 Starting to load project data...")
-
-      // Check auth first
-      const {
-        data: { user },
-        error: authError,
-      } = await supabase.auth.getUser()
-      log.debug({ userId: user?.id, authErr: authError?.message ?? null }, "👤 Current user")
-
-      if (authError || !user) {
-        log.error("❌ Auth error, redirecting...", authError)
-        router.push("/auth/login")
-        return
-      }
-
-      await Promise.all([loadProject(), loademployee(), loadMembers(), loadItems()])
-      log.debug("✅ All project data loaded successfully")
-    } catch (error) {
-      log.error("❌ Error loading project data:", error)
-      log.error("Error details:", JSON.stringify(error, null, 2))
-      toast.error("Failed to load project data")
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const loadProject = async () => {
-    log.debug("📋 Loading project details...")
-    const { data, error } = await supabase
-      .from("projects")
-      .select(
-        `
-        *,
-        project_manager:profiles!projects_project_manager_id_fkey (
-          id,
-          first_name,
-          last_name,
-          company_email
-        )
-      `
-      )
-      .eq("id", projectId)
-      .single()
-
-    log.debug("Project result:", { data, error })
-    if (error) throw error
-    setProject(data)
-  }
-
-  const loademployee = async () => {
-    log.debug("👥 Loading employee...")
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("id, first_name, last_name, company_email, department")
-      .order("last_name", { ascending: true })
-
-    log.debug("employee result:", { count: data?.length, error })
-    if (error) throw error
-    setemployee(data || [])
-  }
-
-  const loadMembers = async () => {
-    log.debug("👨‍👩‍👧‍👦 Loading project members...")
-    const { data, error } = await supabase
-      .from("project_members")
-      .select(
-        `
-        id,
-        user_id,
-        role,
-        assigned_at,
-        user:profiles!project_members_user_id_fkey (
-          id,
-          first_name,
-          last_name,
-          company_email,
-          department
-        )
-      `
-      )
-      .eq("project_id", projectId)
-      .eq("is_active", true)
-      .order("assigned_at", { ascending: false })
-
-    log.debug("Members result:", { count: data?.length, error })
-    if (error) throw error
-    setMembers((data as any) || [])
-  }
-
-  const loadItems = async () => {
-    log.debug("📦 Loading project items...")
-    const { data, error } = await supabase
-      .from("project_items")
-      .select("*")
-      .eq("project_id", projectId)
-      .order("created_at", { ascending: false })
-
-    log.debug("Items result:", { count: data?.length, error })
-    if (error) throw error
-    setItems(data || [])
-  }
+  const project = pageData?.project ?? null
+  const employees = pageData?.employees ?? []
+  const members = pageData?.members ?? []
+  const items = pageData?.items ?? []
 
   const handleAddMember = async () => {
-    if (isAddingMember) return // Prevent duplicate submissions
+    if (isAddingMember) return
     if (!memberForm.user_id) {
       toast.error("Please select a employee member")
       return
     }
-
-    // Check if member already exists
     if (members.some((m) => m.user_id === memberForm.user_id)) {
       toast.error("This member is already assigned to the project")
       return
     }
-
     setIsAddingMember(true)
     try {
       const {
         data: { user },
       } = await supabase.auth.getUser()
       if (!user) throw new Error("Not authenticated")
-
       const { error } = await supabase.from("project_members").insert({
         project_id: projectId,
         user_id: memberForm.user_id,
         role: memberForm.role,
         assigned_by: user.id,
       })
-
       if (error) throw error
-
-      // Add activity update
       await supabase.from("project_updates").insert({
         project_id: projectId,
         user_id: user.id,
         update_type: "member_added",
         content: `Added member with role: ${memberForm.role}`,
       })
-
       toast.success("Member added successfully")
       setIsMemberDialogOpen(false)
       setMemberForm({ user_id: "", role: "member" })
-      loadMembers()
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminProjectDetail(projectId) })
     } catch (error) {
       log.error("Error adding member:", error)
       toast.error("Failed to add member")
@@ -289,16 +130,13 @@ export default function AdminProjectDetailPage() {
 
   const handleRemoveMember = async () => {
     if (!memberToDelete || isRemovingMember) return
-
     setIsRemovingMember(true)
     try {
       const { error } = await supabase
         .from("project_members")
         .update({ is_active: false, removed_at: new Date().toISOString() })
         .eq("id", memberToDelete.id)
-
       if (error) throw error
-
       const {
         data: { user },
       } = await supabase.auth.getUser()
@@ -310,10 +148,9 @@ export default function AdminProjectDetailPage() {
           content: `Removed ${memberToDelete.user.first_name} ${memberToDelete.user.last_name}`,
         })
       }
-
       toast.success("Member removed successfully")
       setMemberToDelete(null)
-      loadMembers()
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminProjectDetail(projectId) })
     } catch (error) {
       log.error("Error removing member:", error)
       toast.error("Failed to remove member")
@@ -335,32 +172,23 @@ export default function AdminProjectDetailPage() {
       })
     } else {
       setSelectedItem(null)
-      setItemForm({
-        item_name: "",
-        description: "",
-        quantity: "1",
-        unit: "",
-        status: "pending",
-        notes: "",
-      })
+      setItemForm({ item_name: "", description: "", quantity: "1", unit: "", status: "pending", notes: "" })
     }
     setIsItemDialogOpen(true)
   }
 
   const handleSaveItem = async () => {
-    if (isSavingItem) return // Prevent duplicate submissions
+    if (isSavingItem) return
     if (!itemForm.item_name) {
       toast.error("Please enter item name")
       return
     }
-
     setIsSavingItem(true)
     try {
       const {
         data: { user },
       } = await supabase.auth.getUser()
       if (!user) throw new Error("Not authenticated")
-
       const itemData = {
         item_name: itemForm.item_name,
         description: itemForm.description || null,
@@ -369,25 +197,19 @@ export default function AdminProjectDetailPage() {
         status: itemForm.status,
         notes: itemForm.notes || null,
       }
-
       if (selectedItem) {
         const { error } = await supabase.from("project_items").update(itemData).eq("id", selectedItem.id)
-
         if (error) throw error
         toast.success("Item updated successfully")
       } else {
-        const { error } = await supabase.from("project_items").insert({
-          ...itemData,
-          project_id: projectId,
-          created_by: user.id,
-        })
-
+        const { error } = await supabase
+          .from("project_items")
+          .insert({ ...itemData, project_id: projectId, created_by: user.id })
         if (error) throw error
         toast.success("Item added successfully")
       }
-
       setIsItemDialogOpen(false)
-      loadItems()
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminProjectDetail(projectId) })
     } catch (error) {
       log.error("Error saving item:", error)
       toast.error("Failed to save item")
@@ -398,16 +220,13 @@ export default function AdminProjectDetailPage() {
 
   const handleDeleteItem = async () => {
     if (!itemToDelete || isDeletingItem) return
-
     setIsDeletingItem(true)
     try {
       const { error } = await supabase.from("project_items").delete().eq("id", itemToDelete.id)
-
       if (error) throw error
-
       toast.success("Item deleted successfully")
       setItemToDelete(null)
-      loadItems()
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminProjectDetail(projectId) })
     } catch (error) {
       log.error("Error deleting item:", error)
       toast.error("Failed to delete item")
@@ -416,26 +235,9 @@ export default function AdminProjectDetailPage() {
     }
   }
 
-  const getItemStatusColor = (status: string) => {
-    switch (status) {
-      case "pending":
-        return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
-      case "ordered":
-        return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
-      case "received":
-        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
-      case "installed":
-        return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-      default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
-    }
-  }
+  const availableEmployees = employees.filter((e) => !members.some((m) => m.user_id === e.id))
 
-  const availableemployee = employee.filter((s) => !members.some((m) => m.user_id === s.id))
-
-  if (isLoading) {
-    return null // loading.tsx will handle the loading state
-  }
+  if (isLoading) return <PageLoader />
 
   if (!project) {
     return (
@@ -461,32 +263,8 @@ export default function AdminProjectDetailPage() {
         backLink={{ href: "/admin/projects", label: "Back to Projects" }}
       />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Project Summary</CardTitle>
-          <CardDescription>Canonical manager is controlled by Project Manager field from project edit.</CardDescription>
-        </CardHeader>
-        <CardContent className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          <div>
-            <p className="text-muted-foreground text-xs uppercase">Manager</p>
-            <p className="font-medium">
-              {project.project_manager
-                ? `${project.project_manager.first_name} ${project.project_manager.last_name}`
-                : "Unassigned"}
-            </p>
-          </div>
-          <div>
-            <p className="text-muted-foreground text-xs uppercase">Status</p>
-            <p className="font-medium capitalize">{project.status.replace("_", " ")}</p>
-          </div>
-          <div>
-            <p className="text-muted-foreground text-xs uppercase">Location</p>
-            <p className="font-medium">{project.location || "—"}</p>
-          </div>
-        </CardContent>
-      </Card>
+      <ProjectSummaryCard project={project} />
 
-      {/* Tabs */}
       <Tabs defaultValue="members" className="space-y-4">
         <TabsList>
           <TabsTrigger value="members" className="flex items-center gap-2">
@@ -499,260 +277,46 @@ export default function AdminProjectDetailPage() {
           </TabsTrigger>
         </TabsList>
 
-        {/* Members Tab */}
         <TabsContent value="members" className="space-y-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0">
-              <div>
-                <CardTitle>Project Members</CardTitle>
-                <CardDescription>Manage team members assigned to this project</CardDescription>
-              </div>
-              <Button onClick={() => setIsMemberDialogOpen(true)}>
-                <UserPlus className="mr-2 h-4 w-4" />
-                Add Member
-              </Button>
-            </CardHeader>
-            <CardContent>
-              {members.length === 0 ? (
-                <EmptyState
-                  title="No members assigned yet"
-                  description='Click "Add Member" to get started.'
-                  icon={Users}
-                  className="border-0"
-                />
-              ) : (
-                <div className="space-y-3">
-                  {members.map((member) => (
-                    <div key={member.id} className="flex items-center justify-between rounded-lg border p-3">
-                      <div className="flex items-center gap-3">
-                        <div className="bg-primary/10 flex h-10 w-10 items-center justify-center rounded-full">
-                          <User className="text-primary h-5 w-5" />
-                        </div>
-                        <div>
-                          <p className="font-medium">
-                            {member.user.first_name} {member.user.last_name}
-                          </p>
-                          <p className="text-muted-foreground text-sm">{member.user.company_email}</p>
-                          <p className="text-muted-foreground text-xs">{member.user.department}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {member.user_id === project.project_manager_id ? (
-                          <Badge>Project Manager</Badge>
-                        ) : (
-                          <Badge variant="outline">{member.role === "manager" ? "member" : member.role}</Badge>
-                        )}
-                        <Button variant="outline" size="icon" onClick={() => setMemberToDelete(member)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <MembersTab
+            members={members}
+            projectManagerId={project.project_manager_id}
+            onAddMember={() => setIsMemberDialogOpen(true)}
+            onRemoveMember={setMemberToDelete}
+          />
         </TabsContent>
 
-        {/* Items Tab */}
         <TabsContent value="items" className="space-y-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0">
-              <div>
-                <CardTitle>Project Items</CardTitle>
-                <CardDescription>Manage equipment and materials for this project</CardDescription>
-              </div>
-              <Button onClick={() => handleOpenItemDialog()}>
-                <Plus className="mr-2 h-4 w-4" />
-                Add Item
-              </Button>
-            </CardHeader>
-            <CardContent>
-              {items.length === 0 ? (
-                <EmptyState
-                  title="No items added yet"
-                  description='Click "Add Item" to get started.'
-                  icon={Package}
-                  className="border-0"
-                />
-              ) : (
-                <div className="space-y-3">
-                  {items.map((item) => (
-                    <div key={item.id} className="rounded-lg border p-3">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="mb-1 flex items-center gap-2">
-                            <p className="font-medium">{item.item_name}</p>
-                            <Badge className={getItemStatusColor(item.status)}>{item.status}</Badge>
-                          </div>
-                          {item.description && <p className="text-muted-foreground mb-2 text-sm">{item.description}</p>}
-                          <div className="flex items-center gap-4 text-sm">
-                            <span className="text-muted-foreground">
-                              Quantity: <span className="text-foreground font-medium">{item.quantity}</span>
-                              {item.unit && ` ${item.unit}`}
-                            </span>
-                          </div>
-                          {item.notes && <p className="text-muted-foreground mt-2 text-xs">Note: {item.notes}</p>}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Button variant="outline" size="icon" onClick={() => handleOpenItemDialog(item)}>
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button variant="outline" size="icon" onClick={() => setItemToDelete(item)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <ItemsTab
+            items={items}
+            getItemStatusColor={getItemStatusColor}
+            onAddItem={() => handleOpenItemDialog()}
+            onEditItem={handleOpenItemDialog}
+            onDeleteItem={setItemToDelete}
+          />
         </TabsContent>
       </Tabs>
 
-      {/* Add Member Dialog */}
-      <Dialog open={isMemberDialogOpen} onOpenChange={setIsMemberDialogOpen}>
-        <DialogContent className="max-h-[90vh] w-[95vw] max-w-xl overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Add Project Member</DialogTitle>
-            <DialogDescription>Assign a employee member to this project</DialogDescription>
-          </DialogHeader>
+      <AddMemberDialog
+        open={isMemberDialogOpen}
+        onOpenChange={setIsMemberDialogOpen}
+        availableEmployees={availableEmployees}
+        form={memberForm}
+        onFormChange={setMemberForm}
+        onSubmit={handleAddMember}
+        isSubmitting={isAddingMember}
+      />
 
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="user_id">employee Member</Label>
-              <SearchableSelect
-                value={memberForm.user_id}
-                onValueChange={(value) => setMemberForm({ ...memberForm, user_id: value })}
-                placeholder="Select employee member"
-                searchPlaceholder="Search employee..."
-                icon={<User className="h-4 w-4" />}
-                options={availableemployee.map((member) => ({
-                  value: member.id,
-                  label: `${member.first_name} ${member.last_name} - ${member.department}`,
-                }))}
-              />
-            </div>
+      <ItemDialog
+        open={isItemDialogOpen}
+        onOpenChange={setIsItemDialogOpen}
+        isEditing={!!selectedItem}
+        form={itemForm}
+        onFormChange={setItemForm}
+        onSubmit={handleSaveItem}
+        isSubmitting={isSavingItem}
+      />
 
-            <FormFieldGroup label="Role">
-              <Select value={memberForm.role} onValueChange={(value) => setMemberForm({ ...memberForm, role: value })}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="member">Member</SelectItem>
-                  <SelectItem value="lead">Lead</SelectItem>
-                </SelectContent>
-              </Select>
-            </FormFieldGroup>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsMemberDialogOpen(false)} disabled={isAddingMember}>
-              Cancel
-            </Button>
-            <Button onClick={handleAddMember} loading={isAddingMember}>
-              Add Member
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Add/Edit Item Dialog */}
-      <Dialog open={isItemDialogOpen} onOpenChange={setIsItemDialogOpen}>
-        <DialogContent className="max-h-[90vh] w-[95vw] max-w-xl overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{selectedItem ? "Edit Item" : "Add Item"}</DialogTitle>
-            <DialogDescription>
-              {selectedItem ? "Update item details" : "Add a new item to this project"}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="item_name">Item Name</Label>
-              <Input
-                id="item_name"
-                value={itemForm.item_name}
-                onChange={(e) => setItemForm({ ...itemForm, item_name: e.target.value })}
-                placeholder="Enter item name"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                value={itemForm.description}
-                onChange={(e) => setItemForm({ ...itemForm, description: e.target.value })}
-                placeholder="Enter item description"
-                rows={3}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="quantity">Quantity</Label>
-                <Input
-                  id="quantity"
-                  type="number"
-                  value={itemForm.quantity}
-                  onChange={(e) => setItemForm({ ...itemForm, quantity: e.target.value })}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="unit">Unit</Label>
-                <Input
-                  id="unit"
-                  value={itemForm.unit}
-                  onChange={(e) => setItemForm({ ...itemForm, unit: e.target.value })}
-                  placeholder="e.g., pieces, units"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="status">Status</Label>
-              <Select value={itemForm.status} onValueChange={(value) => setItemForm({ ...itemForm, status: value })}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="ordered">Ordered</SelectItem>
-                  <SelectItem value="received">Received</SelectItem>
-                  <SelectItem value="installed">Installed</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="notes">Notes</Label>
-              <Textarea
-                id="notes"
-                value={itemForm.notes}
-                onChange={(e) => setItemForm({ ...itemForm, notes: e.target.value })}
-                placeholder="Additional notes"
-                rows={2}
-              />
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsItemDialogOpen(false)} disabled={isSavingItem}>
-              Cancel
-            </Button>
-            <Button onClick={handleSaveItem} loading={isSavingItem}>
-              {selectedItem ? "Update" : "Add"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete Member Confirmation */}
       <AlertDialog open={!!memberToDelete} onOpenChange={() => setMemberToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -776,13 +340,12 @@ export default function AdminProjectDetailPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Delete Item Confirmation */}
       <AlertDialog open={!!itemToDelete} onOpenChange={() => setItemToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Item?</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{itemToDelete?.item_name}"? This action cannot be undone.
+              Are you sure you want to delete &quot;{itemToDelete?.item_name}&quot;? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

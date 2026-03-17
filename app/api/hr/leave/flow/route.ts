@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { logger } from "@/lib/logger"
+import { writeAuditLog } from "@/lib/audit/write-audit"
 
 const log = logger("hr-leave-flow")
 
@@ -116,6 +117,22 @@ export async function POST(request: NextRequest) {
       const { error } = await supabase.from("leave_approver_assignments").upsert(payload)
       if (error) return NextResponse.json({ error: "Failed to save assignments" }, { status: 500 })
     }
+
+    await writeAuditLog(
+      supabase,
+      {
+        action: "update",
+        entityType: "leave_flow_config",
+        entityId: "bulk",
+        newValues: {
+          roles_count: Array.isArray(roles) ? roles.length : 0,
+          routes_count: Array.isArray(routes) ? routes.length : 0,
+          assignments_count: Array.isArray(assignments) ? assignments.length : 0,
+        },
+        context: { actorId: user.id, source: "api", route: "/api/hr/leave/flow" },
+      },
+      { failOpen: true }
+    )
 
     return NextResponse.json({ message: "Leave flow configuration saved" })
   } catch (error) {

@@ -1,6 +1,7 @@
 "use client"
 
-import { Fragment, useEffect, useState } from "react"
+import { Fragment, useState } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -24,7 +25,8 @@ import { ChevronDown, ChevronUp, Mail, Pencil, Plus, Users, Building } from "luc
 import { toast } from "sonner"
 import { StatCard } from "@/components/ui/stat-card"
 import { EmptyState } from "@/components/ui/empty-state"
-import { Skeleton } from "@/components/ui/skeleton"
+import { TableSkeleton } from "@/components/ui/query-states"
+import { QUERY_KEYS } from "@/lib/query-keys"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { applyAssignableStatusFilter } from "@/lib/workforce/assignment-policy"
@@ -33,6 +35,55 @@ import { logger } from "@/lib/logger"
 
 const log = logger("hr-departments")
 
+interface DepartmentsData {
+  departments: Department[]
+  departmentEmployees: Record<string, DepartmentEmployee[]>
+  canManageDepartments: boolean
+}
+
+async function fetchDepartmentsData(): Promise<DepartmentsData> {
+  const supabase = createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  let canManageDepartments = false
+  if (user) {
+    const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
+    canManageDepartments = ["developer", "super_admin", "admin"].includes(profile?.role || "")
+  }
+
+  const { data: depts, error } = await supabase.from("departments").select("*").order("name")
+  if (error) throw new Error(error.message)
+
+  const { data: profiles } = await applyAssignableStatusFilter(
+    supabase
+      .from("profiles")
+      .select(
+        "id, first_name, last_name, company_email, additional_email, company_role, employment_status, department"
+      ),
+    { allowLegacyNullStatus: false }
+  )
+
+  const employeesByDepartment: Record<string, DepartmentEmployee[]> = {}
+  for (const profile of (profiles || []) as DepartmentEmployee[]) {
+    const deptName = profile.department || "Unassigned"
+    if (!employeesByDepartment[deptName]) employeesByDepartment[deptName] = []
+    employeesByDepartment[deptName].push(profile)
+  }
+
+  const deptsWithCounts = (depts || []).map((dept) => ({
+    ...dept,
+    employee_count: employeesByDepartment[dept.name]?.length || 0,
+  }))
+
+  return {
+    departments: deptsWithCounts,
+    departmentEmployees: employeesByDepartment,
+    canManageDepartments,
+  }
+}
 
 interface Department {
   id: string
@@ -60,88 +111,30 @@ interface CurrentUserAccess {
 }
 
 export default function DepartmentsPage() {
-  const [departments, setDepartments] = useState<Department[]>([])
-  const [departmentEmployees, setDepartmentEmployees] = useState<Record<string, DepartmentEmployee[]>>({})
+  const queryClient = useQueryClient()
   const [expandedDepartments, setExpandedDepartments] = useState<Set<string>>(new Set())
-  const [loading, setLoading] = useState(true)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingDepartment, setEditingDepartment] = useState<Department | null>(null)
-  const [currentUserAccess, setCurrentUserAccess] = useState<CurrentUserAccess>({
-    canManageDepartments: false,
-  })
   const [formData, setFormData] = useState({
     name: "",
     description: "",
     is_active: true,
   })
 
-  useEffect(() => {
-    fetchDepartments()
-  }, [])
+  const { data, isLoading: loading } = useQuery({
+    queryKey: QUERY_KEYS.adminDepartmentsPage(),
+    queryFn: fetchDepartmentsData,
+  })
 
-  async function fetchDepartments() {
-    try {
-      const supabase = createClient()
-
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-
-      if (user) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("role, department, is_department_lead, lead_departments")
-          .eq("id", user.id)
-          .single()
-
-        const canManageDepartments = ["developer", "super_admin", "admin"].includes(profile?.role || "")
-
-        setCurrentUserAccess({
-          canManageDepartments,
-        })
-      }
-
-      // Fetch departments
-      const { data: depts, error } = await supabase.from("departments").select("*").order("name")
-
-      if (error) throw error
-
-      const { data: profiles } = await applyAssignableStatusFilter(
-        supabase
-          .from("profiles")
-          .select(
-            "id, first_name, last_name, company_email, additional_email, company_role, employment_status, department"
-          ),
-        { allowLegacyNullStatus: false }
-      )
-
-      const employeesByDepartment: Record<string, DepartmentEmployee[]> = {}
-      for (const profile of (profiles || []) as DepartmentEmployee[]) {
-        const deptName = profile.department || "Unassigned"
-        if (!employeesByDepartment[deptName]) employeesByDepartment[deptName] = []
-        employeesByDepartment[deptName].push(profile)
-      }
-
-      const deptsWithCounts = (depts || []).map((dept) => ({
-        ...dept,
-        employee_count: employeesByDepartment[dept.name]?.length || 0,
-      }))
-
-      setDepartments(deptsWithCounts)
-      setDepartmentEmployees(employeesByDepartment)
-    } catch (error) {
-      log.error("Error fetching departments:", error)
-      toast.error("Failed to load departments")
-    } finally {
-      setLoading(false)
-    }
-  }
+  const departments = data?.departments ?? []
+  const departmentEmployees = data?.departmentEmployees ?? {}
+  const canManageDepartments = data?.canManageDepartments ?? false
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
 
     try {
-      if (!currentUserAccess.canManageDepartments) {
+      if (!canManageDepartments) {
         toast.error("You can view departments but cannot modify them")
         return
       }
@@ -177,7 +170,7 @@ export default function DepartmentsPage() {
       setIsDialogOpen(false)
       setEditingDepartment(null)
       setFormData({ name: "", description: "", is_active: true })
-      fetchDepartments()
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminDepartmentsPage() })
     } catch (error: any) {
       log.error("Error saving department:", error)
       toast.error(error.message || "Failed to save department")
@@ -185,7 +178,7 @@ export default function DepartmentsPage() {
   }
 
   function openEditDialog(dept: Department) {
-    if (!currentUserAccess.canManageDepartments) {
+    if (!canManageDepartments) {
       toast.error("You can view departments but cannot edit them")
       return
     }
@@ -200,7 +193,7 @@ export default function DepartmentsPage() {
   }
 
   function openCreateDialog() {
-    if (!currentUserAccess.canManageDepartments) {
+    if (!canManageDepartments) {
       toast.error("You can view departments but cannot create departments")
       return
     }
@@ -227,7 +220,7 @@ export default function DepartmentsPage() {
       backLinkHref="/admin/hr"
       backLinkLabel="Back to HR"
       actions={
-        currentUserAccess.canManageDepartments ? (
+        canManageDepartments ? (
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button onClick={openCreateDialog}>
@@ -312,26 +305,14 @@ export default function DepartmentsPage() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="space-y-3">
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="flex items-center gap-4">
-                  <Skeleton className="h-4 w-32" />
-                  <Skeleton className="h-4 w-48" />
-                  <Skeleton className="h-4 w-24" />
-                  <Skeleton className="h-4 w-24" />
-                  <Skeleton className="h-4 w-16" />
-                </div>
-              ))}
-            </div>
+            <TableSkeleton rows={5} cols={6} />
           ) : departments.length === 0 ? (
             <EmptyState
               icon={Building}
               title="No departments yet"
               description="Create your first department to get started."
               action={
-                currentUserAccess.canManageDepartments
-                  ? { label: "Add Department", onClick: openCreateDialog, icon: Plus }
-                  : undefined
+                canManageDepartments ? { label: "Add Department", onClick: openCreateDialog, icon: Plus } : undefined
               }
             />
           ) : (
@@ -391,7 +372,7 @@ export default function DepartmentsPage() {
                         </TableCell>
                         <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                           <div className="flex justify-end gap-2">
-                            {currentUserAccess.canManageDepartments && (
+                            {canManageDepartments && (
                               <Button
                                 variant="ghost"
                                 size="icon"
