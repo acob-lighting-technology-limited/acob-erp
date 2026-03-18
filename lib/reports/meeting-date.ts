@@ -85,14 +85,14 @@ export function buildMeetingDocumentFileName({
   if (documentType === "knowledge_sharing_session") {
     const dept = normalizeDisplayToken(department || "Unknown Department")
     const presenter = normalizeDisplayToken(presenterName || "Unknown Presenter")
-    return `KSS - ${dept} - ${presenter} - ${dateLabel} - W${meetingWeek}.${ext}`
+    return `ACOB KSS - ${dept} - ${presenter} - ${dateLabel} - W${meetingWeek}.${ext}`
   }
 
   if (documentType === "minutes") {
-    return `Minutes of Meeting - ${dateLabel} - W${meetingWeek}.${ext}`
+    return `ACOB Minutes of General Meeting - ${dateLabel} - W${meetingWeek}.${ext}`
   }
 
-  return `Action Points - ${dateLabel} - W${meetingWeek}.${ext}`
+  return `ACOB Action Points - ${dateLabel} - W${meetingWeek}.${ext}`
 }
 
 export function sanitizeStoragePathSegment(value: string): string {
