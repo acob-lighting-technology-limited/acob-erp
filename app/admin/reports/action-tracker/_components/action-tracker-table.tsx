@@ -26,6 +26,7 @@ import {
   exportActionTrackerToXLSX,
   type ActionItem,
 } from "@/lib/export-utils"
+import { getOfficeWeekMonday } from "@/lib/meeting-week"
 
 interface ActionTask {
   id: string
@@ -48,6 +49,7 @@ interface ActionTrackerTableProps {
   onToggleDept: (dept: string) => void
   weekFilter: number
   yearFilter: number
+  meetingDate?: string
   canMutateTask: (task: ActionTask) => boolean
   onStatusChange: (taskId: string, newStatus: string) => void
   onEdit: (task: ActionTask) => void
@@ -63,6 +65,7 @@ export function ActionTrackerTable({
   onToggleDept,
   weekFilter,
   yearFilter,
+  meetingDate,
   canMutateTask,
   onStatusChange,
   onEdit,
@@ -71,6 +74,31 @@ export function ActionTrackerTable({
   statusColor,
 }: ActionTrackerTableProps) {
   const deptsPresent = Array.from(new Set(tasks.map((t) => t.department))).sort()
+  const formatDueDate = (task: ActionTask) => {
+    if (task.due_date) {
+      const explicitDueDate = new Date(task.due_date)
+      if (!Number.isNaN(explicitDueDate.getTime())) {
+        return explicitDueDate.toLocaleString("en-GB", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        })
+      }
+    }
+
+    const sunday = getOfficeWeekMonday(task.week_number, task.year)
+    sunday.setDate(sunday.getDate() + 6)
+    sunday.setHours(23, 59, 0, 0)
+    return sunday.toLocaleString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+  }
 
   return (
     <div className="bg-background dark:bg-card overflow-hidden rounded-lg border shadow-sm">
@@ -152,27 +180,53 @@ export function ActionTrackerTable({
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem
-                              onClick={() => exportActionTrackerToPDF(deptActionItemsForExport, weekFilter, yearFilter)}
+                              onClick={() =>
+                                exportActionTrackerToPDF(
+                                  deptActionItemsForExport,
+                                  weekFilter,
+                                  yearFilter,
+                                  meetingDate,
+                                  dept
+                                )
+                              }
                             >
                               <FileText className="mr-2 h-4 w-4" /> Export PDF
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() =>
-                                exportActionTrackerToDocx(deptActionItemsForExport, weekFilter, yearFilter)
+                                exportActionTrackerToDocx(
+                                  deptActionItemsForExport,
+                                  weekFilter,
+                                  yearFilter,
+                                  meetingDate,
+                                  dept
+                                )
                               }
                             >
                               <FileIcon className="mr-2 h-4 w-4" /> Export Word
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() =>
-                                exportActionTrackerToPPTX(deptActionItemsForExport, weekFilter, yearFilter)
+                                exportActionTrackerToPPTX(
+                                  deptActionItemsForExport,
+                                  weekFilter,
+                                  yearFilter,
+                                  meetingDate,
+                                  dept
+                                )
                               }
                             >
                               <Presentation className="mr-2 h-4 w-4" /> Export PPTX
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() =>
-                                exportActionTrackerToXLSX(deptActionItemsForExport, weekFilter, yearFilter, dept)
+                                exportActionTrackerToXLSX(
+                                  deptActionItemsForExport,
+                                  weekFilter,
+                                  yearFilter,
+                                  dept,
+                                  meetingDate
+                                )
                               }
                             >
                               <FileSpreadsheet className="mr-2 h-4 w-4" /> Export XLSX
@@ -198,6 +252,9 @@ export function ActionTrackerTable({
                                   </TableHead>
                                   <TableHead className="text-muted-foreground w-[150px] text-[10px] font-black tracking-widest uppercase">
                                     Status
+                                  </TableHead>
+                                  <TableHead className="text-muted-foreground w-[170px] text-[10px] font-black tracking-widest uppercase">
+                                    Due Date
                                   </TableHead>
                                   <TableHead className="w-[80px] text-right"></TableHead>
                                 </TableRow>
@@ -243,6 +300,9 @@ export function ActionTrackerTable({
                                           </SelectItem>
                                         </SelectContent>
                                       </Select>
+                                    </TableCell>
+                                    <TableCell className="text-muted-foreground text-xs font-medium">
+                                      {formatDueDate(task)}
                                     </TableCell>
                                     <TableCell className="text-right">
                                       <DropdownMenu>

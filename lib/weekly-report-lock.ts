@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { getOfficeWeekMonday } from "@/lib/meeting-week"
+import { resolveEffectiveMeetingDateIso } from "@/lib/reports/meeting-date"
 
 export type WeeklyReportLockState = {
   meetingDate: string
@@ -30,7 +31,13 @@ export async function fetchWeeklyReportLockState(
   week: number,
   year: number
 ): Promise<WeeklyReportLockState> {
-  const fallbackMeetingDate = getDefaultMeetingDateIso(week, year)
+  let fallbackMeetingDate = getDefaultMeetingDateIso(week, year)
+
+  try {
+    fallbackMeetingDate = await resolveEffectiveMeetingDateIso(supabase, week, year)
+  } catch {
+    // Fall back to office-week Monday when the RPC is temporarily unavailable.
+  }
 
   const { data, error } = await supabase.rpc("weekly_report_lock_state", {
     p_week: week,

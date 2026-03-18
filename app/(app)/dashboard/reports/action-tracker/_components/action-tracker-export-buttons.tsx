@@ -14,15 +14,16 @@ interface ActionTrackerExportButtonsProps {
   actionItems: ActionItem[]
   week: number
   year: number
+  meetingDate?: string
 }
 
-export function ActionTrackerExportButtons({ actionItems, week, year }: ActionTrackerExportButtonsProps) {
+export function ActionTrackerExportButtons({ actionItems, week, year, meetingDate }: ActionTrackerExportButtonsProps) {
   return (
     <div className="flex items-center gap-2">
       <Button
         variant="outline"
         size="sm"
-        onClick={() => exportActionTrackerToPDF(actionItems, week, year)}
+        onClick={() => exportActionTrackerToPDF(actionItems, week, year, meetingDate)}
         className="gap-2 border-red-200 text-red-600"
       >
         <FileText className="h-4 w-4" /> PDF
@@ -30,7 +31,7 @@ export function ActionTrackerExportButtons({ actionItems, week, year }: ActionTr
       <Button
         variant="outline"
         size="sm"
-        onClick={() => exportActionTrackerToPPTX(actionItems, week, year)}
+        onClick={() => exportActionTrackerToPPTX(actionItems, week, year, meetingDate)}
         className="gap-2 border-orange-200 text-orange-600"
       >
         <Presentation className="h-4 w-4" /> PPTX
@@ -38,7 +39,7 @@ export function ActionTrackerExportButtons({ actionItems, week, year }: ActionTr
       <Button
         variant="outline"
         size="sm"
-        onClick={() => exportActionTrackerToDocx(actionItems, week, year)}
+        onClick={() => exportActionTrackerToDocx(actionItems, week, year, meetingDate)}
         className="gap-2 border-blue-200 text-blue-600"
       >
         <FileIcon className="h-4 w-4" /> Word
@@ -46,7 +47,7 @@ export function ActionTrackerExportButtons({ actionItems, week, year }: ActionTr
       <Button
         variant="outline"
         size="sm"
-        onClick={() => exportActionTrackerToXLSX(actionItems, week, year)}
+        onClick={() => exportActionTrackerToXLSX(actionItems, week, year, undefined, meetingDate)}
         className="gap-2 border-emerald-200 text-emerald-700"
       >
         <FileSpreadsheet className="h-4 w-4" /> XLSX

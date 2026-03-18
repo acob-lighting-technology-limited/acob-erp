@@ -14,6 +14,7 @@ interface TrackerStatus {
 interface WeeklyReportTableProps {
   loading: boolean
   filteredReports: WeeklyReport[]
+  meetingDate: string
   expandedRows: Set<string>
   trackingData: TrackerStatus[]
   isFilteredWeekLocked: boolean
@@ -27,6 +28,7 @@ interface WeeklyReportTableProps {
 export function WeeklyReportTable({
   loading,
   filteredReports,
+  meetingDate,
   expandedRows,
   trackingData,
   isFilteredWeekLocked,
@@ -43,8 +45,9 @@ export function WeeklyReportTable({
           <TableRow>
             <TableHead className="text-muted-foreground w-[40px]"></TableHead>
             <TableHead className="text-foreground font-bold">Department</TableHead>
-            <TableHead className="text-foreground font-bold">Submitted By</TableHead>
+            <TableHead className="text-foreground font-bold">Meeting Date</TableHead>
             <TableHead className="text-foreground font-bold">Week</TableHead>
+            <TableHead className="text-foreground font-bold">Submitted By</TableHead>
             <TableHead className="text-foreground font-bold">Submission Date</TableHead>
             <TableHead className="text-foreground text-center font-bold">Action Tracker</TableHead>
             <TableHead className="text-foreground text-right font-bold">Actions</TableHead>
@@ -53,13 +56,13 @@ export function WeeklyReportTable({
         <TableBody>
           {loading ? (
             <TableRow>
-              <TableCell colSpan={6} className="p-4">
-                <TableSkeleton rows={4} cols={5} />
+              <TableCell colSpan={8} className="p-4">
+                <TableSkeleton rows={4} cols={8} />
               </TableCell>
             </TableRow>
           ) : filteredReports.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={6} className="text-muted-foreground h-32 text-center font-medium">
+              <TableCell colSpan={8} className="text-muted-foreground h-32 text-center font-medium">
                 No records found for the selected criteria.
               </TableCell>
             </TableRow>
@@ -68,6 +71,7 @@ export function WeeklyReportTable({
               <WeeklyReportTableRow
                 key={report.id}
                 report={report}
+                meetingDate={meetingDate}
                 isExpanded={expandedRows.has(report.id)}
                 onToggle={() => onToggleRow(report.id)}
                 trackingData={trackingData}

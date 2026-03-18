@@ -11,8 +11,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { SearchableMultiSelect } from "@/components/ui/searchable-multi-select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,9 +24,11 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { TableSkeleton } from "@/components/ui/query-states"
+import { createClient } from "@/lib/supabase/client"
 import { getCurrentOfficeWeek } from "@/lib/meeting-week"
 import { REPORT_DOC_MAX_SIZE_BYTES, formatLimitMb } from "@/lib/reports/document-upload-limits"
-import { Download, Eye, Loader2, Pencil, Plus, Presentation, Search, Trash2 } from "lucide-react"
+import { buildMeetingDocumentFileName } from "@/lib/reports/meeting-date"
+import { Download, Loader2, Pencil, Plus, Presentation, Search, Trash2 } from "lucide-react"
 
 type Employee = {
   id: string
@@ -43,18 +45,22 @@ type KssRosterEntry = {
   created_by: string | null
   notes: string | null
   created_at: string
+  meeting_date?: string | null
+  is_locked?: boolean
 }
 
 type KssDocument = {
   id: string
   meeting_week: number
   meeting_year: number
+  meeting_date?: string | null
   document_type: "knowledge_sharing_session"
   department: string | null
   presenter_id: string | null
   file_name: string
   mime_type?: string | null
   signed_url: string | null
+  is_locked?: boolean
 }
 
 const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -74,16 +80,6 @@ function compareWeekYear(aWeek: number, aYear: number, bWeek: number, bYear: num
   return aWeek - bWeek
 }
 
-function sanitizeForFileName(value: string): string {
-  const sanitized = value
-    .trim()
-    .replace(/\s+/g, "_")
-    .replace(/[^a-zA-Z0-9_-]/g, "_")
-    .replace(/_+/g, "_")
-    .replace(/^_+|_+$/g, "")
-  return sanitized || "Unknown"
-}
-
 function getFileExtension(fileName: string, mimeType?: string | null): string {
   const lower = (fileName || "").toLowerCase()
   if (lower.endsWith(".pdf")) return "pdf"
@@ -95,6 +91,17 @@ function getFileExtension(fileName: string, mimeType?: string | null): string {
   return "pdf"
 }
 
+function formatMeetingDate(value?: string | null): string {
+  if (!value) return "-"
+  const date = new Date(`${value}T00:00:00`)
+  if (Number.isNaN(date.getTime())) return "-"
+  return date.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  })
+}
+
 export function KssRosterTable({
   employees,
   backHref,
@@ -102,17 +109,13 @@ export function KssRosterTable({
   title = "Knowledge Sharing Session",
   readOnly = false,
 }: Props) {
+  const supabase = createClient()
   const currentOfficeWeek = getCurrentOfficeWeek()
   const defaultWeek = currentOfficeWeek.week
   const defaultYear = currentOfficeWeek.year
 
   const [showCreate, setShowCreate] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [previewDoc, setPreviewDoc] = useState<{
-    doc: KssDocument
-    row: KssRosterEntry
-    presenterName: string
-  } | null>(null)
   const [pendingDeleteRow, setPendingDeleteRow] = useState<KssRosterEntry | null>(null)
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
 
@@ -184,6 +187,21 @@ export function KssRosterTable({
     },
   })
 
+  const { data: selectedWeekLockState } = useQuery({
+    queryKey: ["kss-selected-week-lock", weekNumber, yearNumber],
+    enabled: !readOnly,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("weekly_report_lock_state", {
+        p_week: weekNumber,
+        p_year: yearNumber,
+      })
+      if (error) throw new Error(error.message)
+      return Array.isArray(data) && data[0] ? Boolean(data[0].is_locked) : false
+    },
+  })
+
+  const isSelectedWeekLocked = Boolean(selectedWeekLockState)
+
   const docByWeekYear = useMemo(() => {
     const map = new Map<string, KssDocument>()
     docs.forEach((d) => map.set(`${d.meeting_year}-${d.meeting_week}`, d))
@@ -248,6 +266,12 @@ export function KssRosterTable({
   }
 
   const openEdit = (row: KssRosterEntry) => {
+    const isPastRow =
+      compareWeekYear(row.meeting_week, row.meeting_year, currentOfficeWeek.week, currentOfficeWeek.year) < 0
+    if (row.is_locked || isPastRow) {
+      toast.error(`Week ${row.meeting_week}, ${row.meeting_year} is locked and can no longer be edited`)
+      return
+    }
     setShowCreate(true)
     setEditingId(row.id)
     setWeekNumber(row.meeting_week)
@@ -261,6 +285,10 @@ export function KssRosterTable({
   const handleSave = async () => {
     if (readOnly) {
       toast.error("You can only add or edit from Admin Reports.")
+      return
+    }
+    if (isSelectedWeekLocked) {
+      toast.error(`Week ${weekNumber}, ${yearNumber} is locked and can no longer be changed`)
       return
     }
     if (file && file.size > REPORT_DOC_MAX_SIZE_BYTES) {
@@ -358,6 +386,12 @@ export function KssRosterTable({
       toast.error("You can only delete from Admin Reports.")
       return
     }
+    const isPastRow =
+      compareWeekYear(row.meeting_week, row.meeting_year, currentOfficeWeek.week, currentOfficeWeek.year) < 0
+    if (row.is_locked || isPastRow) {
+      toast.error(`Week ${row.meeting_week}, ${row.meeting_year} is locked and can no longer be changed`)
+      return
+    }
     try {
       const doc = docByWeekYear.get(`${row.meeting_year}-${row.meeting_week}`)
       if (doc) {
@@ -378,10 +412,15 @@ export function KssRosterTable({
   }
 
   const buildDownloadName = (doc: KssDocument, row: KssRosterEntry, presenterName: string): string => {
-    const department = sanitizeForFileName(row.department)
-    const presenter = sanitizeForFileName(presenterName === "-" ? "Unknown" : presenterName)
     const ext = getFileExtension(doc.file_name, doc.mime_type)
-    return `KSS_${department}_${presenter}_Week_${row.meeting_week}_${row.meeting_year}.${ext}`
+    return buildMeetingDocumentFileName({
+      documentType: "knowledge_sharing_session",
+      meetingDate: doc.meeting_date || `${row.meeting_year}-01-01`,
+      meetingWeek: row.meeting_week,
+      extension: ext,
+      department: row.department,
+      presenterName: presenterName === "-" ? "Unknown Presenter" : presenterName,
+    })
   }
 
   const handleDownload = async (doc: KssDocument, row: KssRosterEntry, presenterName: string) => {
@@ -432,6 +471,7 @@ export function KssRosterTable({
               resetForm()
               setShowCreate(true)
             }}
+            disabled={false}
           >
             <Plus className="mr-2 h-4 w-4" /> Add KSS
           </Button>
@@ -545,57 +585,6 @@ export function KssRosterTable({
         </AlertDialog>
 
         <Dialog
-          open={Boolean(previewDoc)}
-          onOpenChange={(open) => {
-            if (!open) setPreviewDoc(null)
-          }}
-        >
-          <DialogContent className="max-h-[90vh] w-[95vw] max-w-5xl overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>KSS Document Preview</DialogTitle>
-              <DialogDescription>
-                {previewDoc
-                  ? `Week ${previewDoc.row.meeting_week}, ${previewDoc.row.meeting_year} • ${previewDoc.row.department} • ${previewDoc.presenterName}`
-                  : "Preview uploaded KSS file"}
-              </DialogDescription>
-            </DialogHeader>
-            {previewDoc?.doc.signed_url ? (
-              <>
-                {getFileExtension(previewDoc.doc.file_name, previewDoc.doc.mime_type) === "pdf" ? (
-                  previewDoc ? (
-                    <iframe
-                      src={`/api/reports/meeting-week-documents?id=${previewDoc.doc.id}&mode=preview`}
-                      title="KSS document preview"
-                      className="h-[65vh] w-full rounded-md border"
-                    />
-                  ) : (
-                    <div className="text-muted-foreground rounded-md border p-4 text-sm">
-                      Preview could not be loaded here. Use Open or Download.
-                    </div>
-                  )
-                ) : (
-                  <div className="text-muted-foreground rounded-md border p-4 text-sm">
-                    Preview is not supported for this file type. Use Open or Download.
-                  </div>
-                )}
-                <div className="flex justify-end gap-2">
-                  <Button variant="outline" asChild>
-                    <a href={previewDoc.doc.signed_url} target="_blank" rel="noreferrer">
-                      Open in New Tab
-                    </a>
-                  </Button>
-                  <Button onClick={() => handleDownload(previewDoc.doc, previewDoc.row, previewDoc.presenterName)}>
-                    Download
-                  </Button>
-                </div>
-              </>
-            ) : (
-              <div className="text-muted-foreground rounded-md border p-4 text-sm">Document URL unavailable.</div>
-            )}
-          </DialogContent>
-        </Dialog>
-
-        <Dialog
           open={showCreate}
           onOpenChange={(open) => {
             setShowCreate(open)
@@ -616,7 +605,7 @@ export function KssRosterTable({
                 <Select
                   value={String(weekNumber)}
                   onValueChange={(v) => setWeekNumber(Number(v))}
-                  disabled={Boolean(editingId)}
+                  disabled={Boolean(editingId) || isSelectedWeekLocked}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -636,7 +625,7 @@ export function KssRosterTable({
                 <Select
                   value={String(yearNumber)}
                   onValueChange={(v) => setYearNumber(Number(v))}
-                  disabled={Boolean(editingId)}
+                  disabled={Boolean(editingId) || isSelectedWeekLocked}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -653,7 +642,7 @@ export function KssRosterTable({
 
               <div className="space-y-2">
                 <Label>Department</Label>
-                <Select value={department} onValueChange={setDepartment}>
+                <Select value={department} onValueChange={setDepartment} disabled={isSelectedWeekLocked}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select department" />
                   </SelectTrigger>
@@ -670,7 +659,11 @@ export function KssRosterTable({
 
               <div className="space-y-2">
                 <Label>Presenter</Label>
-                <Select value={presenterId} onValueChange={setPresenterId} disabled={department === "none"}>
+                <Select
+                  value={presenterId}
+                  onValueChange={setPresenterId}
+                  disabled={isSelectedWeekLocked || department === "none"}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select presenter" />
                   </SelectTrigger>
@@ -687,7 +680,12 @@ export function KssRosterTable({
 
               <div className="space-y-2">
                 <Label>Notes</Label>
-                <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional" />
+                <Input
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Optional"
+                  disabled={isSelectedWeekLocked}
+                />
               </div>
 
               <div className="space-y-2">
@@ -708,16 +706,22 @@ export function KssRosterTable({
                     }
                     setFile(selected)
                   }}
+                  disabled={isSelectedWeekLocked}
                 />
                 <p className="text-muted-foreground text-xs">
                   Accepted: PDF, PPTX, DOCX. PPTX and DOCX uploads are converted to PDF before storage. Max file size:{" "}
                   {formatLimitMb(REPORT_DOC_MAX_SIZE_BYTES)}
                 </p>
+                {isSelectedWeekLocked ? (
+                  <p className="text-muted-foreground text-xs">
+                    This week is locked after the meeting grace window, so past KSS records are read-only.
+                  </p>
+                ) : null}
               </div>
             </div>
 
             <div className="mt-4 flex gap-2">
-              <Button onClick={handleSave} disabled={saving}>
+              <Button onClick={handleSave} disabled={saving || isSelectedWeekLocked}>
                 {saving ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -754,6 +758,7 @@ export function KssRosterTable({
                   <TableHead>S/N</TableHead>
                   <TableHead>Department</TableHead>
                   <TableHead>Presenter</TableHead>
+                  <TableHead>Meeting Date</TableHead>
                   <TableHead>Week</TableHead>
                   <TableHead>Submitted By</TableHead>
                   <TableHead>Submitted Date</TableHead>
@@ -763,14 +768,22 @@ export function KssRosterTable({
               <TableBody>
                 {isRosterLoading || isDocsLoading ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="p-4">
-                      <TableSkeleton rows={4} cols={7} />
+                    <TableCell colSpan={8} className="p-4">
+                      <TableSkeleton rows={4} cols={8} />
                     </TableCell>
                   </TableRow>
                 ) : (
                   rows.map((row, index) => {
                     const doc = docByWeekYear.get(`${row.meeting_year}-${row.meeting_week}`)
                     const presenterName = row.presenter_id ? employeeNameById.get(row.presenter_id) || "Unknown" : "-"
+                    const isPastRow =
+                      compareWeekYear(
+                        row.meeting_week,
+                        row.meeting_year,
+                        currentOfficeWeek.week,
+                        currentOfficeWeek.year
+                      ) < 0
+                    const isActionLocked = isPastRow || Boolean(row.is_locked)
                     const submittedBy = row.created_by ? employeeNameById.get(row.created_by) || "Unknown" : "-"
                     const submittedDate = row.created_at
                       ? new Date(row.created_at).toLocaleString("en-GB", {
@@ -787,17 +800,18 @@ export function KssRosterTable({
                         <TableCell>{index + 1}</TableCell>
                         <TableCell>{row.department}</TableCell>
                         <TableCell>{presenterName}</TableCell>
-                        <TableCell className="font-medium">{`W${row.meeting_week}, ${row.meeting_year}`}</TableCell>
+                        <TableCell>{formatMeetingDate(row.meeting_date || doc?.meeting_date)}</TableCell>
+                        <TableCell className="font-medium">{`W${row.meeting_week}`}</TableCell>
                         <TableCell>{submittedBy}</TableCell>
                         <TableCell>{submittedDate}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1">
-                            {!readOnly ? (
+                            {!readOnly && !isActionLocked ? (
                               <Button variant="ghost" size="icon" onClick={() => openEdit(row)} title="Edit">
                                 <Pencil className="h-4 w-4" />
                               </Button>
                             ) : null}
-                            {!readOnly ? (
+                            {!readOnly && !isActionLocked ? (
                               <Button
                                 variant="ghost"
                                 size="icon"
@@ -807,20 +821,6 @@ export function KssRosterTable({
                                 <Trash2 className="h-4 w-4 text-red-600" />
                               </Button>
                             ) : null}
-                            {doc?.signed_url ? (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                title="View"
-                                onClick={() => setPreviewDoc({ doc, row, presenterName })}
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                            ) : (
-                              <Button variant="ghost" size="icon" disabled title="View">
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                            )}
                             {doc?.signed_url ? (
                               <Button
                                 variant="ghost"
@@ -845,7 +845,7 @@ export function KssRosterTable({
 
                 {!isRosterLoading && !isDocsLoading && rows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-muted-foreground py-8 text-center">
+                    <TableCell colSpan={8} className="text-muted-foreground py-8 text-center">
                       No rows found for current filters.
                     </TableCell>
                   </TableRow>

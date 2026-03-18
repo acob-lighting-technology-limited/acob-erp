@@ -3,6 +3,7 @@ import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 import { resolveAdminScope, getDepartmentScope, normalizeDepartmentName } from "@/lib/admin/rbac"
 import { writeAuditLog } from "@/lib/audit/write-audit"
+import { resolveEffectiveMeetingDateIso } from "@/lib/reports/meeting-date"
 import { logger } from "@/lib/logger"
 
 const log = logger("api-reports-kss-roster")
@@ -31,6 +32,25 @@ function normalizeDepartment(value: string): string {
 
 function hasGlobalReportsWriteAccess(scope: NonNullable<Awaited<ReturnType<typeof resolveAdminScope>>>): boolean {
   return getDepartmentScope(scope, "general") === null
+}
+
+async function assertWeekIsMutable(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  meetingWeek: number,
+  meetingYear: number
+) {
+  const { data, error } = await supabase.rpc("weekly_report_can_mutate", {
+    p_week: meetingWeek,
+    p_year: meetingYear,
+  })
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  if (!data) {
+    throw new Error(`Week ${meetingWeek}, ${meetingYear} is locked and can no longer be changed`)
+  }
 }
 
 export async function GET(request: Request) {
@@ -63,7 +83,24 @@ export async function GET(request: Request) {
     const { data, error } = await query
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-    return NextResponse.json({ data: data || [] })
+    const rows = data || []
+    const withLockState = await Promise.all(
+      rows.map(async (row) => {
+        const meetingDate = await resolveEffectiveMeetingDateIso(supabase, row.meeting_week, row.meeting_year)
+        const { data: canMutate } = await supabase.rpc("weekly_report_can_mutate", {
+          p_week: row.meeting_week,
+          p_year: row.meeting_year,
+        })
+
+        return {
+          ...row,
+          meeting_date: meetingDate,
+          is_locked: !Boolean(canMutate),
+        }
+      })
+    )
+
+    return NextResponse.json({ data: withLockState })
   } catch (error) {
     log.error({ err: String(error) }, "GET /api/reports/kss-roster failed")
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })
@@ -101,6 +138,8 @@ export async function POST(request: Request) {
     if (!department) {
       return NextResponse.json({ error: "department is required" }, { status: 400 })
     }
+
+    await assertWeekIsMutable(supabase, meetingWeek, meetingYear)
 
     const { data: saved, error } = await supabase
       .from("kss_weekly_roster")
@@ -174,13 +213,15 @@ export async function PATCH(request: Request) {
 
     const { data: existing, error: fetchError } = await supabase
       .from("kss_weekly_roster")
-      .select("id, department")
+      .select("id, department, meeting_week, meeting_year")
       .eq("id", id)
       .single()
 
     if (fetchError || !existing) {
       return NextResponse.json({ error: "Roster entry not found" }, { status: 404 })
     }
+
+    await assertWeekIsMutable(supabase, existing.meeting_week, existing.meeting_year)
 
     const patch: Record<string, unknown> = {}
     if (typeof body?.department === "string" && body.department.trim()) {
@@ -253,13 +294,15 @@ export async function DELETE(request: Request) {
 
     const { data: existing, error: fetchError } = await supabase
       .from("kss_weekly_roster")
-      .select("id, department")
+      .select("id, department, meeting_week, meeting_year")
       .eq("id", id)
       .single()
 
     if (fetchError || !existing) {
       return NextResponse.json({ error: "Roster entry not found" }, { status: 404 })
     }
+
+    await assertWeekIsMutable(supabase, existing.meeting_week, existing.meeting_year)
     const { error } = await supabase.from("kss_weekly_roster").delete().eq("id", id)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 

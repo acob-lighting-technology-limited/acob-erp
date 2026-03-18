@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0"
 import { Resend } from "npm:resend@2.0.0"
 import { writeEdgeAuditLog } from "../_shared/audit.ts"
+import { getCurrentOfficeWeek, getOfficeWeekFromDate, resolveEffectiveMeetingDateIso } from "../_shared/meeting-date.ts"
 import { isEdgeSystemEmailEnabled } from "../_shared/notification-gateway.ts"
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")!
@@ -491,6 +492,8 @@ serve(async (req) => {
       type: ReminderType
       recipients: string[]
       meetingDate?: string
+      meetingWeek?: number
+      meetingYear?: number
       meetingTime?: string
       teamsLink?: string
       agenda?: string[]
@@ -510,9 +513,34 @@ serve(async (req) => {
 
     let html: string
     let subject: string
+    let effectiveMeetingDate = meetingDate
     const from = DEFAULT_SENDER
 
     if (type === "meeting") {
+      const parsedMeetingDate = parseMeetingDateInput(meetingDate)
+      const dayDiffFromToday = parsedMeetingDate
+        ? Math.floor((parsedMeetingDate.getTime() - Date.now()) / (24 * 60 * 60 * 1000))
+        : null
+
+      const resolvedOfficeWeek =
+        typeof body?.meetingWeek === "number" && typeof body?.meetingYear === "number"
+          ? { week: body.meetingWeek, year: body.meetingYear }
+          : parsedMeetingDate && dayDiffFromToday !== null && Math.abs(dayDiffFromToday) <= 7
+            ? getOfficeWeekFromDate(
+                new Date(
+                  parsedMeetingDate.getUTCFullYear(),
+                  parsedMeetingDate.getUTCMonth(),
+                  parsedMeetingDate.getUTCDate()
+                )
+              )
+            : getCurrentOfficeWeek()
+
+      effectiveMeetingDate = await resolveEffectiveMeetingDateIso(
+        supabase,
+        resolvedOfficeWeek.week,
+        resolvedOfficeWeek.year
+      )
+
       const normalizedAgenda = normalizeMeetingAgenda(agenda, knowledgeSharingPresenter, knowledgeSharingDepartment)
       if (kssRosterStatus === "missing") {
         console.warn("[meeting-reminder] KSS roster missing for recurring schedule; sending without roster enrichment")
@@ -520,7 +548,7 @@ serve(async (req) => {
 
       subject = withSubjectPrefix("Meetings", "Reminder for General Weekly Meeting")
       html = buildMeetingReminderHtml(
-        meetingDate,
+        effectiveMeetingDate,
         meetingTime || "8:30 AM",
         teamsLink || "",
         normalizedAgenda,
@@ -566,7 +594,7 @@ serve(async (req) => {
           success_count: successCount,
           failure_count: failureCount,
           subject,
-          meeting_date: meetingDate || null,
+          meeting_date: effectiveMeetingDate || null,
           meeting_time: meetingTime || null,
           knowledge_sharing_department: knowledgeSharingDepartment || null,
           knowledge_sharing_presenter: knowledgeSharingPresenter?.full_name || null,

@@ -22,6 +22,7 @@ import { ActionFormDialog } from "@/components/admin/action-tracker/action-form-
 import { type ActionItem } from "@/lib/export-utils"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
+import { fetchWeeklyReportLockState } from "@/lib/weekly-report-lock"
 import { ActionTrackerStats } from "./_components/action-tracker-stats"
 import { ActionTrackerFilters } from "./_components/action-tracker-filters"
 import { ActionTrackerTable } from "./_components/action-tracker-table"
@@ -119,6 +120,11 @@ export function ActionTrackerContent({
   } = useQuery({
     queryKey: QUERY_KEYS.adminActionTrackerTasks({ weekFilter, yearFilter, deptFilter, scopedDepartments }),
     queryFn: () => fetchAdminActionTrackerTasks(supabase, weekFilter, yearFilter, deptFilter, scopedDepartments),
+  })
+
+  const { data: lockState } = useQuery({
+    queryKey: QUERY_KEYS.adminWeeklyReportLockState(weekFilter, yearFilter),
+    queryFn: () => fetchWeeklyReportLockState(supabase, weekFilter, yearFilter),
   })
 
   const tasksQueryKey = QUERY_KEYS.adminActionTrackerTasks({ weekFilter, yearFilter, deptFilter, scopedDepartments })
@@ -235,7 +241,12 @@ export function ActionTrackerContent({
       backLinkLabel="Back to Reports"
       actions={
         tasks.length > 0 ? (
-          <ActionTrackerExportButtons items={actionItemsForExport} weekFilter={weekFilter} yearFilter={yearFilter} />
+          <ActionTrackerExportButtons
+            items={actionItemsForExport}
+            weekFilter={weekFilter}
+            yearFilter={yearFilter}
+            meetingDate={lockState?.meetingDate}
+          />
         ) : null
       }
       stats={
@@ -270,6 +281,7 @@ export function ActionTrackerContent({
         onToggleDept={toggleDept}
         weekFilter={weekFilter}
         yearFilter={yearFilter}
+        meetingDate={lockState?.meetingDate}
         canMutateTask={canMutateTask}
         onStatusChange={handleStatusChange}
         onEdit={handleEdit}

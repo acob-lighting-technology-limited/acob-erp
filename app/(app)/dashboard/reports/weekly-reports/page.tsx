@@ -100,6 +100,7 @@ export default function WeeklyReportsPortal() {
     { kind: "single"; report: WeeklyReport } | { kind: "all" } | null
   >(null)
   const [isFilteredWeekLocked, setIsFilteredWeekLocked] = useState(false)
+  const [meetingDate, setMeetingDate] = useState<string | undefined>(undefined)
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
 
   const supabase = createClient()
@@ -133,6 +134,7 @@ export default function WeeklyReportsPortal() {
     const loadFilteredWeekLock = async () => {
       const state = await fetchWeeklyReportLockState(supabase, weekFilter, yearFilter)
       setIsFilteredWeekLocked(state.isLocked)
+      setMeetingDate(state.meetingDate || undefined)
     }
     loadFilteredWeekLock()
   }, [weekFilter, yearFilter])
@@ -184,10 +186,10 @@ export default function WeeklyReportsPortal() {
   const runPptxExport = async (mode: WeeklyPptxMode, theme: WeeklyPptxTheme = "light") => {
     if (!pendingPptxExport) return
     if (pendingPptxExport.kind === "all") {
-      await exportAllToPPTX(filteredReports, weekFilter, yearFilter, mode, theme)
+      await exportAllToPPTX(filteredReports, weekFilter, yearFilter, mode, theme, meetingDate)
     } else {
       const { exportToPPTX } = await import("@/lib/export-utils")
-      await exportToPPTX(pendingPptxExport.report, mode, theme)
+      await exportToPPTX(pendingPptxExport.report, mode, theme, meetingDate)
     }
     setPptxModeDialogOpen(false)
     setPendingPptxExport(null)
@@ -208,6 +210,7 @@ export default function WeeklyReportsPortal() {
           filteredReports={filteredReports}
           weekFilter={weekFilter}
           yearFilter={yearFilter}
+          meetingDate={meetingDate}
           isLead={isLead}
           onOpenPptxDialog={openAllPptxModeDialog}
           onSubmitNew={() => {
@@ -238,6 +241,7 @@ export default function WeeklyReportsPortal() {
         loading={loading}
         expandedRows={expandedRows}
         onToggleRow={toggleRow}
+        meetingDate={meetingDate}
         isFilteredWeekLocked={isFilteredWeekLocked}
         currentUserDepartment={profile?.department}
         onEdit={(report) => {

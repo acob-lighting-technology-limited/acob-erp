@@ -3,6 +3,12 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0"
 import { Resend } from "npm:resend@2.0.0"
 import { PDFDocument, rgb, StandardFonts } from "npm:pdf-lib@1.17.1"
 import { writeEdgeAuditLog } from "../_shared/audit.ts"
+import {
+  buildMeetingDocumentFileName,
+  formatMeetingDateLabel,
+  getCurrentOfficeWeek,
+  resolveEffectiveMeetingDateIso,
+} from "../_shared/meeting-date.ts"
 import { isEdgeSystemEmailEnabled } from "../_shared/notification-gateway.ts"
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")!
@@ -27,52 +33,6 @@ const SEND_INTERVAL_MS = Math.ceil(1000 / RESEND_MAX_REQ_PER_SEC) + 100 // ~0.6s
 const MAX_429_RETRIES = 5
 const DEFAULT_SENDER = "ACOB Internal Systems <notifications@acoblighting.com>"
 const MEETING_DOCS_BUCKET = "meeting_documents"
-
-const OFFICE_WEEK_ANCHOR_MONTH_INDEX = 0
-const OFFICE_WEEK_ANCHOR_DAY = 12
-
-function getOfficeYearStart(year: number): Date {
-  return new Date(year, OFFICE_WEEK_ANCHOR_MONTH_INDEX, OFFICE_WEEK_ANCHOR_DAY)
-}
-
-function getCurrentOfficeWeek(): { week: number; year: number } {
-  return getOfficeWeekFromDate(new Date())
-}
-
-function getOfficeWeekFromDate(date: Date): { week: number; year: number } {
-  const input = new Date(date)
-  let year = input.getFullYear()
-  let yearStart = getOfficeYearStart(year)
-
-  if (input < yearStart) {
-    year -= 1
-    yearStart = getOfficeYearStart(year)
-  }
-
-  const diffMs = input.getTime() - yearStart.getTime()
-  const week = Math.floor(diffMs / (7 * 24 * 60 * 60 * 1000)) + 1
-  return { week, year }
-}
-
-function getWeekMonday(week: number, year: number): string {
-  const monday = new Date(getOfficeYearStart(year))
-  monday.setDate(monday.getDate() + (week - 1) * 7)
-  return formatDateWithOrdinal(monday)
-}
-
-function formatDateWithOrdinal(date: Date): string {
-  const day = date.getDate()
-  const suffix = [1, 21, 31].includes(day) ? "st" : [2, 22].includes(day) ? "nd" : [3, 23].includes(day) ? "rd" : "th"
-  const month = date.toLocaleString("en-GB", { month: "long" })
-  return `${day}${suffix} ${month}, ${date.getFullYear()}`
-}
-
-function getNextMeetingDate(week: number, year: number): string {
-  const monday = new Date(getOfficeYearStart(year))
-  monday.setDate(monday.getDate() + (week - 1) * 7)
-  monday.setDate(monday.getDate() + 7)
-  return formatDateWithOrdinal(monday)
-}
 
 const DEPT_ORDER = [
   "Accounts",
@@ -211,6 +171,8 @@ async function resolveStoredMeetingDocument(
     presenterName = presenter?.full_name || null
   }
 
+  const meetingDate = await resolveEffectiveMeetingDateIso(supabase, doc.meeting_week, doc.meeting_year)
+
   const { data: blob, error: downloadError } = await supabase.storage.from(MEETING_DOCS_BUCKET).download(doc.file_path)
   if (downloadError || !blob) return null
 
@@ -220,19 +182,8 @@ async function resolveStoredMeetingDocument(
 
   return {
     base64: btoa(binary),
-    filename: buildAttachmentFilename(doc, presenterName),
+    filename: buildAttachmentFilename(doc, meetingDate, presenterName),
   }
-}
-
-function sanitizeAttachmentToken(value: string): string {
-  return (
-    String(value || "Unknown")
-      .trim()
-      .replace(/\s+/g, "_")
-      .replace(/[^a-zA-Z0-9_-]/g, "_")
-      .replace(/_+/g, "_")
-      .replace(/^_+|_+$/g, "") || "Unknown"
-  )
 }
 
 function extensionFromDocument(fileName: string | null | undefined, mimeType: string | null | undefined): string {
@@ -255,22 +206,25 @@ function buildAttachmentFilename(
     file_name?: string | null
     mime_type?: string | null
   },
+  meetingDate: string,
   presenterName?: string | null
 ): string {
   const extension = extensionFromDocument(doc.file_name, doc.mime_type)
-  const week = doc.meeting_week || "Unknown"
-  const year = doc.meeting_year || "Unknown"
+  const week = Number(doc.meeting_week || 0)
 
-  if (doc.document_type === "knowledge_sharing_session") {
-    return `KSS_${sanitizeAttachmentToken(doc.department || "Unknown")}_${sanitizeAttachmentToken(presenterName || "Unknown")}_Week_${week}_${year}.${extension}`
-  }
-
-  if (doc.document_type === "minutes") {
-    return `Minutes_of_Meeting_Week_${week}_${year}.${extension}`
-  }
-
-  if (doc.document_type === "action_points") {
-    return `Action_Points_Manual_Week_${week}_${year}.${extension}`
+  if (
+    doc.document_type === "knowledge_sharing_session" ||
+    doc.document_type === "minutes" ||
+    doc.document_type === "action_points"
+  ) {
+    return buildMeetingDocumentFileName({
+      documentType: doc.document_type,
+      meetingDate,
+      meetingWeek: week,
+      extension,
+      department: doc.department,
+      presenterName,
+    })
   }
 
   return doc.file_name || "meeting-document.pdf"
@@ -306,13 +260,13 @@ async function addCoverPage(
   regular: any,
   week: number,
   year: number,
+  meetingDateLabel: string,
   subtitle: string,
   secondaryTitle = "Weekly Report",
   coverLogoBytes: Uint8Array | null
 ) {
   const page = doc.addPage([595, 842])
   const { width: W, height: H } = page.getSize()
-  const mondayDate = getWeekMonday(week, year)
 
   // Dark header bar
   page.drawRectangle({ x: 0, y: H - 60, width: W, height: 60, color: DARK })
@@ -365,8 +319,8 @@ async function addCoverPage(
   page.drawText(pillLabel, { x: pillX + 18, y: pillY + 7, size: 12, font: bold, color: WHITE })
 
   // Monday date — properly centred
-  const dateWidth = regular.widthOfTextAtSize(mondayDate, 10)
-  page.drawText(mondayDate, { x: W / 2 - dateWidth / 2, y: pillY - 22, size: 10, font: regular, color: MUTED })
+  const dateWidth = regular.widthOfTextAtSize(meetingDateLabel, 10)
+  page.drawText(meetingDateLabel, { x: W / 2 - dateWidth / 2, y: pillY - 22, size: 10, font: regular, color: MUTED })
 
   if (subtitle) {
     const stWidth = regular.widthOfTextAtSize(subtitle, 10)
@@ -678,6 +632,7 @@ async function buildWeeklyReportPDF(
   reports: any[],
   meetingWeek: number,
   meetingYear: number,
+  meetingDateLabel: string,
   coverLogoBytes: Uint8Array | null,
   headerLogoBytes: Uint8Array | null
 ): Promise<Uint8Array> {
@@ -694,7 +649,17 @@ async function buildWeeklyReportPDF(
     return a.department.localeCompare(b.department)
   })
 
-  await addCoverPage(doc, bold, regular, meetingWeek, meetingYear, "", "Weekly Report", coverLogoBytes)
+  await addCoverPage(
+    doc,
+    bold,
+    regular,
+    meetingWeek,
+    meetingYear,
+    meetingDateLabel,
+    "",
+    "Weekly Report",
+    coverLogoBytes
+  )
   await addTOCPage(
     doc,
     bold,
@@ -715,6 +680,7 @@ async function buildActionTrackerPDF(
   actions: any[],
   meetingWeek: number,
   meetingYear: number,
+  meetingDateLabel: string,
   coverLogoBytes: Uint8Array | null,
   headerLogoBytes: Uint8Array | null
 ): Promise<Uint8Array> {
@@ -722,7 +688,17 @@ async function buildActionTrackerPDF(
   const bold = await doc.embedFont(StandardFonts.HelveticaBold)
   const regular = await doc.embedFont(StandardFonts.Helvetica)
 
-  await addCoverPage(doc, bold, regular, meetingWeek, meetingYear, "Action Tracker", "Action Tracker", coverLogoBytes)
+  await addCoverPage(
+    doc,
+    bold,
+    regular,
+    meetingWeek,
+    meetingYear,
+    meetingDateLabel,
+    "Action Tracker",
+    "Action Tracker",
+    coverLogoBytes
+  )
 
   const grouped: Record<string, any[]> = {}
   for (const a of actions) {
@@ -754,9 +730,13 @@ async function buildActionTrackerPDF(
   return doc.save()
 }
 
-function buildEmailHtml(meetingWeek: number, meetingYear: number, preparedByName: string): string {
-  const meetingDate = getWeekMonday(meetingWeek, meetingYear)
-  const nextMeetingDate = getNextMeetingDate(meetingWeek, meetingYear)
+function buildEmailHtml(
+  meetingWeek: number,
+  meetingYear: number,
+  meetingDate: string,
+  nextMeetingDate: string,
+  preparedByName: string
+): string {
   const safePreparedBy = escapeHtml((preparedByName || "").trim() || "Terna")
 
   return `<!DOCTYPE html>
@@ -884,6 +864,12 @@ serve(async (req) => {
       meetingYear = currentYear
     }
 
+    const meetingDateIso = await resolveEffectiveMeetingDateIso(supabase, meetingWeek, meetingYear)
+    const meetingDateLabel = formatMeetingDateLabel(meetingDateIso)
+    const nextMeetingDate = new Date(`${meetingDateIso}T00:00:00Z`)
+    nextMeetingDate.setUTCDate(nextMeetingDate.getUTCDate() + 7)
+    const nextMeetingDateLabel = formatMeetingDateLabel(nextMeetingDate)
+
     // ── Data weeks ──────────────────────────────────────────────────────
     // Everything uses the same meeting week — no previous-week offset
     const reportDataWeek = meetingWeek
@@ -1004,10 +990,17 @@ serve(async (req) => {
       console.log(`[weekly-report] Generating PDFs: ${reports.length} reports, ${(actions || []).length} actions`)
       const [reportPdfBytes, trackerPdfBytes] = await Promise.all([
         includeWeeklyReport && !reportPdfBase64
-          ? buildWeeklyReportPDF(reports, meetingWeek, meetingYear, coverLogoBytes, headerLogoBytes)
+          ? buildWeeklyReportPDF(reports, meetingWeek, meetingYear, meetingDateLabel, coverLogoBytes, headerLogoBytes)
           : Promise.resolve<Uint8Array | null>(null),
         includeActionTracker && !trackerPdfBase64
-          ? buildActionTrackerPDF(actions || [], meetingWeek, meetingYear, coverLogoBytes, headerLogoBytes)
+          ? buildActionTrackerPDF(
+              actions || [],
+              meetingWeek,
+              meetingYear,
+              meetingDateLabel,
+              coverLogoBytes,
+              headerLogoBytes
+            )
           : Promise.resolve<Uint8Array | null>(null),
       ])
 
@@ -1028,9 +1021,17 @@ serve(async (req) => {
           ? [testEmail]
           : ["i.chibuikem@org.acoblighting.com"]
 
-    const meetingDate = getWeekMonday(meetingWeek, meetingYear)
-    const subject = withSubjectPrefix("Reports", `Minutes and Action Points of the General Meeting - ${meetingDate}`)
-    const html = buildEmailHtml(meetingWeek, meetingYear, preparedByName || "Terna")
+    const subject = withSubjectPrefix(
+      "Reports",
+      `Minutes and Action Points of the General Meeting - ${meetingDateLabel}`
+    )
+    const html = buildEmailHtml(
+      meetingWeek,
+      meetingYear,
+      meetingDateLabel,
+      nextMeetingDateLabel,
+      preparedByName || "Terna"
+    )
 
     const attachments: { filename: string; content: string }[] = []
     if (includeWeeklyReport && reportPdfBase64) {

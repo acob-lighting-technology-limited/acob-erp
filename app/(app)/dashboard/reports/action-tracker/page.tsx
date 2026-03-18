@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { createClient } from "@/lib/supabase/client"
 import { getCurrentOfficeWeek } from "@/lib/meeting-week"
+import { fetchWeeklyReportLockState } from "@/lib/weekly-report-lock"
 import { toast } from "sonner"
 import { FileSpreadsheet, CheckCircle2, Clock, RefreshCw } from "lucide-react"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
@@ -39,6 +40,7 @@ export default function ActionTrackerPortal() {
   })
   const [deptFilter, setDeptFilter] = useState("all")
   const [searchQuery, setSearchQuery] = useState("")
+  const [meetingDate, setMeetingDate] = useState<string | undefined>(undefined)
 
   const { data: metaData } = useQuery({
     queryKey: QUERY_KEYS.actionTrackerMetadata(),
@@ -55,6 +57,15 @@ export default function ActionTrackerPortal() {
   } = useQuery({
     queryKey: QUERY_KEYS.actionTrackerTasks({ week, year, deptFilter }),
     queryFn: () => fetchActionTrackerTasks(supabase, week, year, deptFilter),
+  })
+
+  useQuery({
+    queryKey: ["dashboard-action-tracker-meeting-date", week, year],
+    queryFn: async () => {
+      const state = await fetchWeeklyReportLockState(supabase, week, year)
+      setMeetingDate(state.meetingDate || undefined)
+      return state
+    },
   })
 
   const tasks = tasksData?.tasks ?? []
@@ -122,7 +133,12 @@ export default function ActionTrackerPortal() {
       backLinkLabel="Back to Reports"
       actions={
         tasks.length > 0 ? (
-          <ActionTrackerExportButtons actionItems={actionItemsForExport} week={week} year={year} />
+          <ActionTrackerExportButtons
+            actionItems={actionItemsForExport}
+            week={week}
+            year={year}
+            meetingDate={meetingDate}
+          />
         ) : null
       }
       stats={
@@ -188,6 +204,7 @@ export default function ActionTrackerPortal() {
                 profile={profile}
                 week={week}
                 year={year}
+                meetingDate={meetingDate}
                 onStatusChange={handleStatusChange}
                 getDeptStatus={(dept) => getDeptStatus(tasks, dept)}
                 statusColor={getStatusColor}

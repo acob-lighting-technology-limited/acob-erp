@@ -22,15 +22,28 @@ export default async function WeeklyReportsPage() {
     redirect("/dashboard")
   }
 
-  // Fetch departments for filtering
-  const { data: employeeData } = await dataClient.from("profiles").select("department").not("department", "is", null)
+  // Fetch departments for filtering and presenter options for week setup.
+  const { data: employeeData } = await dataClient
+    .from("profiles")
+    .select("id, full_name, department")
+    .not("department", "is", null)
 
   const departments = Array.from(new Set(employeeData?.map((s: any) => s.department).filter(Boolean))) as string[]
   departments.sort()
 
+  const employees = (employeeData || [])
+    .filter((row: any) => row?.id && row?.full_name && row?.department)
+    .map((row: any) => ({
+      id: String(row.id),
+      full_name: String(row.full_name),
+      department: String(row.department),
+    }))
+    .sort((a, b) => a.full_name.localeCompare(b.full_name))
+
   return (
     <WeeklyReportsContent
       initialDepartments={departments}
+      employees={employees}
       scopedDepartments={[]}
       editableDepartments={scope.isAdminLike ? [] : scope.managedDepartments || []}
       currentUser={{
