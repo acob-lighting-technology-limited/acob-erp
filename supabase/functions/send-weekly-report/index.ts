@@ -198,12 +198,18 @@ async function resolveStoredMeetingDocument(
 ): Promise<{ base64: string; filename: string } | null> {
   const { data: doc, error } = await supabase
     .from("meeting_week_documents")
-    .select("id, file_path, file_name")
+    .select("id, meeting_week, meeting_year, document_type, department, presenter_id, file_path, file_name, mime_type")
     .eq("id", documentId)
     .eq("is_current", true)
     .single()
 
   if (error || !doc?.file_path) return null
+
+  let presenterName: string | null = null
+  if (doc.document_type === "knowledge_sharing_session" && doc.presenter_id) {
+    const { data: presenter } = await supabase.from("profiles").select("full_name").eq("id", doc.presenter_id).single()
+    presenterName = presenter?.full_name || null
+  }
 
   const { data: blob, error: downloadError } = await supabase.storage.from(MEETING_DOCS_BUCKET).download(doc.file_path)
   if (downloadError || !blob) return null
@@ -214,8 +220,60 @@ async function resolveStoredMeetingDocument(
 
   return {
     base64: btoa(binary),
-    filename: doc.file_name || "meeting-document.pdf",
+    filename: buildAttachmentFilename(doc, presenterName),
   }
+}
+
+function sanitizeAttachmentToken(value: string): string {
+  return (
+    String(value || "Unknown")
+      .trim()
+      .replace(/\s+/g, "_")
+      .replace(/[^a-zA-Z0-9_-]/g, "_")
+      .replace(/_+/g, "_")
+      .replace(/^_+|_+$/g, "") || "Unknown"
+  )
+}
+
+function extensionFromDocument(fileName: string | null | undefined, mimeType: string | null | undefined): string {
+  const lower = String(fileName || "").toLowerCase()
+  if (lower.endsWith(".pdf")) return "pdf"
+  if (lower.endsWith(".docx")) return "docx"
+  if (lower.endsWith(".pptx")) return "pptx"
+  if (mimeType === "application/pdf") return "pdf"
+  if (mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") return "docx"
+  if (mimeType === "application/vnd.openxmlformats-officedocument.presentationml.presentation") return "pptx"
+  return "pdf"
+}
+
+function buildAttachmentFilename(
+  doc: {
+    meeting_week?: number
+    meeting_year?: number
+    document_type?: string
+    department?: string | null
+    file_name?: string | null
+    mime_type?: string | null
+  },
+  presenterName?: string | null
+): string {
+  const extension = extensionFromDocument(doc.file_name, doc.mime_type)
+  const week = doc.meeting_week || "Unknown"
+  const year = doc.meeting_year || "Unknown"
+
+  if (doc.document_type === "knowledge_sharing_session") {
+    return `KSS_${sanitizeAttachmentToken(doc.department || "Unknown")}_${sanitizeAttachmentToken(presenterName || "Unknown")}_Week_${week}_${year}.${extension}`
+  }
+
+  if (doc.document_type === "minutes") {
+    return `Minutes_of_Meeting_Week_${week}_${year}.${extension}`
+  }
+
+  if (doc.document_type === "action_points") {
+    return `Action_Points_Manual_Week_${week}_${year}.${extension}`
+  }
+
+  return doc.file_name || "meeting-document.pdf"
 }
 
 async function drawLogoInHeader(
@@ -699,7 +757,7 @@ async function buildActionTrackerPDF(
 function buildEmailHtml(meetingWeek: number, meetingYear: number, preparedByName: string): string {
   const meetingDate = getWeekMonday(meetingWeek, meetingYear)
   const nextMeetingDate = getNextMeetingDate(meetingWeek, meetingYear)
-  const safePreparedBy = escapeHtml((preparedByName || "").trim() || "ACOB Team")
+  const safePreparedBy = escapeHtml((preparedByName || "").trim() || "Terna")
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -972,7 +1030,7 @@ serve(async (req) => {
 
     const meetingDate = getWeekMonday(meetingWeek, meetingYear)
     const subject = withSubjectPrefix("Reports", `Minutes and Action Points of the General Meeting - ${meetingDate}`)
-    const html = buildEmailHtml(meetingWeek, meetingYear, preparedByName || "ACOB Team")
+    const html = buildEmailHtml(meetingWeek, meetingYear, preparedByName || "Terna")
 
     const attachments: { filename: string; content: string }[] = []
     if (includeWeeklyReport && reportPdfBase64) {
@@ -1033,7 +1091,7 @@ serve(async (req) => {
           recipient_count: recipients.length,
           success_count: successCount,
           failure_count: failureCount,
-          prepared_by: preparedByName || "ACOB Team",
+          prepared_by: preparedByName || "Terna",
           attachments: attachments.map((a) => a.filename),
         },
       })

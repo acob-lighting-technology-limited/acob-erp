@@ -82,6 +82,32 @@ const hrNavigation = [
 
 const adminNavigation = [{ name: "Admin Dashboard", href: "/admin", icon: ShieldCheck }]
 
+// Aliases: key = sidebar nav-item href, values = extra path prefixes that should
+// also activate (highlight) that item.
+// Rule: every real app-route must map back to one nav item here or share its prefix.
+const ROUTE_ALIASES: Record<string, string[]> = {
+  // Projects live at /projects (top-level) — also reachable via /dashboard/projects
+  "/projects": ["/dashboard/projects"],
+  // Payments: /payments (top-level) mirrors /dashboard/payments
+  "/dashboard/payments": ["/payments"],
+  // Notifications: singular href /notification, but extra paths use plural or dashboard prefix
+  "/notification": ["/dashboard/notifications", "/notifications"],
+  // Assets: top-level /assets mirrors /dashboard/assets
+  "/dashboard/assets": ["/assets"],
+  // Tasks: top-level /tasks mirrors /dashboard/tasks
+  "/dashboard/tasks": ["/tasks"],
+  // Tools: top-level /tools and /tools/* mirror /dashboard/tools
+  "/dashboard/tools": ["/tools"],
+  // Documentation: top-level /documentation mirrors /dashboard/documentation
+  "/dashboard/documentation": ["/documentation"],
+  // Feedback: top-level /feedback mirrors /dashboard/feedback
+  "/dashboard/feedback": ["/feedback"],
+  // Help Desk: in case there's ever a top-level /help-desk
+  "/dashboard/help-desk": ["/help-desk"],
+  // Reports: in case there's ever a top-level /reports
+  "/dashboard/reports": ["/reports"],
+}
+
 export function Sidebar({ user, profile, canAccessAdmin }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
@@ -134,11 +160,7 @@ export function Sidebar({ user, profile, canAccessAdmin }: SidebarProps) {
     router.push("/auth/login")
   }
 
-  const routeAliases: Record<string, string[]> = {
-    "/dashboard/payments": ["/payments", "/dashboard/payments"],
-    "/dashboard/projects": ["/projects", "/dashboard/projects"],
-    "/notification": ["/notification", "/dashboard/notifications"],
-  }
+  const routeAliases = ROUTE_ALIASES
 
   const isNavItemActive = (href: string): boolean => {
     if (!pathname) return false
@@ -157,7 +179,7 @@ export function Sidebar({ user, profile, canAccessAdmin }: SidebarProps) {
 
   const isLead = Boolean(profile?.lead_departments && profile.lead_departments.length > 0)
 
-  const SidebarContent = () => (
+  const sidebarJSX = (
     <>
       {/* Empty space for logo (moved to navbar) */}
       <div className={cn("transition-[padding] duration-300 ease-in-out", isCollapsed ? "px-2 py-2" : "px-3 py-2")}>
@@ -370,7 +392,7 @@ export function Sidebar({ user, profile, canAccessAdmin }: SidebarProps) {
         }}
         className="bg-card hidden overflow-hidden border-r lg:fixed lg:top-16 lg:bottom-0 lg:flex lg:flex-col"
       >
-        <SidebarContent />
+        {sidebarJSX}
       </motion.aside>
 
       {/* Mobile Header - Hidden, using navbar instead */}
@@ -390,7 +412,7 @@ export function Sidebar({ user, profile, canAccessAdmin }: SidebarProps) {
             isMobileMenuOpen ? "translate-x-0" : "translate-x-full"
           )}
         >
-          <SidebarContent />
+          {sidebarJSX}
         </aside>
       </>
     </>

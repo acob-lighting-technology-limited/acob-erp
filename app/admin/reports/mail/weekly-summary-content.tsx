@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useCallback, useEffect } from "react"
+import { useState, useMemo, useCallback, useEffect, useRef } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { PageWrapper, PageHeader } from "@/components/layout"
 import { Mail, FileText, ClipboardList } from "lucide-react"
@@ -47,6 +47,47 @@ type MeetingWeekDocument = {
   created_at: string
 }
 
+type MailDocRef = {
+  id: string
+  file_name: string
+  display_name: string
+}
+
+function sanitizeAttachmentToken(value: string): string {
+  return (
+    String(value || "Unknown")
+      .trim()
+      .replace(/\s+/g, "_")
+      .replace(/[^a-zA-Z0-9_-]/g, "_")
+      .replace(/_+/g, "_")
+      .replace(/^_+|_+$/g, "") || "Unknown"
+  )
+}
+
+function getFileExtension(fileName: string): string {
+  const lower = String(fileName || "").toLowerCase()
+  if (lower.endsWith(".pdf")) return "pdf"
+  if (lower.endsWith(".docx")) return "docx"
+  if (lower.endsWith(".pptx")) return "pptx"
+  return "pdf"
+}
+
+function buildMeetingDocumentDisplayName(document: MeetingWeekDocument, presenterName?: string | null): string {
+  const extension = getFileExtension(document.file_name)
+
+  if (document.document_type === "knowledge_sharing_session") {
+    return `KSS_${sanitizeAttachmentToken(document.department || "Unknown")}_${sanitizeAttachmentToken(
+      presenterName || "Unknown"
+    )}_Week_${document.meeting_week}_${document.meeting_year}.${extension}`
+  }
+
+  if (document.document_type === "minutes") {
+    return `Minutes_of_Meeting_Week_${document.meeting_week}_${document.meeting_year}.${extension}`
+  }
+
+  return `Action_Points_Manual_Week_${document.meeting_week}_${document.meeting_year}.${extension}`
+}
+
 interface Props {
   employees: Employee[]
   currentUser?: {
@@ -70,7 +111,7 @@ export function WeeklySummaryContent({ employees, currentUser }: Props) {
   const [selectedContentChoices, setSelectedContentChoices] = useState<Set<ContentChoice>>(
     new Set<ContentChoice>(["weekly_report"])
   )
-  const [selectedPreparedBy, setSelectedPreparedBy] = useState("ACOB Team")
+  const [selectedPreparedBy, setSelectedPreparedBy] = useState("Terna")
 
   const currentYear = currentOfficeWeek.year
   const currentWeekNumber = currentOfficeWeek.week
@@ -82,6 +123,7 @@ export function WeeklySummaryContent({ employees, currentUser }: Props) {
   const [scheduledTime, setScheduledTime] = useState("09:00")
   const [recurringDay, setRecurringDay] = useState("monday")
   const [recurringTime, setRecurringTime] = useState("09:00")
+  const hasAppliedDefaultPreparer = useRef(false)
 
   const queryClient = useQueryClient()
 
@@ -119,13 +161,30 @@ export function WeeklySummaryContent({ employees, currentUser }: Props) {
   })
 
   const currentDocByType = useMemo(() => {
-    return {
-      knowledgeSharingSession:
-        meetingDocuments.find((d) => d.document_type === "knowledge_sharing_session" && d.is_current) || null,
-      minutesOfMeeting: meetingDocuments.find((d) => d.document_type === "minutes" && d.is_current) || null,
-      actionPointsManual: meetingDocuments.find((d) => d.document_type === "action_points" && d.is_current) || null,
+    const toMailDocRef = (document: MeetingWeekDocument | undefined | null): MailDocRef | null => {
+      if (!document) return null
+      const presenterName =
+        document.presenter_id && document.document_type === "knowledge_sharing_session"
+          ? employees.find((employee) => employee.id === document.presenter_id)?.full_name || null
+          : null
+
+      return {
+        id: document.id,
+        file_name: document.file_name,
+        display_name: buildMeetingDocumentDisplayName(document, presenterName),
+      }
     }
-  }, [meetingDocuments])
+
+    return {
+      knowledgeSharingSession: toMailDocRef(
+        meetingDocuments.find((d) => d.document_type === "knowledge_sharing_session" && d.is_current)
+      ),
+      minutesOfMeeting: toMailDocRef(meetingDocuments.find((d) => d.document_type === "minutes" && d.is_current)),
+      actionPointsManual: toMailDocRef(
+        meetingDocuments.find((d) => d.document_type === "action_points" && d.is_current)
+      ),
+    }
+  }, [employees, meetingDocuments])
 
   const contentOptions = useMemo(
     () => [
@@ -149,6 +208,8 @@ export function WeeklySummaryContent({ employees, currentUser }: Props) {
         icon: FileText,
         desc: "Uses uploaded Knowledge Sharing Session file from Reports",
         disabled: !currentDocByType.knowledgeSharingSession,
+        helperHref: "/admin/reports/kss",
+        helperLabel: "Go to KSS",
       },
       {
         value: "minutes_of_meeting" as ContentChoice,
@@ -156,6 +217,8 @@ export function WeeklySummaryContent({ employees, currentUser }: Props) {
         icon: FileText,
         desc: "Uses uploaded Minutes of Meeting PDF from Reports",
         disabled: !currentDocByType.minutesOfMeeting,
+        helperHref: "/admin/reports/minutes-of-meeting",
+        helperLabel: "Go to Minutes",
       },
       {
         value: "action_points_manual" as ContentChoice,
@@ -163,6 +226,8 @@ export function WeeklySummaryContent({ employees, currentUser }: Props) {
         icon: ClipboardList,
         desc: "Uses uploaded manual Action Points PDF from Reports",
         disabled: !currentDocByType.actionPointsManual,
+        helperHref: "/admin/reports/action-points-manual",
+        helperLabel: "Go to Action Points",
       },
     ],
     [currentDocByType.actionPointsManual, currentDocByType.knowledgeSharingSession, currentDocByType.minutesOfMeeting]
@@ -217,16 +282,26 @@ export function WeeklySummaryContent({ employees, currentUser }: Props) {
 
   useEffect(() => {
     if (adminHrPreparers.length === 0) {
-      setSelectedPreparedBy("ACOB Team")
+      setSelectedPreparedBy("Terna")
       return
     }
 
     const currentDept = (currentUser?.department || "").toLowerCase()
     const currentName = (currentUser?.full_name || "").trim()
     const isCurrentUserAdminHr = currentDept.includes("admin") && currentDept.includes("hr")
+    const ternaName = adminHrPreparers.find((name) => name.trim().toLowerCase().includes("terna"))
 
     const preferredName =
-      isCurrentUserAdminHr && currentName && adminHrPreparers.includes(currentName) ? currentName : adminHrPreparers[0]
+      ternaName ||
+      (isCurrentUserAdminHr && currentName && adminHrPreparers.includes(currentName)
+        ? currentName
+        : adminHrPreparers[0])
+
+    if (!hasAppliedDefaultPreparer.current) {
+      setSelectedPreparedBy(preferredName)
+      hasAppliedDefaultPreparer.current = true
+      return
+    }
 
     if (!selectedPreparedBy || !adminHrPreparers.includes(selectedPreparedBy)) {
       setSelectedPreparedBy(preferredName)

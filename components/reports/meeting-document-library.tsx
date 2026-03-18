@@ -10,7 +10,11 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { getCurrentOfficeWeek } from "@/lib/meeting-week"
+import { REPORT_DOC_MAX_SIZE_BYTES, formatLimitMb } from "@/lib/reports/document-upload-limits"
 import { BookOpen, CalendarDays, Loader2, Presentation, Upload } from "lucide-react"
+
+const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+const PPTX_MIME = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
 
 type Employee = {
   id: string
@@ -179,7 +183,9 @@ export function MeetingDocumentLibrary({ employees, backHref, backLabel, title =
       if (kind === "minutes") setMinutesFile(null)
       if (kind === "action_points") setActionPointsFile(null)
 
-      toast.success("Document uploaded and saved for this week")
+      toast.success(
+        payload?.converted ? "Document uploaded and converted to PDF" : "Document uploaded and saved for this week"
+      )
       void refetchMeetingDocuments()
     } catch (error: any) {
       toast.error(error?.message || "Failed to upload document")
@@ -310,12 +316,28 @@ export function MeetingDocumentLibrary({ employees, backHref, backLabel, title =
           <CardContent className="space-y-5">
             <div className="grid gap-4 md:grid-cols-3">
               <div className="space-y-2">
-                <Label>Knowledge Sharing Session (PPT/PPTX/PDF)</Label>
+                <Label>Knowledge Sharing Session (PDF/PPTX/DOCX)</Label>
                 <Input
                   type="file"
-                  accept=".ppt,.pptx,application/pdf,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation"
-                  onChange={(e) => setKssFile(e.target.files?.[0] || null)}
+                  accept=".pdf,.pptx,.docx,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  onChange={(e) => {
+                    const selected = e.target.files?.[0] || null
+                    if (selected && selected.size > REPORT_DOC_MAX_SIZE_BYTES) {
+                      toast.error(`File exceeds max size of ${formatLimitMb(REPORT_DOC_MAX_SIZE_BYTES)}`)
+                      e.currentTarget.value = ""
+                      setKssFile(null)
+                      return
+                    }
+                    if (selected?.type === PPTX_MIME || selected?.type === DOCX_MIME) {
+                      toast.info("This file will be converted to PDF before it is stored.")
+                    }
+                    setKssFile(selected)
+                  }}
                 />
+                <p className="text-muted-foreground text-xs">
+                  Accepted: PDF, PPTX, DOCX. PPTX and DOCX uploads are converted to PDF before storage. Max file size:{" "}
+                  {formatLimitMb(REPORT_DOC_MAX_SIZE_BYTES)}
+                </p>
                 <Button
                   type="button"
                   variant="outline"
@@ -335,12 +357,28 @@ export function MeetingDocumentLibrary({ employees, backHref, backLabel, title =
                 </Button>
               </div>
               <div className="space-y-2">
-                <Label>Minutes of Meeting (PDF)</Label>
+                <Label>Minutes of Meeting (PDF/DOCX)</Label>
                 <Input
                   type="file"
-                  accept="application/pdf"
-                  onChange={(e) => setMinutesFile(e.target.files?.[0] || null)}
+                  accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  onChange={(e) => {
+                    const selected = e.target.files?.[0] || null
+                    if (selected && selected.size > REPORT_DOC_MAX_SIZE_BYTES) {
+                      toast.error(`File exceeds max size of ${formatLimitMb(REPORT_DOC_MAX_SIZE_BYTES)}`)
+                      e.currentTarget.value = ""
+                      setMinutesFile(null)
+                      return
+                    }
+                    if (selected?.type === DOCX_MIME) {
+                      toast.info("This DOCX file will be converted to PDF before it is stored.")
+                    }
+                    setMinutesFile(selected)
+                  }}
                 />
+                <p className="text-muted-foreground text-xs">
+                  Accepted: PDF, DOCX. DOCX uploads are converted to PDF before storage. Max file size:{" "}
+                  {formatLimitMb(REPORT_DOC_MAX_SIZE_BYTES)}
+                </p>
                 <Button
                   type="button"
                   variant="outline"
@@ -356,12 +394,28 @@ export function MeetingDocumentLibrary({ employees, backHref, backLabel, title =
                 </Button>
               </div>
               <div className="space-y-2">
-                <Label>Action Points (Manual PDF)</Label>
+                <Label>Action Points (PDF/DOCX)</Label>
                 <Input
                   type="file"
-                  accept="application/pdf"
-                  onChange={(e) => setActionPointsFile(e.target.files?.[0] || null)}
+                  accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  onChange={(e) => {
+                    const selected = e.target.files?.[0] || null
+                    if (selected && selected.size > REPORT_DOC_MAX_SIZE_BYTES) {
+                      toast.error(`File exceeds max size of ${formatLimitMb(REPORT_DOC_MAX_SIZE_BYTES)}`)
+                      e.currentTarget.value = ""
+                      setActionPointsFile(null)
+                      return
+                    }
+                    if (selected?.type === DOCX_MIME) {
+                      toast.info("This DOCX file will be converted to PDF before it is stored.")
+                    }
+                    setActionPointsFile(selected)
+                  }}
                 />
+                <p className="text-muted-foreground text-xs">
+                  Accepted: PDF, DOCX. DOCX uploads are converted to PDF before storage. Max file size:{" "}
+                  {formatLimitMb(REPORT_DOC_MAX_SIZE_BYTES)}
+                </p>
                 <Button
                   type="button"
                   variant="outline"

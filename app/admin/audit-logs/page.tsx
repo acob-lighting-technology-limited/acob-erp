@@ -66,7 +66,9 @@ async function getAuditLogsData(): Promise<AuditLogsData> {
   const rows = (rpcRows ?? []) as any[]
   const totalCount = rows.length > 0 ? Number(rows[0].total_count ?? rows.length) : 0
 
-  // Map RPC rows → AuditLog shape expected by the client component
+  // Map RPC rows → AuditLog shape expected by the client component.
+  // Supports both the newer JSONB-column format (user_data, target_user_data…)
+  // and the older flat-column format (actor_first_name, actor_last_name…).
   const logs: AuditLog[] = rows.map(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (row: any) => {
@@ -76,6 +78,93 @@ async function getAuditLogsData(): Promise<AuditLogsData> {
         ...(row.metadata || {}),
         ...(row.metadata?.event ? {} : rawAction !== normalizedAction ? { event: rawAction } : {}),
       }
+
+      // -- actor (performed-by) user -----------------------------------------
+      // Prefer JSONB user_data (new RPC); fall back to flat actor_* columns (old RPC).
+      const user =
+        row.user_data ??
+        (row.actor_first_name || row.actor_last_name
+          ? {
+              first_name: row.actor_first_name ?? "",
+              last_name: row.actor_last_name ?? "",
+              company_email: row.actor_email ?? "",
+              employee_number: row.actor_employee_no ?? undefined,
+            }
+          : null)
+
+      // -- target user --------------------------------------------------------
+      const target_user =
+        row.target_user_data ??
+        (row.target_first_name || row.target_last_name
+          ? {
+              first_name: row.target_first_name ?? "",
+              last_name: row.target_last_name ?? "",
+              company_email: row.target_email ?? "",
+              employee_number: row.target_employee_no ?? undefined,
+            }
+          : null)
+
+      // -- task ---------------------------------------------------------------
+      const task_info = row.task_info ?? (row.task_title ? { title: row.task_title } : null)
+
+      // -- asset --------------------------------------------------------------
+      const asset_info =
+        row.asset_info ??
+        (row.asset_name
+          ? {
+              asset_name: row.asset_name,
+              unique_code: row.asset_unique_code ?? undefined,
+              serial_number: row.asset_serial ?? undefined,
+              assigned_to: row.asset_assigned_to ?? undefined,
+              assigned_to_user:
+                row.asset_assignee_first_name || row.asset_assignee_last_name
+                  ? {
+                      first_name: row.asset_assignee_first_name ?? "",
+                      last_name: row.asset_assignee_last_name ?? "",
+                    }
+                  : undefined,
+            }
+          : null)
+
+      // -- payment ------------------------------------------------------------
+      const payment_info =
+        row.payment_info ??
+        (row.payment_title
+          ? { title: row.payment_title, amount: 0, currency: "", department_name: row.payment_dept_name ?? undefined }
+          : null)
+
+      // -- document -----------------------------------------------------------
+      const document_info =
+        row.document_info ??
+        (row.doc_file_name
+          ? { file_name: row.doc_file_name, document_type: "", department_name: row.doc_dept_name ?? undefined }
+          : null)
+
+      // -- department ---------------------------------------------------------
+      const department_info = row.department_info ?? (row.dept_name ? { name: row.dept_name } : null)
+
+      // -- category -----------------------------------------------------------
+      const category_info = row.category_info ?? (row.category_name ? { name: row.category_name } : null)
+
+      // -- leave request ------------------------------------------------------
+      const leave_request_info =
+        row.leave_request_info ??
+        (row.leave_type_name
+          ? {
+              user_id: row.user_id ?? "",
+              leave_type_name: row.leave_type_name,
+              requester_user:
+                row.leave_requester_first_name || row.leave_requester_last_name
+                  ? {
+                      first_name: row.leave_requester_first_name ?? "",
+                      last_name: row.leave_requester_last_name ?? "",
+                    }
+                  : undefined,
+            }
+          : null)
+
+      // -- device -------------------------------------------------------------
+      const device_info = row.device_info ?? (row.device_name ? { device_name: row.device_name } : null)
 
       return {
         id: row.id,
@@ -89,16 +178,16 @@ async function getAuditLogsData(): Promise<AuditLogsData> {
         created_at: row.created_at,
         department: row.department ?? null,
         changed_fields: row.changed_fields ?? [],
-        user: row.user_data ?? null,
-        target_user: row.target_user_data ?? null,
-        task_info: row.task_info ?? null,
-        asset_info: row.asset_info ?? null,
-        payment_info: row.payment_info ?? null,
-        document_info: row.document_info ?? null,
-        department_info: row.department_info ?? null,
-        category_info: row.category_info ?? null,
-        leave_request_info: row.leave_request_info ?? null,
-        device_info: row.device_info ?? null,
+        user,
+        target_user,
+        task_info,
+        asset_info,
+        payment_info,
+        document_info,
+        department_info,
+        category_info,
+        leave_request_info,
+        device_info,
       }
     }
   )
