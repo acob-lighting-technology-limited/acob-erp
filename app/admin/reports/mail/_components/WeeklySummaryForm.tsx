@@ -1,9 +1,11 @@
 "use client"
 
+import Link from "next/link"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { FileText, ClipboardList, CalendarDays } from "lucide-react"
 
@@ -21,6 +23,8 @@ interface ContentOption {
   icon: any
   desc: string
   disabled: boolean
+  helperHref?: string
+  helperLabel?: string
 }
 
 interface WeeklySummaryFormProps {
@@ -122,9 +126,9 @@ export function WeeklySummaryForm({
                   key={opt.value}
                   className={`flex items-start gap-3 rounded-lg border p-3 transition-colors ${
                     opt.disabled
-                      ? "bg-muted/20 opacity-60"
+                      ? "bg-muted/20 opacity-70"
                       : checked
-                        ? "border-green-600 bg-green-50/60"
+                        ? "text-foreground border-emerald-500 bg-emerald-50 shadow-sm dark:bg-emerald-950/20"
                         : "hover:bg-muted/40"
                   }`}
                 >
@@ -139,7 +143,20 @@ export function WeeklySummaryForm({
                     <div className="text-sm font-semibold">{opt.label}</div>
                     <div className="text-muted-foreground text-xs">{opt.desc}</div>
                     {opt.disabled ? (
-                      <div className="text-destructive mt-1 text-[11px]">Upload this in Reports first</div>
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <div className="text-destructive text-[11px]">Upload this in Reports first</div>
+                        {opt.helperHref ? (
+                          <Button size="sm" variant="outline" asChild className="h-7 px-2 text-[11px]">
+                            <Link href={opt.helperHref}>{opt.helperLabel || "Open Reports"}</Link>
+                          </Button>
+                        ) : null}
+                      </div>
+                    ) : opt.helperHref ? (
+                      <div className="mt-2">
+                        <Button size="sm" variant="ghost" asChild className="h-7 px-2 text-[11px]">
+                          <Link href={opt.helperHref}>{opt.helperLabel || "Open Reports"}</Link>
+                        </Button>
+                      </div>
                     ) : null}
                   </div>
                 </label>
@@ -164,7 +181,7 @@ export function WeeklySummaryForm({
                     </SelectItem>
                   ))
                 ) : (
-                  <SelectItem value="ACOB Team">ACOB Team</SelectItem>
+                  <SelectItem value="Terna">Terna</SelectItem>
                 )}
               </SelectContent>
             </Select>

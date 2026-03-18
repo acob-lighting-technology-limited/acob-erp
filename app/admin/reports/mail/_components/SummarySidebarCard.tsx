@@ -16,6 +16,7 @@ type SendTiming = "now" | "scheduled" | "recurring"
 
 interface DocRef {
   file_name: string
+  display_name: string
 }
 
 interface CurrentDocByType {
@@ -99,17 +100,17 @@ export function SummarySidebarCard({
             )}
             {selectedContentChoices.has("knowledge_sharing_session") && currentDocByType.knowledgeSharingSession && (
               <Badge variant="secondary" className="gap-1">
-                <FileText className="h-3 w-3" /> {currentDocByType.knowledgeSharingSession.file_name}
+                <FileText className="h-3 w-3" /> {currentDocByType.knowledgeSharingSession.display_name}
               </Badge>
             )}
             {selectedContentChoices.has("minutes_of_meeting") && currentDocByType.minutesOfMeeting && (
               <Badge variant="secondary" className="gap-1">
-                <FileText className="h-3 w-3" /> {currentDocByType.minutesOfMeeting.file_name}
+                <FileText className="h-3 w-3" /> {currentDocByType.minutesOfMeeting.display_name}
               </Badge>
             )}
             {selectedContentChoices.has("action_points_manual") && currentDocByType.actionPointsManual && (
               <Badge variant="secondary" className="gap-1">
-                <ClipboardList className="h-3 w-3" /> {currentDocByType.actionPointsManual.file_name}
+                <ClipboardList className="h-3 w-3" /> {currentDocByType.actionPointsManual.display_name}
               </Badge>
             )}
             {selectedContentChoices.size === 0 ? (

@@ -1,10 +1,11 @@
 "use client"
 
+import Link from "next/link"
 import { useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { TablePage } from "@/components/admin/admin-table-page"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -55,6 +56,10 @@ type KssDocument = {
   mime_type?: string | null
   signed_url: string | null
 }
+
+const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+const PPTX_MIME = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+type UploadPhase = "idle" | "saving" | "converting" | "uploading"
 
 interface Props {
   employees: Employee[]
@@ -118,6 +123,7 @@ export function KssRosterTable({
   const [notes, setNotes] = useState("")
   const [file, setFile] = useState<File | null>(null)
   const [saving, setSaving] = useState(false)
+  const [uploadPhase, setUploadPhase] = useState<UploadPhase>("idle")
 
   const [searchQuery, setSearchQuery] = useState("")
   const [departmentFilter, setDepartmentFilter] = useState("all")
@@ -238,6 +244,7 @@ export function KssRosterTable({
     setNotes("")
     setFile(null)
     setEditingId(null)
+    setUploadPhase("idle")
   }
 
   const openEdit = (row: KssRosterEntry) => {
@@ -270,6 +277,7 @@ export function KssRosterTable({
     }
 
     setSaving(true)
+    setUploadPhase("saving")
     try {
       const rosterRes = await fetch("/api/reports/kss-roster", {
         method: editingId ? "PATCH" : "POST",
@@ -295,6 +303,7 @@ export function KssRosterTable({
       if (!rosterRes.ok) throw new Error(rosterPayload.error || "Failed to save roster")
 
       if (file) {
+        const requiresConversion = [DOCX_MIME, PPTX_MIME].includes(file.type)
         const fd = new FormData()
         fd.append("file", file)
         fd.append("meetingWeek", String(editingId ? rosterPayload.data.meeting_week : weekNumber))
@@ -304,15 +313,35 @@ export function KssRosterTable({
         fd.append("presenterId", presenterId)
         if (notes.trim()) fd.append("notes", notes.trim())
 
+        if (requiresConversion) {
+          setUploadPhase("converting")
+        } else {
+          setUploadPhase("uploading")
+        }
+
+        let phaseTimer: ReturnType<typeof setTimeout> | null = null
+        if (requiresConversion) {
+          phaseTimer = setTimeout(() => {
+            setUploadPhase("uploading")
+          }, 1200)
+        }
+
         const uploadRes = await fetch("/api/reports/meeting-week-documents", {
           method: "POST",
           body: fd,
         })
+        if (phaseTimer) clearTimeout(phaseTimer)
+        setUploadPhase("uploading")
         const uploadPayload = await uploadRes.json()
         if (!uploadRes.ok) throw new Error(uploadPayload.error || "Failed to upload KSS file")
+        if (uploadPayload?.converted) {
+          toast.success("KSS file uploaded and converted to PDF")
+        }
       }
 
-      toast.success(editingId ? "KSS updated" : "KSS created")
+      if (!file || !["docx", "pptx"].includes(getFileExtension(file.name, file.type))) {
+        toast.success(editingId ? "KSS updated" : "KSS created")
+      }
       resetForm()
       setShowCreate(false)
       await Promise.all([refetchRoster(), refetchDocs()])
@@ -320,6 +349,7 @@ export function KssRosterTable({
       toast.error(error?.message || "Failed to save KSS")
     } finally {
       setSaving(false)
+      setUploadPhase("idle")
     }
   }
 
@@ -375,6 +405,17 @@ export function KssRosterTable({
       setDownloadingId((current) => (current === doc.id ? null : current))
     }
   }
+
+  const saveLabel =
+    uploadPhase === "converting"
+      ? "Converting..."
+      : uploadPhase === "uploading"
+        ? "Uploading..."
+        : uploadPhase === "saving"
+          ? "Saving..."
+          : editingId
+            ? "Save Changes"
+            : "Add KSS"
 
   return (
     <TablePage
@@ -521,11 +562,17 @@ export function KssRosterTable({
             {previewDoc?.doc.signed_url ? (
               <>
                 {getFileExtension(previewDoc.doc.file_name, previewDoc.doc.mime_type) === "pdf" ? (
-                  <iframe
-                    src={previewDoc.doc.signed_url}
-                    title="KSS document preview"
-                    className="h-[65vh] w-full rounded-md border"
-                  />
+                  previewDoc ? (
+                    <iframe
+                      src={`/api/reports/meeting-week-documents?id=${previewDoc.doc.id}&mode=preview`}
+                      title="KSS document preview"
+                      className="h-[65vh] w-full rounded-md border"
+                    />
+                  ) : (
+                    <div className="text-muted-foreground rounded-md border p-4 text-sm">
+                      Preview could not be loaded here. Use Open or Download.
+                    </div>
+                  )
                 ) : (
                   <div className="text-muted-foreground rounded-md border p-4 text-sm">
                     Preview is not supported for this file type. Use Open or Download.
@@ -644,10 +691,10 @@ export function KssRosterTable({
               </div>
 
               <div className="space-y-2">
-                <Label>Upload PPT/PPTX/PDF</Label>
+                <Label>Upload PDF, PPTX, or DOCX</Label>
                 <Input
                   type="file"
-                  accept=".ppt,.pptx,.pdf,application/pdf,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                  accept=".pdf,.pptx,.docx,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                   onChange={(e) => {
                     const selected = e.target.files?.[0] || null
                     if (selected && selected.size > REPORT_DOC_MAX_SIZE_BYTES) {
@@ -656,11 +703,15 @@ export function KssRosterTable({
                       setFile(null)
                       return
                     }
+                    if (selected?.type === PPTX_MIME || selected?.type === DOCX_MIME) {
+                      toast.info("This file will be converted to PDF before it is stored.")
+                    }
                     setFile(selected)
                   }}
                 />
                 <p className="text-muted-foreground text-xs">
-                  Max file size: {formatLimitMb(REPORT_DOC_MAX_SIZE_BYTES)}
+                  Accepted: PDF, PPTX, DOCX. PPTX and DOCX uploads are converted to PDF before storage. Max file size:{" "}
+                  {formatLimitMb(REPORT_DOC_MAX_SIZE_BYTES)}
                 </p>
               </div>
             </div>
@@ -670,12 +721,10 @@ export function KssRosterTable({
                 {saving ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    {file ? "Uploading..." : "Saving..."}
+                    {saveLabel}
                   </>
-                ) : editingId ? (
-                  "Save Changes"
                 ) : (
-                  "Add KSS"
+                  saveLabel
                 )}
               </Button>
               <Button
@@ -688,6 +737,11 @@ export function KssRosterTable({
               >
                 Cancel
               </Button>
+              {readOnly ? (
+                <Button variant="secondary" asChild>
+                  <Link href="/admin/reports/kss">Open Admin KSS</Link>
+                </Button>
+              ) : null}
             </div>
           </DialogContent>
         </Dialog>

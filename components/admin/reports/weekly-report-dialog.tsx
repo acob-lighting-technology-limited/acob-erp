@@ -64,7 +64,6 @@ export function WeeklyReportAdminDialog({
 }: WeeklyReportAdminDialogProps) {
   const [loading, setLoading] = useState(false)
   const [departments, setDepartments] = useState<string[]>([])
-  const [currentActions, setCurrentActions] = useState<any[]>([])
   const [isNextWeekActive, setIsNextWeekActive] = useState(false)
   const [lockState, setLockState] = useState<WeeklyReportLockState | null>(null)
   const currentOfficeWeek = getCurrentOfficeWeek()
@@ -163,19 +162,7 @@ export function WeeklyReportAdminDialog({
         }
       }
     }
-    const fetchCurrent = async () => {
-      if (!formData.department) return
-      const { data } = await supabase
-        .from("tasks")
-        .select("*")
-        .eq("category", "weekly_action")
-        .eq("department", formData.department)
-        .eq("week_number", formData.week_number)
-        .eq("year", formData.year)
-      if (data) setCurrentActions(data)
-    }
     fetchStatus()
-    fetchCurrent()
   }, [currentUser.id, formData.department, formData.week_number, formData.year, report])
 
   useEffect(() => {
@@ -234,64 +221,8 @@ export function WeeklyReportAdminDialog({
         .select("id")
         .single()
       if (reportError) throw reportError
-      const reportId = savedReport.id
+      void savedReport
       toast.success(report ? "Updated" : "Saved")
-
-      if (!isNextWeekActive) {
-        const payload: any[] = []
-        currentActions
-          .filter((a) => a.status === "not_started" || a.status === "in_progress")
-          .forEach((a) => {
-            payload.push({
-              title: a.title,
-              department: a.department,
-              description: a.description,
-              status: "pending",
-              week_number: formData.week_number,
-              year: formData.year,
-              original_week: a.original_week || a.week_number,
-              original_year: a.original_year || a.year,
-              assigned_by: safeFormData.user_id,
-              report_id: reportId,
-            })
-          })
-        formData.tasks_new_week
-          .split("\n")
-          .filter((l) => l.trim().length > 0)
-          .forEach((l) => {
-            const title = l.replace(/^\d+\.\s/, "").trim()
-            if (title)
-              payload.push({
-                title,
-                department: formData.department,
-                status: "pending",
-                week_number: formData.week_number,
-                year: formData.year,
-                original_week: formData.week_number,
-                original_year: formData.year,
-                assigned_by: safeFormData.user_id,
-                report_id: reportId,
-              })
-          })
-        await supabase
-          .from("tasks")
-          .delete()
-          .eq("department", formData.department)
-          .eq("week_number", formData.week_number)
-          .eq("year", formData.year)
-          .eq("category", "weekly_action")
-          .eq("status", "pending")
-        if (payload.length > 0) {
-          const enrichedPayload = payload.map((p: any) => ({
-            ...p,
-            source_type: "action_item",
-            category: "weekly_action",
-            assignment_type: "department",
-            priority: "medium",
-          }))
-          await supabase.from("tasks").insert(enrichedPayload)
-        }
-      }
       onSuccess()
       onClose()
     } catch (error: any) {

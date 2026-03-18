@@ -240,8 +240,14 @@ const adminSections = [
 ]
 
 const ADMIN_ROUTE_ALIASES: Record<string, string[]> = {
+  // Finance — purchasing and payments have their own top-level prefixes
   "/admin/finance": ["/admin/payments", "/admin/purchasing"],
+  // Assets — inventory lives at a separate prefix
   "/admin/assets": ["/admin/inventory"],
+  // HR — employees are sometimes accessed at /admin/employees (flat) in addition to /admin/hr/employees
+  "/admin/hr": ["/admin/employees"],
+  // Communications — correspondence is logically part of communications
+  "/admin/communications": ["/admin/correspondence"],
 }
 
 export function AdminSidebar({ user, profile }: AdminSidebarProps) {
@@ -336,7 +342,7 @@ export function AdminSidebar({ user, profile }: AdminSidebarProps) {
     profile?.is_department_lead || (profile?.lead_departments && profile.lead_departments.length > 0)
   )
 
-  const SidebarContent = () => (
+  const sidebarJSX = (
     <>
       {/* Empty space for logo (moved to navbar) */}
       <div className={cn("transition-[padding] duration-300 ease-in-out", isCollapsed ? "px-2 py-2" : "px-3 py-2")}>
@@ -508,7 +514,7 @@ export function AdminSidebar({ user, profile }: AdminSidebarProps) {
         }}
         className="hidden overflow-hidden border-r border-[var(--admin-sidebar-border)] bg-[var(--admin-sidebar-bg)] lg:fixed lg:top-16 lg:bottom-0 lg:flex lg:flex-col"
       >
-        <SidebarContent />
+        {sidebarJSX}
       </motion.aside>
 
       {/* Mobile Header - Hidden, using navbar instead */}
@@ -528,7 +534,7 @@ export function AdminSidebar({ user, profile }: AdminSidebarProps) {
             isMobileMenuOpen ? "translate-x-0" : "translate-x-full"
           )}
         >
-          <SidebarContent />
+          {sidebarJSX}
         </aside>
       </>
     </>

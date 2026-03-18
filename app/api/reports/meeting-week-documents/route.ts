@@ -4,6 +4,7 @@ import { NextResponse } from "next/server"
 import { resolveAdminScope, getDepartmentScope, normalizeDepartmentName } from "@/lib/admin/rbac"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { REPORT_DOC_MAX_SIZE_BYTES, formatLimitMb } from "@/lib/reports/document-upload-limits"
+import { convertOfficeDocumentToPdf } from "@/lib/reports/office-pdf"
 import { logger } from "@/lib/logger"
 
 const log = logger("api-reports-meeting-week-documents")
@@ -13,9 +14,12 @@ type DocumentType = "knowledge_sharing_session" | "minutes" | "action_points"
 
 const KSS_ALLOWED = new Set([
   "application/pdf",
-  "application/vnd.ms-powerpoint",
   "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 ])
+
+const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+const PPTX_MIME = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
 
 async function createClient() {
   const cookieStore = await cookies()
@@ -43,11 +47,15 @@ function sanitizeName(name: string): string {
   return String(name || "file").replace(/[^a-zA-Z0-9._-]/g, "_")
 }
 
-function dateStamp(input = new Date()): string {
-  const y = input.getFullYear()
-  const m = String(input.getMonth() + 1).padStart(2, "0")
-  const d = String(input.getDate()).padStart(2, "0")
-  return `${y}-${m}-${d}`
+function sanitizeLabelToken(value: string): string {
+  return (
+    String(value || "Unknown")
+      .trim()
+      .replace(/\s+/g, "_")
+      .replace(/[^a-zA-Z0-9_-]/g, "_")
+      .replace(/_+/g, "_")
+      .replace(/^_+|_+$/g, "") || "Unknown"
+  )
 }
 
 function resolveExtension(file: File): string {
@@ -55,9 +63,24 @@ function resolveExtension(file: File): string {
   const dotIdx = raw.lastIndexOf(".")
   if (dotIdx > -1) return raw.slice(dotIdx + 1).toLowerCase()
   if (file.type === "application/pdf") return "pdf"
-  if (file.type === "application/vnd.ms-powerpoint") return "ppt"
-  if (file.type === "application/vnd.openxmlformats-officedocument.presentationml.presentation") return "pptx"
+  if (file.type === PPTX_MIME) return "pptx"
+  if (file.type === DOCX_MIME) return "docx"
   return "bin"
+}
+
+function baseNameWithoutExtension(fileName: string): string {
+  const dotIdx = fileName.lastIndexOf(".")
+  return dotIdx > 0 ? fileName.slice(0, dotIdx) : fileName
+}
+
+function buildKssFileName(
+  department: string,
+  presenterName: string,
+  meetingWeek: number,
+  meetingYear: number,
+  extension: string
+): string {
+  return `KSS_${sanitizeLabelToken(department)}_${sanitizeLabelToken(presenterName)}_Week_${meetingWeek}_${meetingYear}.${extension}`
 }
 
 function hasGlobalReportsWriteAccess(scope: NonNullable<Awaited<ReturnType<typeof resolveAdminScope>>>): boolean {
@@ -82,10 +105,36 @@ export async function GET(request: Request) {
     if (!scope) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
     const { searchParams } = new URL(request.url)
+    const id = String(searchParams.get("id") || "")
     const week = Number(searchParams.get("week") || "")
     const year = Number(searchParams.get("year") || "")
     const docType = parseDocumentType(searchParams.get("documentType"))
     const currentOnly = searchParams.get("currentOnly") === "true"
+    const mode = searchParams.get("mode")
+
+    if (id && mode === "preview") {
+      const { data: row, error: rowError } = await supabase
+        .from("meeting_week_documents")
+        .select("id, file_name, file_path, mime_type")
+        .eq("id", id)
+        .single()
+
+      if (rowError || !row) return NextResponse.json({ error: "Document not found" }, { status: 404 })
+
+      const { data: fileData, error: downloadError } = await supabase.storage.from(BUCKET).download(row.file_path)
+      if (downloadError || !fileData) {
+        return NextResponse.json({ error: downloadError?.message || "Failed to load preview file" }, { status: 500 })
+      }
+
+      const bytes = new Uint8Array(await fileData.arrayBuffer())
+      return new NextResponse(bytes, {
+        headers: {
+          "Content-Type": row.mime_type || "application/pdf",
+          "Content-Disposition": `inline; filename="${sanitizeName(row.file_name || "document.pdf")}"`,
+          "Cache-Control": "private, max-age=60",
+        },
+      })
+    }
 
     let query = supabase
       .from("meeting_week_documents")
@@ -178,15 +227,25 @@ export async function POST(request: Request) {
         )
       }
       if (!KSS_ALLOWED.has(file.type)) {
-        return NextResponse.json({ error: "Knowledge Sharing Session file must be PPT/PPTX/PDF" }, { status: 400 })
+        return NextResponse.json(
+          { error: "Knowledge Sharing Session file must be PDF, PPTX, or DOCX" },
+          { status: 400 }
+        )
       }
     } else {
-      if (file.type !== "application/pdf") {
-        return NextResponse.json({ error: "Minutes and action points must be PDF" }, { status: 400 })
+      if (!["application/pdf", DOCX_MIME].includes(file.type)) {
+        return NextResponse.json({ error: "Minutes and action points must be PDF or DOCX" }, { status: 400 })
       }
     }
 
+    const shouldConvertToPdf = file.type === PPTX_MIME || file.type === DOCX_MIME
+    const originalExtension = resolveExtension(file)
+    let uploadBuffer: Uint8Array<ArrayBufferLike> = new Uint8Array(await file.arrayBuffer())
+    let uploadMimeType = file.type
+    let uploadFileName = file.name
+    let convertedFrom: "docx" | "pptx" | null = null
     let normalizedFileName = file.name
+
     if (documentType === "knowledge_sharing_session") {
       const { data: presenter, error: presenterError } = await supabase
         .from("profiles")
@@ -196,17 +255,37 @@ export async function POST(request: Request) {
       if (presenterError || !presenter?.full_name) {
         return NextResponse.json({ error: "Presenter not found" }, { status: 400 })
       }
-      const ext = resolveExtension(file)
-      const submitted = dateStamp()
-      normalizedFileName = `Knowledge Sharing Session - ${department} - ${presenter.full_name} - Week ${meetingWeek} ${meetingYear} - Submitted ${submitted}.${ext}`
+      const kssDepartment = department ?? "Unknown"
+      normalizedFileName = buildKssFileName(
+        kssDepartment,
+        presenter.full_name,
+        meetingWeek,
+        meetingYear,
+        shouldConvertToPdf ? "pdf" : originalExtension
+      )
+    } else if (shouldConvertToPdf) {
+      normalizedFileName = `${baseNameWithoutExtension(file.name)}.pdf`
+    }
+
+    if (shouldConvertToPdf) {
+      const converted = await convertOfficeDocumentToPdf(
+        uploadBuffer,
+        baseNameWithoutExtension(normalizedFileName),
+        file.type === PPTX_MIME ? "pptx" : "docx"
+      )
+      uploadBuffer = converted.buffer
+      uploadMimeType = converted.mimeType
+      uploadFileName = converted.fileName
+      normalizedFileName = converted.fileName
+      convertedFrom = converted.sourceKind
     }
 
     const deptPath = department ? sanitizeName(department) : "all"
     const safeName = sanitizeName(normalizedFileName)
     const filePath = `${meetingYear}/week-${meetingWeek}/${documentType}/${deptPath}/${Date.now()}-${safeName}`
 
-    const { error: uploadError } = await supabase.storage.from(BUCKET).upload(filePath, file, {
-      contentType: file.type,
+    const { error: uploadError } = await supabase.storage.from(BUCKET).upload(filePath, uploadBuffer, {
+      contentType: uploadMimeType,
       upsert: false,
     })
     if (uploadError) return NextResponse.json({ error: uploadError.message }, { status: 500 })
@@ -245,10 +324,10 @@ export async function POST(request: Request) {
         department,
         presenter_id: documentType === "knowledge_sharing_session" ? presenterId : null,
         notes,
-        file_name: normalizedFileName,
+        file_name: uploadFileName,
         file_path: filePath,
-        mime_type: file.type,
-        file_size: file.size,
+        mime_type: uploadMimeType,
+        file_size: uploadBuffer.byteLength,
         version_no: nextVersion,
         is_current: true,
         replaced_by: null,
@@ -279,6 +358,9 @@ export async function POST(request: Request) {
           department,
           presenter_id: presenterId,
           version_no: nextVersion,
+          converted_from: convertedFrom,
+          original_file_name: file.name,
+          original_mime_type: file.type,
         },
         context: {
           actorId: user.id,
@@ -290,7 +372,7 @@ export async function POST(request: Request) {
       { failOpen: true }
     )
 
-    return NextResponse.json({ data: saved }, { status: 201 })
+    return NextResponse.json({ data: saved, converted: Boolean(convertedFrom), convertedFrom }, { status: 201 })
   } catch (error) {
     log.error({ err: String(error) }, "POST /api/reports/meeting-week-documents failed")
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })

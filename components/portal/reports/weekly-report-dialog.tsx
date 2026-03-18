@@ -59,7 +59,6 @@ export function WeeklyReportDialog({ isOpen, onClose, onSuccess, initialData }: 
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [profile, setProfile] = useState<any>(null)
-  const [currentActions, setCurrentActions] = useState<any[]>([])
   const [isNextWeekActive, setIsNextWeekActive] = useState(false)
   const [lockState, setLockState] = useState<WeeklyReportLockState | null>(null)
 
@@ -142,15 +141,6 @@ export function WeeklyReportDialog({ isOpen, onClose, onSuccess, initialData }: 
           setFormData((prev) => ({ ...prev, tasks_new_week: autoNumberReportText(syncedText) }))
         }
       }
-
-      const { data: current } = await supabase
-        .from("tasks")
-        .select("*")
-        .eq("category", "weekly_action")
-        .eq("department", dept)
-        .eq("week_number", week)
-        .eq("year", year)
-      setCurrentActions(current || [])
     } catch (error) {
       log.error("Failed to load actions:", error)
     } finally {
@@ -178,63 +168,7 @@ export function WeeklyReportDialog({ isOpen, onClose, onSuccess, initialData }: 
         .select("id")
         .single()
       if (reportError) throw reportError
-      const reportId = savedReport.id
-
-      if (!isNextWeekActive) {
-        const payload: any[] = []
-        currentActions
-          .filter((a) => a.status === "not_started" || a.status === "in_progress")
-          .forEach((a) => {
-            payload.push({
-              title: a.title,
-              department: a.department,
-              description: a.description,
-              status: "pending",
-              week_number: formData.week_number,
-              year: formData.year,
-              original_week: a.original_week || a.week_number,
-              original_year: a.original_year || a.year,
-              assigned_by: formData.user_id,
-              report_id: reportId,
-            })
-          })
-        formData.tasks_new_week
-          .split("\n")
-          .filter((l) => l.trim().length > 0)
-          .forEach((l) => {
-            const title = l.replace(/^\d+\.\s/, "").trim()
-            if (title)
-              payload.push({
-                title,
-                department: formData.department,
-                status: "pending",
-                week_number: formData.week_number,
-                year: formData.year,
-                original_week: formData.week_number,
-                original_year: formData.year,
-                assigned_by: formData.user_id,
-                report_id: reportId,
-              })
-          })
-        await supabase
-          .from("tasks")
-          .delete()
-          .eq("department", formData.department)
-          .eq("week_number", formData.week_number)
-          .eq("year", formData.year)
-          .eq("category", "weekly_action")
-          .eq("status", "pending")
-        if (payload.length > 0) {
-          const enrichedPayload = payload.map((p: any) => ({
-            ...p,
-            source_type: "action_item",
-            category: "weekly_action",
-            assignment_type: "department",
-            priority: "medium",
-          }))
-          await supabase.from("tasks").insert(enrichedPayload)
-        }
-      }
+      void savedReport
       toast.success("Success")
       onSuccess()
       onClose()

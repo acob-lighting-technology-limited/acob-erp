@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { toast } from "sonner"
@@ -38,6 +39,9 @@ type MeetingDocument = {
   created_at: string
 }
 
+const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+type UploadPhase = "idle" | "converting" | "uploading"
+
 interface Props {
   documentType: DocumentType
   title: string
@@ -45,6 +49,11 @@ interface Props {
   backHref: string
   backLabel: string
   readOnly?: boolean
+}
+
+function getAdminReportsHref(documentType: DocumentType): string {
+  if (documentType === "minutes") return "/admin/reports/minutes-of-meeting"
+  return "/admin/reports/action-points-manual"
 }
 
 function compareWeekYear(aWeek: number, aYear: number, bWeek: number, bYear: number): number {
@@ -67,6 +76,7 @@ export function MeetingDocumentTypeTable({
   const [yearNumber, setYearNumber] = useState(officeWeek.year)
   const [file, setFile] = useState<File | null>(null)
   const [saving, setSaving] = useState(false)
+  const [uploadPhase, setUploadPhase] = useState<UploadPhase>("idle")
 
   const [searchQuery, setSearchQuery] = useState("")
   const [weekFilter, setWeekFilter] = useState("all")
@@ -116,7 +126,7 @@ export function MeetingDocumentTypeTable({
       return
     }
     if (!file) {
-      toast.error("Please select a PDF file")
+      toast.error("Please select a PDF or DOCX file")
       return
     }
     if (file.size > REPORT_DOC_MAX_SIZE_BYTES) {
@@ -126,17 +136,33 @@ export function MeetingDocumentTypeTable({
 
     setSaving(true)
     try {
+      const requiresConversion = file.type === DOCX_MIME
       const fd = new FormData()
       fd.append("file", file)
       fd.append("meetingWeek", String(weekNumber))
       fd.append("meetingYear", String(yearNumber))
       fd.append("documentType", documentType)
 
+      if (requiresConversion) {
+        setUploadPhase("converting")
+      } else {
+        setUploadPhase("uploading")
+      }
+
+      let phaseTimer: ReturnType<typeof setTimeout> | null = null
+      if (requiresConversion) {
+        phaseTimer = setTimeout(() => {
+          setUploadPhase("uploading")
+        }, 1200)
+      }
+
       const res = await fetch("/api/reports/meeting-week-documents", { method: "POST", body: fd })
+      if (phaseTimer) clearTimeout(phaseTimer)
+      setUploadPhase("uploading")
       const payload = await res.json()
       if (!res.ok) throw new Error(payload.error || "Upload failed")
 
-      toast.success("Document uploaded")
+      toast.success(payload?.converted ? "Document uploaded and converted to PDF" : "Document uploaded")
       setShowCreate(false)
       setFile(null)
       await refetch()
@@ -144,8 +170,12 @@ export function MeetingDocumentTypeTable({
       toast.error(error?.message || "Upload failed")
     } finally {
       setSaving(false)
+      setUploadPhase("idle")
     }
   }
+
+  const uploadLabel =
+    uploadPhase === "converting" ? "Converting..." : uploadPhase === "uploading" ? "Uploading..." : "Upload"
 
   const remove = async (id: string) => {
     if (readOnly) {
@@ -259,13 +289,14 @@ export function MeetingDocumentTypeTable({
             setWeekNumber(officeWeek.week)
             setYearNumber(officeWeek.year)
             setFile(null)
+            setUploadPhase("idle")
           }
         }}
       >
         <DialogContent className="max-h-[90vh] w-[95vw] max-w-xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{title}</DialogTitle>
-            <DialogDescription>Upload a PDF and link it to a meeting week and year.</DialogDescription>
+            <DialogDescription>Upload a PDF or DOCX. DOCX files are converted to PDF before storage.</DialogDescription>
           </DialogHeader>
 
           <div className="grid gap-4 md:grid-cols-2">
@@ -300,10 +331,10 @@ export function MeetingDocumentTypeTable({
               </Select>
             </div>
             <div className="space-y-2 md:col-span-2">
-              <Label>Upload PDF</Label>
+              <Label>Upload PDF or DOCX</Label>
               <Input
                 type="file"
-                accept="application/pdf,.pdf"
+                accept="application/pdf,.pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                 onChange={(e) => {
                   const selected = e.target.files?.[0] || null
                   if (selected && selected.size > REPORT_DOC_MAX_SIZE_BYTES) {
@@ -312,10 +343,16 @@ export function MeetingDocumentTypeTable({
                     setFile(null)
                     return
                   }
+                  if (selected?.type === DOCX_MIME) {
+                    toast.info("This DOCX file will be converted to PDF before it is stored.")
+                  }
                   setFile(selected)
                 }}
               />
-              <p className="text-muted-foreground text-xs">Max file size: {formatLimitMb(REPORT_DOC_MAX_SIZE_BYTES)}</p>
+              <p className="text-muted-foreground text-xs">
+                Accepted: PDF, DOCX. DOCX uploads are converted to PDF before storage. Max file size:{" "}
+                {formatLimitMb(REPORT_DOC_MAX_SIZE_BYTES)}
+              </p>
             </div>
           </div>
 
@@ -324,15 +361,20 @@ export function MeetingDocumentTypeTable({
               {saving ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Uploading...
+                  {uploadLabel}
                 </>
               ) : (
-                "Upload"
+                uploadLabel
               )}
             </Button>
             <Button variant="outline" onClick={() => setShowCreate(false)} disabled={saving}>
               Cancel
             </Button>
+            {readOnly ? (
+              <Button variant="secondary" asChild>
+                <Link href={getAdminReportsHref(documentType)}>Open Admin Reports</Link>
+              </Button>
+            ) : null}
           </div>
         </DialogContent>
       </Dialog>
