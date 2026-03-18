@@ -39,6 +39,7 @@ interface DeptActionRowsProps {
   profile: any
   week: number
   year: number
+  meetingDate?: string
   onStatusChange: (taskId: string, newStatus: string) => void
   getDeptStatus: (dept: string) => DeptStatus
   statusColor: (status: string) => string
@@ -52,6 +53,7 @@ export function DeptActionRows({
   profile,
   week,
   year,
+  meetingDate,
   onStatusChange,
   getDeptStatus,
   statusColor,
@@ -111,17 +113,31 @@ export function DeptActionRows({
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => exportActionTrackerToPDF(deptActionItemsForExport, week, year)}>
+                      <DropdownMenuItem
+                        onClick={() =>
+                          exportActionTrackerToPDF(deptActionItemsForExport, week, year, meetingDate, dept)
+                        }
+                      >
                         <FileText className="mr-2 h-4 w-4" /> Export PDF
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => exportActionTrackerToDocx(deptActionItemsForExport, week, year)}>
+                      <DropdownMenuItem
+                        onClick={() =>
+                          exportActionTrackerToDocx(deptActionItemsForExport, week, year, meetingDate, dept)
+                        }
+                      >
                         <FileIcon className="mr-2 h-4 w-4" /> Export Word
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => exportActionTrackerToPPTX(deptActionItemsForExport, week, year)}>
+                      <DropdownMenuItem
+                        onClick={() =>
+                          exportActionTrackerToPPTX(deptActionItemsForExport, week, year, meetingDate, dept)
+                        }
+                      >
                         <Presentation className="mr-2 h-4 w-4" /> Export PPTX
                       </DropdownMenuItem>
                       <DropdownMenuItem
-                        onClick={() => exportActionTrackerToXLSX(deptActionItemsForExport, week, year, dept)}
+                        onClick={() =>
+                          exportActionTrackerToXLSX(deptActionItemsForExport, week, year, dept, meetingDate)
+                        }
                       >
                         <FileSpreadsheet className="mr-2 h-4 w-4" /> Export XLSX
                       </DropdownMenuItem>

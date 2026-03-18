@@ -12,14 +12,7 @@ import { writeAuditLogClient } from "@/lib/audit/client"
 import { PageWrapper, PageHeader } from "@/components/layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Megaphone, Users, Calendar, Clock } from "lucide-react"
-import {
-  DEFAULT_TEAMS_LINK,
-  DEFAULT_AGENDA,
-  getNextMondayFormatted,
-  formatDateNice,
-  capitalize,
-  stripHtmlToText,
-} from "./composer-utils"
+import { DEFAULT_TEAMS_LINK, DEFAULT_AGENDA, formatDateNice, capitalize, stripHtmlToText } from "./composer-utils"
 import { MeetingReminderForm } from "./MeetingReminderForm"
 import { KnowledgeSessionForm } from "./KnowledgeSessionForm"
 import { BroadcastForm } from "./BroadcastForm"
@@ -27,7 +20,8 @@ import { RecipientSelector } from "./RecipientSelector"
 import { SchedulingOptions } from "./SchedulingOptions"
 import { SendSummary } from "./SendSummary"
 import { ReminderTypeSelector } from "./ReminderTypeSelector"
-import { getOfficeWeekFromDate } from "@/lib/meeting-week"
+import { getCurrentOfficeWeek, getOfficeWeekFromDate } from "@/lib/meeting-week"
+import { getDefaultMeetingDateIso } from "@/lib/weekly-report-lock"
 
 type Employee = {
   id: string
@@ -54,6 +48,14 @@ interface Props {
 }
 
 export function CommunicationsComposer({ employees, mode = "meetings", currentUser }: Props) {
+  const nextOfficeMeetingBaseDate = useMemo(() => {
+    const next = new Date()
+    next.setDate(next.getDate() + 7)
+    return next
+  }, [])
+  const nextOfficeWeek = getCurrentOfficeWeek(nextOfficeMeetingBaseDate)
+  const defaultMeetingDate = getDefaultMeetingDateIso(nextOfficeWeek.week, nextOfficeWeek.year)
+
   // ── State ──────────────────────────────────────────────────────────────────
   const [reminderType, setReminderType] = useState<ReminderType>(
     mode === "communications" ? "admin_broadcast" : "meeting"
@@ -65,13 +67,13 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
   const [searchQuery, setSearchQuery] = useState("")
 
   // Meeting fields
-  const [meetingDate, setMeetingDate] = useState(getNextMondayFormatted())
+  const [meetingDate, setMeetingDate] = useState(defaultMeetingDate)
   const [meetingTime, setMeetingTime] = useState("08:30")
   const [teamsLink, setTeamsLink] = useState(DEFAULT_TEAMS_LINK)
   const [agendaText, setAgendaText] = useState(DEFAULT_AGENDA.join("\n"))
 
   // Knowledge sharing fields
-  const [sessionDate, setSessionDate] = useState(getNextMondayFormatted())
+  const [sessionDate, setSessionDate] = useState(defaultMeetingDate)
   const [sessionTime, setSessionTime] = useState("08:30")
   const [duration, setDuration] = useState("30 minutes")
   const [knowledgeDepartment, setKnowledgeDepartment] = useState("none")
@@ -103,6 +105,20 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
   const currentUserName = (currentUser?.full_name || "").trim()
   const isCurrentUserAdminHr =
     currentUserDept.toLowerCase().includes("admin") && currentUserDept.toLowerCase().includes("hr")
+
+  const { data: canonicalMeetingSetup } = useQuery({
+    queryKey: ["canonical-meeting-date", nextOfficeWeek.week, nextOfficeWeek.year],
+    enabled: mode !== "communications",
+    queryFn: async (): Promise<{ meetingDate: string; meetingTime: string }> => {
+      const res = await fetch(`/api/reports/meeting-date?week=${nextOfficeWeek.week}&year=${nextOfficeWeek.year}`)
+      const payload = await res.json()
+      if (!res.ok) throw new Error(payload.error || "Failed to resolve meeting date")
+      return {
+        meetingDate: String(payload?.data?.meetingDate || defaultMeetingDate),
+        meetingTime: String(payload?.data?.meetingTime || "08:30"),
+      }
+    },
+  })
 
   // ── Derived options ────────────────────────────────────────────────────────
   const departmentOptions = useMemo(() => {
@@ -192,9 +208,16 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
 
   useEffect(() => {
     if (reminderType !== "meeting") return
+    if (!canonicalMeetingSetup) return
+    if (!meetingDate || meetingDate === defaultMeetingDate) {
+      setMeetingDate(canonicalMeetingSetup.meetingDate)
+    }
+    setMeetingTime(canonicalMeetingSetup.meetingTime || "08:30")
+  }, [canonicalMeetingSetup, defaultMeetingDate, meetingDate, reminderType])
+
+  useEffect(() => {
+    if (reminderType !== "meeting") return
     if (!meetingDate) return
-    // Respect manual selection; only auto-fill when both fields are untouched.
-    if (knowledgeDepartment !== "none" || knowledgePresenterId !== "none") return
 
     const [year, month, day] = meetingDate.split("-").map((part) => Number(part))
     if (!year || !month || !day) return
@@ -209,10 +232,16 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
 
         const roster = Array.isArray(payload?.data) ? payload.data : []
         const picked = roster.find((entry: { is_active?: boolean }) => entry?.is_active !== false) ?? roster[0]
-        if (!picked || cancelled) return
+        if (!picked || cancelled) {
+          setKnowledgeDepartment("none")
+          setKnowledgePresenterId("none")
+          return
+        }
 
         if (typeof picked.department === "string" && picked.department.trim()) {
           setKnowledgeDepartment(picked.department)
+        } else {
+          setKnowledgeDepartment("none")
         }
 
         const presenterId = typeof picked.presenter_id === "string" ? picked.presenter_id : null
@@ -230,7 +259,7 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
     return () => {
       cancelled = true
     }
-  }, [employees, knowledgeDepartment, knowledgePresenterId, meetingDate, reminderType])
+  }, [employees, meetingDate, reminderType])
 
   // ── Query: active schedules ───────────────────────────────────────────────
   const { data: schedulesData } = useQuery({
@@ -351,6 +380,24 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
     [currentUser?.id, supabase]
   )
 
+  const resolveMeetingContext = useCallback((dateValue: string) => {
+    const [year, month, day] = String(dateValue || "")
+      .split("-")
+      .map((part) => Number(part))
+
+    if (!year || !month || !day) return null
+
+    const date = new Date(year, month - 1, day)
+    if (Number.isNaN(date.getTime())) return null
+
+    const officeWeek = getOfficeWeekFromDate(date)
+    return {
+      meetingDate: `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`,
+      meetingWeek: officeWeek.week,
+      meetingYear: officeWeek.year,
+    }
+  }, [])
+
   const handleSend = async () => {
     if (resolvedRecipients.length === 0) {
       toast.error("No recipients selected")
@@ -381,6 +428,20 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
       return
     }
 
+    let meetingContext: {
+      meetingDate: string
+      meetingWeek: number
+      meetingYear: number
+    } | null = null
+
+    if (reminderType === "meeting") {
+      meetingContext = resolveMeetingContext(meetingDate)
+      if (!meetingContext) {
+        toast.error("Meeting date is unavailable. Update it from Admin Reports first.")
+        return
+      }
+    }
+
     // Scheduled / recurring → save to DB
     if (sendTiming === "scheduled" || sendTiming === "recurring") {
       const toastId = toast.loading("Saving schedule...")
@@ -396,7 +457,7 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
           meeting_config: {
             type: reminderType,
             requestedByUserId: currentUser?.id || null,
-            meetingDate: reminderType === "meeting" ? meetingDate : undefined,
+            meetingDate: reminderType === "meeting" ? meetingContext?.meetingDate : undefined,
             meetingTime: reminderType === "meeting" ? meetingTime : undefined,
             teamsLink: reminderType === "meeting" ? teamsLink : undefined,
             agenda: reminderType === "meeting" ? agendaText : undefined,
@@ -481,7 +542,9 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
       }
 
       if (reminderType === "meeting") {
-        payload.meetingDate = meetingDate
+        payload.meetingDate = meetingContext?.meetingDate
+        payload.meetingWeek = meetingContext?.meetingWeek
+        payload.meetingYear = meetingContext?.meetingYear
         payload.meetingTime = new Date(`2000-01-01T${meetingTime}`).toLocaleTimeString("en-US", {
           hour: "numeric",
           minute: "2-digit",
@@ -602,7 +665,7 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
               </CardTitle>
               <CardDescription>
                 {reminderType === "meeting"
-                  ? "Configure the meeting date, time, Teams link, and agenda"
+                  ? "Meeting date, time, and KSS presenter setup come from Admin Reports. Configure the Teams link and agenda here."
                   : reminderType === "knowledge_sharing"
                     ? "Configure the session date, time, and duration"
                     : "Write your custom subject and formatted message body"}
@@ -612,17 +675,13 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
               {reminderType === "meeting" ? (
                 <MeetingReminderForm
                   meetingDate={meetingDate}
-                  setMeetingDate={setMeetingDate}
                   meetingTime={meetingTime}
-                  setMeetingTime={setMeetingTime}
                   teamsLink={teamsLink}
                   setTeamsLink={setTeamsLink}
                   agendaText={agendaText}
                   setAgendaText={setAgendaText}
                   knowledgeDepartment={knowledgeDepartment}
-                  setKnowledgeDepartment={setKnowledgeDepartment}
                   knowledgePresenterId={knowledgePresenterId}
-                  setKnowledgePresenterId={setKnowledgePresenterId}
                   meetingPreparedById={meetingPreparedById}
                   setMeetingPreparedById={setMeetingPreparedById}
                   departmentOptions={departmentOptions}

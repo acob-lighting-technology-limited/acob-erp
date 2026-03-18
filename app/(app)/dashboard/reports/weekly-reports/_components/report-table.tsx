@@ -18,14 +18,7 @@ import {
   MoreVertical,
   FileSpreadsheet,
 } from "lucide-react"
-import {
-  exportToPDF,
-  exportToDocx,
-  exportToPPTX,
-  exportToXLSX,
-  autoNumberLines,
-  type WeeklyReport,
-} from "@/lib/export-utils"
+import { exportToPDF, exportToDocx, exportToXLSX, autoNumberLines, type WeeklyReport } from "@/lib/export-utils"
 import { format } from "date-fns"
 
 interface ReportTableProps {
@@ -33,6 +26,7 @@ interface ReportTableProps {
   loading: boolean
   expandedRows: Set<string>
   onToggleRow: (id: string) => void
+  meetingDate?: string
   isFilteredWeekLocked: boolean
   currentUserDepartment: string | null | undefined
   onEdit: (report: WeeklyReport) => void
@@ -45,6 +39,7 @@ export function ReportTable({
   loading,
   expandedRows,
   onToggleRow,
+  meetingDate,
   isFilteredWeekLocked,
   currentUserDepartment,
   onEdit,
@@ -123,7 +118,7 @@ export function ReportTable({
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7 text-red-600 hover:text-red-700"
-                            onClick={() => exportToPDF(report)}
+                            onClick={() => exportToPDF(report, meetingDate)}
                             title="PDF"
                           >
                             <FileText className="h-3.5 w-3.5" />
@@ -132,7 +127,7 @@ export function ReportTable({
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7 text-indigo-600 hover:text-indigo-700"
-                            onClick={() => exportToDocx(report)}
+                            onClick={() => exportToDocx(report, meetingDate)}
                             title="Word"
                           >
                             <FileIcon className="h-3.5 w-3.5" />
@@ -150,7 +145,7 @@ export function ReportTable({
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7 text-emerald-600 hover:text-emerald-700"
-                            onClick={() => exportToXLSX(report)}
+                            onClick={() => exportToXLSX(report, meetingDate)}
                             title="XLSX"
                           >
                             <FileSpreadsheet className="h-3.5 w-3.5" />

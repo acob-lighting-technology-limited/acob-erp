@@ -4,6 +4,11 @@ import { NextResponse } from "next/server"
 import { resolveAdminScope, getDepartmentScope, normalizeDepartmentName } from "@/lib/admin/rbac"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { REPORT_DOC_MAX_SIZE_BYTES, formatLimitMb } from "@/lib/reports/document-upload-limits"
+import {
+  buildMeetingDocumentFileName,
+  resolveEffectiveMeetingDateIso,
+  sanitizeStoragePathSegment,
+} from "@/lib/reports/meeting-date"
 import { convertOfficeDocumentToPdf } from "@/lib/reports/office-pdf"
 import { logger } from "@/lib/logger"
 
@@ -47,17 +52,6 @@ function sanitizeName(name: string): string {
   return String(name || "file").replace(/[^a-zA-Z0-9._-]/g, "_")
 }
 
-function sanitizeLabelToken(value: string): string {
-  return (
-    String(value || "Unknown")
-      .trim()
-      .replace(/\s+/g, "_")
-      .replace(/[^a-zA-Z0-9_-]/g, "_")
-      .replace(/_+/g, "_")
-      .replace(/^_+|_+$/g, "") || "Unknown"
-  )
-}
-
 function resolveExtension(file: File): string {
   const raw = file.name || ""
   const dotIdx = raw.lastIndexOf(".")
@@ -73,16 +67,6 @@ function baseNameWithoutExtension(fileName: string): string {
   return dotIdx > 0 ? fileName.slice(0, dotIdx) : fileName
 }
 
-function buildKssFileName(
-  department: string,
-  presenterName: string,
-  meetingWeek: number,
-  meetingYear: number,
-  extension: string
-): string {
-  return `KSS_${sanitizeLabelToken(department)}_${sanitizeLabelToken(presenterName)}_Week_${meetingWeek}_${meetingYear}.${extension}`
-}
-
 function hasGlobalReportsWriteAccess(scope: NonNullable<Awaited<ReturnType<typeof resolveAdminScope>>>): boolean {
   return getDepartmentScope(scope, "general") === null
 }
@@ -90,6 +74,25 @@ function hasGlobalReportsWriteAccess(scope: NonNullable<Awaited<ReturnType<typeo
 function parseDocumentType(value: unknown): DocumentType | null {
   if (value === "knowledge_sharing_session" || value === "minutes" || value === "action_points") return value
   return null
+}
+
+async function assertWeekIsMutable(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  meetingWeek: number,
+  meetingYear: number
+) {
+  const { data, error } = await supabase.rpc("weekly_report_can_mutate", {
+    p_week: meetingWeek,
+    p_year: meetingYear,
+  })
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  if (!data) {
+    throw new Error(`Week ${meetingWeek}, ${meetingYear} is locked and can no longer be changed`)
+  }
 }
 
 export async function GET(request: Request) {
@@ -115,7 +118,9 @@ export async function GET(request: Request) {
     if (id && mode === "preview") {
       const { data: row, error: rowError } = await supabase
         .from("meeting_week_documents")
-        .select("id, file_name, file_path, mime_type")
+        .select(
+          "id, meeting_week, meeting_year, document_type, department, presenter_id, file_name, file_path, mime_type"
+        )
         .eq("id", id)
         .single()
 
@@ -154,13 +159,27 @@ export async function GET(request: Request) {
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
     const rows = data || []
+    const meetingDateByWeekYear = new Map<string, string>()
+    await Promise.all(
+      Array.from(new Set(rows.map((row) => `${row.meeting_year}-${row.meeting_week}`))).map(async (key) => {
+        const [yearText, weekText] = key.split("-")
+        const meetingDate = await resolveEffectiveMeetingDateIso(supabase, Number(weekText), Number(yearText))
+        meetingDateByWeekYear.set(key, meetingDate)
+      })
+    )
     const withUrls = await Promise.all(
       rows.map(async (row) => {
         const { data: signed, error: signedError } = await supabase.storage
           .from(BUCKET)
           .createSignedUrl(row.file_path, 3600)
+        const { data: canMutate } = await supabase.rpc("weekly_report_can_mutate", {
+          p_week: row.meeting_week,
+          p_year: row.meeting_year,
+        })
         return {
           ...row,
+          meeting_date: meetingDateByWeekYear.get(`${row.meeting_year}-${row.meeting_week}`) || null,
+          is_locked: !Boolean(canMutate),
           signed_url: signedError ? null : (signed?.signedUrl ?? null),
         }
       })
@@ -213,6 +232,8 @@ export async function POST(request: Request) {
     }
     if (!documentType) return NextResponse.json({ error: "Invalid documentType" }, { status: 400 })
 
+    await assertWeekIsMutable(supabase, meetingWeek, meetingYear)
+
     if (documentType === "knowledge_sharing_session") {
       if (!department) {
         return NextResponse.json(
@@ -242,8 +263,9 @@ export async function POST(request: Request) {
     const originalExtension = resolveExtension(file)
     let uploadBuffer: Uint8Array<ArrayBufferLike> = new Uint8Array(await file.arrayBuffer())
     let uploadMimeType = file.type
-    let uploadFileName = file.name
     let convertedFrom: "docx" | "pptx" | null = null
+    const meetingDate = await resolveEffectiveMeetingDateIso(supabase, meetingWeek, meetingYear)
+    let presenterName: string | null = null
     let normalizedFileName = file.name
 
     if (documentType === "knowledge_sharing_session") {
@@ -255,17 +277,17 @@ export async function POST(request: Request) {
       if (presenterError || !presenter?.full_name) {
         return NextResponse.json({ error: "Presenter not found" }, { status: 400 })
       }
-      const kssDepartment = department ?? "Unknown"
-      normalizedFileName = buildKssFileName(
-        kssDepartment,
-        presenter.full_name,
-        meetingWeek,
-        meetingYear,
-        shouldConvertToPdf ? "pdf" : originalExtension
-      )
-    } else if (shouldConvertToPdf) {
-      normalizedFileName = `${baseNameWithoutExtension(file.name)}.pdf`
+      presenterName = presenter.full_name
     }
+
+    normalizedFileName = buildMeetingDocumentFileName({
+      documentType,
+      meetingDate,
+      meetingWeek,
+      extension: shouldConvertToPdf ? "pdf" : originalExtension,
+      department,
+      presenterName,
+    })
 
     if (shouldConvertToPdf) {
       const converted = await convertOfficeDocumentToPdf(
@@ -275,13 +297,19 @@ export async function POST(request: Request) {
       )
       uploadBuffer = converted.buffer
       uploadMimeType = converted.mimeType
-      uploadFileName = converted.fileName
-      normalizedFileName = converted.fileName
+      normalizedFileName = buildMeetingDocumentFileName({
+        documentType,
+        meetingDate,
+        meetingWeek,
+        extension: "pdf",
+        department,
+        presenterName,
+      })
       convertedFrom = converted.sourceKind
     }
 
-    const deptPath = department ? sanitizeName(department) : "all"
-    const safeName = sanitizeName(normalizedFileName)
+    const deptPath = department ? sanitizeName(sanitizeStoragePathSegment(department)) : "all"
+    const safeName = sanitizeName(sanitizeStoragePathSegment(normalizedFileName))
     const filePath = `${meetingYear}/week-${meetingWeek}/${documentType}/${deptPath}/${Date.now()}-${safeName}`
 
     const { error: uploadError } = await supabase.storage.from(BUCKET).upload(filePath, uploadBuffer, {
@@ -324,7 +352,7 @@ export async function POST(request: Request) {
         department,
         presenter_id: documentType === "knowledge_sharing_session" ? presenterId : null,
         notes,
-        file_name: uploadFileName,
+        file_name: normalizedFileName,
         file_path: filePath,
         mime_type: uploadMimeType,
         file_size: uploadBuffer.byteLength,
@@ -410,6 +438,8 @@ export async function PATCH(request: Request) {
 
     if (fetchError || !doc) return NextResponse.json({ error: "Document not found" }, { status: 404 })
 
+    await assertWeekIsMutable(supabase, doc.meeting_week, doc.meeting_year)
+
     if (makeCurrent) {
       const { error: clearError } = await supabase
         .from("meeting_week_documents")
@@ -494,6 +524,8 @@ export async function DELETE(request: Request) {
       .single()
 
     if (fetchError || !doc) return NextResponse.json({ error: "Document not found" }, { status: 404 })
+
+    await assertWeekIsMutable(supabase, doc.meeting_week, doc.meeting_year)
 
     if (doc.file_path) {
       await supabase.storage.from(BUCKET).remove([doc.file_path])

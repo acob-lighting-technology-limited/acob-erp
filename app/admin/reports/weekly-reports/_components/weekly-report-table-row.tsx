@@ -37,6 +37,7 @@ interface TrackerStatus {
 
 interface WeeklyReportTableRowProps {
   report: WeeklyReport
+  meetingDate: string
   isExpanded: boolean
   onToggle: () => void
   trackingData: TrackerStatus[]
@@ -70,6 +71,7 @@ function getActionTrackerStatus(department: string, trackingData: TrackerStatus[
 
 export function WeeklyReportTableRow({
   report,
+  meetingDate,
   isExpanded,
   onToggle,
   trackingData,
@@ -82,6 +84,11 @@ export function WeeklyReportTableRow({
   const trackerStatus = getActionTrackerStatus(report.department, trackingData)
   const submitterProfile = Array.isArray(report.profiles) ? report.profiles[0] : report.profiles
   const submitterName = submitterProfile ? `${submitterProfile.first_name} ${submitterProfile.last_name}` : "Unknown"
+  const formattedMeetingDate = (() => {
+    const date = new Date(`${meetingDate}T00:00:00`)
+    if (Number.isNaN(date.getTime())) return "-"
+    return format(date, "MMM dd, yyyy")
+  })()
 
   return (
     <Fragment>
@@ -97,10 +104,9 @@ export function WeeklyReportTableRow({
           )}
         </TableCell>
         <TableCell className="text-foreground font-bold">{report.department}</TableCell>
+        <TableCell className="text-muted-foreground text-sm">{formattedMeetingDate}</TableCell>
+        <TableCell className="text-foreground font-medium">W{report.week_number}</TableCell>
         <TableCell className="text-muted-foreground">{submitterName}</TableCell>
-        <TableCell className="text-foreground font-medium">
-          W{report.week_number}, {report.year}
-        </TableCell>
         <TableCell className="text-muted-foreground text-sm">
           {format(new Date(report.created_at), "MMM dd, yyyy")}
         </TableCell>
@@ -132,7 +138,7 @@ export function WeeklyReportTableRow({
                 variant="ghost"
                 size="icon"
                 className="h-7 w-7 text-red-600 hover:text-red-700"
-                onClick={() => exportToPDF(report)}
+                onClick={() => exportToPDF(report, meetingDate)}
                 title="PDF"
               >
                 <FileIcon className="h-3.5 w-3.5" />
@@ -141,7 +147,7 @@ export function WeeklyReportTableRow({
                 variant="ghost"
                 size="icon"
                 className="h-7 w-7 text-indigo-600 hover:text-indigo-700"
-                onClick={() => exportToDocx(report)}
+                onClick={() => exportToDocx(report, meetingDate)}
                 title="Word"
               >
                 <FileText className="h-3.5 w-3.5" />
@@ -159,7 +165,7 @@ export function WeeklyReportTableRow({
                 variant="ghost"
                 size="icon"
                 className="h-7 w-7 text-emerald-600 hover:text-emerald-700"
-                onClick={() => exportToXLSX(report)}
+                onClick={() => exportToXLSX(report, meetingDate)}
                 title="XLSX"
               >
                 <FileSpreadsheet className="h-3.5 w-3.5" />
@@ -201,7 +207,7 @@ export function WeeklyReportTableRow({
       </TableRow>
       {isExpanded && (
         <TableRow className="bg-muted/20 hover:bg-muted/20 border-t-0">
-          <TableCell colSpan={6} className="p-0">
+          <TableCell colSpan={8} className="p-0">
             <div className="animate-in slide-in-from-top-2 grid grid-cols-1 gap-8 p-6 duration-200 md:grid-cols-3">
               <div className="space-y-3">
                 <h4 className="flex items-center gap-2 text-[10px] font-black tracking-widest text-blue-600 uppercase">

@@ -1,5 +1,7 @@
 "use client"
 
+import Link from "next/link"
+import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -16,17 +18,13 @@ type Employee = {
 
 interface MeetingReminderFormProps {
   meetingDate: string
-  setMeetingDate: (v: string) => void
   meetingTime: string
-  setMeetingTime: (v: string) => void
   teamsLink: string
   setTeamsLink: (v: string) => void
   agendaText: string
   setAgendaText: (v: string) => void
   knowledgeDepartment: string
-  setKnowledgeDepartment: (v: string) => void
   knowledgePresenterId: string
-  setKnowledgePresenterId: (v: string) => void
   meetingPreparedById: string
   setMeetingPreparedById: (v: string) => void
   departmentOptions: string[]
@@ -36,17 +34,13 @@ interface MeetingReminderFormProps {
 
 export function MeetingReminderForm({
   meetingDate,
-  setMeetingDate,
   meetingTime,
-  setMeetingTime,
   teamsLink,
   setTeamsLink,
   agendaText,
   setAgendaText,
   knowledgeDepartment,
-  setKnowledgeDepartment,
   knowledgePresenterId,
-  setKnowledgePresenterId,
   meetingPreparedById,
   setMeetingPreparedById,
   departmentOptions,
@@ -58,23 +52,20 @@ export function MeetingReminderForm({
       <div className="flex flex-wrap gap-4">
         <div className="space-y-2">
           <Label htmlFor="meet-date">Meeting Date</Label>
-          <Input
-            id="meet-date"
-            type="date"
-            value={meetingDate}
-            onChange={(e) => setMeetingDate(e.target.value)}
-            className="w-[180px]"
-          />
+          <Input id="meet-date" type="date" value={meetingDate} className="w-[180px]" disabled readOnly />
+          <p className="text-muted-foreground text-xs">
+            Managed from Admin Reports meeting window. This value is read-only here.
+          </p>
+          <Button variant="outline" size="sm" asChild className="h-7 px-2 text-[11px]">
+            <Link href="/admin/reports/weekly-reports">Manage Meeting Date</Link>
+          </Button>
         </div>
         <div className="space-y-2">
           <Label htmlFor="meet-time">Meeting Time</Label>
-          <Input
-            id="meet-time"
-            type="time"
-            value={meetingTime}
-            onChange={(e) => setMeetingTime(e.target.value)}
-            className="w-[140px]"
-          />
+          <Input id="meet-time" type="time" value={meetingTime} className="w-[140px]" disabled readOnly />
+          <p className="text-muted-foreground text-xs">
+            Managed from Admin Reports week setup. This value is read-only here.
+          </p>
         </div>
       </div>
       <div className="space-y-2">
@@ -108,13 +99,7 @@ export function MeetingReminderForm({
         <div className="flex flex-wrap gap-3">
           <div className="space-y-2">
             <Label htmlFor="ks-department">Department</Label>
-            <Select
-              value={knowledgeDepartment}
-              onValueChange={(value) => {
-                setKnowledgeDepartment(value)
-                setKnowledgePresenterId("none")
-              }}
-            >
+            <Select value={knowledgeDepartment} disabled>
               <SelectTrigger id="ks-department" className="w-[220px]">
                 <SelectValue placeholder="Select department" />
               </SelectTrigger>
@@ -130,11 +115,7 @@ export function MeetingReminderForm({
           </div>
           <div className="space-y-2">
             <Label htmlFor="ks-presenter">Presenter</Label>
-            <Select
-              value={knowledgePresenterId}
-              onValueChange={setKnowledgePresenterId}
-              disabled={knowledgeDepartment === "none"}
-            >
+            <Select value={knowledgePresenterId} disabled>
               <SelectTrigger id="ks-presenter" className="w-[260px]">
                 <SelectValue placeholder="Select presenter" />
               </SelectTrigger>
@@ -149,6 +130,9 @@ export function MeetingReminderForm({
             </Select>
           </div>
         </div>
+        <p className="text-muted-foreground text-xs">
+          Department and presenter are managed from Admin Reports week setup so the reminder and KSS stay in sync.
+        </p>
       </div>
       <div className="space-y-2">
         <Label htmlFor="meeting-prepared-by">Prepared by</Label>

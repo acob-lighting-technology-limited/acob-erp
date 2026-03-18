@@ -6,6 +6,7 @@ import { PageWrapper, PageHeader } from "@/components/layout"
 import { Mail, FileText, ClipboardList } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { getCurrentOfficeWeek } from "@/lib/meeting-week"
+import { buildMeetingDocumentFileName } from "@/lib/reports/meeting-date"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { toast } from "sonner"
 import { RecipientSelector } from "./_components/RecipientSelector"
@@ -37,6 +38,7 @@ type MeetingWeekDocument = {
   id: string
   meeting_week: number
   meeting_year: number
+  meeting_date: string | null
   document_type: "knowledge_sharing_session" | "minutes" | "action_points"
   department: string | null
   presenter_id: string | null
@@ -53,17 +55,6 @@ type MailDocRef = {
   display_name: string
 }
 
-function sanitizeAttachmentToken(value: string): string {
-  return (
-    String(value || "Unknown")
-      .trim()
-      .replace(/\s+/g, "_")
-      .replace(/[^a-zA-Z0-9_-]/g, "_")
-      .replace(/_+/g, "_")
-      .replace(/^_+|_+$/g, "") || "Unknown"
-  )
-}
-
 function getFileExtension(fileName: string): string {
   const lower = String(fileName || "").toLowerCase()
   if (lower.endsWith(".pdf")) return "pdf"
@@ -73,19 +64,14 @@ function getFileExtension(fileName: string): string {
 }
 
 function buildMeetingDocumentDisplayName(document: MeetingWeekDocument, presenterName?: string | null): string {
-  const extension = getFileExtension(document.file_name)
-
-  if (document.document_type === "knowledge_sharing_session") {
-    return `KSS_${sanitizeAttachmentToken(document.department || "Unknown")}_${sanitizeAttachmentToken(
-      presenterName || "Unknown"
-    )}_Week_${document.meeting_week}_${document.meeting_year}.${extension}`
-  }
-
-  if (document.document_type === "minutes") {
-    return `Minutes_of_Meeting_Week_${document.meeting_week}_${document.meeting_year}.${extension}`
-  }
-
-  return `Action_Points_Manual_Week_${document.meeting_week}_${document.meeting_year}.${extension}`
+  return buildMeetingDocumentFileName({
+    documentType: document.document_type,
+    meetingDate: document.meeting_date || `${document.meeting_year}-01-01`,
+    meetingWeek: document.meeting_week,
+    extension: getFileExtension(document.file_name),
+    department: document.department,
+    presenterName,
+  })
 }
 
 interface Props {

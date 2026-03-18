@@ -41,6 +41,80 @@ export interface WeeklyReport {
   profiles?: any
 }
 
+const INVALID_FILENAME_CHARS = /[<>:"/\\|?*\u0000-\u001F]+/g
+
+const sanitizeFilenameSegment = (value: string) =>
+  value.replace(INVALID_FILENAME_CHARS, " ").replace(/\s+/g, " ").trim()
+
+const resolveExportMeetingDate = (week: number, year: number, meetingDate?: string) => {
+  if (meetingDate) {
+    const parsed = new Date(`${meetingDate}T00:00:00`)
+    if (!Number.isNaN(parsed.getTime())) return parsed
+  }
+
+  const fallback = getOfficeWeekMonday(week, year)
+  fallback.setHours(0, 0, 0, 0)
+  return fallback
+}
+
+const formatMeetingDateForFilename = (week: number, year: number, meetingDate?: string) =>
+  new Intl.DateTimeFormat("en-GB", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(resolveExportMeetingDate(week, year, meetingDate))
+
+const buildWeeklyReportFilename = ({
+  week,
+  year: _year,
+  meetingDate,
+  extension,
+  department,
+  allDepartments = false,
+  theme,
+}: {
+  week: number
+  year: number
+  meetingDate?: string
+  extension: string
+  department?: string
+  allDepartments?: boolean
+  theme?: WeeklyPptxTheme
+}) => {
+  const parts = [
+    allDepartments ? "ACOB Weekly Reports" : "ACOB Weekly Report",
+    department ? sanitizeFilenameSegment(department) : null,
+    formatMeetingDateForFilename(week, _year, meetingDate),
+    `W${week}`,
+    theme === "dark" ? "Dark Theme" : null,
+  ].filter(Boolean)
+
+  return `${parts.join(" - ")}.${extension}`
+}
+
+const buildActionTrackerFilename = ({
+  week,
+  year: _year,
+  meetingDate,
+  extension,
+  department,
+}: {
+  week: number
+  year: number
+  meetingDate?: string
+  extension: string
+  department?: string
+}) => {
+  const parts = [
+    "ACOB Action Tracker",
+    department ? sanitizeFilenameSegment(department) : null,
+    formatMeetingDateForFilename(week, _year, meetingDate),
+    `W${week}`,
+  ].filter(Boolean)
+
+  return `${parts.join(" - ")}.${extension}`
+}
+
 // ─── Constants & Sorting ──────────────────────────────────────────────────
 export const DEPARTMENT_ORDER = [
   "Accounts",
@@ -543,7 +617,7 @@ const pdfContentPage = (
   }
 }
 
-export const exportToPDF = async (report: WeeklyReport) => {
+export const exportToPDF = async (report: WeeklyReport, meetingDate?: string) => {
   const doc = new jsPDF()
   // Cover shows the CURRENT week (week being reported IN = report week + 1)
   const currentWeek = report.week_number + 1
@@ -562,10 +636,18 @@ export const exportToPDF = async (report: WeeklyReport) => {
   doc.addPage()
   pdfContentPage(doc, report.department, report, logoDark)
 
-  doc.save(`ACOB_Report_${report.department}_W${report.week_number}.pdf`)
+  doc.save(
+    buildWeeklyReportFilename({
+      week: report.week_number,
+      year: report.year,
+      meetingDate,
+      extension: "pdf",
+      department: report.department,
+    })
+  )
 }
 
-export const exportAllToPDF = async (reports: WeeklyReport[], week: number, year: number) => {
+export const exportAllToPDF = async (reports: WeeklyReport[], week: number, year: number, meetingDate?: string) => {
   const doc = new jsPDF()
   const sortedReports = sortReportsByDepartment(reports)
   // Cover shows the CURRENT week (week being reported IN = report week + 1)
@@ -592,7 +674,15 @@ export const exportAllToPDF = async (reports: WeeklyReport[], week: number, year
     pdfContentPage(doc, report.department, report, logoDark, idx + 3)
   })
 
-  doc.save(`ACOB_Weekly_Reports_W${currentWeek}_${currentYear}.pdf`)
+  doc.save(
+    buildWeeklyReportFilename({
+      week,
+      year,
+      meetingDate,
+      extension: "pdf",
+      allDepartments: true,
+    })
+  )
 }
 
 /**
@@ -841,16 +931,28 @@ export const exportActionTrackerToPDFBase64 = async (
 /**
  * Saves the Action Tracker as a downloadable PDF file.
  */
-export const exportActionTrackerToPDF = async (actions: ActionItem[], week: number, year: number): Promise<void> => {
+export const exportActionTrackerToPDF = async (
+  actions: ActionItem[],
+  week: number,
+  year: number,
+  meetingDate?: string,
+  department?: string
+): Promise<void> => {
   const base64 = await exportActionTrackerToPDFBase64(actions, week, year)
   const blob = new Blob([Uint8Array.from(atob(base64), (c) => c.charCodeAt(0))], { type: "application/pdf" })
-  saveAs(blob, `ACOB_Action_Tracker_W${week}_${year}.pdf`)
+  saveAs(blob, buildActionTrackerFilename({ week, year, meetingDate, extension: "pdf", department }))
 }
 
 /**
  * Exports the Action Tracker as a PPTX presentation.
  */
-export const exportActionTrackerToPPTX = async (actions: ActionItem[], week: number, year: number): Promise<void> => {
+export const exportActionTrackerToPPTX = async (
+  actions: ActionItem[],
+  week: number,
+  year: number,
+  meetingDate?: string,
+  department?: string
+): Promise<void> => {
   const PptxConstructor = await loadPptxGenJS()
   const pres = new PptxConstructor()
   pres.layout = "LAYOUT_WIDE"
@@ -1051,7 +1153,9 @@ export const exportActionTrackerToPPTX = async (actions: ActionItem[], week: num
     })
   })
 
-  await pres.writeFile({ fileName: `ACOB_Action_Tracker_W${week}_${year}.pptx` })
+  await pres.writeFile({
+    fileName: buildActionTrackerFilename({ week, year, meetingDate, extension: "pptx", department }),
+  })
 }
 
 // ─── DOCX helpers ─────────────────────────────────────────────────────────────
@@ -1085,7 +1189,7 @@ const docxNumberedItems = (text: string, fallback: string) => {
   )
 }
 
-export const exportToDocx = async (report: WeeklyReport) => {
+export const exportToDocx = async (report: WeeklyReport, meetingDate?: string) => {
   const p = Array.isArray(report.profiles) ? report.profiles[0] : report.profiles
   const name = p ? `${p.first_name} ${p.last_name}` : "Employee"
   const mondayDate = getWeekMonday(report.week_number, report.year)
@@ -1174,13 +1278,28 @@ export const exportToDocx = async (report: WeeklyReport) => {
   })
 
   const blob = await Packer.toBlob(doc)
-  saveAs(blob, `ACOB_Report_${report.department}_W${report.week_number}.docx`)
+  saveAs(
+    blob,
+    buildWeeklyReportFilename({
+      week: report.week_number,
+      year: report.year,
+      meetingDate,
+      extension: "docx",
+      department: report.department,
+    })
+  )
 }
 
 /**
  * Exports the Action Tracker to a DOCX document.
  */
-export const exportActionTrackerToDocx = async (actions: ActionItem[], week: number, year: number) => {
+export const exportActionTrackerToDocx = async (
+  actions: ActionItem[],
+  week: number,
+  year: number,
+  meetingDate?: string,
+  department?: string
+) => {
   const mondayDate = getWeekMonday(week, year)
 
   const docSize = { width: 11906, height: 16838 } // A4 in twips
@@ -1312,14 +1431,15 @@ export const exportActionTrackerToDocx = async (actions: ActionItem[], week: num
   })
 
   const blob = await Packer.toBlob(doc)
-  saveAs(blob, `ACOB_Action_Tracker_W${week}_${year}.docx`)
+  saveAs(blob, buildActionTrackerFilename({ week, year, meetingDate, extension: "docx", department }))
 }
 
 export const exportActionTrackerToXLSX = async (
   actions: ActionItem[],
   week: number,
   year: number,
-  department?: string
+  department?: string,
+  meetingDate?: string
 ) => {
   const XLSX = await import("xlsx")
   const filteredActions = department ? actions.filter((item) => item.department === department) : actions
@@ -1339,16 +1459,21 @@ export const exportActionTrackerToXLSX = async (
   XLSX.utils.book_append_sheet(workbook, worksheet, "Action Tracker")
 
   const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" })
-  const safeDepartment = department ? department.replace(/[^a-z0-9]+/gi, "_") : "All"
   saveAs(
     new Blob([excelBuffer], {
       type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     }),
-    `ACOB_Action_Tracker_${safeDepartment}_W${week}_${year}.xlsx`
+    buildActionTrackerFilename({
+      week,
+      year,
+      meetingDate,
+      extension: "xlsx",
+      department: department || "All Departments",
+    })
   )
 }
 
-export const exportAllToDocx = async (reports: WeeklyReport[], week: number, year: number) => {
+export const exportAllToDocx = async (reports: WeeklyReport[], week: number, year: number, meetingDate?: string) => {
   const sortedReports = sortReportsByDepartment(reports)
   const mondayDate = getWeekMonday(week, year)
 
@@ -1435,10 +1560,19 @@ export const exportAllToDocx = async (reports: WeeklyReport[], week: number, yea
     ],
   })
   const blob = await Packer.toBlob(doc)
-  saveAs(blob, `ACOB_Weekly_Reports_All_W${week}_${year}.docx`)
+  saveAs(
+    blob,
+    buildWeeklyReportFilename({
+      week,
+      year,
+      meetingDate,
+      extension: "docx",
+      allDepartments: true,
+    })
+  )
 }
 
-export const exportToXLSX = async (report: WeeklyReport) => {
+export const exportToXLSX = async (report: WeeklyReport, meetingDate?: string) => {
   const buildSectionRows = (section: string, text: string) => {
     const lines = autoNumberLines(text || "")
       .split("\n")
@@ -1481,16 +1615,21 @@ export const exportToXLSX = async (report: WeeklyReport) => {
   XLSX.utils.book_append_sheet(workbook, worksheet, "Weekly Report")
 
   const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" })
-  const safeDepartment = report.department.replace(/[^a-z0-9]+/gi, "_")
   saveAs(
     new Blob([excelBuffer], {
       type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     }),
-    `ACOB_Report_${safeDepartment}_W${report.week_number}_${report.year}.xlsx`
+    buildWeeklyReportFilename({
+      week: report.week_number,
+      year: report.year,
+      meetingDate,
+      extension: "xlsx",
+      department: report.department,
+    })
   )
 }
 
-export const exportAllToXLSX = async (reports: WeeklyReport[], week: number, year: number) => {
+export const exportAllToXLSX = async (reports: WeeklyReport[], week: number, year: number, meetingDate?: string) => {
   const buildSectionRows = (report: WeeklyReport, section: string, text: string) => {
     const lines = autoNumberLines(text || "")
       .split("\n")
@@ -1538,7 +1677,13 @@ export const exportAllToXLSX = async (reports: WeeklyReport[], week: number, yea
     new Blob([excelBuffer], {
       type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     }),
-    `ACOB_Weekly_Reports_All_W${week}_${year}.xlsx`
+    buildWeeklyReportFilename({
+      week,
+      year,
+      meetingDate,
+      extension: "xlsx",
+      allDepartments: true,
+    })
   )
 }
 
@@ -2644,7 +2789,8 @@ const renderDepartmentCompactSlides = (
 export const exportToPPTX = async (
   report: WeeklyReport,
   mode: WeeklyPptxMode = "full",
-  theme: WeeklyPptxTheme = "light"
+  theme: WeeklyPptxTheme = "light",
+  meetingDate?: string
 ) => {
   const PptxConstructor = await loadPptxGenJS()
   const pres = new PptxConstructor()
@@ -2662,8 +2808,16 @@ export const exportToPPTX = async (
     renderDepartmentWeeklySlides(pres, departmentPlan, undefined, 2, theme)
   }
 
-  const themeSuffix = theme === "dark" ? "_dark" : ""
-  await pres.writeFile({ fileName: `ACOB_Report_${report.department}_W${report.week_number}${themeSuffix}.pptx` })
+  await pres.writeFile({
+    fileName: buildWeeklyReportFilename({
+      week: report.week_number,
+      year: report.year,
+      meetingDate,
+      extension: "pptx",
+      department: report.department,
+      theme,
+    }),
+  })
 }
 
 export const exportAllToPPTX = async (
@@ -2671,7 +2825,8 @@ export const exportAllToPPTX = async (
   week: number,
   year: number,
   mode: WeeklyPptxMode = "full",
-  theme: WeeklyPptxTheme = "light"
+  theme: WeeklyPptxTheme = "light",
+  meetingDate?: string
 ) => {
   const PptxConstructor = await loadPptxGenJS()
   const pres = new PptxConstructor()
@@ -2738,6 +2893,14 @@ export const exportAllToPPTX = async (
     })
   }
 
-  const themeSuffix = theme === "dark" ? "_dark" : ""
-  await pres.writeFile({ fileName: `ACOB_Weekly_Reports_All_W${week}_${year}${themeSuffix}.pptx` })
+  await pres.writeFile({
+    fileName: buildWeeklyReportFilename({
+      week,
+      year,
+      meetingDate,
+      extension: "pptx",
+      allDepartments: true,
+      theme,
+    }),
+  })
 }

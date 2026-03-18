@@ -2,19 +2,23 @@
 
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
-import { FileText, File as FileIcon, Presentation, Plus, ExternalLink, FileSpreadsheet } from "lucide-react"
-import {
-  exportAllToPDF,
-  exportAllToDocx,
-  exportAllToPPTX,
-  exportAllToXLSX,
-  type WeeklyReport,
-} from "@/lib/export-utils"
+import { FileText, File as FileIcon, Presentation, Plus, ExternalLink, FileSpreadsheet, Download } from "lucide-react"
+import { exportAllToPDF, exportAllToDocx, exportAllToXLSX, type WeeklyReport } from "@/lib/export-utils"
+
+interface MeetingDocumentHelper {
+  id: string
+  file_name: string
+  signed_url: string | null
+}
 
 interface WeeklyReportExportActionsProps {
   filteredReports: WeeklyReport[]
   weekFilter: number
   yearFilter: number
+  meetingDate: string
+  kssDocument: MeetingDocumentHelper | null
+  minutesDocument: MeetingDocumentHelper | null
+  onDownloadDocument: (document: MeetingDocumentHelper) => void
   onOpenAllPptx: () => void
   onAddReport: () => void
 }
@@ -23,6 +27,10 @@ export function WeeklyReportExportActions({
   filteredReports,
   weekFilter,
   yearFilter,
+  meetingDate,
+  kssDocument,
+  minutesDocument,
+  onDownloadDocument,
   onOpenAllPptx,
   onAddReport,
 }: WeeklyReportExportActionsProps) {
@@ -32,14 +40,14 @@ export function WeeklyReportExportActions({
         <>
           <Button
             variant="outline"
-            onClick={() => exportAllToPDF(filteredReports, weekFilter, yearFilter)}
+            onClick={() => exportAllToPDF(filteredReports, weekFilter, yearFilter, meetingDate)}
             className="gap-2 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-900/30 dark:hover:bg-red-950/20"
           >
             <FileText className="h-4 w-4" /> <span className="hidden sm:inline">PDF</span>
           </Button>
           <Button
             variant="outline"
-            onClick={() => exportAllToDocx(filteredReports, weekFilter, yearFilter)}
+            onClick={() => exportAllToDocx(filteredReports, weekFilter, yearFilter, meetingDate)}
             className="gap-2 border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700 dark:border-blue-900/30 dark:hover:bg-blue-950/20"
           >
             <FileIcon className="h-4 w-4" /> <span className="hidden sm:inline">Word</span>
@@ -53,7 +61,7 @@ export function WeeklyReportExportActions({
           </Button>
           <Button
             variant="outline"
-            onClick={() => exportAllToXLSX(filteredReports, weekFilter, yearFilter)}
+            onClick={() => exportAllToXLSX(filteredReports, weekFilter, yearFilter, meetingDate)}
             className="gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 dark:border-emerald-900/30 dark:hover:bg-emerald-950/20"
           >
             <FileSpreadsheet className="h-4 w-4" /> <span className="hidden sm:inline">XLSX</span>
@@ -70,6 +78,24 @@ export function WeeklyReportExportActions({
           </Button>
         </>
       )}
+      <Button
+        variant="outline"
+        className="gap-2 border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-800 dark:border-slate-800 dark:hover:bg-slate-950/20"
+        onClick={() => kssDocument && onDownloadDocument(kssDocument)}
+        disabled={!kssDocument?.signed_url}
+      >
+        <Download className="h-4 w-4" />
+        <span className="hidden sm:inline">Download KSS</span>
+      </Button>
+      <Button
+        variant="outline"
+        className="gap-2 border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-800 dark:border-slate-800 dark:hover:bg-slate-950/20"
+        onClick={() => minutesDocument && onDownloadDocument(minutesDocument)}
+        disabled={!minutesDocument?.signed_url}
+      >
+        <Download className="h-4 w-4" />
+        <span className="hidden sm:inline">Download Minutes</span>
+      </Button>
       <Button onClick={onAddReport} className="gap-2">
         <Plus className="h-4 w-4" /> Add Report
       </Button>

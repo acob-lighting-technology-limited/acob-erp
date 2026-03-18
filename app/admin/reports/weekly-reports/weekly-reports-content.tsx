@@ -79,8 +79,20 @@ interface TrackerStatus {
   status: string
 }
 
+interface MeetingDocumentHelper {
+  id: string
+  file_name: string
+  signed_url: string | null
+  document_type: "knowledge_sharing_session" | "minutes"
+}
+
 interface WeeklyReportsContentProps {
   initialDepartments: string[]
+  employees: Array<{
+    id: string
+    full_name: string
+    department: string
+  }>
   scopedDepartments?: string[]
   editableDepartments?: string[]
   currentUser: {
@@ -95,7 +107,8 @@ interface WeeklyReportsContentProps {
 
 export function WeeklyReportsContent({
   initialDepartments,
-  scopedDepartments = [],
+  employees,
+  scopedDepartments: _scopedDepartments = [],
   editableDepartments = [],
   currentUser,
 }: WeeklyReportsContentProps) {
@@ -114,7 +127,10 @@ export function WeeklyReportsContent({
   const [meetingDateInput, setMeetingDateInput] = useState(
     getDefaultMeetingDateIso(currentOfficeWeek.week, currentOfficeWeek.year)
   )
+  const [meetingTimeInput, setMeetingTimeInput] = useState("08:30")
   const [meetingGraceHours, setMeetingGraceHours] = useState(24)
+  const [kssDepartmentInput, setKssDepartmentInput] = useState("none")
+  const [kssPresenterIdInput, setKssPresenterIdInput] = useState("none")
   const [savingMeetingWindow, setSavingMeetingWindow] = useState(false)
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
 
@@ -156,6 +172,62 @@ export function WeeklyReportsContent({
     queryFn: () => fetchAdminWeeklyReportLockState(supabase, weekFilter, yearFilter),
   })
 
+  const { data: weekSetupData } = useQuery({
+    queryKey: ["admin-week-setup", weekFilter, yearFilter],
+    queryFn: async () => {
+      const [meetingWindowResult, rosterResult] = await Promise.all([
+        supabase
+          .from("weekly_report_meeting_windows")
+          .select("meeting_time")
+          .eq("week_number", weekFilter)
+          .eq("year", yearFilter)
+          .maybeSingle(),
+        supabase
+          .from("kss_weekly_roster")
+          .select("department, presenter_id")
+          .eq("meeting_week", weekFilter)
+          .eq("meeting_year", yearFilter)
+          .maybeSingle(),
+      ])
+
+      if (meetingWindowResult.error) throw new Error(meetingWindowResult.error.message)
+      if (rosterResult.error) throw new Error(rosterResult.error.message)
+
+      return {
+        meetingTime:
+          typeof meetingWindowResult.data?.meeting_time === "string" ? meetingWindowResult.data.meeting_time : "08:30",
+        kssDepartment:
+          typeof rosterResult.data?.department === "string" && rosterResult.data.department.trim()
+            ? rosterResult.data.department
+            : "none",
+        kssPresenterId:
+          typeof rosterResult.data?.presenter_id === "string" && rosterResult.data.presenter_id
+            ? rosterResult.data.presenter_id
+            : "none",
+      }
+    },
+  })
+
+  const { data: selectedWeekDocuments = [] } = useQuery({
+    queryKey: ["admin-weekly-report-helper-documents", weekFilter, yearFilter],
+    queryFn: async (): Promise<MeetingDocumentHelper[]> => {
+      const [kssRes, minutesRes] = await Promise.all([
+        fetch(
+          `/api/reports/meeting-week-documents?documentType=knowledge_sharing_session&currentOnly=true&week=${weekFilter}&year=${yearFilter}`
+        ),
+        fetch(
+          `/api/reports/meeting-week-documents?documentType=minutes&currentOnly=true&week=${weekFilter}&year=${yearFilter}`
+        ),
+      ])
+
+      const [kssPayload, minutesPayload] = await Promise.all([kssRes.json(), minutesRes.json()])
+      if (!kssRes.ok) throw new Error(kssPayload.error || "Failed to fetch KSS document")
+      if (!minutesRes.ok) throw new Error(minutesPayload.error || "Failed to fetch minutes document")
+
+      return [...(kssPayload.data || []), ...(minutesPayload.data || [])]
+    },
+  })
+
   const isFilteredWeekLocked = lockState?.isLocked ?? false
 
   useEffect(() => {
@@ -163,7 +235,44 @@ export function WeeklyReportsContent({
       setMeetingDateInput(lockState.meetingDate || getDefaultMeetingDateIso(weekFilter, yearFilter))
       setMeetingGraceHours(lockState.graceHours || 24)
     }
-  }, [lockState, isAdminRole])
+  }, [isAdminRole, lockState, weekFilter, yearFilter])
+
+  useEffect(() => {
+    if (!weekSetupData || !isAdminRole) return
+    setMeetingTimeInput(weekSetupData.meetingTime || "08:30")
+    setKssDepartmentInput(weekSetupData.kssDepartment || "none")
+    setKssPresenterIdInput(weekSetupData.kssPresenterId || "none")
+  }, [isAdminRole, weekSetupData])
+
+  const presenterOptions = employees
+    .filter((employee) => employee.department === kssDepartmentInput)
+    .sort((a, b) => a.full_name.localeCompare(b.full_name))
+
+  const kssDocument = selectedWeekDocuments.find((doc) => doc.document_type === "knowledge_sharing_session") || null
+  const minutesDocument = selectedWeekDocuments.find((doc) => doc.document_type === "minutes") || null
+
+  const handleDownloadMeetingDocument = async (document: MeetingDocumentHelper) => {
+    if (!document.signed_url) {
+      toast.error("No file available to download yet")
+      return
+    }
+
+    try {
+      const response = await fetch(document.signed_url)
+      if (!response.ok) throw new Error("Failed to download document")
+      const blob = await response.blob()
+      const objectUrl = URL.createObjectURL(blob)
+      const anchor = document.createElement("a")
+      anchor.href = objectUrl
+      anchor.download = document.file_name
+      document.body.appendChild(anchor)
+      anchor.click()
+      anchor.remove()
+      URL.revokeObjectURL(objectUrl)
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Failed to download document")
+    }
+  }
 
   const toggleRow = (id: string) => {
     const newExpanded = new Set(expandedRows)
@@ -203,29 +312,62 @@ export function WeeklyReportsContent({
       toast.error("Meeting date is required")
       return
     }
+    if (!meetingTimeInput) {
+      toast.error("Meeting time is required")
+      return
+    }
     if (meetingGraceHours < 0 || meetingGraceHours > 24) {
       toast.error("Grace hours must be between 0 and 24")
+      return
+    }
+    if (kssDepartmentInput === "none") {
+      toast.error("KSS department is required")
+      return
+    }
+    if (kssPresenterIdInput === "none") {
+      toast.error("KSS presenter is required")
       return
     }
 
     setSavingMeetingWindow(true)
     try {
-      const { error } = await supabase.from("weekly_report_meeting_windows").upsert(
-        {
-          week_number: weekFilter,
-          year: yearFilter,
-          meeting_date: meetingDateInput,
-          grace_hours: meetingGraceHours,
-          updated_by: currentUser.id,
-          created_by: currentUser.id,
-        },
-        { onConflict: "week_number,year" }
-      )
-      if (error) throw error
-      toast.success("Meeting window saved")
+      const [meetingWindowResult, rosterResult] = await Promise.all([
+        supabase.from("weekly_report_meeting_windows").upsert(
+          {
+            week_number: weekFilter,
+            year: yearFilter,
+            meeting_date: meetingDateInput,
+            meeting_time: meetingTimeInput,
+            grace_hours: meetingGraceHours,
+            updated_by: currentUser.id,
+            created_by: currentUser.id,
+          },
+          { onConflict: "week_number,year" }
+        ),
+        supabase.from("kss_weekly_roster").upsert(
+          {
+            meeting_week: weekFilter,
+            meeting_year: yearFilter,
+            department: kssDepartmentInput,
+            presenter_id: kssPresenterIdInput,
+            is_active: true,
+            created_by: currentUser.id,
+          },
+          { onConflict: "meeting_week,meeting_year" }
+        ),
+      ])
+
+      if (meetingWindowResult.error) throw meetingWindowResult.error
+      if (rosterResult.error) throw rosterResult.error
+
+      toast.success("Week setup saved")
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminWeeklyReportLockState(weekFilter, yearFilter) }),
+        queryClient.invalidateQueries({ queryKey: ["admin-week-setup", weekFilter, yearFilter] }),
+      ])
     } catch (error: unknown) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      toast.error((error as any)?.message || "Failed to save meeting window")
+      toast.error((error as any)?.message || "Failed to save week setup")
     } finally {
       setSavingMeetingWindow(false)
     }
@@ -249,11 +391,12 @@ export function WeeklyReportsContent({
 
   const runPptxExport = async (mode: WeeklyPptxMode, theme: WeeklyPptxTheme = "light") => {
     if (!pendingPptxExport) return
+    const exportMeetingDate = lockState?.meetingDate || meetingDateInput
     if (pendingPptxExport.kind === "all") {
-      await exportAllToPPTX(filteredReports, weekFilter, yearFilter, mode, theme)
+      await exportAllToPPTX(filteredReports, weekFilter, yearFilter, mode, theme, exportMeetingDate)
     } else {
       const { exportToPPTX } = await import("@/lib/export-utils")
-      await exportToPPTX(pendingPptxExport.report, mode, theme)
+      await exportToPPTX(pendingPptxExport.report, mode, theme, exportMeetingDate)
     }
     setPptxModeDialogOpen(false)
     setPendingPptxExport(null)
@@ -271,6 +414,10 @@ export function WeeklyReportsContent({
           filteredReports={filteredReports}
           weekFilter={weekFilter}
           yearFilter={yearFilter}
+          meetingDate={lockState?.meetingDate || meetingDateInput}
+          kssDocument={kssDocument}
+          minutesDocument={minutesDocument}
+          onDownloadDocument={handleDownloadMeetingDocument}
           onOpenAllPptx={openAllPptxModeDialog}
           onAddReport={() => {
             setEditingReport(null)
@@ -294,8 +441,16 @@ export function WeeklyReportsContent({
           isAdminRole={isAdminRole}
           meetingDateInput={meetingDateInput}
           setMeetingDateInput={setMeetingDateInput}
+          meetingTimeInput={meetingTimeInput}
+          setMeetingTimeInput={setMeetingTimeInput}
           meetingGraceHours={meetingGraceHours}
           setMeetingGraceHours={setMeetingGraceHours}
+          kssDepartmentInput={kssDepartmentInput}
+          setKssDepartmentInput={setKssDepartmentInput}
+          kssPresenterIdInput={kssPresenterIdInput}
+          setKssPresenterIdInput={setKssPresenterIdInput}
+          presenterOptions={presenterOptions}
+          isWeekSetupLocked={isFilteredWeekLocked}
           savingMeetingWindow={savingMeetingWindow}
           saveMeetingWindow={saveMeetingWindow}
         />
@@ -304,6 +459,7 @@ export function WeeklyReportsContent({
       <WeeklyReportTable
         loading={loading}
         filteredReports={filteredReports}
+        meetingDate={lockState?.meetingDate || meetingDateInput}
         expandedRows={expandedRows}
         trackingData={trackingData}
         isFilteredWeekLocked={isFilteredWeekLocked}
