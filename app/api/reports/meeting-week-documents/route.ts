@@ -240,7 +240,7 @@ export async function POST(request: Request) {
 
     const shouldConvertToPdf = file.type === PPTX_MIME || file.type === DOCX_MIME
     const originalExtension = resolveExtension(file)
-    let uploadBuffer = Buffer.from(await file.arrayBuffer())
+    let uploadBuffer = new Uint8Array(await file.arrayBuffer())
     let uploadMimeType = file.type
     let uploadFileName = file.name
     let convertedFrom: "docx" | "pptx" | null = null
