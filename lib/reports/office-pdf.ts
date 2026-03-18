@@ -11,7 +11,7 @@ const CONVERTER_SCRIPT = join(process.cwd(), "scripts", "office", "convert-to-pd
 type ConvertibleOfficeKind = "docx" | "pptx"
 
 export type ConvertedOfficeDocument = {
-  buffer: Buffer
+  buffer: Uint8Array
   fileName: string
   mimeType: "application/pdf"
   fileSize: number
@@ -59,7 +59,7 @@ function runPowerShellConversion(inputPath: string, outputPath: string, kind: Co
 }
 
 export async function convertOfficeDocumentToPdf(
-  input: Buffer,
+  input: Uint8Array,
   baseName: string,
   kind: ConvertibleOfficeKind
 ): Promise<ConvertedOfficeDocument> {
