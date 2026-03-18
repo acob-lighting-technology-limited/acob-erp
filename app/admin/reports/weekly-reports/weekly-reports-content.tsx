@@ -83,7 +83,7 @@ interface MeetingDocumentHelper {
   id: string
   file_name: string
   signed_url: string | null
-  document_type: "knowledge_sharing_session" | "minutes"
+  document_type?: "knowledge_sharing_session" | "minutes"
 }
 
 interface WeeklyReportsContentProps {
@@ -251,20 +251,20 @@ export function WeeklyReportsContent({
   const kssDocument = selectedWeekDocuments.find((doc) => doc.document_type === "knowledge_sharing_session") || null
   const minutesDocument = selectedWeekDocuments.find((doc) => doc.document_type === "minutes") || null
 
-  const handleDownloadMeetingDocument = async (document: MeetingDocumentHelper) => {
-    if (!document.signed_url) {
+  const handleDownloadMeetingDocument = async (meetingDocument: MeetingDocumentHelper) => {
+    if (!meetingDocument.signed_url) {
       toast.error("No file available to download yet")
       return
     }
 
     try {
-      const response = await fetch(document.signed_url)
+      const response = await fetch(meetingDocument.signed_url)
       if (!response.ok) throw new Error("Failed to download document")
       const blob = await response.blob()
       const objectUrl = URL.createObjectURL(blob)
       const anchor = document.createElement("a")
       anchor.href = objectUrl
-      anchor.download = document.file_name
+      anchor.download = meetingDocument.file_name
       document.body.appendChild(anchor)
       anchor.click()
       anchor.remove()
