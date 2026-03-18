@@ -255,8 +255,9 @@ export async function POST(request: Request) {
       if (presenterError || !presenter?.full_name) {
         return NextResponse.json({ error: "Presenter not found" }, { status: 400 })
       }
+      const kssDepartment = department ?? "Unknown"
       normalizedFileName = buildKssFileName(
-        department,
+        kssDepartment,
         presenter.full_name,
         meetingWeek,
         meetingYear,
