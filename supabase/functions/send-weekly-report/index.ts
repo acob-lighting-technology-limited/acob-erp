@@ -230,6 +230,14 @@ function buildAttachmentFilename(
   return doc.file_name || "meeting-document.pdf"
 }
 
+function buildWeeklyReportAttachmentName(meetingDateLabel: string, meetingWeek: number): string {
+  return `ACOB Weekly Reports - ${meetingDateLabel} - W${meetingWeek}.pdf`
+}
+
+function buildActionTrackerAttachmentName(meetingDateLabel: string, meetingWeek: number): string {
+  return `ACOB Action Tracker - ${meetingDateLabel} - W${meetingWeek}.pdf`
+}
+
 async function drawLogoInHeader(
   doc: PDFDocument,
   page: any,
@@ -1036,13 +1044,13 @@ serve(async (req) => {
     const attachments: { filename: string; content: string }[] = []
     if (includeWeeklyReport && reportPdfBase64) {
       attachments.push({
-        filename: resolvedWeeklyReportFilename || `ACOB_Weekly_Reports_W${meetingWeek}_${meetingYear}.pdf`,
+        filename: resolvedWeeklyReportFilename || buildWeeklyReportAttachmentName(meetingDateLabel, meetingWeek),
         content: reportPdfBase64,
       })
     }
     if (includeActionTracker && trackerPdfBase64) {
       attachments.push({
-        filename: resolvedActionTrackerFilename || `ACOB_Action_Tracker_W${meetingWeek}_${meetingYear}.pdf`,
+        filename: resolvedActionTrackerFilename || buildActionTrackerAttachmentName(meetingDateLabel, meetingWeek),
         content: trackerPdfBase64,
       })
     }

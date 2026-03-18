@@ -94,14 +94,14 @@ export function buildMeetingDocumentFileName(params: {
   const extension = ensureExtension(params.extension)
 
   if (params.documentType === "knowledge_sharing_session") {
-    return `KSS - ${normalizeDisplayToken(params.department || "Unknown Department")} - ${normalizeDisplayToken(params.presenterName || "Unknown Presenter")} - ${dateLabel} - W${params.meetingWeek}.${extension}`
+    return `ACOB KSS - ${normalizeDisplayToken(params.department || "Unknown Department")} - ${normalizeDisplayToken(params.presenterName || "Unknown Presenter")} - ${dateLabel} - W${params.meetingWeek}.${extension}`
   }
 
   if (params.documentType === "minutes") {
-    return `Minutes of Meeting - ${dateLabel} - W${params.meetingWeek}.${extension}`
+    return `ACOB Minutes of General Meeting - ${dateLabel} - W${params.meetingWeek}.${extension}`
   }
 
-  return `Action Points - ${dateLabel} - W${params.meetingWeek}.${extension}`
+  return `ACOB Action Points - ${dateLabel} - W${params.meetingWeek}.${extension}`
 }
 
 export async function resolveEffectiveMeetingDateIso(
