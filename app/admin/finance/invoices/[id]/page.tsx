@@ -49,7 +49,9 @@ interface InvoiceItem {
   amount: number
 }
 
-const statusColors: Record<string, string> = {
+type InvoiceStatusVariant = "default" | "destructive" | "secondary" | "outline"
+
+const statusColors: Record<Invoice["status"], InvoiceStatusVariant> = {
   draft: "secondary",
   sent: "default",
   paid: "default",
@@ -137,7 +139,7 @@ export default function InvoiceDetailPage() {
       backLinkLabel="Back to Invoices"
       actions={
         <div className="flex flex-wrap gap-2">
-          <Badge variant={statusColors[invoice.status] as any} className="capitalize">
+          <Badge variant={statusColors[invoice.status]} className="capitalize">
             {invoice.status}
           </Badge>
           {invoice.status === "draft" && (

@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = await createClient()
-    const dataClient = getServiceRoleClientOrFallback(supabase as any)
+    const dataClient = getServiceRoleClientOrFallback(supabase)
     const {
       data: { user },
     } = await supabase.auth.getUser()

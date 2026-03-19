@@ -101,7 +101,7 @@ export function FeedbackContent({ initialFeedback, userId }: FeedbackContentProp
       if (feedbackToDelete) {
         try {
           await writeAuditLogClient(
-            supabase as any,
+            supabase,
             {
               action: "delete",
               entityType: "feedback",

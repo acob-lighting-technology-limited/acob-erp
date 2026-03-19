@@ -6,7 +6,6 @@ import { logger } from "@/lib/logger"
 
 const log = logger("projects")
 
-
 export interface Project {
   id: string
   project_name: string
@@ -79,13 +78,14 @@ async function getProjectsData() {
     )
     .or(`id.in.(${projectIds.join(",")}),project_manager_id.eq.${user.id},created_by.eq.${user.id}`)
     .order("created_at", { ascending: false })
+    .returns<Project[]>()
 
   if (error) {
     log.error("Error loading projects:", error)
   }
 
   return {
-    projects: (data as any) || [],
+    projects: data || [],
   }
 }
 
@@ -96,7 +96,7 @@ export default async function ProjectsPage() {
     redirect(data.redirect)
   }
 
-  const projectsData = data as { projects: Project[] }
+  const projectsData = data as Exclude<Awaited<ReturnType<typeof getProjectsData>>, { redirect: "/auth/login" }>
 
   return <ProjectsContent initialProjects={projectsData.projects} />
 }

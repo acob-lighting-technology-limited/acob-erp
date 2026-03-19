@@ -22,13 +22,92 @@ import { writeAuditLog } from "@/lib/audit/write-audit"
 
 const log = logger("leave-requests")
 
-function isRelieverStage(request: any) {
+type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>
+
+type LeaveRequestStageState = {
+  id: string
+  status: string
+  current_stage_code?: string | null
+  approval_stage?: string | null
+}
+
+type ProfileReferenceRow = {
+  id: string
+  first_name?: string | null
+  last_name?: string | null
+  full_name?: string | null
+  company_email?: string | null
+  department_id?: string | null
+}
+
+type LeaveTypeReferenceRow = {
+  id: string
+  name?: string | null
+  code?: string | null
+  description?: string | null
+  max_days?: number | null
+  requires_approval?: boolean | null
+}
+
+type LeaveEvidenceRow = {
+  id: string
+  leave_request_id: string
+  document_type?: string | null
+  file_url?: string | null
+  status?: string | null
+  verified_by?: string | null
+  verified_at?: string | null
+  notes?: string | null
+  created_at?: string | null
+}
+
+type LeaveApprovalRow = {
+  id: string
+  leave_request_id: string
+  approver_id?: string | null
+  approval_level?: number | null
+  status?: string | null
+  comments?: string | null
+  approved_at?: string | null
+  stage_code?: string | null
+  stage_order?: number | null
+  superseded?: boolean | null
+  reliever_revision?: number | null
+}
+
+type LeaveBalanceRow = {
+  leave_type_id?: string | null
+  balance_days?: number | null
+}
+
+type LeaveRequestRow = LeaveRequestStageState & {
+  user_id: string
+  leave_type_id: string
+  reliever_id?: string | null
+  supervisor_id?: string | null
+  route_snapshot?: Array<{
+    stage_order?: number | null
+    approver_role_code?: string | null
+    approver_user_id?: string | null
+  }> | null
+  start_date?: string | null
+  end_date?: string | null
+  days_count?: number | null
+  reason?: string | null
+  handover_note?: string | null
+}
+
+type LeavePolicySummary = {
+  required_documents?: string[] | null
+}
+
+function isRelieverStage(request: LeaveRequestStageState) {
   const stage = request.current_stage_code || request.approval_stage
   return stage === "pending_reliever" || stage === "reliever_pending"
 }
 
 async function assertNoDepartmentOverlap(
-  supabase: any,
+  supabase: SupabaseServerClient,
   requesterId: string,
   departmentId: string | null | undefined,
   startDate: string,
@@ -43,7 +122,7 @@ async function assertNoDepartmentOverlap(
     .eq("department_id", departmentId)
     .neq("id", requesterId)
 
-  const peerIds = (peers || []).map((row: any) => row.id).filter(Boolean)
+  const peerIds = ((peers || []) as ProfileReferenceRow[]).map((row) => row.id).filter(Boolean)
   if (peerIds.length === 0) return
 
   let overlapQuery = supabase
@@ -70,7 +149,7 @@ async function assertNoDepartmentOverlap(
 }
 
 async function assertRequesterNotBlockedByRelieverCommitment(
-  supabase: any,
+  supabase: SupabaseServerClient,
   requesterId: string,
   startDate: string,
   endDate: string,
@@ -102,7 +181,10 @@ async function assertRequesterNotBlockedByRelieverCommitment(
   }
 }
 
-async function canRequesterModifyBeforeRelieverDecision(supabase: any, request: any) {
+async function canRequesterModifyBeforeRelieverDecision(
+  supabase: SupabaseServerClient,
+  request: LeaveRequestStageState
+) {
   if (!["pending", "pending_evidence"].includes(request.status)) return false
   if (!isRelieverStage(request)) return false
 
@@ -164,9 +246,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: `Failed to fetch leave requests: ${error.message}` }, { status: 500 })
     }
 
-    const requestRowsRaw = requests || []
-    const requestRows = all ? requestRowsRaw : requestRowsRaw.filter((row: any) => row.user_id === targetUserId)
-    const requestIds = requestRows.map((row: any) => row.id).filter(Boolean)
+    const requestRowsRaw = (requests || []) as LeaveRequestRow[]
+    const requestRows = all ? requestRowsRaw : requestRowsRaw.filter((row) => row.user_id === targetUserId)
+    const requestIds = requestRows.map((row) => row.id).filter(Boolean)
 
     const { data: balanceRows } = await supabase
       .from("leave_balances")
@@ -174,8 +256,8 @@ export async function GET(request: NextRequest) {
       .eq("user_id", targetUserId)
       .order("leave_type_id")
 
-    let evidenceRows: any[] = []
-    let approvalRows: any[] = []
+    let evidenceRows: LeaveEvidenceRow[] = []
+    let approvalRows: LeaveApprovalRow[] = []
 
     if (requestIds.length > 0) {
       const [{ data: evidenceData }, { data: approvalsData }] = await Promise.all([
@@ -213,8 +295,8 @@ export async function GET(request: NextRequest) {
       if (balance.leave_type_id) leaveTypeIdSet.add(balance.leave_type_id)
     }
 
-    let profileRows: any[] = []
-    let leaveTypeRows: any[] = []
+    let profileRows: ProfileReferenceRow[] = []
+    let leaveTypeRows: LeaveTypeReferenceRow[] = []
 
     const profileIds = Array.from(profileIdSet)
     const leaveTypeIds = Array.from(leaveTypeIdSet)
@@ -235,10 +317,10 @@ export async function GET(request: NextRequest) {
       leaveTypeRows = data || []
     }
 
-    const profileMap = new Map((profileRows || []).map((row: any) => [row.id, row]))
-    const leaveTypeMap = new Map((leaveTypeRows || []).map((row: any) => [row.id, row]))
-    const evidenceByRequest = new Map<string, any[]>()
-    const approvalsByRequest = new Map<string, any[]>()
+    const profileMap = new Map((profileRows || []).map((row) => [row.id, row] as const))
+    const leaveTypeMap = new Map((leaveTypeRows || []).map((row) => [row.id, row] as const))
+    const evidenceByRequest = new Map<string, LeaveEvidenceRow[]>()
+    const approvalsByRequest = new Map<string, Array<LeaveApprovalRow & { approver: ProfileReferenceRow | null }>>()
 
     for (const evidence of evidenceRows) {
       const rows = evidenceByRequest.get(evidence.leave_request_id) || []
@@ -257,7 +339,7 @@ export async function GET(request: NextRequest) {
 
     // Pre-fetch all leave policies in parallel (one per unique leave_type_id)
     // instead of fetching inside the map (which would be N sequential queries).
-    const uniqueLeaveTypeIds = Array.from(new Set(requestRows.map((r: any) => r.leave_type_id).filter(Boolean)))
+    const uniqueLeaveTypeIds = Array.from(new Set(requestRows.map((r) => r.leave_type_id).filter(Boolean)))
     const policyEntries = await Promise.all(
       uniqueLeaveTypeIds.map(async (ltId) => {
         const policy = await getLeavePolicy(supabase, ltId as string)
@@ -268,9 +350,9 @@ export async function GET(request: NextRequest) {
 
     // Check evidence completeness for all requests in parallel
     const enriched = await Promise.all(
-      requestRows.map(async (leaveRequest: any) => {
-        const policy = policyMap.get(leaveRequest.leave_type_id) ?? { required_documents: [] }
-        const requiredDocs = (policy as any).required_documents || []
+      requestRows.map(async (leaveRequest) => {
+        const policy = (policyMap.get(leaveRequest.leave_type_id) ?? { required_documents: [] }) as LeavePolicySummary
+        const requiredDocs = policy.required_documents || []
         const evidence = await areRequiredDocumentsVerified(supabase, leaveRequest.id, requiredDocs)
         return {
           ...leaveRequest,
@@ -287,12 +369,12 @@ export async function GET(request: NextRequest) {
       })
     )
 
-    const balances = (balanceRows || []).map((row: any) => ({
+    const balances = ((balanceRows || []) as LeaveBalanceRow[]).map((row) => ({
       ...row,
       leave_type: row.leave_type_id ? leaveTypeMap.get(row.leave_type_id) || null : null,
     }))
 
-    let relieverCommitments: any[] = []
+    let relieverCommitments: LeaveRequestRow[] = []
     if (!all) {
       const todayIsoDate = new Date().toISOString().slice(0, 10)
       const { data: relieverRows } = await supabase
@@ -536,7 +618,7 @@ export async function POST(request: NextRequest) {
           : `${requesterName || "Employee"} requested ${effectiveDays} day(s) leave from ${start_date} to ${endDate}.`,
         actorId: user.id,
         entityId: newRequest.id,
-        linkUrl: "/dashboard/leave",
+        linkUrl: "/leave",
       })
     }
 
@@ -614,7 +696,7 @@ export async function PUT(request: NextRequest) {
       )
 
       const routeSnapshot = Array.isArray(existingRequest.route_snapshot) ? [...existingRequest.route_snapshot] : []
-      const updatedSnapshot = routeSnapshot.map((stage: any) => {
+      const updatedSnapshot = routeSnapshot.map((stage) => {
         if (Number(stage.stage_order) === 1 && stage.approver_role_code === "reliever") {
           return { ...stage, approver_user_id: newReliever.id }
         }
@@ -655,7 +737,7 @@ export async function PUT(request: NextRequest) {
         message: "A leave request now requires your reliever approval before workflow continues.",
         actorId: user.id,
         entityId: existingRequest.id,
-        linkUrl: "/dashboard/leave",
+        linkUrl: "/leave",
       })
 
       return NextResponse.json({ message: "Reliever updated and request returned to reliever approval" })

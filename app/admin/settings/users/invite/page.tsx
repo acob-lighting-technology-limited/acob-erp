@@ -72,9 +72,9 @@ export default function InviteUserPage() {
 
       toast.success(`Invitation sent to ${formData.email}`)
       router.push("/admin/settings/users")
-    } catch (error: any) {
+    } catch (error: unknown) {
       log.error("Error inviting user:", error)
-      toast.error(error.message || "Failed to invite user")
+      toast.error(error instanceof Error ? error.message : "Failed to invite user")
     } finally {
       setSending(false)
     }
@@ -92,7 +92,7 @@ export default function InviteUserPage() {
         <Card>
           <CardHeader>
             <CardTitle>User Details</CardTitle>
-            <CardDescription>Enter the new user's information</CardDescription>
+            <CardDescription>Enter the new user&apos;s information</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <FormFieldGroup label="Email Address *">

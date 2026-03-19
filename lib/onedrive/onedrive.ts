@@ -185,7 +185,6 @@ export class OneDriveService {
     let lastItem: OneDriveItem | null = null
 
     for (const part of pathParts) {
-      const parentPath = currentPath || "root"
       const endpoint = currentPath === "" ? "/root/children" : `/root:/${encodeURIComponent(currentPath)}:/children`
 
       try {

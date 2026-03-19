@@ -137,8 +137,8 @@ export function MeetingDocumentLibrary({ employees, backHref, backLabel, title =
       if (!res.ok) throw new Error(payload.error || "Failed to save KSS roster")
       toast.success("KSS roster saved for selected week")
       void refetchRoster()
-    } catch (error: any) {
-      toast.error(error?.message || "Failed to save KSS roster")
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Failed to save KSS roster")
     } finally {
       setSavingRoster(false)
     }
@@ -187,8 +187,8 @@ export function MeetingDocumentLibrary({ employees, backHref, backLabel, title =
         payload?.converted ? "Document uploaded and converted to PDF" : "Document uploaded and saved for this week"
       )
       void refetchMeetingDocuments()
-    } catch (error: any) {
-      toast.error(error?.message || "Failed to upload document")
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Failed to upload document")
     } finally {
       setUploadingDocType(null)
     }

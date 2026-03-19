@@ -12,6 +12,20 @@ import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 
+type FleetBookingAttachmentRow = {
+  id: string
+  booking_id: string
+  file_name?: string | null
+  mime_type?: string | null
+  file_size?: number | null
+  file_path?: string | null
+  created_at?: string | null
+}
+
+type FleetBookingRow = {
+  id: string
+}
+
 export async function GET() {
   try {
     const supabase = await createClient()
@@ -36,8 +50,8 @@ export async function GET() {
       return NextResponse.json({ error: error.message || "Failed to load bookings" }, { status: 500 })
     }
 
-    const bookingIds = (bookings || []).map((row: any) => row.id)
-    let attachmentRows: any[] = []
+    const bookingIds = ((bookings || []) as FleetBookingRow[]).map((row) => row.id)
+    let attachmentRows: FleetBookingAttachmentRow[] = []
     if (bookingIds.length > 0) {
       const { data: attachments } = await supabase
         .from("fleet_booking_attachments")
@@ -47,14 +61,14 @@ export async function GET() {
       attachmentRows = attachments || []
     }
 
-    const attachmentsByBooking = new Map<string, any[]>()
+    const attachmentsByBooking = new Map<string, FleetBookingAttachmentRow[]>()
     for (const attachment of attachmentRows) {
       const rows = attachmentsByBooking.get(attachment.booking_id) || []
       rows.push(attachment)
       attachmentsByBooking.set(attachment.booking_id, rows)
     }
 
-    const data = (bookings || []).map((booking: any) => ({
+    const data = ((bookings || []) as FleetBookingRow[]).map((booking) => ({
       ...booking,
       attachments: attachmentsByBooking.get(booking.id) || [],
     }))

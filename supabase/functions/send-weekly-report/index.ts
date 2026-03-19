@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0"
 import { Resend } from "npm:resend@2.0.0"
-import { PDFDocument, rgb, StandardFonts } from "npm:pdf-lib@1.17.1"
+import { PDFDocument, PDFFont, PDFPage, rgb, StandardFonts, type RGB } from "npm:pdf-lib@1.17.1"
 import { writeEdgeAuditLog } from "../_shared/audit.ts"
 import {
   buildMeetingDocumentFileName,
@@ -33,6 +33,82 @@ const SEND_INTERVAL_MS = Math.ceil(1000 / RESEND_MAX_REQ_PER_SEC) + 100 // ~0.6s
 const MAX_429_RETRIES = 5
 const DEFAULT_SENDER = "ACOB Internal Systems <notifications@acoblighting.com>"
 const MEETING_DOCS_BUCKET = "meeting_documents"
+
+type AttachmentPayload = {
+  filename: string
+  content: string
+}
+
+type RateLimitErrorLike = {
+  statusCode?: number | string
+  status?: number | string
+  name?: string
+  message?: string
+}
+
+type SendEmailResponse = {
+  data?: { id?: string | null } | null
+  error?: { message?: string | null } | null
+}
+
+type WeeklyReportRow = {
+  id: string
+  department: string
+  week_number: number
+  year: number
+  work_done: string | null
+  tasks_new_week: string | null
+  challenges: string | null
+  status: string | null
+}
+
+type ActionItemRow = {
+  id: string
+  title: string | null
+  department: string
+  status: string
+  week_number: number
+  year: number
+}
+
+type WeeklyReportRequestBody = {
+  testEmail?: string
+  recipients?: string[]
+  weeklyReportBase64?: string
+  actionTrackerBase64?: string
+  meetingWeek?: number
+  meetingYear?: number
+  forceWeek?: number
+  forceYear?: number
+  week?: number
+  year?: number
+  contentChoice?: "weekly_report" | "action_tracker" | "both"
+  skipWeeklyReport?: boolean
+  skipActionTracker?: boolean
+  weeklyReportFilename?: string
+  actionTrackerFilename?: string
+  weeklyReportDocumentId?: string
+  actionTrackerDocumentId?: string
+  additionalDocumentIds?: unknown[]
+  preparedByName?: string
+  requestedByUserId?: string
+}
+
+type DeliveryResult = {
+  to: string
+  success: boolean
+  emailId?: string | null
+  error?: unknown
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message
+  if (typeof error === "object" && error !== null && "message" in error) {
+    const message = (error as { message?: unknown }).message
+    if (typeof message === "string") return message
+  }
+  return "Unknown error"
+}
 
 const DEPT_ORDER = [
   "Accounts",
@@ -67,7 +143,7 @@ function wrapText(text: string, maxChars: number): string[] {
   return lines
 }
 
-function sanitizeForPdf(text: string, font: any): string {
+function sanitizeForPdf(text: string, font: PDFFont): string {
   if (!text) return ""
   let out = ""
   for (const ch of text) {
@@ -107,7 +183,7 @@ function withSubjectPrefix(moduleName: string, subject: string): string {
   return String(subject || "").trim() || "Notification"
 }
 
-function isRateLimitError(error: any): boolean {
+function isRateLimitError(error: RateLimitErrorLike | null | undefined): boolean {
   if (!error) return false
   const statusCode = Number(error?.statusCode || error?.status || 0)
   const name = String(error?.name || "").toLowerCase()
@@ -122,9 +198,9 @@ async function sendWithRetry(
     to: string
     subject: string
     html: string
-    attachments: { filename: string; content: string }[]
+    attachments: AttachmentPayload[]
   }
-): Promise<{ data?: any; error?: any }> {
+): Promise<SendEmailResponse> {
   let attempt = 0
   while (attempt <= MAX_429_RETRIES) {
     const { data, error } = await resend.emails.send(payload)
@@ -240,7 +316,7 @@ function buildActionTrackerAttachmentName(meetingDateLabel: string, meetingWeek:
 
 async function drawLogoInHeader(
   doc: PDFDocument,
-  page: any,
+  page: PDFPage,
   logoBytes: Uint8Array | null,
   headerH: number,
   H: number,
@@ -264,8 +340,8 @@ async function drawLogoInHeader(
 // ─── Cover page ───────────────────────────────────────────────────────────────
 async function addCoverPage(
   doc: PDFDocument,
-  bold: any,
-  regular: any,
+  bold: PDFFont,
+  regular: PDFFont,
   week: number,
   year: number,
   meetingDateLabel: string,
@@ -348,8 +424,8 @@ async function addCoverPage(
 
 async function addTOCPage(
   doc: PDFDocument,
-  bold: any,
-  regular: any,
+  bold: PDFFont,
+  regular: PDFFont,
   title: string,
   entries: string[],
   headerLogoBytes: Uint8Array | null
@@ -391,10 +467,10 @@ async function addTOCPage(
 
 async function addWeeklyReportContentPage(
   doc: PDFDocument,
-  bold: any,
-  regular: any,
+  bold: PDFFont,
+  regular: PDFFont,
   department: string,
-  report: any,
+  report: WeeklyReportRow,
   headerLogoBytes: Uint8Array | null,
   pageNumber: number
 ) {
@@ -526,10 +602,10 @@ async function addWeeklyReportContentPage(
 
 async function addActionTrackerPage(
   doc: PDFDocument,
-  bold: any,
-  regular: any,
+  bold: PDFFont,
+  regular: PDFFont,
   department: string,
-  actions: any[],
+  actions: ActionItemRow[],
   week: number,
   year: number,
   headerLogoBytes: Uint8Array | null,
@@ -578,7 +654,7 @@ async function addActionTrackerPage(
   page.drawText("ACTION ITEM", { x: actionX + 6, y: headerY + 2, size: 8, font: bold, color: WHITE })
   page.drawText("STATUS", { x: statusX + 6, y: headerY + 2, size: 8, font: bold, color: WHITE })
 
-  const statusColors: Record<string, any> = {
+  const statusColors: Record<string, RGB> = {
     completed: rgb(0.086, 0.396, 0.204),
     in_progress: rgb(0.114, 0.306, 0.847),
     not_started: rgb(0.706, 0.325, 0.035),
@@ -637,7 +713,7 @@ async function addActionTrackerPage(
 }
 
 async function buildWeeklyReportPDF(
-  reports: any[],
+  reports: WeeklyReportRow[],
   meetingWeek: number,
   meetingYear: number,
   meetingDateLabel: string,
@@ -685,7 +761,7 @@ async function buildWeeklyReportPDF(
 }
 
 async function buildActionTrackerPDF(
-  actions: any[],
+  actions: ActionItemRow[],
   meetingWeek: number,
   meetingYear: number,
   meetingDateLabel: string,
@@ -708,7 +784,7 @@ async function buildActionTrackerPDF(
     coverLogoBytes
   )
 
-  const grouped: Record<string, any[]> = {}
+  const grouped: Record<string, ActionItemRow[]> = {}
   for (const a of actions) {
     if (!grouped[a.department]) grouped[a.department] = []
     grouped[a.department].push(a)
@@ -810,14 +886,14 @@ serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
     const resend = new Resend(RESEND_API_KEY)
-    const reportsMailEnabled = await isEdgeSystemEmailEnabled(supabase as any, "reports")
+    const reportsMailEnabled = await isEdgeSystemEmailEnabled(supabase, "reports")
     if (!reportsMailEnabled) {
       return new Response(JSON.stringify({ success: true, skipped: true, reason: "reports_email_disabled" }), {
         status: 200,
       })
     }
 
-    let body: any = {}
+    let body: WeeklyReportRequestBody = {}
     try {
       body = await req.json()
     } catch {
@@ -943,7 +1019,7 @@ serve(async (req) => {
       }
     }
 
-    const additionalAttachments: { filename: string; content: string }[] = []
+    const additionalAttachments: AttachmentPayload[] = []
     if (requestedAdditionalDocumentIds.length > 0) {
       const seenIds = new Set<string>()
       for (const docId of requestedAdditionalDocumentIds) {
@@ -995,14 +1071,24 @@ serve(async (req) => {
         fetchLogoBytes(`${STORAGE_BASE}/acob-logo-dark.png`),
       ])
 
-      console.log(`[weekly-report] Generating PDFs: ${reports.length} reports, ${(actions || []).length} actions`)
+      const reportRows = (reports || []) as WeeklyReportRow[]
+      const actionRows = (actions || []) as ActionItemRow[]
+
+      console.log(`[weekly-report] Generating PDFs: ${reportRows.length} reports, ${actionRows.length} actions`)
       const [reportPdfBytes, trackerPdfBytes] = await Promise.all([
         includeWeeklyReport && !reportPdfBase64
-          ? buildWeeklyReportPDF(reports, meetingWeek, meetingYear, meetingDateLabel, coverLogoBytes, headerLogoBytes)
+          ? buildWeeklyReportPDF(
+              reportRows,
+              meetingWeek,
+              meetingYear,
+              meetingDateLabel,
+              coverLogoBytes,
+              headerLogoBytes
+            )
           : Promise.resolve<Uint8Array | null>(null),
         includeActionTracker && !trackerPdfBase64
           ? buildActionTrackerPDF(
-              actions || [],
+              actionRows,
               meetingWeek,
               meetingYear,
               meetingDateLabel,
@@ -1041,7 +1127,7 @@ serve(async (req) => {
       preparedByName || "Terna"
     )
 
-    const attachments: { filename: string; content: string }[] = []
+    const attachments: AttachmentPayload[] = []
     if (includeWeeklyReport && reportPdfBase64) {
       attachments.push({
         filename: resolvedWeeklyReportFilename || buildWeeklyReportAttachmentName(meetingDateLabel, meetingWeek),
@@ -1059,7 +1145,7 @@ serve(async (req) => {
     }
     if (attachments.length === 0) throw new Error("No attachments to send")
 
-    const results = []
+    const results: DeliveryResult[] = []
     for (const to of recipients) {
       const { data, error } = await sendWithRetry(resend, {
         from: DEFAULT_SENDER,
@@ -1079,10 +1165,10 @@ serve(async (req) => {
     }
 
     try {
-      const successCount = results.filter((r: any) => r.success).length
+      const successCount = results.filter((r) => r.success).length
       const failureCount = results.length - successCount
       const auditEntityId = crypto.randomUUID()
-      await writeEdgeAuditLog(supabase as any, {
+      await writeEdgeAuditLog(supabase, {
         action: "weekly_report_sent",
         entityType: "mail_summary",
         entityId: auditEntityId,
@@ -1121,9 +1207,9 @@ serve(async (req) => {
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
     )
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("[send-weekly-report] Error:", err)
-    return new Response(JSON.stringify({ error: err.message }), {
+    return new Response(JSON.stringify({ error: getErrorMessage(err) }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,
     })

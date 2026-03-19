@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation"
 
 export default function AdminSetupPage() {
-  redirect("/dashboard")
+  redirect("/profile")
 }

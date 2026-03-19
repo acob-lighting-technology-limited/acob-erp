@@ -24,7 +24,7 @@ export function AdminContextRibbon({ role, department }: AdminContextRibbonProps
           <Badge variant="outline">Role: {getRoleDisplayName(role)}</Badge>
           <Badge variant="outline">Scope: {department || "Organization-wide"}</Badge>
           <Link
-            href="/dashboard"
+            href="/profile"
             className="text-muted-foreground hover:text-foreground ml-auto inline-flex shrink-0 items-center gap-1 text-xs font-medium"
           >
             <ArrowLeftRight className="h-3.5 w-3.5" />

@@ -4,7 +4,7 @@ import { logger } from "@/lib/logger"
 
 const log = logger("auth-create-profile")
 
-export async function POST(request: Request) {
+export async function POST(_request: Request) {
   try {
     const supabase = await createClient()
 

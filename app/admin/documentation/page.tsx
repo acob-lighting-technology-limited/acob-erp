@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { PageHeader, PageWrapper, Section } from "@/components/layout"
 import { FileText, FolderOpen } from "lucide-react"
-import { getAdminDocumentationData } from "./data"
+import { getAdminDocumentationData, type AdminDocumentationDataResult } from "./data"
 
 export default async function AdminDocumentationPage() {
   const data = await getAdminDocumentationData()
@@ -13,10 +13,7 @@ export default async function AdminDocumentationPage() {
     redirect(data.redirect)
   }
 
-  const pageData = data as {
-    documentation: any[]
-    departmentDocs: { enabled: boolean }
-  }
+  const pageData = data as Exclude<AdminDocumentationDataResult, { redirect: "/auth/login" | "/profile" }>
 
   return (
     <PageWrapper maxWidth="full" background="gradient">

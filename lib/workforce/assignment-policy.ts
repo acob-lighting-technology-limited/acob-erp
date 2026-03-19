@@ -1,4 +1,6 @@
 import type { EmploymentStatus } from "@/types/database"
+import type { SupabaseClient } from "@supabase/supabase-js"
+import type { Database } from "@/types/database"
 
 export interface AssignableProfileLite {
   id: string
@@ -22,6 +24,11 @@ export interface AssignableQueryOptions extends AssignablePolicyOptions {
   departmentScope?: string[] | null
   leadOnly?: boolean
   excludeUserId?: string
+}
+
+interface AssignableStatusQuery<TSelf> {
+  eq(column: string, value: string | boolean): TSelf
+  or(filters: string): TSelf
 }
 
 const ASSIGNABLE_SELECT =
@@ -58,14 +65,17 @@ export function getUnassignableReason(
   return null
 }
 
-export function applyAssignableStatusFilter(query: any, options: AssignablePolicyOptions = {}) {
+export function applyAssignableStatusFilter<TQuery extends AssignableStatusQuery<TQuery>>(
+  query: TQuery,
+  options: AssignablePolicyOptions = {}
+) {
   if (options.allowLegacyNullStatus === false) {
     return query.eq("employment_status", "active")
   }
   return query.or("employment_status.eq.active,employment_status.is.null")
 }
 
-export function buildAssignableProfilesQuery(client: any, options: AssignableQueryOptions = {}) {
+export function buildAssignableProfilesQuery(client: SupabaseClient<Database>, options: AssignableQueryOptions = {}) {
   let query = client
     .from("profiles")
     .select(options.select || ASSIGNABLE_SELECT)
@@ -93,7 +103,7 @@ export function buildAssignableProfilesQuery(client: any, options: AssignableQue
   return query
 }
 
-export async function listAssignableProfiles(client: any, options: AssignableQueryOptions = {}) {
+export async function listAssignableProfiles(client: SupabaseClient<Database>, options: AssignableQueryOptions = {}) {
   const { data, error } = await buildAssignableProfilesQuery(client, options)
   if (error) return { data: [] as AssignableProfileLite[], error }
   const rows = (data || []) as AssignableProfileLite[]

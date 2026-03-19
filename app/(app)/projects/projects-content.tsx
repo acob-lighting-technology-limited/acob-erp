@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { FolderKanban, Calendar, MapPin, User, ArrowRight, CheckCircle2, Clock, AlertCircle, Pause } from "lucide-react"
+import { FolderKanban, MapPin, User, ArrowRight, CheckCircle2, Clock, AlertCircle, Pause } from "lucide-react"
 import type { Project } from "./page"
 import { AppTablePage } from "@/components/app/app-table-page"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -26,23 +26,6 @@ export function ProjectsContent({ initialProjects }: ProjectsContentProps) {
       setFilteredProjects(projects.filter((p) => p.status === filterStatus))
     }
   }, [filterStatus, projects])
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "planning":
-        return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
-      case "active":
-        return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-      case "on_hold":
-        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
-      case "completed":
-        return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
-      case "cancelled":
-        return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
-      default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
-    }
-  }
 
   const getStatusIcon = (status: string) => {
     switch (status) {

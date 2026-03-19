@@ -1,10 +1,28 @@
 import { sendLeaveWorkflowEmail } from "@/lib/leave-mailer"
 import { resolveChannelEligibleUserIds } from "@/lib/notifications/delivery-policy"
 import { logger } from "@/lib/logger"
+import type { SupabaseClient } from "@supabase/supabase-js"
+import type { Json } from "@/types/database"
 
 const log = logger("leave-workflow")
 
-type SupabaseClient = any
+type LeaveWorkflowClient = SupabaseClient
+
+type HolidayCalendarRow = {
+  holiday_date: string
+  is_business_day: boolean
+}
+
+type MinimalProfileRow = {
+  id: string
+  full_name: string | null
+  company_email: string | null
+  department_id: string | null
+}
+
+type LeaveTypeLimitRow = {
+  max_days: number
+}
 
 export const LEAVE_PENDING_STAGES = {
   RELIEVER: "pending_reliever",
@@ -24,9 +42,9 @@ export interface LeavePolicyRecord {
   notice_days: number
   accrual_mode: "calendar_days" | "business_days"
   is_active: boolean
-  eligibility_conditions?: Record<string, any>
+  eligibility_conditions?: Record<string, Json>
   required_documents?: string[]
-  frequency_rules?: Record<string, any>
+  frequency_rules?: Record<string, Json>
   override_allowed?: boolean
 }
 
@@ -94,7 +112,7 @@ function toStringArray(value: unknown): string[] {
 }
 
 async function hasLifeEvent(
-  supabase: SupabaseClient,
+  supabase: LeaveWorkflowClient,
   employeeId: string,
   eventTypes: string[],
   windowDays?: number
@@ -116,7 +134,12 @@ async function hasLifeEvent(
   return Boolean(data && data.length)
 }
 
-export async function getHolidaySet(supabase: SupabaseClient, location: string, startDate: string, endDate: string) {
+export async function getHolidaySet(
+  supabase: LeaveWorkflowClient,
+  location: string,
+  startDate: string,
+  endDate: string
+) {
   const { data, error } = await supabase
     .from("holiday_calendar")
     .select("holiday_date, is_business_day")
@@ -129,7 +152,7 @@ export async function getHolidaySet(supabase: SupabaseClient, location: string, 
   }
 
   const holidaySet = new Set<string>()
-  for (const row of data || []) {
+  for (const row of (data || []) as HolidayCalendarRow[]) {
     if (!row.is_business_day) {
       holidaySet.add(row.holiday_date)
     }
@@ -144,7 +167,7 @@ function isBusinessDay(date: Date, holidaySet: Set<string>) {
 }
 
 export async function computeLeaveDates(params: {
-  supabase: SupabaseClient
+  supabase: LeaveWorkflowClient
   startDate: string
   daysCount: number
   accrualMode: "calendar_days" | "business_days"
@@ -198,7 +221,7 @@ export async function computeLeaveDates(params: {
 }
 
 export async function resolveProfileByIdentifier(
-  supabase: SupabaseClient,
+  supabase: LeaveWorkflowClient,
   identifier: string,
   label: string
 ): Promise<{ id: string; full_name: string | null; company_email: string | null; department_id: string | null }> {
@@ -214,7 +237,7 @@ export async function resolveProfileByIdentifier(
 
     if (error) throw new Error(`Failed to resolve ${label}`)
     if (!data) throw new Error(`${label} not found`)
-    return data
+    return data as MinimalProfileRow
   }
 
   const isEmail = input.includes("@")
@@ -227,7 +250,7 @@ export async function resolveProfileByIdentifier(
     if (error) throw new Error(`Failed to resolve ${label}`)
     if (!data?.length) throw new Error(`${label} email not found`)
     if (data.length > 1) throw new Error(`${label} email resolved to multiple records`)
-    return data[0]
+    return data[0] as MinimalProfileRow
   }
 
   const { data, error } = await supabase
@@ -238,24 +261,25 @@ export async function resolveProfileByIdentifier(
   if (error) throw new Error(`Failed to resolve ${label}`)
   if (!data?.length) throw new Error(`${label} name not found`)
   if (data.length > 1) throw new Error(`${label} name is ambiguous. Use email or ID.`)
-  return data[0]
+  return data[0] as MinimalProfileRow
 }
 
-export async function getSupervisorForUser(supabase: SupabaseClient, userId: string) {
+export async function getSupervisorForUser(supabase: LeaveWorkflowClient, userId: string) {
   const { data: userProfile, error: userProfileError } = await supabase
     .from("profiles")
     .select("department_id")
     .eq("id", userId)
     .single()
+  const typedUserProfile = userProfile as Pick<MinimalProfileRow, "department_id"> | null
 
-  if (userProfileError || !userProfile?.department_id) {
+  if (userProfileError || !typedUserProfile?.department_id) {
     throw new Error("Cannot determine your department for supervisor mapping")
   }
 
   const { data: supervisor, error: supervisorError } = await supabase
     .from("profiles")
     .select("id, full_name, company_email, department_id")
-    .eq("department_id", userProfile.department_id)
+    .eq("department_id", typedUserProfile.department_id)
     .eq("is_department_lead", true)
     .limit(1)
     .maybeSingle()
@@ -268,10 +292,10 @@ export async function getSupervisorForUser(supabase: SupabaseClient, userId: str
     throw new Error("No department lead configured for your department")
   }
 
-  return supervisor
+  return supervisor as MinimalProfileRow
 }
 
-export async function getLeavePolicy(supabase: SupabaseClient, leaveTypeId: string): Promise<LeavePolicyRecord> {
+export async function getLeavePolicy(supabase: LeaveWorkflowClient, leaveTypeId: string): Promise<LeavePolicyRecord> {
   const { data, error } = await supabase
     .from("leave_policies")
     .select(
@@ -304,7 +328,7 @@ export async function getLeavePolicy(supabase: SupabaseClient, leaveTypeId: stri
 
     if (legacyData?.is_active) {
       return {
-        ...legacyData,
+        ...(legacyData as LeavePolicyRecord),
         eligibility_conditions: {},
         required_documents: [],
         frequency_rules: {},
@@ -315,7 +339,7 @@ export async function getLeavePolicy(supabase: SupabaseClient, leaveTypeId: stri
 
   if (data?.is_active) {
     return {
-      ...data,
+      ...(data as LeavePolicyRecord),
       eligibility_conditions: data.eligibility_conditions || {},
       required_documents: toStringArray(data.required_documents),
       frequency_rules: data.frequency_rules || {},
@@ -329,13 +353,14 @@ export async function getLeavePolicy(supabase: SupabaseClient, leaveTypeId: stri
     .eq("id", leaveTypeId)
     .single()
 
-  if (leaveTypeError || !leaveType) {
+  const typedLeaveType = leaveType as LeaveTypeLimitRow | null
+  if (leaveTypeError || !typedLeaveType) {
     throw new Error("Leave type not found")
   }
 
   return {
     leave_type_id: leaveTypeId,
-    annual_days: leaveType.max_days,
+    annual_days: typedLeaveType.max_days,
     eligibility: "all",
     min_tenure_months: 0,
     notice_days: 0,
@@ -349,7 +374,7 @@ export async function getLeavePolicy(supabase: SupabaseClient, leaveTypeId: stri
 }
 
 export async function evaluateLeaveEligibility(params: {
-  supabase: SupabaseClient
+  supabase: LeaveWorkflowClient
   policy: LeavePolicyRecord
   requesterProfile: {
     id: string
@@ -428,8 +453,8 @@ export async function evaluateLeaveEligibility(params: {
     }
   }
 
-  const conditions = (policy.eligibility_conditions || {}) as Record<string, any>
-  const frequencyRules = (policy.frequency_rules || {}) as Record<string, any>
+  const conditions = (policy.eligibility_conditions || {}) as Record<string, Json>
+  const frequencyRules = (policy.frequency_rules || {}) as Record<string, Json>
 
   if (Array.isArray(conditions.allowed_employment_types) && conditions.allowed_employment_types.length > 0) {
     if (
@@ -626,7 +651,7 @@ function buildNotificationRows(params: {
   linkUrl?: string
   entityId?: string
 }) {
-  const actionUrl = params.linkUrl || "/dashboard/leave"
+  const actionUrl = params.linkUrl || "/leave"
   return params.userIds.map((userId) => ({
     user_id: userId,
     type: "approval_request",

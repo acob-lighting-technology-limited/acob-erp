@@ -1,15 +1,16 @@
 import test from "node:test"
 import assert from "node:assert/strict"
+import type { SupabaseClient } from "@supabase/supabase-js"
 import { writeAuditLog } from "../write-audit"
 
 test("writeAuditLog throws on critical audit failure", async () => {
   const supabase = {
     rpc: async () => ({ data: null, error: { message: "boom" } }),
-  }
+  } as unknown as Pick<SupabaseClient, "rpc"> as SupabaseClient
 
   await assert.rejects(() =>
     writeAuditLog(
-      supabase as any,
+      supabase,
       {
         action: "approve",
         entityType: "help_desk_ticket",
@@ -24,10 +25,10 @@ test("writeAuditLog throws on critical audit failure", async () => {
 test("writeAuditLog fail-open returns null", async () => {
   const supabase = {
     rpc: async () => ({ data: null, error: { message: "boom" } }),
-  }
+  } as unknown as Pick<SupabaseClient, "rpc"> as SupabaseClient
 
   const id = await writeAuditLog(
-    supabase as any,
+    supabase,
     {
       action: "create",
       entityType: "feedback",

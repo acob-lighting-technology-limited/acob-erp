@@ -8,12 +8,9 @@ import { Calendar, Clock, TrendingUp, Users, CheckCircle, AlertCircle, FileText,
 import Link from "next/link"
 import { PageWrapper, PageHeader, Section } from "@/components/layout"
 import { StatCard } from "@/components/ui/stat-card"
-import { applyAssignableStatusFilter } from "@/lib/workforce/assignment-policy"
+import { isAssignableEmploymentStatus } from "@/lib/workforce/assignment-policy"
 import { QUERY_KEYS } from "@/lib/query-keys"
-
-import { logger } from "@/lib/logger"
-
-const log = logger("hr")
+import type { Database } from "@/types/database"
 
 interface DashboardStats {
   pendingLeaveRequests: number
@@ -23,6 +20,22 @@ interface DashboardStats {
   totalDepartments: number
   totalOfficeLocations: number
 }
+
+type HrProfile = Pick<
+  Database["public"]["Tables"]["profiles"]["Row"],
+  "role" | "department" | "is_department_lead" | "lead_departments"
+>
+
+type ProfileIdRow = Pick<Database["public"]["Tables"]["profiles"]["Row"], "id">
+type AttendanceRow = {
+  id: string
+  user_id: string
+}
+type ReviewRow = {
+  id: string
+  user_id: string
+}
+type LocationRow = Pick<Database["public"]["Tables"]["profiles"]["Row"], "office_location" | "department">
 
 async function fetchHrDashboardStats(): Promise<DashboardStats> {
   const supabase = createClient()
@@ -34,17 +47,17 @@ async function fetchHrDashboardStats(): Promise<DashboardStats> {
         .from("profiles")
         .select("role, department, is_department_lead, lead_departments")
         .eq("id", user.id)
-        .maybeSingle()
-    : ({ data: null } as any)
+        .maybeSingle<HrProfile>()
+    : { data: null as HrProfile | null }
 
   const isAdminLike = ["developer", "admin", "super_admin"].includes(String(profile?.role || ""))
   const scopedDepartments =
     !isAdminLike && profile?.is_department_lead
-      ? Array.from(new Set([profile?.department, ...((profile as any)?.lead_departments || [])].filter(Boolean)))
+      ? Array.from(new Set([profile.department, ...(profile.lead_departments || [])].filter(Boolean)))
       : []
   const scopedUserIds = scopedDepartments.length
     ? (await supabase.from("profiles").select("id").in("department", scopedDepartments)).data?.map(
-        (row: any) => row.id
+        (row: ProfileIdRow) => row.id
       ) || []
     : []
 
@@ -60,15 +73,20 @@ async function fetchHrDashboardStats(): Promise<DashboardStats> {
   }
 
   const today = new Date().toISOString().split("T")[0]
-  const { data: attendance } = await supabase.from("attendance_records").select("id, user_id").eq("date", today)
+  const { data: attendance } = await supabase
+    .from("attendance_records")
+    .select("id, user_id")
+    .eq("date", today)
+    .returns<AttendanceRow[]>()
   const attendanceRows =
-    scopedUserIds.length > 0
-      ? attendance?.filter((row: any) => scopedUserIds.includes((row as any).user_id))
-      : attendance
+    scopedUserIds.length > 0 ? attendance?.filter((row) => scopedUserIds.includes(row.user_id)) : attendance
 
-  const { data: reviews } = await supabase.from("performance_reviews").select("id, user_id").eq("status", "draft")
-  const reviewRows =
-    scopedUserIds.length > 0 ? reviews?.filter((row: any) => scopedUserIds.includes(row.user_id)) : reviews
+  const { data: reviews } = await supabase
+    .from("performance_reviews")
+    .select("id, user_id")
+    .eq("status", "draft")
+    .returns<ReviewRow[]>()
+  const reviewRows = scopedUserIds.length > 0 ? reviews?.filter((row) => scopedUserIds.includes(row.user_id)) : reviews
 
   let employeeCountQuery = supabase.from("profiles").select("*", { count: "exact", head: true })
   if (scopedDepartments.length > 0) {
@@ -80,14 +98,17 @@ async function fetchHrDashboardStats(): Promise<DashboardStats> {
     departmentCountQuery = departmentCountQuery.in("name", scopedDepartments)
   }
   const { count: departmentCount } = await departmentCountQuery
-  const { data: locations } = await applyAssignableStatusFilter(
-    supabase.from("profiles").select("office_location, department"),
-    { allowLegacyNullStatus: false }
-  )
+  const { data: locations } = await supabase.from("profiles").select("office_location, department, employment_status")
   const locationRows =
     scopedDepartments.length > 0
-      ? (locations || []).filter((row: any) => scopedDepartments.includes(String((row as any).department || "")))
-      : locations || []
+      ? (locations || []).filter(
+          (row: LocationRow & { employment_status?: string | null }) =>
+            isAssignableEmploymentStatus(row.employment_status, { allowLegacyNullStatus: false }) &&
+            scopedDepartments.includes(String(row.department || ""))
+        )
+      : (locations || []).filter((row: LocationRow & { employment_status?: string | null }) =>
+          isAssignableEmploymentStatus(row.employment_status, { allowLegacyNullStatus: false })
+        )
 
   return {
     pendingLeaveRequests: pendingLeaveCount,
@@ -95,7 +116,9 @@ async function fetchHrDashboardStats(): Promise<DashboardStats> {
     upcomingReviews: reviewRows?.length || 0,
     totalEmployees: employeeCount || 0,
     totalDepartments: departmentCount || 0,
-    totalOfficeLocations: new Set(locationRows.map((l: any) => (l.office_location || "").trim()).filter(Boolean)).size,
+    totalOfficeLocations: new Set(
+      locationRows.map((location) => (location.office_location || "").trim()).filter(Boolean)
+    ).size,
   }
 }
 
@@ -303,7 +326,7 @@ export default function HRAdminDashboard() {
                   <CheckCircle className="h-5 w-5 text-green-500" />
                   <div className="flex-1">
                     <p className="font-medium">{stats.todayAttendance} employees clocked in</p>
-                    <p className="text-muted-foreground text-sm">Today's attendance</p>
+                    <p className="text-muted-foreground text-sm">Today&apos;s attendance</p>
                   </div>
                 </div>
               )}

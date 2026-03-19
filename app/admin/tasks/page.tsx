@@ -15,10 +15,21 @@ import { logger } from "@/lib/logger"
 
 const log = logger("tasks")
 
+type TaskAssignmentRow = {
+  task_id: string
+  user_id: string
+}
+
+type ProfileDepartmentRow = {
+  id: string
+  first_name: string
+  last_name: string
+  department: string | null
+}
 
 async function getAdminTasksData() {
   const supabase = await createClient()
-  const dataClient = getServiceRoleClientOrFallback(supabase as any)
+  const dataClient = getServiceRoleClientOrFallback(supabase)
 
   const {
     data: { user },
@@ -29,9 +40,9 @@ async function getAdminTasksData() {
     return { redirect: "/auth/login" as const }
   }
 
-  const scope = await resolveAdminScope(supabase as any, user.id)
+  const scope = await resolveAdminScope(supabase, user.id)
   if (!scope) {
-    return { redirect: "/dashboard" as const }
+    return { redirect: "/profile" as const }
   }
   const departmentScope = getDepartmentScope(scope, "general")
 
@@ -68,12 +79,12 @@ async function getAdminTasksData() {
   }
 
   // 1. Collect all IDs for batch queries
-  const allTaskIds = tasksResult.data?.map((t: any) => t.id) || []
+  const allTaskIds = ((tasksResult.data as Task[] | null) || []).map((t) => t.id)
   const allIndivUserIds = Array.from(
     new Set(
-      tasksResult.data
-        ?.filter((t: any) => t.assignment_type === "individual" && t.assigned_to)
-        .map((t: any) => t.assigned_to) || []
+      ((tasksResult.data as Task[] | null) || [])
+        .filter((t) => t.assignment_type === "individual" && t.assigned_to)
+        .map((t) => t.assigned_to) || []
     )
   ) as string[]
 
@@ -82,22 +93,25 @@ async function getAdminTasksData() {
     allIndivUserIds.length > 0
       ? await dataClient.from("profiles").select("id, first_name, last_name, department").in("id", allIndivUserIds)
       : { data: [] }
-  const indivProfileMap = new Map(indivProfiles?.map((p: any) => [p.id, p]))
+  const indivProfileMap = new Map(((indivProfiles as ProfileDepartmentRow[] | null) || []).map((p) => [p.id, p]))
 
   // 3. Fetch task assignments for multiple tasks
-  const multTaskIds = tasksResult.data?.filter((t: any) => t.assignment_type === "multiple").map((t: any) => t.id) || []
+  const multTaskIds =
+    ((tasksResult.data as Task[] | null) || []).filter((t) => t.assignment_type === "multiple").map((t) => t.id) || []
   const { data: allTaskAssignments } =
     multTaskIds.length > 0
       ? await dataClient.from("task_assignments").select("task_id, user_id").in("task_id", multTaskIds)
       : { data: [] }
 
   // 4. Fetch profiles for multiple assigned users
-  const multUserIds = Array.from(new Set(allTaskAssignments?.map((a: any) => a.user_id) || []))
+  const multUserIds = Array.from(
+    new Set(((allTaskAssignments as TaskAssignmentRow[] | null) || []).map((a) => a.user_id))
+  )
   const { data: multProfiles } =
     multUserIds.length > 0
       ? await dataClient.from("profiles").select("id, first_name, last_name, department").in("id", multUserIds)
       : { data: [] }
-  const multProfileMap = new Map(multProfiles?.map((p: any) => [p.id, p]))
+  const multProfileMap = new Map(((multProfiles as ProfileDepartmentRow[] | null) || []).map((p) => [p.id, p]))
 
   // 5. Fetch all completions
   const { data: allCompletions } =
@@ -107,23 +121,29 @@ async function getAdminTasksData() {
 
   // Grouping logic
   const assignmentsByTask = new Map()
-  allTaskAssignments?.forEach((a: any) => {
+  allTaskAssignments?.forEach((a) => {
     if (!assignmentsByTask.has(a.task_id)) assignmentsByTask.set(a.task_id, [])
     assignmentsByTask.get(a.task_id).push(a.user_id)
   })
 
   const completionsByTask = new Map()
-  allCompletions?.forEach((c: any) => {
+  allCompletions?.forEach((c) => {
     if (!completionsByTask.has(c.task_id)) completionsByTask.set(c.task_id, new Set())
     completionsByTask.get(c.task_id).add(c.user_id)
   })
 
   // 6. Reconstruct tasksWithUsers
-  const tasksWithUsers = (tasksResult.data || []).map((task: any) => {
-    const taskData: any = { ...task }
+  const tasksWithUsers = ((tasksResult.data as Task[] | null) || []).map((task) => {
+    const taskData: Task = { ...task }
 
     if (task.assignment_type === "individual" && task.assigned_to) {
-      taskData.assigned_to_user = indivProfileMap.get(task.assigned_to)
+      const assignedProfile = indivProfileMap.get(task.assigned_to)
+      taskData.assigned_to_user = assignedProfile
+        ? {
+            ...assignedProfile,
+            department: assignedProfile.department || "",
+          }
+        : undefined
     }
 
     if (task.assignment_type === "multiple") {
@@ -133,17 +153,18 @@ async function getAdminTasksData() {
         const prof = multProfileMap.get(uid)
         return {
           ...prof,
+          department: prof?.department || "",
           completed: taskComps.has(uid),
         }
       })
     }
     return taskData
-  })
+  }) as Task[]
 
   // For leads, filter tasks strictly by their departments
   let filteredTasks = tasksWithUsers || []
   if (departmentScope) {
-    filteredTasks = filteredTasks.filter((task: any) => {
+    filteredTasks = filteredTasks.filter((task) => {
       if (task.department && departmentScope.includes(task.department)) {
         return true
       }
@@ -151,7 +172,7 @@ async function getAdminTasksData() {
         return true
       }
       if (task.assigned_users && task.assigned_users.length > 0) {
-        return task.assigned_users.some((u: any) => u.department && departmentScope.includes(u.department))
+        return task.assigned_users.some((u) => u.department && departmentScope.includes(u.department))
       }
       return false
     })
@@ -162,7 +183,9 @@ async function getAdminTasksData() {
   if (departmentScope) {
     departments = [...departmentScope].sort()
   } else {
-    departments = Array.from(new Set(employeeResult.data?.map((s: any) => s.department).filter(Boolean))) as string[]
+    departments = Array.from(
+      new Set(((employeeResult.data as employee[] | null) || []).map((s) => s.department).filter(Boolean))
+    ) as string[]
     departments.sort()
   }
 

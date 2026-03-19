@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import {
   HELP_DESK_PRIORITIES,
-  canLeadDepartment,
   getAuthContext,
+  HelpDeskProfile,
+  HelpDeskTicketRow,
   getSlaTarget,
   isAdminRole,
   appendHelpDeskEvent,
@@ -13,6 +14,18 @@ import { sendHelpDeskMail } from "@/lib/help-desk/mailer"
 import { logger } from "@/lib/logger"
 
 const log = logger("help-desk-tickets")
+export const dynamic = "force-dynamic"
+
+type ErrorWithCode = {
+  code?: string
+  message?: string
+  details?: string
+}
+
+type InsertTicketResult = {
+  data: HelpDeskTicketRow | null
+  error: ErrorWithCode | null
+}
 
 function describeError(error: unknown): string {
   if (error instanceof Error) return error.message
@@ -41,11 +54,15 @@ function generateFallbackHelpDeskTicketNumber() {
   return `HD-${epochMillis}${randomSuffix}`
 }
 
-function isTicketNumberConflict(error: any) {
+function isTicketNumberConflict(error: ErrorWithCode | null | undefined) {
   if (!error) return false
   const code = String(error.code || "")
   const text = `${String(error.message || "")} ${String(error.details || "")}`.toLowerCase()
   return code === "23505" && text.includes("help_desk_tickets_ticket_number_key")
+}
+
+function getManagedDepartments(profile: HelpDeskProfile): string[] {
+  return Array.isArray(profile.managed_departments) ? profile.managed_departments : []
 }
 
 export async function GET(request: NextRequest) {
@@ -62,9 +79,7 @@ export async function GET(request: NextRequest) {
 
     let query = supabase.from("help_desk_tickets").select("*").order("created_at", { ascending: false })
 
-    const managedDepartments = Array.isArray((profile as any)?.managed_departments)
-      ? ((profile as any).managed_departments as string[])
-      : []
+    const managedDepartments = getManagedDepartments(profile as HelpDeskProfile)
 
     if (scope === "mine") {
       query = query.or(`requester_id.eq.${user.id},assigned_to.eq.${user.id},created_by.eq.${user.id}`)
@@ -87,14 +102,13 @@ export async function GET(request: NextRequest) {
     const { data, error } = await query
     if (error) throw error
 
-    let rows = data || []
+    let rows: HelpDeskTicketRow[] = (data as HelpDeskTicketRow[] | null) || []
     if (scope === "department" && !isAdminRole(profile.role)) {
-      const managedDepartments = Array.isArray((profile as any)?.managed_departments)
-        ? ((profile as any).managed_departments as string[])
-        : []
+      const managedDepartments = getManagedDepartments(profile as HelpDeskProfile)
       rows = rows.filter(
-        (row: any) =>
-          managedDepartments.includes(row.service_department) || managedDepartments.includes(row.requester_department)
+        (row) =>
+          managedDepartments.includes(row.service_department ?? "") ||
+          managedDepartments.includes(row.requester_department ?? "")
       )
     }
 
@@ -124,13 +138,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "title and service_department are required" }, { status: 400 })
     }
 
-    if (!HELP_DESK_PRIORITIES.includes(priority as any)) {
+    if (!HELP_DESK_PRIORITIES.includes(priority as (typeof HELP_DESK_PRIORITIES)[number])) {
       return NextResponse.json({ error: "Invalid priority" }, { status: 400 })
     }
 
-    const managedDepartments = Array.isArray((profile as any)?.managed_departments)
-      ? ((profile as any).managed_departments as string[])
-      : []
+    const managedDepartments = getManagedDepartments(profile as HelpDeskProfile)
     if (
       profile.is_department_lead &&
       managedDepartments.length > 0 &&
@@ -140,7 +152,7 @@ export async function POST(request: NextRequest) {
     }
 
     const submittedAt = new Date()
-    const slaTarget = getSlaTarget(priority as any, submittedAt)
+    const slaTarget = getSlaTarget(priority as (typeof HELP_DESK_PRIORITIES)[number], submittedAt)
     const approvalRequired = requestType === "procurement"
     const supportMode: "open_queue" | "lead_review_required" | null = requestType === "support" ? "open_queue" : null
 
@@ -186,21 +198,21 @@ export async function POST(request: NextRequest) {
       paused_at: approvalRequired ? submittedAt.toISOString() : null,
     }
 
-    const insertTicketWithCollisionRetry = async (payload: Record<string, any>) => {
+    const insertTicketWithCollisionRetry = async (payload: Record<string, unknown>): Promise<InsertTicketResult> => {
       let attemptPayload = payload
-      let lastError: any = null
+      let lastError: ErrorWithCode | null = null
 
       for (let attempt = 0; attempt < 4; attempt += 1) {
         const { data, error } = await supabase.from("help_desk_tickets").insert(attemptPayload).select("*").single()
 
-        if (!error) return { data, error: null as any }
+        if (!error) return { data: data as HelpDeskTicketRow, error: null }
         lastError = error
 
         if (!isTicketNumberConflict(error)) break
         attemptPayload = { ...payload, ticket_number: generateFallbackHelpDeskTicketNumber() }
       }
 
-      return { data: null as any, error: lastError }
+      return { data: null, error: lastError }
     }
 
     let { data: created, error: createError } = await insertTicketWithCollisionRetry(modernInsertPayload)
@@ -217,6 +229,9 @@ export async function POST(request: NextRequest) {
     }
 
     if (createError) throw createError
+    if (!created) {
+      throw new Error("Ticket creation returned no record")
+    }
 
     const { data: leadCandidates } = await supabase
       .from("profiles")
@@ -306,7 +321,7 @@ export async function POST(request: NextRequest) {
         title: "New Help Desk Ticket Submitted",
         message: `${created.title} (${created.service_department}) has been submitted with ${created.priority} priority.`,
         ticketNumber: created.ticket_number,
-        ctaPath: approvalRequired ? "/admin/help-desk" : "/dashboard/help-desk",
+        ctaPath: approvalRequired ? "/admin/help-desk" : "/help-desk",
       })
     } catch (mailError) {
       log.error({ err: String(mailError) }, "Help desk mail error on create")

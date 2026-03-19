@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
-import { appendAuditLog, appendHelpDeskEvent, getAuthContext } from "@/lib/help-desk/server"
+import { appendAuditLog, appendHelpDeskEvent, getAuthContext, HelpDeskProfile } from "@/lib/help-desk/server"
 import { sendHelpDeskMail } from "@/lib/help-desk/mailer"
 import { getUnassignableReason } from "@/lib/workforce/assignment-policy"
 import { logger } from "@/lib/logger"
 
 const log = logger("help-desk-tickets-assign")
 
-function managesDepartmentStrict(profile: any, department: string | null | undefined) {
+function managesDepartmentStrict(profile: HelpDeskProfile, department: string | null | undefined) {
   if (!profile?.is_department_lead || !department) return false
   const managedDepartments = Array.isArray(profile?.managed_departments)
     ? profile.managed_departments
@@ -155,7 +155,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         p_title: "Help desk ticket assigned",
         p_message: `${ticket.ticket_number} - ${ticket.title}`,
         p_priority: ticket.priority === "urgent" ? "urgent" : ticket.priority === "high" ? "high" : "normal",
-        p_link_url: "/dashboard/help-desk",
+        p_link_url: "/help-desk",
         p_actor_id: user.id,
         p_entity_type: "help_desk_ticket",
         p_entity_id: ticket.id,

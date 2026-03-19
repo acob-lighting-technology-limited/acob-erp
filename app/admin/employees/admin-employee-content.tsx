@@ -12,7 +12,6 @@ import { formatName } from "@/lib/utils"
 import { Users, Shield, UserCog, LayoutGrid, List, Download, FileText, Plus } from "lucide-react"
 import type { UserRole, EmploymentStatus } from "@/types/database"
 import { getRoleDisplayName, getRoleBadgeColor, canAssignRoles } from "@/lib/permissions"
-import { useDepartments } from "@/hooks/use-departments"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { logger } from "@/lib/logger"
 import { CreateUserDialog } from "@/components/employees/CreateUserDialog"
@@ -78,7 +77,6 @@ async function fetchAllEmployees(): Promise<Employee[]> {
 }
 
 export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmployeeContentProps) {
-  const { departments: DEPARTMENTS } = useDepartments()
   const searchParams = useSearchParams()
   const queryClient = useQueryClient()
 
@@ -97,8 +95,8 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
 
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
-  const [isDeleting, setIsDeleting] = useState(false)
-  const [assignedItems, setAssignedItems] = useState<{
+  const [isDeleting] = useState(false)
+  const [assignedItems] = useState<{
     tasks: // eslint-disable-next-line @typescript-eslint/no-explicit-any
     any[]
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

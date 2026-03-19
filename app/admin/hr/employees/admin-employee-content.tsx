@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useSearchParams } from "next/navigation"
 import { QUERY_KEYS } from "@/lib/query-keys"
@@ -25,7 +25,6 @@ import {
 } from "lucide-react"
 import type { UserRole, EmploymentStatus } from "@/types/database"
 import { getRoleDisplayName, getRoleBadgeColor, canAssignRoles } from "@/lib/permissions"
-import { useDepartments } from "@/hooks/use-departments"
 import { PendingApplicationsModal } from "./pending-applications-modal"
 import { formValidation } from "@/lib/validation"
 import {
@@ -46,6 +45,8 @@ import {
   exportEmployeesToWord,
 } from "@/lib/employees/employee-export"
 import { EmployeeListView } from "@/components/employees/EmployeeListView"
+import type { Database } from "@/types/database"
+import type { EmployeeAssignedItems, EmployeeProfile, EmployeeViewData } from "@/components/employees/types"
 
 const log = logger("hr-employees-admin-employee-content")
 
@@ -96,10 +97,9 @@ interface AdminEmployeeContentProps {
 }
 
 export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmployeeContentProps) {
-  const { departments: DEPARTMENTS } = useDepartments()
   const searchParams = useSearchParams()
   const [employees, setEmployees] = useState<Employee[]>(initialEmployees)
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [departmentFilter, setDepartmentFilter] = useState<string[]>([])
   const [employeeFilter, setEmployeeFilter] = useState<string[]>([])
@@ -115,16 +115,8 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
 
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
-  const [isDeleting, setIsDeleting] = useState(false)
-  const [assignedItems, setAssignedItems] = useState<{
-    tasks: any[]
-    taskAssignments: any[]
-    assets: any[]
-    projects: any[]
-    projectMemberships: any[]
-    feedback: any[]
-    documentation: any[]
-  }>({
+  const [isDeleting] = useState(false)
+  const [assignedItems] = useState<EmployeeAssignedItems>({
     tasks: [],
     taskAssignments: [],
     assets: [],
@@ -158,12 +150,12 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
     "Lead Departments": true,
     "Created At": true,
   })
-  const [viewEmployeeProfile, setViewEmployeeProfile] = useState<any>(null)
-  const [viewEmployeeData, setViewEmployeeData] = useState<{
-    tasks: any[]
-    assets: any[]
-    documentation: any[]
-  }>({ tasks: [], assets: [], documentation: [] })
+  const [viewEmployeeProfile, setViewEmployeeProfile] = useState<EmployeeProfile | null>(null)
+  const [viewEmployeeData, setViewEmployeeData] = useState<EmployeeViewData>({
+    tasks: [],
+    assets: [],
+    documentation: [],
+  })
   const [isCreateUserDialogOpen, setIsCreateUserDialogOpen] = useState(false)
   const [isCreatingUser, setIsCreatingUser] = useState(false)
   const [createUserForm, setCreateUserForm] = useState({
@@ -207,7 +199,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
   })
   const [showMoreOptions, setShowMoreOptions] = useState(false)
 
-  const supabase = createClient()
+  const [supabase] = useState(() => createClient())
   const queryClient = useQueryClient()
   const canManageUsers = ["developer", "super_admin", "admin"].includes(userProfile?.role || "")
 
@@ -222,99 +214,102 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
     if (fetchedEmployees) setEmployees(fetchedEmployees)
   }, [fetchedEmployees])
 
+  const loadData = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminEmployees() })
+  }, [queryClient])
+
+  const handleEditEmployee = useCallback(
+    async (employee: Employee) => {
+      if (!canManageUsers) {
+        toast.error("You can view users but cannot edit them")
+        return
+      }
+
+      try {
+        setSelectedEmployee(employee)
+
+        // Load full profile data to get all fields
+        const { data: fullProfile } = await supabase.from("profiles").select("*").eq("id", employee.id).single()
+
+        if (fullProfile) {
+          setEditForm({
+            role: fullProfile.role || "employee",
+            admin_domains: Array.isArray(fullProfile.admin_domains) ? fullProfile.admin_domains : [],
+            is_department_lead: Boolean(fullProfile.is_department_lead),
+            department: fullProfile.department || "",
+            office_location: fullProfile.office_location || "",
+            company_role: fullProfile.company_role || "",
+            lead_departments: fullProfile.lead_departments || [],
+            // Expanded fields
+            employee_number: fullProfile.employee_number || "",
+            first_name: fullProfile.first_name || "",
+            last_name: fullProfile.last_name || "",
+            other_names: fullProfile.other_names || "",
+            company_email: fullProfile.company_email || "",
+            additional_email: fullProfile.additional_email || "",
+            phone_number: fullProfile.phone_number || "",
+            additional_phone: fullProfile.additional_phone || "",
+            residential_address: fullProfile.residential_address || "",
+            bank_name: fullProfile.bank_name || "",
+            bank_account_number: fullProfile.bank_account_number || "",
+            bank_account_name: fullProfile.bank_account_name || "",
+            date_of_birth: fullProfile.date_of_birth || "",
+            employment_date: fullProfile.employment_date || "",
+            job_description: fullProfile.job_description || "",
+          })
+        } else {
+          // Fallback to basic fields if full profile not found
+          setEditForm({
+            role: employee.role,
+            admin_domains: Array.isArray(employee.admin_domains) ? employee.admin_domains : [],
+            is_department_lead: Boolean(employee.is_department_lead),
+            department: employee.department,
+            office_location: employee.office_location || "",
+            company_role: employee.company_role || "",
+            lead_departments: employee.lead_departments || [],
+            employee_number: employee.employee_number || "",
+            first_name: employee.first_name || "",
+            last_name: employee.last_name || "",
+            other_names: employee.other_names || "",
+            company_email: employee.company_email || "",
+            additional_email: employee.additional_email || "",
+            phone_number: employee.phone_number || "",
+            additional_phone: "",
+            residential_address: employee.residential_address || "",
+            bank_name: "",
+            bank_account_number: "",
+            bank_account_name: "",
+            date_of_birth: "",
+            employment_date: "",
+            job_description: "",
+          })
+        }
+
+        setShowMoreOptions(false) // Reset expanded state
+
+        // Set profile states so the unified modal has data
+        setSelectedEmployee(employee)
+        setViewEmployeeProfile(employee)
+        setModalViewMode("edit")
+        setIsViewDialogOpen(true)
+      } catch (error: unknown) {
+        log.error({ err: String(error) }, "error loading employees for edit")
+        toast.error("Failed to load employees details")
+      }
+    },
+    [canManageUsers, supabase]
+  )
+
   // Handle userId from search params (for edit dialog)
   useEffect(() => {
     const userId = searchParams?.get("userId")
     if (userId && employees.length > 0 && !isViewDialogOpen) {
-      const user = employees.find((s) => s.id === userId)
+      const user = employees.find((employeeRecord) => employeeRecord.id === userId)
       if (user) {
-        handleEditEmployee(user)
+        void handleEditEmployee(user)
       }
     }
-  }, [searchParams, employees, isViewDialogOpen])
-
-  const loadData = () => {
-    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminEmployees() })
-  }
-
-  const handleEditEmployee = async (employee: Employee) => {
-    if (!canManageUsers) {
-      toast.error("You can view users but cannot edit them")
-      return
-    }
-
-    try {
-      setSelectedEmployee(employee)
-
-      // Load full profile data to get all fields
-      const { data: fullProfile } = await supabase.from("profiles").select("*").eq("id", employee.id).single()
-
-      if (fullProfile) {
-        setEditForm({
-          role: fullProfile.role || "employee",
-          admin_domains: Array.isArray(fullProfile.admin_domains) ? fullProfile.admin_domains : [],
-          is_department_lead: Boolean(fullProfile.is_department_lead),
-          department: fullProfile.department || "",
-          office_location: fullProfile.office_location || "",
-          company_role: fullProfile.company_role || "",
-          lead_departments: fullProfile.lead_departments || [],
-          // Expanded fields
-          employee_number: fullProfile.employee_number || "",
-          first_name: fullProfile.first_name || "",
-          last_name: fullProfile.last_name || "",
-          other_names: fullProfile.other_names || "",
-          company_email: fullProfile.company_email || "",
-          additional_email: fullProfile.additional_email || "",
-          phone_number: fullProfile.phone_number || "",
-          additional_phone: fullProfile.additional_phone || "",
-          residential_address: fullProfile.residential_address || "",
-          bank_name: fullProfile.bank_name || "",
-          bank_account_number: fullProfile.bank_account_number || "",
-          bank_account_name: fullProfile.bank_account_name || "",
-          date_of_birth: fullProfile.date_of_birth || "",
-          employment_date: fullProfile.employment_date || "",
-          job_description: fullProfile.job_description || "",
-        })
-      } else {
-        // Fallback to basic fields if full profile not found
-        setEditForm({
-          role: employee.role,
-          admin_domains: Array.isArray(employee.admin_domains) ? employee.admin_domains : [],
-          is_department_lead: Boolean(employee.is_department_lead),
-          department: employee.department,
-          office_location: employee.office_location || "",
-          company_role: employee.company_role || "",
-          lead_departments: employee.lead_departments || [],
-          employee_number: employee.employee_number || "",
-          first_name: employee.first_name || "",
-          last_name: employee.last_name || "",
-          other_names: employee.other_names || "",
-          company_email: employee.company_email || "",
-          additional_email: employee.additional_email || "",
-          phone_number: employee.phone_number || "",
-          additional_phone: "",
-          residential_address: employee.residential_address || "",
-          bank_name: "",
-          bank_account_number: "",
-          bank_account_name: "",
-          date_of_birth: "",
-          employment_date: "",
-          job_description: "",
-        })
-      }
-
-      setShowMoreOptions(false) // Reset expanded state
-
-      // Set profile states so the unified modal has data
-      setSelectedEmployee(employee)
-      setViewEmployeeProfile(employee as any)
-      setModalViewMode("edit")
-      setIsViewDialogOpen(true)
-    } catch (error: any) {
-      log.error({ err: String(error) }, "error loading employees for edit")
-      toast.error("Failed to load employees details")
-    }
-  }
+  }, [searchParams, employees, isViewDialogOpen, handleEditEmployee])
 
   const handleViewEmployeeSignature = async (employee: Employee) => {
     try {
@@ -322,20 +317,20 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
 
       setModalViewMode("signature")
       setIsViewDialogOpen(true)
-      setViewEmployeeProfile(employee as any)
+      setViewEmployeeProfile(employee)
 
       // Load full profile data for signature
       const { data: profileData } = await supabase.from("profiles").select("*").eq("id", employee.id).single()
 
       if (profileData) {
-        const fullProfile = profileData as any
+        const fullProfile = profileData as EmployeeProfile
         setSelectedEmployee(fullProfile)
         // If we're in view dialog, update the viewEmployeeProfile too
         if (isViewDialogOpen) {
           setViewEmployeeProfile(fullProfile)
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       log.error({ err: String(error) }, "error loading profile for signature")
       toast.error("Failed to load profile data")
     }
@@ -354,8 +349,8 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
       const response = await fetch(`/api/admin/hr/employees/${employee.id}/overview`, { cache: "no-store" })
       const payload = (await response.json().catch(() => ({}))) as {
         error?: string
-        profile?: any
-        related?: { tasks?: any[]; assets?: any[]; documentation?: any[] }
+        profile?: EmployeeProfile
+        related?: EmployeeViewData
       }
 
       if (!response.ok) throw new Error(payload.error || "Failed to load employee details")
@@ -367,75 +362,10 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         assets: payload.related?.assets || [],
         documentation: payload.related?.documentation || [],
       })
-    } catch (error: any) {
+    } catch (error: unknown) {
       log.error({ err: String(error) }, "error loading employee details")
       toast.error("Failed to load employees details")
     }
-  }
-
-  const checkAssignedItems = async (employee: Employee) => {
-    try {
-      const [
-        tasksResult,
-        taskAssignmentsResult,
-        assetsResult,
-        projectsResult,
-        projectMembersResult,
-        feedbackResult,
-        docsResult,
-      ] = await Promise.all([
-        // Tasks assigned to this user
-        supabase.from("tasks").select("id, title, status").eq("assigned_to", employee.id),
-        // Task assignments (multiple user assignments)
-        supabase
-          .from("task_assignments")
-          .select("id, task_id, Task:tasks(id, title, status)")
-          .eq("user_id", employee.id),
-        // Current asset assignments
-        supabase
-          .from("asset_assignments")
-          .select("id, Asset:assets(id, asset_name, asset_type, unique_code, serial_number)")
-          .eq("assigned_to", employee.id)
-          .eq("is_current", true),
-        // Projects managed or created by this user
-        supabase
-          .from("projects")
-          .select("id, project_name, status")
-          .or(`project_manager_id.eq.${employee.id},created_by.eq.${employee.id}`),
-        // Active project memberships
-        supabase
-          .from("project_members")
-          .select("id, Project:projects(id, project_name)")
-          .eq("user_id", employee.id)
-          .eq("is_active", true),
-        // Feedback submitted by this user
-        supabase.from("feedback").select("id, title, status").eq("user_id", employee.id),
-        // User documentation
-        supabase.from("user_documentation").select("id, title").eq("user_id", employee.id),
-      ])
-
-      const assigned = {
-        tasks: tasksResult.data || [],
-        taskAssignments: taskAssignmentsResult.data || [],
-        assets: assetsResult.data || [],
-        projects: projectsResult.data || [],
-        projectMemberships: projectMembersResult.data || [],
-        feedback: feedbackResult.data || [],
-        documentation: docsResult.data || [],
-      }
-
-      setAssignedItems(assigned)
-      return assigned
-    } catch (error: any) {
-      log.error({ err: String(error) }, "error checking assigned items")
-      toast.error("Failed to check assigned items")
-      return null
-    }
-  }
-
-  const handleDeleteEmployee = async (employee: Employee) => {
-    setSelectedEmployee(employee)
-    toast.error("User deletion is disabled. Suspend or deactivate the employee instead.")
   }
 
   const confirmDeleteEmployee = async () => {
@@ -527,13 +457,6 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         }
       }
 
-      const trimmedAdditionalEmail = editForm.additional_email.trim()
-      if (trimmedAdditionalEmail && !formValidation.isEmail(trimmedAdditionalEmail)) {
-        toast.error("Additional email must be a valid email address")
-        setIsSaving(false)
-        return
-      }
-
       if (editForm.is_department_lead && editForm.lead_departments.length !== 1) {
         toast.error("A department lead must have exactly one lead department")
         setIsSaving(false)
@@ -554,7 +477,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
       const isLead = editForm.is_department_lead
 
       // Build update object with all fields
-      const updateData: any = {
+      const updateData: Database["public"]["Tables"]["profiles"]["Update"] = {
         role: editForm.role,
         admin_domains: editForm.role === "admin" ? editForm.admin_domains : null,
         department: editForm.department,
@@ -564,10 +487,9 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         lead_departments: isLead ? editForm.lead_departments : [],
         updated_at: new Date().toISOString(),
         // Always include expanded fields if they exist in form state
-        first_name: editForm.first_name || null,
-        last_name: editForm.last_name || null,
+        first_name: editForm.first_name || "",
+        last_name: editForm.last_name || "",
         other_names: editForm.other_names || null,
-        additional_email: trimmedAdditionalEmail || null,
         phone_number: editForm.phone_number || null,
         additional_phone: editForm.additional_phone || null,
         residential_address: editForm.residential_address || null,
@@ -596,14 +518,14 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
           .single()
 
         if (updatedProfile) {
-          setViewEmployeeProfile(updatedProfile as any)
+          setViewEmployeeProfile(updatedProfile as EmployeeProfile)
         }
       }
 
       loadData()
-    } catch (error: any) {
+    } catch (error: unknown) {
       log.error({ err: String(error) }, "error updating employee")
-      toast.error(error?.message || "Failed to update employees member")
+      toast.error(error instanceof Error ? error.message : "Failed to update employees member")
     } finally {
       setIsSaving(false)
     }
@@ -690,9 +612,9 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         employeeNumber: "",
       })
       loadData()
-    } catch (error: any) {
+    } catch (error: unknown) {
       log.error({ err: String(error) }, "error creating user")
-      toast.error(error.message || "Failed to create user")
+      toast.error(error instanceof Error ? error.message : "Failed to create user")
     } finally {
       setIsCreatingUser(false)
     }

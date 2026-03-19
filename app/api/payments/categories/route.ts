@@ -9,6 +9,8 @@ const log = logger("payments-categories")
 
 export const dynamic = "force-dynamic"
 
+type PaymentsClient = Awaited<ReturnType<typeof createClient>>
+
 // Helper function to create Supabase client
 async function createClient() {
   const cookieStore = await cookies()
@@ -42,7 +44,7 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const scope = await resolveAdminScope(supabase as any, user.id)
+    const scope = await resolveAdminScope(supabase, user.id)
     if (!scope) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
@@ -71,7 +73,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const scope = await resolveAdminScope(supabase as any, user.id)
+    const scope = await resolveAdminScope(supabase, user.id)
     if (!scope || !scope.isAdminLike) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
@@ -88,7 +90,7 @@ export async function POST(request: Request) {
     if (error) throw error
 
     await writeAuditLog(
-      supabase as any,
+      supabase as PaymentsClient,
       {
         action: "create",
         entityType: "payment_category",

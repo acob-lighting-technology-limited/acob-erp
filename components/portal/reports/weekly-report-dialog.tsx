@@ -1,9 +1,8 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { createClient } from "@/lib/supabase/client"
@@ -15,18 +14,6 @@ import { sanitizeReportText } from "@/lib/export-utils"
 import { logger } from "@/lib/logger"
 
 const log = logger("portal-weekly-report-dialog")
-
-interface WeeklyReport {
-  id: string
-  department: string
-  week_number: number
-  year: number
-  work_done: string
-  tasks_new_week: string
-  challenges: string
-  status: string
-  user_id: string
-}
 
 interface WeeklyReportDialogProps {
   isOpen: boolean
@@ -58,7 +45,6 @@ const autoNumberReportText = (text: string): string => {
 export function WeeklyReportDialog({ isOpen, onClose, onSuccess, initialData }: WeeklyReportDialogProps) {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [profile, setProfile] = useState<any>(null)
   const [isNextWeekActive, setIsNextWeekActive] = useState(false)
   const [lockState, setLockState] = useState<WeeklyReportLockState | null>(null)
 
@@ -78,20 +64,14 @@ export function WeeklyReportDialog({ isOpen, onClose, onSuccess, initialData }: 
   const supabase = createClient()
 
   useEffect(() => {
-    if (isOpen) {
-      setupDialog()
-    }
-  }, [isOpen, initialData])
-
-  useEffect(() => {
     const fetchLockState = async () => {
       const state = await fetchWeeklyReportLockState(supabase, formData.week_number, formData.year)
       setLockState(state)
     }
     fetchLockState()
-  }, [formData.week_number, formData.year])
+  }, [formData.week_number, formData.year, supabase])
 
-  async function setupDialog() {
+  const setupDialog = useCallback(async () => {
     setLoading(true)
     try {
       const {
@@ -99,7 +79,6 @@ export function WeeklyReportDialog({ isOpen, onClose, onSuccess, initialData }: 
       } = await supabase.auth.getUser()
       if (!user) return
       const { data: p } = await supabase.from("profiles").select("*").eq("id", user.id).single()
-      setProfile(p)
 
       const week = initialData?.week || currentOfficeWeek.week
       const year = initialData?.year || currentOfficeWeek.year
@@ -146,7 +125,13 @@ export function WeeklyReportDialog({ isOpen, onClose, onSuccess, initialData }: 
     } finally {
       setLoading(false)
     }
-  }
+  }, [currentOfficeWeek.week, currentOfficeWeek.year, initialData, supabase])
+
+  useEffect(() => {
+    if (isOpen) {
+      void setupDialog()
+    }
+  }, [isOpen, setupDialog])
 
   const handleSubmit = async () => {
     const state = await fetchWeeklyReportLockState(supabase, formData.week_number, formData.year)
@@ -172,8 +157,8 @@ export function WeeklyReportDialog({ isOpen, onClose, onSuccess, initialData }: 
       toast.success("Success")
       onSuccess()
       onClose()
-    } catch (error: any) {
-      toast.error(error.message)
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Failed to submit report")
     } finally {
       setSaving(false)
     }
@@ -244,7 +229,7 @@ export function WeeklyReportDialog({ isOpen, onClose, onSuccess, initialData }: 
                 />
                 {f === "tasks_new_week" && isNextWeekActive && (
                   <p className="text-muted-foreground text-[10px] italic">
-                    Locked: Next week's tracker is already active.
+                    Locked: Next week&apos;s tracker is already active.
                   </p>
                 )}
               </div>

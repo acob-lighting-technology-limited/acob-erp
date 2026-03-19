@@ -20,6 +20,9 @@ import {
 import { formatName } from "@/lib/utils"
 import type { Task } from "@/app/admin/tasks/management/admin-tasks-content"
 
+type TaskAssignee = NonNullable<Task["assigned_to_user"]>
+type MultiAssignedUser = NonNullable<Task["assigned_users"]>[number]
+
 interface TaskListViewProps {
   filteredTasks: Task[]
   viewMode: "list" | "card"
@@ -172,7 +175,10 @@ export function TaskListView({
                             // eslint-disable-next-line @typescript-eslint/no-explicit-any
                             .slice(0, 2)
                             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                            .map((u: any) => `${formatName(u.first_name)} ${formatName(u.last_name)}`)
+                            .map(
+                              (user: MultiAssignedUser) =>
+                                `${formatName(user.first_name)} ${formatName(user.last_name)}`
+                            )
                             .join(", ")}
                           {task.assigned_users.length > 2 && ` +${task.assigned_users.length - 2} more`}
                         </div>
@@ -188,8 +194,8 @@ export function TaskListView({
                     ) : task.assigned_to_user ? (
                       <div className="text-sm">
                         <div className="text-foreground">
-                          {formatName((task.assigned_to_user as any)?.first_name)}{" "}
-                          {formatName((task.assigned_to_user as any)?.last_name)}
+                          {formatName((task.assigned_to_user as TaskAssignee)?.first_name)}{" "}
+                          {formatName((task.assigned_to_user as TaskAssignee)?.last_name)}
                         </div>
                         {task.department && <div className="text-muted-foreground text-xs">{task.department}</div>}
                       </div>
@@ -277,8 +283,8 @@ export function TaskListView({
                   <User className="text-muted-foreground h-4 w-4" />
                   <span className="text-muted-foreground">Assigned to:</span>
                   <span className="text-foreground font-medium">
-                    {formatName((task.assigned_to_user as any)?.first_name)}{" "}
-                    {formatName((task.assigned_to_user as any)?.last_name)}
+                    {formatName((task.assigned_to_user as TaskAssignee)?.first_name)}{" "}
+                    {formatName((task.assigned_to_user as TaskAssignee)?.last_name)}
                   </span>
                 </div>
               )

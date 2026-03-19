@@ -1,0 +1,327 @@
+"use client"
+
+import { useMemo, useRef, useState } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
+import { toast } from "sonner"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { MyTicketsTable } from "@/components/dashboard/help-desk/my-tickets-table"
+import { PageHeader, PageWrapper } from "@/components/layout"
+import { Headset } from "lucide-react"
+import { HelpDeskStats } from "@/components/help-desk/help-desk-stats"
+import { PendingApprovalsCard } from "@/components/help-desk/pending-approvals-card"
+import { CreateTicketDialog, type CreateTicketForm } from "@/components/help-desk/create-ticket-dialog"
+import { ViewTicketDialog } from "@/components/help-desk/view-ticket-dialog"
+import type {
+  HelpDeskTicket,
+  HelpDeskTicketDetailResponse,
+  HelpDeskContentProps,
+} from "@/components/help-desk/help-desk-types"
+
+type ErrorPayload = {
+  error?: string
+  message?: string
+}
+
+function buildFetchDebugLabel(source: string, status: number, payload: unknown) {
+  const p = payload as ErrorPayload
+  const detail = p?.error || p?.message || (typeof payload === "string" ? payload : "") || "Unknown error"
+  return `${source} failed (${status}): ${detail}`
+}
+
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback
+}
+
+export function HelpDeskContent({
+  userId,
+  userDepartment,
+  canReviewPendingApprovals,
+  initialDepartments,
+  initialTickets,
+  initialError,
+}: HelpDeskContentProps) {
+  const queryClient = useQueryClient()
+  const [tickets, setTickets] = useState<HelpDeskTicket[]>(initialTickets)
+  const [isSaving, setIsSaving] = useState(false)
+  const [createOpen, setCreateOpen] = useState(false)
+  const [availableDepartments] = useState<string[]>(initialDepartments || [])
+  const [viewTicketId, setViewTicketId] = useState<string | null>(null)
+  const [viewTicketOpen, setViewTicketOpen] = useState(false)
+  const [viewTicketLoading, setViewTicketLoading] = useState(false)
+  const [viewTicketSaving, setViewTicketSaving] = useState(false)
+  const [viewTicketData, setViewTicketData] = useState<HelpDeskTicketDetailResponse | null>(null)
+  const [viewTicketStatus, setViewTicketStatus] = useState<string>("")
+  const pendingRef = useRef<HTMLDivElement | null>(null)
+  const [form, setForm] = useState<CreateTicketForm>({
+    title: "",
+    description: "",
+    service_department: "IT and Communications",
+    priority: "medium",
+    request_type: "support",
+  })
+
+  if (initialError) {
+    toast.error(initialError)
+  }
+
+  const pendingApprovalsPath = canReviewPendingApprovals
+    ? "/api/help-desk/tickets?scope=department&status=pending_approval"
+    : "/api/help-desk/tickets?scope=mine&status=pending_approval"
+
+  const { data: pendingApprovalsData } = useQuery({
+    queryKey: QUERY_KEYS.tickets({
+      scope: canReviewPendingApprovals ? "department" : "mine",
+      status: "pending_approval",
+    }),
+    queryFn: async () => {
+      const res = await fetch(pendingApprovalsPath, { cache: "no-store" })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(buildFetchDebugLabel("Pending approvals load", res.status, json))
+      return json.data || []
+    },
+  })
+  const pendingApprovals: HelpDeskTicket[] = pendingApprovalsData || []
+
+  const myOpenTickets = useMemo(
+    () => tickets.filter((t) => !["resolved", "closed", "cancelled"].includes(t.status)).length,
+    [tickets]
+  )
+  const pendingReviewCount = pendingApprovals.length
+
+  const departmentOptions = useMemo(() => {
+    const options = new Set<string>()
+    options.add(form.service_department)
+    for (const department of availableDepartments) {
+      if (department) options.add(department)
+    }
+    for (const ticket of tickets) {
+      if (ticket.service_department) options.add(ticket.service_department)
+    }
+    return Array.from(options).filter((department) => Boolean(department))
+  }, [availableDepartments, form.service_department, tickets])
+
+  const avgCsat = useMemo(() => {
+    const rated = tickets.filter((t) => t.csat_rating)
+    if (!rated.length) return "-"
+    return (rated.reduce((sum, t) => sum + Number(t.csat_rating), 0) / rated.length).toFixed(1)
+  }, [tickets])
+
+  async function refreshTickets() {
+    const res = await fetch("/api/help-desk/tickets?scope=mine", { cache: "no-store" })
+    const json = await res.json()
+    if (!res.ok) {
+      toast.error(buildFetchDebugLabel("Tickets refresh", res.status, json))
+      return
+    }
+    setTickets(json.data || [])
+    queryClient.invalidateQueries({
+      queryKey: QUERY_KEYS.tickets({
+        scope: canReviewPendingApprovals ? "department" : "mine",
+        status: "pending_approval",
+      }),
+    })
+  }
+
+  async function createTicket(e: React.FormEvent) {
+    e.preventDefault()
+
+    if (!form.title.trim()) {
+      toast.error("Title is required")
+      return
+    }
+    if (userDepartment && form.service_department === userDepartment) {
+      toast.error("You cannot submit help desk requests to your own department.")
+      return
+    }
+
+    setIsSaving(true)
+    try {
+      const res = await fetch("/api/help-desk/tickets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      })
+
+      if (!res.ok) {
+        const body = await res.json()
+        throw new Error(body.error || "Failed to create ticket")
+      }
+
+      toast.success("Ticket submitted")
+      setCreateOpen(false)
+      setForm({
+        title: "",
+        description: "",
+        service_department: "IT and Communications",
+        priority: "medium",
+        request_type: "support",
+      })
+      await refreshTickets()
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, "Failed to create ticket"))
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  async function setStatus(ticketId: string, status: string) {
+    try {
+      const res = await fetch(`/api/help-desk/tickets/${ticketId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      })
+
+      if (!res.ok) {
+        const body = await res.json()
+        throw new Error(body.error || "Failed to update")
+      }
+
+      toast.success("Ticket updated")
+      await refreshTickets()
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, "Update failed"))
+    }
+  }
+
+  async function rateTicket(ticketId: string, rating: number) {
+    try {
+      const res = await fetch(`/api/help-desk/tickets/${ticketId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ csat_rating: rating }),
+      })
+
+      if (!res.ok) {
+        const body = await res.json()
+        throw new Error(body.error || "Failed to rate")
+      }
+
+      toast.success("Thanks for your feedback")
+      await refreshTickets()
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, "Failed to submit rating"))
+    }
+  }
+
+  async function openTicketDetails(ticketId: string) {
+    setViewTicketId(ticketId)
+    setViewTicketOpen(true)
+    setViewTicketLoading(true)
+
+    try {
+      const res = await fetch(`/api/help-desk/tickets/${ticketId}`, { cache: "no-store" })
+      const json = await res.json()
+
+      if (!res.ok) {
+        throw new Error(json?.error || "Failed to load ticket details")
+      }
+
+      setViewTicketData(json.data || null)
+      setViewTicketStatus(json.data?.ticket?.status || "")
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, "Failed to load ticket details"))
+      setViewTicketData(null)
+      setViewTicketStatus("")
+    } finally {
+      setViewTicketLoading(false)
+    }
+  }
+
+  async function saveTicketStatusFromModal() {
+    if (!viewTicketId || !viewTicketStatus) return
+
+    setViewTicketSaving(true)
+    try {
+      const res = await fetch(`/api/help-desk/tickets/${viewTicketId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: viewTicketStatus }),
+      })
+      const json = await res.json().catch(() => ({}))
+
+      if (!res.ok) {
+        throw new Error(json?.error || "Failed to update ticket")
+      }
+
+      toast.success("Ticket status updated")
+      await refreshTickets()
+      await openTicketDetails(viewTicketId)
+    } catch (error: unknown) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      toast.error((error as any).message || "Failed to update ticket")
+    } finally {
+      setViewTicketSaving(false)
+    }
+  }
+
+  return (
+    <PageWrapper maxWidth="full" background="gradient">
+      <PageHeader
+        title="Help Desk"
+        description="Submit and track support/procurement tickets."
+        icon={Headset}
+        backLink={{ href: "/profile", label: "Back to Dashboard" }}
+        actions={
+          <>
+            {pendingReviewCount > 0 && (
+              <Button
+                variant="outline"
+                onClick={() => pendingRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+              >
+                Pending Reviews ({pendingReviewCount})
+              </Button>
+            )}
+            <CreateTicketDialog
+              open={createOpen}
+              onOpenChange={setCreateOpen}
+              form={form}
+              onFormChange={setForm}
+              onSubmit={createTicket}
+              isSaving={isSaving}
+              departmentOptions={departmentOptions}
+              userDepartment={userDepartment}
+            />
+          </>
+        }
+      />
+
+      <HelpDeskStats
+        myOpenTickets={myOpenTickets}
+        resolvedCount={tickets.filter((t) => t.status === "resolved").length}
+        avgCsat={avgCsat}
+      />
+
+      {pendingReviewCount > 0 && <PendingApprovalsCard ref={pendingRef} tickets={pendingApprovals} />}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>My Tickets</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <MyTicketsTable
+            tickets={tickets}
+            userId={userId}
+            onSetStatus={setStatus}
+            onRateTicket={rateTicket}
+            onViewTicket={openTicketDetails}
+          />
+        </CardContent>
+      </Card>
+
+      <ViewTicketDialog
+        open={viewTicketOpen}
+        onOpenChange={setViewTicketOpen}
+        loading={viewTicketLoading}
+        ticket={viewTicketData?.ticket ?? null}
+        events={viewTicketData?.events ?? []}
+        currentStatus={viewTicketStatus}
+        onStatusChange={setViewTicketStatus}
+        onSave={saveTicketStatusFromModal}
+        isSaving={viewTicketSaving}
+      />
+    </PageWrapper>
+  )
+}

@@ -13,7 +13,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Plus, Receipt, Search, Filter, Eye, CheckCircle } from "lucide-react"
 import Link from "next/link"
-import { toast } from "sonner"
 import { StatCard } from "@/components/ui/stat-card"
 import { EmptyState } from "@/components/ui/empty-state"
 import { TableSkeleton } from "@/components/ui/query-states"
@@ -49,7 +48,9 @@ interface Bill {
   created_at: string
 }
 
-const statusColors: Record<string, string> = {
+type BillStatusVariant = "default" | "destructive" | "secondary" | "outline"
+
+const statusColors: Record<Bill["status"], BillStatusVariant> = {
   pending: "secondary",
   approved: "default",
   paid: "default",
@@ -224,7 +225,7 @@ export default function BillsPage() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={statusColors[bill.status] as any} className="capitalize">
+                      <Badge variant={statusColors[bill.status]} className="capitalize">
                         {bill.status}
                       </Badge>
                     </TableCell>

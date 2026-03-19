@@ -10,6 +10,8 @@ interface CreateAssetTypePayload {
   requiresSerialModel?: boolean
 }
 
+type AdminAssetTypesClient = Awaited<ReturnType<typeof createClient>>
+
 export async function GET() {
   const supabase = await createClient()
   const {
@@ -21,12 +23,12 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  const scope = await resolveAdminScope(supabase as any, user.id)
+  const scope = await resolveAdminScope(supabase as AdminAssetTypesClient, user.id)
   if (!scope || !canAccessAdminSection(scope, "assets")) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
 
-  const dataClient = getServiceRoleClientOrFallback(supabase as any)
+  const dataClient = getServiceRoleClientOrFallback(supabase as AdminAssetTypesClient)
   let { data, error } = await dataClient
     .from("asset_types")
     .select("id, label, code, requires_serial_model")
@@ -61,7 +63,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  const scope = await resolveAdminScope(supabase as any, user.id)
+  const scope = await resolveAdminScope(supabase as AdminAssetTypesClient, user.id)
   if (!scope || !scope.isAdminLike || !canAccessAdminSection(scope, "assets")) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
@@ -78,7 +80,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Both label and code are required" }, { status: 400 })
   }
 
-  const dataClient = getServiceRoleClientOrFallback(supabase as any)
+  const dataClient = getServiceRoleClientOrFallback(supabase as AdminAssetTypesClient)
   const { data, error } = await dataClient
     .from("asset_types")
     .insert({

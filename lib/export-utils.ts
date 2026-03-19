@@ -1,5 +1,4 @@
 import { jsPDF } from "jspdf"
-import autoTable from "jspdf-autotable"
 import { saveAs } from "file-saver"
 import { DEPT_EXECUTIVE_MANAGEMENT } from "@/config/constants"
 import {
@@ -9,7 +8,6 @@ import {
   PageNumber,
   Paragraph,
   TextRun,
-  HeadingLevel,
   AlignmentType,
   Table,
   TableRow,
@@ -21,10 +19,33 @@ import { formatOfficeDateWithOrdinal, getOfficeWeekMonday } from "./meeting-week
 
 // Load pptxgenjs from the installed npm package via dynamic import.
 // Dynamic import keeps it out of the SSR bundle (it requires browser APIs).
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const loadPptxGenJS = async (): Promise<new (...args: any[]) => any> => {
+type PptxShapeTypeMap = Record<string, string>
+
+type PptxSlide = {
+  background?: { color: string }
+  transition?: { type: string; duration: number }
+  addShape: (shapeName: string, options: Record<string, unknown>) => void
+  addText: (text: string, options: Record<string, unknown>) => void
+  addImage: (options: Record<string, unknown>) => void
+}
+
+type PptxPresentation = {
+  layout: string
+  ShapeType?: PptxShapeTypeMap
+  addSlide: () => PptxSlide
+  writeFile: (options: { fileName: string }) => Promise<string>
+}
+
+type PptxConstructor = new () => PptxPresentation
+
+const loadPptxGenJS = async (): Promise<PptxConstructor> => {
   const mod = await import("pptxgenjs")
-  return mod.default ?? mod
+  return (mod.default ?? mod) as unknown as PptxConstructor
+}
+
+type WeeklyReportProfile = {
+  first_name?: string | null
+  last_name?: string | null
 }
 
 export interface WeeklyReport {
@@ -38,7 +59,7 @@ export interface WeeklyReport {
   status: string
   user_id: string
   created_at: string
-  profiles?: any
+  profiles?: WeeklyReportProfile | WeeklyReportProfile[] | null
 }
 
 const INVALID_FILENAME_CHARS = /[<>:"/\\|?*\u0000-\u001F]+/g
@@ -424,7 +445,7 @@ const pdfDeptIndexPage = (doc: jsPDF, departments: string[], week: number, year:
 }
 
 /** Draws a dept section header page (green full-bleed). */
-const pdfDeptHeaderPage = (doc: jsPDF, department: string, submittedBy: string) => {
+const _pdfDeptHeaderPage = (doc: jsPDF, department: string, _submittedBy: string) => {
   const W = 210,
     H = 297
   doc.setFillColor(...PDF_GREEN)
@@ -495,8 +516,6 @@ const pdfContentPage = (
   const padX = 14
   const innerW = W - padX * 2
   const fontSize = 10 // bigger body font
-  const lineSpacing = 6 // more spacing between lines
-
   const sections = [
     { title: "WORK DONE", color: PDF_GREEN, text: autoNumberLines(report.work_done) || "No data provided." },
     {
@@ -1302,8 +1321,6 @@ export const exportActionTrackerToDocx = async (
 ) => {
   const mondayDate = getWeekMonday(week, year)
 
-  const docSize = { width: 11906, height: 16838 } // A4 in twips
-
   const grouped: Record<string, ActionItem[]> = {}
   actions.forEach((a) => {
     if (!grouped[a.department]) grouped[a.department] = []
@@ -1336,7 +1353,7 @@ export const exportActionTrackerToDocx = async (
       })
   )
 
-  const deptChildren: any[] = []
+  const deptChildren: Array<Paragraph | Table> = []
   departments.forEach((dept, i) => {
     const deptActions = grouped[dept] || []
     deptChildren.push(
@@ -1477,7 +1494,7 @@ export const exportAllToDocx = async (reports: WeeklyReport[], week: number, yea
   const sortedReports = sortReportsByDepartment(reports)
   const mondayDate = getWeekMonday(week, year)
 
-  const tocChildren: any[] = [
+  const tocChildren: Array<Paragraph | Table> = [
     new Paragraph({
       children: [new TextRun({ text: "ACOB LIGHTING TECHNOLOGY LIMITED", bold: true, size: 36, color: "1A7A4A" })],
       alignment: AlignmentType.CENTER,
@@ -1519,7 +1536,7 @@ export const exportAllToDocx = async (reports: WeeklyReport[], week: number, yea
     }),
   ]
 
-  const reportChildren: any[] = []
+  const reportChildren: Paragraph[] = []
   sortedReports.forEach((report, idx) => {
     reportChildren.push(
       new Paragraph({
@@ -1740,7 +1757,13 @@ const getWeeklyPptxThemeColors = (theme: WeeklyPptxTheme = "light") => {
 }
 
 /** Adds the ACOB cover slide. */
-const addCoverSlide = (pres: any, week: number, year: number, subtitle?: string, theme: WeeklyPptxTheme = "light") => {
+const addCoverSlide = (
+  pres: PptxPresentation,
+  week: number,
+  year: number,
+  subtitle?: string,
+  theme: WeeklyPptxTheme = "light"
+) => {
   const colors = getWeeklyPptxThemeColors(theme)
   const slide = pres.addSlide()
 
@@ -1911,7 +1934,7 @@ const addCoverSlide = (pres: any, week: number, year: number, subtitle?: string,
  * Adds a department title slide (full-bleed green).
  */
 const addDeptTitleSlide = (
-  pres: any,
+  pres: PptxPresentation,
   department: string,
   submittedBy: string,
   pageNumber?: number,
@@ -1980,7 +2003,7 @@ const addDeptTitleSlide = (
  * Adds a numbered department index slide (shown after the cover in bulk export).
  */
 const addDeptIndexSlide = (
-  pres: any,
+  pres: PptxPresentation,
   departments: string[],
   week: number,
   year: number,
@@ -2109,7 +2132,7 @@ const WEEKLY_CONTENT_LAYOUT = {
   footerH: 0.6,
 }
 
-const applyWeeklySlideTransition = (slide: any) => {
+const applyWeeklySlideTransition = (slide: PptxSlide) => {
   // PptxGenJS transition support varies by viewer/version; keep this guarded.
   try {
     slide.transition = {
@@ -2270,7 +2293,7 @@ const chooseSectionFontSize = (
   boxHIn: number,
   preferredFont = PPTX_WEEKLY_BODY_FONT_SIZE,
   minFont = PPTX_WEEKLY_MIN_BODY_FONT_SIZE,
-  strictFit = true
+  _strictFit = true
 ): number => {
   for (let fontSize = preferredFont; fontSize >= minFont; fontSize -= 0.5) {
     const charsPerLine = Math.max(10, Math.floor((boxWIn * 72) / (fontSize * PPTX_WEEKLY_AVG_CHAR_WIDTH_RATIO)))
@@ -2339,8 +2362,8 @@ const getReportSectionPlans = (report: WeeklyReport): WeeklySectionPlan[] => {
 }
 
 const addWeeklyHeaderAndFooter = (
-  pres: any,
-  slide: any,
+  pres: PptxPresentation,
+  slide: PptxSlide,
   department: string,
   nextDept?: string,
   pageNumber?: number,
@@ -2423,8 +2446,8 @@ const addWeeklyHeaderAndFooter = (
 }
 
 const addSectionCard = (
-  pres: any,
-  slide: any,
+  pres: PptxPresentation,
+  slide: PptxSlide,
   box: { x: number; y: number; w: number; h: number; textW: number; textH: number },
   title: string,
   color: string,
@@ -2573,7 +2596,7 @@ const fitTextToPptxBoxCompact = (
 }
 
 const addCompactContentSlide = (
-  pres: any,
+  pres: PptxPresentation,
   department: string,
   report: WeeklyReport,
   nextDept?: string,
@@ -2635,7 +2658,7 @@ const addCompactContentSlide = (
 }
 
 const addWorkDoneSlide = (
-  pres: any,
+  pres: PptxPresentation,
   department: string,
   workDonePlan: WeeklySectionPlan,
   nextDept?: string,
@@ -2665,7 +2688,7 @@ const addWorkDoneSlide = (
 }
 
 const addTasksAndChallengesSlide = (
-  pres: any,
+  pres: PptxPresentation,
   department: string,
   tasksPlan: WeeklySectionPlan,
   challengesPlan: WeeklySectionPlan,
@@ -2728,7 +2751,7 @@ const buildDepartmentPptxPlan = (report: WeeklyReport): DepartmentPptxPlan => {
 }
 
 const renderDepartmentWeeklySlides = (
-  pres: any,
+  pres: PptxPresentation,
   departmentPlan: DepartmentPptxPlan,
   nextDepartmentName?: string,
   startPageNumber?: number,
@@ -2761,7 +2784,7 @@ const renderDepartmentWeeklySlides = (
 }
 
 const renderDepartmentCompactSlides = (
-  pres: any,
+  pres: PptxPresentation,
   report: WeeklyReport,
   nextDepartmentName?: string,
   contentPageNumber?: number,

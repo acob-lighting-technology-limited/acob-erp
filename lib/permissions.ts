@@ -1,4 +1,4 @@
-import type { UserRole, Profile } from "@/types/database"
+import type { UserRole } from "@/types/database"
 import { canAssignRole as canAssignManagedRole } from "@/lib/role-management"
 import { DEPT_EXECUTIVE_MANAGEMENT } from "@/config/constants"
 

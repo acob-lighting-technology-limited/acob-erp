@@ -10,15 +10,15 @@ function isAdminDashboardNavigation(fromHref: string, toHref: string): boolean {
 
   const adminPaths = ["/admin"]
   const dashboardPaths = [
-    "/dashboard",
     "/profile",
     "/projects",
-    "/tasks",
     "/assets",
     "/payments",
     "/feedback",
-    "/signature",
-    "/watermark",
+    "/notifications",
+    "/tools",
+    "/tools/signature",
+    "/tools/watermark",
     "/documentation",
     "/job-description",
   ]

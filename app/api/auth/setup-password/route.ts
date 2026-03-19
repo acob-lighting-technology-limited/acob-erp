@@ -70,12 +70,12 @@ export async function POST(req: Request) {
       .eq("id", profile.id)
 
     if (updateError) {
-      log.error({ err: updateError }, "Failed to clear setup token")
+      log.error({ err: String(updateError) }, "Failed to clear setup token")
       // We don't return error here because the password was already updated successfully
     }
 
     return NextResponse.json({ success: true, message: "Account activated successfully" })
-  } catch (error: any) {
+  } catch (error: unknown) {
     log.error({ err: String(error) }, "Setup password error")
     return NextResponse.json({ error: "An unexpected error occurred" }, { status: 500 })
   }

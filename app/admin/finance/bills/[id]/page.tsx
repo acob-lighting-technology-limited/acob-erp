@@ -13,10 +13,6 @@ import { toast } from "sonner"
 import { PageHeader } from "@/components/layout/page-header"
 import { PageLoader } from "@/components/ui/query-states"
 
-import { logger } from "@/lib/logger"
-
-const log = logger("finance-bills")
-
 interface Bill {
   id: string
   bill_number: string
@@ -39,6 +35,8 @@ interface BillItem {
   unit_price: number
   amount: number
 }
+
+type BillStatusVariant = "default" | "destructive" | "secondary" | "outline"
 
 async function fetchBill(id: string): Promise<Bill> {
   const supabase = createClient()
@@ -63,7 +61,7 @@ export default function BillDetailPage() {
       await supabase.from("bills").update({ status: "paid" }).eq("id", id)
       toast.success("Marked as paid")
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminBillDetail(id) })
-    } catch (error) {
+    } catch {
       toast.error("Failed to update")
     }
   }
@@ -79,7 +77,7 @@ export default function BillDetailPage() {
   if (isLoading) return <PageLoader />
   if (!bill) return null
 
-  const statusColors: Record<string, string> = {
+  const statusColors: Record<Bill["status"], BillStatusVariant> = {
     pending: "secondary",
     approved: "default",
     paid: "default",
@@ -94,7 +92,7 @@ export default function BillDetailPage() {
         backLink={{ href: "/admin/finance/bills", label: "Back to Bills" }}
         actions={
           <>
-            <Badge variant={statusColors[bill.status] as any} className="capitalize">
+            <Badge variant={statusColors[bill.status]} className="capitalize">
               {bill.status}
             </Badge>
             {bill.status !== "paid" && (

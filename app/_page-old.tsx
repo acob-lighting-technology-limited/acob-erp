@@ -8,7 +8,7 @@ export default async function HomePage() {
 
   // If user is logged in, redirect to dashboard
   if (!error && data?.user) {
-    redirect("/dashboard")
+    redirect("/profile")
   }
 
   // If not logged in, redirect to login

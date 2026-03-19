@@ -10,10 +10,10 @@ import { writeAuditLogClient } from "@/lib/audit/client"
 import { FeedbackFilterBar } from "@/components/feedback/feedback-filter-bar"
 import { FeedbackDetailDialog } from "@/components/feedback/feedback-detail-dialog"
 import { FeedbackTable } from "@/components/feedback/feedback-table"
+import type { FeedbackRecord } from "@/components/feedback/types"
 
 interface FeedbackViewerClientProps {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  feedback: any[]
+  feedback: FeedbackRecord[]
 }
 
 interface FeedbackFilterData {
@@ -77,8 +77,7 @@ export function FeedbackViewerClient({ feedback }: FeedbackViewerClientProps) {
   const [departmentFilter, setDepartmentFilter] = useState("all")
   const [employeeFilter, setEmployeeFilter] = useState("all")
   const [nameSortOrder, setNameSortOrder] = useState<"asc" | "desc">("asc")
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [selectedFeedback, setSelectedFeedback] = useState<any | null>(null)
+  const [selectedFeedback, setSelectedFeedback] = useState<FeedbackRecord | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isUpdating, setIsUpdating] = useState(false)
 
@@ -117,8 +116,7 @@ export function FeedbackViewerClient({ feedback }: FeedbackViewerClientProps) {
     })
   }, [feedback, searchQuery, selectedType, selectedStatus, departmentFilter, employeeFilter, nameSortOrder])
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handleViewDetails = (item: any) => {
+  const handleViewDetails = (item: FeedbackRecord) => {
     setSelectedFeedback(item)
     setIsModalOpen(true)
   }
@@ -136,9 +134,8 @@ export function FeedbackViewerClient({ feedback }: FeedbackViewerClientProps) {
 
       if (error) throw error
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await writeAuditLogClient(
-        supabase as any,
+        supabase,
         {
           action: "status_change",
           entityType: "feedback",

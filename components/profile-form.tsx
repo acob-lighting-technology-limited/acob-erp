@@ -12,13 +12,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "sonner"
 import Link from "next/link"
-import { X } from "lucide-react"
-
 import { Switch } from "@/components/ui/switch"
+import type { Database } from "@/types/database"
+
+type ProfileRecord = Database["public"]["Tables"]["profiles"]["Row"] & {
+  email_notifications?: boolean | null
+}
 
 interface ProfileFormProps {
-  user: any
-  profile: any
+  user: {
+    id: string
+  }
+  profile: ProfileRecord | null
 }
 
 export function ProfileForm({ user, profile }: ProfileFormProps) {
@@ -307,8 +312,8 @@ export function ProfileForm({ user, profile }: ProfileFormProps) {
               <Button type="submit" loading={isLoading}>
                 Save Changes
               </Button>
-              <Link href="/dashboard">
-                <Button variant="outline">Back to Dashboard</Button>
+              <Link href="/profile">
+                <Button variant="outline">Back to Home</Button>
               </Link>
             </div>
           </form>

@@ -17,10 +17,6 @@ import { StatCard } from "@/components/ui/stat-card"
 import { EmptyState } from "@/components/ui/empty-state"
 import { TableSkeleton } from "@/components/ui/query-states"
 
-import { logger } from "@/lib/logger"
-
-const log = logger("purchasing-orders")
-
 interface PurchaseOrder {
   id: string
   po_number: string
@@ -34,12 +30,18 @@ interface PurchaseOrder {
   created_at: string
 }
 
-const statusColors: Record<string, string> = {
+type BadgeVariant = "default" | "destructive" | "secondary" | "outline"
+
+const statusColors: Record<PurchaseOrder["status"], BadgeVariant> = {
   draft: "secondary",
   pending: "default",
   approved: "default",
   received: "default",
   cancelled: "destructive",
+}
+
+type PurchaseOrderRow = PurchaseOrder & {
+  supplier?: { name?: string | null } | null
 }
 
 async function fetchPurchaseOrdersList(): Promise<PurchaseOrder[]> {
@@ -56,9 +58,9 @@ async function fetchPurchaseOrdersList(): Promise<PurchaseOrder[]> {
     throw new Error(error.message)
   }
 
-  return (data || []).map((o: any) => ({
+  return ((data || []) as PurchaseOrderRow[]).map((o) => ({
     ...o,
-    supplier_name: o.supplier?.name,
+    supplier_name: o.supplier?.name || undefined,
   }))
 }
 
@@ -198,7 +200,7 @@ export default function PurchaseOrdersPage() {
                     <TableCell>{o.expected_date ? formatDate(o.expected_date) : "—"}</TableCell>
                     <TableCell className="text-right">{formatCurrency(o.total_amount, o.currency)}</TableCell>
                     <TableCell>
-                      <Badge variant={statusColors[o.status] as any} className="capitalize">
+                      <Badge variant={statusColors[o.status]} className="capitalize">
                         {o.status}
                       </Badge>
                     </TableCell>

@@ -12,10 +12,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { TrendingUp, TrendingDown, DollarSign, Calendar, BarChart3 } from "lucide-react"
 import { PageLoader } from "@/components/ui/query-states"
 
-import { logger } from "@/lib/logger"
-
-const log = logger("finance-reports")
-
 interface ReportData {
   totalRevenue: number
   totalExpenses: number

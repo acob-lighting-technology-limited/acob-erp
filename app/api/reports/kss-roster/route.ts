@@ -8,6 +8,8 @@ import { logger } from "@/lib/logger"
 
 const log = logger("api-reports-kss-roster")
 
+type ReportsClient = Awaited<ReturnType<typeof createClient>>
+
 async function createClient() {
   const cookieStore = await cookies()
   return createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
@@ -34,11 +36,7 @@ function hasGlobalReportsWriteAccess(scope: NonNullable<Awaited<ReturnType<typeo
   return getDepartmentScope(scope, "general") === null
 }
 
-async function assertWeekIsMutable(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  meetingWeek: number,
-  meetingYear: number
-) {
+async function assertWeekIsMutable(supabase: ReportsClient, meetingWeek: number, meetingYear: number) {
   const { data, error } = await supabase.rpc("weekly_report_can_mutate", {
     p_week: meetingWeek,
     p_year: meetingYear,
@@ -62,7 +60,7 @@ export async function GET(request: Request) {
 
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const scope = await resolveAdminScope(supabase as any, user.id)
+    const scope = await resolveAdminScope(supabase as ReportsClient, user.id)
     if (!scope) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
     const { searchParams } = new URL(request.url)
@@ -116,7 +114,7 @@ export async function POST(request: Request) {
 
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const scope = await resolveAdminScope(supabase as any, user.id)
+    const scope = await resolveAdminScope(supabase as ReportsClient, user.id)
     if (!scope) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     if (!hasGlobalReportsWriteAccess(scope)) {
       return NextResponse.json({ error: "Only reports admins can create KSS roster entries" }, { status: 403 })
@@ -163,7 +161,7 @@ export async function POST(request: Request) {
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
     await writeAuditLog(
-      supabase as any,
+      supabase as ReportsClient,
       {
         action: "update",
         entityType: "communications_mail",
@@ -201,7 +199,7 @@ export async function PATCH(request: Request) {
 
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const scope = await resolveAdminScope(supabase as any, user.id)
+    const scope = await resolveAdminScope(supabase as ReportsClient, user.id)
     if (!scope) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     if (!hasGlobalReportsWriteAccess(scope)) {
       return NextResponse.json({ error: "Only reports admins can update KSS roster entries" }, { status: 403 })
@@ -247,7 +245,7 @@ export async function PATCH(request: Request) {
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
     await writeAuditLog(
-      supabase as any,
+      supabase as ReportsClient,
       {
         action: "update",
         entityType: "communications_mail",
@@ -282,7 +280,7 @@ export async function DELETE(request: Request) {
 
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const scope = await resolveAdminScope(supabase as any, user.id)
+    const scope = await resolveAdminScope(supabase as ReportsClient, user.id)
     if (!scope) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     if (!hasGlobalReportsWriteAccess(scope)) {
       return NextResponse.json({ error: "Only reports admins can delete KSS roster entries" }, { status: 403 })
@@ -307,7 +305,7 @@ export async function DELETE(request: Request) {
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
     await writeAuditLog(
-      supabase as any,
+      supabase as ReportsClient,
       {
         action: "delete",
         entityType: "communications_mail",

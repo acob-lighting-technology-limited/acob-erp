@@ -19,7 +19,6 @@ import { logger } from "@/lib/logger"
 
 const log = logger("finance-invoices-new")
 
-
 interface InvoiceItem {
   id: string
   description: string
@@ -168,9 +167,9 @@ export default function NewInvoicePage() {
 
       toast.success(`Invoice ${invoiceNumber} created successfully!`)
       router.push("/admin/finance/invoices")
-    } catch (error: any) {
+    } catch (error: unknown) {
       log.error("Error creating invoice:", error)
-      toast.error(error.message || "Failed to create invoice")
+      toast.error(error instanceof Error ? error.message : "Failed to create invoice")
     } finally {
       setSaving(false)
     }
@@ -238,7 +237,7 @@ export default function NewInvoicePage() {
                 <CardDescription>Add the products or services</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {items.map((item, index) => (
+                {items.map((item) => (
                   <div key={item.id} className="grid items-end gap-4 border-b pb-4 last:border-0 sm:grid-cols-12">
                     <div className="space-y-2 sm:col-span-4">
                       <Label>Description</Label>
@@ -411,7 +410,7 @@ export default function NewInvoicePage() {
                 variant="outline"
                 className="w-full"
                 disabled={saving}
-                onClick={(e) => handleSubmit(e as any, "sent")}
+                onClick={(e) => void handleSubmit(e, "sent")}
               >
                 Save & Send
               </Button>

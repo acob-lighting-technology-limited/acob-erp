@@ -15,6 +15,7 @@ import { PageHeader } from "@/components/layout"
 import { EmptyState } from "@/components/ui/patterns"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { PageLoader } from "@/components/ui/query-states"
+import Image from "next/image"
 
 import { logger } from "@/lib/logger"
 
@@ -30,6 +31,8 @@ interface JobDescriptionData {
   phone_number: string | null
   userId: string
 }
+
+type AuditClient = Parameters<typeof writeAuditLogClient>[0]
 
 async function fetchJobDescription(supabase: ReturnType<typeof createClient>): Promise<JobDescriptionData> {
   const {
@@ -112,7 +115,7 @@ export default function JobDescriptionPage() {
       if (error) throw error
 
       await writeAuditLogClient(
-        supabase as any,
+        supabase as AuditClient,
         {
           action: "update",
           entityType: "job_description",
@@ -207,7 +210,7 @@ export default function JobDescriptionPage() {
           <div className="hidden print:mb-8 print:block print:border-b print:pb-4">
             <div className="flex items-start justify-between">
               <div>
-                <img src="/acob-logo.webp" alt="ACOB Lighting" className="h-16 w-auto" />
+                <Image src="/acob-logo.webp" alt="ACOB Lighting" width={180} height={64} className="h-16 w-auto" />
               </div>
               <div className="text-right text-sm">
                 {profile?.first_name && profile?.last_name && (
@@ -312,7 +315,7 @@ export default function JobDescriptionPage() {
                   <p className="mb-1 font-medium">Why add a job description?</p>
                   <p>
                     Your job description helps your managers and HR understand your role better, ensuring you get the
-                    right support and resources. It's also useful during performance reviews and role transitions.
+                    right support and resources. It&apos;s also useful during performance reviews and role transitions.
                   </p>
                 </div>
               </div>

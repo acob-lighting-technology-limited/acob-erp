@@ -9,6 +9,8 @@ const log = logger("payments-categories")
 
 export const dynamic = "force-dynamic"
 
+type PaymentsClient = Awaited<ReturnType<typeof createClient>>
+
 // Helper function to create Supabase client
 async function createClient() {
   const cookieStore = await cookies()
@@ -44,7 +46,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const scope = await resolveAdminScope(supabase as any, user.id)
+    const scope = await resolveAdminScope(supabase, user.id)
     if (!scope || !scope.isAdminLike) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
@@ -66,7 +68,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
     if (error) throw error
 
     await writeAuditLog(
-      supabase as any,
+      supabase as PaymentsClient,
       {
         action: "update",
         entityType: "payment_category",
@@ -97,7 +99,7 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const scope = await resolveAdminScope(supabase as any, user.id)
+    const scope = await resolveAdminScope(supabase, user.id)
     if (!scope || !scope.isAdminLike) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
@@ -107,7 +109,7 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
     if (error) throw error
 
     await writeAuditLog(
-      supabase as any,
+      supabase as PaymentsClient,
       {
         action: "delete",
         entityType: "payment_category",

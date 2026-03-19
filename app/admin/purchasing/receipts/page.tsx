@@ -12,10 +12,6 @@ import { StatCard } from "@/components/ui/stat-card"
 import { EmptyState } from "@/components/ui/patterns"
 import { TableSkeleton } from "@/components/ui/query-states"
 
-import { logger } from "@/lib/logger"
-
-const log = logger("purchasing-receipts")
-
 interface Receipt {
   id: string
   receipt_number: string
@@ -24,6 +20,13 @@ interface Receipt {
   received_date: string
   total_items: number
   created_at: string
+}
+
+type ReceiptRow = Receipt & {
+  purchase_order?: {
+    po_number?: string | null
+    supplier?: { name?: string | null } | null
+  } | null
 }
 
 async function fetchReceipts(): Promise<Receipt[]> {
@@ -35,10 +38,10 @@ async function fetchReceipts(): Promise<Receipt[]> {
 
   if (error && error.code !== "42P01") throw new Error(error.message)
 
-  return (data || []).map((r: any) => ({
+  return ((data || []) as ReceiptRow[]).map((r) => ({
     ...r,
-    po_number: r.purchase_order?.po_number,
-    supplier_name: r.purchase_order?.supplier?.name,
+    po_number: r.purchase_order?.po_number || undefined,
+    supplier_name: r.purchase_order?.supplier?.name || undefined,
   }))
 }
 

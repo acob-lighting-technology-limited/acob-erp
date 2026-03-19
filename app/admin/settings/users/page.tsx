@@ -68,8 +68,8 @@ export default function UsersPage() {
       toast.success("User updated")
       setIsDialogOpen(false)
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminUsersSettings() })
-    } catch (error: any) {
-      toast.error(error.message || "Failed to update")
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Failed to update")
     }
   }
 
@@ -132,9 +132,9 @@ export default function UsersPage() {
       toast.success(`User role updated to ${roleFilter}`)
       setIsAddUserDialogOpen(false)
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminUsersSettings() })
-    } catch (error: any) {
+    } catch (error: unknown) {
       log.error("Error adding user to role:", error)
-      toast.error(error.message || "Failed to update role")
+      toast.error(error instanceof Error ? error.message : "Failed to update role")
     }
   }
 

@@ -29,10 +29,6 @@ import { StatCard } from "@/components/ui/stat-card"
 import { EmptyState, FormFieldGroup, ListToolbar, StatusBadge } from "@/components/ui/patterns"
 import { TableSkeleton } from "@/components/ui/query-states"
 
-import { logger } from "@/lib/logger"
-
-const log = logger("purchasing-suppliers")
-
 interface Supplier {
   id: string
   name: string
@@ -106,8 +102,8 @@ export default function SuppliersPage() {
       setEditing(null)
       setFormData({ name: "", code: "", email: "", phone: "", address: "", contact_person: "", is_active: true })
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminSuppliers() })
-    } catch (error: any) {
-      toast.error(error.message || "Failed to save")
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Failed to save")
     }
   }
 
@@ -118,8 +114,8 @@ export default function SuppliersPage() {
       if (error) throw error
       toast.success("Deleted")
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminSuppliers() })
-    } catch (error: any) {
-      toast.error(error.message)
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Failed to delete")
     }
   }
 

@@ -4,6 +4,7 @@ import { areRequiredDocumentsVerified, getLeavePolicy } from "@/lib/hr/leave-wor
 import { logger } from "@/lib/logger"
 
 const log = logger("hr-leave-queue")
+export const dynamic = "force-dynamic"
 
 const LEGACY_SLA_STAGE_MAP: Record<string, string> = {
   pending_reliever: "reliever_pending",
@@ -14,6 +15,49 @@ const LEGACY_SLA_STAGE_MAP: Record<string, string> = {
 }
 
 const ADMIN_LIKE_ROLES = ["developer", "admin", "super_admin"]
+
+type ProfileSummary = {
+  id: string
+  full_name?: string | null
+  company_email?: string | null
+  role?: string | null
+}
+
+type LeaveApprovalRow = {
+  id: string
+  leave_request_id: string
+  approver_id?: string | null
+  approval_level?: number | null
+  status?: string | null
+  comments?: string | null
+  approved_at?: string | null
+  stage_code?: string | null
+  stage_order?: number | null
+  reliever_revision?: number | null
+  superseded?: boolean | null
+}
+
+type LeaveQueueRequestRow = {
+  id: string
+  created_at: string
+  leave_type_id: string
+  approval_stage?: string | null
+  current_stage_code?: string | null
+  current_approver_user_id?: string | null
+  user?: ProfileSummary | null
+  reliever?: ProfileSummary | null
+  supervisor?: ProfileSummary | null
+  leave_type?: {
+    id: string
+    name?: string | null
+  } | null
+}
+
+type SlaPolicyRow = {
+  stage: string
+  due_hours: number
+  reminder_hours_before: number
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -59,12 +103,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: `Failed to fetch approval queue: ${error.message}` }, { status: 500 })
     }
 
-    const requestIds = Array.from(new Set((requests || []).map((row: any) => row.id).filter(Boolean))) as string[]
+    const typedRequests = (requests || []) as LeaveQueueRequestRow[]
+    const requestIds = Array.from(new Set(typedRequests.map((row) => row.id).filter(Boolean)))
     const approverIds = Array.from(
-      new Set((requests || []).map((row: any) => row.current_approver_user_id).filter(Boolean))
+      new Set(typedRequests.map((row) => row.current_approver_user_id).filter(Boolean))
     ) as string[]
 
-    const approverMap = new Map<string, any>()
+    const approverMap = new Map<string, ProfileSummary>()
     if (approverIds.length > 0) {
       const { data: approverRows } = await supabase
         .from("profiles")
@@ -75,7 +120,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const approvalsByRequest = new Map<string, any[]>()
+    const approvalsByRequest = new Map<string, Array<LeaveApprovalRow & { approver: ProfileSummary | null }>>()
     if (requestIds.length > 0) {
       const { data: approvalRows, error: approvalError } = await supabase
         .from("leave_approvals")
@@ -93,9 +138,9 @@ export async function GET(request: NextRequest) {
       }
 
       const approvalApproverIds = Array.from(
-        new Set((approvalRows || []).map((row: any) => row.approver_id).filter(Boolean))
+        new Set(((approvalRows || []) as LeaveApprovalRow[]).map((row) => row.approver_id).filter(Boolean))
       )
-      const approvalApproverMap = new Map<string, any>()
+      const approvalApproverMap = new Map<string, ProfileSummary>()
       if (approvalApproverIds.length > 0) {
         const { data: approvalApproverRows } = await supabase
           .from("profiles")
@@ -106,7 +151,7 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      for (const approval of approvalRows || []) {
+      for (const approval of (approvalRows || []) as LeaveApprovalRow[]) {
         const rows = approvalsByRequest.get(approval.leave_request_id) || []
         rows.push({
           ...approval,
@@ -121,13 +166,13 @@ export async function GET(request: NextRequest) {
       .select("stage, due_hours, reminder_hours_before")
       .eq("is_active", true)
 
-    const slaMap = new Map((slaRows || []).map((row: any) => [row.stage, row]))
+    const slaMap = new Map(((slaRows || []) as SlaPolicyRow[]).map((row) => [row.stage, row] as const))
 
     const now = Date.now()
     const enriched = await Promise.all(
-      (requests || []).map(async (item: any) => {
+      typedRequests.map(async (item) => {
         try {
-          const stageCode = item.current_stage_code || item.approval_stage
+          const stageCode = item.current_stage_code || item.approval_stage || ""
           const slaStage = LEGACY_SLA_STAGE_MAP[stageCode] || "reliever_pending"
 
           const policy = slaMap.get(slaStage) || { due_hours: 24, reminder_hours_before: 4 }
@@ -160,7 +205,7 @@ export async function GET(request: NextRequest) {
               hours_remaining: Math.floor(remainingMs / (1000 * 60 * 60)),
             },
           }
-        } catch (itemError: any) {
+        } catch (itemError: unknown) {
           return {
             ...item,
             approvals: approvalsByRequest.get(item.id) || [],
@@ -171,7 +216,7 @@ export async function GET(request: NextRequest) {
             evidence_complete: true,
             missing_documents: [],
             sla: null,
-            queue_enrichment_error: itemError?.message || "Queue enrichment failed",
+            queue_enrichment_error: itemError instanceof Error ? itemError.message : "Queue enrichment failed",
           }
         }
       })
@@ -194,10 +239,13 @@ export async function GET(request: NextRequest) {
     }
 
     const historyRequestIds = Array.from(
-      new Set((historyApprovals || []).map((row: any) => row.leave_request_id).filter(Boolean))
+      new Set(((historyApprovals || []) as LeaveApprovalRow[]).map((row) => row.leave_request_id).filter(Boolean))
     )
-    const historyRequestMap = new Map<string, any>()
-    const historyApprovalsByRequest = new Map<string, any[]>()
+    const historyRequestMap = new Map<
+      string,
+      LeaveQueueRequestRow & { approvals: Array<LeaveApprovalRow & { approver: ProfileSummary | null }> }
+    >()
+    const historyApprovalsByRequest = new Map<string, Array<LeaveApprovalRow & { approver: ProfileSummary | null }>>()
     if (historyRequestIds.length > 0) {
       const { data: historyRequests } = await supabase
         .from("leave_requests")
@@ -221,9 +269,9 @@ export async function GET(request: NextRequest) {
         .order("approved_at", { ascending: false })
 
       const historyApproverIds = Array.from(
-        new Set((historyRequestApprovals || []).map((row: any) => row.approver_id).filter(Boolean))
+        new Set(((historyRequestApprovals || []) as LeaveApprovalRow[]).map((row) => row.approver_id).filter(Boolean))
       )
-      const historyApproverMap = new Map<string, any>()
+      const historyApproverMap = new Map<string, ProfileSummary>()
       if (historyApproverIds.length > 0) {
         const { data: historyApproverRows } = await supabase
           .from("profiles")
@@ -234,7 +282,7 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      for (const approval of historyRequestApprovals || []) {
+      for (const approval of (historyRequestApprovals || []) as LeaveApprovalRow[]) {
         const rows = historyApprovalsByRequest.get(approval.leave_request_id) || []
         rows.push({
           ...approval,
@@ -243,7 +291,7 @@ export async function GET(request: NextRequest) {
         historyApprovalsByRequest.set(approval.leave_request_id, rows)
       }
 
-      for (const row of historyRequests || []) {
+      for (const row of (historyRequests || []) as LeaveQueueRequestRow[]) {
         historyRequestMap.set(row.id, {
           ...row,
           approvals: historyApprovalsByRequest.get(row.id) || [],
@@ -251,7 +299,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const history = (historyApprovals || []).map((approval: any) => ({
+    const history = ((historyApprovals || []) as LeaveApprovalRow[]).map((approval) => ({
       ...approval,
       request: historyRequestMap.get(approval.leave_request_id) || null,
     }))

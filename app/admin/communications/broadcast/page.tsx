@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { CommunicationsComposer } from "@/app/admin/communications/_components/communications-composer"
-import { applyAssignableStatusFilter } from "@/lib/workforce/assignment-policy"
+import { isAssignableEmploymentStatus } from "@/lib/workforce/assignment-policy"
 import { resolveAdminScope } from "@/lib/admin/rbac"
 
 export default async function CommunicationsBroadcastPage() {
@@ -22,23 +22,24 @@ export default async function CommunicationsBroadcastPage() {
     .eq("id", user.id)
     .single()
 
-  const scope = await resolveAdminScope(supabase as any, user.id)
+  const scope = await resolveAdminScope(supabase, user.id)
   if (!profile || !scope) {
     redirect("/admin")
   }
 
-  const { data: employees } = await applyAssignableStatusFilter(
-    supabase
-      .from("profiles")
-      .select("id, full_name, company_email, additional_email, department, employment_status")
-      .or("company_email.not.is.null,additional_email.not.is.null")
-      .order("full_name"),
-    { allowLegacyNullStatus: false }
+  const { data: employees } = await supabase
+    .from("profiles")
+    .select("id, full_name, company_email, additional_email, department, employment_status")
+    .or("company_email.not.is.null,additional_email.not.is.null")
+    .order("full_name")
+
+  const assignableEmployees = (employees || []).filter((employee) =>
+    isAssignableEmploymentStatus(employee.employment_status, { allowLegacyNullStatus: false })
   )
 
   return (
     <CommunicationsComposer
-      employees={employees || []}
+      employees={assignableEmployees}
       mode="communications"
       currentUser={{
         id: user.id,

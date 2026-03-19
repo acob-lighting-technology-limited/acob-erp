@@ -15,6 +15,29 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 }
 
+type AssetNotificationPayload = {
+  asset_code?: string
+  unique_code?: string
+  mail_audience?: string
+  oversight_target_role?: string
+  assigned_employee_name?: string
+  assigned_employee_department?: string
+  assigned_employee_email?: string
+  assigned_date?: string
+  assigned_at?: string
+  transfer_date?: string
+  return_date?: string
+  date?: string
+  assigned_by?: string
+  actor_id?: string
+  status_action?: string
+  resolution_note?: string
+  status_description?: string
+  reported_by?: string
+  authorized_by?: string
+  condition?: string
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders })
 
@@ -44,17 +67,17 @@ serve(async (req) => {
     const record = payload.record
     if (!record?.user_id) return new Response("Missing user_id", { status: 200 })
 
-    let notificationData = {}
+    let notificationData: unknown = {}
     try {
       notificationData = typeof record.data === "string" ? JSON.parse(record.data) : record.data || {}
     } catch {
       console.warn("[WARN] Failed to parse record.data, using empty object")
     }
-    const notificationPayload = notificationData as any
+    const notificationPayload = (notificationData ?? {}) as AssetNotificationPayload
     const assetCode = notificationPayload.asset_code || notificationPayload.unique_code
 
     // 1. Resolve recipient context from a single resolver
-    const recipientContext = await resolveAssetMailRecipientContext(supabase as any, record.user_id)
+    const recipientContext = await resolveAssetMailRecipientContext(supabase, record.user_id)
     if (!recipientContext) {
       console.log(`[INFO] Skipping notification for inactive recipient ${record.user_id}`)
       return new Response("Recipient is not active", { status: 200 })
@@ -63,7 +86,7 @@ serve(async (req) => {
     const { recipientEmails, recipientName, recipientFirstName, recipientDept } = recipientContext
     if (recipientEmails.length === 0) return new Response("User has no recipient email", { status: 200 })
 
-    const canReceiveEmail = await canEdgeUserReceiveEmail(supabase as any, record.user_id, "assets")
+    const canReceiveEmail = await canEdgeUserReceiveEmail(supabase, record.user_id, "assets")
     if (!canReceiveEmail) {
       console.log(`[INFO] Asset email disabled by policy/preferences for recipient ${record.user_id}`)
       return new Response("Recipient email disabled by preference/policy", { status: 200 })
@@ -89,7 +112,7 @@ serve(async (req) => {
       record.created_at ||
       null
     const parsedEventDate = rawEventDate ? new Date(rawEventDate) : null
-    let assignedDate =
+    const assignedDate =
       parsedEventDate && !isNaN(parsedEventDate.getTime())
         ? parsedEventDate.toLocaleDateString("en-GB")
         : new Date().toLocaleDateString("en-GB")
@@ -398,9 +421,9 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     })
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Global Error:", err)
-    return new Response(JSON.stringify({ error: err.message }), {
+    return new Response(JSON.stringify({ error: err instanceof Error ? err.message : "Unknown error" }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 400,
     })

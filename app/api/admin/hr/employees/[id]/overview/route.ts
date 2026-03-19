@@ -3,6 +3,23 @@ import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { canAccessAdminSection, resolveAdminScope } from "@/lib/admin/rbac"
 
+type EmployeeOverviewClient = Awaited<ReturnType<typeof createClient>>
+
+type AssetAssignmentRow = {
+  id: string
+  asset_id: string
+  assigned_at?: string | null
+  is_current?: boolean | null
+  assignment_type?: string | null
+}
+
+type AssetRow = {
+  id: string
+  created_at?: string | null
+  department?: string | null
+  office_location?: string | null
+}
+
 export async function GET(_: Request, { params }: { params: { id: string } }) {
   try {
     const supabase = await createClient()
@@ -14,7 +31,7 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const scope = await resolveAdminScope(supabase as any, user.id)
+    const scope = await resolveAdminScope(supabase as EmployeeOverviewClient, user.id)
     if (!scope || !canAccessAdminSection(scope, "hr")) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
@@ -24,7 +41,7 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
       return NextResponse.json({ error: "Employee id is required" }, { status: 400 })
     }
 
-    const dataClient = getServiceRoleClientOrFallback(supabase as any)
+    const dataClient = getServiceRoleClientOrFallback(supabase as EmployeeOverviewClient)
 
     const { data: profile, error: profileError } = await dataClient
       .from("profiles")
@@ -74,7 +91,7 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
             .eq("status", "assigned")
             .is("deleted_at", null)
             .limit(10)
-        : Promise.resolve({ data: [] as any[] }),
+        : Promise.resolve({ data: [] as AssetRow[] }),
       profile.office_location
         ? dataClient
             .from("assets")
@@ -86,7 +103,7 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
             .eq("status", "assigned")
             .is("deleted_at", null)
             .limit(10)
-        : Promise.resolve({ data: [] as any[] }),
+        : Promise.resolve({ data: [] as AssetRow[] }),
       dataClient
         .from("user_documentation")
         .select("id, title, created_at")
@@ -96,10 +113,10 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
     ])
 
     const assignedAssetIds = Array.from(
-      new Set((assignmentsResult.data || []).map((row: any) => row.asset_id).filter(Boolean))
+      new Set(((assignmentsResult.data || []) as AssetAssignmentRow[]).map((row) => row.asset_id).filter(Boolean))
     )
 
-    let assetMap = new Map<string, any>()
+    let assetMap = new Map<string, AssetRow>()
     if (assignedAssetIds.length > 0) {
       const { data: assetRows } = await dataClient
         .from("assets")
@@ -107,16 +124,16 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
         .in("id", assignedAssetIds)
         .is("deleted_at", null)
 
-      assetMap = new Map((assetRows || []).map((row: any) => [row.id, row]))
+      assetMap = new Map(((assetRows || []) as AssetRow[]).map((row) => [row.id, row] as const))
     }
 
-    const individualAssets = (assignmentsResult.data || []).map((assignment: any) => ({
+    const individualAssets = ((assignmentsResult.data || []) as AssetAssignmentRow[]).map((assignment) => ({
       ...assignment,
       Asset: assetMap.get(assignment.asset_id) || null,
       assignmentType: "individual",
     }))
 
-    const departmentAssets = (deptAssetsResult.data || []).map((asset: any) => ({
+    const departmentAssets = ((deptAssetsResult.data || []) as AssetRow[]).map((asset) => ({
       id: `dept-${asset.id}`,
       asset_id: asset.id,
       assigned_at: asset.created_at,
@@ -127,7 +144,7 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
       department: asset.department,
     }))
 
-    const officeAssets = (officeAssetsResult.data || []).map((asset: any) => ({
+    const officeAssets = ((officeAssetsResult.data || []) as AssetRow[]).map((asset) => ({
       id: `office-${asset.id}`,
       asset_id: asset.id,
       assigned_at: asset.created_at,
@@ -146,8 +163,8 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
         documentation: docsResult.data || [],
       },
     })
-  } catch (error: any) {
-    const message = error?.message || "Failed to load employee overview"
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Failed to load employee overview"
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }

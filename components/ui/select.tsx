@@ -8,24 +8,36 @@ import { SearchableSelect } from "@/components/ui/searchable-select"
 import { cn } from "@/lib/utils"
 
 type SelectProps = React.ComponentPropsWithoutRef<typeof SelectPrimitive.Root>
+type SelectChildProps = {
+  children?: React.ReactNode
+  placeholder?: string
+  className?: string
+  value?: string
+}
+type SelectLikeElement = React.ReactElement<SelectChildProps>
+type DisplayNameType = { displayName?: string }
+
+function isSelectElement(node: React.ReactNode): node is SelectLikeElement {
+  return React.isValidElement<SelectChildProps>(node)
+}
 
 function getNodeText(node: React.ReactNode): string {
   if (node === null || node === undefined || typeof node === "boolean") return ""
   if (typeof node === "string" || typeof node === "number") return String(node)
   if (Array.isArray(node)) return node.map(getNodeText).join("")
-  if (React.isValidElement(node)) return getNodeText(node.props.children)
+  if (isSelectElement(node)) return getNodeText(node.props.children)
   return ""
 }
 
 function findSelectItems(nodes: React.ReactNode): React.ReactElement[] {
   const items: React.ReactElement[] = []
   React.Children.forEach(nodes, (child) => {
-    if (!React.isValidElement(child)) return
-    const typeAny = child.type as any
+    if (!isSelectElement(child)) return
+    const typeValue = child.type as DisplayNameType
     const isItem =
-      typeAny === SelectItem ||
-      typeAny?.displayName === SelectItem.displayName ||
-      String(typeAny?.displayName || "").includes("SelectItem")
+      typeValue === SelectItem ||
+      typeValue.displayName === SelectItem.displayName ||
+      String(typeValue.displayName || "").includes("SelectItem")
     if (isItem) {
       items.push(child)
       return
@@ -40,12 +52,12 @@ function findSelectItems(nodes: React.ReactNode): React.ReactElement[] {
 function findPlaceholder(nodes: React.ReactNode): string | undefined {
   let placeholder: string | undefined
   React.Children.forEach(nodes, (child) => {
-    if (!React.isValidElement(child)) return
-    const typeAny = child.type as any
+    if (!isSelectElement(child)) return
+    const typeValue = child.type as DisplayNameType
     const isValue =
-      typeAny === SelectValue ||
-      typeAny?.displayName === SelectValue.displayName ||
-      String(typeAny?.displayName || "").includes("SelectValue")
+      typeValue === SelectValue ||
+      typeValue.displayName === SelectValue.displayName ||
+      String(typeValue.displayName || "").includes("SelectValue")
     if (isValue && typeof child.props?.placeholder === "string") {
       placeholder = child.props.placeholder
       return
@@ -60,12 +72,12 @@ function findPlaceholder(nodes: React.ReactNode): string | undefined {
 function findTriggerClassName(nodes: React.ReactNode): string | undefined {
   let className: string | undefined
   React.Children.forEach(nodes, (child) => {
-    if (!React.isValidElement(child)) return
-    const typeAny = child.type as any
+    if (!isSelectElement(child)) return
+    const typeValue = child.type as DisplayNameType
     const isTrigger =
-      typeAny === SelectTrigger ||
-      typeAny?.displayName === SelectTrigger.displayName ||
-      String(typeAny?.displayName || "").includes("SelectTrigger")
+      typeValue === SelectTrigger ||
+      typeValue.displayName === SelectTrigger.displayName ||
+      String(typeValue.displayName || "").includes("SelectTrigger")
     if (isTrigger && typeof child.props?.className === "string") {
       className = child.props.className
       return

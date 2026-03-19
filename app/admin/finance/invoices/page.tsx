@@ -13,7 +13,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Plus, FileText, Search, Filter, Eye, Download, Send } from "lucide-react"
 import Link from "next/link"
-import { toast } from "sonner"
 import { StatCard } from "@/components/ui/stat-card"
 import { EmptyState } from "@/components/ui/empty-state"
 import { TableSkeleton } from "@/components/ui/query-states"
@@ -50,7 +49,9 @@ interface Invoice {
   created_at: string
 }
 
-const statusColors: Record<string, string> = {
+type InvoiceStatusVariant = "default" | "destructive" | "secondary" | "outline"
+
+const statusColors: Record<Invoice["status"], InvoiceStatusVariant> = {
   draft: "secondary",
   sent: "default",
   paid: "default",
@@ -227,7 +228,7 @@ export default function InvoicesPage() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={statusColors[invoice.status] as any} className="capitalize">
+                      <Badge variant={statusColors[invoice.status]} className="capitalize">
                         {invoice.status}
                       </Badge>
                     </TableCell>

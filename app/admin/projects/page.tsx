@@ -38,7 +38,7 @@ export interface employee {
 
 async function getAdminProjectsData() {
   const supabase = await createClient()
-  const dataClient = getServiceRoleClientOrFallback(supabase as any)
+  const dataClient = getServiceRoleClientOrFallback(supabase)
 
   const {
     data: { user },
@@ -49,9 +49,9 @@ async function getAdminProjectsData() {
     return { redirect: "/auth/login" as const }
   }
 
-  const scope = await resolveAdminScope(supabase as any, user.id)
+  const scope = await resolveAdminScope(supabase, user.id)
   if (!scope || !canAccessAdminSection(scope, "projects")) {
-    return { redirect: "/dashboard" as const }
+    return { redirect: "/profile" as const }
   }
   const departmentScope = getDepartmentScope(scope, "general")
 
@@ -93,7 +93,10 @@ export default async function AdminProjectsPage() {
     redirect(data.redirect)
   }
 
-  const projectsData = data as { projects: Project[]; employee: employee[] }
+  const projectsData = data as Exclude<
+    Awaited<ReturnType<typeof getAdminProjectsData>>,
+    { redirect: "/auth/login" | "/profile" }
+  >
 
   return <AdminProjectsContent initialProjects={projectsData.projects} initialemployee={projectsData.employee} />
 }

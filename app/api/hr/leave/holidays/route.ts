@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 
-async function assertHR(supabase: any, userId: string) {
+type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>
+
+async function assertHR(supabase: SupabaseServerClient, userId: string) {
   const { data } = await supabase.from("profiles").select("role").eq("id", userId).single()
   return ["developer", "admin", "super_admin"].includes(data?.role)
 }

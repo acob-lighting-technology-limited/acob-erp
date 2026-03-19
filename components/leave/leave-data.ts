@@ -1,4 +1,4 @@
-import type { LeaveBalance, LeaveRequest, LeaveType } from "@/app/(app)/dashboard/leave/page"
+import type { LeaveBalance, LeaveRequest, LeaveType } from "@/app/(app)/leave/page"
 
 export async function fetchLeaveData(currentUserId: string) {
   const [requestRes, queueRes, typesRes, relieversRes] = await Promise.all([

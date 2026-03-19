@@ -6,6 +6,7 @@ import { logger } from "@/lib/logger"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 
 const log = logger("dev-maintenance")
+export const dynamic = "force-dynamic"
 
 export async function GET() {
   try {

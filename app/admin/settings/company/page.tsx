@@ -34,8 +34,8 @@ export default function CompanySettingsPage() {
     try {
       // Save settings to database
       toast.success("Company settings saved")
-    } catch (error: any) {
-      toast.error(error.message || "Failed to save")
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Failed to save")
     } finally {
       setSaving(false)
     }

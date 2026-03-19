@@ -13,10 +13,11 @@ import { Switch } from "@/components/ui/switch"
 import { toast } from "sonner"
 import { EyeOff } from "lucide-react"
 import { writeAuditLogClient } from "@/lib/audit/client"
+import type { FeedbackRecord } from "@/components/feedback/types"
 
 interface FeedbackFormProps {
   userId: string
-  onFeedbackSubmitted?: (feedback: any) => void
+  onFeedbackSubmitted?: (feedback: FeedbackRecord) => void
   variant?: "card" | "modal"
 }
 
@@ -59,7 +60,7 @@ export function FeedbackForm({ userId, onFeedbackSubmitted, variant = "card" }: 
       // Log audit for all feedback - anonymous ones will show as "Anonymous" in the audit log
       if (data && data.length > 0) {
         await writeAuditLogClient(
-          supabase as any,
+          supabase,
           {
             action: "create",
             entityType: "feedback",

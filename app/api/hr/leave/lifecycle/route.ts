@@ -12,7 +12,9 @@ import { writeAuditLog } from "@/lib/audit/write-audit"
 
 const log = logger("hr-leave-lifecycle")
 
-async function restoreBalance(supabase: any, userId: string, leaveTypeId: string, days: number) {
+type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>
+
+async function restoreBalance(supabase: SupabaseServerClient, userId: string, leaveTypeId: string, days: number) {
   const currentYear = new Date().getUTCFullYear()
 
   const { data: balance } = await supabase

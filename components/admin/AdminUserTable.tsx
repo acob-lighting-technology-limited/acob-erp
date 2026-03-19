@@ -110,7 +110,7 @@ export function AdminUserTable({ users, sortKey, sortDir, onSort, onViewDetails,
                       >
                         <Copy className="h-4 w-4" />
                       </Button>
-                      <Link href={`/signature?userId=${user.id}`} onClick={(e) => e.stopPropagation()}>
+                      <Link href={`/tools/signature?userId=${user.id}`} onClick={(e) => e.stopPropagation()}>
                         <Button variant="ghost" size="sm" aria-label="View signature">
                           <Eye className="h-4 w-4" />
                         </Button>

@@ -29,10 +29,6 @@ import { toast } from "sonner"
 import { EmptyState } from "@/components/ui/patterns"
 import { TableSkeleton } from "@/components/ui/query-states"
 
-import { logger } from "@/lib/logger"
-
-const log = logger("inventory-categories")
-
 interface Category {
   id: string
   name: string
@@ -102,8 +98,8 @@ export default function CategoriesPage() {
       setEditingCategory(null)
       setFormData({ name: "", description: "" })
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminCategories() })
-    } catch (error: any) {
-      toast.error(error.message || "Failed to save category")
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Failed to save category")
     }
   }
 
@@ -114,8 +110,8 @@ export default function CategoriesPage() {
       if (error) throw error
       toast.success("Category deleted")
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminCategories() })
-    } catch (error: any) {
-      toast.error(error.message || "Failed to delete")
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Failed to delete")
     }
   }
 

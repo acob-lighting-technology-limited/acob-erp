@@ -29,7 +29,7 @@ export function EmployeeExportDialog({
   isOpen,
   onOpenChange,
   exportType,
-  setExportType,
+  setExportType: _setExportType,
   selectedColumns,
   setSelectedColumns,
   onConfirm,

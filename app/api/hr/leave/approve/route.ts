@@ -14,13 +14,51 @@ import { writeAuditLog } from "@/lib/audit/write-audit"
 
 const log = logger("hr-leave-approve")
 
+type LeaveRequestStageSnapshot = {
+  stage_order: number
+  approver_role_code: string
+  stage_code: string
+  approver_user_id?: string | null
+}
+
+function normalizeRouteSnapshot(snapshot: LeaveRequestStageSnapshot[]) {
+  return snapshot.filter(
+    (
+      stage
+    ): stage is LeaveRequestStageSnapshot & {
+      approver_user_id: string
+    } => typeof stage.approver_user_id === "string" && stage.approver_user_id.length > 0
+  )
+}
+
+type LeaveRequestApprovalRow = {
+  status: string
+  current_stage_code?: string | null
+  approval_stage?: string | null
+  route_snapshot?: LeaveRequestStageSnapshot[] | null
+  current_stage_order?: number | null
+  current_approver_user_id?: string | null
+  reliever_decision_at?: string | null
+  supervisor_decision_at?: string | null
+  hr_decision_at?: string | null
+  reliever_revision?: number | null
+  user_id: string
+  leave_type_id: string
+  days_count: number
+  start_date: string
+  end_date: string
+  resume_date?: string | null
+  reliever_id?: string | null
+  lead_reconfirm_required?: boolean | null
+}
+
 function normalizeAction(body: { action?: string; status?: string }) {
   if (body.action === "approve" || body.status === "approved") return "approved"
   if (body.action === "reject" || body.status === "rejected") return "rejected"
   return null
 }
 
-function inferCurrentStageCode(leaveRequest: any) {
+function inferCurrentStageCode(leaveRequest: LeaveRequestApprovalRow) {
   return leaveRequest.current_stage_code || leaveRequest.approval_stage
 }
 
@@ -99,17 +137,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Leave request not found" }, { status: 404 })
     }
 
-    if (!["pending", "pending_evidence"].includes(leaveRequest.status)) {
+    const typedLeaveRequest = leaveRequest as LeaveRequestApprovalRow
+
+    if (!["pending", "pending_evidence"].includes(typedLeaveRequest.status)) {
       return NextResponse.json({ error: "Only active requests can be processed" }, { status: 400 })
     }
 
-    const stageCode = inferCurrentStageCode(leaveRequest)
-    const snapshot = Array.isArray(leaveRequest.route_snapshot) ? leaveRequest.route_snapshot : []
+    const stageCode = inferCurrentStageCode(typedLeaveRequest)
+    const snapshot = Array.isArray(typedLeaveRequest.route_snapshot)
+      ? normalizeRouteSnapshot(typedLeaveRequest.route_snapshot)
+      : []
 
-    const currentStageOrder = Number(leaveRequest.current_stage_order || 1)
+    if (!stageCode) {
+      return NextResponse.json({ error: "LEAVE_APPROVER_NOT_CONFIGURED:current_stage_code" }, { status: 400 })
+    }
+
+    const currentStageOrder = Number(typedLeaveRequest.current_stage_order || 1)
     const currentStage = getRouteStageByOrder(snapshot, currentStageOrder)
 
-    const expectedApproverId = leaveRequest.current_approver_user_id || currentStage?.approver_user_id
+    const expectedApproverId = typedLeaveRequest.current_approver_user_id || currentStage?.approver_user_id
     if (!expectedApproverId) {
       return NextResponse.json({ error: "LEAVE_APPROVER_NOT_CONFIGURED:current_stage" }, { status: 400 })
     }
@@ -118,7 +164,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "LEAVE_STAGE_NOT_ASSIGNED_TO_ACTOR" }, { status: 403 })
     }
 
-    if (leaveRequest.status === "pending_evidence" && action === "approved" && !isHRAdmin) {
+    if (typedLeaveRequest.status === "pending_evidence" && action === "approved" && !isHRAdmin) {
       return NextResponse.json({ error: "Request is awaiting evidence verification before approval." }, { status: 400 })
     }
 
@@ -133,13 +179,14 @@ export async function POST(request: NextRequest) {
           current_stage_code: "rejected",
           rejected_reason: comments,
           workflow_rejection_stage: toWorkflowRejectionStage(stageCode),
-          reliever_decision_at: stageCode === stageCodeForRole("reliever") ? now : leaveRequest.reliever_decision_at,
+          reliever_decision_at:
+            stageCode === stageCodeForRole("reliever") ? now : typedLeaveRequest.reliever_decision_at,
           supervisor_decision_at:
-            stageCode === stageCodeForRole("department_lead") ? now : leaveRequest.supervisor_decision_at,
+            stageCode === stageCodeForRole("department_lead") ? now : typedLeaveRequest.supervisor_decision_at,
           hr_decision_at:
             stageCode === stageCodeForRole("admin_hr_lead") || stageCode === stageCodeForRole("hcs")
               ? now
-              : leaveRequest.hr_decision_at,
+              : typedLeaveRequest.hr_decision_at,
         })
         .eq("id", leave_request_id)
 
@@ -157,7 +204,7 @@ export async function POST(request: NextRequest) {
           approved_at: now,
           stage_code: stageCode,
           stage_order: currentStageOrder,
-          reliever_revision: leaveRequest.reliever_revision || 1,
+          reliever_revision: typedLeaveRequest.reliever_revision || 1,
           superseded: false,
         },
         { onConflict: "leave_request_id,approver_id,approval_level" }
@@ -170,23 +217,23 @@ export async function POST(request: NextRequest) {
       }
 
       await notifyUsers(supabaseAdmin, {
-        userIds: [leaveRequest.user_id],
+        userIds: [typedLeaveRequest.user_id],
         title: "Leave request rejected",
         message: `Your leave request was rejected at ${stageCode.replaceAll("_", " ")}. Reason: ${comments}`,
         actorId: user.id,
-        linkUrl: "/dashboard/leave",
+        linkUrl: "/leave",
         entityId: leave_request_id,
         emailEvent: "rejected",
       })
 
       // If a different reliever had already been attached, tell them the commitment is no longer active.
-      if (leaveRequest.reliever_id && leaveRequest.reliever_id !== leaveRequest.user_id) {
+      if (typedLeaveRequest.reliever_id && typedLeaveRequest.reliever_id !== typedLeaveRequest.user_id) {
         await notifyUsers(supabaseAdmin, {
-          userIds: [leaveRequest.reliever_id],
+          userIds: [typedLeaveRequest.reliever_id],
           title: "Reliever commitment released",
           message: "This leave request was rejected, so your reliever commitment for it is no longer active.",
           actorId: user.id,
-          linkUrl: "/dashboard/leave",
+          linkUrl: "/leave",
           entityId: leave_request_id,
           emailEvent: "approval_required",
         })
@@ -218,7 +265,7 @@ export async function POST(request: NextRequest) {
         approved_at: now,
         stage_code: stageCode,
         stage_order: currentStageOrder,
-        reliever_revision: leaveRequest.reliever_revision || 1,
+        reliever_revision: typedLeaveRequest.reliever_revision || 1,
         superseded: false,
       },
       { onConflict: "leave_request_id,approver_id,approval_level" }
@@ -234,7 +281,7 @@ export async function POST(request: NextRequest) {
     const nextStage = getRouteStageByOrder(snapshot, nextStageOrder)
 
     if (!nextStage) {
-      const policy = await getLeavePolicy(supabase, leaveRequest.leave_type_id)
+      const policy = await getLeavePolicy(supabase, typedLeaveRequest.leave_type_id)
       const requiredDocs = policy.required_documents || []
       const evidenceStatus = await areRequiredDocumentsVerified(supabase, leave_request_id, requiredDocs)
 
@@ -278,35 +325,35 @@ export async function POST(request: NextRequest) {
 
       await supabaseAdmin.rpc("update_leave_balance", {
         p_user_id: leaveRequest.user_id,
-        p_leave_type_id: leaveRequest.leave_type_id,
-        p_days: leaveRequest.days_count,
+        p_leave_type_id: typedLeaveRequest.leave_type_id,
+        p_days: typedLeaveRequest.days_count,
       })
 
       await syncAttendanceForApprovedLeave(
         supabaseAdmin,
-        leaveRequest.user_id,
-        leaveRequest.start_date,
-        leaveRequest.end_date,
+        typedLeaveRequest.user_id,
+        typedLeaveRequest.start_date,
+        typedLeaveRequest.end_date,
         "set"
       )
 
       await notifyUsers(supabaseAdmin, {
-        userIds: [leaveRequest.user_id],
+        userIds: [typedLeaveRequest.user_id],
         title: "Leave approved - proceed on leave",
-        message: `${actorName} completed final approval. Start: ${leaveRequest.start_date}, Resume: ${leaveRequest.resume_date}.`,
+        message: `${actorName} completed final approval. Start: ${typedLeaveRequest.start_date}, Resume: ${typedLeaveRequest.resume_date}.`,
         actorId: user.id,
-        linkUrl: "/dashboard/leave",
+        linkUrl: "/leave",
         entityId: leave_request_id,
         emailEvent: "approved",
       })
 
-      if (leaveRequest.reliever_id && leaveRequest.reliever_id !== leaveRequest.user_id) {
+      if (typedLeaveRequest.reliever_id && typedLeaveRequest.reliever_id !== typedLeaveRequest.user_id) {
         await notifyUsers(supabaseAdmin, {
-          userIds: [leaveRequest.reliever_id],
+          userIds: [typedLeaveRequest.reliever_id],
           title: "Reliever commitment is now active",
-          message: `This leave is fully approved (${leaveRequest.start_date} to ${leaveRequest.end_date}). You cannot request overlapping leave during this period.`,
+          message: `This leave is fully approved (${typedLeaveRequest.start_date} to ${typedLeaveRequest.end_date}). You cannot request overlapping leave during this period.`,
           actorId: user.id,
-          linkUrl: "/dashboard/leave",
+          linkUrl: "/leave",
           entityId: leave_request_id,
           emailEvent: "approval_required",
         })
@@ -337,7 +384,7 @@ export async function POST(request: NextRequest) {
       current_stage_order: nextStage.stage_order,
       current_approver_user_id: nextStage.approver_user_id,
       lead_reconfirm_required:
-        stageCode === stageCodeForRole("department_lead") ? false : leaveRequest.lead_reconfirm_required,
+        stageCode === stageCodeForRole("department_lead") ? false : typedLeaveRequest.lead_reconfirm_required,
     }
 
     if (stageCode === stageCodeForRole("reliever")) {
@@ -368,7 +415,7 @@ export async function POST(request: NextRequest) {
       title: `${humanStage(stageCode)} approved your leave request`,
       message: `${actorName} approved at ${humanStage(stageCode)} stage. Next: ${humanStage(nextStage.stage_code)}.`,
       actorId: user.id,
-      linkUrl: "/dashboard/leave",
+      linkUrl: "/leave",
       entityId: leave_request_id,
       emailEvent: "approval_required",
     })
@@ -378,7 +425,7 @@ export async function POST(request: NextRequest) {
       title: "Leave request awaiting your approval",
       message: `A leave request is now waiting at ${nextStage.stage_code.replaceAll("_", " ")}.`,
       actorId: user.id,
-      linkUrl: "/dashboard/leave",
+      linkUrl: "/leave",
       entityId: leave_request_id,
       emailEvent: "approval_required",
     })

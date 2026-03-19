@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { X, Trash2 } from "lucide-react"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
@@ -34,7 +35,7 @@ export function ImageGallery({ images, selectedIndex, onSelect, onRemove, onClea
 
     // Cleanup function
     return () => {
-      thumbnails.forEach((url) => URL.revokeObjectURL(url))
+      newThumbnails.forEach((url) => URL.revokeObjectURL(url))
     }
   }, [images])
 
@@ -76,7 +77,7 @@ export function ImageGallery({ images, selectedIndex, onSelect, onRemove, onClea
                   )}
                 >
                   {thumbnailUrl ? (
-                    <img src={thumbnailUrl} alt={file.name} className="h-full w-full object-cover" />
+                    <Image src={thumbnailUrl} alt={file.name} fill unoptimized className="object-cover" />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center">
                       <span className="text-muted-foreground text-xs">Loading...</span>

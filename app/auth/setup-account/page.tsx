@@ -21,7 +21,6 @@ import { logger } from "@/lib/logger"
 
 const log = logger("auth-setup-account")
 
-
 function SetupAccountContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -70,7 +69,7 @@ function SetupAccountContent() {
     // Also listen for PASSWORD_RECOVERY event (hash fragment / implicit flow)
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
+    } = supabase.auth.onAuthStateChange(async (event, _session) => {
       if (event === "PASSWORD_RECOVERY") {
         setIsRecoveryMode(true)
       }
@@ -175,9 +174,9 @@ function SetupAccountContent() {
       // OTP verified — session is now established, show password form
       setIsRecoveryMode(true)
       toast.success("Code verified! Now create your password.")
-    } catch (err: any) {
+    } catch (err: unknown) {
       log.error("OTP Verification Error:", err)
-      toast.error(err.message || "Invalid or expired code. Please try again.")
+      toast.error(err instanceof Error ? err.message : "Invalid or expired code. Please try again.")
       setOtpDigits(["", "", "", "", "", ""])
       otpRefs.current[0]?.focus()
     } finally {
@@ -224,8 +223,8 @@ function SetupAccountContent() {
       setTimeout(() => {
         router.push("/auth/login")
       }, 2000)
-    } catch (error: any) {
-      toast.error(error.message || "Failed to process request")
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Failed to process request")
     } finally {
       setIsLoading(false)
     }

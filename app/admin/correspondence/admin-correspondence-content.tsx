@@ -32,6 +32,10 @@ interface AdminCorrespondenceContentProps {
   departmentCodes: DepartmentCodeOption[]
 }
 
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback
+}
+
 export function AdminCorrespondenceContent({
   initialRecords,
   employees,
@@ -90,8 +94,8 @@ export function AdminCorrespondenceContent({
 
       toast.success("Responsible officer assigned")
       await refresh()
-    } catch (error: any) {
-      toast.error(error.message || "Failed to assign officer")
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, "Failed to assign officer"))
     } finally {
       setLoadingRecordId(null)
     }
@@ -113,8 +117,8 @@ export function AdminCorrespondenceContent({
 
       toast.success(`Record ${decision.replaceAll("_", " ")}`)
       await refresh()
-    } catch (error: any) {
-      toast.error(error.message || "Failed to apply decision")
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, "Failed to apply decision"))
     } finally {
       setLoadingRecordId(null)
     }
@@ -139,8 +143,8 @@ export function AdminCorrespondenceContent({
 
       toast.success(`Record marked ${finalStatus}`)
       await refresh()
-    } catch (error: any) {
-      toast.error(error.message || "Failed to finalize dispatch")
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, "Failed to finalize dispatch"))
     } finally {
       setLoadingRecordId(null)
     }
@@ -171,8 +175,8 @@ export function AdminCorrespondenceContent({
 
       toast.success("Department code updated")
       setCodeForm({ department_name: "", department_code: "" })
-    } catch (error: any) {
-      toast.error(error.message || "Failed to update department code")
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, "Failed to update department code"))
     }
   }
 

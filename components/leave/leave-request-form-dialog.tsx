@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { SearchableSelect } from "@/components/ui/searchable-select"
 import { Textarea } from "@/components/ui/textarea"
 import { CalendarDays } from "lucide-react"
-import type { LeaveType, LeaveBalance } from "@/app/(app)/dashboard/leave/page"
+import type { LeaveType, LeaveBalance } from "@/app/(app)/leave/page"
 
 function prettyEligibility(status: string) {
   if (status === "eligible") return "Eligible"

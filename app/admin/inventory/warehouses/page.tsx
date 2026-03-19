@@ -29,10 +29,6 @@ import { EmptyState, FormFieldGroup } from "@/components/ui/patterns"
 import { TableSkeleton } from "@/components/ui/query-states"
 import { toast } from "sonner"
 
-import { logger } from "@/lib/logger"
-
-const log = logger("inventory-warehouses")
-
 interface WarehouseData {
   id: string
   name: string
@@ -91,8 +87,8 @@ export default function WarehousesPage() {
       setEditing(null)
       setFormData({ name: "", code: "", address: "", is_active: true })
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminWarehouses() })
-    } catch (error: any) {
-      toast.error(error.message || "Failed to save")
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Failed to save")
     }
   }
 
@@ -103,8 +99,8 @@ export default function WarehousesPage() {
       if (error) throw error
       toast.success("Deleted")
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminWarehouses() })
-    } catch (error: any) {
-      toast.error(error.message)
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Failed to delete")
     }
   }
 

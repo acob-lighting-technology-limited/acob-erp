@@ -3,9 +3,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { FileSignature, MessageSquare, Droplet, CreditCard } from "lucide-react"
 
 const quickActions = [
-  { name: "Email Signature", href: "/signature", icon: FileSignature, description: "Create professional signature" },
+  {
+    name: "Email Signature",
+    href: "/tools/signature",
+    icon: FileSignature,
+    description: "Create professional signature",
+  },
   { name: "Submit Feedback", href: "/feedback", icon: MessageSquare, description: "Share your thoughts" },
-  { name: "Watermark Tool", href: "/watermark", icon: Droplet, description: "Add watermarks to images" },
+  { name: "Watermark Tool", href: "/tools/watermark", icon: Droplet, description: "Add watermarks to images" },
   { name: "Payments", href: "/payments", icon: CreditCard, description: "Manage department payments" },
 ]
 

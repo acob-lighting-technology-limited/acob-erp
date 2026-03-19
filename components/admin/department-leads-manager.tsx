@@ -22,6 +22,7 @@ import { SearchableSelect } from "@/components/ui/searchable-select"
 import { toast } from "sonner"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { applyAssignableStatusFilter } from "@/lib/workforce/assignment-policy"
+import type { PostgrestError } from "@supabase/supabase-js"
 
 interface Department {
   id: string
@@ -102,7 +103,7 @@ export function DepartmentLeadsManager() {
       setIsDialogOpen(false)
       queryClient.invalidateQueries({ queryKey: ["department-leads"] })
     },
-    onError: (error: any) => {
+    onError: (error: PostgrestError | Error) => {
       toast.error(error.message || "Failed to assign lead")
     },
   })

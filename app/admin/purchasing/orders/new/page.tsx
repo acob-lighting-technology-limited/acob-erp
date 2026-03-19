@@ -168,8 +168,8 @@ export default function NewPurchaseOrderPage() {
 
       toast.success(`PO ${poNumber} created!`)
       router.push("/admin/purchasing/orders")
-    } catch (error: any) {
-      toast.error(error.message || "Failed to create")
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Failed to create")
     } finally {
       setSaving(false)
     }

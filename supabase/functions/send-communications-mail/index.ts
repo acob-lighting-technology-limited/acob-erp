@@ -18,11 +18,48 @@ const SEND_INTERVAL_MS = Math.ceil(1000 / RESEND_MAX_REQ_PER_SEC) + 100
 const MAX_429_RETRIES = 5
 const DEFAULT_SENDER = "ACOB Internal Systems <notifications@acoblighting.com>"
 
+type RateLimitErrorLike = {
+  statusCode?: number | string
+  status?: number | string
+  name?: string
+  message?: string
+}
+
+type SendEmailResponse = {
+  data?: { id?: string | null } | null
+  error?: { message?: string | null } | null
+}
+
+type BroadcastRequestBody = {
+  recipients?: string[]
+  broadcastSubject?: string
+  broadcastBodyHtml?: string
+  broadcastDepartment?: string
+  broadcastPreparedByName?: string
+  requestedByUserId?: string
+}
+
+type DeliveryResult = {
+  to: string
+  success: boolean
+  emailId?: string | null
+  error?: unknown
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message
+  if (typeof error === "object" && error !== null && "message" in error) {
+    const message = (error as { message?: unknown }).message
+    if (typeof message === "string") return message
+  }
+  return "Unknown error"
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-function isRateLimitError(error: any): boolean {
+function isRateLimitError(error: RateLimitErrorLike | null | undefined): boolean {
   if (!error) return false
   const statusCode = Number(error?.statusCode || error?.status || 0)
   const name = String(error?.name || "").toLowerCase()
@@ -36,7 +73,7 @@ async function sendWithRetry(
   to: string,
   subject: string,
   html: string
-): Promise<{ data?: any; error?: any }> {
+): Promise<SendEmailResponse> {
   let attempt = 0
   while (attempt <= MAX_429_RETRIES) {
     const { data, error } = await resend.emails.send({
@@ -153,14 +190,14 @@ serve(async (req) => {
 
     const resend = new Resend(RESEND_API_KEY)
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
-    const communicationsMailEnabled = await isEdgeSystemEmailEnabled(supabase as any, "communications")
+    const communicationsMailEnabled = await isEdgeSystemEmailEnabled(supabase, "communications")
     if (!communicationsMailEnabled) {
       return new Response(JSON.stringify({ success: true, skipped: true, reason: "communications_email_disabled" }), {
         status: 200,
       })
     }
 
-    const body = await req.json()
+    const body = (await req.json()) as BroadcastRequestBody
 
     const recipients = body.recipients as string[] | undefined
     const broadcastSubject = body.broadcastSubject as string | undefined
@@ -189,7 +226,7 @@ serve(async (req) => {
 
     console.log("[communications-mail] Sending admin_broadcast to " + recipients.length + " recipients")
 
-    const results: any[] = []
+    const results: DeliveryResult[] = []
     for (const to of recipients) {
       const { data, error } = await sendWithRetry(resend, from, to, subject, html)
       if (error) {
@@ -204,10 +241,10 @@ serve(async (req) => {
     }
 
     try {
-      const successCount = results.filter((r: any) => r.success).length
+      const successCount = results.filter((r) => r.success).length
       const failureCount = results.length - successCount
       const auditEntityId = crypto.randomUUID()
-      await writeEdgeAuditLog(supabase as any, {
+      await writeEdgeAuditLog(supabase, {
         action: "communications_broadcast_sent",
         entityType: "communications_mail",
         entityId: auditEntityId,
@@ -232,9 +269,9 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     })
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("[send-communications-mail] Error:", err)
-    return new Response(JSON.stringify({ error: err.message }), {
+    return new Response(JSON.stringify({ error: getErrorMessage(err) }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,
     })

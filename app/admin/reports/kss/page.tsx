@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import { applyAssignableStatusFilter } from "@/lib/workforce/assignment-policy"
+import { isAssignableEmploymentStatus } from "@/lib/workforce/assignment-policy"
 import { KssRosterTable } from "@/components/reports/kss-roster-table"
 
 export default async function AdminKssPage() {
@@ -23,14 +23,18 @@ export default async function AdminKssPage() {
   const isAllowed = ["developer", "super_admin", "admin"].includes(role) || profile?.is_department_lead === true
   if (!isAllowed) redirect("/admin/reports")
 
-  const { data: employees } = await applyAssignableStatusFilter(
-    supabase.from("profiles").select("id, full_name, department, employment_status").order("full_name"),
-    { allowLegacyNullStatus: false }
+  const { data: employees } = await supabase
+    .from("profiles")
+    .select("id, full_name, department, employment_status")
+    .order("full_name")
+
+  const assignableEmployees = (employees || []).filter((employee) =>
+    isAssignableEmploymentStatus(employee.employment_status, { allowLegacyNullStatus: false })
   )
 
   return (
     <KssRosterTable
-      employees={(employees || []).map((e: { id: string; full_name: string; department: string | null }) => ({
+      employees={assignableEmployees.map((e: { id: string; full_name: string; department: string | null }) => ({
         id: e.id,
         full_name: e.full_name,
         department: e.department,

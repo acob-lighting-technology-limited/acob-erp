@@ -142,6 +142,31 @@ interface AssetAssignment {
   }
 }
 
+type AssignableAsset = {
+  status: string
+  assignment_type?: string
+  department?: string
+  office_location?: string
+  current_assignment?: {
+    assigned_to?: string
+    department?: string
+    office_location?: string
+    assignment_type?: string
+    user?: {
+      first_name: string
+      last_name: string
+    }
+  }
+}
+
+type ProfileNameRow = {
+  id: string
+  first_name?: string | null
+  last_name?: string | null
+}
+
+type SortableValue = string | number
+
 interface AssetActivity {
   id: string
   timestamp: string
@@ -335,7 +360,7 @@ export function AdminAssetsContent({
     assigned_at: "",
   })
 
-  const [currentAssignment, setCurrentAssignment] = useState<AssetAssignment | null>(null)
+  const [currentAssignment] = useState<AssetAssignment | null>(null)
 
   const supabase = createClient()
   const scopedDepartments = userProfile.managed_departments ?? userProfile.lead_departments ?? []
@@ -415,9 +440,10 @@ export function AdminAssetsContent({
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminAssetTypes() })
       // Auto-select the newly created asset type
       setAssetForm({ ...assetForm, asset_type: code })
-    } catch (error: any) {
+    } catch (error: unknown) {
       log.error("Error creating asset type:", error)
-      toast.error("Failed to create asset type: " + (error.message || "Unknown error"))
+      const message = error instanceof Error ? error.message : "Unknown error"
+      toast.error("Failed to create asset type: " + message)
     } finally {
       setIsCreatingAssetType(false)
     }
@@ -439,61 +465,11 @@ export function AdminAssetsContent({
       const payload = (await response.json()) as { assets: Asset[]; employees: Employee[] }
       setAssets(payload.assets || [])
       setEmployees(payload.employees || [])
-    } catch (error: any) {
+    } catch (error: unknown) {
       log.error("Error loading data:", error)
       toast.error("Failed to refresh data")
     } finally {
       setIsLoading(false)
-    }
-  }
-
-  const loadCurrentAssignment = async (assetId: string) => {
-    try {
-      // Get asset to check assignment type and status
-      const { data: assetData } = await supabase
-        .from("assets")
-        .select("assignment_type, department, status")
-        .eq("id", assetId)
-        .single()
-
-      // If asset status is not "assigned" or "retired" or "maintenance", we still want to load the PREVIOUS assignment for the details view
-      const { data, error } = await supabase
-        .from("asset_assignments")
-        .select(
-          "id, assigned_to, assigned_at, handed_over_at, is_current, department, office_location, assignment_type, handover_notes"
-        )
-        .eq("asset_id", assetId)
-        .order("assigned_at", { ascending: false })
-        .limit(1)
-        .maybeSingle()
-
-      if (error && error.code !== "PGRST116") throw error
-
-      if (data) {
-        if (data.assigned_to) {
-          // Fetch user details separately
-          const { data: userProfile } = await supabase
-            .from("profiles")
-            .select("first_name, last_name")
-            .eq("id", data.assigned_to)
-            .single()
-
-          setCurrentAssignment({
-            ...data,
-            user: userProfile,
-          } as any)
-        } else if (data.department) {
-          setCurrentAssignment({
-            ...data,
-            department: data.department,
-          } as any)
-        }
-      } else {
-        setCurrentAssignment(null)
-      }
-    } catch (error) {
-      log.error("Error loading assignment:", error)
-      setCurrentAssignment(null)
     }
   }
 
@@ -541,13 +517,13 @@ export function AdminAssetsContent({
         if (l.user_id) userIds.add(l.user_id)
       })
 
-      let usersMap = new Map()
+      let usersMap = new Map<string, ProfileNameRow>()
       if (userIds.size > 0) {
         const { data: usersData } = await supabase
           .from("profiles")
           .select("id, first_name, last_name")
           .in("id", Array.from(userIds))
-        if (usersData) usersMap = new Map(usersData.map((u: any) => [u.id, u]))
+        if (usersData) usersMap = new Map((usersData as ProfileNameRow[]).map((u) => [u.id, u] as const))
       }
 
       const getUName = (id: string | null | undefined) => {
@@ -641,9 +617,10 @@ export function AdminAssetsContent({
       setAssetHistory(activities)
       setSelectedAsset(asset)
       setIsHistoryOpen(true)
-    } catch (error: any) {
+    } catch (error: unknown) {
       log.error("Error loading asset history:", error)
-      toast.error(`Failed to load history: ${error.message}`)
+      const message = error instanceof Error ? error.message : "Unknown error"
+      toast.error(`Failed to load history: ${message}`)
     }
   }
 
@@ -657,7 +634,7 @@ export function AdminAssetsContent({
 
       if (error) throw error
       setAssetIssues(data || [])
-    } catch (error: any) {
+    } catch (error: unknown) {
       log.error("Error loading asset issues:", error)
       toast.error("Failed to load asset issues")
     }
@@ -688,7 +665,7 @@ export function AdminAssetsContent({
       setNewIssueDescription("")
       await loadAssetIssues(selectedAsset.id)
       await loadData() // Refresh to update issue counts
-    } catch (error: any) {
+    } catch (error: unknown) {
       log.error("Error adding issue:", error)
       toast.error("Failed to add issue")
     } finally {
@@ -707,7 +684,7 @@ export function AdminAssetsContent({
         await loadAssetIssues(selectedAsset.id)
       }
       await loadData() // Refresh to update issue counts
-    } catch (error: any) {
+    } catch (error: unknown) {
       log.error("Error toggling issue:", error)
       toast.error("Failed to update issue")
     }
@@ -724,7 +701,7 @@ export function AdminAssetsContent({
         await loadAssetIssues(selectedAsset.id)
       }
       await loadData() // Refresh to update issue counts
-    } catch (error: any) {
+    } catch (error: unknown) {
       log.error("Error deleting issue:", error)
       toast.error("Failed to delete issue")
     }
@@ -908,46 +885,13 @@ export function AdminAssetsContent({
 
       setIsAssetDialogOpen(false)
       loadData()
-    } catch (error: any) {
+    } catch (error: unknown) {
       log.error("Error saving asset:", error)
-      toast.error(`Failed to save asset: ${error.message}`)
+      const message = error instanceof Error ? error.message : "Unknown error"
+      toast.error(`Failed to save asset: ${message}`)
     } finally {
       setIsSaving(false)
     }
-  }
-
-  // Helper to construct assignment data from form
-  const getAssignmentData = (assetId: string, userId: string) => {
-    if (assetForm.assignment_type === "individual" && !assetForm.assigned_to) {
-      return { success: false, error: "Please select a user" } as const
-    }
-    if (assetForm.assignment_type === "department" && !assetForm.assignment_department) {
-      return { success: false, error: "Please select a department" } as const
-    }
-    if (assetForm.assignment_type === "office" && !assetForm.office_location) {
-      return { success: false, error: "Please select an office location" } as const
-    }
-
-    const data: any = {
-      asset_id: assetId,
-      assigned_by: assetForm.assigned_by || userId,
-      assigned_at: assetForm.assigned_at ? new Date(assetForm.assigned_at).toISOString() : new Date().toISOString(),
-      is_current: true,
-      assignment_notes: assetForm.assignment_notes || null,
-      assignment_type: assetForm.assignment_type,
-    }
-
-    if (assetForm.assignment_type === "individual") {
-      data.assigned_to = assetForm.assigned_to
-      const profile = employees.find((e) => e.id === assetForm.assigned_to)
-      if (profile) data.department = profile.department
-    } else if (assetForm.assignment_type === "department") {
-      data.department = assetForm.assignment_department
-    } else if (assetForm.assignment_type === "office") {
-      data.office_location = assetForm.office_location
-    }
-
-    return { success: true, data } as const
   }
 
   const handleAssignAsset = async () => {
@@ -1001,9 +945,10 @@ export function AdminAssetsContent({
       toast.success("Asset reassigned successfully")
       setIsAssignDialogOpen(false)
       loadData()
-    } catch (error: any) {
+    } catch (error: unknown) {
       log.error("Error assigning asset:", error)
-      toast.error(`Failed: ${error.message}`)
+      const message = error instanceof Error ? error.message : "Unknown error"
+      toast.error(`Failed: ${message}`)
     } finally {
       setIsAssigning(false)
     }
@@ -1064,9 +1009,9 @@ export function AdminAssetsContent({
       setIsDeleteDialogOpen(false)
       setAssetToDelete(null)
       loadData()
-    } catch (error: any) {
+    } catch (error: unknown) {
       log.error("Error archiving asset:", error)
-      const errorMessage = error?.message || error?.toString() || "Failed to archive asset"
+      const errorMessage = error instanceof Error ? error.message : "Failed to archive asset"
       toast.error(`Failed to archive asset: ${errorMessage}`)
     } finally {
       setIsDeleting(false)
@@ -1090,9 +1035,10 @@ export function AdminAssetsContent({
       if (error) throw error
       toast.success("Asset restored successfully")
       await loadData()
-    } catch (error: any) {
+    } catch (error: unknown) {
       log.error("Error restoring asset:", error)
-      toast.error(`Failed to restore asset: ${error?.message || "Unknown error"}`)
+      const message = error instanceof Error ? error.message : "Unknown error"
+      toast.error(`Failed to restore asset: ${message}`)
     } finally {
       setIsDeleting(false)
     }
@@ -1107,10 +1053,10 @@ export function AdminAssetsContent({
     setSortConfig({ key, direction })
   }
 
-  const getEffectiveAssignmentType = (asset: Asset) =>
+  const getEffectiveAssignmentType = (asset: AssignableAsset) =>
     (asset.current_assignment?.assignment_type || asset.assignment_type || "").toLowerCase()
 
-  const getAssignedPersonName = (asset: Asset) => {
+  const getAssignedPersonName = (asset: AssignableAsset) => {
     const assignedId = asset.current_assignment?.assigned_to
     if (!assignedId) return null
 
@@ -1123,7 +1069,7 @@ export function AdminAssetsContent({
     return fullName || "Assigned User"
   }
 
-  const getAssignedToLabel = (asset: Asset, withStatusSuffix = false) => {
+  const getAssignedToLabel = (asset: AssignableAsset, withStatusSuffix = false) => {
     const isAssignedLike = asset.status === "assigned" || asset.status === "retired" || asset.status === "maintenance"
     if (!isAssignedLike) return "Unassigned"
 
@@ -1150,8 +1096,8 @@ export function AdminAssetsContent({
     if (!sortConfig) return assetsToSort
 
     const sorted = [...assetsToSort].sort((a, b) => {
-      let aValue: any
-      let bValue: any
+      let aValue: SortableValue
+      let bValue: SortableValue
 
       switch (sortConfig.key) {
         case "unique_code":
@@ -1206,8 +1152,7 @@ export function AdminAssetsContent({
     const rows = buildAssetExportRows(
       getSortedAssets(filteredAssets),
       { selectedColumns, employees, getDepartmentForOffice },
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (asset, withStatus) => getAssignedToLabel(asset as any, withStatus)
+      (asset, withStatus) => getAssignedToLabel(asset, withStatus)
     )
     const filename = `assets-export-${new Date().toISOString().split("T")[0]}`
     if (exportType === "excel") await exportAssetsToExcel(rows, filename)
@@ -1543,7 +1488,8 @@ export function AdminAssetsContent({
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will archive "{assetToDelete?.unique_code}" ({ASSET_TYPE_MAP[assetToDelete?.asset_type || ""]?.label}
+              This will archive &quot;{assetToDelete?.unique_code}&quot; (
+              {ASSET_TYPE_MAP[assetToDelete?.asset_type || ""]?.label}
               ). Archived assets are recoverable and not permanently deleted.
             </AlertDialogDescription>
           </AlertDialogHeader>

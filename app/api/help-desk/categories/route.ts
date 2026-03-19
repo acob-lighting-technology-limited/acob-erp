@@ -4,6 +4,35 @@ import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { logger } from "@/lib/logger"
 
 const log = logger("help-desk-categories")
+export const dynamic = "force-dynamic"
+
+type ErrorWithCode = {
+  code?: string
+  message?: string
+  details?: string
+  hint?: string
+}
+
+type ProfileDepartmentRow = {
+  department: string | null
+}
+
+type DepartmentRow = {
+  name: string | null
+}
+
+type HelpDeskCategoryRow = {
+  id: string
+  service_department: string | null
+  request_type: string | null
+  code: string | null
+  name: string | null
+  description: string | null
+  support_mode: string | null
+  is_active: boolean
+}
+
+type LegacyHelpDeskCategoryRow = Omit<HelpDeskCategoryRow, "support_mode" | "is_active">
 
 function describeError(error: unknown): string {
   if (error instanceof Error) return error.message
@@ -24,7 +53,7 @@ function describeError(error: unknown): string {
 export async function GET() {
   try {
     const supabase = await createClient()
-    const dataClient = getServiceRoleClientOrFallback(supabase as any)
+    const dataClient = getServiceRoleClientOrFallback(supabase)
     const {
       data: { user },
     } = await supabase.auth.getUser()
@@ -40,9 +69,9 @@ export async function GET() {
       ])
 
     if (profilesError) throw profilesError
-    if (departmentsError && (departmentsError as any).code !== "42703") throw departmentsError
+    if (departmentsError && (departmentsError as ErrorWithCode).code !== "42703") throw departmentsError
 
-    let data: any[] = []
+    let data: HelpDeskCategoryRow[] = []
     const { data: categoryRows, error: categoriesError } = await dataClient
       .from("help_desk_categories")
       .select("id, service_department, request_type, code, name, description, support_mode, is_active")
@@ -51,9 +80,9 @@ export async function GET() {
       .order("name")
 
     if (!categoriesError) {
-      data = categoryRows || []
+      data = (categoryRows as HelpDeskCategoryRow[] | null) || []
     } else {
-      const errCode = (categoriesError as any)?.code
+      const errCode = (categoriesError as ErrorWithCode)?.code
 
       if (errCode === "42P01") {
         data = []
@@ -65,11 +94,15 @@ export async function GET() {
           .order("name")
 
         if (legacyError) {
-          const legacyCode = (legacyError as any)?.code
+          const legacyCode = (legacyError as ErrorWithCode)?.code
           if (legacyCode !== "42P01") throw legacyError
           data = []
         } else {
-          data = (legacyRows || []).map((row: any) => ({ ...row, support_mode: null, is_active: true }))
+          data = ((legacyRows as LegacyHelpDeskCategoryRow[] | null) || []).map((row) => ({
+            ...row,
+            support_mode: null,
+            is_active: true,
+          }))
         }
       } else {
         throw categoriesError
@@ -77,10 +110,14 @@ export async function GET() {
     }
 
     const departments = Array.from(
-      new Set((profileDepartments || []).map((row: any) => String(row.department || "").trim()).filter(Boolean))
+      new Set(
+        ((profileDepartments as ProfileDepartmentRow[] | null) || [])
+          .map((row) => String(row.department || "").trim())
+          .filter(Boolean)
+      )
     )
-    for (const row of departmentRows || []) {
-      const name = String((row as any)?.name || "").trim()
+    for (const row of (departmentRows as DepartmentRow[] | null) || []) {
+      const name = String(row.name || "").trim()
       if (name) departments.push(name)
     }
     const uniqueDepartments = Array.from(new Set(departments)).sort()

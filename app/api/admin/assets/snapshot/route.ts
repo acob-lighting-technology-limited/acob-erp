@@ -4,6 +4,36 @@ import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
 import { listAssignableProfiles } from "@/lib/workforce/assignment-policy"
 
+type AdminAssetsSnapshotClient = Awaited<ReturnType<typeof createClient>>
+
+type AssetAssignmentRow = {
+  asset_id: string
+  assigned_to?: string | null
+  department?: string | null
+  office_location?: string | null
+  assignment_type?: string | null
+}
+
+type AssignmentUserRow = {
+  id: string
+  first_name?: string | null
+  last_name?: string | null
+  department?: string | null
+}
+
+type AssetIssueRow = {
+  asset_id: string
+  resolved?: boolean | null
+}
+
+type EmployeeRow = {
+  id: string
+}
+
+type AssetRow = {
+  id: string
+}
+
 export async function GET() {
   const supabase = await createClient()
   const {
@@ -15,14 +45,14 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  const scope = await resolveAdminScope(supabase as any, user.id)
+  const scope = await resolveAdminScope(supabase as AdminAssetsSnapshotClient, user.id)
   if (!scope) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
 
   const departmentScope = getDepartmentScope(scope, "general")
 
-  const dataClient = getServiceRoleClientOrFallback(supabase as any)
+  const dataClient = getServiceRoleClientOrFallback(supabase as AdminAssetsSnapshotClient)
 
   let { data: assetsData, error: assetsError } = await dataClient
     .from("assets")
@@ -44,9 +74,9 @@ export async function GET() {
     .select("asset_id, assigned_to, department, office_location, assignment_type")
     .eq("is_current", true)
 
-  const assignedUserIds = (assignmentsData || []).map((a: any) => a.assigned_to).filter(Boolean)
+  const assignedUserIds = ((assignmentsData || []) as AssetAssignmentRow[]).map((a) => a.assigned_to).filter(Boolean)
 
-  let assignmentUsersMap = new Map<string, any>()
+  let assignmentUsersMap = new Map<string, AssignmentUserRow>()
   if (assignedUserIds.length > 0) {
     const { data: usersData } = await dataClient
       .from("profiles")
@@ -66,7 +96,7 @@ export async function GET() {
   const { data: issuesData } = await dataClient.from("asset_issues").select("asset_id, resolved")
 
   const issueCountsByAsset: Record<string, number> = {}
-  ;(issuesData || []).forEach((issue: any) => {
+  ;((issuesData || []) as AssetIssueRow[]).forEach((issue) => {
     if (!issue.resolved) {
       issueCountsByAsset[issue.asset_id] = (issueCountsByAsset[issue.asset_id] || 0) + 1
     }
@@ -74,9 +104,11 @@ export async function GET() {
 
   let filteredAssets = assetsData || []
   if (departmentScope) {
-    const deptUserIds = employees.map((s: any) => s.id)
-    filteredAssets = filteredAssets.filter((asset: any) => {
-      const assignment = (assignmentsData || []).find((a: any) => a.asset_id === asset.id)
+    const deptUserIds = (employees as EmployeeRow[]).map((s) => s.id)
+    filteredAssets = filteredAssets.filter((asset) => {
+      const assignment = ((assignmentsData || []) as AssetAssignmentRow[]).find(
+        (a) => a.asset_id === (asset as AssetRow).id
+      )
       if (!assignment) return false
 
       if (assignment.assigned_to && deptUserIds.includes(assignment.assigned_to)) return true
@@ -86,8 +118,8 @@ export async function GET() {
     })
   }
 
-  const assets = filteredAssets.map((asset: any) => {
-    const assignment = (assignmentsData || []).find((a: any) => a.asset_id === asset.id)
+  const assets = (filteredAssets as AssetRow[]).map((asset) => {
+    const assignment = ((assignmentsData || []) as AssetAssignmentRow[]).find((a) => a.asset_id === asset.id)
     return {
       ...asset,
       current_assignment: assignment

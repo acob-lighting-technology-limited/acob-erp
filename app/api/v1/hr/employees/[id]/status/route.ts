@@ -11,6 +11,8 @@ const log = logger("v1-hr-employees-status")
 // Force dynamic rendering to allow cookies/auth
 export const dynamic = "force-dynamic"
 
+type EmployeeStatusClient = Awaited<ReturnType<typeof createClient>>
+
 interface StatusUpdateBody {
   status: EmploymentStatus
   reason?: string
@@ -35,7 +37,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const scope = await resolveAdminScope(supabase as any, user.id)
+    const scope = await resolveAdminScope(supabase as EmployeeStatusClient, user.id)
     if (!scope || !canAccessAdminSection(scope, "hr")) {
       return NextResponse.json({ error: "Forbidden - Admin access required" }, { status: 403 })
     }
@@ -157,7 +159,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
 
     await writeAuditLog(
-      supabase as any,
+      supabase as EmployeeStatusClient,
       {
         action: "status_change",
         entityType: "profile",

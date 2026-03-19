@@ -5,6 +5,33 @@ import { writeAuditLog } from "@/lib/audit/write-audit"
 
 const log = logger("hr-leave-flow")
 
+type LeaveApproverRoleInput = {
+  code: string
+  name?: string | null
+  description?: string | null
+  resolution_mode?: string | null
+  resolution_config?: Record<string, unknown> | null
+  is_active?: boolean | null
+}
+
+type LeaveApprovalRouteInput = {
+  requester_kind: string
+  stage_order: number
+  approver_role_code: string
+  is_active?: boolean | null
+}
+
+type LeaveApproverAssignmentInput = {
+  approver_role_code: string
+  user_id: string
+  scope_type?: string | null
+  scope_value?: string | null
+  effective_from?: string | null
+  effective_to?: string | null
+  is_active?: boolean | null
+  is_primary?: boolean | null
+}
+
 function canViewFlow(role?: string | null) {
   return ["developer", "super_admin", "admin"].includes(role || "")
 }
@@ -76,7 +103,7 @@ export async function POST(request: NextRequest) {
     const { roles, routes, assignments } = body || {}
 
     if (Array.isArray(roles) && roles.length) {
-      const payload = roles.map((row: any) => ({
+      const payload = (roles as LeaveApproverRoleInput[]).map((row) => ({
         code: String(row.code),
         name: String(row.name || row.code),
         description: row.description || null,
@@ -89,7 +116,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (Array.isArray(routes) && routes.length) {
-      const payload = routes.map((row: any) => ({
+      const payload = (routes as LeaveApprovalRouteInput[]).map((row) => ({
         requester_kind: String(row.requester_kind),
         stage_order: Number(row.stage_order),
         approver_role_code: String(row.approver_role_code),
@@ -103,7 +130,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (Array.isArray(assignments) && assignments.length) {
-      const payload = assignments.map((row: any) => ({
+      const payload = (assignments as LeaveApproverAssignmentInput[]).map((row) => ({
         approver_role_code: String(row.approver_role_code),
         user_id: String(row.user_id),
         scope_type: row.scope_type || "global",

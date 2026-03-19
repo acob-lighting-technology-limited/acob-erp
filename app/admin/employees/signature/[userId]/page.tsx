@@ -15,9 +15,9 @@ export default async function AdminemployeeSignaturePage({ params }: { params: {
     redirect("/auth/login")
   }
 
-  const scope = await resolveAdminScope(supabase as any, data.user.id)
+  const scope = await resolveAdminScope(supabase, data.user.id)
   if (!scope) {
-    redirect("/dashboard")
+    redirect("/profile")
   }
 
   // Fetch the target user's profile

@@ -7,7 +7,7 @@ import { z } from "zod"
 import { useQuery } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { createClient } from "@/lib/supabase/client"
-import { Loader2, CheckCircle2, User, Building2, MapPin, Mail, Phone, Briefcase } from "lucide-react"
+import { Loader2, CheckCircle2, User, MapPin, Mail, Phone, Briefcase } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import Link from "next/link"
+import Image from "next/image"
 import { PageHeader } from "@/components/layout/page-header"
 
 import { logger } from "@/lib/logger"
@@ -127,10 +128,10 @@ export default function EmployeeOnboardingForm() {
       toast.success("Application Submitted", {
         description: "Your details have been sent to HR for review.",
       })
-    } catch (error: any) {
+    } catch (error: unknown) {
       log.error("Submission Error:", error)
       toast.error("Submission Failed", {
-        description: error.message || "An unexpected error occurred.",
+        description: error instanceof Error ? error.message : "An unexpected error occurred.",
       })
     } finally {
       setIsSubmitting(false)
@@ -164,16 +165,22 @@ export default function EmployeeOnboardingForm() {
       <div className="mx-auto max-w-4xl">
         <div className="mb-12 space-y-4 text-center">
           <div className="mb-6 flex justify-center">
-            <img
+            <Image
               src="/images/logo-dark-2.png"
               alt="ACOB Lighting"
+              width={160}
+              height={56}
               className="block h-14 dark:hidden"
+              unoptimized
               onError={(e) => (e.currentTarget.style.display = "none")}
             />
-            <img
+            <Image
               src="/images/logo-dark-2.png"
               alt="ACOB Lighting"
+              width={160}
+              height={56}
               className="hidden h-14 brightness-0 invert dark:block"
+              unoptimized
               onError={(e) => (e.currentTarget.style.display = "none")}
             />
           </div>

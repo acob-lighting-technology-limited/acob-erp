@@ -9,14 +9,15 @@ import { Card, CardContent } from "@/components/ui/card"
 import { ArrowLeft } from "lucide-react"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { PageLoader } from "@/components/ui/query-states"
+import type { Database } from "@/types/database"
 
-import { logger } from "@/lib/logger"
-
-const log = logger("profile-edit")
+type ProfileRecord = Database["public"]["Tables"]["profiles"]["Row"] & {
+  email_notifications?: boolean | null
+}
 
 interface ProfileEditData {
   user: { id: string; email: string | undefined }
-  profile: Record<string, unknown>
+  profile: ProfileRecord | null
 }
 
 async function fetchProfileEditData(supabase: ReturnType<typeof createClient>): Promise<ProfileEditData> {
@@ -56,10 +57,10 @@ async function fetchProfileEditData(supabase: ReturnType<typeof createClient>): 
       .single()
 
     if (insertError) throw new Error(insertError.message)
-    return { user: { id: authUser.id, email: authUser.email ?? undefined }, profile: newProfile }
+    return { user: { id: authUser.id, email: authUser.email ?? undefined }, profile: newProfile as ProfileRecord }
   }
 
-  return { user: { id: authUser.id, email: authUser.email ?? undefined }, profile: profileData }
+  return { user: { id: authUser.id, email: authUser.email ?? undefined }, profile: profileData as ProfileRecord }
 }
 
 export default function EditProfilePage() {

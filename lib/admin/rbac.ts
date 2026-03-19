@@ -229,7 +229,7 @@ export async function requireAdminSectionAccess(section: AdminSection): Promise<
   if (error || !user) redirect("/auth/login")
 
   const scope = await resolveAdminScope(supabase, user.id)
-  if (!scope) redirect("/dashboard")
+  if (!scope) redirect("/profile")
   if (!canAccessAdminSection(scope, section)) redirect("/admin")
 
   return scope

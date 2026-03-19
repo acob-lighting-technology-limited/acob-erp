@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
-import { PageLoader, QueryError, EmptyState as QEmptyState } from "@/components/ui/query-states"
+import { PageLoader, EmptyState as QEmptyState } from "@/components/ui/query-states"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { DollarSign, CreditCard, Clock, CheckCircle, AlertCircle, Package, ShoppingCart } from "lucide-react"
@@ -20,7 +20,17 @@ interface FinanceStats {
   overduePayments: number
 }
 
-async function fetchPayments(): Promise<any[]> {
+interface FinancePayment {
+  id: string
+  title?: string | null
+  category?: string | null
+  currency?: string | null
+  status: string
+  amount?: number | null
+  payment_type?: string | null
+}
+
+async function fetchPayments(): Promise<FinancePayment[]> {
   const response = await fetch("/api/payments")
   if (!response.ok) throw new Error("Failed to load finance data")
   const payload = await response.json()
@@ -32,7 +42,6 @@ export function FinanceDashboardContent() {
     data: allPayments = [],
     isLoading: loading,
     isError,
-    refetch,
   } = useQuery({
     queryKey: QUERY_KEYS.payments(),
     queryFn: fetchPayments,
@@ -40,19 +49,20 @@ export function FinanceDashboardContent() {
 
   const stats: FinanceStats = {
     totalPayments: allPayments.length,
-    pendingPayments: allPayments.filter((p: any) => p.status === "pending" || p.status === "due").length,
-    paidPayments: allPayments.filter((p: any) => p.status === "paid").length,
-    totalAmount: allPayments.reduce((sum: number, p: any) => sum + (p.amount || 0), 0),
-    recurringPayments: allPayments.filter((p: any) => p.payment_type === "recurring").length,
-    overduePayments: allPayments.filter((p: any) => p.status === "overdue").length,
+    pendingPayments: allPayments.filter((p) => p.status === "pending" || p.status === "due").length,
+    paidPayments: allPayments.filter((p) => p.status === "paid").length,
+    totalAmount: allPayments.reduce((sum, p) => sum + (p.amount || 0), 0),
+    recurringPayments: allPayments.filter((p) => p.payment_type === "recurring").length,
+    overduePayments: allPayments.filter((p) => p.status === "overdue").length,
   }
 
   const recentPayments = allPayments.slice(0, 5)
 
-  function formatCurrency(amount: number, currency: string = "NGN") {
+  function formatCurrency(amount: number, currency: string | null = "NGN") {
+    const safeCurrency = currency || "NGN"
     return new Intl.NumberFormat("en-NG", {
       style: "currency",
-      currency: currency,
+      currency: safeCurrency,
     }).format(amount)
   }
 

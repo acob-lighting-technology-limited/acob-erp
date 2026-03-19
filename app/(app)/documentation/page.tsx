@@ -35,7 +35,7 @@ export default async function DocumentationPage() {
         title="Documentation"
         description="Access internal knowledge docs and department file repository"
         icon={FileText}
-        backLink={{ href: "/dashboard/profile", label: "Back to Dashboard" }}
+        backLink={{ href: "/profile", label: "Back to Home" }}
       />
 
       <Section title="Documentation Sections">
@@ -61,7 +61,7 @@ export default async function DocumentationPage() {
                 <FolderOpen className="h-5 w-5" />
                 Department Documents
               </CardTitle>
-              <CardDescription>Browse your department's confidential OneDrive files.</CardDescription>
+              <CardDescription>Browse your department&apos;s confidential OneDrive files.</CardDescription>
             </CardHeader>
             <CardContent>
               <Link href="/documentation/department-documents">

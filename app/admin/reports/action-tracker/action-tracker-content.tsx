@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import { useSearchParams } from "next/navigation"
-import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
 import { getCurrentOfficeWeek } from "@/lib/meeting-week"
 import { toast } from "sonner"

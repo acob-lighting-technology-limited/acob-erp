@@ -24,6 +24,17 @@ export interface ProductFields {
   updated_at?: string
 }
 
+type ProductRow = ProductFields & {
+  id: string
+  created_at: string
+  updated_at: string
+}
+type ProductWithCategoryRow = ProductRow & {
+  category?: {
+    name: string | null
+  } | null
+}
+
 /**
  * Service for managing products in the inventory module.
  */
@@ -51,9 +62,9 @@ export class ProductService extends BaseService {
       throw error
     }
 
-    return (data || []).map((p: any) => ({
-      ...p,
-      category_name: p.category?.name,
+    return ((data || []) as ProductWithCategoryRow[]).map((product) => ({
+      ...product,
+      category_name: product.category?.name,
     }))
   }
 
@@ -66,7 +77,7 @@ export class ProductService extends BaseService {
     const { data, error } = await supabase.from(this.tableName).select("*")
 
     if (error) throw error
-    return (data || []).filter((p: any) => p.quantity_on_hand <= p.reorder_level)
+    return ((data || []) as ProductRow[]).filter((product) => product.quantity_on_hand <= product.reorder_level)
   }
 
   /**
@@ -86,8 +97,12 @@ export class ProductService extends BaseService {
     if (productsResult.error) throw productsResult.error
 
     const products = productsResult.data || []
-    const lowStock = products.filter((p: any) => p.quantity_on_hand <= p.reorder_level).length
-    const totalValue = products.reduce((sum: number, p: any) => sum + p.unit_cost * p.quantity_on_hand, 0)
+    const typedProducts = products as Pick<ProductRow, "unit_cost" | "quantity_on_hand" | "reorder_level">[]
+    const lowStock = typedProducts.filter((product) => product.quantity_on_hand <= product.reorder_level).length
+    const totalValue = typedProducts.reduce(
+      (sum: number, product) => sum + product.unit_cost * product.quantity_on_hand,
+      0
+    )
 
     return {
       total: totalResult.count || 0,

@@ -16,10 +16,6 @@ import { FormFieldGroup } from "@/components/ui/patterns"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { PageLoader } from "@/components/ui/query-states"
 
-import { logger } from "@/lib/logger"
-
-const log = logger("hr-performance-create")
-
 interface User {
   id: string
   first_name: string
@@ -110,8 +106,8 @@ export default function CreateReviewPage() {
       toast.success("Performance review created successfully")
 
       router.push("/hr")
-    } catch (error: any) {
-      toast.error(error.message)
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Failed to create review")
     } finally {
       setSaving(false)
     }

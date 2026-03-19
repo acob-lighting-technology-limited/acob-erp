@@ -11,19 +11,18 @@ import { logger } from "@/lib/logger"
 
 const log = logger("feedback")
 
-
 export default async function AdminFeedbackPage() {
   const supabase = await createClient()
-  const dataClient = getServiceRoleClientOrFallback(supabase as any)
+  const dataClient = getServiceRoleClientOrFallback(supabase)
 
   const { data, error } = await supabase.auth.getUser()
   if (error || !data?.user) {
     redirect("/auth/login")
   }
 
-  const scope = await resolveAdminScope(supabase as any, data.user.id)
+  const scope = await resolveAdminScope(supabase, data.user.id)
   if (!scope) {
-    redirect("/dashboard")
+    redirect("/profile")
   }
   const departmentScope = getDepartmentScope(scope, "general")
 

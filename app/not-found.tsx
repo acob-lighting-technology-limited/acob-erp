@@ -37,10 +37,10 @@ export default function NotFound() {
 
           {/* Action Buttons */}
           <div className="mb-8 flex flex-col justify-center gap-3 sm:flex-row">
-            <Link href="/dashboard">
+            <Link href="/profile">
               <Button size="lg" className="w-full px-6 py-2 sm:w-auto">
                 <Home className="mr-2 h-4 w-4" />
-                Go to Dashboard
+                Go to Home
               </Button>
             </Link>
             <Button size="lg" variant="outline" onClick={() => router.back()} className="w-full px-6 py-2 sm:w-auto">
@@ -53,12 +53,12 @@ export default function NotFound() {
           <div className="bg-card/50 border-border rounded-xl border p-6 shadow-sm backdrop-blur-sm">
             <h3 className="text-foreground mb-4 text-lg font-semibold">Quick Links</h3>
             <div className="grid grid-cols-3 gap-3">
-              <Link href="/dashboard" className="group">
+              <Link href="/profile" className="group">
                 <div className="bg-muted/50 hover:bg-muted border-border rounded-lg border p-3 transition-colors">
                   <div className="bg-primary mx-auto mb-2 flex h-8 w-8 items-center justify-center rounded-md">
                     <LayoutDashboard className="text-primary-foreground h-4 w-4" />
                   </div>
-                  <h4 className="text-foreground text-sm font-medium">Dashboard</h4>
+                  <h4 className="text-foreground text-sm font-medium">Home</h4>
                 </div>
               </Link>
 

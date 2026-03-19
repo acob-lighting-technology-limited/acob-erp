@@ -1,6 +1,6 @@
 "use client"
 
-import { useParams, useRouter } from "next/navigation"
+import { useParams } from "next/navigation"
 import { useQuery } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { createClient } from "@/lib/supabase/client"
@@ -13,10 +13,6 @@ import Link from "next/link"
 import { PageHeader } from "@/components/layout/page-header"
 import { EmptyState } from "@/components/ui/patterns"
 import { PageLoader } from "@/components/ui/query-states"
-
-import { logger } from "@/lib/logger"
-
-const log = logger("purchasing-suppliers")
 
 interface Supplier {
   id: string
@@ -70,7 +66,6 @@ function formatDate(date: string) {
 
 export default function SupplierDetailPage() {
   const params = useParams()
-  const router = useRouter()
   const id = params.id as string
 
   const { data, isLoading } = useQuery({

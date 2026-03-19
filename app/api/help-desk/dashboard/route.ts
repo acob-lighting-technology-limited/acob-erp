@@ -1,8 +1,14 @@
 import { NextResponse } from "next/server"
-import { canLeadDepartment, getAuthContext, isAdminRole } from "@/lib/help-desk/server"
+import { getAuthContext, HelpDeskProfile, HelpDeskTicketRow, isAdminRole } from "@/lib/help-desk/server"
 import { logger } from "@/lib/logger"
 
 const log = logger("help-desk-dashboard")
+export const dynamic = "force-dynamic"
+
+type ResolvedHelpDeskTicket = HelpDeskTicketRow & {
+  resolved_at: string
+  assigned_at: string
+}
 
 export async function GET() {
   try {
@@ -14,8 +20,8 @@ export async function GET() {
 
     let query = supabase.from("help_desk_tickets").select("*")
 
-    const managedDepartments = Array.isArray((profile as any)?.managed_departments)
-      ? ((profile as any).managed_departments as string[])
+    const managedDepartments = Array.isArray((profile as HelpDeskProfile).managed_departments)
+      ? ((profile as HelpDeskProfile).managed_departments ?? [])
       : []
 
     if (!isAdminRole(profile.role)) {
@@ -34,40 +40,42 @@ export async function GET() {
     const { data: tickets, error } = await query
     if (error) throw error
 
-    let rows = tickets || []
+    let rows: HelpDeskTicketRow[] = (tickets as HelpDeskTicketRow[] | null) || []
     if (!isAdminRole(profile.role) && profile.is_department_lead && managedDepartments.length) {
       rows = rows.filter(
-        (ticket: any) =>
-          managedDepartments.includes(ticket.service_department) ||
-          managedDepartments.includes(ticket.requester_department)
+        (ticket) =>
+          managedDepartments.includes(ticket.service_department ?? "") ||
+          managedDepartments.includes(ticket.requester_department ?? "")
       )
     }
     const now = Date.now()
 
     const counts = {
       total: rows.length,
-      new: rows.filter((t: any) => t.status === "new").length,
-      assigned: rows.filter((t: any) => t.status === "assigned").length,
-      in_progress: rows.filter((t: any) => t.status === "in_progress").length,
-      pending_approval: rows.filter((t: any) => t.status === "pending_approval").length,
-      resolved: rows.filter((t: any) => t.status === "resolved").length,
-      closed: rows.filter((t: any) => t.status === "closed").length,
+      new: rows.filter((t) => t.status === "new").length,
+      assigned: rows.filter((t) => t.status === "assigned").length,
+      in_progress: rows.filter((t) => t.status === "in_progress").length,
+      pending_approval: rows.filter((t) => t.status === "pending_approval").length,
+      resolved: rows.filter((t) => t.status === "resolved").length,
+      closed: rows.filter((t) => t.status === "closed").length,
       breached: rows.filter(
-        (t: any) =>
+        (t) =>
           t.sla_target_at && new Date(t.sla_target_at).getTime() < now && !["resolved", "closed"].includes(t.status)
       ).length,
     }
 
-    const resolvedRows = rows.filter((t: any) => t.resolved_at && t.assigned_at)
+    const resolvedRows = rows.filter(
+      (t): t is ResolvedHelpDeskTicket => typeof t.resolved_at === "string" && typeof t.assigned_at === "string"
+    )
     const avgResolutionHours = resolvedRows.length
-      ? resolvedRows.reduce((acc: number, t: any) => {
+      ? resolvedRows.reduce((acc: number, t) => {
           return acc + (new Date(t.resolved_at).getTime() - new Date(t.assigned_at).getTime()) / (1000 * 60 * 60)
         }, 0) / resolvedRows.length
       : 0
 
-    const csatRows = rows.filter((t: any) => typeof t.csat_rating === "number")
+    const csatRows = rows.filter((t) => typeof t.csat_rating === "number")
     const avgCsat = csatRows.length
-      ? csatRows.reduce((acc: number, t: any) => acc + Number(t.csat_rating || 0), 0) / csatRows.length
+      ? csatRows.reduce((acc: number, t) => acc + Number(t.csat_rating || 0), 0) / csatRows.length
       : 0
 
     return NextResponse.json({

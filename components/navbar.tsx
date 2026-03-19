@@ -55,8 +55,8 @@ export function Navbar({ user, canAccessAdmin = false, isAdminMode = false }: Na
   const pathname = usePathname()
   const isMaintenancePage = pathname.startsWith("/maintenance")
   const { resolvedTheme } = useTheme()
-  const dashboardHref = isAdminMode ? "/admin" : "/dashboard"
-  const dashboardLabel = isAdminMode ? "Admin Dashboard" : "Dashboard"
+  const dashboardHref = isAdminMode ? "/admin" : "/profile"
+  const dashboardLabel = isAdminMode ? "Admin Dashboard" : "Home"
 
   // Get sidebar context safely (returns null if not available)
   const sidebarContext = useSidebarSafe()
@@ -148,13 +148,13 @@ export function Navbar({ user, canAccessAdmin = false, isAdminMode = false }: Na
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
-              <Link href="/signature" className="cursor-pointer">
+              <Link href="/tools/signature" className="cursor-pointer">
                 <FileSignature className="mr-2 h-4 w-4" />
                 Signature
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
-              <Link href="/watermark" className="cursor-pointer">
+              <Link href="/tools/watermark" className="cursor-pointer">
                 <Droplet className="mr-2 h-4 w-4" />
                 Watermark
               </Link>
@@ -174,7 +174,7 @@ export function Navbar({ user, canAccessAdmin = false, isAdminMode = false }: Na
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
-                  <Link href="/dashboard" className="flex cursor-pointer items-center">
+                  <Link href="/profile" className="flex cursor-pointer items-center">
                     <LayoutDashboard className="mr-2 h-4 w-4" />
                     User Dashboard
                   </Link>
@@ -307,11 +307,11 @@ export function Navbar({ user, canAccessAdmin = false, isAdminMode = false }: Na
             <MessageSquare className="h-4 w-4" />
             Feedback
           </Link>
-          <Link href="/signature" className="hover:bg-accent flex items-center gap-2 rounded px-4 py-2 text-sm">
+          <Link href="/tools/signature" className="hover:bg-accent flex items-center gap-2 rounded px-4 py-2 text-sm">
             <FileSignature className="h-4 w-4" />
             Signature
           </Link>
-          <Link href="/watermark" className="hover:bg-accent flex items-center gap-2 rounded px-4 py-2 text-sm">
+          <Link href="/tools/watermark" className="hover:bg-accent flex items-center gap-2 rounded px-4 py-2 text-sm">
             <Droplet className="h-4 w-4" />
             Watermark
           </Link>
@@ -327,7 +327,7 @@ export function Navbar({ user, canAccessAdmin = false, isAdminMode = false }: Na
           {isAdminMode && (
             <>
               <div className="border-border my-2 border-t"></div>
-              <Link href="/dashboard" className="hover:bg-accent flex items-center gap-2 rounded px-4 py-2 text-sm">
+              <Link href="/profile" className="hover:bg-accent flex items-center gap-2 rounded px-4 py-2 text-sm">
                 <LayoutDashboard className="h-4 w-4" />
                 User Dashboard
               </Link>

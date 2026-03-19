@@ -8,7 +8,20 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { EmptyState } from "@/components/ui/patterns"
 
-function isEscalation(log: any): boolean {
+type AuditLogRow = {
+  id: string
+  action: string | null
+  operation: string | null
+  entity_type: string | null
+  entity_id: string | null
+  user_id: string | null
+  old_values: Record<string, unknown> | null
+  new_values: Record<string, unknown> | null
+  metadata: Record<string, unknown> | null
+  created_at: string
+}
+
+function isEscalation(log: AuditLogRow): boolean {
   const text =
     `${log.action || ""} ${log.operation || ""} ${log.entity_type || ""} ${JSON.stringify(log.new_values || {})} ${JSON.stringify(log.old_values || {})} ${JSON.stringify(log.metadata || {})}`.toLowerCase()
   const touchesRole = text.includes("role")
@@ -24,10 +37,11 @@ export default async function DevRoleEscalationsPage() {
   await requireAdminSectionAccess("dev")
 
   const supabase = await createClient()
-  const dataClient = getServiceRoleClientOrFallback(supabase as any)
+  const dataClient = getServiceRoleClientOrFallback(supabase)
   const { data, error } = await dataClient
     .from("audit_logs")
     .select("id, action, operation, entity_type, entity_id, user_id, old_values, new_values, metadata, created_at")
+    .returns<AuditLogRow[]>()
     .order("created_at", { ascending: false })
     .limit(1200)
 
@@ -75,7 +89,7 @@ export default async function DevRoleEscalationsPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                rows.map((row: any) => (
+                rows.map((row) => (
                   <TableRow key={row.id}>
                     <TableCell>{new Date(row.created_at).toLocaleString()}</TableCell>
                     <TableCell>{row.action}</TableCell>

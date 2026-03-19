@@ -22,7 +22,7 @@ export abstract class BaseService {
    * Get all records with optional filters
    */
   async getAll(options?: {
-    filters?: Record<string, any>
+    filters?: Record<string, unknown>
     orderBy?: { column: string; ascending?: boolean }
     limit?: number
     offset?: number
@@ -74,7 +74,7 @@ export abstract class BaseService {
   /**
    * Create a new record
    */
-  async create(data: Record<string, any>) {
+  async create(data: Record<string, unknown>) {
     const supabase = await this.getClient()
 
     const { data: created, error } = await supabase.from(this.tableName).insert(data).select().single()
@@ -86,7 +86,7 @@ export abstract class BaseService {
   /**
    * Update an existing record
    */
-  async update(id: string, data: Record<string, any>) {
+  async update(id: string, data: Record<string, unknown>) {
     const supabase = await this.getClient()
 
     const { data: updated, error } = await supabase.from(this.tableName).update(data).eq("id", id).select().single()
@@ -110,7 +110,7 @@ export abstract class BaseService {
   /**
    * Count records with optional filters
    */
-  async count(filters?: Record<string, any>) {
+  async count(filters?: Record<string, unknown>) {
     const supabase = await this.getClient()
 
     let query = supabase.from(this.tableName).select("*", { count: "exact", head: true })

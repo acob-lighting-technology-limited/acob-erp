@@ -16,6 +16,8 @@ const log = logger("admin-create-user")
 
 export const dynamic = "force-dynamic"
 
+type AdminCreateUserClient = Awaited<ReturnType<typeof createServerClient>>
+
 export async function POST(request: NextRequest) {
   // First, verify the caller is authenticated and has user-management privileges
   const supabase = await createServerClient()
@@ -27,7 +29,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 })
   }
 
-  const scope = await resolveAdminScope(supabase as any, user.id)
+  const scope = await resolveAdminScope(supabase as AdminCreateUserClient, user.id)
   const managedDepartments = scope?.managedDepartments || []
   const canManageUsers = !!scope && (scope.isAdminLike || managedDepartments.includes("Admin & HR"))
   if (!canManageUsers) {

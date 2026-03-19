@@ -87,7 +87,7 @@ export function ActionTrackerExportDialog({ isOpen, onClose, departments }: Expo
 
       toast.success("Export completed")
       onClose()
-    } catch (error: any) {
+    } catch (error: unknown) {
       log.error("Export error:", error)
       toast.error("Export failed")
     } finally {
@@ -122,7 +122,11 @@ export function ActionTrackerExportDialog({ isOpen, onClose, departments }: Expo
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Year</Label>
-              <Input type="number" value={year} onChange={(e: any) => setYear(parseInt(e.target.value))} />
+              <Input
+                type="number"
+                value={year}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setYear(parseInt(e.target.value))}
+              />
             </div>
             {period !== "year" && (
               <div className="space-y-2">

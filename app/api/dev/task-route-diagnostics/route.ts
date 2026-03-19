@@ -10,8 +10,8 @@
 
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { createClient as createAdminClient } from "@supabase/supabase-js"
-import { applyAssignableStatusFilter } from "@/lib/workforce/assignment-policy"
+import { createClient as createAdminClient, type SupabaseClient } from "@supabase/supabase-js"
+import { isAssignableEmploymentStatus } from "@/lib/workforce/assignment-policy"
 
 type DiagRow = {
   check_code: "department_lead_coverage" | "department_assignment_target"
@@ -22,13 +22,25 @@ type DiagRow = {
   fail_reason?: string
 }
 
-function getManagedDepartments(profile: any): string[] {
+type DiagnosticProfile = {
+  id: string
+  full_name?: string | null
+  department?: string | null
+  is_department_lead?: boolean | null
+  lead_departments?: string[] | null
+}
+
+type DepartmentNameRow = {
+  name?: string | null
+}
+
+function getManagedDepartments(profile: DiagnosticProfile | null | undefined): string[] {
   const managed = Array.isArray(profile?.lead_departments) ? profile.lead_departments.filter(Boolean) : []
   const withPrimary = profile?.department ? [profile.department, ...managed] : managed
   return Array.from(new Set(withPrimary))
 }
 
-function isLeadForDepartment(profile: any, departmentName: string): boolean {
+function isLeadForDepartment(profile: DiagnosticProfile | null | undefined, departmentName: string): boolean {
   if (!profile?.is_department_lead) return false
   return getManagedDepartments(profile).includes(departmentName)
 }
@@ -55,15 +67,11 @@ export async function GET() {
   const admin = createAdminClient(url, serviceKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   })
+  const db = admin as unknown as SupabaseClient
 
   const [departmentsRes, profilesRes] = await Promise.all([
-    admin.from("departments").select("name").order("name"),
-    applyAssignableStatusFilter(
-      admin
-        .from("profiles")
-        .select("id, full_name, department, is_department_lead, lead_departments, employment_status"),
-      { allowLegacyNullStatus: false }
-    ),
+    db.from("departments").select("name").order("name"),
+    db.from("profiles").select("id, full_name, department, is_department_lead, lead_departments, employment_status"),
   ])
 
   if (departmentsRes.error) {
@@ -73,16 +81,20 @@ export async function GET() {
     return NextResponse.json({ error: `Failed to load profiles: ${profilesRes.error.message}` }, { status: 500 })
   }
 
-  const departments = (departmentsRes.data || []).map((d: any) => d.name).filter(Boolean)
-  const profiles = profilesRes.data || []
-  const leadProfiles = profiles.filter((p: any) => p.is_department_lead)
+  const departments = ((departmentsRes.data || []) as DepartmentNameRow[])
+    .map((d) => d.name)
+    .filter((name): name is string => typeof name === "string" && name.length > 0)
+  const profiles = (
+    (profilesRes.data || []) as Array<DiagnosticProfile & { employment_status?: string | null }>
+  ).filter((profile) => isAssignableEmploymentStatus(profile.employment_status, { allowLegacyNullStatus: false }))
+  const leadProfiles = profiles.filter((p) => p.is_department_lead)
   const multiDepartmentLeadIds = new Set(
-    leadProfiles.filter((p: any) => getManagedDepartments(p).length > 1).map((p: any) => p.id)
+    leadProfiles.filter((p) => getManagedDepartments(p).length > 1).map((p) => p.id)
   )
   const rows: DiagRow[] = []
 
   for (const departmentName of departments) {
-    const leadCandidate = profiles.find((p: any) => isLeadForDepartment(p, departmentName))
+    const leadCandidate = profiles.find((p) => isLeadForDepartment(p, departmentName))
     const isConflict = Boolean(leadCandidate?.id && multiDepartmentLeadIds.has(leadCandidate.id))
     rows.push({
       check_code: "department_lead_coverage",
@@ -99,7 +111,7 @@ export async function GET() {
   }
 
   for (const departmentName of departments) {
-    const members = profiles.filter((p: any) => p.department === departmentName)
+    const members = profiles.filter((p) => p.department === departmentName)
     rows.push({
       check_code: "department_assignment_target",
       scope: departmentName,

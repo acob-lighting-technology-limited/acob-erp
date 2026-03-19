@@ -52,7 +52,7 @@ export class AttendanceService extends BaseService {
   async getByDate(date: string, department?: string) {
     const supabase = await this.getClient()
 
-    let query = supabase
+    const query = supabase
       .from("attendance_records")
       .select(
         `
@@ -68,7 +68,9 @@ export class AttendanceService extends BaseService {
 
     // Filter by department if provided
     if (department && data) {
-      return data.filter((record: any) => record.employee?.department === department)
+      return data.filter((record: { employee?: { department?: string | null } | null }) => {
+        return record.employee?.department === department
+      })
     }
 
     return data
@@ -142,7 +144,7 @@ export class AttendanceService extends BaseService {
       total: data?.length || 0,
     }
 
-    data?.forEach((record: any) => {
+    data?.forEach((record: { status?: string | null }) => {
       if (record.status === "present") summary.present++
       if (record.status === "absent") summary.absent++
       if (record.status === "late") summary.late++

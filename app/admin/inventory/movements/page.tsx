@@ -14,10 +14,6 @@ import { Badge } from "@/components/ui/badge"
 import { ArrowUpDown, ArrowUp, ArrowDown, Filter, Boxes } from "lucide-react"
 import { TableSkeleton } from "@/components/ui/query-states"
 
-import { logger } from "@/lib/logger"
-
-const log = logger("inventory-movements")
-
 interface StockMovement {
   id: string
   product_id: string
@@ -30,18 +26,25 @@ interface StockMovement {
   created_by_name?: string
 }
 
-const typeColors: Record<string, string> = {
+type BadgeVariant = "default" | "destructive" | "secondary" | "outline"
+
+const typeColors: Record<StockMovement["movement_type"], BadgeVariant> = {
   in: "default",
   out: "destructive",
   adjustment: "secondary",
   transfer: "secondary",
 }
 
-const typeIcons: Record<string, any> = {
+const typeIcons: Record<StockMovement["movement_type"], typeof ArrowUpDown> = {
   in: ArrowDown,
   out: ArrowUp,
   adjustment: ArrowUpDown,
   transfer: ArrowUpDown,
+}
+
+type StockMovementRow = StockMovement & {
+  product?: { name?: string | null } | null
+  created_by?: { first_name?: string | null; last_name?: string | null } | null
 }
 
 async function fetchMovementsList(): Promise<StockMovement[]> {
@@ -59,10 +62,12 @@ async function fetchMovementsList(): Promise<StockMovement[]> {
     throw new Error(error.message)
   }
 
-  return (data || []).map((m: any) => ({
+  return ((data || []) as StockMovementRow[]).map((m) => ({
     ...m,
-    product_name: m.product?.name,
-    created_by_name: m.created_by ? `${m.created_by.first_name} ${m.created_by.last_name}` : null,
+    product_name: m.product?.name || undefined,
+    created_by_name: m.created_by
+      ? `${m.created_by.first_name || ""} ${m.created_by.last_name || ""}`.trim() || undefined
+      : undefined,
   }))
 }
 
@@ -167,7 +172,7 @@ export default function MovementsPage() {
                         <TableCell className="text-sm">{formatDate(m.created_at)}</TableCell>
                         <TableCell className="font-medium">{m.product_name || "—"}</TableCell>
                         <TableCell>
-                          <Badge variant={typeColors[m.movement_type] as any} className="capitalize">
+                          <Badge variant={typeColors[m.movement_type]} className="capitalize">
                             <Icon className="mr-1 h-3 w-3" />
                             {m.movement_type}
                           </Badge>

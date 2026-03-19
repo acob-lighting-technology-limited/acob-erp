@@ -2,6 +2,8 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { SignatureCreator } from "@/components/signature-creator"
 import { resolveAdminScope } from "@/lib/admin/rbac"
+import { PageHeader, PageWrapper } from "@/components/layout"
+import { FileSignature } from "lucide-react"
 
 export default async function SignaturePage({ searchParams }: { searchParams: { userId?: string } }) {
   const supabase = await createClient()
@@ -14,7 +16,7 @@ export default async function SignaturePage({ searchParams }: { searchParams: { 
   // If admin and userId specified, allow viewing that user's signature
   let targetUserId = data.user.id
   if (searchParams?.userId) {
-    const scope = await resolveAdminScope(supabase as any, data.user.id)
+    const scope = await resolveAdminScope(supabase, data.user.id)
     if (scope) {
       targetUserId = searchParams.userId
     }
@@ -24,15 +26,14 @@ export default async function SignaturePage({ searchParams }: { searchParams: { 
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", targetUserId).single()
 
   return (
-    <div className="bg-background min-h-screen">
-      <div className="mx-auto max-w-6xl p-6">
-        <div className="mb-8">
-          <h1 className="text-foreground text-3xl font-bold">Email Signature Creator</h1>
-          <p className="text-muted-foreground">Generate your professional email signature</p>
-        </div>
-
-        <SignatureCreator profile={profile} />
-      </div>
-    </div>
+    <PageWrapper maxWidth="full" background="gradient">
+      <PageHeader
+        title="Email Signature Creator"
+        description="Generate your professional email signature"
+        icon={FileSignature}
+        backLink={{ href: "/tools", label: "Back to Tools" }}
+      />
+      <SignatureCreator profile={profile} />
+    </PageWrapper>
   )
 }

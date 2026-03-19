@@ -1,6 +1,8 @@
 import { Resend } from "resend"
+import type { SupabaseClient } from "@supabase/supabase-js"
 import { applyAssignableStatusFilter } from "@/lib/workforce/assignment-policy"
 import { ORG_NOTIFICATION_SENDER } from "@/lib/org-config"
+import type { Database } from "@/types/database"
 
 export const DEFAULT_NOTIFICATION_SENDER = ORG_NOTIFICATION_SENDER
 
@@ -45,12 +47,12 @@ export async function sendNotificationEmail(input: SendEmailInput) {
   return { sent: true as const, recipients }
 }
 
-export async function resolveActiveLeadRecipientEmails(supabaseClient: any) {
+export async function resolveActiveLeadRecipientEmails(supabaseClient: SupabaseClient<Database>) {
   const recipients = await resolveActiveLeadRecipients(supabaseClient)
   return recipients.flatMap((lead) => lead.emails)
 }
 
-export async function resolveActiveLeadRecipients(supabaseClient: any) {
+export async function resolveActiveLeadRecipients(supabaseClient: SupabaseClient<Database>) {
   const { data: leadProfiles, error } = await applyAssignableStatusFilter(
     supabaseClient
       .from("profiles")

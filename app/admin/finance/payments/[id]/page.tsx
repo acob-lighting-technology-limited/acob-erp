@@ -221,7 +221,7 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
         const data = await response.json()
         toast.error(data.error || "Failed to update payment")
       }
-    } catch (error) {
+    } catch {
       toast.error("Error updating payment")
     } finally {
       setUpdating(false)
@@ -240,7 +240,7 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
         const data = await response.json()
         toast.error(data.error || "Failed to delete payment")
       }
-    } catch (error) {
+    } catch {
       toast.error("Error deleting payment")
     } finally {
       setDeleteLoading(false)
@@ -300,7 +300,7 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
         } else {
           toast.error("Failed to update payment")
         }
-      } catch (error) {
+      } catch {
         toast.error("Error processing payment")
       }
     } else {
@@ -326,7 +326,7 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
       } else {
         toast.error("Failed to update status")
       }
-    } catch (error) {
+    } catch {
       toast.error("Error updating status")
     }
   }
@@ -372,7 +372,7 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
         const data = await response.json()
         toast.error(data.error || "Upload failed")
       }
-    } catch (error) {
+    } catch {
       toast.error("Error uploading file")
     } finally {
       setUploading(false)

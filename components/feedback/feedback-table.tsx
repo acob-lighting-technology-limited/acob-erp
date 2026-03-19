@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { MessageSquare, Eye, ArrowUp, ArrowDown } from "lucide-react"
 import { formatName } from "@/lib/utils"
+import type { FeedbackRecord } from "@/components/feedback/types"
 
 function getTypeColor(type: string): string {
   switch (type) {
@@ -38,12 +39,10 @@ function getStatusColor(status: string): string {
 }
 
 interface FeedbackTableProps {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  items: any[]
+  items: FeedbackRecord[]
   nameSortOrder: "asc" | "desc"
   onToggleSort: () => void
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  onView: (item: any) => void
+  onView: (item: FeedbackRecord) => void
   hasActiveFilters: boolean
 }
 

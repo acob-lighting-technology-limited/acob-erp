@@ -1,15 +1,8 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,7 +21,7 @@ import { Loader2, CheckCircle, UserPlus, ChevronRight, ShieldCheck, Hash } from 
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { format } from "date-fns"
-import { cn, formatName, formatFullName } from "@/lib/utils"
+import { cn, formatName } from "@/lib/utils"
 import { QUERY_KEYS } from "@/lib/query-keys"
 
 import { logger } from "@/lib/logger"
@@ -74,7 +67,7 @@ export function PendingApplicationsModal({ onEmployeeCreated }: PendingApplicati
   const [employeeId, setEmployeeId] = useState("")
   const [hireDate, setHireDate] = useState(new Date().toISOString().split("T")[0])
 
-  const supabase = createClient()
+  const [supabase] = useState(() => createClient())
   const queryClient = useQueryClient()
 
   const { data: pendingUsers = [], isLoading } = useQuery({
@@ -83,14 +76,7 @@ export function PendingApplicationsModal({ onEmployeeCreated }: PendingApplicati
     enabled: isOpen,
   })
 
-  // Auto-select first user when data loads
-  useEffect(() => {
-    if (pendingUsers.length > 0 && !selectedUser) {
-      handleUserSelect(pendingUsers[0])
-    }
-  }, [pendingUsers])
-
-  const fetchSuggestedId = async () => {
+  const fetchSuggestedId = useCallback(async () => {
     try {
       const { data: lastProfile } = await supabase
         .from("profiles")
@@ -117,12 +103,22 @@ export function PendingApplicationsModal({ onEmployeeCreated }: PendingApplicati
       log.error("Error suggesting ID:", err)
       setEmployeeId(`ACOB/${new Date().getFullYear()}/001`)
     }
-  }
+  }, [supabase])
 
-  const handleUserSelect = (user: PendingUser) => {
-    setSelectedUser(user)
-    fetchSuggestedId()
-  }
+  const handleUserSelect = useCallback(
+    (user: PendingUser) => {
+      setSelectedUser(user)
+      void fetchSuggestedId()
+    },
+    [fetchSuggestedId]
+  )
+
+  // Auto-select first user when data loads
+  useEffect(() => {
+    if (pendingUsers.length > 0 && !selectedUser) {
+      handleUserSelect(pendingUsers[0])
+    }
+  }, [pendingUsers, selectedUser, handleUserSelect])
 
   const handleApprove = async () => {
     if (!selectedUser) return
@@ -163,9 +159,9 @@ export function PendingApplicationsModal({ onEmployeeCreated }: PendingApplicati
         setEmployeeId("")
       }
       onEmployeeCreated()
-    } catch (error: any) {
+    } catch (error: unknown) {
       log.error("Approval error:", error)
-      toast.error(error.message || "Failed to approve user")
+      toast.error(error instanceof Error ? error.message : "Failed to approve user")
     } finally {
       setIsProcessing(false)
     }
@@ -189,7 +185,7 @@ export function PendingApplicationsModal({ onEmployeeCreated }: PendingApplicati
         setSelectedUser(null)
         setEmployeeId("")
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       log.error("Rejection error:", error)
       toast.error("Failed to reject application")
     } finally {

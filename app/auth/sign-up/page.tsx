@@ -52,7 +52,7 @@ export default function SignUpPage() {
     try {
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://erp.acoblighting.com"
       // Create user with password
-      const { data, error: signUpError } = await supabase.auth.signUp({
+      const { error: signUpError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
         options: {

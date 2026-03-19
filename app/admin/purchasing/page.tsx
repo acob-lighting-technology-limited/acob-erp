@@ -10,10 +10,6 @@ import Link from "next/link"
 import { PageWrapper, PageHeader, Section } from "@/components/layout"
 import { StatCard } from "@/components/ui/stat-card"
 
-import { logger } from "@/lib/logger"
-
-const log = logger("purchasing")
-
 interface PurchasingStats {
   totalSuppliers: number
   activeOrders: number
@@ -21,14 +17,20 @@ interface PurchasingStats {
   totalOrderValue: number
 }
 
+interface PurchaseOrderRow {
+  status?: string | null
+  total_amount?: number | null
+}
+
 async function fetchPurchasingStats(): Promise<PurchasingStats> {
   const supabase = createClient()
   const { data: suppliers } = await supabase.from("suppliers").select("*")
   const { data: orders } = await supabase.from("purchase_orders").select("*")
 
-  const activeOrders = (orders || []).filter((o: any) => o.status === "pending" || o.status === "approved")
-  const pendingReceipts = (orders || []).filter((o: any) => o.status === "approved").length
-  const totalValue = (orders || []).reduce((sum: number, o: any) => sum + (o.total_amount || 0), 0)
+  const orderRows = (orders || []) as PurchaseOrderRow[]
+  const activeOrders = orderRows.filter((order) => order.status === "pending" || order.status === "approved")
+  const pendingReceipts = orderRows.filter((order) => order.status === "approved").length
+  const totalValue = orderRows.reduce((sum, order) => sum + (order.total_amount || 0), 0)
 
   return {
     totalSuppliers: suppliers?.length || 0,

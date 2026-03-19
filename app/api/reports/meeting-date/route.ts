@@ -4,6 +4,8 @@ import { NextResponse } from "next/server"
 import { resolveAdminScope } from "@/lib/admin/rbac"
 import { resolveCanonicalMeetingSetup, upsertCanonicalMeetingDate } from "@/lib/reports/meeting-date"
 
+type ReportsClient = Awaited<ReturnType<typeof createClient>>
+
 async function createClient() {
   const cookieStore = await cookies()
   return createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
@@ -75,7 +77,7 @@ export async function POST(request: Request) {
 
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const scope = await resolveAdminScope(supabase as any, user.id)
+    const scope = await resolveAdminScope(supabase as ReportsClient, user.id)
     if (!scope) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
     const body = await request.json()

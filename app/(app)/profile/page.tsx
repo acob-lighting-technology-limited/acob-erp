@@ -66,9 +66,33 @@ export interface Feedback {
   created_at: string
 }
 
+type ProfileRow = UserProfile & {
+  department_id?: string | null
+}
+
+type DepartmentNameRow = {
+  name: string
+}
+
+type TaskAssignmentRow = {
+  task_id: string
+}
+
+type AssetRow = Asset & {
+  created_at?: string
+  deleted_at?: string | null
+}
+
+type AssetAssignmentRow = {
+  assigned_at: string
+  asset: AssetRow | null
+}
+
+const isDefined = <T,>(value: T | null | undefined): value is T => value != null
+
 async function getProfileData() {
   const supabase = await createClient()
-  const dataClient = getServiceRoleClientOrFallback(supabase as any)
+  const dataClient = getServiceRoleClientOrFallback(supabase)
   const loadErrors: string[] = []
 
   // Get current user
@@ -88,19 +112,19 @@ async function getProfileData() {
     .from("profiles")
     .select("*")
     .eq("id", userId)
-    .single()
+    .single<ProfileRow>()
 
   if (profileError || !profileData) {
     return { profile: null, tasks: [], assets: [], documentation: [], feedback: [] }
   }
 
-  let resolvedDepartment = (profileData as any).department || null
-  if ((profileData as any).department_id) {
+  let resolvedDepartment = profileData.department || null
+  if (profileData.department_id) {
     const { data: deptById } = await dataClient
       .from("departments")
       .select("name")
-      .eq("id", (profileData as any).department_id)
-      .maybeSingle()
+      .eq("id", profileData.department_id)
+      .maybeSingle<DepartmentNameRow>()
     if (deptById?.name) resolvedDepartment = deptById.name
   }
   if (String(resolvedDepartment || "").toLowerCase() === "finance") {
@@ -120,11 +144,12 @@ async function getProfileData() {
     .from("task_assignments")
     .select("task_id")
     .eq("user_id", userId)
+    .returns<TaskAssignmentRow[]>()
   if (taskAssignmentsError) loadErrors.push("tasks")
 
   let multipleUserTasks: Task[] = []
   if (taskAssignments && taskAssignments.length > 0) {
-    const taskIds = taskAssignments.map((ta: any) => ta.task_id)
+    const taskIds = taskAssignments.map((ta) => ta.task_id)
     const { data: tasksData, error: tasksDataError } = await dataClient
       .from("tasks")
       .select("*")
@@ -166,6 +191,7 @@ async function getProfileData() {
     )
     .eq("assigned_to", userId)
     .eq("is_current", true)
+    .returns<AssetAssignmentRow[]>()
   if (individualAssignmentsError) loadErrors.push("assets")
 
   // Load department and office assets (separate queries to avoid filter parsing issues with commas in names)
@@ -178,7 +204,7 @@ async function getProfileData() {
           .is("deleted_at", null)
           .eq("assignment_type", "department")
           .eq("department", resolvedDepartment)
-      : Promise.resolve({ data: [] } as any),
+      : Promise.resolve({ data: [] as AssetRow[], error: null }),
     profileData.office_location
       ? dataClient
           .from("assets")
@@ -187,7 +213,7 @@ async function getProfileData() {
           .is("deleted_at", null)
           .eq("assignment_type", "office")
           .eq("office_location", profileData.office_location)
-      : Promise.resolve({ data: [] } as any),
+      : Promise.resolve({ data: [] as AssetRow[], error: null }),
   ])
   if (departmentAssetsRes.error || officeAssetsRes.error) loadErrors.push("assets")
   const sharedAssets = [...(departmentAssetsRes.data || []), ...(officeAssetsRes.data || [])]
@@ -197,18 +223,22 @@ async function getProfileData() {
   // Process individual assignments
   if (individualAssignments) {
     const indAssets = individualAssignments
-      .map((a: any) => ({
-        ...a.asset,
-        assigned_at: a.assigned_at,
-        assignment_type: "individual" as const,
-      }))
-      .filter((asset: any) => asset && !asset.deleted_at)
+      .map((a): Asset | null =>
+        a.asset && !a.asset.deleted_at
+          ? {
+              ...a.asset,
+              assigned_at: a.assigned_at,
+              assignment_type: "individual",
+            }
+          : null
+      )
+      .filter(isDefined)
     allAssets = [...allAssets, ...indAssets]
   }
 
   // Process shared assets
   if (sharedAssets) {
-    const shAssets = sharedAssets.map((a: any) => ({
+    const shAssets = sharedAssets.map((a) => ({
       ...a,
       assigned_at: a.created_at, // Use created_at for shared assets
       assignment_type: a.assignment_type,
@@ -235,9 +265,9 @@ async function getProfileData() {
   const loadError = loadErrors.length > 0 ? "Some profile sections failed to load. Please refresh." : null
 
   return {
-    profile: profileData as UserProfile,
-    tasks: allTasks as Task[],
-    assets: allAssets as Asset[],
+    profile: profileData,
+    tasks: allTasks,
+    assets: allAssets,
     documentation: (docsData || []) as Documentation[],
     feedback: (feedbackData || []) as Feedback[],
     loadError,
@@ -252,14 +282,7 @@ export default async function ProfilePage() {
   }
 
   // Type assertion since we've checked for redirect above
-  const profileData = data as {
-    profile: UserProfile | null
-    tasks: Task[]
-    assets: Asset[]
-    documentation: Documentation[]
-    feedback: Feedback[]
-    loadError?: string | null
-  }
+  const profileData = data as Exclude<Awaited<ReturnType<typeof getProfileData>>, { redirect: "/auth/login" }>
 
   return (
     <ProfileContent

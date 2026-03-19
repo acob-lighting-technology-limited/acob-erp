@@ -373,8 +373,8 @@ export function KssRosterTable({
       resetForm()
       setShowCreate(false)
       await Promise.all([refetchRoster(), refetchDocs()])
-    } catch (error: any) {
-      toast.error(error?.message || "Failed to save KSS")
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Failed to save KSS")
     } finally {
       setSaving(false)
       setUploadPhase("idle")
@@ -406,8 +406,8 @@ export function KssRosterTable({
       toast.success("KSS deleted")
       setPendingDeleteRow(null)
       await Promise.all([refetchRoster(), refetchDocs()])
-    } catch (error: any) {
-      toast.error(error?.message || "Delete failed")
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Delete failed")
     }
   }
 
@@ -438,8 +438,8 @@ export function KssRosterTable({
       anchor.click()
       anchor.remove()
       URL.revokeObjectURL(objectUrl)
-    } catch (error: any) {
-      toast.error(error?.message || "Failed to download file")
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Failed to download file")
     } finally {
       setDownloadingId((current) => (current === doc.id ? null : current))
     }

@@ -37,12 +37,26 @@ interface SaveAssetPayload {
   } | null
 }
 
+type AdminAssetsClient = Awaited<ReturnType<typeof createClient>>
+
+type AssetAssignmentInsert = {
+  asset_id: string
+  assigned_by: string
+  assigned_at: string
+  is_current: boolean
+  assignment_notes: string | null
+  assignment_type: AssignmentType
+  assigned_to?: string
+  department?: string | null
+  office_location?: string | null
+}
+
 async function buildAssignmentData(
-  dataClient: any,
+  dataClient: AdminAssetsClient,
   assetId: string,
   userId: string,
   form: AssetFormPayload
-): Promise<{ ok: true; data: Record<string, any> } | { ok: false; error: string }> {
+): Promise<{ ok: true; data: AssetAssignmentInsert } | { ok: false; error: string }> {
   if (form.assignment_type === "individual" && !form.assigned_to) {
     return { ok: false, error: "Please select a user" }
   }
@@ -53,7 +67,7 @@ async function buildAssignmentData(
     return { ok: false, error: "Please select an office location" }
   }
 
-  const assignment: Record<string, any> = {
+  const assignment: AssetAssignmentInsert = {
     asset_id: assetId,
     assigned_by: form.assigned_by || userId,
     assigned_at: form.assigned_at ? new Date(form.assigned_at).toISOString() : new Date().toISOString(),
@@ -80,7 +94,11 @@ async function buildAssignmentData(
   return { ok: true, data: assignment }
 }
 
-async function closeCurrentAssetAssignments(dataClient: any, assetId: string, handoverNotes: string): Promise<void> {
+async function closeCurrentAssetAssignments(
+  dataClient: AdminAssetsClient,
+  assetId: string,
+  handoverNotes: string
+): Promise<void> {
   const { error: closeError } = await dataClient
     .from("asset_assignments")
     .update({
@@ -107,7 +125,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  const scope = await resolveAdminScope(supabase as any, user.id)
+  const scope = await resolveAdminScope(supabase as AdminAssetsClient, user.id)
   if (!scope || !scope.isAdminLike || !canAccessAdminSection(scope, "assets")) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
@@ -124,7 +142,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Please select an asset type" }, { status: 400 })
   }
 
-  const dataClient = getServiceRoleClientOrFallback(supabase as any)
+  const dataClient = getServiceRoleClientOrFallback(supabase as AdminAssetsClient)
   const createdCodes: string[] = []
 
   try {
@@ -290,8 +308,8 @@ export async function POST(request: NextRequest) {
     )
 
     return NextResponse.json({ message, createdCodes, createdCount: createdCodes.length })
-  } catch (error: any) {
-    const baseError = error?.message || "Failed to save asset"
+  } catch (error: unknown) {
+    const baseError = error instanceof Error ? error.message : "Failed to save asset"
     const errorMessage =
       createdCodes.length > 0 ? `Created ${createdCodes.length} asset(s) before failure. ${baseError}` : baseError
     return NextResponse.json({ error: errorMessage }, { status: 500 })

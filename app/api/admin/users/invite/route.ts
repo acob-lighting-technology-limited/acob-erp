@@ -15,6 +15,15 @@ const log = logger("admin-users-invite")
 
 const SUPER_ADMIN_ROLE = "super_admin"
 type AllowedRole = (typeof ASSIGNABLE_ROLES)[number]
+type ProfileInvitePayload = {
+  id: string
+  company_email: string
+  employment_status: "active"
+  role?: AllowedRole
+  first_name?: string
+  last_name?: string
+  department?: string
+}
 
 function isValidRole(role: string): role is AllowedRole {
   return ASSIGNABLE_ROLES.includes(role as (typeof ASSIGNABLE_ROLES)[number])
@@ -181,7 +190,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "You cannot change your own role." }, { status: 400 })
     }
 
-    const profilePayload: any = {
+    const profilePayload: ProfileInvitePayload = {
       id: userId,
       company_email: emailNormalized,
       employment_status: "active",
@@ -202,21 +211,25 @@ export async function POST(request: Request) {
     }
 
     // Audit: user invite/profile creation
-    await writeAuditLog(supabase, {
-      action: existingUser ? "update" : "create",
-      entityType: "profile",
-      entityId: userId,
-      context: { actorId: user.id, source: "api" as const },
-      newValues: {
-        company_email: emailNormalized,
-        ...(roleToApply ? { role: roleToApply } : {}),
-        ...(department ? { department } : {}),
+    await writeAuditLog(
+      supabase,
+      {
+        action: existingUser ? "update" : "create",
+        entityType: "profile",
+        entityId: userId,
+        context: { actorId: user.id, source: "api" as const },
+        newValues: {
+          company_email: emailNormalized,
+          ...(roleToApply ? { role: roleToApply } : {}),
+          ...(department ? { department } : {}),
+        },
+        metadata: { source: "admin-users-invite", invited: !existingUser },
       },
-      metadata: { source: "admin-users-invite", invited: !existingUser },
-    }, { failOpen: true })
+      { failOpen: true }
+    )
 
     return NextResponse.json({ success: true, userId })
-  } catch (error: any) {
+  } catch (error: unknown) {
     log.error({ err: String(error) }, "Invite error:")
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }

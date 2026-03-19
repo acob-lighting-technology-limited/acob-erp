@@ -1,11 +1,21 @@
 import { createClient } from "@/lib/supabase/client"
-import type { Task } from "@/app/(app)/dashboard/tasks/management/tasks-content"
+import type { Task, TaskUserProfile } from "@/app/(app)/tasks/management/tasks-content"
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type TaskAssignmentRow = {
+  task_id: string
+  user_id: string
+}
+
+type BasicProfile = {
+  id: string
+  first_name: string
+  last_name: string
+}
+
 export async function loadUserTasks(
   supabase: ReturnType<typeof createClient>,
   userId: string,
-  userProfile: any
+  userProfile: TaskUserProfile | null
 ): Promise<Task[]> {
   const { data: individualTasks } = await supabase
     .from("tasks")
@@ -15,8 +25,7 @@ export async function loadUserTasks(
 
   const { data: assignments } = await supabase.from("task_assignments").select("task_id").eq("user_id", userId)
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const multipleTaskIds = assignments?.map((a: any) => a.task_id) || []
+  const multipleTaskIds = ((assignments as TaskAssignmentRow[] | null) || []).map((a) => a.task_id)
   const { data: multipleTasks } =
     multipleTaskIds.length > 0
       ? await supabase.from("tasks").select("*").in("id", multipleTaskIds).eq("assignment_type", "multiple")
@@ -31,14 +40,11 @@ export async function loadUserTasks(
     : { data: [] }
 
   const allTasks = [...(individualTasks || []), ...(multipleTasks || []), ...(departmentTasks || [])]
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const uniqueTasks = Array.from(new Map(allTasks.map((t: any) => [t.id, t])).values())
+  const uniqueTasks = Array.from(new Map(allTasks.map((t) => [t.id, t])).values()) as Task[]
 
   const tasksWithUsers = await Promise.all(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (uniqueTasks || []).map(async (task: any) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const taskData: any = { ...task }
+    uniqueTasks.map(async (task) => {
+      const taskData: Task = { ...task }
 
       if (task.assigned_by) {
         const { data: profile } = await supabase
@@ -47,7 +53,7 @@ export async function loadUserTasks(
           .eq("id", task.assigned_by)
           .single()
 
-        taskData.assigned_by_user = profile
+        taskData.assigned_by_user = profile || undefined
       }
 
       if (task.assignment_type === "multiple") {
@@ -57,8 +63,7 @@ export async function loadUserTasks(
           .eq("task_id", task.id)
 
         if (taskAssignments && taskAssignments.length > 0) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const userIds = taskAssignments.map((a: any) => a.user_id)
+          const userIds = (taskAssignments as TaskAssignmentRow[]).map((a) => a.user_id)
           const { data: userProfiles } = await supabase
             .from("profiles")
             .select("id, first_name, last_name")
@@ -72,18 +77,17 @@ export async function loadUserTasks(
             .single()
 
           const completedUserIds = new Set(
-            (await supabase.from("task_user_completion").select("user_id").eq("task_id", task.id)).data?.map(
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              (c: any) => c.user_id
-            ) || []
+            (
+              ((await supabase.from("task_user_completion").select("user_id").eq("task_id", task.id)).data as Array<{
+                user_id: string
+              }> | null) || []
+            ).map((c) => c.user_id)
           )
 
-          taskData.assigned_users =
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            userProfiles?.map((profile: any) => ({
-              ...profile,
-              completed: completedUserIds.has(profile.id),
-            })) || []
+          taskData.assigned_users = ((userProfiles as BasicProfile[] | null) || []).map((profile) => ({
+            ...profile,
+            completed: completedUserIds.has(profile.id),
+          }))
           taskData.user_completed = !!userCompletion
         }
       }
@@ -92,7 +96,9 @@ export async function loadUserTasks(
         const canChangeStatus =
           userProfile?.role === "admin" ||
           ["developer", "super_admin"].includes(userProfile?.role || "") ||
-          (userProfile?.is_department_lead && userProfile?.lead_departments?.includes(task.department))
+          (userProfile?.is_department_lead && task.department
+            ? userProfile?.lead_departments?.includes(task.department)
+            : false)
         taskData.can_change_status = canChangeStatus
       }
 
@@ -100,8 +106,7 @@ export async function loadUserTasks(
     })
   )
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  tasksWithUsers.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+  tasksWithUsers.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 
-  return (tasksWithUsers as Task[]) || []
+  return tasksWithUsers || []
 }

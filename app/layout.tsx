@@ -37,7 +37,7 @@ async function HeaderWrapperWithData() {
     return null
   }
 
-  const canAccessAdmin = Boolean(await resolveAdminScope(supabase as any, data.user.id))
+  const canAccessAdmin = Boolean(await resolveAdminScope(supabase, data.user.id))
 
   // Serialize only the necessary user data to avoid hydration issues
   const userData = {

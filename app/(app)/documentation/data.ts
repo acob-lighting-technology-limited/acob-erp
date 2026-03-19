@@ -6,6 +6,21 @@ import { logger } from "@/lib/logger"
 
 const log = logger("documentation-data")
 
+type DocumentationDepartmentDocs = {
+  initialPath: string
+  rootLabel: string
+  enabled: boolean
+}
+
+export type DocumentationDataResult =
+  | {
+      redirect: "/auth/login"
+    }
+  | {
+      docs: Documentation[]
+      userId: string
+      departmentDocs: DocumentationDepartmentDocs
+    }
 
 export async function getDocumentationData() {
   const supabase = await createClient()
@@ -29,7 +44,7 @@ export async function getDocumentationData() {
     log.error("Error loading documentation:", error)
   }
 
-  const oneDriveScope = await resolveOneDriveAccessScope(supabase as any, user.id)
+  const oneDriveScope = await resolveOneDriveAccessScope(supabase, user.id)
 
   return {
     docs: (data || []) as Documentation[],

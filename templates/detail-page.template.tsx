@@ -32,6 +32,12 @@ interface Item {
   updated_at: string
 }
 
+interface RelatedItem {
+  id: string
+  name: string
+  type: string
+}
+
 // ============================================
 // DATA FETCHING (Server-side)
 // ============================================
@@ -96,7 +102,7 @@ export default async function DetailPage({ params }: DetailPageProps) {
 
   const pageData = data as {
     item: Item
-    relatedItems: any[]
+    relatedItems: RelatedItem[]
   }
 
   const getStatusColor = (status: string) => {
@@ -164,7 +170,7 @@ export default async function DetailPage({ params }: DetailPageProps) {
               <Card>
                 <CardContent className="pt-6">
                   <div className="space-y-3">
-                    {pageData.relatedItems.map((related: any) => (
+                    {pageData.relatedItems.map((related) => (
                       <div key={related.id} className="flex items-center justify-between border-b pb-2 last:border-0">
                         <span>{related.name}</span>
                         <Badge variant="outline">{related.type}</Badge>

@@ -10,7 +10,7 @@
 
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { createClient as createAdminClient } from "@supabase/supabase-js"
+import { createClient as createAdminClient, type SupabaseClient } from "@supabase/supabase-js"
 import { DEPT_EXECUTIVE_MANAGEMENT, DEPT_CORPORATE_SERVICES } from "@/config/constants"
 
 const DEPARTMENT_NAMES: Record<string, string> = {
@@ -29,8 +29,32 @@ type DiagRow = {
   fail_reason?: string
 }
 
+type LeaveResolverProfile = {
+  id: string
+  full_name?: string | null
+  department?: string | null
+  lead_departments?: string[] | null
+  is_department_lead?: boolean | null
+}
+
+type LeaveApproverAssignmentRow = {
+  user_id: string
+  effective_from?: string | null
+  effective_to?: string | null
+  profiles?: {
+    full_name?: string | null
+  } | null
+}
+
+type LeaveRouteRow = {
+  requester_kind: string
+  stage_order: number
+  approver_role_code: string
+  is_active: boolean
+}
+
 async function tryResolve(
-  admin: any,
+  admin: SupabaseClient,
   roleCode: string,
   dummyRelieverId = "00000000-0000-0000-0000-000000000000"
 ): Promise<{ id: string; name: string | null } | null> {
@@ -54,14 +78,14 @@ async function tryResolve(
 
     if (error) return null
 
-    const match = (data || []).find((p: any) => {
+    const match = ((data || []) as LeaveResolverProfile[]).find((p) => {
       const managed = Array.isArray(p.lead_departments) ? p.lead_departments : []
       return p.is_department_lead && (p.department === departmentName || managed.includes(departmentName))
     })
 
     if (!match) return null
     if (
-      (data || []).filter((p: any) => {
+      ((data || []) as LeaveResolverProfile[]).filter((p) => {
         const managed = Array.isArray(p.lead_departments) ? p.lead_departments : []
         return p.is_department_lead && (p.department === departmentName || managed.includes(departmentName))
       }).length > 1
@@ -85,7 +109,7 @@ async function tryResolve(
 
   if (error || !data?.length) return null
 
-  const valid = (data || []).filter((row: any) => {
+  const valid = ((data || []) as LeaveApproverAssignmentRow[]).filter((row) => {
     const startsOk = !row.effective_from || row.effective_from <= now
     const endsOk = !row.effective_to || row.effective_to >= now
     return startsOk && endsOk
@@ -95,7 +119,7 @@ async function tryResolve(
   const top = valid[0]
   return {
     id: top.user_id,
-    name: (top.profiles as any)?.full_name || null,
+    name: top.profiles?.full_name || null,
   }
 }
 
@@ -121,9 +145,10 @@ export async function GET() {
   const admin = createAdminClient(url, serviceKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   })
+  const db = admin as unknown as SupabaseClient
 
   // Fetch all route rows
-  const { data: routeRows, error: routeError } = await admin
+  const { data: routeRows, error: routeError } = await db
     .from("leave_approval_role_routes")
     .select("requester_kind, stage_order, approver_role_code, is_active")
     .order("requester_kind")
@@ -135,7 +160,7 @@ export async function GET() {
 
   const results: DiagRow[] = []
 
-  for (const row of routeRows || []) {
+  for (const row of (routeRows || []) as LeaveRouteRow[]) {
     if (!row.is_active) {
       results.push({
         requester_kind: row.requester_kind,
@@ -148,7 +173,7 @@ export async function GET() {
     }
 
     try {
-      const resolved = await tryResolve(admin, row.approver_role_code)
+      const resolved = await tryResolve(db, row.approver_role_code)
       results.push({
         requester_kind: row.requester_kind,
         stage_order: row.stage_order,
@@ -158,13 +183,13 @@ export async function GET() {
         resolved_name: resolved?.name ?? null,
         fail_reason: resolved ? undefined : `No active approver found for role "${row.approver_role_code}"`,
       })
-    } catch (e: any) {
+    } catch (e: unknown) {
       results.push({
         requester_kind: row.requester_kind,
         stage_order: row.stage_order,
         approver_role_code: row.approver_role_code,
         resolved: false,
-        fail_reason: e?.message || "Unknown error during resolution",
+        fail_reason: e instanceof Error ? e.message : "Unknown error during resolution",
       })
     }
   }

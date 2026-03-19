@@ -190,7 +190,7 @@ serve(async (req) => {
 
         if (recipientEmails.length === 0) continue
 
-        const canReceiveEmail = await canEdgeUserReceiveEmail(supabase as any, event.creatorId, "system")
+        const canReceiveEmail = await canEdgeUserReceiveEmail(supabase, event.creatorId, "system")
         if (!canReceiveEmail) continue
 
         const dueDateText = new Date(event.payment.next_payment_due as string).toLocaleDateString("en-GB")

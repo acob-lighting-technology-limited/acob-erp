@@ -85,7 +85,8 @@ export default function ForgotPasswordPage() {
                 <div className="space-y-6">
                   <div className="rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-900 dark:bg-green-950/30">
                     <p className="text-sm text-green-800 dark:text-green-200">
-                      Check your email inbox for a password reset link. If you don't see it, check your spam folder.
+                      Check your email inbox for a password reset link. If you don&apos;t see it, check your spam
+                      folder.
                     </p>
                   </div>
                   <div className="space-y-3">
@@ -154,8 +155,8 @@ export default function ForgotPasswordPage() {
                 <div className="text-sm text-blue-900 dark:text-blue-100">
                   <p className="mb-1 font-medium">Need help?</p>
                   <p>
-                    If you're having trouble resetting your password, please contact your system administrator or IT
-                    support.
+                    If you&apos;re having trouble resetting your password, please contact your system administrator or
+                    IT support.
                   </p>
                 </div>
               </div>

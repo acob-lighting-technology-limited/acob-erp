@@ -1,11 +1,19 @@
 "use client"
 
 import { WatermarkStudio } from "@/components/watermark-studio"
+import { PageHeader, PageWrapper } from "@/components/layout"
+import { Droplet } from "lucide-react"
 
 export default function WatermarkPage() {
   return (
-    <main className="bg-background min-h-screen">
+    <PageWrapper maxWidth="full" background="gradient">
+      <PageHeader
+        title="Watermark Studio"
+        description="Add ACOB branding watermarks to your images and videos"
+        icon={Droplet}
+        backLink={{ href: "/tools", label: "Back to Tools" }}
+      />
       <WatermarkStudio />
-    </main>
+    </PageWrapper>
   )
 }

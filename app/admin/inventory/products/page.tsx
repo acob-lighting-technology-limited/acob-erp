@@ -16,6 +16,7 @@ import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { StatCard } from "@/components/ui/stat-card"
 import { EmptyState } from "@/components/ui/empty-state"
 import { TableSkeleton } from "@/components/ui/query-states"
+import type { BadgeProps } from "@/components/ui/badge"
 
 import { logger } from "@/lib/logger"
 
@@ -36,7 +37,13 @@ interface Product {
   created_at: string
 }
 
-const statusColors: Record<string, string> = {
+interface ProductRow extends Product {
+  category?: {
+    name: string | null
+  } | null
+}
+
+const statusColors: Record<Product["status"], BadgeProps["variant"]> = {
   active: "default",
   inactive: "secondary",
   discontinued: "destructive",
@@ -54,9 +61,9 @@ async function fetchProductsList(): Promise<Product[]> {
     throw new Error(error.message)
   }
 
-  return (data || []).map((p: any) => ({
+  return ((data || []) as ProductRow[]).map((p) => ({
     ...p,
-    category_name: p.category?.name,
+    category_name: p.category?.name || undefined,
   }))
 }
 
@@ -208,7 +215,7 @@ export default function ProductsPage() {
                       </span>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={statusColors[product.status] as any} className="capitalize">
+                      <Badge variant={statusColors[product.status]} className="capitalize">
                         {product.status}
                       </Badge>
                     </TableCell>

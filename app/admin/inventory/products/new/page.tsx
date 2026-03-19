@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { createClient } from "@/lib/supabase/client"
 import { PageHeader, PageWrapper } from "@/components/layout"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -15,10 +15,6 @@ import { Package } from "lucide-react"
 import { StatCard } from "@/components/ui/stat-card"
 import { toast } from "sonner"
 import { FormFieldGroup } from "@/components/ui/patterns"
-
-import { logger } from "@/lib/logger"
-
-const log = logger("inventory-products-new")
 
 interface Category {
   id: string
@@ -90,9 +86,8 @@ export default function NewProductPage() {
 
       toast.success("Product created successfully!")
       router.push("/admin/inventory/products")
-    } catch (error: any) {
-      log.error("Error creating product:", error)
-      toast.error(error.message || "Failed to create product")
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Failed to create product")
     } finally {
       setSaving(false)
     }

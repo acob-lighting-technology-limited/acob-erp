@@ -7,7 +7,6 @@ import { logger } from "@/lib/logger"
 
 const log = logger("assets")
 
-
 export interface Asset {
   id: string
   unique_code: string
@@ -34,9 +33,34 @@ export interface AssetAssignment {
   department?: string
 }
 
+type AssetsPageClient = Awaited<ReturnType<typeof createClient>>
+
+type AssetProfileRow = {
+  department?: string | null
+  department_id?: string | null
+  office_location?: string | null
+}
+
+type SharedAssetRow = Asset & {
+  created_at?: string | null
+}
+
+type SharedAssignmentRow = {
+  id: string
+  assigned_at: string
+  assignment_notes?: string | null
+  assigned_by?: string | null
+  asset_id: string
+  department?: string | null
+  asset?: Asset | null
+  assigner?: { first_name: string; last_name: string } | null
+}
+
+const isDefined = <T,>(value: T | null | undefined): value is T => value != null
+
 async function getAssetsData() {
   const supabase = await createClient()
-  const dataClient = getServiceRoleClientOrFallback(supabase as any)
+  const dataClient = getServiceRoleClientOrFallback(supabase as AssetsPageClient)
 
   const {
     data: { user },
@@ -54,12 +78,13 @@ async function getAssetsData() {
     .eq("id", user.id)
     .single()
 
-  let profileDepartment = (profile as any)?.department || null
-  if ((profile as any)?.department_id) {
+  const typedProfile = profile as AssetProfileRow | null
+  let profileDepartment = typedProfile?.department || null
+  if (typedProfile?.department_id) {
     const { data: deptById } = await dataClient
       .from("departments")
       .select("name")
-      .eq("id", (profile as any).department_id)
+      .eq("id", typedProfile.department_id)
       .maybeSingle()
     if (deptById?.name) profileDepartment = deptById.name
   }
@@ -92,7 +117,7 @@ async function getAssetsData() {
   }
 
   // Fetch department and office assignments if user has a department or office
-  let departmentAndOfficeAssets: any[] = []
+  let departmentAndOfficeAssets: SharedAssignmentRow[] = []
   if (profileDepartment || profile?.office_location) {
     const [departmentAssetsRes, officeAssetsRes] = await Promise.all([
       profileDepartment
@@ -117,7 +142,7 @@ async function getAssetsData() {
             .is("deleted_at", null)
             .eq("assignment_type", "department")
             .eq("department", profileDepartment)
-        : Promise.resolve({ data: [], error: null } as any),
+        : Promise.resolve({ data: [] as SharedAssetRow[], error: null }),
       profile?.office_location
         ? dataClient
             .from("assets")
@@ -140,7 +165,7 @@ async function getAssetsData() {
             .is("deleted_at", null)
             .eq("assignment_type", "office")
             .eq("office_location", profile.office_location)
-        : Promise.resolve({ data: [], error: null } as any),
+        : Promise.resolve({ data: [] as SharedAssetRow[], error: null }),
     ])
 
     if (departmentAssetsRes.error || officeAssetsRes.error) {
@@ -176,7 +201,7 @@ async function getAssetsData() {
 
   // Fetch Asset and assigner details separately (only for individual assignments)
   const assignmentsWithDetails = await Promise.all(
-    allAssignments.map(async (assignment: any) => {
+    allAssignments.map(async (assignment: SharedAssignmentRow) => {
       if (assignment.asset) {
         return assignment
       }
@@ -201,8 +226,24 @@ async function getAssetsData() {
     })
   )
 
+  const assignments = assignmentsWithDetails
+    .map((entry): AssetAssignment | null => {
+      if (!entry.asset) return null
+
+      return {
+        id: entry.id,
+        assigned_at: entry.assigned_at,
+        assignment_notes: entry.assignment_notes || undefined,
+        assigned_by: entry.assigned_by || "",
+        asset: entry.asset,
+        assigner: entry.assigner || undefined,
+        department: entry.department || undefined,
+      }
+    })
+    .filter(isDefined)
+
   return {
-    assignments: assignmentsWithDetails.filter((entry) => Boolean((entry as any).asset)) as AssetAssignment[],
+    assignments,
     loadError,
   }
 }

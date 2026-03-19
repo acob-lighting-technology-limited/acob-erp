@@ -11,7 +11,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
 import { AlertCircle, CheckCircle2, Trash2, Search, Package, Calendar, User, Filter } from "lucide-react"
 import { SearchableSelect } from "@/components/ui/searchable-select"
 import {
@@ -173,7 +172,7 @@ export default function AssetIssuesPage() {
       if (error) throw error
       toast.success(issue.resolved ? "Issue marked as unresolved" : "Issue marked as resolved")
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminAssetIssues() })
-    } catch (error: any) {
+    } catch (error: unknown) {
       log.error("Error toggling issue:", error)
       toast.error("Failed to update issue")
     }
@@ -186,7 +185,7 @@ export default function AssetIssuesPage() {
       if (error) throw error
       toast.success("Issue deleted")
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminAssetIssues() })
-    } catch (error: any) {
+    } catch (error: unknown) {
       log.error("Error deleting issue:", error)
       toast.error("Failed to delete issue")
     }

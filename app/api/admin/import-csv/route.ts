@@ -7,7 +7,10 @@ import { writeAuditLog } from "@/lib/audit/write-audit"
 
 const log = logger("import-csv")
 
-export async function POST(request: Request) {
+type AdminImportClient = Awaited<ReturnType<typeof createClient>>
+type CsvRecord = Record<string, string>
+
+export async function POST(_request: Request) {
   try {
     const supabase = await createClient()
 
@@ -21,7 +24,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const scope = await resolveAdminScope(supabase as any, user.id)
+    const scope = await resolveAdminScope(supabase as AdminImportClient, user.id)
     if (!scope || !canAccessAdminSection(scope, "hr")) {
       return NextResponse.json({ error: "Forbidden: Admin access required" }, { status: 403 })
     }
@@ -42,7 +45,7 @@ export async function POST(request: Request) {
     const csvText = await response.text()
 
     // Robust CSV parsing (handles quoted commas and escaped quotes)
-    const parseCsv = (text: string): any[] => {
+    const parseCsv = (text: string): CsvRecord[] => {
       const rows: string[] = []
       let cur = ""
       let inQuotes = false
@@ -97,7 +100,7 @@ export async function POST(request: Request) {
       const headerIdxByNorm: Record<string, number> = {}
       rawHeaders.forEach((h, idx) => (headerIdxByNorm[normalize(h)] = idx))
 
-      const result: any[] = []
+      const result: CsvRecord[] = []
       for (let r = 1; r < rows.length; r++) {
         const row = rows[r]
         if (!row || !row.trim()) continue
@@ -121,7 +124,7 @@ export async function POST(request: Request) {
     const errors: string[] = []
 
     const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "")
-    const get = (rec: any, headers: string[]): string => {
+    const get = (rec: CsvRecord, headers: string[]): string => {
       for (const h of headers) {
         const key = norm(h)
         if (rec[key] !== undefined) return rec[key]
@@ -267,7 +270,7 @@ export async function POST(request: Request) {
 
         log.info({ email }, "Successfully imported")
         importedCount++
-      } catch (error) {
+      } catch (error: unknown) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error"
         log.error({ email, err: errorMessage }, "Error processing record")
         errors.push(`${email}: ${errorMessage}`)

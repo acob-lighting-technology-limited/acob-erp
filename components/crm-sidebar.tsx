@@ -7,24 +7,21 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import {
-  LayoutDashboard,
-  Users,
-  Target,
-  Calendar,
-  BarChart3,
-  Settings,
-  ChevronLeft,
-  ChevronRight,
-  Building2,
-  Phone,
-  Mail,
-  FileText,
-} from "lucide-react"
+import { LayoutDashboard, Users, Target, Calendar, BarChart3, ChevronLeft, ChevronRight, Building2 } from "lucide-react"
+import type { Database } from "@/types/database"
+
+type SidebarUser = {
+  email?: string | null
+}
+
+type SidebarProfile = Pick<
+  Database["public"]["Tables"]["profiles"]["Row"],
+  "first_name" | "last_name" | "full_name" | "role"
+> | null
 
 interface CRMSidebarProps {
-  user: any
-  profile: any
+  user: SidebarUser | null
+  profile: SidebarProfile
 }
 
 const crmNavigation = [

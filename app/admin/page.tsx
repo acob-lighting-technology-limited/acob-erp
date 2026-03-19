@@ -29,25 +29,48 @@ const notificationPriority: Record<NotificationItem["type"], number> = {
   info: 2,
 }
 
+type ProfileIdRow = {
+  id: string
+}
+
+type ActivityActorRow = {
+  id: string
+  first_name?: string | null
+  last_name?: string | null
+  company_email?: string | null
+}
+
+type ActivityLogRow = {
+  id: string
+  user_id: string | null
+  created_at: string
+  action?: string | null
+  operation?: string | null
+  entity_type?: string | null
+  table_name?: string | null
+  entity_id?: string | null
+  department?: string | null
+  metadata?: Record<string, unknown> | null
+  changed_fields?: unknown
+  new_values?: Record<string, unknown> | null
+  old_values?: Record<string, unknown> | null
+}
+
 export default async function AdminDashboardPage() {
   const supabase = await createClient()
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const dataClient = getServiceRoleClientOrFallback(supabase as any)
+  const dataClient = getServiceRoleClientOrFallback(supabase)
   const {
     data: { user },
   } = await supabase.auth.getUser()
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const scope = user ? await resolveAdminScope(supabase as any, user.id) : null
+  const scope = user ? await resolveAdminScope(supabase, user.id) : null
   const departmentScope = scope ? getDepartmentScope(scope, "general") : null
   const profileIdsInScope = departmentScope
     ? (departmentScope.length > 0
-        ? await dataClient.from("profiles").select("id").in("department", departmentScope)
-        : // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          ({ data: [] as { id: string }[] } as any)
+        ? await dataClient.from("profiles").select("id").in("department", departmentScope).returns<ProfileIdRow[]>()
+        : { data: [] as ProfileIdRow[] }
       ).data || []
     : null
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const scopedUserIds = profileIdsInScope ? profileIdsInScope.map((p: any) => p.id) : []
+  const scopedUserIds = profileIdsInScope ? profileIdsInScope.map((profileRow) => profileRow.id) : []
 
   const { data: profile } = await dataClient.from("profiles").select("*").eq("id", user?.id).single()
 
@@ -104,28 +127,34 @@ export default async function AdminDashboardPage() {
     auditQuery =
       departmentScope.length > 0 ? auditQuery.in("department", departmentScope) : auditQuery.eq("id", "__none__")
   }
-  const { data: rawActivity, error: auditError } = await auditQuery
+  const { data: rawActivity, error: auditError } = await auditQuery.returns<ActivityLogRow[]>()
   if (auditError) log.error("Recent activity query failed", auditError)
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const filteredRawActivity = (rawActivity || [])
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .filter(
-      (item: any) =>
+      (item) =>
         !["sync", "migrate", "update_schema", "migration"].includes(normalizeToken(item.action || item.operation))
     )
     .slice(0, 6)
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const actorIds = Array.from(new Set(filteredRawActivity.map((item: any) => item.user_id).filter(Boolean)))
+  const actorIds = Array.from(new Set(filteredRawActivity.map((item) => item.user_id).filter(Boolean)))
   let actorMap = new Map<string, { first_name?: string; last_name?: string; company_email?: string }>()
   if (actorIds.length > 0) {
     const { data: actorProfiles } = await dataClient
       .from("profiles")
       .select("id, first_name, last_name, company_email")
       .in("id", actorIds)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    actorMap = new Map((actorProfiles || []).map((actor: any) => [actor.id, actor]))
+      .returns<ActivityActorRow[]>()
+    actorMap = new Map(
+      (actorProfiles || []).map((actor) => [
+        actor.id,
+        {
+          first_name: actor.first_name || undefined,
+          last_name: actor.last_name || undefined,
+          company_email: actor.company_email || undefined,
+        },
+      ])
+    )
   }
 
   const recentActivity = buildRecentActivity(filteredRawActivity, actorMap)
