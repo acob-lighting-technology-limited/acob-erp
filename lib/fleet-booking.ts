@@ -1,4 +1,6 @@
-﻿import { canAccessAdminSection, resolveAdminScope } from "@/lib/admin/rbac"
+import type { SupabaseClient } from "@supabase/supabase-js"
+import { canAccessAdminSection, resolveAdminScope } from "@/lib/admin/rbac"
+import type { Database } from "@/types/database"
 
 export const FLEET_BLOCKING_STATUSES = ["pending", "approved"] as const
 export const FLEET_ALLOWED_MIME_TYPES = new Set([
@@ -41,7 +43,7 @@ export function assertBookingWindow(startAt: string, endAt: string): { start: Da
 }
 
 export async function assertNoFleetOverlap(params: {
-  supabase: any
+  supabase: SupabaseClient<Database>
   resourceId: string
   startAt: string
   endAt: string
@@ -72,8 +74,8 @@ export async function assertNoFleetOverlap(params: {
   }
 }
 
-export async function canManageFleet(supabase: any, userId: string): Promise<boolean> {
-  const scope = await resolveAdminScope(supabase as any, userId)
+export async function canManageFleet(supabase: SupabaseClient<Database>, userId: string): Promise<boolean> {
+  const scope = await resolveAdminScope(supabase, userId)
   if (!scope) return false
   return canAccessAdminSection(scope, "hr")
 }

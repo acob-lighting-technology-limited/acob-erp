@@ -1,4 +1,5 @@
 import { BaseService } from "../base.service"
+import type { Database } from "@/types/database"
 
 /**
  * Payment Service
@@ -188,7 +189,12 @@ export class PaymentService extends BaseService {
       due: 0,
     }
 
-    data?.forEach((payment: any) => {
+    type PaymentStatsRow = Pick<
+      Database["public"]["Tables"]["department_payments"]["Row"],
+      "payment_type" | "amount" | "status"
+    >
+
+    data?.forEach((payment: PaymentStatsRow) => {
       if (payment.payment_type === "one-time") stats.oneTime++
       if (payment.payment_type === "recurring") stats.recurring++
       stats.totalAmount += payment.amount || 0

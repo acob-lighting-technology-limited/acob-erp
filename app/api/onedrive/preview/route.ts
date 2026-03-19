@@ -14,6 +14,8 @@ const log = logger("onedrive-preview")
 
 export const dynamic = "force-dynamic"
 
+type OneDriveClient = Awaited<ReturnType<typeof createClient>>
+
 async function createClient() {
   const cookieStore = await cookies()
 
@@ -49,7 +51,7 @@ export async function GET(request: Request) {
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
-    const scope = await resolveOneDriveAccessScope(supabase as any, user.id)
+    const scope = await resolveOneDriveAccessScope(supabase as OneDriveClient, user.id)
     if (!scope) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }

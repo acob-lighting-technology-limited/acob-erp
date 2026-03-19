@@ -12,7 +12,9 @@ type PolicyUpdatePayload = {
   email_mandatory?: boolean
 }
 
-async function requirePrivilegedActor(supabase: any) {
+type MailSettingsClient = Awaited<ReturnType<typeof createClient>>
+
+async function requirePrivilegedActor(supabase: MailSettingsClient) {
   const {
     data: { user },
   } = await supabase.auth.getUser()
@@ -33,7 +35,7 @@ export async function GET() {
     const auth = await requirePrivilegedActor(supabase)
     if (auth.error) return auth.error
 
-    const admin = getServiceRoleClientOrFallback(supabase as any)
+    const admin = getServiceRoleClientOrFallback(supabase)
 
     const { data, error } = await admin
       .from("notification_delivery_policies")
@@ -96,7 +98,7 @@ export async function PUT(request: NextRequest) {
       }
     }
 
-    const admin = getServiceRoleClientOrFallback(supabase as any)
+    const admin = getServiceRoleClientOrFallback(supabase)
 
     const { error } = await admin.from("notification_delivery_policies").upsert(payload, {
       onConflict: "notification_key",

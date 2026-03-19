@@ -1,6 +1,6 @@
 "use client"
 
-import { useParams, useRouter } from "next/navigation"
+import { useParams } from "next/navigation"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { createClient } from "@/lib/supabase/client"
@@ -12,10 +12,6 @@ import { Printer, CheckCircle, Package } from "lucide-react"
 import { toast } from "sonner"
 import { PageHeader } from "@/components/layout/page-header"
 import { PageLoader } from "@/components/ui/query-states"
-
-import { logger } from "@/lib/logger"
-
-const log = logger("purchasing-orders")
 
 interface PurchaseOrder {
   id: string
@@ -35,9 +31,19 @@ interface POItem {
   id: string
   product_id: string
   product_name?: string
+  product?: {
+    name?: string | null
+  } | null
   quantity: number
   unit_price: number
   amount: number
+}
+
+type BadgeVariant = "default" | "destructive" | "secondary" | "outline"
+
+type PurchaseOrderDetailRow = PurchaseOrder & {
+  supplier?: { name?: string | null } | null
+  items?: POItem[]
 }
 
 async function fetchPurchaseOrderDetail(id: string): Promise<PurchaseOrder> {
@@ -50,10 +56,12 @@ async function fetchPurchaseOrderDetail(id: string): Promise<PurchaseOrder> {
 
   if (error) throw new Error(error.message)
 
+  const detail = data as PurchaseOrderDetailRow
+
   return {
-    ...data,
-    supplier_name: data.supplier?.name,
-    items: data.items?.map((i: any) => ({ ...i, product_name: i.product?.name })) || [],
+    ...detail,
+    supplier_name: detail.supplier?.name || undefined,
+    items: detail.items?.map((item) => ({ ...item, product_name: item.product?.name || undefined })) || [],
   }
 }
 
@@ -67,7 +75,6 @@ function formatDate(date: string) {
 
 export default function PurchaseOrderDetailPage() {
   const params = useParams()
-  const router = useRouter()
   const queryClient = useQueryClient()
   const id = params.id as string
 
@@ -82,7 +89,7 @@ export default function PurchaseOrderDetailPage() {
       await supabase.from("purchase_orders").update({ status }).eq("id", id)
       toast.success(`Status updated to ${status}`)
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminPurchaseOrderDetail(id) })
-    } catch (error) {
+    } catch {
       toast.error("Failed to update")
     }
   }
@@ -90,7 +97,7 @@ export default function PurchaseOrderDetailPage() {
   if (isLoading) return <PageLoader />
   if (!order) return null
 
-  const statusColors: Record<string, string> = {
+  const statusColors: Record<PurchaseOrder["status"], BadgeVariant> = {
     draft: "secondary",
     pending: "default",
     approved: "default",
@@ -106,7 +113,7 @@ export default function PurchaseOrderDetailPage() {
         backLink={{ href: "/admin/purchasing/orders", label: "Back to Orders" }}
         actions={
           <>
-            <Badge variant={statusColors[order.status] as any} className="capitalize">
+            <Badge variant={statusColors[order.status]} className="capitalize">
               {order.status}
             </Badge>
             {order.status === "draft" && <Button onClick={() => updateStatus("pending")}>Submit for Approval</Button>}

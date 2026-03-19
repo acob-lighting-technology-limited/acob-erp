@@ -23,9 +23,9 @@ async function fetchInventoryStats(): Promise<InventoryStats> {
   const { data: warehouses, error: whError } = await supabase.from("warehouses").select("*")
   if (whError && whError.code !== "42P01") log.error("Error fetching warehouses:", whError)
 
-  const allProducts = products || []
-  const lowStock = allProducts.filter((p: any) => p.quantity_on_hand <= (p.reorder_level || 10))
-  const totalVal = allProducts.reduce((sum: number, p: any) => sum + (p.unit_cost || 0) * (p.quantity_on_hand || 0), 0)
+  const allProducts = (products || []) as ProductRow[]
+  const lowStock = allProducts.filter((p) => (p.quantity_on_hand || 0) <= (p.reorder_level || 10))
+  const totalVal = allProducts.reduce((sum, p) => sum + (p.unit_cost || 0) * (p.quantity_on_hand || 0), 0)
   return {
     totalProducts: allProducts.length,
     totalCategories: categories?.length || 0,
@@ -41,6 +41,12 @@ interface InventoryStats {
   totalWarehouses: number
   lowStockItems: number
   totalValue: number
+}
+
+interface ProductRow {
+  quantity_on_hand?: number | null
+  reorder_level?: number | null
+  unit_cost?: number | null
 }
 
 export default function InventoryDashboard() {

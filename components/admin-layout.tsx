@@ -20,9 +20,9 @@ export async function AdminLayout({ children }: AdminLayoutProps) {
   // Fetch user profile with role
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", data.user.id).single()
 
-  const scope = await resolveAdminScope(supabase as any, data.user.id)
+  const scope = await resolveAdminScope(supabase, data.user.id)
   if (!profile || !scope) {
-    redirect("/dashboard")
+    redirect("/profile")
   }
 
   const userData = {

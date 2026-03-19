@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation"
 import { AdminDocumentationContent } from "../admin-documentation-content"
-import { getAdminDocumentationData } from "../data"
+import { getAdminDocumentationData, type AdminDocumentationDataResult } from "../data"
 
 export default async function AdminInternalDocumentationPage() {
   const data = await getAdminDocumentationData()
@@ -9,7 +9,7 @@ export default async function AdminInternalDocumentationPage() {
     redirect(data.redirect)
   }
 
-  const pageData = data as any
+  const pageData = data as Exclude<AdminDocumentationDataResult, { redirect: "/auth/login" | "/profile" }>
 
   return (
     <AdminDocumentationContent

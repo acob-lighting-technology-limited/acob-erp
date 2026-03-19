@@ -21,9 +21,9 @@ export default async function AdminSettingsPage() {
     redirect("/auth/login")
   }
 
-  const scope = await resolveAdminScope(supabase as any, user.id)
+  const scope = await resolveAdminScope(supabase, user.id)
   if (!scope) {
-    redirect("/dashboard")
+    redirect("/profile")
   }
 
   return (

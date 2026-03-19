@@ -30,38 +30,48 @@ export function FilePreview({ file, category, isOpen, onClose }: FilePreviewProp
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (file && isOpen) {
-      fetchPreview()
-    } else {
+    if (!file || !isOpen) {
       setPreviewData(null)
       setError(null)
+      return
+    }
+    let isCancelled = false
+
+    const fetchPreview = async () => {
+      setLoading(true)
+      setError(null)
+
+      try {
+        const response = await fetch(`/api/onedrive/preview?path=${encodeURIComponent(file.path)}`)
+        const data = await response.json()
+
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to load preview")
+        }
+
+        if (!isCancelled) {
+          setPreviewData({
+            previewUrl: data.data.previewUrl,
+            previewType: data.data.previewType,
+          })
+        }
+      } catch (err: unknown) {
+        if (!isCancelled) {
+          setError(err instanceof Error ? err.message : "Failed to load preview")
+        }
+      } finally {
+        if (!isCancelled) {
+          setLoading(false)
+        }
+      }
+    }
+
+    fetchPreview()
+
+    return () => {
+      isCancelled = true
     }
   }, [file, isOpen])
-
-  const fetchPreview = async () => {
-    if (!file) return
-
-    setLoading(true)
-    setError(null)
-
-    try {
-      const response = await fetch(`/api/onedrive/preview?path=${encodeURIComponent(file.path)}`)
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to load preview")
-      }
-
-      setPreviewData({
-        previewUrl: data.data.previewUrl,
-        previewType: data.data.previewType,
-      })
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to load preview")
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const handleDownload = () => {
     if (!file) return

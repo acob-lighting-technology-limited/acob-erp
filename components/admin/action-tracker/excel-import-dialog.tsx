@@ -13,7 +13,6 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "sonner"
 import { FileSpreadsheet, Loader2, Upload } from "lucide-react"
 import * as XLSX from "xlsx"
@@ -22,14 +21,17 @@ import { getCurrentOfficeWeek } from "@/lib/meeting-week"
 
 const log = logger("action-tracker-excel-import-dialog")
 
+interface ExcelRow {
+  [key: string]: string | number | Date | null | undefined
+}
+
 interface ExcelImportDialogProps {
   isOpen: boolean
   onClose: () => void
   onComplete: () => void
-  departments: string[]
 }
 
-export function ExcelImportDialog({ isOpen, onClose, onComplete, departments }: ExcelImportDialogProps) {
+export function ExcelImportDialog({ isOpen, onClose, onComplete }: ExcelImportDialogProps) {
   const currentOfficeWeek = getCurrentOfficeWeek()
   const [file, setFile] = useState<File | null>(null)
   const [isUploading, setIsUploading] = useState(false)
@@ -57,7 +59,7 @@ export function ExcelImportDialog({ isOpen, onClose, onComplete, departments }: 
         const workbook = XLSX.read(data, { type: "array", cellDates: true })
         const firstSheetName = workbook.SheetNames[0]
         const worksheet = workbook.Sheets[firstSheetName]
-        const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" }) as any[]
+        const jsonData = XLSX.utils.sheet_to_json<ExcelRow>(worksheet, { defval: "" })
 
         if (jsonData.length === 0) {
           toast.error("The selected sheet is empty")
@@ -90,15 +92,6 @@ export function ExcelImportDialog({ isOpen, onClose, onComplete, departments }: 
           const priorityRaw = String(getCol(["Priority", "Level"]) || "medium").toLowerCase()
           const priority = ["low", "medium", "high", "urgent"].includes(priorityRaw) ? priorityRaw : "medium"
 
-          let dueDate = null
-          const rawDate = getCol(["Due Date", "Deadline", "Date"])
-          if (rawDate) {
-            const d = new Date(rawDate)
-            if (!isNaN(d.getTime())) {
-              dueDate = d.toISOString()
-            }
-          }
-
           return {
             title: String(title).substring(0, 255),
             description: String(getCol(["Detailed Description", "Notes", "Details"]) || "").substring(0, 1000) || null,
@@ -121,9 +114,9 @@ export function ExcelImportDialog({ isOpen, onClose, onComplete, departments }: 
         toast.success(`Successfully imported ${tasksToInsert.length} actions`)
         onComplete()
         onClose()
-      } catch (error: any) {
+      } catch (error: unknown) {
         log.error("Import error:", error)
-        toast.error(`Failed to import: ${error.message}`)
+        toast.error(`Failed to import: ${error instanceof Error ? error.message : "Unknown error"}`)
       } finally {
         setIsUploading(false)
       }

@@ -4,19 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
-import {
-  Bell,
-  AlertCircle,
-  CheckCircle,
-  Info,
-  X,
-  Clock,
-  UserPlus,
-  MessageSquare,
-  ClipboardList,
-  Laptop,
-  ArrowRight,
-} from "lucide-react"
+import { Bell, AlertCircle, CheckCircle, Info, X, Clock, ArrowRight } from "lucide-react"
 import { useState } from "react"
 
 interface Notification {

@@ -5,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { FlaskConical, Route, Ticket, ClipboardList, Package } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { PageHeader, PageWrapper } from "@/components/layout"
-import { applyAssignableStatusFilter } from "@/lib/workforce/assignment-policy"
+import { isAssignableEmploymentStatus } from "@/lib/workforce/assignment-policy"
 import { logger } from "@/lib/logger"
 import { LeaveTab } from "./_components/LeaveTab"
 import { HelpDeskTab } from "./_components/HelpDeskTab"
@@ -13,6 +13,24 @@ import { TaskTab } from "./_components/TaskTab"
 import { AssetMailRoutingPanel } from "./_components/AssetMailRoutingPanel"
 
 const log = logger("dev-tests")
+
+type ProfileRow = {
+  id: string
+  full_name?: string | null
+  first_name?: string | null
+  last_name?: string | null
+  company_email?: string | null
+  employment_status?: string | null
+}
+
+type LeaveTypeRow = {
+  id: string
+  name: string
+}
+
+type DepartmentRow = {
+  name: string
+}
 
 // ── Root Content Component ────────────────────────────────────────────────────
 export function DevTestsContent() {
@@ -23,26 +41,25 @@ export function DevTestsContent() {
 
   const load = useCallback(async () => {
     const [profilesRes, typesRes, deptRes] = await Promise.all([
-      applyAssignableStatusFilter(
-        supabase.from("profiles").select("id, full_name, first_name, last_name, company_email").order("first_name"),
-        { allowLegacyNullStatus: false }
-      ),
+      supabase
+        .from("profiles")
+        .select("id, full_name, first_name, last_name, company_email, employment_status")
+        .order("first_name"),
       supabase.from("leave_types").select("id, name").order("name"),
       supabase.from("departments").select("name").order("name"),
     ])
 
     setEmployees(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (profilesRes.data || []).map((p: any) => ({
-        value: p.id,
-        label: p.full_name?.trim() || `${p.first_name || ""} ${p.last_name || ""}`.trim() || p.company_email || p.id,
-      }))
+      ((profilesRes.data || []) as ProfileRow[])
+        .filter((profile) => isAssignableEmploymentStatus(profile.employment_status, { allowLegacyNullStatus: false }))
+        .map((p) => ({
+          value: p.id,
+          label: p.full_name?.trim() || `${p.first_name || ""} ${p.last_name || ""}`.trim() || p.company_email || p.id,
+        }))
     )
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    setLeaveTypes((typesRes.data || []).map((t: any) => ({ value: t.id, label: t.name })))
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    setDepartments((deptRes.data || []).map((d: any) => d.name).filter(Boolean))
-  }, [])
+    setLeaveTypes(((typesRes.data || []) as LeaveTypeRow[]).map((t) => ({ value: t.id, label: t.name })))
+    setDepartments(((deptRes.data || []) as DepartmentRow[]).map((d) => d.name).filter(Boolean))
+  }, [supabase])
 
   useEffect(() => {
     load().catch((err) => log.error({ err: String(err) }, "load failed"))

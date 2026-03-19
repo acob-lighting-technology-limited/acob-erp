@@ -99,8 +99,6 @@ export default function AdminFleetPage() {
     queryFn: () => fetchFleetBookings(tab),
   })
 
-  const loading = loadingResources || loadingBookings
-
   async function createResource() {
     setSavingResource(true)
     try {

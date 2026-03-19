@@ -218,8 +218,8 @@ export function MeetingDocumentTypeTable({
       setEditingDoc(null)
       setFile(null)
       await refetch()
-    } catch (error: any) {
-      toast.error(error?.message || "Upload failed")
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Upload failed")
     } finally {
       setSaving(false)
       setUploadPhase("idle")
@@ -251,8 +251,8 @@ export function MeetingDocumentTypeTable({
       toast.success("Document deleted")
       setPendingDeleteDoc(null)
       await refetch()
-    } catch (error: any) {
-      toast.error(error?.message || "Delete failed")
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Delete failed")
     }
   }
 
@@ -270,8 +270,8 @@ export function MeetingDocumentTypeTable({
       anchor.click()
       anchor.remove()
       URL.revokeObjectURL(objectUrl)
-    } catch (error: any) {
-      toast.error(error?.message || "Download failed")
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Download failed")
     }
   }
 

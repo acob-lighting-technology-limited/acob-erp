@@ -8,7 +8,6 @@ import { logger } from "@/lib/logger"
 
 const log = logger("finance-payments")
 
-
 interface Payment {
   id: string
   department_id: string
@@ -62,11 +61,11 @@ async function getPaymentsData() {
     return { redirect: "/auth/login" as const }
   }
 
-  const scope = await resolveAdminScope(supabase as any, user.id)
+  const scope = await resolveAdminScope(supabase, user.id)
   if (!scope) {
-    return { redirect: "/dashboard" as const }
+    return { redirect: "/profile" as const }
   }
-  const dataClient = getServiceRoleClientOrFallback(supabase as any)
+  const dataClient = getServiceRoleClientOrFallback(supabase)
   const departmentScope = getDepartmentScope(scope, "finance")
 
   let paymentsQuery = dataClient
@@ -122,12 +121,10 @@ export default async function AdminPaymentsPage() {
     redirect(data.redirect)
   }
 
-  const paymentsData = data as {
-    payments: Payment[]
-    departments: Department[]
-    categories: Category[]
-    currentUser: { id: string; department_id: string | null; isAdmin: boolean }
-  }
+  const paymentsData = data as Exclude<
+    Awaited<ReturnType<typeof getPaymentsData>>,
+    { redirect: "/auth/login" | "/profile" }
+  >
 
   return (
     <PaymentsTable

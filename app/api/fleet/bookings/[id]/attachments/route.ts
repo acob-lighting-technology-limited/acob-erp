@@ -3,6 +3,16 @@ import { canManageFleet } from "@/lib/fleet-booking"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
 
+type FleetBookingAttachmentRow = {
+  id: string
+  booking_id: string
+  file_name?: string | null
+  file_path: string
+  mime_type?: string | null
+  file_size?: number | null
+  created_at?: string | null
+}
+
 export async function GET(_: Request, { params }: { params: { id: string } }) {
   try {
     const supabase = await createClient()
@@ -47,7 +57,7 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
     }
 
     const rows = await Promise.all(
-      (attachments || []).map(async (row: any) => {
+      ((attachments || []) as FleetBookingAttachmentRow[]).map(async (row) => {
         const { data } = await dataClient.storage.from("fleet_booking_documents").createSignedUrl(row.file_path, 900)
         return {
           ...row,

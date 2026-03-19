@@ -1,5 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 
+type SeparationProfileRow = {
+  role?: string | null
+  is_department_lead?: boolean | null
+  lead_departments?: string[] | null
+}
+
 export interface SeparationBlockers {
   assets: number
   tasks: number
@@ -12,10 +18,7 @@ export interface SeparationBlockers {
 
 const ACTIVE_PROJECT_STATUSES = ["planning", "active", "on_hold"]
 
-export async function getSeparationBlockers(
-  supabase: SupabaseClient<any, "public", any>,
-  employeeId: string
-): Promise<SeparationBlockers> {
+export async function getSeparationBlockers(supabase: SupabaseClient, employeeId: string): Promise<SeparationBlockers> {
   const [assetsRes, tasksRes, taskAssignmentsRes, managedProjectsRes, projectMembershipsRes, profileRes] =
     await Promise.all([
       supabase
@@ -47,8 +50,9 @@ export async function getSeparationBlockers(
       supabase.from("profiles").select("role, is_department_lead, lead_departments").eq("id", employeeId).single(),
     ])
 
-  const leadDepartments = Array.isArray(profileRes.data?.lead_departments) ? profileRes.data.lead_departments : []
-  const hasLeadRole = profileRes.data?.is_department_lead === true || leadDepartments.length > 0
+  const profile = profileRes.data as SeparationProfileRow | null
+  const leadDepartments = Array.isArray(profile?.lead_departments) ? profile.lead_departments : []
+  const hasLeadRole = profile?.is_department_lead === true || leadDepartments.length > 0
 
   const blockers: SeparationBlockers = {
     assets: assetsRes.count || 0,

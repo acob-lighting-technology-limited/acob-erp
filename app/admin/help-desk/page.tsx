@@ -4,6 +4,13 @@ import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { AdminHelpDeskContent } from "./management/admin-help-desk-content"
 import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
 import { listAssignableProfiles } from "@/lib/workforce/assignment-policy"
+import type { EmployeeOption, HelpDeskTicket, LeadDirectoryMember } from "@/components/help-desk/ticket-queue-table"
+
+type HelpDeskTicketRow = HelpDeskTicket & {
+  requester_id: string
+  current_approval_stage?: string | null
+  requester_department?: string | null
+}
 
 const STAGE_ORDER = [
   "requester_department_lead",
@@ -27,7 +34,7 @@ function stageRank(stage: string | null | undefined) {
 
 async function getData() {
   const supabase = await createClient()
-  const dataClient = getServiceRoleClientOrFallback(supabase as any)
+  const dataClient = getServiceRoleClientOrFallback(supabase)
 
   const {
     data: { user },
@@ -37,9 +44,9 @@ async function getData() {
     return { redirectTo: "/auth/login" as const }
   }
 
-  const scope = await resolveAdminScope(supabase as any, user.id)
+  const scope = await resolveAdminScope(supabase, user.id)
   if (!scope) {
-    return { redirectTo: "/dashboard" as const }
+    return { redirectTo: "/profile" as const }
   }
   const departmentScope = getDepartmentScope(scope, "general")
 
@@ -57,19 +64,26 @@ async function getData() {
     }),
   ])
 
-  const requesterIds = Array.from(new Set((tickets || []).map((t: any) => t.requester_id).filter(Boolean)))
+  const requesterIds = Array.from(
+    new Set(((tickets as HelpDeskTicketRow[] | null) || []).map((t) => t.requester_id).filter(Boolean))
+  )
   const { data: requesterProfiles } =
     requesterIds.length > 0
       ? await dataClient.from("profiles").select("id, department").in("id", requesterIds)
-      : { data: [] as any[] }
-  const requesterDepartmentMap = new Map((requesterProfiles || []).map((row: any) => [row.id, row.department || null]))
+      : { data: [] as Array<{ id: string; department: string | null }> }
+  const requesterDepartmentMap = new Map(
+    ((requesterProfiles as Array<{ id: string; department: string | null }> | null) || []).map((row) => [
+      row.id,
+      row.department || null,
+    ])
+  )
 
-  const enrichedTickets = (tickets || []).map((ticket: any) => ({
+  const enrichedTickets = ((tickets as HelpDeskTicketRow[] | null) || []).map((ticket) => ({
     ...ticket,
     requester_department: requesterDepartmentMap.get(ticket.requester_id) || null,
-  }))
+  })) as HelpDeskTicketRow[]
 
-  const ticketIds = enrichedTickets.map((ticket: any) => ticket.id).filter(Boolean)
+  const ticketIds = enrichedTickets.map((ticket) => ticket.id).filter(Boolean)
   const { data: pendingApprovals } =
     ticketIds.length > 0
       ? await dataClient
@@ -78,7 +92,14 @@ async function getData() {
           .in("ticket_id", ticketIds)
           .eq("status", "pending")
           .order("requested_at", { ascending: true })
-      : { data: [] as any[] }
+      : {
+          data: [] as Array<{
+            ticket_id: string
+            approval_stage: string | null
+            status: string
+            requested_at: string | null
+          }>,
+        }
   const pendingStageByTicketId = new Map<string, string>()
   for (const approval of pendingApprovals || []) {
     const normalizedStage = normalizeApprovalStage(approval.approval_stage)
@@ -88,7 +109,7 @@ async function getData() {
       pendingStageByTicketId.set(approval.ticket_id, normalizedStage)
     }
   }
-  const ticketsWithStage = enrichedTickets.map((ticket: any) => ({
+  const ticketsWithStage = enrichedTickets.map((ticket) => ({
     ...ticket,
     current_approval_stage:
       normalizeApprovalStage(ticket.current_approval_stage) || pendingStageByTicketId.get(ticket.id) || null,
@@ -99,19 +120,30 @@ async function getData() {
       "id, full_name, first_name, last_name, role, department, is_department_lead, lead_departments, employment_status",
     leadOnly: true,
   })
-  const leadDirectory = (leadDirectoryRows || []).map((profile: any) => ({
+  const leadDirectory = (
+    (leadDirectoryRows as Array<{
+      id: string
+      full_name: string | null
+      first_name: string | null
+      last_name: string | null
+      role: string | null
+      department: string | null
+      lead_departments: string[] | null
+    }> | null) || []
+  ).map((profile) => ({
     id: profile.id,
     full_name:
       profile.full_name || [profile.first_name, profile.last_name].filter(Boolean).join(" ").trim() || "Unnamed Lead",
     role: profile.role || "",
     department: profile.department || null,
     lead_departments: Array.isArray(profile.lead_departments) ? profile.lead_departments : [],
-  }))
+  })) as LeadDirectoryMember[]
 
   const scopedTickets = departmentScope
     ? ticketsWithStage.filter(
-        (ticket: any) =>
-          departmentScope.includes(ticket.service_department) || departmentScope.includes(ticket.requester_department)
+        (ticket) =>
+          departmentScope.includes(ticket.service_department) ||
+          departmentScope.includes(ticket.requester_department || "")
       )
     : ticketsWithStage
 
@@ -139,10 +171,10 @@ export default async function AdminHelpDeskPage() {
 
   return (
     <AdminHelpDeskContent
-      initialTickets={data.tickets as any}
-      employees={data.employees as any}
-      leadDirectory={data.leadDirectory as any}
-      viewer={data.viewer as any}
+      initialTickets={data.tickets as HelpDeskTicket[]}
+      employees={data.employees as EmployeeOption[]}
+      leadDirectory={data.leadDirectory as LeadDirectoryMember[]}
+      viewer={data.viewer}
     />
   )
 }

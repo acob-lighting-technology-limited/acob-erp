@@ -3,15 +3,33 @@ import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
 import { resolveOneDriveAccessScope } from "@/lib/onedrive/access"
 import type { Documentation, UserProfile, employeeMember } from "./admin-documentation-content"
+import type { UserRole } from "@/types/database"
 
 import { logger } from "@/lib/logger"
 
 const log = logger("documentation-data")
 
+type AdminDepartmentDocs = {
+  initialPath: string
+  rootLabel: string
+  enabled: boolean
+  lockToInitialPath: boolean
+}
+
+export type AdminDocumentationDataResult =
+  | {
+      redirect: "/auth/login" | "/profile"
+    }
+  | {
+      documentation: Documentation[]
+      employee: employeeMember[]
+      userProfile: UserProfile
+      departmentDocs: AdminDepartmentDocs
+    }
 
 export async function getAdminDocumentationData() {
   const supabase = await createClient()
-  const dataClient = getServiceRoleClientOrFallback(supabase as any)
+  const dataClient = getServiceRoleClientOrFallback(supabase)
 
   const {
     data: { user },
@@ -22,14 +40,14 @@ export async function getAdminDocumentationData() {
     return { redirect: "/auth/login" as const }
   }
 
-  const scope = await resolveAdminScope(supabase as any, user.id)
+  const scope = await resolveAdminScope(supabase, user.id)
   if (!scope) {
-    return { redirect: "/dashboard" as const }
+    return { redirect: "/profile" as const }
   }
   const departmentScope = getDepartmentScope(scope, "general")
 
   const userProfile: UserProfile = {
-    role: scope.role as any,
+    role: scope.role as UserRole,
     lead_departments: scope.leadDepartments,
     managed_departments: scope.managedDepartments,
   }
@@ -98,7 +116,7 @@ export async function getAdminDocumentationData() {
   const { data: employeeData } = await employeeQuery
 
   employee = employeeData || []
-  const oneDriveScope = await resolveOneDriveAccessScope(supabase as any, user.id)
+  const oneDriveScope = await resolveOneDriveAccessScope(supabase, user.id)
 
   return {
     documentation,

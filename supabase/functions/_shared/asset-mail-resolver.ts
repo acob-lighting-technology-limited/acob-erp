@@ -32,7 +32,15 @@ type SupabaseEdgeClient = {
         column: string,
         value: string
       ) => {
-        single: () => Promise<{ data: any; error: unknown }>
+        single: () => Promise<{
+          data: {
+            full_name?: string | null
+            department?: string | null
+            additional_email?: string | null
+            employment_status?: string | null
+          } | null
+          error: unknown
+        }>
       }
     }
   }

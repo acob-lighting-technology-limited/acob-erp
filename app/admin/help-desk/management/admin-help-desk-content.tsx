@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 import { toast } from "sonner"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -27,6 +27,10 @@ interface AdminHelpDeskContentProps {
 
 const FINAL_STATUSES = new Set(["resolved", "closed", "cancelled", "rejected"])
 
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback
+}
+
 export function AdminHelpDeskContent({ initialTickets, employees, leadDirectory, viewer }: AdminHelpDeskContentProps) {
   const [tickets, setTickets] = useState(initialTickets)
   const [assignmentMap, setAssignmentMap] = useState<Record<string, string>>({})
@@ -45,13 +49,19 @@ export function AdminHelpDeskContent({ initialTickets, employees, leadDirectory,
     }
   }, [tickets])
 
-  const managedDepartments =
-    (Array.isArray(viewer.managed_departments) && viewer.managed_departments.length > 0
-      ? viewer.managed_departments
-      : viewer.lead_departments) || []
+  const managedDepartments = useMemo(
+    () =>
+      (Array.isArray(viewer.managed_departments) && viewer.managed_departments.length > 0
+        ? viewer.managed_departments
+        : viewer.lead_departments) || [],
+    [viewer.lead_departments, viewer.managed_departments]
+  )
 
-  const canLeadDepartment = (department: string | null) =>
-    Boolean(viewer.is_department_lead && department && managedDepartments.includes(department))
+  const canLeadDepartment = useCallback(
+    (department: string | null) =>
+      Boolean(viewer.is_department_lead && department && managedDepartments.includes(department)),
+    [managedDepartments, viewer.is_department_lead]
+  )
 
   const allPendingTickets = useMemo(() => tickets.filter((ticket) => !FINAL_STATUSES.has(ticket.status)), [tickets])
   const historyTickets = useMemo(() => tickets.filter((ticket) => FINAL_STATUSES.has(ticket.status)), [tickets])
@@ -80,7 +90,7 @@ export function AdminHelpDeskContent({ initialTickets, employees, leadDirectory,
       }
       return ticket.assigned_to === viewer.id
     })
-  }, [allPendingTickets, managedDepartments, viewer.id, viewer.is_department_lead])
+  }, [allPendingTickets, canLeadDepartment, viewer.id])
 
   const myActionQueueIds = useMemo(() => new Set(myActionQueue.map((t) => t.id)), [myActionQueue])
 
@@ -119,8 +129,7 @@ export function AdminHelpDeskContent({ initialTickets, employees, leadDirectory,
       toast.success("Ticket assigned")
       await refresh()
     } catch (error: unknown) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      toast.error((error as any)?.message || "Assignment failed")
+      toast.error(getErrorMessage(error, "Assignment failed"))
     } finally {
       setLoadingTicketId(null)
     }
@@ -141,8 +150,7 @@ export function AdminHelpDeskContent({ initialTickets, employees, leadDirectory,
       toast.success("Ticket updated")
       await refresh()
     } catch (error: unknown) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      toast.error((error as any)?.message || "Routing failed")
+      toast.error(getErrorMessage(error, "Routing failed"))
     } finally {
       setLoadingTicketId(null)
     }
@@ -163,8 +171,7 @@ export function AdminHelpDeskContent({ initialTickets, employees, leadDirectory,
       toast.success("Ticket moved to procurement approval")
       await refresh()
     } catch (error: unknown) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      toast.error((error as any)?.message || "Pivot failed")
+      toast.error(getErrorMessage(error, "Pivot failed"))
     } finally {
       setLoadingTicketId(null)
     }
@@ -185,8 +192,7 @@ export function AdminHelpDeskContent({ initialTickets, employees, leadDirectory,
       toast.success(decision === "approved" ? "Approval recorded" : "Rejection recorded")
       await refresh()
     } catch (error: unknown) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      toast.error((error as any)?.message || "Decision failed")
+      toast.error(getErrorMessage(error, "Decision failed"))
     } finally {
       setLoadingTicketId(null)
     }

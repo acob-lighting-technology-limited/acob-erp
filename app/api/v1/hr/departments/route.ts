@@ -8,6 +8,8 @@ const log = logger("v1-hr-departments")
 
 export const dynamic = "force-dynamic"
 
+type HrDepartmentsClient = Awaited<ReturnType<typeof createClient>>
+
 // Helper function to create Supabase client
 async function createClient() {
   const cookieStore = await cookies()
@@ -63,7 +65,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const scope = await resolveAdminScope(supabase as any, user.id)
+    const scope = await resolveAdminScope(supabase as HrDepartmentsClient, user.id)
     if (!scope || !canAccessAdminSection(scope, "hr")) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }

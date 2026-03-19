@@ -49,7 +49,7 @@ interface Category {
 
 async function getPaymentsData() {
   const supabase = await createClient()
-  const dataClient = getServiceRoleClientOrFallback(supabase as any)
+  const dataClient = getServiceRoleClientOrFallback(supabase)
 
   const {
     data: { user },
@@ -65,10 +65,9 @@ async function getPaymentsData() {
     .from("profiles")
     .select("department, department_id")
     .eq("id", user.id)
-    .single()
+    .single<{ department: string | null; department_id: string | null }>()
 
   let currentUserDepartmentId: string | null = null
-  const isAdmin = false
 
   const resolveDepartmentCandidates = (department: string | null | undefined): string[] => {
     const raw = String(department || "").trim()
@@ -78,7 +77,7 @@ async function getPaymentsData() {
   }
 
   if (profile) {
-    currentUserDepartmentId = (profile as any).department_id || null
+    currentUserDepartmentId = profile.department_id || null
     if (!currentUserDepartmentId) {
       const candidates = resolveDepartmentCandidates(profile.department)
       if (candidates.length > 0) {
@@ -149,13 +148,7 @@ export default async function DepartmentPaymentsPage() {
     redirect(data.redirect)
   }
 
-  const paymentsData = data as {
-    payments: Payment[]
-    departments: Department[]
-    categories: Category[]
-    loadError?: string | null
-    currentUser: { id: string; department_id: string | null; isAdmin: boolean }
-  }
+  const paymentsData = data as Exclude<Awaited<ReturnType<typeof getPaymentsData>>, { redirect: "/auth/login" }>
 
   return (
     <PaymentsTable

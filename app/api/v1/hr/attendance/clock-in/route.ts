@@ -5,7 +5,7 @@ import { writeAuditLog } from "@/lib/audit/write-audit"
 
 const log = logger("v1-hr-attendance-clock-in")
 
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   try {
     const supabase = await createClient()
 

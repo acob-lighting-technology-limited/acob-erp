@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { formatName } from "@/lib/utils"
+import type { FeedbackRecord } from "@/components/feedback/types"
 
 function getTypeColor(type: string): string {
   switch (type) {
@@ -38,8 +39,7 @@ function getStatusColor(status: string): string {
 }
 
 interface FeedbackDetailDialogProps {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  feedback: any | null
+  feedback: FeedbackRecord | null
   isOpen: boolean
   onOpenChange: (open: boolean) => void
   onUpdateStatus: (newStatus: string) => void

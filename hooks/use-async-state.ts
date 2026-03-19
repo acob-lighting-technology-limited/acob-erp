@@ -19,10 +19,10 @@ export function useAsyncState<T>(initialData: T | null = null) {
         setStatus("success")
       }
       return result
-    } catch (e: any) {
-      setError(e?.message || "Request failed")
+    } catch (error: unknown) {
+      setError(error instanceof Error ? error.message : "Request failed")
       setStatus("error")
-      throw e
+      throw error
     }
   }, [])
 

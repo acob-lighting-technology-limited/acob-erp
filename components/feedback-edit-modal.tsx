@@ -10,11 +10,12 @@ import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
 import { writeAuditLogClient } from "@/lib/audit/client"
+import type { EditableFeedbackRecord } from "@/components/feedback/types"
 
 interface FeedbackEditModalProps {
-  feedback: any
+  feedback: EditableFeedbackRecord
   onClose: () => void
-  onSave: (feedback: any) => void
+  onSave: (feedback: EditableFeedbackRecord) => void
 }
 
 export function FeedbackEditModal({ feedback, onClose, onSave }: FeedbackEditModalProps) {
@@ -44,7 +45,7 @@ export function FeedbackEditModal({ feedback, onClose, onSave }: FeedbackEditMod
 
       // Log audit
       await writeAuditLogClient(
-        supabase as any,
+        supabase,
         {
           action: "update",
           entityType: "feedback",
@@ -70,7 +71,9 @@ export function FeedbackEditModal({ feedback, onClose, onSave }: FeedbackEditMod
       toast.success("Feedback updated successfully!")
       onSave({
         ...feedback,
-        ...formData,
+        feedback_type: formData.feedbackType,
+        title: formData.title,
+        description: formData.description,
       })
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Failed to update feedback"
@@ -120,7 +123,7 @@ export function FeedbackEditModal({ feedback, onClose, onSave }: FeedbackEditMod
             <Label htmlFor="description">Description</Label>
             <Textarea
               id="description"
-              value={formData.description}
+              value={formData.description ?? ""}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               rows={4}
             />

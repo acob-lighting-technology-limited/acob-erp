@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 
-async function assertHR(supabase: any, userId: string) {
+async function assertHR(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
   const { data } = await supabase.from("profiles").select("role").eq("id", userId).single()
   return ["developer", "admin", "super_admin"].includes(data?.role)
 }
@@ -22,7 +22,7 @@ export async function GET() {
 
     if (error) return NextResponse.json({ error: "Failed to fetch leave policies" }, { status: 500 })
     return NextResponse.json({ data: data || [] })
-  } catch (error) {
+  } catch (_error) {
     return NextResponse.json({ error: "An error occurred" }, { status: 500 })
   }
 }

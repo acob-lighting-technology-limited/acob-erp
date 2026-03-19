@@ -63,8 +63,25 @@ export async function sendEdgeNotificationEmail(input: SendEdgeNotificationEmail
 type EdgeSupabaseClient = {
   from: (table: string) => {
     select: (query: string) => {
-      eq: (column: string, value: string) => any
-      maybeSingle: () => Promise<{ data: any; error: unknown }>
+      eq: (
+        column: string,
+        value: string
+      ) => {
+        eq: (
+          column: string,
+          value: string
+        ) => {
+          maybeSingle: () => Promise<{ data: { email_enabled?: boolean | null } | null; error: unknown }>
+        }
+        maybeSingle: () => Promise<{
+          data: { email_enabled?: boolean | null; email_mandatory?: boolean | null } | null
+          error: unknown
+        }>
+      }
+      maybeSingle: () => Promise<{
+        data: { email_enabled?: boolean | null; email_mandatory?: boolean | null } | null
+        error: unknown
+      }>
     }
   }
 }

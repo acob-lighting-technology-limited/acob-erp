@@ -49,7 +49,7 @@ export function ProjectTasksTab({ tasks, getStatusColor, getPriorityColor, forma
         ) : (
           <div className="space-y-3">
             {tasks.map((task) => (
-              <Link key={task.id} href={`/tasks`}>
+              <Link key={task.id} href="/tasks">
                 <div className="hover:bg-accent cursor-pointer rounded-lg border p-3 transition-colors">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">

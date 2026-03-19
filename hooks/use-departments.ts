@@ -29,7 +29,6 @@ export function useDepartments() {
     data: departments = [],
     isLoading,
     error,
-    refetch,
   } = useQuery({
     queryKey: QUERY_KEYS.departments(),
     queryFn: fetchDepartmentNames,

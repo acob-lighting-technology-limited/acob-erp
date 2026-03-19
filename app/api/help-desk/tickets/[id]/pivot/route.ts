@@ -4,14 +4,33 @@ import {
   appendHelpDeskEvent,
   canLeadDepartment,
   getAuthContext,
+  HelpDeskProfile,
   isAdminRole,
   resolveLeadForDepartment,
 } from "@/lib/help-desk/server"
 import { sendHelpDeskMail } from "@/lib/help-desk/mailer"
-import { applyAssignableStatusFilter } from "@/lib/workforce/assignment-policy"
 import { logger } from "@/lib/logger"
 
 const log = logger("help-desk-tickets-pivot")
+export const dynamic = "force-dynamic"
+
+type ApprovalProfileRow = Pick<
+  HelpDeskProfile,
+  "id" | "full_name" | "role" | "department" | "is_department_lead" | "lead_departments"
+>
+
+type ResolvableApprovalProfile = Omit<ApprovalProfileRow, "is_department_lead"> & {
+  is_department_lead?: boolean
+}
+
+function normalizeApprovalProfiles(profiles: ApprovalProfileRow[] | null | undefined): ResolvableApprovalProfile[] {
+  return (profiles || [])
+    .filter((profile): profile is ApprovalProfileRow => Boolean(profile?.id))
+    .map((profile) => ({
+      ...profile,
+      is_department_lead: profile.is_department_lead ?? undefined,
+    }))
+}
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -76,12 +95,15 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       ])
     }
 
-    const { data: profiles } = await applyAssignableStatusFilter(
-      supabase.from("profiles").select("id, full_name, role, department, is_department_lead, lead_departments"),
-      { allowLegacyNullStatus: false }
-    )
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("id, full_name, role, department, is_department_lead, lead_departments")
+      .eq("is_department_lead", true)
 
-    const requesterLead = resolveLeadForDepartment((profiles || []) as any[], ticket.requester_department) as any
+    const requesterLead = resolveLeadForDepartment(
+      normalizeApprovalProfiles(profiles as ApprovalProfileRow[] | null),
+      ticket.requester_department
+    )
 
     try {
       await sendHelpDeskMail({

@@ -4,6 +4,14 @@ import { evaluateLeaveEligibility, getLeavePolicy } from "@/lib/hr/leave-workflo
 import { logger } from "@/lib/logger"
 
 const log = logger("hr-leave-types")
+export const dynamic = "force-dynamic"
+
+type LeaveTypeSummary = {
+  id: string
+  name?: string | null
+  code?: string | null
+  max_days?: number | null
+}
 
 export async function GET(_: NextRequest) {
   try {
@@ -41,7 +49,7 @@ export async function GET(_: NextRequest) {
     }
 
     const enriched = await Promise.all(
-      (leaveTypes || []).map(async (leaveType: any) => {
+      ((leaveTypes || []) as LeaveTypeSummary[]).map(async (leaveType) => {
         const policy = await getLeavePolicy(supabase, leaveType.id)
         const evaluation = await evaluateLeaveEligibility({
           supabase,

@@ -3,10 +3,25 @@ import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { AdminCorrespondenceContent } from "../../correspondence/admin-correspondence-content"
 import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
+import type { CorrespondenceRecord } from "@/types/correspondence"
+
+type EmployeeRow = {
+  id: string
+  first_name: string | null
+  last_name: string | null
+  department: string | null
+  role: string | null
+}
+
+type DepartmentCodeRow = {
+  department_name: string
+  department_code: string
+  is_active: boolean
+}
 
 async function getData() {
   const supabase = await createClient()
-  const dataClient = getServiceRoleClientOrFallback(supabase as any)
+  const dataClient = getServiceRoleClientOrFallback(supabase)
 
   const {
     data: { user },
@@ -16,9 +31,9 @@ async function getData() {
     return { redirectTo: "/auth/login" as const }
   }
 
-  const scope = await resolveAdminScope(supabase as any, user.id)
+  const scope = await resolveAdminScope(supabase, user.id)
   if (!scope) {
-    return { redirectTo: "/dashboard" as const }
+    return { redirectTo: "/profile" as const }
   }
 
   const departmentScope = getDepartmentScope(scope, "general")
@@ -39,19 +54,20 @@ async function getData() {
 
   const [{ data: records }, { data: employees }, { data: departmentCodes }] = await Promise.all([
     recordsQuery,
-    employeesQuery,
+    employeesQuery.returns<EmployeeRow[]>(),
     dataClient
       .from("correspondence_department_codes")
       .select("department_name, department_code, is_active")
-      .order("department_name", { ascending: true }),
+      .order("department_name", { ascending: true })
+      .returns<DepartmentCodeRow[]>(),
   ])
 
   const scopedRecords =
     departmentScope && departmentScope.length > 0
       ? (records || []).filter(
-          (record: any) =>
-            departmentScope.includes(record.department_name) ||
-            departmentScope.includes(record.assigned_department_name)
+          (record: CorrespondenceRecord) =>
+            departmentScope.includes(record.department_name || "") ||
+            departmentScope.includes(record.assigned_department_name || "")
         )
       : departmentScope
         ? []
@@ -73,9 +89,9 @@ export default async function AdminReferenceGeneratorPage() {
 
   return (
     <AdminCorrespondenceContent
-      initialRecords={data.records as any}
-      employees={data.employees as any}
-      departmentCodes={data.departmentCodes as any}
+      initialRecords={data.records}
+      employees={data.employees}
+      departmentCodes={data.departmentCodes}
     />
   )
 }

@@ -2,6 +2,13 @@ import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { listAssignableProfiles } from "@/lib/workforce/assignment-policy"
 
+type AssignableProfileRow = {
+  id: string
+  full_name?: string | null
+  first_name?: string | null
+  last_name?: string | null
+}
+
 export async function GET() {
   try {
     const supabase = await createClient()
@@ -20,8 +27,8 @@ export async function GET() {
 
     if (error) return NextResponse.json({ error: "Failed to fetch relievers" }, { status: 500 })
 
-    const options = (data || [])
-      .map((person: any) => {
+    const options = ((data || []) as AssignableProfileRow[])
+      .map((person) => {
         const label =
           person.full_name?.trim() || `${person.first_name || ""} ${person.last_name || ""}`.trim() || "Unnamed"
         return { value: person.id, label }

@@ -17,7 +17,7 @@ import {
   Eye,
 } from "lucide-react"
 import { formatName } from "@/lib/utils"
-import type { Task } from "@/app/(app)/dashboard/tasks/management/tasks-content"
+import type { Task } from "@/app/(app)/tasks/management/tasks-content"
 
 function getPriorityColor(priority: string) {
   switch (priority) {

@@ -5,12 +5,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Copy } from "lucide-react"
-import { useTheme } from "next-themes"
 import { toast } from "sonner"
-import Link from "next/link"
 
 interface SignatureCreatorProps {
-  profile: any
+  profile: {
+    first_name?: string | null
+    other_names?: string | null
+    last_name?: string | null
+    company_role?: string | null
+    phone_number?: string | null
+    company_email?: string | null
+  } | null
 }
 
 interface FormData {
@@ -23,7 +28,6 @@ interface FormData {
 }
 
 export function SignatureCreator({ profile }: SignatureCreatorProps) {
-  const { theme, setTheme } = useTheme()
   const [formData, setFormData] = useState<FormData>({
     firstName: profile?.first_name || "",
     middleName: profile?.other_names || "",
@@ -50,7 +54,7 @@ export function SignatureCreator({ profile }: SignatureCreatorProps) {
         setFormData((prev) => ({ ...prev, companyEmail: autoEmail }))
       }
     }
-  }, [formData.firstName, formData.lastName])
+  }, [formData.companyEmail, formData.firstName, formData.lastName])
 
   const formatPhoneNumber = (phone: string) => {
     const digits = phone.replace(/\D/g, "")
@@ -161,7 +165,7 @@ export function SignatureCreator({ profile }: SignatureCreatorProps) {
     try {
       await navigator.clipboard.writeText(signature)
       toast.success("Signature copied to clipboard!")
-    } catch (err) {
+    } catch {
       toast.error("Failed to copy signature")
     }
   }

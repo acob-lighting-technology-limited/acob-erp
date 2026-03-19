@@ -13,10 +13,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { TableSkeleton } from "@/components/ui/query-states"
 
-import { logger } from "@/lib/logger"
-
-const log = logger("dev-login-logs-dev-login-logs-content")
-
 type DevLoginLogRow = {
   id: string
   email: string

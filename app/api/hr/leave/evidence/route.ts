@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
         title: "Leave request ready for approval",
         message: "Required evidence has been completed. The leave request has entered approval workflow.",
         actorId: user.id,
-        linkUrl: "/dashboard/leave",
+        linkUrl: "/leave",
         entityId: leave_request_id,
         emailEvent: "ready_for_approval",
       })

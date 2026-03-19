@@ -163,14 +163,12 @@ export function DocumentationContent({
         updated_at: new Date().toISOString(),
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const sb = supabase as any
       const auditCtx = { source: "ui" as const, route: "/documentation", actorId: userId }
       if (selectedDoc) {
         const { error } = await supabase.from("user_documentation").update(docData).eq("id", selectedDoc.id)
         if (error) throw error
         await writeAuditLogClient(
-          sb,
+          supabase,
           {
             action: "update",
             entityType: "documentation",
@@ -189,7 +187,7 @@ export function DocumentationContent({
           .single()
         if (error) throw error
         await writeAuditLogClient(
-          sb,
+          supabase,
           {
             action: "create",
             entityType: "documentation",
@@ -219,9 +217,8 @@ export function DocumentationContent({
     try {
       const { error } = await supabase.from("user_documentation").delete().eq("id", selectedDoc.id)
       if (error) throw error
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await writeAuditLogClient(
-        supabase as any,
+        supabase,
         {
           action: "delete",
           entityType: "documentation",

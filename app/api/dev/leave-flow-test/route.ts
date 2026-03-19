@@ -132,8 +132,8 @@ export async function POST(request: NextRequest) {
           routeSnapshot.map((s) => ({ order: s.stage_order, stage: s.stage_code, approver: s.approver_user_id }))
         )
       )
-    } catch (e: any) {
-      steps.push(err("build_route_snapshot", e.message))
+    } catch (e: unknown) {
+      steps.push(err("build_route_snapshot", e instanceof Error ? e.message : "Unknown error"))
       return NextResponse.json({ ok: false, steps })
     }
 
@@ -306,7 +306,7 @@ export async function POST(request: NextRequest) {
 
     const allOk = steps.every((s) => s.status !== "error")
     return NextResponse.json({ ok: allOk, leave_request_id: cleanup ? null : leaveRequestId, steps })
-  } catch (error: any) {
+  } catch (error: unknown) {
     // cleanup on unexpected error
     if (cleanup && leaveRequestId) {
       try {
@@ -320,6 +320,7 @@ export async function POST(request: NextRequest) {
         /* ignore */
       }
     }
-    return NextResponse.json({ ok: false, error: error?.message || "Unexpected error", steps }, { status: 500 })
+    const message = error instanceof Error ? error.message : "Unexpected error"
+    return NextResponse.json({ ok: false, error: message, steps }, { status: 500 })
   }
 }

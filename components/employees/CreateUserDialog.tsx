@@ -51,7 +51,7 @@ export function CreateUserDialog({
   setForm,
   onCreate,
   isCreating,
-  canManageUsers,
+  canManageUsers: _canManageUsers,
   userProfile,
 }: CreateUserDialogProps) {
   const { departments: DEPARTMENTS } = useDepartments()

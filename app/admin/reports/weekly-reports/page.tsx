@@ -4,9 +4,15 @@ import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { WeeklyReportsContent } from "./weekly-reports-content"
 import { resolveAdminScope } from "@/lib/admin/rbac"
 
+type EmployeeRow = {
+  id: string
+  full_name: string | null
+  department: string | null
+}
+
 export default async function WeeklyReportsPage() {
   const supabase = await createClient()
-  const dataClient = getServiceRoleClientOrFallback(supabase as any)
+  const dataClient = getServiceRoleClientOrFallback(supabase)
 
   const {
     data: { user },
@@ -17,9 +23,9 @@ export default async function WeeklyReportsPage() {
     redirect("/auth/login")
   }
 
-  const scope = await resolveAdminScope(supabase as any, user.id)
+  const scope = await resolveAdminScope(supabase, user.id)
   if (!scope) {
-    redirect("/dashboard")
+    redirect("/profile")
   }
 
   // Fetch departments for filtering and presenter options for week setup.
@@ -27,13 +33,14 @@ export default async function WeeklyReportsPage() {
     .from("profiles")
     .select("id, full_name, department")
     .not("department", "is", null)
+    .returns<EmployeeRow[]>()
 
-  const departments = Array.from(new Set(employeeData?.map((s: any) => s.department).filter(Boolean))) as string[]
+  const departments = Array.from(new Set((employeeData || []).map((row) => row.department).filter(Boolean))) as string[]
   departments.sort()
 
   const employees = (employeeData || [])
-    .filter((row: any) => row?.id && row?.full_name && row?.department)
-    .map((row: any) => ({
+    .filter((row) => row?.id && row?.full_name && row?.department)
+    .map((row) => ({
       id: String(row.id),
       full_name: String(row.full_name),
       department: String(row.department),

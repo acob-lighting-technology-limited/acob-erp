@@ -3,6 +3,14 @@ import { canManageFleet } from "@/lib/fleet-booking"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
 
+type FleetAdminBookingRow = {
+  id: string
+}
+
+type FleetAttachmentRow = {
+  booking_id: string
+}
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient()
@@ -48,8 +56,8 @@ export async function GET(request: NextRequest) {
     const { data: bookings, error } = await query
     if (error) return NextResponse.json({ error: error.message || "Failed to load bookings" }, { status: 500 })
 
-    const bookingIds = (bookings || []).map((row: any) => row.id)
-    let attachmentRows: any[] = []
+    const bookingIds = ((bookings || []) as FleetAdminBookingRow[]).map((row) => row.id)
+    let attachmentRows: FleetAttachmentRow[] = []
     if (bookingIds.length > 0) {
       const { data: attachments } = await dataClient
         .from("fleet_booking_attachments")
@@ -64,7 +72,7 @@ export async function GET(request: NextRequest) {
       attachmentCounts.set(attachment.booking_id, (attachmentCounts.get(attachment.booking_id) || 0) + 1)
     }
 
-    const data = (bookings || []).map((booking: any) => ({
+    const data = ((bookings || []) as FleetAdminBookingRow[]).map((booking) => ({
       ...booking,
       attachment_count: attachmentCounts.get(booking.id) || 0,
     }))

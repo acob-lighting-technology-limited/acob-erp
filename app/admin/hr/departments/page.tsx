@@ -29,7 +29,7 @@ import { TableSkeleton } from "@/components/ui/query-states"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
-import { applyAssignableStatusFilter } from "@/lib/workforce/assignment-policy"
+import { isAssignableEmploymentStatus } from "@/lib/workforce/assignment-policy"
 
 import { logger } from "@/lib/logger"
 
@@ -57,17 +57,14 @@ async function fetchDepartmentsData(): Promise<DepartmentsData> {
   const { data: depts, error } = await supabase.from("departments").select("*").order("name")
   if (error) throw new Error(error.message)
 
-  const { data: profiles } = await applyAssignableStatusFilter(
-    supabase
-      .from("profiles")
-      .select(
-        "id, first_name, last_name, company_email, additional_email, company_role, employment_status, department"
-      ),
-    { allowLegacyNullStatus: false }
-  )
+  const { data: profiles } = await supabase
+    .from("profiles")
+    .select("id, first_name, last_name, company_email, additional_email, company_role, employment_status, department")
 
   const employeesByDepartment: Record<string, DepartmentEmployee[]> = {}
-  for (const profile of (profiles || []) as DepartmentEmployee[]) {
+  for (const profile of ((profiles || []) as DepartmentEmployee[]).filter((employee) =>
+    isAssignableEmploymentStatus(employee.employment_status, { allowLegacyNullStatus: false })
+  )) {
     const deptName = profile.department || "Unassigned"
     if (!employeesByDepartment[deptName]) employeesByDepartment[deptName] = []
     employeesByDepartment[deptName].push(profile)
@@ -104,10 +101,6 @@ interface DepartmentEmployee {
   company_role: string | null
   employment_status: string | null
   department: string | null
-}
-
-interface CurrentUserAccess {
-  canManageDepartments: boolean
 }
 
 export default function DepartmentsPage() {
@@ -171,9 +164,9 @@ export default function DepartmentsPage() {
       setEditingDepartment(null)
       setFormData({ name: "", description: "", is_active: true })
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminDepartmentsPage() })
-    } catch (error: any) {
+    } catch (error: unknown) {
       log.error("Error saving department:", error)
-      toast.error(error.message || "Failed to save department")
+      toast.error(error instanceof Error ? error.message : "Failed to save department")
     }
   }
 

@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { EmptyState } from "@/components/ui/patterns"
 import { Users, Building2, MessageSquare, Send, TrendingUp, AlertCircle, CheckCircle2, Clock } from "lucide-react"
 import { formatName } from "@/lib/utils"
-import type { Task } from "@/app/(app)/dashboard/tasks/management/tasks-content"
+import type { Task } from "@/app/(app)/tasks/management/tasks-content"
 
 interface TaskUpdate {
   id: string

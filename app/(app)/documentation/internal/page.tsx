@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation"
 import { DocumentationContent } from "../documentation-content"
-import { getDocumentationData } from "../data"
+import { getDocumentationData, type DocumentationDataResult } from "../data"
 
 export default async function InternalDocumentationPage() {
   const data = await getDocumentationData()
@@ -9,7 +9,7 @@ export default async function InternalDocumentationPage() {
     redirect(data.redirect)
   }
 
-  const docsData = data as any
+  const docsData = data as Exclude<DocumentationDataResult, { redirect: "/auth/login" }>
 
   return (
     <DocumentationContent

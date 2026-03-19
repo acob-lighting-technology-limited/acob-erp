@@ -13,7 +13,6 @@ import {
   FileText,
   MessageSquare,
   ScrollText,
-  ShieldCheck,
   LogOut,
   FolderKanban,
   CreditCard,
@@ -86,7 +85,7 @@ function getDomainForAdminPath(path: string): AdminDomain | null {
   if (
     path.startsWith("/admin/documentation") ||
     path.startsWith("/admin/feedback") ||
-    path.startsWith("/admin/notification") ||
+    path.startsWith("/admin/notifications") ||
     path.startsWith("/admin/communications") ||
     path.startsWith("/admin/tools") ||
     path.startsWith("/admin/help-desk")
@@ -156,7 +155,7 @@ const adminNavigation = [
   {
     section: "operations",
     name: "Notifications",
-    href: "/admin/notification",
+    href: "/admin/notifications",
     icon: Bell,
     roles: ["developer", "super_admin", "admin"],
   },
@@ -446,7 +445,7 @@ export function AdminSidebar({ user, profile }: AdminSidebarProps) {
 
       {/* Back to Dashboard & Logout */}
       <div className="space-y-1.5 border-t px-2.5 py-2.5">
-        <Link href="/dashboard" className="block">
+        <Link href="/profile" className="block">
           <Button
             variant="outline"
             className={cn(

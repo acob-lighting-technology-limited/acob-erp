@@ -19,14 +19,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import type { EditableFeedbackRecord } from "@/components/feedback/types"
 
 interface UserFeedbackListProps {
-  feedback: any[]
+  feedback: EditableFeedbackRecord[]
 }
 
 export function UserFeedbackList({ feedback }: UserFeedbackListProps) {
   const [feedbackList, setFeedbackList] = useState(feedback)
-  const [selectedFeedback, setSelectedFeedback] = useState<any>(null)
+  const [selectedFeedback, setSelectedFeedback] = useState<EditableFeedbackRecord | null>(null)
   const [showEditModal, setShowEditModal] = useState(false)
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
 
@@ -74,7 +75,7 @@ export function UserFeedbackList({ feedback }: UserFeedbackListProps) {
       // Log audit
       if (feedbackToDelete) {
         await writeAuditLogClient(
-          supabase as any,
+          supabase,
           {
             action: "delete",
             entityType: "feedback",
@@ -102,12 +103,12 @@ export function UserFeedbackList({ feedback }: UserFeedbackListProps) {
     }
   }
 
-  const handleEdit = (item: any) => {
+  const handleEdit = (item: EditableFeedbackRecord) => {
     setSelectedFeedback(item)
     setShowEditModal(true)
   }
 
-  const handleSaveEdit = (updatedFeedback: any) => {
+  const handleSaveEdit = (updatedFeedback: EditableFeedbackRecord) => {
     setFeedbackList(feedbackList.map((item) => (item.id === updatedFeedback.id ? updatedFeedback : item)))
     setShowEditModal(false)
     setSelectedFeedback(null)

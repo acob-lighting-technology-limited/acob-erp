@@ -235,12 +235,13 @@ export async function POST(req: Request) {
     )
 
     return NextResponse.json({ success: true, employeeId })
-  } catch (error: any) {
+  } catch (error: unknown) {
     log.error({ err: String(error) }, "Approval process failed")
     // Redact internal error details from the client
-    const message = error.message?.includes("Auth creation failed")
-      ? error.message
-      : "An unexpected error occurred during the approval process. Please check system logs."
+    const message =
+      error instanceof Error && error.message.includes("Auth creation failed")
+        ? error.message
+        : "An unexpected error occurred during the approval process. Please check system logs."
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }

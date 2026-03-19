@@ -4,11 +4,11 @@
  */
 
 import { createClient } from "@/lib/supabase/client"
+import type { Json } from "@/types/database"
 
 import { logger } from "@/lib/logger"
 
 const log = logger("lib-notifications")
-
 
 interface CreateNotificationParams {
   userId: string
@@ -32,7 +32,7 @@ interface CreateNotificationParams {
   actorId?: string
   entityType?: string
   entityId?: string
-  richContent?: any
+  richContent?: Json
 }
 
 /**

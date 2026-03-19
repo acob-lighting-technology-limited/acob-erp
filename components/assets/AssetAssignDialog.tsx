@@ -99,8 +99,7 @@ export function AssetAssignDialog({
                   <span>{currentAssignment.department} (Department)</span>
                 ) : currentAssignment.user ? (
                   <span>
-                    {formatName((currentAssignment.user as any)?.first_name)}{" "}
-                    {formatName((currentAssignment.user as any)?.last_name)}
+                    {formatName(currentAssignment.user.first_name)} {formatName(currentAssignment.user.last_name)}
                   </span>
                 ) : (
                   "Unknown"

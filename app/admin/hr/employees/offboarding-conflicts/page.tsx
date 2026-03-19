@@ -23,7 +23,7 @@ export default async function OffboardingConflictsPage() {
 
   const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
   if (!profile || !["developer", "super_admin", "admin"].includes(profile.role)) {
-    redirect("/dashboard")
+    redirect("/profile")
   }
 
   const { data: separatedUsers } = await supabase

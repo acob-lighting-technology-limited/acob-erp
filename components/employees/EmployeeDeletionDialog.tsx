@@ -12,22 +12,13 @@ import { Button } from "@/components/ui/button"
 import { AlertTriangle, Loader2, Trash2 } from "lucide-react"
 import { formatName } from "@/lib/utils"
 import type { Employee } from "@/app/admin/hr/employees/admin-employee-content"
-
-interface AssignedItems {
-  tasks: any[]
-  taskAssignments: any[]
-  assets: any[]
-  projects: any[]
-  projectMemberships: any[]
-  feedback: any[]
-  documentation: any[]
-}
+import type { EmployeeAssignedItems } from "./types"
 
 interface EmployeeDeletionDialogProps {
   isOpen: boolean
   onOpenChange: (open: boolean) => void
   employee: Employee | null
-  assignedItems: AssignedItems
+  assignedItems: EmployeeAssignedItems
   onDelete: () => void
   isDeleting: boolean
 }
@@ -82,7 +73,7 @@ export function EmployeeDeletionDialog({
                       <div>
                         <p className="text-foreground mb-1 text-sm font-medium">Tasks ({assignedItems.tasks.length})</p>
                         <div className="max-h-32 space-y-1 overflow-y-auto">
-                          {assignedItems.tasks.slice(0, 5).map((task: any) => (
+                          {assignedItems.tasks.slice(0, 5).map((task) => (
                             <div key={task.id} className="text-muted-foreground bg-background rounded p-2 text-xs">
                               • {task.title} ({task.status})
                             </div>
@@ -102,7 +93,7 @@ export function EmployeeDeletionDialog({
                           Task Assignments ({assignedItems.taskAssignments.length})
                         </p>
                         <div className="max-h-32 space-y-1 overflow-y-auto">
-                          {assignedItems.taskAssignments.slice(0, 5).map((assignment: any) => (
+                          {assignedItems.taskAssignments.slice(0, 5).map((assignment) => (
                             <div
                               key={assignment.id}
                               className="text-muted-foreground bg-background rounded p-2 text-xs"
@@ -125,7 +116,7 @@ export function EmployeeDeletionDialog({
                           Assets ({assignedItems.assets.length})
                         </p>
                         <div className="max-h-32 space-y-1 overflow-y-auto">
-                          {assignedItems.assets.slice(0, 5).map((assignment: any) => (
+                          {assignedItems.assets.slice(0, 5).map((assignment) => (
                             <div
                               key={assignment.id}
                               className="text-muted-foreground bg-background rounded p-2 text-xs"
@@ -150,7 +141,7 @@ export function EmployeeDeletionDialog({
                           Projects ({assignedItems.projects.length})
                         </p>
                         <div className="max-h-32 space-y-1 overflow-y-auto">
-                          {assignedItems.projects.slice(0, 5).map((project: any) => (
+                          {assignedItems.projects.slice(0, 5).map((project) => (
                             <div key={project.id} className="text-muted-foreground bg-background rounded p-2 text-xs">
                               • {project.project_name} ({project.status})
                             </div>
@@ -170,7 +161,7 @@ export function EmployeeDeletionDialog({
                           Project Memberships ({assignedItems.projectMemberships.length})
                         </p>
                         <div className="max-h-32 space-y-1 overflow-y-auto">
-                          {assignedItems.projectMemberships.slice(0, 5).map((membership: any) => (
+                          {assignedItems.projectMemberships.slice(0, 5).map((membership) => (
                             <div
                               key={membership.id}
                               className="text-muted-foreground bg-background rounded p-2 text-xs"
@@ -193,7 +184,7 @@ export function EmployeeDeletionDialog({
                           Feedback ({assignedItems.feedback.length})
                         </p>
                         <div className="max-h-32 space-y-1 overflow-y-auto">
-                          {assignedItems.feedback.slice(0, 5).map((fb: any) => (
+                          {assignedItems.feedback.slice(0, 5).map((fb) => (
                             <div key={fb.id} className="text-muted-foreground bg-background rounded p-2 text-xs">
                               • {fb.title} ({fb.status})
                             </div>
@@ -213,7 +204,7 @@ export function EmployeeDeletionDialog({
                           Documentation ({assignedItems.documentation.length})
                         </p>
                         <div className="max-h-32 space-y-1 overflow-y-auto">
-                          {assignedItems.documentation.slice(0, 5).map((doc: any) => (
+                          {assignedItems.documentation.slice(0, 5).map((doc) => (
                             <div key={doc.id} className="text-muted-foreground bg-background rounded p-2 text-xs">
                               • {doc.title}
                             </div>

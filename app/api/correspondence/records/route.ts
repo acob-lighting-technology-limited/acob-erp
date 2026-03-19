@@ -7,11 +7,23 @@ import {
   getDepartmentCodeByName,
   isAdminRole,
 } from "@/lib/correspondence/server"
-import type { CorrespondenceDirection } from "@/types/correspondence"
 import { logger } from "@/lib/logger"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 
 const log = logger("correspondence-records")
+
+type CorrespondenceListRecord = {
+  department_name?: string | null
+  assigned_department_name?: string | null
+}
+
+type CorrespondenceLeadCandidate = {
+  id: string
+  role?: string | null
+  lead_departments?: string[] | null
+  department?: string | null
+  is_department_lead?: boolean | null
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -49,7 +61,7 @@ export async function GET(request: NextRequest) {
     const { data, error } = await query
     if (error) throw error
 
-    const filtered = (data || []).filter((record: any) => {
+    const filtered = ((data || []) as CorrespondenceListRecord[]).filter((record) => {
       if (!department) return true
       return record.department_name === department || record.assigned_department_name === department
     })
@@ -64,7 +76,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const { supabase, user, profile } = await getAuthContext()
-    const dataClient = getServiceRoleClientOrFallback(supabase as any)
+    const dataClient = getServiceRoleClientOrFallback(supabase)
 
     if (!user || !profile) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -172,7 +184,9 @@ export async function POST(request: NextRequest) {
           .select("id, role, lead_departments, department, is_department_lead")
           .eq("is_department_lead", true)
 
-        const targetLead = (leadCandidates || []).find((p: any) => canAccessDepartment(p, notifyDepartment))
+        const targetLead = ((leadCandidates || []) as CorrespondenceLeadCandidate[]).find((p) =>
+          canAccessDepartment(p, notifyDepartment)
+        )
 
         if (targetLead?.id) {
           await supabase.rpc("create_notification", {

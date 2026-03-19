@@ -1,1 +1,1 @@
-export { GET } from "@/app/api/hr/leave/queue/route"
+export { dynamic, GET } from "@/app/api/hr/leave/queue/route"

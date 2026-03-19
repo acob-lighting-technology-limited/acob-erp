@@ -1,6 +1,22 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import { PortalCorrespondenceContent } from "../../dashboard/correspondence/portal-correspondence-content"
+import { PortalCorrespondenceContent } from "../../correspondence/portal-correspondence-content"
+import type { CorrespondenceRecord } from "@/types/correspondence"
+
+interface DepartmentCodeOption {
+  department_name: string
+  department_code: string
+}
+
+interface ProfileRow {
+  full_name: string | null
+  first_name: string | null
+  last_name: string | null
+  department: string | null
+  role: string | null
+  lead_departments: string[] | null
+  is_department_lead: boolean | null
+}
 
 async function getData() {
   const supabase = await createClient()
@@ -16,7 +32,7 @@ async function getData() {
     .from("profiles")
     .select("full_name, first_name, last_name, department, role, lead_departments, is_department_lead")
     .eq("id", user.id)
-    .single()
+    .single<ProfileRow>()
 
   const currentViewerName =
     profile?.full_name?.trim() ||
@@ -27,6 +43,7 @@ async function getData() {
   const { data: records } = await supabase
     .from("correspondence_records")
     .select("*")
+    .returns<CorrespondenceRecord[]>()
     .order("created_at", { ascending: false })
 
   const role = profile?.role || ""
@@ -38,7 +55,7 @@ async function getData() {
       )
     )
   )
-  const scopedRecords = (records || []).filter((record: any) => {
+  const scopedRecords = (records || []).filter((record) => {
     if (record.originator_id === user.id || record.responsible_officer_id === user.id) return true
     if (["developer", "admin", "super_admin"].includes(role)) return true
     if (isDeptLead) {
@@ -55,6 +72,7 @@ async function getData() {
     .select("department_name, department_code")
     .eq("is_active", true)
     .order("department_name", { ascending: true })
+    .returns<DepartmentCodeOption[]>()
 
   return {
     userId: user.id,
@@ -81,8 +99,8 @@ export default async function ToolsReferenceGeneratorPage() {
       isDepartmentLead={data.isDepartmentLead}
       currentViewerName={data.currentViewerName}
       currentViewerDepartment={data.currentViewerDepartment}
-      initialRecords={data.records as any}
-      departmentCodes={data.departmentCodes as any}
+      initialRecords={data.records}
+      departmentCodes={data.departmentCodes}
     />
   )
 }

@@ -14,9 +14,10 @@ import { toast } from "sonner"
 import { Eye, List, LayoutGrid, MessageSquare } from "lucide-react"
 import { formatName } from "@/lib/utils"
 import { writeAuditLogClient } from "@/lib/audit/client"
+import type { FeedbackRecord } from "@/components/feedback/types"
 
 interface FeedbackViewerProps {
-  feedback: any[]
+  feedback: FeedbackRecord[]
 }
 
 export function FeedbackViewer({ feedback }: FeedbackViewerProps) {
@@ -24,7 +25,7 @@ export function FeedbackViewer({ feedback }: FeedbackViewerProps) {
   const [selectedType, setSelectedType] = useState("all")
   const [selectedStatus, setSelectedStatus] = useState("all")
   const [viewMode, setViewMode] = useState<"list" | "card">("list")
-  const [selectedFeedback, setSelectedFeedback] = useState<any | null>(null)
+  const [selectedFeedback, setSelectedFeedback] = useState<FeedbackRecord | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isUpdating, setIsUpdating] = useState(false)
 
@@ -73,7 +74,7 @@ export function FeedbackViewer({ feedback }: FeedbackViewerProps) {
     }
   }
 
-  const handleViewDetails = (item: any) => {
+  const handleViewDetails = (item: FeedbackRecord) => {
     setSelectedFeedback(item)
     setIsModalOpen(true)
   }
@@ -97,7 +98,7 @@ export function FeedbackViewer({ feedback }: FeedbackViewerProps) {
 
       // Log audit
       await writeAuditLogClient(
-        supabase as any,
+        supabase,
         {
           action: "status_change",
           entityType: "feedback",

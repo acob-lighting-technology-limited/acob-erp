@@ -1,1 +1,1 @@
-export { GET } from "@/app/api/hr/leave/balances/route"
+export { dynamic, GET } from "@/app/api/hr/leave/balances/route"

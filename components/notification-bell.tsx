@@ -1,9 +1,10 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import { logger } from "@/lib/logger"
 
 const log = logger("notification-bell")
+import type { SupabaseClient, RealtimeChannel } from "@supabase/supabase-js"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -21,7 +22,6 @@ import {
 import {
   Bell,
   CheckCheck,
-  X,
   Search,
   Settings,
   AlertCircle,
@@ -32,7 +32,6 @@ import {
   MessageSquare,
   FileText,
   AlertTriangle,
-  Clock,
   ChevronRight,
   Trash2,
 } from "lucide-react"
@@ -50,7 +49,7 @@ interface Notification {
   priority: string
   title: string
   message: string
-  data?: any
+  data?: unknown
   action_url?: string | null
   actor_name?: string
   actor_avatar?: string
@@ -78,15 +77,6 @@ const typeIcons = {
 }
 
 // Category icons
-const categoryIcons = {
-  tasks: User,
-  assets: Package,
-  feedback: MessageSquare,
-  approvals: FileText,
-  system: Settings,
-  mentions: MessageSquare,
-}
-
 // Priority colors
 const priorityColors = {
   low: "text-gray-500",
@@ -134,7 +124,7 @@ function getInitials(name?: string): string {
 
 export function NotificationBell({ isAdmin = false }: NotificationBellProps) {
   const router = useRouter()
-  const supabase = createClient()
+  const [supabase] = useState<SupabaseClient>(() => createClient())
   const queryClient = useQueryClient()
 
   // State
@@ -143,7 +133,7 @@ export function NotificationBell({ isAdmin = false }: NotificationBellProps) {
   const [searchQuery, setSearchQuery] = useState("")
 
   // Real-time subscription ref
-  const subscriptionRef = useRef<any>(null)
+  const subscriptionRef = useRef<RealtimeChannel | null>(null)
 
   const { data: notifications = [], isLoading } = useQuery({
     queryKey: QUERY_KEYS.notificationBell(),
@@ -165,13 +155,9 @@ export function NotificationBell({ isAdmin = false }: NotificationBellProps) {
     },
   })
 
-  const loadNotifications = () => {
-    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.notificationBell() })
-  }
-
   // Setup real-time subscription
   useEffect(() => {
-    loadNotifications()
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.notificationBell() })
 
     // Subscribe to real-time updates
     const setupSubscription = async () => {
@@ -218,14 +204,14 @@ export function NotificationBell({ isAdmin = false }: NotificationBellProps) {
         subscriptionRef.current.unsubscribe()
       }
     }
-  }, [supabase, router])
+  }, [queryClient, router, supabase])
 
   // Refresh when dropdown opens
   useEffect(() => {
     if (isOpen) {
-      loadNotifications()
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.notificationBell() })
     }
-  }, [isOpen])
+  }, [isOpen, queryClient])
 
   // Mark as read
   const markAsRead = async (notificationId: string) => {
@@ -238,7 +224,7 @@ export function NotificationBell({ isAdmin = false }: NotificationBellProps) {
       if (error) throw error
 
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.notificationBell() })
-    } catch (error: any) {
+    } catch (error: unknown) {
       log.error("Error marking as read:", error)
     }
   }
@@ -260,7 +246,7 @@ export function NotificationBell({ isAdmin = false }: NotificationBellProps) {
 
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.notificationBell() })
       toast.success("All notifications marked as read")
-    } catch (error: any) {
+    } catch (error: unknown) {
       log.error("Error marking all as read:", error)
       toast.error("Failed to mark all as read")
     }
@@ -274,7 +260,7 @@ export function NotificationBell({ isAdmin = false }: NotificationBellProps) {
       if (error) throw error
 
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.notificationBell() })
-    } catch (error: any) {
+    } catch (error: unknown) {
       log.error("Error deleting notification:", error)
       toast.error("Failed to delete notification")
     }
@@ -376,7 +362,7 @@ export function NotificationBell({ isAdmin = false }: NotificationBellProps) {
               </Button>
             )}
 
-            <Link href={isAdmin ? "/admin/notification" : "/notification"}>
+            <Link href={isAdmin ? "/admin/notifications" : "/notifications"}>
               <Button
                 variant="ghost"
                 size="icon"
@@ -570,7 +556,7 @@ export function NotificationBell({ isAdmin = false }: NotificationBellProps) {
         <DropdownMenuSeparator className="my-0" />
         <div className="bg-muted/20 p-3">
           <Link
-            href={isAdmin ? "/admin/notification" : "/notification"}
+            href={isAdmin ? "/admin/notifications" : "/notifications"}
             onClick={() => setIsOpen(false)}
             className="text-primary block w-full py-1 text-center text-xs font-medium hover:underline"
           >

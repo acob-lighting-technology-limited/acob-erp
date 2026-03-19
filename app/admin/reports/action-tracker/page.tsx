@@ -5,9 +5,13 @@ import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { ActionTrackerContent } from "./action-tracker-content"
 import { resolveAdminScope } from "@/lib/admin/rbac"
 
+type DepartmentRow = {
+  department: string | null
+}
+
 export default async function ActionTrackerPage() {
   const supabase = await createClient()
-  const dataClient = getServiceRoleClientOrFallback(supabase as any)
+  const dataClient = getServiceRoleClientOrFallback(supabase)
 
   const {
     data: { user },
@@ -18,15 +22,19 @@ export default async function ActionTrackerPage() {
     redirect("/auth/login")
   }
 
-  const scope = await resolveAdminScope(supabase as any, user.id)
+  const scope = await resolveAdminScope(supabase, user.id)
   if (!scope) {
-    redirect("/dashboard")
+    redirect("/profile")
   }
 
   // Fetch departments for filtering
-  const { data: employeeData } = await dataClient.from("profiles").select("department").not("department", "is", null)
+  const { data: employeeData } = await dataClient
+    .from("profiles")
+    .select("department")
+    .not("department", "is", null)
+    .returns<DepartmentRow[]>()
 
-  const departments = Array.from(new Set(employeeData?.map((s: any) => s.department).filter(Boolean))) as string[]
+  const departments = Array.from(new Set((employeeData || []).map((row) => row.department).filter(Boolean))) as string[]
   departments.sort()
 
   return (

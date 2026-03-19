@@ -9,6 +9,27 @@ import { logger } from "@/lib/logger"
 
 const log = logger("assets")
 
+type AdminAssetsPageClient = Awaited<ReturnType<typeof createClient>>
+
+type AssetAssignmentRow = {
+  asset_id: string
+  assigned_to?: string | null
+  department?: string | null
+  office_location?: string | null
+  assignment_type?: string | null
+}
+
+type AssetIssueRow = {
+  asset_id: string
+  resolved?: boolean | null
+}
+
+type AssignmentUserRow = {
+  id: string
+  first_name?: string | null
+  last_name?: string | null
+  department?: string | null
+}
 
 async function getAdminAssetsData() {
   const supabase = await createClient()
@@ -22,9 +43,9 @@ async function getAdminAssetsData() {
     return { redirect: "/auth/login" as const }
   }
 
-  const scope = await resolveAdminScope(supabase as any, user.id)
+  const scope = await resolveAdminScope(supabase as AdminAssetsPageClient, user.id)
   if (!scope) {
-    return { redirect: "/dashboard" as const }
+    return { redirect: "/profile" as const }
   }
 
   const userProfile: UserProfile = {
@@ -37,7 +58,7 @@ async function getAdminAssetsData() {
   }
   const departmentScope = getDepartmentScope(scope, "general")
 
-  const dataClient = getServiceRoleClientOrFallback(supabase as any)
+  const dataClient = getServiceRoleClientOrFallback(supabase as AdminAssetsPageClient)
 
   // Fetch assets
   let { data: assetsData, error: assetsError } = await dataClient
@@ -64,9 +85,9 @@ async function getAdminAssetsData() {
     .eq("is_current", true)
 
   // Fetch user details for assignments
-  const assignedUserIds = (assignmentsData || []).map((a: any) => a.assigned_to).filter(Boolean)
+  const assignedUserIds = ((assignmentsData || []) as AssetAssignmentRow[]).map((a) => a.assigned_to).filter(Boolean)
 
-  let assignmentUsersMap = new Map()
+  let assignmentUsersMap = new Map<string, AssignmentUserRow>()
   if (assignedUserIds.length > 0) {
     const { data: usersData } = await dataClient
       .from("profiles")
@@ -88,7 +109,7 @@ async function getAdminAssetsData() {
   const { data: issuesData } = await dataClient.from("asset_issues").select("asset_id, resolved")
 
   const issueCountsByAsset: Record<string, number> = {}
-  ;(issuesData || []).forEach((issue: any) => {
+  ;((issuesData || []) as AssetIssueRow[]).forEach((issue) => {
     if (!issue.resolved) {
       issueCountsByAsset[issue.asset_id] = (issueCountsByAsset[issue.asset_id] || 0) + 1
     }
@@ -99,7 +120,7 @@ async function getAdminAssetsData() {
   if (departmentScope) {
     const deptUserIds = employees.map((s) => s.id)
     filteredAssets = filteredAssets.filter((asset) => {
-      const assignment = (assignmentsData || []).find((a: any) => a.asset_id === asset.id)
+      const assignment = ((assignmentsData || []) as AssetAssignmentRow[]).find((a) => a.asset_id === asset.id)
       if (!assignment) return false
 
       if (assignment.assigned_to && deptUserIds.includes(assignment.assigned_to)) return true
@@ -111,7 +132,7 @@ async function getAdminAssetsData() {
 
   // Combine assets with assignments and issue counts
   const assets: Asset[] = filteredAssets.map((asset) => {
-    const assignment = (assignmentsData || []).find((a: any) => a.asset_id === asset.id)
+    const assignment = ((assignmentsData || []) as AssetAssignmentRow[]).find((a) => a.asset_id === asset.id)
     return {
       ...asset,
       current_assignment: assignment

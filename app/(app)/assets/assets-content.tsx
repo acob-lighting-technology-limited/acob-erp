@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { formatName } from "@/lib/utils"
 import { Package, Calendar, User, FileText, Building2, LayoutGrid, List, Hash } from "lucide-react"
 import { ASSET_TYPE_MAP } from "@/lib/asset-types"
-import type { Asset, AssetAssignment } from "./page"
+import type { AssetAssignment } from "./page"
 import { AppTablePage } from "@/components/app/app-table-page"
 import { toast } from "sonner"
 import { StatCard } from "@/components/ui/stat-card"

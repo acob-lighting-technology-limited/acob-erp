@@ -11,8 +11,8 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { createClient as createAdminClient } from "@supabase/supabase-js"
-import { applyAssignableStatusFilter } from "@/lib/workforce/assignment-policy"
+import { createClient as createAdminClient, type SupabaseClient } from "@supabase/supabase-js"
+import { isAssignableEmploymentStatus } from "@/lib/workforce/assignment-policy"
 import { DEPT_EXECUTIVE_MANAGEMENT, DEPT_CORPORATE_SERVICES } from "@/config/constants"
 
 type StepResult = {
@@ -29,10 +29,51 @@ function err(step: string, detail: string): StepResult {
   return { step, status: "error", detail }
 }
 
-async function testHelpDesk(admin: any, body: any): Promise<{ ok: boolean; steps: StepResult[] }> {
+type DevProfileRow = {
+  id: string
+  full_name?: string | null
+  department?: string | null
+  role?: string | null
+  is_department_lead?: boolean | null
+  lead_departments?: string[] | null
+  employment_status?: string | null
+}
+
+type DevRequesterRow = {
+  id: string
+  full_name?: string | null
+  department?: string | null
+}
+
+type DevTicketRow = {
+  id: string
+  ticket_number?: string | null
+}
+
+type DevStatusRow = {
+  status?: string | null
+}
+
+type DevTaskRow = {
+  id: string
+}
+
+type TestFlowBody = {
+  cleanup?: boolean
+  requester_id?: string
+  service_department?: string
+  request_type?: string
+  support_mode?: string
+  assigner_id?: string
+  assignee_id?: string
+  kind?: string
+}
+
+async function testHelpDesk(admin: SupabaseClient, body: TestFlowBody): Promise<{ ok: boolean; steps: StepResult[] }> {
   const steps: StepResult[] = []
   let ticketId: string | null = null
   const cleanup = body.cleanup !== false
+  const db = admin as unknown as SupabaseClient
 
   try {
     const { requester_id, service_department } = body
@@ -44,21 +85,22 @@ async function testHelpDesk(admin: any, body: any): Promise<{ ok: boolean; steps
     }
 
     // Step 1: Load requester
-    const { data: requester, error: reqErr } = await admin
+    const { data: requester, error: reqErr } = await db
       .from("profiles")
       .select("id, full_name, department")
       .eq("id", requester_id)
       .single()
-    if (reqErr || !requester) {
+    const typedRequester = requester as DevRequesterRow | null
+    if (reqErr || !typedRequester) {
       steps.push(err("load_requester", reqErr?.message || "Not found"))
       return { ok: false, steps }
     }
-    steps.push(ok("load_requester", `Loaded: ${requester.full_name || requester.id}`))
+    steps.push(ok("load_requester", `Loaded: ${typedRequester.full_name || typedRequester.id}`))
 
     // Step 2: Create a test ticket for the selected flow.
     const now = new Date()
     const slaTarget = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString()
-    const { data: ticket, error: ticketErr } = await admin
+    const { data: ticket, error: ticketErr } = await db
       .from("help_desk_tickets")
       .insert({
         title: "[TEST] Automated help desk flow test",
@@ -77,7 +119,7 @@ async function testHelpDesk(admin: any, body: any): Promise<{ ok: boolean; steps
         approval_required: requestType === "procurement",
         support_mode: requestType === "support" ? supportMode : null,
         handling_mode: requestType === "support" ? "queue" : "individual",
-        requester_department: requester.department || null,
+        requester_department: typedRequester.department || null,
         submitted_at: now.toISOString(),
         sla_target_at: slaTarget,
         paused_at: requestType === "procurement" ? now.toISOString() : null,
@@ -85,15 +127,16 @@ async function testHelpDesk(admin: any, body: any): Promise<{ ok: boolean; steps
       .select()
       .single()
 
-    if (ticketErr || !ticket) {
+    const typedTicket = ticket as DevTicketRow | null
+    if (ticketErr || !typedTicket) {
       steps.push(err("create_ticket", ticketErr?.message || "Insert returned no data"))
       return { ok: false, steps }
     }
-    ticketId = ticket.id
-    steps.push(ok("create_ticket", `Created ticket #${ticket.ticket_number || ticket.id}`))
+    ticketId = typedTicket.id
+    steps.push(ok("create_ticket", `Created ticket #${typedTicket.ticket_number || typedTicket.id}`))
 
     if (requestType === "procurement") {
-      const { error: approvalSeedErr } = await admin.from("help_desk_approvals").insert([
+      const { error: approvalSeedErr } = await db.from("help_desk_approvals").insert([
         { ticket_id: ticketId, approval_stage: "department_lead", status: "pending" },
         { ticket_id: ticketId, approval_stage: "head_corporate_services", status: "pending" },
         { ticket_id: ticketId, approval_stage: "managing_director", status: "pending" },
@@ -107,12 +150,15 @@ async function testHelpDesk(admin: any, body: any): Promise<{ ok: boolean; steps
     }
 
     // Step 3: Find department lead
-    const { data: profiles } = await applyAssignableStatusFilter(
-      admin.from("profiles").select("id, full_name, role, is_department_lead, lead_departments, department"),
-      { allowLegacyNullStatus: false }
+    const { data: profiles } = await db
+      .from("profiles")
+      .select("id, full_name, role, is_department_lead, lead_departments, department, employment_status")
+
+    const activeProfiles = ((profiles || []) as DevProfileRow[]).filter((profile) =>
+      isAssignableEmploymentStatus(profile.employment_status, { allowLegacyNullStatus: false })
     )
 
-    const lead = (profiles || []).find((p: any) => {
+    const lead = activeProfiles.find((p) => {
       const managed = Array.isArray(p.lead_departments) ? p.lead_departments : []
       return p.is_department_lead && (p.department === service_department || managed.includes(service_department))
     })
@@ -130,7 +176,7 @@ async function testHelpDesk(admin: any, body: any): Promise<{ ok: boolean; steps
     if (requestType === "support") {
       if (supportMode === "lead_review_required") {
         if (lead) {
-          const { error: releaseErr } = await admin
+          const { error: releaseErr } = await db
             .from("help_desk_tickets")
             .update({ status: "department_queue", handling_mode: "queue" })
             .eq("id", ticketId)
@@ -148,7 +194,7 @@ async function testHelpDesk(admin: any, body: any): Promise<{ ok: boolean; steps
 
       // Step 4: Assign ticket to lead
       if (lead) {
-        const { error: assignErr } = await admin
+        const { error: assignErr } = await db
           .from("help_desk_tickets")
           .update({ assigned_to: lead.id, status: "in_progress", handling_mode: "individual" })
           .eq("id", ticketId)
@@ -157,7 +203,7 @@ async function testHelpDesk(admin: any, body: any): Promise<{ ok: boolean; steps
       }
 
       // Step 5: Close ticket
-      const { error: closeErr } = await admin
+      const { error: closeErr } = await db
         .from("help_desk_tickets")
         .update({ status: "resolved", resolved_at: new Date().toISOString() })
         .eq("id", ticketId)
@@ -165,32 +211,37 @@ async function testHelpDesk(admin: any, body: any): Promise<{ ok: boolean; steps
       else steps.push(ok("resolve_ticket", "Ticket marked resolved"))
 
       // Step 6: Verify
-      const { data: final } = await admin.from("help_desk_tickets").select("status").eq("id", ticketId).single()
-      if (final?.status === "resolved") steps.push(ok("verify_final_state", "status=resolved ✓"))
-      else steps.push(err("verify_final_state", `Expected resolved, got ${final?.status}`))
+      const { data: final } = await db.from("help_desk_tickets").select("status").eq("id", ticketId).single()
+      const finalTicket = final as DevStatusRow | null
+      if (finalTicket?.status === "resolved") steps.push(ok("verify_final_state", "status=resolved ✓"))
+      else steps.push(err("verify_final_state", `Expected resolved, got ${finalTicket?.status}`))
     } else {
-      const requesterLead = (profiles || []).find((p: any) => {
-        const managed = Array.isArray(p.lead_departments) ? p.lead_departments : []
-        return p.is_department_lead && (p.department === requester.department || managed.includes(requester.department))
-      })
-      const serviceLead = lead
-      const hcs = (profiles || []).find((p: any) => {
+      const requesterLead = activeProfiles.find((p) => {
         const managed = Array.isArray(p.lead_departments) ? p.lead_departments : []
         return (
-          (["developer", "admin", "super_admin"].includes(p.role) || p.is_department_lead) &&
+          p.is_department_lead &&
+          (p.department === typedRequester.department || managed.includes(typedRequester.department || ""))
+        )
+      })
+      const serviceLead = lead
+      const hcs = activeProfiles.find((p) => {
+        const managed = Array.isArray(p.lead_departments) ? p.lead_departments : []
+        return (
+          (["developer", "admin", "super_admin"].includes(p.role || "") || p.is_department_lead) &&
           (p.department === DEPT_CORPORATE_SERVICES || managed.includes(DEPT_CORPORATE_SERVICES))
         )
       })
-      const md = (profiles || []).find((p: any) => {
+      const md = activeProfiles.find((p) => {
         return (
-          (["developer", "admin", "super_admin"].includes(p.role) && p.department === DEPT_EXECUTIVE_MANAGEMENT) ||
+          (["developer", "admin", "super_admin"].includes(p.role || "") &&
+            p.department === DEPT_EXECUTIVE_MANAGEMENT) ||
           p.role === "developer" ||
           p.role === "super_admin"
         )
       })
 
       if (requesterLead) {
-        const { error: deptApproveErr } = await admin
+        const { error: deptApproveErr } = await db
           .from("help_desk_approvals")
           .update({
             status: "approved",
@@ -212,13 +263,13 @@ async function testHelpDesk(admin: any, body: any): Promise<{ ok: boolean; steps
         steps.push(
           err(
             "approve_requester_department_lead",
-            `No requester department lead configured for "${requester.department}"`
+            `No requester department lead configured for "${typedRequester.department}"`
           )
         )
       }
 
       if (serviceLead) {
-        const { error: serviceApproveErr } = await admin
+        const { error: serviceApproveErr } = await db
           .from("help_desk_approvals")
           .update({
             status: "approved",
@@ -243,7 +294,7 @@ async function testHelpDesk(admin: any, body: any): Promise<{ ok: boolean; steps
       }
 
       if (hcs) {
-        const { error: hcsApproveErr } = await admin
+        const { error: hcsApproveErr } = await db
           .from("help_desk_approvals")
           .update({
             status: "approved",
@@ -260,7 +311,7 @@ async function testHelpDesk(admin: any, body: any): Promise<{ ok: boolean; steps
       }
 
       if (md) {
-        const { error: mdApproveErr } = await admin
+        const { error: mdApproveErr } = await db
           .from("help_desk_approvals")
           .update({
             status: "approved",
@@ -276,7 +327,7 @@ async function testHelpDesk(admin: any, body: any): Promise<{ ok: boolean; steps
         steps.push(err("approve_managing_director", "No managing director approver configured"))
       }
 
-      const { error: finaliseErr } = await admin
+      const { error: finaliseErr } = await db
         .from("help_desk_tickets")
         .update({
           status: "approved_for_procurement",
@@ -290,18 +341,19 @@ async function testHelpDesk(admin: any, body: any): Promise<{ ok: boolean; steps
         steps.push(ok("finalise_procurement", "Ticket advanced to approved_for_procurement"))
       }
 
-      const { data: final } = await admin.from("help_desk_tickets").select("status").eq("id", ticketId).single()
-      if (final?.status === "approved_for_procurement") {
+      const { data: final } = await db.from("help_desk_tickets").select("status").eq("id", ticketId).single()
+      const finalTicket = final as DevStatusRow | null
+      if (finalTicket?.status === "approved_for_procurement") {
         steps.push(ok("verify_final_state", "status=approved_for_procurement ✓"))
       } else {
-        steps.push(err("verify_final_state", `Expected approved_for_procurement, got ${final?.status}`))
+        steps.push(err("verify_final_state", `Expected approved_for_procurement, got ${finalTicket?.status}`))
       }
     }
 
     // Cleanup
     if (cleanup && ticketId) {
       try {
-        await admin.from("help_desk_tickets").delete().eq("id", ticketId)
+        await db.from("help_desk_tickets").delete().eq("id", ticketId)
       } catch {
         /* ignore */
       }
@@ -309,22 +361,23 @@ async function testHelpDesk(admin: any, body: any): Promise<{ ok: boolean; steps
     }
 
     return { ok: steps.every((s) => s.status !== "error"), steps }
-  } catch (e: any) {
+  } catch (e: unknown) {
     if (cleanup && ticketId) {
       try {
-        await admin.from("help_desk_tickets").delete().eq("id", ticketId)
+        await db.from("help_desk_tickets").delete().eq("id", ticketId)
       } catch {
         /* ignore */
       }
     }
-    return { ok: false, steps: [...steps, err("unexpected", e.message)] }
+    return { ok: false, steps: [...steps, err("unexpected", e instanceof Error ? e.message : "Unknown error")] }
   }
 }
 
-async function testTask(admin: any, body: any): Promise<{ ok: boolean; steps: StepResult[] }> {
+async function testTask(admin: SupabaseClient, body: TestFlowBody): Promise<{ ok: boolean; steps: StepResult[] }> {
   const steps: StepResult[] = []
   let taskId: string | null = null
   const cleanup = body.cleanup !== false
+  const db = admin as unknown as SupabaseClient
 
   try {
     const { assigner_id, assignee_id } = body
@@ -334,26 +387,32 @@ async function testTask(admin: any, body: any): Promise<{ ok: boolean; steps: St
     }
 
     // Step 1: Load assigner
-    const { data: assigner } = await admin
+    const { data: assigner } = await db
       .from("profiles")
       .select("id, full_name, department")
       .eq("id", assigner_id)
       .single()
-    steps.push(assigner ? ok("load_assigner", `Loaded: ${assigner.full_name}`) : err("load_assigner", "Not found"))
-    if (!assigner) return { ok: false, steps }
+    const typedAssigner = assigner as DevRequesterRow | null
+    steps.push(
+      typedAssigner ? ok("load_assigner", `Loaded: ${typedAssigner.full_name}`) : err("load_assigner", "Not found")
+    )
+    if (!typedAssigner) return { ok: false, steps }
 
     // Step 2: Load assignee
-    const { data: assignee } = await admin
+    const { data: assignee } = await db
       .from("profiles")
       .select("id, full_name, department")
       .eq("id", assignee_id)
       .single()
-    steps.push(assignee ? ok("load_assignee", `Loaded: ${assignee.full_name}`) : err("load_assignee", "Not found"))
-    if (!assignee) return { ok: false, steps }
+    const typedAssignee = assignee as DevRequesterRow | null
+    steps.push(
+      typedAssignee ? ok("load_assignee", `Loaded: ${typedAssignee.full_name}`) : err("load_assignee", "Not found")
+    )
+    if (!typedAssignee) return { ok: false, steps }
 
     // Step 3: Create task
     const due = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
-    const { data: task, error: taskErr } = await admin
+    const { data: task, error: taskErr } = await db
       .from("tasks")
       .insert({
         title: "[TEST] Automated task flow test",
@@ -362,27 +421,28 @@ async function testTask(admin: any, body: any): Promise<{ ok: boolean; steps: St
         status: "pending",
         assigned_to: assignee_id,
         assigned_by: assigner_id,
-        department: assignee.department || null,
+        department: typedAssignee.department || null,
         due_date: due,
         assignment_type: "individual",
       })
       .select()
       .single()
 
-    if (taskErr || !task) {
+    const typedTask = task as DevTaskRow | null
+    if (taskErr || !typedTask) {
       steps.push(err("create_task", taskErr?.message || "Insert returned no data"))
       return { ok: false, steps }
     }
-    taskId = task.id
-    steps.push(ok("create_task", `Created task ${task.id}`))
+    taskId = typedTask.id
+    steps.push(ok("create_task", `Created task ${typedTask.id}`))
 
     // Step 4: Move to in_progress
-    const { error: startErr } = await admin.from("tasks").update({ status: "in_progress" }).eq("id", taskId)
+    const { error: startErr } = await db.from("tasks").update({ status: "in_progress" }).eq("id", taskId)
     if (startErr) steps.push(err("start_task", startErr.message))
     else steps.push(ok("start_task", "Status → in_progress"))
 
     // Step 5: Complete task
-    const { error: completeErr } = await admin
+    const { error: completeErr } = await db
       .from("tasks")
       .update({ status: "completed", completed_at: new Date().toISOString() })
       .eq("id", taskId)
@@ -390,14 +450,15 @@ async function testTask(admin: any, body: any): Promise<{ ok: boolean; steps: St
     else steps.push(ok("complete_task", "Status → completed"))
 
     // Step 6: Verify
-    const { data: final } = await admin.from("tasks").select("status").eq("id", taskId).single()
-    if (final?.status === "completed") steps.push(ok("verify_final_state", "status=completed ✓"))
-    else steps.push(err("verify_final_state", `Expected completed, got ${final?.status}`))
+    const { data: final } = await db.from("tasks").select("status").eq("id", taskId).single()
+    const finalTask = final as DevStatusRow | null
+    if (finalTask?.status === "completed") steps.push(ok("verify_final_state", "status=completed ✓"))
+    else steps.push(err("verify_final_state", `Expected completed, got ${finalTask?.status}`))
 
     // Cleanup
     if (cleanup && taskId) {
       try {
-        await admin.from("tasks").delete().eq("id", taskId)
+        await db.from("tasks").delete().eq("id", taskId)
       } catch {
         /* ignore */
       }
@@ -405,15 +466,15 @@ async function testTask(admin: any, body: any): Promise<{ ok: boolean; steps: St
     }
 
     return { ok: steps.every((s) => s.status !== "error"), steps }
-  } catch (e: any) {
+  } catch (e: unknown) {
     if (cleanup && taskId) {
       try {
-        await admin.from("tasks").delete().eq("id", taskId)
+        await db.from("tasks").delete().eq("id", taskId)
       } catch {
         /* ignore */
       }
     }
-    return { ok: false, steps: [...steps, err("unexpected", e.message)] }
+    return { ok: false, steps: [...steps, err("unexpected", e instanceof Error ? e.message : "Unknown error")] }
   }
 }
 

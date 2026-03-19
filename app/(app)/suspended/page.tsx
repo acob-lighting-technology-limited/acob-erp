@@ -10,10 +10,6 @@ import { format, formatDistanceToNow } from "date-fns"
 import { useRouter } from "next/navigation"
 import { QUERY_KEYS } from "@/lib/query-keys"
 
-import { logger } from "@/lib/logger"
-
-const log = logger("suspended")
-
 interface SuspensionData {
   reason: string
   start_date: string

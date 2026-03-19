@@ -15,6 +15,7 @@ import { writeAuditLogClient } from "@/lib/audit/client"
 import { EmptyState } from "@/components/ui/patterns"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { PageLoader } from "@/components/ui/query-states"
+import Image from "next/image"
 
 import { logger } from "@/lib/logger"
 
@@ -32,6 +33,8 @@ interface JobDescriptionData {
     id: string
   } | null
 }
+
+type AuditClient = Parameters<typeof writeAuditLogClient>[0]
 
 async function fetchJobDescriptionData(): Promise<JobDescriptionData> {
   const supabase = createClient()
@@ -111,7 +114,7 @@ export default function JobDescriptionPage() {
       if (error) throw error
 
       await writeAuditLogClient(
-        supabase as any,
+        supabase as AuditClient,
         {
           action: "update",
           entityType: "job_description",
@@ -203,7 +206,7 @@ export default function JobDescriptionPage() {
         <div className="hidden print:mb-8 print:block print:border-b print:pb-4">
           <div className="flex items-start justify-between">
             <div>
-              <img src="/acob-logo.webp" alt="ACOB Lighting" className="h-16 w-auto" />
+              <Image src="/acob-logo.webp" alt="ACOB Lighting" width={180} height={64} className="h-16 w-auto" />
             </div>
             <div className="text-right text-sm">
               {profile?.first_name && profile?.last_name && (

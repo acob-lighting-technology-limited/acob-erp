@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useEffect, useState } from "react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -78,7 +78,7 @@ export function WeeklyReportAdminDialog({
     status: "submitted",
   })
 
-  const supabase = createClient()
+  const [supabase] = useState(() => createClient())
   const isLead = currentUser.is_department_lead
 
   useEffect(() => {
@@ -94,7 +94,7 @@ export function WeeklyReportAdminDialog({
       }
     }
     fetchMetadata()
-  }, [currentUser.department, isLead])
+  }, [currentUser.department, isLead, supabase])
 
   useEffect(() => {
     const fetchLockState = async () => {
@@ -102,7 +102,7 @@ export function WeeklyReportAdminDialog({
       setLockState(state)
     }
     fetchLockState()
-  }, [formData.week_number, formData.year])
+  }, [formData.week_number, formData.year, supabase])
 
   useEffect(() => {
     const fetchStatus = async () => {
@@ -163,7 +163,7 @@ export function WeeklyReportAdminDialog({
       }
     }
     fetchStatus()
-  }, [currentUser.id, formData.department, formData.week_number, formData.year, report])
+  }, [currentUser.id, formData.department, formData.week_number, formData.year, report, supabase])
 
   useEffect(() => {
     if (report) {
@@ -225,8 +225,8 @@ export function WeeklyReportAdminDialog({
       toast.success(report ? "Updated" : "Saved")
       onSuccess()
       onClose()
-    } catch (error: any) {
-      toast.error(error.message)
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Failed to save report")
     } finally {
       setLoading(false)
     }
@@ -267,7 +267,7 @@ export function WeeklyReportAdminDialog({
             <Sparkles className="h-4 w-4 text-blue-500" />
           </DialogTitle>
           <DialogDescription>
-            {report ? "Update this weekly report's details" : "Add a new departmental weekly report"}
+            {report ? "Update this weekly report&apos;s details" : "Add a new departmental weekly report"}
           </DialogDescription>
           {lockState?.isLocked && (
             <p className="text-destructive text-xs">
@@ -323,7 +323,7 @@ export function WeeklyReportAdminDialog({
               />
               {f === "tasks_new_week" && isNextWeekActive && (
                 <p className="text-muted-foreground text-[10px] italic">
-                  Locked: Next week's tracker already has activity.
+                  Locked: Next week&apos;s tracker already has activity.
                 </p>
               )}
             </div>

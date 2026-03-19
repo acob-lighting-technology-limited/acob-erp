@@ -296,7 +296,7 @@ export function PaymentsTable({
         const data = await response.json()
         toast.error(data.error || "Failed to create payment")
       }
-    } catch (error) {
+    } catch {
       toast.error("Error creating payment")
     } finally {
       setSubmitting(false)
@@ -467,7 +467,7 @@ export function PaymentsTable({
         document.body.removeChild(link)
         window.URL.revokeObjectURL(blobUrl)
       }, 100)
-    } catch (error) {
+    } catch (error: unknown) {
       log.error("Error downloading file:", error)
       throw error
     }
@@ -492,7 +492,7 @@ export function PaymentsTable({
           } else {
             toast.error("Could not get document URL")
           }
-        } catch (error) {
+        } catch {
           toast.error("Error downloading document")
         }
         return
@@ -511,7 +511,7 @@ export function PaymentsTable({
         } else {
           toast.error("Could not get document URL")
         }
-      } catch (error) {
+      } catch {
         toast.error("Error downloading document")
       }
     }
@@ -530,7 +530,7 @@ export function PaymentsTable({
       } else {
         toast.error("Could not get document URL")
       }
-    } catch (error) {
+    } catch {
       toast.error("Error downloading document")
     }
   }

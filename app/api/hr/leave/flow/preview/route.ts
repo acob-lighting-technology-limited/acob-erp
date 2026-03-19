@@ -4,6 +4,7 @@ import { buildResolvedRouteSnapshot, classifyRequesterKind } from "@/lib/hr/leav
 import { logger } from "@/lib/logger"
 
 const log = logger("hr-leave-flow-preview")
+export const dynamic = "force-dynamic"
 
 function canViewFlow(role?: string | null) {
   return ["developer", "super_admin", "admin"].includes(role || "")

@@ -1,8 +1,38 @@
 import { notifyUsers } from "@/lib/hr/leave-workflow"
 import { applyAssignableStatusFilter } from "@/lib/workforce/assignment-policy"
 import { DEPT_EXECUTIVE_MANAGEMENT, DEPT_CORPORATE_SERVICES } from "@/config/constants"
+import type { SupabaseClient } from "@supabase/supabase-js"
 
-type SupabaseClient = any
+type LeaveRoutingClient = SupabaseClient
+type LeaveLeadProfile = {
+  id: string
+  department: string | null
+  lead_departments: string[] | null
+  is_department_lead: boolean
+}
+type LeaveApproverAssignment = {
+  user_id: string
+  effective_from: string | null
+  effective_to: string | null
+  is_primary: boolean | null
+}
+type LeaveRequester = {
+  department_id: string | null
+  department: string | null
+}
+type DepartmentHeadRow = {
+  id?: string
+  department_head_id?: string | null
+}
+type RouteConfigRow = {
+  stage_order: number
+  approver_role_code: string
+  is_active?: boolean | null
+}
+type RouteSnapshotRow = Pick<
+  ResolvedRouteStage,
+  "stage_order" | "approver_role_code" | "approver_user_id" | "stage_code"
+>
 
 export const REQUESTER_KINDS = ["employee", "dept_lead", "admin_hr_lead", "hcs", "md"] as const
 export type RequesterKind = (typeof REQUESTER_KINDS)[number]
@@ -20,7 +50,7 @@ const DEPARTMENT_NAMES = {
   hcs: DEPT_CORPORATE_SERVICES,
 } as const
 
-function hasLeadForDepartment(profile: any, departmentName: string) {
+function hasLeadForDepartment(profile: LeaveLeadProfile | null | undefined, departmentName: string) {
   if (!profile) return false
   const managed = Array.isArray(profile.lead_departments) ? profile.lead_departments : []
   return Boolean(
@@ -45,7 +75,7 @@ export function stageCodeForRole(roleCode: string) {
   }
 }
 
-export function classifyRequesterKind(profile: any): RequesterKind {
+export function classifyRequesterKind(profile: LeaveLeadProfile | null | undefined): RequesterKind {
   if (hasLeadForDepartment(profile, DEPARTMENT_NAMES.md)) return "md"
   if (hasLeadForDepartment(profile, DEPARTMENT_NAMES.hcs)) return "hcs"
   if (hasLeadForDepartment(profile, DEPARTMENT_NAMES.adminHr)) return "admin_hr_lead"
@@ -54,7 +84,7 @@ export function classifyRequesterKind(profile: any): RequesterKind {
 }
 
 async function resolveProfileByDepartmentLead(
-  supabase: SupabaseClient,
+  supabase: LeaveRoutingClient,
   departmentName: string
 ): Promise<{ id: string } | null> {
   const { data, error } = await supabase
@@ -64,13 +94,15 @@ async function resolveProfileByDepartmentLead(
 
   if (error) throw new Error(`Failed to resolve ${departmentName} lead`)
 
-  const matches = (data || []).filter((profile: any) => hasLeadForDepartment(profile, departmentName))
+  const matches = ((data || []) as LeaveLeadProfile[]).filter((profile) =>
+    hasLeadForDepartment(profile, departmentName)
+  )
   if (matches.length > 1) throw new Error(`LEAVE_APPROVER_CONFLICT:${departmentName}`)
   return matches[0] || null
 }
 
 async function resolveDepartmentHeadById(
-  supabase: SupabaseClient,
+  supabase: LeaveRoutingClient,
   departmentId: string
 ): Promise<{ id: string } | null> {
   const { data: department, error: departmentError } = await supabase
@@ -78,11 +110,12 @@ async function resolveDepartmentHeadById(
     .select("department_head_id")
     .eq("id", departmentId)
     .single()
+  const typedDepartment = department as DepartmentHeadRow | null
 
   if (departmentError) throw new Error("Failed to resolve department lead")
-  if (!department?.department_head_id) return null
+  if (!typedDepartment?.department_head_id) return null
 
-  const profileQueryById = supabase.from("profiles").select("id").eq("id", department.department_head_id)
+  const profileQueryById = supabase.from("profiles").select("id").eq("id", typedDepartment.department_head_id)
   const { data: profile, error: profileError } = await applyAssignableStatusFilter(profileQueryById, {
     allowLegacyNullStatus: false,
   }).single()
@@ -92,7 +125,7 @@ async function resolveDepartmentHeadById(
 }
 
 async function resolveDepartmentHeadByName(
-  supabase: SupabaseClient,
+  supabase: LeaveRoutingClient,
   departmentName: string
 ): Promise<{ id: string } | null> {
   const { data: department, error: departmentError } = await supabase
@@ -100,12 +133,13 @@ async function resolveDepartmentHeadByName(
     .select("id, department_head_id")
     .eq("name", departmentName)
     .limit(2)
+  const typedDepartments = (department || []) as DepartmentHeadRow[]
 
   if (departmentError) throw new Error("Failed to resolve department lead")
-  if (!department || department.length === 0) return null
-  if (department.length > 1) throw new Error(`LEAVE_APPROVER_CONFLICT:${departmentName}`)
+  if (typedDepartments.length === 0) return null
+  if (typedDepartments.length > 1) throw new Error(`LEAVE_APPROVER_CONFLICT:${departmentName}`)
 
-  const departmentHeadId = department[0]?.department_head_id
+  const departmentHeadId = typedDepartments[0]?.department_head_id
   if (!departmentHeadId) return null
 
   const profileQueryByName = supabase.from("profiles").select("id").eq("id", departmentHeadId)
@@ -118,8 +152,8 @@ async function resolveDepartmentHeadByName(
 }
 
 async function resolveRequesterDepartmentLead(
-  supabase: SupabaseClient,
-  requester: { department_id?: string | null; department?: string | null }
+  supabase: LeaveRoutingClient,
+  requester: LeaveRequester
 ): Promise<{ id: string } | null> {
   if (requester.department_id) {
     const departmentHead = await resolveDepartmentHeadById(supabase, requester.department_id)
@@ -147,7 +181,10 @@ async function resolveRequesterDepartmentLead(
   return null
 }
 
-async function resolveFixedRoleAssignee(supabase: SupabaseClient, roleCode: string): Promise<{ id: string } | null> {
+async function resolveFixedRoleAssignee(
+  supabase: LeaveRoutingClient,
+  roleCode: string
+): Promise<{ id: string } | null> {
   const now = new Date().toISOString()
 
   const { data, error } = await supabase
@@ -160,13 +197,13 @@ async function resolveFixedRoleAssignee(supabase: SupabaseClient, roleCode: stri
 
   if (error) throw new Error(`Failed to resolve ${roleCode} assignment`)
 
-  const valid = (data || []).filter((row: any) => {
+  const valid = ((data || []) as LeaveApproverAssignment[]).filter((row) => {
     const startsOk = !row.effective_from || row.effective_from <= now
     const endsOk = !row.effective_to || row.effective_to >= now
     return startsOk && endsOk
   })
 
-  if (valid.length > 1 && valid.filter((x: any) => x.is_primary).length > 1) {
+  if (valid.length > 1 && valid.filter((assignment) => assignment.is_primary).length > 1) {
     throw new Error(`LEAVE_APPROVER_CONFLICT:${roleCode}`)
   }
 
@@ -174,10 +211,10 @@ async function resolveFixedRoleAssignee(supabase: SupabaseClient, roleCode: stri
 }
 
 async function resolveRoleApprover(
-  supabase: SupabaseClient,
+  supabase: LeaveRoutingClient,
   roleCode: string,
   context: {
-    requester: any
+    requester: LeaveRequester
     relieverId: string
   }
 ): Promise<{ id: string } | null> {
@@ -204,7 +241,7 @@ async function resolveRoleApprover(
   return resolveFixedRoleAssignee(supabase, roleCode)
 }
 
-export async function loadRouteRows(supabase: SupabaseClient, requesterKind: RequesterKind) {
+export async function loadRouteRows(supabase: LeaveRoutingClient, requesterKind: RequesterKind) {
   const { data, error } = await supabase
     .from("leave_approval_role_routes")
     .select("stage_order, approver_role_code, is_active")
@@ -213,12 +250,12 @@ export async function loadRouteRows(supabase: SupabaseClient, requesterKind: Req
     .order("stage_order", { ascending: true })
 
   if (error) throw new Error("Failed to load leave route configuration")
-  return data || []
+  return (data || []) as RouteConfigRow[]
 }
 
 export async function buildResolvedRouteSnapshot(params: {
-  supabase: SupabaseClient
-  requester: any
+  supabase: LeaveRoutingClient
+  requester: LeaveRequester
   requesterId: string
   requesterKind: RequesterKind
   relieverId: string
@@ -266,7 +303,10 @@ export async function buildResolvedRouteSnapshot(params: {
   return resolved
 }
 
-export function getRouteStageByOrder(snapshot: any, stageOrder: number): ResolvedRouteStage | null {
+export function getRouteStageByOrder(
+  snapshot: RouteSnapshotRow[] | null | undefined,
+  stageOrder: number
+): ResolvedRouteStage | null {
   if (!Array.isArray(snapshot)) return null
   return (
     snapshot
@@ -281,7 +321,7 @@ export function getRouteStageByOrder(snapshot: any, stageOrder: number): Resolve
 }
 
 export async function notifyStageApprover(params: {
-  supabase: SupabaseClient
+  supabase: LeaveRoutingClient
   approverUserId: string
   title: string
   message: string
@@ -295,7 +335,7 @@ export async function notifyStageApprover(params: {
     message: params.message,
     actorId: params.actorId,
     entityId: params.entityId,
-    linkUrl: params.linkUrl || "/dashboard/leave",
+    linkUrl: params.linkUrl || "/leave",
     emailEvent: "approval_required",
   })
 }

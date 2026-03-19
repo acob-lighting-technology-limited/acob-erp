@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Upload, Loader2 } from "lucide-react"
+import Image from "next/image"
 import { toast } from "sonner"
 import type { WatermarkConfig } from "@/components/watermark-studio"
 import { convertImagesIfNeeded } from "@/lib/convert-image"
@@ -251,7 +252,14 @@ export function MediaPreview({
             </div>
             <div className="border-border glass-effect overflow-hidden rounded-lg border">
               {mediaType === "image" ? (
-                <img src={processedUrl || "/placeholder.svg"} alt="Processed" className="h-auto w-full" />
+                <Image
+                  src={processedUrl || "/placeholder.svg"}
+                  alt="Processed"
+                  width={1600}
+                  height={900}
+                  unoptimized
+                  className="h-auto w-full"
+                />
               ) : (
                 <video src={processedUrl} controls className="h-auto w-full" />
               )}

@@ -28,11 +28,58 @@ const MAX_429_RETRIES = 5
 const DEFAULT_TIME_ZONE = "Africa/Lagos"
 const DEFAULT_SENDER = "ACOB Internal Systems <notifications@acoblighting.com>"
 
+type RateLimitErrorLike = {
+  statusCode?: number | string
+  status?: number | string
+  name?: string
+  message?: string
+}
+
+type SendEmailResponse = {
+  data?: { id?: string | null } | null
+  error?: { message?: string | null } | null
+}
+
+type ReminderRequestBody = {
+  type: ReminderType
+  recipients: string[]
+  meetingDate?: string
+  meetingWeek?: number
+  meetingYear?: number
+  meetingTime?: string
+  teamsLink?: string
+  agenda?: string[]
+  meetingPreparedByName?: string
+  sessionDate?: string
+  sessionTime?: string
+  duration?: string
+  knowledgeSharingDepartment?: string
+  knowledgeSharingPresenter?: KnowledgePresenter
+  kssRosterStatus?: string
+  requestedByUserId?: string
+}
+
+type DeliveryResult = {
+  to: string
+  success: boolean
+  emailId?: string | null
+  error?: unknown
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message
+  if (typeof error === "object" && error !== null && "message" in error) {
+    const message = (error as { message?: unknown }).message
+    if (typeof message === "string") return message
+  }
+  return "Unknown error"
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-function isRateLimitError(error: any): boolean {
+function isRateLimitError(error: RateLimitErrorLike | null | undefined): boolean {
   if (!error) return false
   const statusCode = Number(error?.statusCode || error?.status || 0)
   const name = String(error?.name || "").toLowerCase()
@@ -50,7 +97,7 @@ async function sendWithRetry(
   to: string,
   subject: string,
   html: string
-): Promise<{ data?: any; error?: any }> {
+): Promise<SendEmailResponse> {
   let attempt = 0
   while (attempt <= MAX_429_RETRIES) {
     const { data, error } = await resend.emails.send({
@@ -464,14 +511,14 @@ serve(async (req) => {
 
     const resend = new Resend(RESEND_API_KEY)
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
-    const meetingsMailEnabled = await isEdgeSystemEmailEnabled(supabase as any, "meetings")
+    const meetingsMailEnabled = await isEdgeSystemEmailEnabled(supabase, "meetings")
     if (!meetingsMailEnabled) {
       return new Response(JSON.stringify({ success: true, skipped: true, reason: "meetings_email_disabled" }), {
         status: 200,
       })
     }
 
-    const body = await req.json()
+    const body = (await req.json()) as ReminderRequestBody
 
     const {
       type,
@@ -488,24 +535,7 @@ serve(async (req) => {
       knowledgeSharingPresenter,
       kssRosterStatus,
       requestedByUserId,
-    } = body as {
-      type: ReminderType
-      recipients: string[]
-      meetingDate?: string
-      meetingWeek?: number
-      meetingYear?: number
-      meetingTime?: string
-      teamsLink?: string
-      agenda?: string[]
-      meetingPreparedByName?: string
-      sessionDate?: string
-      sessionTime?: string
-      duration?: string
-      knowledgeSharingDepartment?: string
-      knowledgeSharingPresenter?: KnowledgePresenter
-      kssRosterStatus?: string
-      requestedByUserId?: string
-    }
+    } = body
 
     if (!recipients || recipients.length === 0) {
       return new Response(JSON.stringify({ error: "No recipients" }), { status: 400 })
@@ -561,7 +591,7 @@ serve(async (req) => {
 
     console.log("[meeting-reminder] Sending " + type + " to " + recipients.length + " recipients")
 
-    const results: any[] = []
+    const results: DeliveryResult[] = []
     for (const to of recipients) {
       const { data, error } = await sendWithRetry(resend, from, to, subject, html)
       if (error) {
@@ -577,10 +607,10 @@ serve(async (req) => {
     }
 
     try {
-      const successCount = results.filter((r: any) => r.success).length
+      const successCount = results.filter((r) => r.success).length
       const failureCount = results.length - successCount
       const auditEntityId = crypto.randomUUID()
-      await writeEdgeAuditLog(supabase as any, {
+      await writeEdgeAuditLog(supabase, {
         action: "meeting_reminder_sent",
         entityType: "communications_mail",
         entityId: auditEntityId,
@@ -610,9 +640,9 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     })
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("[send-meeting-reminder] Error:", err)
-    return new Response(JSON.stringify({ error: err.message }), {
+    return new Response(JSON.stringify({ error: getErrorMessage(err) }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,
     })

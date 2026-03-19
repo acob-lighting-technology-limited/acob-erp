@@ -1,44 +1,37 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
+import { useEffect, useState } from "react"
+import { motion, AnimatePresence } from "framer-motion"
+import {
+  Bell,
+  Briefcase,
+  Calendar,
+  Car,
+  ClipboardList,
+  Clock,
+  CreditCard,
+  FileBarChart,
+  FileText,
+  FolderKanban,
+  LayoutDashboard,
+  LogOut,
+  MessageSquare,
+  Package,
+  ShieldCheck,
+  Target,
+  Wrench,
+} from "lucide-react"
+import { toast } from "sonner"
 import { cn, formatName } from "@/lib/utils"
+import { createClient } from "@/lib/supabase/client"
+import { getRoleBadgeColor, getRoleDisplayName } from "@/lib/permissions"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import {
-  LayoutDashboard,
-  User,
-  MessageSquare,
-  ShieldCheck,
-  LogOut,
-  Menu,
-  X,
-  ClipboardList,
-  FileText,
-  Briefcase,
-  Package,
-  ChevronLeft,
-  ChevronRight,
-  FolderKanban,
-  CreditCard,
-  Calendar,
-  Clock,
-  Car,
-  Target,
-  Wrench,
-  FileBarChart,
-  Bell,
-} from "lucide-react"
-import Image from "next/image"
-import { useState, useEffect } from "react"
-import { createClient } from "@/lib/supabase/client"
-import { useRouter } from "next/navigation"
-import { toast } from "sonner"
-import { useSidebar } from "./sidebar-context"
-import { motion, AnimatePresence } from "framer-motion"
 import type { UserRole } from "@/types/database"
-import { getRoleDisplayName, getRoleBadgeColor } from "@/lib/permissions"
+import { useSidebar } from "./sidebar-context"
 
 interface SidebarProps {
   user?: {
@@ -60,61 +53,32 @@ interface SidebarProps {
 
 const navigation = [
   { name: "Home", href: "/profile", icon: LayoutDashboard },
-  { name: "Notifications", href: "/notification", icon: Bell },
+  { name: "Notifications", href: "/notifications", icon: Bell },
   { name: "Job Description", href: "/job-description", icon: Briefcase },
   { name: "Projects", href: "/projects", icon: FolderKanban },
-  { name: "Tasks", href: "/dashboard/tasks", icon: ClipboardList },
-  { name: "Help Desk", href: "/dashboard/help-desk", icon: ClipboardList },
-  { name: "Reports", href: "/dashboard/reports", icon: FileBarChart },
-  { name: "Assets", href: "/dashboard/assets", icon: Package },
-  { name: "Payments", href: "/dashboard/payments", icon: CreditCard },
-  { name: "Documentation", href: "/dashboard/documentation", icon: FileText },
-  { name: "Feedback", href: "/dashboard/feedback", icon: MessageSquare },
-  { name: "Tools", href: "/dashboard/tools", icon: Wrench },
+  { name: "Tasks", href: "/tasks", icon: ClipboardList },
+  { name: "Help Desk", href: "/help-desk", icon: ClipboardList },
+  { name: "Reports", href: "/reports", icon: FileBarChart },
+  { name: "Assets", href: "/assets", icon: Package },
+  { name: "Payments", href: "/payments", icon: CreditCard },
+  { name: "Documentation", href: "/documentation", icon: FileText },
+  { name: "Feedback", href: "/feedback", icon: MessageSquare },
+  { name: "Tools", href: "/tools", icon: Wrench },
 ]
 
 const hrNavigation = [
-  { name: "Leave", href: "/dashboard/leave", icon: Calendar },
-  { name: "Attendance", href: "/dashboard/attendance", icon: Clock },
-  { name: "Fleet", href: "/dashboard/fleet", icon: Car },
-  { name: "Goals", href: "/dashboard/goals", icon: Target },
+  { name: "Leave", href: "/leave", icon: Calendar },
+  { name: "Attendance", href: "/attendance", icon: Clock },
+  { name: "Fleet", href: "/fleet", icon: Car },
+  { name: "Goals", href: "/goals", icon: Target },
 ]
-
-const adminNavigation = [{ name: "Admin Dashboard", href: "/admin", icon: ShieldCheck }]
-
-// Aliases: key = sidebar nav-item href, values = extra path prefixes that should
-// also activate (highlight) that item.
-// Rule: every real app-route must map back to one nav item here or share its prefix.
-const ROUTE_ALIASES: Record<string, string[]> = {
-  // Projects live at /projects (top-level) — also reachable via /dashboard/projects
-  "/projects": ["/dashboard/projects"],
-  // Payments: /payments (top-level) mirrors /dashboard/payments
-  "/dashboard/payments": ["/payments"],
-  // Notifications: singular href /notification, but extra paths use plural or dashboard prefix
-  "/notification": ["/dashboard/notifications", "/notifications"],
-  // Assets: top-level /assets mirrors /dashboard/assets
-  "/dashboard/assets": ["/assets"],
-  // Tasks: top-level /tasks mirrors /dashboard/tasks
-  "/dashboard/tasks": ["/tasks"],
-  // Tools: top-level /tools and /tools/* mirror /dashboard/tools
-  "/dashboard/tools": ["/tools"],
-  // Documentation: top-level /documentation mirrors /dashboard/documentation
-  "/dashboard/documentation": ["/documentation"],
-  // Feedback: top-level /feedback mirrors /dashboard/feedback
-  "/dashboard/feedback": ["/feedback"],
-  // Help Desk: in case there's ever a top-level /help-desk
-  "/dashboard/help-desk": ["/help-desk"],
-  // Reports: in case there's ever a top-level /reports
-  "/dashboard/reports": ["/reports"],
-}
 
 export function Sidebar({ user, profile, canAccessAdmin }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const { isCollapsed, setIsCollapsed } = useSidebar()
+  const { isCollapsed } = useSidebar()
 
-  // Listen for toggle event from navbar
   useEffect(() => {
     const handleToggle = (e: Event) => {
       e.preventDefault()
@@ -129,7 +93,6 @@ export function Sidebar({ user, profile, canAccessAdmin }: SidebarProps) {
     }
   }, [])
 
-  // Notify navbar of sidebar state changes
   useEffect(() => {
     const event = new CustomEvent("sidebar-state-change", {
       detail: { isOpen: isMobileMenuOpen },
@@ -160,20 +123,8 @@ export function Sidebar({ user, profile, canAccessAdmin }: SidebarProps) {
     router.push("/auth/login")
   }
 
-  const routeAliases = ROUTE_ALIASES
-
   const isNavItemActive = (href: string): boolean => {
     if (!pathname) return false
-
-    const aliases = routeAliases[href]
-    if (aliases && aliases.some((alias) => pathname === alias || pathname.startsWith(`${alias}/`))) {
-      return true
-    }
-
-    if (href === "/profile") {
-      return pathname === "/profile" || pathname === "/dashboard/profile" || pathname.startsWith("/dashboard/profile/")
-    }
-
     return pathname === href || pathname.startsWith(`${href}/`)
   }
 
@@ -181,19 +132,16 @@ export function Sidebar({ user, profile, canAccessAdmin }: SidebarProps) {
 
   const sidebarJSX = (
     <>
-      {/* Empty space for logo (moved to navbar) */}
       <div className={cn("transition-[padding] duration-300 ease-in-out", isCollapsed ? "px-2 py-2" : "px-3 py-2")}>
         {/* Logo space maintained but empty */}
       </div>
 
-      {/* User Profile Section */}
       <div
         className={cn(
           "flex min-h-[80px] flex-col border-b py-2.5 transition-[padding,margin] duration-300 ease-in-out",
           isCollapsed ? "mx-0 items-center px-0" : "px-3"
         )}
       >
-        {/* User Profile */}
         <div
           className={cn(
             "flex shrink-0 items-center transition-[gap] duration-300 ease-in-out",
@@ -236,9 +184,7 @@ export function Sidebar({ user, profile, canAccessAdmin }: SidebarProps) {
         </div>
       </div>
 
-      {/* Navigation */}
       <nav className="scrollbar-custom flex-1 space-y-0.5 overflow-y-auto px-2.5 py-3">
-        {/* Regular Navigation */}
         {navigation.map((item) => {
           const isActive = isNavItemActive(item.href)
           return (
@@ -274,7 +220,6 @@ export function Sidebar({ user, profile, canAccessAdmin }: SidebarProps) {
           )
         })}
 
-        {/* HR Section Divider */}
         <div
           className={cn(
             "my-1.5 border-t transition-[margin] duration-300 ease-in-out",
@@ -282,7 +227,6 @@ export function Sidebar({ user, profile, canAccessAdmin }: SidebarProps) {
           )}
         />
 
-        {/* HR Navigation */}
         {hrNavigation.map((item) => {
           const isActive = pathname === item.href || pathname?.startsWith(item.href + "/")
           return (
@@ -319,9 +263,7 @@ export function Sidebar({ user, profile, canAccessAdmin }: SidebarProps) {
         })}
       </nav>
 
-      {/* Footer - Admin & Logout */}
       <div className="space-y-1.5 border-t px-2.5 py-2.5">
-        {/* Go to Admin - Only for admins/leads */}
         {canAccessAdmin && (
           <Link href="/admin" className="block">
             <Button
@@ -379,7 +321,6 @@ export function Sidebar({ user, profile, canAccessAdmin }: SidebarProps) {
 
   return (
     <>
-      {/* Desktop Sidebar */}
       <motion.aside
         initial={false}
         animate={{
@@ -395,9 +336,6 @@ export function Sidebar({ user, profile, canAccessAdmin }: SidebarProps) {
         {sidebarJSX}
       </motion.aside>
 
-      {/* Mobile Header - Hidden, using navbar instead */}
-
-      {/* Mobile Sidebar */}
       <>
         <div
           className={cn(

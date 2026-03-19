@@ -3,6 +3,8 @@ import { canAccessAdminSection, resolveAdminScope } from "@/lib/admin/rbac"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 
+type LoginLogsClient = Awaited<ReturnType<typeof createClient>>
+
 export async function GET() {
   const supabase = await createClient()
   const {
@@ -14,12 +16,12 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  const scope = await resolveAdminScope(supabase as any, user.id)
+  const scope = await resolveAdminScope(supabase as LoginLogsClient, user.id)
   if (!scope || !canAccessAdminSection(scope, "dev")) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
 
-  const dataClient = getServiceRoleClientOrFallback(supabase as any)
+  const dataClient = getServiceRoleClientOrFallback(supabase as LoginLogsClient)
   const { data, error } = await dataClient
     .from("dev_login_logs")
     .select("id, email, full_name, role, ip_address, user_agent, auth_method, login_at")

@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ChevronDown, ChevronRight } from "lucide-react"
-import type { LeaveBalance, LeaveType } from "@/app/(app)/dashboard/leave/page"
+import type { LeaveBalance, LeaveType } from "@/app/(app)/leave/page"
 
 const ELIGIBILITY_VARIANT: Record<string, "default" | "destructive" | "secondary" | "outline"> = {
   eligible: "default",

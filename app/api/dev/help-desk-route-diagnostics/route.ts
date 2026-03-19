@@ -10,8 +10,8 @@
 
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { createClient as createAdminClient } from "@supabase/supabase-js"
-import { applyAssignableStatusFilter } from "@/lib/workforce/assignment-policy"
+import { createClient as createAdminClient, type SupabaseClient } from "@supabase/supabase-js"
+import { isAssignableEmploymentStatus } from "@/lib/workforce/assignment-policy"
 import { DEPT_EXECUTIVE_MANAGEMENT, DEPT_CORPORATE_SERVICES } from "@/config/constants"
 
 type DiagRow = {
@@ -29,36 +29,49 @@ type DiagRow = {
   fail_reason?: string
 }
 
-function getManagedDepartments(profile: any): string[] {
+type DiagnosticProfile = {
+  id: string
+  full_name?: string | null
+  role?: string | null
+  department?: string | null
+  is_department_lead?: boolean | null
+  lead_departments?: string[] | null
+}
+
+type DepartmentNameRow = {
+  name?: string | null
+}
+
+function getManagedDepartments(profile: DiagnosticProfile | null | undefined): string[] {
   const managed = Array.isArray(profile?.lead_departments) ? profile.lead_departments.filter(Boolean) : []
   const withPrimary = profile?.department ? [profile.department, ...managed] : managed
   return Array.from(new Set(withPrimary))
 }
 
-function isLeadForDepartment(profile: any, departmentName: string): boolean {
+function isLeadForDepartment(profile: DiagnosticProfile | null | undefined, departmentName: string): boolean {
   if (!profile?.is_department_lead) return false
   return getManagedDepartments(profile).includes(departmentName)
 }
 
-function isHcsCandidate(profile: any): boolean {
+function isHcsCandidate(profile: DiagnosticProfile | null | undefined): boolean {
   if (!profile) return false
   const managed = Array.isArray(profile.lead_departments) ? profile.lead_departments : []
-  return (
+  return Boolean(
     (profile.role === "developer" ||
       profile.role === "super_admin" ||
       profile.role === "admin" ||
       profile.is_department_lead) &&
-    (profile.department === DEPT_CORPORATE_SERVICES || managed.includes(DEPT_CORPORATE_SERVICES))
+      (profile.department === DEPT_CORPORATE_SERVICES || managed.includes(DEPT_CORPORATE_SERVICES))
   )
 }
 
-function isMdCandidate(profile: any): boolean {
+function isMdCandidate(profile: DiagnosticProfile | null | undefined): boolean {
   if (!profile) return false
-  return (
+  return Boolean(
     ((profile.role === "developer" || profile.role === "super_admin" || profile.role === "admin") &&
       profile.department === DEPT_EXECUTIVE_MANAGEMENT) ||
-    profile.role === "developer" ||
-    profile.role === "super_admin"
+      profile.role === "developer" ||
+      profile.role === "super_admin"
   )
 }
 
@@ -84,15 +97,13 @@ export async function GET() {
   const admin = createAdminClient(url, serviceKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   })
+  const db = admin as unknown as SupabaseClient
 
   const [departmentsRes, leadsRes] = await Promise.all([
-    admin.from("departments").select("name").order("name"),
-    applyAssignableStatusFilter(
-      admin
-        .from("profiles")
-        .select("id, full_name, role, department, is_department_lead, lead_departments, employment_status"),
-      { allowLegacyNullStatus: false }
-    ),
+    db.from("departments").select("name").order("name"),
+    db
+      .from("profiles")
+      .select("id, full_name, role, department, is_department_lead, lead_departments, employment_status"),
   ])
 
   if (departmentsRes.error) {
@@ -102,16 +113,20 @@ export async function GET() {
     return NextResponse.json({ error: `Failed to load profiles: ${leadsRes.error.message}` }, { status: 500 })
   }
 
-  const departments = (departmentsRes.data || []).map((d: any) => d.name).filter(Boolean)
-  const profiles = leadsRes.data || []
-  const leadProfiles = profiles.filter((p: any) => p.is_department_lead)
+  const departments = ((departmentsRes.data || []) as DepartmentNameRow[])
+    .map((d) => d.name)
+    .filter((name): name is string => typeof name === "string" && name.length > 0)
+  const profiles = ((leadsRes.data || []) as Array<DiagnosticProfile & { employment_status?: string | null }>).filter(
+    (profile) => isAssignableEmploymentStatus(profile.employment_status, { allowLegacyNullStatus: false })
+  )
+  const leadProfiles = profiles.filter((p) => p.is_department_lead)
   const multiDepartmentLeadIds = new Set(
-    leadProfiles.filter((p: any) => getManagedDepartments(p).length > 1).map((p: any) => p.id)
+    leadProfiles.filter((p) => getManagedDepartments(p).length > 1).map((p) => p.id)
   )
   const rows: DiagRow[] = []
 
   for (const departmentName of departments) {
-    const leadCandidate = profiles.find((p: any) => isLeadForDepartment(p, departmentName))
+    const leadCandidate = profiles.find((p) => isLeadForDepartment(p, departmentName))
     const isConflict = Boolean(leadCandidate?.id && multiDepartmentLeadIds.has(leadCandidate.id))
     rows.push({
       flow_kind: "support",
@@ -129,7 +144,7 @@ export async function GET() {
   }
 
   for (const departmentName of departments) {
-    const deptLead = profiles.find((p: any) => isLeadForDepartment(p, departmentName))
+    const deptLead = profiles.find((p) => isLeadForDepartment(p, departmentName))
     const isConflict = Boolean(deptLead?.id && multiDepartmentLeadIds.has(deptLead.id))
     rows.push({
       flow_kind: "procurement",
@@ -159,7 +174,7 @@ export async function GET() {
     })
   }
 
-  const hcsCandidate = profiles.find((p: any) => isHcsCandidate(p))
+  const hcsCandidate = profiles.find((p) => isHcsCandidate(p))
   rows.push({
     flow_kind: "procurement",
     stage_code: "head_corporate_services",
@@ -172,7 +187,7 @@ export async function GET() {
       : "No active HCS approver candidate (Corporate Services lead/admin context) found",
   })
 
-  const mdCandidate = profiles.find((p: any) => isMdCandidate(p))
+  const mdCandidate = profiles.find((p) => isMdCandidate(p))
   rows.push({
     flow_kind: "procurement",
     stage_code: "managing_director",

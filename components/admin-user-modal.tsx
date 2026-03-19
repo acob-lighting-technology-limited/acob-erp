@@ -11,7 +11,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner"
 
 interface AdminUserModalProps {
-  user: any
+  user: {
+    id: string
+    first_name?: string | null
+    last_name?: string | null
+    department?: string | null
+    company_role?: string | null
+    phone_number?: string | null
+  }
   onClose: () => void
   onSave: () => void
 }

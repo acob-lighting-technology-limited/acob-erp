@@ -7,7 +7,6 @@ import { Search, Building2, Shield, UserCircle, User } from "lucide-react"
 import { formatName } from "@/lib/utils"
 import { getRoleDisplayName } from "@/lib/permissions"
 import type { UserRole } from "@/types/database"
-import { useDepartments } from "@/hooks/use-departments"
 import type { Employee } from "@/app/admin/hr/employees/admin-employee-content"
 
 interface Filters {
@@ -27,8 +26,6 @@ interface EmployeeFilterBarProps {
 }
 
 export function EmployeeFilterBar({ filters, onFilterChange, departments, employees, roles }: EmployeeFilterBarProps) {
-  const { departments: DEPARTMENTS } = useDepartments()
-
   return (
     <Card className="border-2">
       <CardContent className="p-6">
@@ -50,7 +47,7 @@ export function EmployeeFilterBar({ filters, onFilterChange, departments, employ
               label="Departments"
               icon={<Building2 className="h-4 w-4" />}
               values={filters.departmentFilter}
-              options={DEPARTMENTS.map((dept) => ({
+              options={departments.map((dept) => ({
                 value: dept,
                 label: dept,
                 icon: <Building2 className="h-3 w-3" />,

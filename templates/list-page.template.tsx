@@ -11,7 +11,7 @@
 
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import { PageWrapper, PageHeader, Section } from "@/components/layout"
+import { PageWrapper, PageHeader } from "@/components/layout"
 import { StatCard } from "@/components/ui/stat-card"
 import { EmptyState } from "@/components/ui/empty-state"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"

@@ -10,10 +10,29 @@ import { logger } from "@/lib/logger"
 
 const log = logger("dev-ui-errors")
 
+type UiAuditLogRow = {
+  id: string
+  created_at: string
+  error_details: string | null
+  metadata: Record<string, unknown> | null
+  user_id: string | null
+}
+
+type UiErrorUserRow = {
+  id: string
+  first_name?: string | null
+  last_name?: string | null
+  company_email?: string | null
+}
+
+function readMetaString(metadata: Record<string, unknown> | null, key: string) {
+  const value = metadata?.[key]
+  return typeof value === "string" ? value : ""
+}
 
 export default async function DevUiErrorsPage() {
   const supabase = await createClient()
-  const dataClient = getServiceRoleClientOrFallback(supabase as any)
+  const dataClient = getServiceRoleClientOrFallback(supabase)
 
   const { data: logs, error } = await dataClient
     .from("audit_logs")
@@ -22,36 +41,38 @@ export default async function DevUiErrorsPage() {
     .eq("entity_type", "ui_runtime")
     .order("created_at", { ascending: false })
     .limit(500)
+    .returns<UiAuditLogRow[]>()
 
   if (error) {
     log.error("Error loading UI telemetry logs:", error)
   }
 
-  const userIds = Array.from(new Set((logs || []).map((l: any) => l.user_id).filter(Boolean)))
-  let usersMap = new Map<string, { first_name?: string; last_name?: string; company_email?: string }>()
+  const userIds = Array.from(new Set((logs || []).map((entry) => entry.user_id).filter(Boolean)))
+  let usersMap = new Map<string, UiErrorUserRow>()
 
   if (userIds.length > 0) {
     const { data: users } = await dataClient
       .from("profiles")
       .select("id, first_name, last_name, company_email")
       .in("id", userIds)
-    usersMap = new Map((users || []).map((u: any) => [u.id, u]))
+      .returns<UiErrorUserRow[]>()
+    usersMap = new Map((users || []).map((user) => [user.id, user]))
   }
 
-  const rows: UiErrorRow[] = (logs || []).map((log: any) => {
-    const meta = log.metadata && typeof log.metadata === "object" ? log.metadata : {}
-    const source = String((meta as any).source || "unknown")
-    const route = String((meta as any).route || (meta as any).href || "")
-    const user = log.user_id ? usersMap.get(log.user_id) : null
+  const rows: UiErrorRow[] = (logs || []).map((entry) => {
+    const meta = entry.metadata
+    const source = readMetaString(meta, "source") || "unknown"
+    const route = readMetaString(meta, "route") || readMetaString(meta, "href")
+    const user = entry.user_id ? usersMap.get(entry.user_id) : null
     const userName =
       user?.first_name && user?.last_name
         ? `${user.first_name} ${user.last_name}`
-        : user?.company_email || (log.user_id ? "Authenticated User" : "Anonymous")
+        : user?.company_email || (entry.user_id ? "Authenticated User" : "Anonymous")
 
     return {
-      id: log.id,
-      created_at: log.created_at,
-      message: String(log.error_details || "Unknown error"),
+      id: entry.id,
+      created_at: entry.created_at,
+      message: String(entry.error_details || "Unknown error"),
       source,
       route,
       user_name: userName,

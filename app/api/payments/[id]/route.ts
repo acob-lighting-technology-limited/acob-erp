@@ -5,6 +5,15 @@ import { getDepartmentScope, resolveAdminScope, normalizeDepartmentName } from "
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 
+type PaymentsClient = Awaited<ReturnType<typeof createClient>>
+
+type DepartmentRelation = { name?: string | null } | Array<{ name?: string | null }> | null
+
+type PaymentDepartmentRecord = {
+  department?: DepartmentRelation
+  created_by?: string | null
+}
+
 async function createClient() {
   const cookieStore = await cookies()
 
@@ -24,7 +33,7 @@ async function createClient() {
   })
 }
 
-function getRelatedDepartmentName(payment: any): string | null {
+function getRelatedDepartmentName(payment: PaymentDepartmentRecord | null | undefined): string | null {
   const relation = payment?.department
   if (!relation) return null
   if (Array.isArray(relation)) return relation[0]?.name ?? null
@@ -53,9 +62,9 @@ export async function GET(request: Request, { params }: { params: { id: string }
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const scope = await resolveAdminScope(supabase as any, user.id)
+    const scope = await resolveAdminScope(supabase, user.id)
     const { data: profile } = await supabase.from("profiles").select("department").eq("id", user.id).single()
-    const dataClient = getServiceRoleClientOrFallback(supabase as any)
+    const dataClient = getServiceRoleClientOrFallback(supabase)
 
     const { data: payment, error } = await dataClient
       .from("department_payments")
@@ -94,8 +103,9 @@ export async function GET(request: Request, { params }: { params: { id: string }
     }
 
     return NextResponse.json({ data: payment })
-  } catch (error: any) {
-    return NextResponse.json({ error: error?.message || "Internal Server Error" }, { status: 500 })
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Internal Server Error"
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
 
@@ -114,9 +124,9 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const scope = await resolveAdminScope(supabase as any, user.id)
+    const scope = await resolveAdminScope(supabase, user.id)
     const { data: profile } = await supabase.from("profiles").select("department").eq("id", user.id).single()
-    const dataClient = getServiceRoleClientOrFallback(supabase as any)
+    const dataClient = getServiceRoleClientOrFallback(supabase)
 
     // Check permissions (scoped admin/lead or department member)
     if (!scope) {
@@ -191,7 +201,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     }
 
     await writeAuditLog(
-      supabase as any,
+      supabase as PaymentsClient,
       {
         action: "update",
         entityType: "payment",
@@ -203,8 +213,9 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     )
 
     return NextResponse.json({ data: updatedPayment })
-  } catch (error: any) {
-    return NextResponse.json({ error: error?.message || "Internal Server Error" }, { status: 500 })
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Internal Server Error"
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
 
@@ -222,9 +233,9 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const scope = await resolveAdminScope(supabase as any, user.id)
+    const scope = await resolveAdminScope(supabase, user.id)
     const { data: profile } = await supabase.from("profiles").select("department").eq("id", user.id).single()
-    const dataClient = getServiceRoleClientOrFallback(supabase as any)
+    const dataClient = getServiceRoleClientOrFallback(supabase)
 
     if (scope) {
       const { data: payment } = await dataClient
@@ -258,7 +269,7 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
     }
 
     await writeAuditLog(
-      supabase as any,
+      supabase as PaymentsClient,
       {
         action: "delete",
         entityType: "payment",
@@ -269,7 +280,8 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
     )
 
     return NextResponse.json({ success: true })
-  } catch (error: any) {
-    return NextResponse.json({ error: error?.message || "Internal Server Error" }, { status: 500 })
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Internal Server Error"
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

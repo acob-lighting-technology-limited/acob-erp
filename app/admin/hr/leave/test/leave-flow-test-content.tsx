@@ -12,7 +12,7 @@ import { CheckCircle, XCircle, Loader2, PlayCircle, FlaskConical, SkipForward, R
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
-import { applyAssignableStatusFilter } from "@/lib/workforce/assignment-policy"
+import { isAssignableEmploymentStatus } from "@/lib/workforce/assignment-policy"
 import { logger } from "@/lib/logger"
 
 const log = logger("leave-flow-test")
@@ -47,6 +47,20 @@ type DiagnosticsResult = {
   total: number
 }
 
+type ProfileOptionRow = {
+  id: string
+  full_name?: string | null
+  first_name?: string | null
+  last_name?: string | null
+  company_email?: string | null
+  employment_status?: string | null
+}
+
+type LeaveTypeOptionRow = {
+  id: string
+  name: string
+}
+
 const FIX_HINTS: Record<string, string> = {
   md: 'Set someone\'s profile: is_department_lead = true AND department = "Executive Management" (or add "Executive Management" to their lead_departments array)',
   hcs: 'Set someone\'s profile: is_department_lead = true AND department = "Corporate Services" (or add it to lead_departments)',
@@ -58,8 +72,6 @@ const FIX_HINTS: Record<string, string> = {
 }
 
 export function LeaveFlowTestContent() {
-  const supabase = createClient()
-
   const [employees, setEmployees] = useState<{ value: string; label: string }[]>([])
   const [leaveTypes, setLeaveTypes] = useState<{ value: string; label: string }[]>([])
   const [requesterId, setRequesterId] = useState("")
@@ -74,20 +86,23 @@ export function LeaveFlowTestContent() {
 
   useEffect(() => {
     async function load() {
+      const supabase = createClient()
       const [profilesRes, typesRes] = await Promise.all([
-        applyAssignableStatusFilter(
-          supabase.from("profiles").select("id, full_name, first_name, last_name, company_email").order("first_name"),
-          { allowLegacyNullStatus: false }
-        ),
+        supabase
+          .from("profiles")
+          .select("id, full_name, first_name, last_name, company_email, employment_status")
+          .order("first_name"),
         supabase.from("leave_types").select("id, name").order("name"),
       ])
 
-      const profileOptions = (profilesRes.data || []).map((p: any) => ({
-        value: p.id,
-        label: p.full_name?.trim() || `${p.first_name || ""} ${p.last_name || ""}`.trim() || p.company_email || p.id,
-      }))
+      const profileOptions = ((profilesRes.data || []) as ProfileOptionRow[])
+        .filter((profile) => isAssignableEmploymentStatus(profile.employment_status, { allowLegacyNullStatus: false }))
+        .map((p) => ({
+          value: p.id,
+          label: p.full_name?.trim() || `${p.first_name || ""} ${p.last_name || ""}`.trim() || p.company_email || p.id,
+        }))
 
-      const typeOptions = (typesRes.data || []).map((t: any) => ({
+      const typeOptions = ((typesRes.data || []) as LeaveTypeOptionRow[]).map((t) => ({
         value: t.id,
         label: t.name,
       }))
@@ -132,8 +147,8 @@ export function LeaveFlowTestContent() {
       } else {
         toast.error("One or more stages failed — check results below")
       }
-    } catch (e: any) {
-      toast.error(e.message || "Network error")
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Network error")
     } finally {
       setRunning(false)
     }
@@ -154,8 +169,8 @@ export function LeaveFlowTestContent() {
       } else {
         toast.error(`${payload.broken_count} broken stage(s) found — see details below`)
       }
-    } catch (e: any) {
-      toast.error(e.message || "Network error")
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Network error")
     } finally {
       setDiagnosticsRunning(false)
     }

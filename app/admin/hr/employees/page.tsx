@@ -1,15 +1,18 @@
 import { redirect } from "next/navigation"
+import type { SupabaseClient } from "@supabase/supabase-js"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { AdminEmployeeContent, type Employee, type UserProfile } from "./admin-employee-content"
 import { resolveAdminScope } from "@/lib/admin/rbac"
 import { logger } from "@/lib/logger"
+import type { Database, UserRole } from "@/types/database"
 
 const log = logger("admin-employees")
 
 async function getAdminEmployeeData() {
   const supabase = await createClient()
-  const dataClient = getServiceRoleClientOrFallback(supabase as any)
+  const typedSupabase = supabase as SupabaseClient<Database>
+  const dataClient = getServiceRoleClientOrFallback(typedSupabase)
 
   const {
     data: { user },
@@ -20,12 +23,12 @@ async function getAdminEmployeeData() {
     return { redirect: "/auth/login" as const }
   }
 
-  const scope = await resolveAdminScope(supabase as any, user.id)
+  const scope = await resolveAdminScope(typedSupabase, user.id)
   if (!scope) {
-    return { redirect: "/dashboard" as const }
+    return { redirect: "/profile" as const }
   }
   const userProfile: UserProfile = {
-    role: scope.role as any,
+    role: scope.role as UserRole,
     managed_departments: scope.managedDepartments,
   }
 

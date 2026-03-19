@@ -10,6 +10,13 @@ const log = logger("payments")
 
 export const dynamic = "force-dynamic"
 
+type PaymentsClient = Awaited<ReturnType<typeof createClient>>
+
+type UserPaymentsProfile = {
+  department?: string | null
+  department_id?: string | null
+}
+
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 const normalizeDepartmentId = (value: unknown): string | null => {
@@ -64,8 +71,8 @@ export async function GET(request: Request) {
       .select("role, department, department_id")
       .eq("id", user.id)
       .single()
-    const scope = await resolveAdminScope(supabase as any, user.id)
-    const dataClient = getServiceRoleClientOrFallback(supabase as any)
+    const scope = await resolveAdminScope(supabase, user.id)
+    const dataClient = getServiceRoleClientOrFallback(supabase)
 
     let query = dataClient
       .from("department_payments")
@@ -90,11 +97,11 @@ export async function GET(request: Request) {
         query = query.eq("department_id", departmentId)
       }
     } else {
-      const deptId = normalizeDepartmentId((profile as any)?.department_id)
+      const deptId = normalizeDepartmentId((profile as UserPaymentsProfile | null)?.department_id)
       if (deptId) {
         query = query.eq("department_id", deptId)
       } else {
-        const rawDept = String((profile as any)?.department || "").trim()
+        const rawDept = String((profile as UserPaymentsProfile | null)?.department || "").trim()
         const deptCandidates = Array.from(new Set([normalizeDepartmentName(rawDept), rawDept].filter(Boolean)))
         const { data: userDept } = await dataClient
           .from("departments")
@@ -192,8 +199,8 @@ export async function POST(request: Request) {
       .select("role, department, department_id")
       .eq("id", user.id)
       .single()
-    const scope = await resolveAdminScope(supabase as any, user.id)
-    const dataClient = getServiceRoleClientOrFallback(supabase as any)
+    const scope = await resolveAdminScope(supabase, user.id)
+    const dataClient = getServiceRoleClientOrFallback(supabase)
 
     if (scope) {
       const scopedDepartments = getDepartmentScope(scope, "finance")
@@ -211,9 +218,9 @@ export async function POST(request: Request) {
         }
       }
     } else {
-      let userDepartmentId = normalizeDepartmentId((profile as any)?.department_id)
+      let userDepartmentId = normalizeDepartmentId((profile as UserPaymentsProfile | null)?.department_id)
       if (!userDepartmentId) {
-        const rawDept = String((profile as any)?.department || "").trim()
+        const rawDept = String((profile as UserPaymentsProfile | null)?.department || "").trim()
         const deptCandidates = Array.from(new Set([normalizeDepartmentName(rawDept), rawDept].filter(Boolean)))
         const { data: userDept } = await dataClient
           .from("departments")
@@ -261,7 +268,7 @@ export async function POST(request: Request) {
     if (error) throw error
 
     await writeAuditLog(
-      supabase as any,
+      supabase as PaymentsClient,
       {
         action: "create",
         entityType: "payment",
@@ -273,8 +280,9 @@ export async function POST(request: Request) {
     )
 
     return NextResponse.json({ data: payment }, { status: 201 })
-  } catch (error: any) {
+  } catch (error: unknown) {
     log.error({ err: String(error) }, "Error creating payment:")
-    return NextResponse.json({ error: error?.message || "Failed to create payment" }, { status: 500 })
+    const message = error instanceof Error ? error.message : "Failed to create payment"
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

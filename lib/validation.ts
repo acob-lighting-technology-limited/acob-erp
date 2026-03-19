@@ -167,7 +167,7 @@ export const formValidation = {
   /**
    * Check if all required fields are filled
    */
-  hasRequiredFields: (fields: Record<string, any>, requiredKeys: string[]): boolean => {
+  hasRequiredFields: (fields: Record<string, unknown>, requiredKeys: string[]): boolean => {
     return requiredKeys.every((key) => {
       const value = fields[key]
       return value !== null && value !== undefined && value !== ""
@@ -177,7 +177,7 @@ export const formValidation = {
   /**
    * Get missing required field names
    */
-  getMissingFields: (fields: Record<string, any>, requiredKeys: string[]): string[] => {
+  getMissingFields: (fields: Record<string, unknown>, requiredKeys: string[]): string[] => {
     return requiredKeys.filter((key) => {
       const value = fields[key]
       return value === null || value === undefined || value === ""

@@ -4,6 +4,8 @@ import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 
+type FleetResourcePatch = Record<string, string | boolean | null>
+
 export async function GET() {
   try {
     const supabase = await createClient()
@@ -113,7 +115,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Resource id is required" }, { status: 400 })
     }
 
-    const patch: Record<string, any> = {}
+    const patch: FleetResourcePatch = {}
     if (body?.name !== undefined) {
       const name = String(body.name || "").trim()
       if (name.length < 2) return NextResponse.json({ error: "Invalid resource name" }, { status: 400 })

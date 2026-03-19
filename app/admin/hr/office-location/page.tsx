@@ -15,11 +15,7 @@ import { StatCard } from "@/components/ui/stat-card"
 import { ChevronDown, ChevronUp, Mail, MapPin, Pencil, Users } from "lucide-react"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
-import { applyAssignableStatusFilter } from "@/lib/workforce/assignment-policy"
-
-import { logger } from "@/lib/logger"
-
-const log = logger("hr-office-location")
+import { isAssignableEmploymentStatus } from "@/lib/workforce/assignment-policy"
 
 interface OfficeLocationsData {
   locations: OfficeLocationRow[]
@@ -28,17 +24,18 @@ interface OfficeLocationsData {
 
 async function fetchOfficeLocations(): Promise<OfficeLocationsData> {
   const supabase = createClient()
-  const { data, error } = await applyAssignableStatusFilter(
-    supabase
-      .from("profiles")
-      .select("id, first_name, last_name, company_email, additional_email, company_role, office_location"),
-    { allowLegacyNullStatus: false }
-  )
+  const { data, error } = await supabase
+    .from("profiles")
+    .select(
+      "id, first_name, last_name, company_email, additional_email, company_role, office_location, employment_status"
+    )
 
   if (error) throw new Error(error.message)
 
   const byLocation: Record<string, LocationEmployee[]> = {}
-  for (const profile of (data || []) as LocationEmployee[]) {
+  for (const profile of ((data || []) as Array<LocationEmployee & { employment_status?: string | null }>).filter(
+    (employee) => isAssignableEmploymentStatus(employee.employment_status, { allowLegacyNullStatus: false })
+  )) {
     const locationName = profile.office_location?.trim() || "Unassigned"
     if (!byLocation[locationName]) byLocation[locationName] = []
     byLocation[locationName].push(profile)

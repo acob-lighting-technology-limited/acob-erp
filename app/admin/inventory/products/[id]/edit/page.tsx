@@ -110,8 +110,8 @@ export default function EditProductPage() {
       if (error) throw error
       toast.success("Product updated")
       router.push(`/admin/inventory/products/${id}`)
-    } catch (error: any) {
-      toast.error(error.message || "Failed to update")
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Failed to update")
     } finally {
       setSaving(false)
     }

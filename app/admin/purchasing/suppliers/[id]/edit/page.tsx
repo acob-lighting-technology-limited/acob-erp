@@ -86,8 +86,8 @@ export default function EditSupplierPage() {
       if (error) throw error
       toast.success("Supplier updated")
       router.push(`/admin/purchasing/suppliers/${id}`)
-    } catch (error: any) {
-      toast.error(error.message || "Failed to update")
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Failed to update")
     } finally {
       setSaving(false)
     }

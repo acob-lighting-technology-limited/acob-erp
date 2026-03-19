@@ -14,6 +14,8 @@ const log = logger("onedrive")
 
 export const dynamic = "force-dynamic"
 
+type OneDriveClient = Awaited<ReturnType<typeof createClient>>
+
 // Helper function to create Supabase client for auth check
 async function createClient() {
   const cookieStore = await cookies()
@@ -58,7 +60,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const scope = await resolveOneDriveAccessScope(supabase as any, user.id)
+    const scope = await resolveOneDriveAccessScope(supabase as OneDriveClient, user.id)
     if (!scope) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
@@ -141,7 +143,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const scope = await resolveOneDriveAccessScope(supabase as any, user.id)
+    const scope = await resolveOneDriveAccessScope(supabase as OneDriveClient, user.id)
     if (!scope) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }

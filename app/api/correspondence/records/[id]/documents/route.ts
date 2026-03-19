@@ -81,9 +81,10 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     }
 
     return NextResponse.json({ data: files })
-  } catch (error: any) {
+  } catch (error: unknown) {
     log.error({ err: String(error) }, "Error in GET /api/correspondence/records/[id]/documents:")
-    return NextResponse.json({ error: error?.message || "Internal Server Error" }, { status: 500 })
+    const message = error instanceof Error ? error.message : "Internal Server Error"
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
 
@@ -222,8 +223,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
     })
 
     return NextResponse.json({ data: versionRow }, { status: 201 })
-  } catch (error: any) {
+  } catch (error: unknown) {
     log.error({ err: String(error) }, "Error in POST /api/correspondence/records/[id]/documents:")
-    return NextResponse.json({ error: error?.message || "Internal Server Error" }, { status: 500 })
+    const message = error instanceof Error ? error.message : "Internal Server Error"
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

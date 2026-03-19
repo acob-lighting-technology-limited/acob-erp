@@ -6,18 +6,21 @@ import { cn } from "@/lib/utils"
 import { ArrowLeft } from "lucide-react"
 import Link from "next/link"
 import { resolveAdminScope } from "@/lib/admin/rbac"
+import type { SupabaseClient } from "@supabase/supabase-js"
+import type { Database } from "@/types/database"
 
 export default async function AdminEmployeeSignaturePage({ params }: { params: { userId: string } }) {
   const supabase = await createClient()
+  const typedSupabase = supabase as SupabaseClient<Database>
 
   const { data, error } = await supabase.auth.getUser()
   if (error || !data?.user) {
     redirect("/auth/login")
   }
 
-  const scope = await resolveAdminScope(supabase as any, data.user.id)
+  const scope = await resolveAdminScope(typedSupabase, data.user.id)
   if (!scope) {
-    redirect("/dashboard")
+    redirect("/profile")
   }
 
   // Fetch the target user's profile

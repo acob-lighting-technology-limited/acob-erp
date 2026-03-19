@@ -9,6 +9,8 @@ const log = logger("departments")
 
 export const dynamic = "force-dynamic"
 
+type DepartmentsClient = Awaited<ReturnType<typeof createClient>>
+
 // Helper function to create Supabase client
 async function createClient() {
   const cookieStore = await cookies()
@@ -42,7 +44,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const scope = await resolveAdminScope(supabase as any, user.id)
+    const scope = await resolveAdminScope(supabase as DepartmentsClient, user.id)
 
     const { data: department, error } = await supabase.from("departments").select("*").eq("id", params.id).single()
 
@@ -80,7 +82,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const scope = await resolveAdminScope(supabase as any, user.id)
+    const scope = await resolveAdminScope(supabase as DepartmentsClient, user.id)
     const managedDepartments = scope?.managedDepartments || []
     const canManageDepartments = !!scope && (scope.isAdminLike || managedDepartments.includes("Admin & HR"))
     if (!canManageDepartments) {
@@ -108,7 +110,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
     if (error) throw error
 
     await writeAuditLog(
-      supabase as any,
+      supabase as DepartmentsClient,
       {
         action: "update",
         entityType: "department",
@@ -139,7 +141,7 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const scope = await resolveAdminScope(supabase as any, user.id)
+    const scope = await resolveAdminScope(supabase as DepartmentsClient, user.id)
     const managedDepartments = scope?.managedDepartments || []
     const canManageDepartments = !!scope && (scope.isAdminLike || managedDepartments.includes("Admin & HR"))
     if (!canManageDepartments) {
@@ -177,7 +179,7 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
     if (error) throw error
 
     await writeAuditLog(
-      supabase as any,
+      supabase as DepartmentsClient,
       {
         action: "delete",
         entityType: "department",

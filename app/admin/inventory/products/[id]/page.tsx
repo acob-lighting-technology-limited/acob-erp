@@ -12,10 +12,6 @@ import Link from "next/link"
 import { PageHeader } from "@/components/layout/page-header"
 import { PageLoader } from "@/components/ui/query-states"
 
-import { logger } from "@/lib/logger"
-
-const log = logger("inventory-products")
-
 interface Product {
   id: string
   sku: string
@@ -31,6 +27,12 @@ interface Product {
   created_at: string
 }
 
+interface ProductRow extends Product {
+  category?: {
+    name: string | null
+  } | null
+}
+
 async function fetchProduct(id: string): Promise<Product> {
   const supabase = createClient()
   const { data, error } = await supabase
@@ -39,7 +41,8 @@ async function fetchProduct(id: string): Promise<Product> {
     .eq("id", id)
     .single()
   if (error) throw new Error(error.message)
-  return { ...data, category_name: data.category?.name }
+  const product = data as ProductRow
+  return { ...product, category_name: product.category?.name || undefined }
 }
 
 export default function ProductDetailPage() {

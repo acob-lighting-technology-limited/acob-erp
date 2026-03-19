@@ -8,6 +8,14 @@ import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 
 const log = logger("payments-documents")
 
+type PaymentsClient = Awaited<ReturnType<typeof createClient>>
+
+type DepartmentRelation = { name?: string | null } | Array<{ name?: string | null }> | null
+
+type PaymentDepartmentRecord = {
+  department?: DepartmentRelation
+}
+
 async function createClient() {
   const cookieStore = await cookies()
 
@@ -35,14 +43,10 @@ function isFinanceDepartment(value: string | null | undefined): boolean {
   return normalizeDepartment(value) === "accounts"
 }
 
-async function assertPaymentAccess(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  userId: string,
-  paymentId: string
-) {
-  const scope = await resolveAdminScope(supabase as any, userId)
+async function assertPaymentAccess(supabase: PaymentsClient, userId: string, paymentId: string) {
+  const scope = await resolveAdminScope(supabase, userId)
   const { data: profile } = await supabase.from("profiles").select("department").eq("id", userId).single()
-  const dataClient = getServiceRoleClientOrFallback(supabase as any)
+  const dataClient = getServiceRoleClientOrFallback(supabase)
 
   const { data: payment } = await dataClient
     .from("department_payments")
@@ -50,9 +54,8 @@ async function assertPaymentAccess(
     .eq("id", paymentId)
     .single()
 
-  const paymentDepartment = Array.isArray((payment as any)?.department)
-    ? (payment as any)?.department?.[0]?.name
-    : (payment as any)?.department?.name
+  const relation = (payment as PaymentDepartmentRecord | null)?.department
+  const paymentDepartment = Array.isArray(relation) ? relation[0]?.name : relation?.name
 
   if (!paymentDepartment) {
     return { allowed: false as const, status: 404, error: "Payment not found" }
@@ -120,8 +123,9 @@ export async function GET(request: Request, { params }: { params: { id: string }
     }
 
     return NextResponse.json({ data: documents })
-  } catch (error: any) {
-    return NextResponse.json({ error: error?.message || "Internal Server Error" }, { status: 500 })
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Internal Server Error"
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
 

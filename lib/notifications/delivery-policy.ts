@@ -1,4 +1,5 @@
-import { createClient as createAdminClient } from "@supabase/supabase-js"
+import { createClient as createAdminClient, type SupabaseClient } from "@supabase/supabase-js"
+import type { Database } from "@/types/database"
 
 export const NOTIFICATION_KEYS = [
   "onboarding",
@@ -27,7 +28,7 @@ function getServiceRoleClientOrNull() {
 }
 
 export async function isSystemNotificationChannelEnabled(
-  supabaseClient: any,
+  supabaseClient: SupabaseClient<Database>,
   notificationKey: NotificationKey,
   channel: NotificationChannel
 ): Promise<boolean> {
@@ -44,7 +45,7 @@ export async function isSystemNotificationChannelEnabled(
 }
 
 export async function isSystemNotificationChannelMandatory(
-  supabaseClient: any,
+  supabaseClient: SupabaseClient<Database>,
   notificationKey: NotificationKey,
   channel: NotificationChannel
 ): Promise<boolean> {
@@ -61,7 +62,7 @@ export async function isSystemNotificationChannelMandatory(
 }
 
 export async function resolveChannelEligibleUserIds(
-  supabaseClient: any,
+  supabaseClient: SupabaseClient<Database>,
   params: {
     userIds: string[]
     notificationKey: NotificationKey

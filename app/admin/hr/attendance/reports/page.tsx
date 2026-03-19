@@ -36,6 +36,20 @@ interface AttendanceReport {
   total_hours: number
 }
 
+interface AttendanceRecordRow {
+  total_hours?: number | null
+  status?: string | null
+  user?: {
+    id?: string | null
+    first_name?: string | null
+    last_name?: string | null
+    department_id?: string | null
+    department?: {
+      name?: string | null
+    } | null
+  } | null
+}
+
 export default function AttendanceReportsPage() {
   const [loading, setLoading] = useState(false)
   const [reports, setReports] = useState<AttendanceReport[]>([])
@@ -78,18 +92,19 @@ export default function AttendanceReportsPage() {
         // Group by user
         const userMap = new Map<string, AttendanceReport>()
 
-        data.forEach((record: any) => {
-          const userId = record.user?.id
+        data.forEach((record: AttendanceRecordRow) => {
+          const recordUser = record.user
+          const userId = recordUser?.id
           if (!userId) return
 
           // Filter by department if selected
-          if (filters.department_id !== "all" && record.user.department_id !== filters.department_id) return
+          if (filters.department_id !== "all" && recordUser.department_id !== filters.department_id) return
 
           if (!userMap.has(userId)) {
             userMap.set(userId, {
               user_id: userId,
-              user_name: `${record.user.first_name} ${record.user.last_name}`,
-              department: record.user.department?.name || "N/A",
+              user_name: `${recordUser.first_name} ${recordUser.last_name}`,
+              department: recordUser.department?.name || "N/A",
               total_days: 0,
               present_days: 0,
               late_days: 0,

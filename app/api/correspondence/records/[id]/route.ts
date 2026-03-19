@@ -7,6 +7,7 @@ import {
   getAuthContext,
 } from "@/lib/correspondence/server"
 import { logger } from "@/lib/logger"
+import type { CorrespondenceStatus } from "@/types/correspondence"
 
 const log = logger("correspondence-records")
 
@@ -85,7 +86,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     const nextStatus = body?.status ? String(body.status) : null
     const shouldCreateVersion = Boolean(body?.version_file_path || body?.change_summary)
 
-    if (nextStatus && !CORRESPONDENCE_STATUSES.includes(nextStatus as any)) {
+    if (nextStatus && !CORRESPONDENCE_STATUSES.includes(nextStatus as CorrespondenceStatus)) {
       return NextResponse.json({ error: "Invalid status" }, { status: 400 })
     }
 

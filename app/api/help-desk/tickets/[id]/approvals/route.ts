@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
-import { appendAuditLog, appendHelpDeskEvent, getAuthContext, resolveLeadForDepartment } from "@/lib/help-desk/server"
+import {
+  appendAuditLog,
+  appendHelpDeskEvent,
+  getAuthContext,
+  HelpDeskApprovalRow,
+  HelpDeskProfile,
+  resolveLeadForDepartment,
+} from "@/lib/help-desk/server"
 import { sendHelpDeskMail } from "@/lib/help-desk/mailer"
-import { applyAssignableStatusFilter } from "@/lib/workforce/assignment-policy"
 import { logger } from "@/lib/logger"
 
 const log = logger("help-desk-tickets-approvals")
@@ -13,13 +19,33 @@ const STAGE_ORDER = [
   "managing_director",
 ] as const
 
+type ApprovalProfileRow = {
+  id: string
+  full_name: string | null
+  role: string | null
+  department: string | null
+  is_department_lead: boolean | null
+  lead_departments: string[] | null
+}
+
+type ResolvableApprovalProfile = Omit<ApprovalProfileRow, "is_department_lead"> & {
+  is_department_lead?: boolean
+}
+
+function normalizeApprovalProfiles(profiles: ApprovalProfileRow[] | null | undefined): ResolvableApprovalProfile[] {
+  return (profiles || []).map((profile) => ({
+    ...profile,
+    is_department_lead: profile.is_department_lead ?? undefined,
+  }))
+}
+
 function nextStage(currentStage: string) {
   const idx = STAGE_ORDER.indexOf(currentStage as (typeof STAGE_ORDER)[number])
   if (idx < 0 || idx === STAGE_ORDER.length - 1) return null
   return STAGE_ORDER[idx + 1]
 }
 
-function managesDepartmentStrict(profile: any, department: string | null | undefined) {
+function managesDepartmentStrict(profile: HelpDeskProfile, department: string | null | undefined) {
   if (!profile?.is_department_lead || !department) return false
   const managedDepartments = Array.isArray(profile?.managed_departments)
     ? profile.managed_departments
@@ -75,9 +101,9 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     if (approvalsError) throw approvalsError
 
     const pendingApproval =
-      (approvals || [])
-        .filter((a: any) => a.status === "pending")
-        .sort((a: any, b: any) => stageRank(a.approval_stage) - stageRank(b.approval_stage))[0] || null
+      ((approvals as HelpDeskApprovalRow[] | null) || [])
+        .filter((a) => a.status === "pending")
+        .sort((a, b) => stageRank(a.approval_stage) - stageRank(b.approval_stage))[0] || null
     if (!pendingApproval) {
       return NextResponse.json({ error: "No pending approval for this ticket" }, { status: 400 })
     }
@@ -124,7 +150,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         p_title: "Procurement request rejected",
         p_message: `${ticket.ticket_number} was rejected at ${approvalStage}`,
         p_priority: "high",
-        p_link_url: "/dashboard/help-desk",
+        p_link_url: "/help-desk",
         p_actor_id: user.id,
         p_entity_type: "help_desk_ticket",
         p_entity_id: ticket.id,
@@ -166,7 +192,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
             p_title: "Procurement approved",
             p_message: `${ticket.ticket_number} has completed all approval stages`,
             p_priority: "normal",
-            p_link_url: "/dashboard/help-desk",
+            p_link_url: "/help-desk",
             p_actor_id: user.id,
             p_entity_type: "help_desk_ticket",
             p_entity_id: ticket.id,
@@ -188,13 +214,13 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       } else {
         finalStatus = "pending_approval"
 
-        const { data: potentialApprovers } = await applyAssignableStatusFilter(
-          supabase.from("profiles").select("id, full_name, role, department, is_department_lead, lead_departments"),
-          { allowLegacyNullStatus: false }
-        )
+        const { data: potentialApprovers } = await supabase
+          .from("profiles")
+          .select("id, full_name, role, department, is_department_lead, lead_departments")
+          .eq("is_department_lead", true)
 
-        const nextApprover = ((): any | null => {
-          const rows = potentialApprovers || []
+        const nextApprover = (() => {
+          const rows = normalizeApprovalProfiles(potentialApprovers as ApprovalProfileRow[] | null)
           if (upcomingStage === "requester_department_lead") {
             return resolveLeadForDepartment(rows, ticket.requester_department)
           }
@@ -203,7 +229,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
           }
           if (upcomingStage === "head_corporate_services") {
             return (
-              rows.find((p: any) => {
+              rows.find((p) => {
                 return (
                   p.is_department_lead &&
                   (p.department === "Corporate Services" || (p.lead_departments || []).includes("Corporate Services"))
@@ -212,7 +238,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
             )
           }
           return (
-            rows.find((p: any) => {
+            rows.find((p) => {
               return (
                 p.is_department_lead &&
                 (p.department === "Executive Management" || (p.lead_departments || []).includes("Executive Management"))

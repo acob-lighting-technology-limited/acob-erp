@@ -10,7 +10,7 @@ export interface LeaveWorkflowEmailPayload {
 }
 
 function buildEmailHtml(payload: Omit<LeaveWorkflowEmailPayload, "to" | "subject">) {
-  const ctaUrl = `${process.env.NEXT_PUBLIC_SITE_URL || "https://erp.acoblighting.com"}${payload.ctaPath || "/dashboard/leave"}`
+  const ctaUrl = `${process.env.NEXT_PUBLIC_SITE_URL || "https://erp.acoblighting.com"}${payload.ctaPath || "/leave"}`
 
   return `
   <div style="font-family:Arial,sans-serif;max-width:620px;margin:0 auto;padding:24px;border:1px solid #e5e7eb;border-radius:10px;">

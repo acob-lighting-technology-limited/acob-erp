@@ -49,7 +49,7 @@ export function getDomainForAdminPath(path: string): AdminDomain | null {
   if (
     path.startsWith("/admin/documentation") ||
     path.startsWith("/admin/feedback") ||
-    path.startsWith("/admin/notification") ||
+    path.startsWith("/admin/notifications") ||
     path.startsWith("/admin/communications") ||
     path.startsWith("/admin/tools") ||
     path.startsWith("/admin/help-desk")

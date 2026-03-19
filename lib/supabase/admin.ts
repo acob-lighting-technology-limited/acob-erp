@@ -25,7 +25,7 @@ export async function syncEmploymentStatusToAuth(userId: string, employmentStatu
   }
 }
 
-export function getServiceRoleClientOrFallback<T = any>(fallback: SupabaseClient<T>): SupabaseClient<T> {
+export function getServiceRoleClientOrFallback<T = unknown>(fallback: SupabaseClient<T>): SupabaseClient<T> {
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
     return fallback
   }

@@ -5,12 +5,57 @@ import { BUSINESS_HOUR_START, BUSINESS_HOUR_END, HELP_DESK_SLA } from "@/lib/org
 import type { SupabaseClient } from "@supabase/supabase-js"
 
 /** Minimal profile shape used in help-desk access-control helpers */
-interface ProfileLike {
+export interface ProfileLike {
   role?: string | null
   department?: string | null
   is_department_lead?: boolean | null
   lead_departments?: string[] | null
   managed_departments?: string[] | null
+}
+
+export interface HelpDeskProfile extends ProfileLike {
+  id: string
+  first_name?: string | null
+  last_name?: string | null
+  full_name?: string | null
+}
+
+export interface HelpDeskTicketRow {
+  id: string
+  title: string
+  ticket_number: string
+  status: string
+  priority: string
+  service_department: string | null
+  requester_department: string | null
+  requester_id: string
+  assigned_to: string | null
+  assigned_at?: string | null
+  sla_target_at?: string | null
+  started_at?: string | null
+  resolved_at?: string | null
+  closed_at?: string | null
+  resumed_at?: string | null
+  paused_at?: string | null
+  current_approval_stage?: string | null
+  request_type?: string | null
+  support_mode?: HelpDeskSupportMode | null
+  handling_mode?: HelpDeskHandlingMode | null
+  csat_rating?: number | null
+  csat_feedback?: string | null
+  [key: string]: unknown
+}
+
+export interface HelpDeskApprovalRow {
+  id: string
+  ticket_id: string
+  approval_stage: string
+  status: string
+  approver_id?: string | null
+  comments?: string | null
+  decided_at?: string | null
+  requested_at?: string | null
+  [key: string]: unknown
 }
 
 export const HELP_DESK_PRIORITIES = ["low", "medium", "high", "urgent"] as const

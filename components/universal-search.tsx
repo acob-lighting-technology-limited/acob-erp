@@ -18,7 +18,7 @@ interface SearchResult {
   subtitle?: string
   description?: string
   href: string
-  metadata?: Record<string, any>
+  metadata?: Record<string, unknown>
 }
 
 interface UniversalSearchProps {

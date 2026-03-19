@@ -4,7 +4,7 @@ import { forwardRef } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import type { LeaveRequest } from "@/app/(app)/dashboard/leave/page"
+import type { LeaveRequest } from "@/app/(app)/leave/page"
 
 const STAGE_LABELS: Record<string, string> = {
   pending_reliever: "Waiting Reliever",

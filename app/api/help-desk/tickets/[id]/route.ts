@@ -11,6 +11,7 @@ import { sendHelpDeskMail } from "@/lib/help-desk/mailer"
 import { logger } from "@/lib/logger"
 
 const log = logger("help-desk-ticket")
+export const dynamic = "force-dynamic"
 
 export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -102,7 +103,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     const updates: Record<string, unknown> = {}
 
     if (nextStatus) {
-      if (!HELP_DESK_STATUSES.includes(nextStatus as any)) {
+      if (!HELP_DESK_STATUSES.includes(nextStatus as (typeof HELP_DESK_STATUSES)[number])) {
         return NextResponse.json({ error: "Invalid status" }, { status: 400 })
       }
 
@@ -168,7 +169,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
         p_title: "Ticket resolved",
         p_message: `${ticket.ticket_number} has been resolved. Please review and rate the service.`,
         p_priority: "normal",
-        p_link_url: "/dashboard/help-desk",
+        p_link_url: "/help-desk",
         p_actor_id: user.id,
         p_entity_type: "help_desk_ticket",
         p_entity_id: ticket.id,

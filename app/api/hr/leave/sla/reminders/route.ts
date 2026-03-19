@@ -6,6 +6,27 @@ import { logger } from "@/lib/logger"
 
 const log = logger("hr-leave-sla-reminders")
 
+type SlaPolicyRow = {
+  stage: string
+  due_hours: number
+  reminder_hours_before: number
+  escalate_to_role?: string | null
+}
+
+type PendingLeaveRequestRow = {
+  id: string
+  user_id: string
+  status: string
+  start_date?: string | null
+  current_stage_code?: string | null
+  current_approver_user_id?: string | null
+  created_at: string
+}
+
+type ProfileIdRow = {
+  id: string
+}
+
 const LEGACY_SLA_STAGE_MAP: Record<string, string> = {
   pending_reliever: "reliever_pending",
   pending_department_lead: "supervisor_pending",
@@ -46,7 +67,7 @@ export async function POST() {
       .select("stage, due_hours, reminder_hours_before, escalate_to_role")
       .eq("is_active", true)
 
-    const policyMap = new Map((slaPolicies || []).map((item: any) => [item.stage, item]))
+    const policyMap = new Map(((slaPolicies || []) as SlaPolicyRow[]).map((item) => [item.stage, item] as const))
 
     const { data: pendingRequests, error } = await supabase
       .from("leave_requests")
@@ -59,7 +80,7 @@ export async function POST() {
     const today = new Date().toISOString().slice(0, 10)
     let remindersSent = 0
 
-    for (const request of pendingRequests || []) {
+    for (const request of (pendingRequests || []) as PendingLeaveRequestRow[]) {
       // Industry-standard lapse behavior: unresolved requests are expired/cancelled
       // once leave start date is reached.
       if (request.start_date && request.start_date <= today) {
@@ -85,7 +106,7 @@ export async function POST() {
               userIds: uniqueRecipients,
               title: "Leave request lapsed",
               message: `Leave request ${request.id} was automatically lapsed because it was not fully approved before start date.`,
-              linkUrl: "/dashboard/leave",
+              linkUrl: "/leave",
               entityId: request.id,
               emailEvent: "lapsed",
             })
@@ -111,7 +132,7 @@ export async function POST() {
           userIds: [request.current_approver_user_id],
           title: "Leave approval SLA reminder",
           message: `Leave request ${request.id} is due soon. Please review before SLA breach.`,
-          linkUrl: "/dashboard/leave",
+          linkUrl: "/leave",
           entityId: request.id,
           emailEvent: "sla_reminder",
         })
@@ -124,7 +145,7 @@ export async function POST() {
           .select("id")
           .eq("role", policy.escalate_to_role)
 
-        const escalateRecipients = (escalatedUsers || []).map((row: any) => row.id)
+        const escalateRecipients = ((escalatedUsers || []) as ProfileIdRow[]).map((row) => row.id)
         if (escalateRecipients.length) {
           await notifyUsers(supabase, {
             userIds: escalateRecipients,

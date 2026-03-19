@@ -9,6 +9,8 @@ const log = logger("departments")
 
 export const dynamic = "force-dynamic"
 
+type DepartmentsClient = Awaited<ReturnType<typeof createClient>>
+
 // Helper function to create Supabase client
 async function createClient() {
   const cookieStore = await cookies()
@@ -42,7 +44,7 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const scope = await resolveAdminScope(supabase as any, user.id)
+    const scope = await resolveAdminScope(supabase as DepartmentsClient, user.id)
     let query = supabase.from("departments").select("*").eq("is_active", true).order("name")
 
     if (scope) {
@@ -79,7 +81,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const scope = await resolveAdminScope(supabase as any, user.id)
+    const scope = await resolveAdminScope(supabase as DepartmentsClient, user.id)
     const managedDepartments = scope?.managedDepartments || []
     const canManageDepartments = !!scope && (scope.isAdminLike || managedDepartments.includes("Admin & HR"))
     if (!canManageDepartments) {
@@ -106,7 +108,7 @@ export async function POST(request: Request) {
     if (error) throw error
 
     await writeAuditLog(
-      supabase as any,
+      supabase as DepartmentsClient,
       {
         action: "create",
         entityType: "department",

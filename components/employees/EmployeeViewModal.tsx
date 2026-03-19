@@ -35,7 +35,6 @@ import {
   Building2,
   MapPin,
   Shield,
-  UserCog,
   FileSignature,
   ChevronDown,
   ChevronUp,
@@ -49,7 +48,8 @@ import type { UserRole, EmploymentStatus } from "@/types/database"
 import { getRoleDisplayName, getRoleBadgeColor, OFFICE_LOCATIONS } from "@/lib/permissions"
 import { useDepartments } from "@/hooks/use-departments"
 import { createClient } from "@/lib/supabase/client"
-import type { Employee, UserProfile } from "@/app/admin/hr/employees/admin-employee-content"
+import type { UserProfile } from "@/app/admin/hr/employees/admin-employee-content"
+import type { EmployeeAssignedItems, EmployeeProfile, EmployeeStatusSummary, EmployeeViewData } from "./types"
 
 interface EditForm {
   role: UserRole
@@ -79,16 +79,8 @@ interface EditForm {
 interface EmployeeViewModalProps {
   isOpen: boolean
   onOpenChange: (open: boolean) => void
-  employee: any | null
-  assignedItems: {
-    tasks: any[]
-    taskAssignments: any[]
-    assets: any[]
-    projects: any[]
-    projectMemberships: any[]
-    feedback: any[]
-    documentation: any[]
-  }
+  employee: EmployeeProfile | null
+  assignedItems: EmployeeAssignedItems
   modalViewMode: "profile" | "employment" | "edit" | "signature" | "status"
   setModalViewMode: (mode: "profile" | "employment" | "edit" | "signature" | "status") => void
   onSave: () => void
@@ -98,15 +90,11 @@ interface EmployeeViewModalProps {
   showMoreOptions: boolean
   setShowMoreOptions: (show: boolean) => void
   userProfile: UserProfile
-  viewEmployeeData: {
-    tasks: any[]
-    assets: any[]
-    documentation: any[]
-  }
-  onEditEmployee: (employee: any) => void
-  onSignature: (employee: any) => void
+  viewEmployeeData: EmployeeViewData
+  onEditEmployee: (employee: EmployeeProfile) => void
+  onSignature: (employee: EmployeeProfile) => void
   loadData: () => void
-  setViewEmployeeProfile: (profile: any) => void
+  setViewEmployeeProfile: (profile: EmployeeProfile | null) => void
   canManageUsers: boolean
   getAvailableRoles: () => UserRole[]
 }
@@ -115,7 +103,7 @@ export function EmployeeViewModal({
   isOpen,
   onOpenChange,
   employee,
-  assignedItems,
+  assignedItems: _assignedItems,
   modalViewMode,
   setModalViewMode,
   onSave,
@@ -395,7 +383,7 @@ export function EmployeeViewModal({
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
-                                {viewEmployeeData.assets.map((assignment: any, index: number) => {
+                                {viewEmployeeData.assets.map((assignment, index: number) => {
                                   const asset = assignment.Asset
                                   const assetTypeLabel = asset?.asset_type
                                     ? ASSET_TYPE_MAP[asset.asset_type]?.label || asset.asset_type
@@ -465,7 +453,7 @@ export function EmployeeViewModal({
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
-                                {viewEmployeeData.tasks.map((task: any, index: number) => (
+                                {viewEmployeeData.tasks.map((task, index: number) => (
                                   <TableRow key={task.id}>
                                     <TableCell className="text-muted-foreground">{index + 1}</TableCell>
                                     <TableCell className="font-medium">{task.title || "Untitled Task"}</TableCell>
@@ -504,7 +492,7 @@ export function EmployeeViewModal({
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
-                                {viewEmployeeData.documentation.map((doc: any, index: number) => (
+                                {viewEmployeeData.documentation.map((doc, index: number) => (
                                   <TableRow key={doc.id}>
                                     <TableCell className="text-muted-foreground">{index + 1}</TableCell>
                                     <TableCell className="font-medium">{doc.title || "Untitled"}</TableCell>
@@ -609,7 +597,7 @@ export function EmployeeViewModal({
           {viewEmployeeProfile && modalViewMode === "signature" && (
             <ScrollArea className="h-full pr-4">
               <div className="mt-4">
-                <SignatureCreator profile={viewEmployeeProfile as any} />
+                <SignatureCreator profile={viewEmployeeProfile} />
               </div>
             </ScrollArea>
           )}
@@ -617,12 +605,14 @@ export function EmployeeViewModal({
           {viewEmployeeProfile && modalViewMode === "status" && (
             <div className="mx-auto max-w-md">
               <ChangeStatusContent
-                employee={{
-                  id: viewEmployeeProfile.id,
-                  first_name: viewEmployeeProfile.first_name,
-                  last_name: viewEmployeeProfile.last_name,
-                  employment_status: (viewEmployeeProfile.employment_status as any) || "active",
-                }}
+                employee={
+                  {
+                    id: viewEmployeeProfile.id,
+                    first_name: viewEmployeeProfile.first_name,
+                    last_name: viewEmployeeProfile.last_name,
+                    employment_status: viewEmployeeProfile.employment_status || "active",
+                  } satisfies EmployeeStatusSummary
+                }
                 onSuccess={() => {
                   setModalViewMode("profile")
                   loadData()
@@ -633,7 +623,7 @@ export function EmployeeViewModal({
                     .eq("id", viewEmployeeProfile.id)
                     .single()
                     .then(({ data }) => {
-                      if (data) setViewEmployeeProfile(data as any)
+                      if (data) setViewEmployeeProfile(data as EmployeeProfile)
                     })
                 }}
               />
@@ -1014,7 +1004,13 @@ export function EmployeeViewModal({
                 >
                   Overview
                 </Button>
-                <Button variant="outline" onClick={() => onSignature(viewEmployeeProfile as any)} className="gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    if (viewEmployeeProfile) onSignature(viewEmployeeProfile)
+                  }}
+                  className="gap-2"
+                >
                   <FileSignature className="h-4 w-4" />
                   Signature
                 </Button>
@@ -1039,7 +1035,9 @@ export function EmployeeViewModal({
                 {canManageUsers && modalViewMode === "profile" && (
                   <Button
                     variant="default"
-                    onClick={() => onEditEmployee(viewEmployeeProfile as any)}
+                    onClick={() => {
+                      if (viewEmployeeProfile) onEditEmployee(viewEmployeeProfile)
+                    }}
                     className="gap-2"
                   >
                     <Edit className="h-4 w-4" />

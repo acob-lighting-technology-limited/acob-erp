@@ -4,7 +4,7 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { PageWrapper, PageHeader } from "@/components/layout"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -17,7 +17,6 @@ import { FormFieldGroup } from "@/components/ui/patterns"
 import { logger } from "@/lib/logger"
 
 const log = logger("finance-bills-new")
-
 
 interface BillItem {
   id: string
@@ -144,9 +143,9 @@ export default function NewBillPage() {
 
       toast.success(`Bill ${billNumber} created successfully!`)
       router.push("/admin/finance/bills")
-    } catch (error: any) {
+    } catch (error: unknown) {
       log.error("Error creating bill:", error)
-      toast.error(error.message || "Failed to create bill")
+      toast.error(error instanceof Error ? error.message : "Failed to create bill")
     } finally {
       setSaving(false)
     }

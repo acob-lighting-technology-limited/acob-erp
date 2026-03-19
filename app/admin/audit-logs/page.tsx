@@ -10,6 +10,18 @@ import { logger } from "@/lib/logger"
 
 const log = logger("audit-logs")
 
+type AuditLogsRpcClient = {
+  rpc: (
+    fn: "get_audit_logs_enriched",
+    args: {
+      p_limit: number
+      p_offset: number
+      p_hidden_actions: string[]
+      p_department_filter: string[] | null
+    }
+  ) => Promise<{ data: unknown[] | null; error: unknown }>
+}
+
 type AuditLogsData =
   | { kind: "redirect"; redirect: string }
   | {
@@ -36,11 +48,12 @@ async function getAuditLogsData(): Promise<AuditLogsData> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const scope = await resolveAdminScope(supabase as any, user.id)
   if (!scope) {
-    return { kind: "redirect", redirect: "/dashboard" }
+    return { kind: "redirect", redirect: "/profile" }
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const dataClient = getServiceRoleClientOrFallback(supabase as any)
+  const auditLogsRpcClient = dataClient as unknown as AuditLogsRpcClient
   const departmentScope = getDepartmentScope(scope, "general")
 
   const userProfile: UserProfile = {
@@ -50,7 +63,7 @@ async function getAuditLogsData(): Promise<AuditLogsData> {
   }
 
   // Single enriched RPC call (replaces 13 sequential queries)
-  const { data: rpcRows, error: rpcError } = await dataClient.rpc("get_audit_logs_enriched", {
+  const { data: rpcRows, error: rpcError } = await auditLogsRpcClient.rpc("get_audit_logs_enriched", {
     p_limit: 500,
     p_offset: 0,
     p_hidden_actions: ["sync", "migrate", "update_schema", "migration"],

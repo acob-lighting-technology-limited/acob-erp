@@ -4,13 +4,12 @@ import { logger } from "@/lib/logger"
 
 const log = logger("lib-hooks-useDataExport")
 
-
 interface ExportOptions {
   filename: string
   sheetName?: string
 }
 
-export function useDataExport<T extends Record<string, any>>() {
+export function useDataExport<T extends Record<string, unknown>>() {
   const exportToExcel = async (data: T[], options: ExportOptions) => {
     try {
       if (data.length === 0) {

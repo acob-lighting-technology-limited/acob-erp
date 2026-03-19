@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+export const dynamic = "force-dynamic"
 
 import { createClient } from "@/lib/supabase/server"
 import {
@@ -7,7 +8,7 @@ import {
   resolveAssetMailSpecialRecipients,
   type AssetMailRoutingProfile,
 } from "@/lib/asset-mail-routing"
-import { applyAssignableStatusFilter } from "@/lib/workforce/assignment-policy"
+import { isAssignableEmploymentStatus } from "@/lib/workforce/assignment-policy"
 import { logger } from "@/lib/logger"
 
 const log = logger("dev-asset-mail-routing")
@@ -29,22 +30,21 @@ export async function GET() {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
-    const { data: profiles, error } = await applyAssignableStatusFilter(
-      supabase
-        .from("profiles")
-        .select(
-          "id, full_name, first_name, last_name, company_email, department, is_department_lead, lead_departments, employment_status"
-        )
-        .order("department", { ascending: true })
-        .order("full_name", { ascending: true }),
-      { allowLegacyNullStatus: false }
-    )
+    const { data: profiles, error } = await supabase
+      .from("profiles")
+      .select(
+        "id, full_name, first_name, last_name, company_email, department, is_department_lead, lead_departments, employment_status"
+      )
+      .order("department", { ascending: true })
+      .order("full_name", { ascending: true })
 
     if (error) {
       return NextResponse.json({ error: `Failed to load profiles: ${error.message}` }, { status: 500 })
     }
 
-    const typedProfiles = (profiles || []) as AssetMailRoutingProfile[]
+    const typedProfiles = ((profiles || []) as AssetMailRoutingProfile[]).filter((profile) =>
+      isAssignableEmploymentStatus(profile.employment_status, { allowLegacyNullStatus: false })
+    )
     const routingRows = buildAssetMailRoutingRows(typedProfiles)
     const specialRecipients = resolveAssetMailSpecialRecipients(typedProfiles)
 

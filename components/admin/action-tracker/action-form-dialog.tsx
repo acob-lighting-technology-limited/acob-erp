@@ -18,16 +18,28 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "sonner"
-import { Loader2, Plus, Save, Trash2, X } from "lucide-react"
+import { Loader2, Plus, Save, X } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { getCurrentOfficeWeek } from "@/lib/meeting-week"
+
+interface EditableAction {
+  id: string
+  title?: string | null
+  description?: string | null
+  priority?: string | null
+  status?: string | null
+  due_date?: string | null
+  department: string
+  week_number: number
+  year: number
+}
 
 interface ActionFormDialogProps {
   isOpen: boolean
   onClose: () => void
   onComplete: () => void
   departments: string[]
-  editingAction?: any | null
+  editingAction?: EditableAction | null
   defaultDept?: string
   defaultWeek?: number
   defaultYear?: number
@@ -194,7 +206,7 @@ export function ActionFormDialog({
                   title: title,
                   message: message,
                   priority: "normal",
-                  linkUrl: `/dashboard/reports/action-tracker?dept=${dept}`,
+                  linkUrl: `/reports/action-tracker?dept=${dept}`,
                   actorId: user.id,
                   entityType: "task_batch",
                 })
@@ -208,8 +220,8 @@ export function ActionFormDialog({
 
       onComplete()
       onClose()
-    } catch (error: any) {
-      toast.error(error.message)
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Failed to save action")
     } finally {
       setIsSaving(false)
     }
@@ -328,7 +340,7 @@ export function ActionFormDialog({
               <div className="bg-muted/10 min-h-[150px] space-y-2 rounded-xl border-2 border-dashed p-3">
                 {actionItems.length === 0 ? (
                   <p className="text-muted-foreground py-10 text-center text-sm italic">
-                    No actions added yet. Type above and click "Add".
+                    No actions added yet. Type above and click &quot;Add&quot;.
                   </p>
                 ) : (
                   <div className="space-y-2">

@@ -3,6 +3,8 @@ import { SidebarContent } from "@/components/sidebar-content"
 import { createClient } from "@/lib/supabase/server"
 import { resolveAdminScope } from "@/lib/admin/rbac"
 import { redirect } from "next/navigation"
+import type { SupabaseClient } from "@supabase/supabase-js"
+import type { Database } from "@/types/database"
 
 interface AppLayoutProps {
   children: React.ReactNode
@@ -10,6 +12,7 @@ interface AppLayoutProps {
 
 export async function AppLayout({ children }: AppLayoutProps) {
   const supabase = await createClient()
+  const typedSupabase = supabase as SupabaseClient<Database>
   const { data, error } = await supabase.auth.getUser()
 
   if (error || !data?.user) {
@@ -18,7 +21,7 @@ export async function AppLayout({ children }: AppLayoutProps) {
 
   // Fetch user profile
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", data.user.id).single()
-  const canAccessAdmin = Boolean(await resolveAdminScope(supabase as any, data.user.id))
+  const canAccessAdmin = Boolean(await resolveAdminScope(typedSupabase, data.user.id))
 
   const userData = {
     email: data.user.email,

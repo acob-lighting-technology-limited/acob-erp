@@ -48,7 +48,10 @@ export function AdminAuditLogsContent({
   initialDepartments,
   userProfile,
 }: AdminAuditLogsContentProps) {
-  const scopedDepartments = userProfile.managed_departments ?? userProfile.lead_departments ?? []
+  const scopedDepartments = useMemo(
+    () => userProfile.managed_departments ?? userProfile.lead_departments ?? [],
+    [userProfile.managed_departments, userProfile.lead_departments]
+  )
 
   const [logs, setLogs] = useState<AuditLog[]>(initialLogs)
   const [totalCount, setTotalCount] = useState<number>(initialTotalCount)
@@ -107,8 +110,7 @@ export function AdminAuditLogsContent({
 
         const usersMap = new Map(usersData?.map((u) => [u.id, u]))
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const mapped = logsData.map((l: any) => {
+        const mapped: AuditLog[] = logsData.map((l) => {
           const rawAction = l.action || l.operation?.toLowerCase() || "update"
           const action = normalizeAuditAction(rawAction).action
           const entity_type = l.entity_type || l.table_name || "unknown"
@@ -125,11 +127,11 @@ export function AdminAuditLogsContent({
             new_values,
             metadata: l.metadata || {},
             created_at: l.created_at,
-            user: l.user_id ? usersMap.get(l.user_id) : null,
+            user: l.user_id ? usersMap.get(l.user_id) || undefined : undefined,
           }
         })
 
-        setLogs(mapped as AuditLog[])
+        setLogs(mapped)
       } else {
         setLogs([])
       }
