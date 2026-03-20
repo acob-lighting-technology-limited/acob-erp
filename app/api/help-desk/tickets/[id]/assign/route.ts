@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
-import { appendAuditLog, appendHelpDeskEvent, getAuthContext, HelpDeskProfile } from "@/lib/help-desk/server"
+import {
+  appendAuditLog,
+  appendHelpDeskEvent,
+  getAuthContext,
+  HelpDeskProfile,
+  syncHelpDeskTicketTask,
+} from "@/lib/help-desk/server"
 import { sendHelpDeskMail } from "@/lib/help-desk/mailer"
 import { getUnassignableReason } from "@/lib/workforce/assignment-policy"
 import { logger } from "@/lib/logger"
@@ -122,6 +128,13 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     if (updateError) throw updateError
 
+    const syncResult = await syncHelpDeskTicketTask({
+      ticket: updated,
+      actorId: user.id,
+    })
+
+    const workItemNumber = syncResult?.workItemNumber || updated.ticket_number || ticket.ticket_number
+
     await appendHelpDeskEvent({
       ticketId: ticket.id,
       actorId: user.id,
@@ -153,7 +166,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         p_type: "task_assigned",
         p_category: "tasks",
         p_title: "Help desk ticket assigned",
-        p_message: `${ticket.ticket_number} - ${ticket.title}`,
+        p_message: `${workItemNumber} - ${ticket.title}`,
         p_priority: ticket.priority === "urgent" ? "urgent" : ticket.priority === "high" ? "high" : "normal",
         p_link_url: "/help-desk",
         p_actor_id: user.id,
@@ -165,10 +178,10 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       try {
         await sendHelpDeskMail({
           userIds: [newAssignedTo],
-          subject: `Help Desk Assignment: ${ticket.ticket_number}`,
+          subject: `Help Desk Assignment: ${workItemNumber}`,
           title: "Ticket Assigned To You",
           message: `${ticket.title} has been assigned to you for execution.`,
-          ticketNumber: ticket.ticket_number,
+          ticketNumber: workItemNumber,
         })
       } catch (mailError) {
         log.error({ err: String(mailError) }, "Help desk mail error (assign):")

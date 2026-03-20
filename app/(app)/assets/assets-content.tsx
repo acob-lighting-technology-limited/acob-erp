@@ -1,12 +1,14 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { formatName } from "@/lib/utils"
-import { Package, Calendar, User, FileText, Building2, LayoutGrid, List, Hash } from "lucide-react"
+import { Package, Calendar, User, FileText, Building2, LayoutGrid, List, Hash, Search, Filter } from "lucide-react"
 import { ASSET_TYPE_MAP } from "@/lib/asset-types"
 import type { AssetAssignment } from "./page"
 import { AppTablePage } from "@/components/app/app-table-page"
@@ -22,6 +24,9 @@ interface AssetsContentProps {
 export function AssetsContent({ initialAssignments, initialError }: AssetsContentProps) {
   const [assignments] = useState<AssetAssignment[]>(initialAssignments)
   const [viewMode, setViewMode] = useState<"list" | "card">("list")
+  const [searchQuery, setSearchQuery] = useState("")
+  const [statusFilter, setStatusFilter] = useState("all")
+  const [assignmentTypeFilter, setAssignmentTypeFilter] = useState("all")
 
   useEffect(() => {
     if (initialError) {
@@ -80,6 +85,31 @@ export function AssetsContent({ initialAssignments, initialError }: AssetsConten
     }
   }
 
+  const filteredAssignments = useMemo(() => {
+    const normalizedSearch = searchQuery.trim().toLowerCase()
+
+    return assignments.filter((assignment) => {
+      const assignmentType = getAssignmentTypeLabel(assignment)
+      const status = assignment.asset?.status || "available"
+      const matchesStatus = statusFilter === "all" || status === statusFilter
+      const matchesAssignmentType = assignmentTypeFilter === "all" || assignmentType === assignmentTypeFilter
+      const matchesSearch =
+        normalizedSearch.length === 0 ||
+        [
+          getAssetTypeLabel(assignment.asset?.asset_type || ""),
+          assignment.asset?.unique_code,
+          assignment.asset?.asset_model,
+          assignment.asset?.serial_number,
+          String(assignment.asset?.acquisition_year || ""),
+          assignment.department,
+          assignment.assigner ? `${assignment.assigner.first_name || ""} ${assignment.assigner.last_name || ""}` : "",
+          assignmentType,
+        ].some((value) => String(value || "").toLowerCase().includes(normalizedSearch))
+
+      return matchesStatus && matchesAssignmentType && matchesSearch
+    })
+  }, [assignmentTypeFilter, assignments, searchQuery, statusFilter])
+
   return (
     <AppTablePage
       title="My Assets"
@@ -110,17 +140,83 @@ export function AssetsContent({ initialAssignments, initialError }: AssetsConten
       stats={
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard
-            title="Active Assets"
+            title="Assigned Assets"
             value={assignments.length}
             icon={Package}
             iconBgColor="bg-blue-100 dark:bg-blue-900/30"
             iconColor="text-blue-600 dark:text-blue-400"
           />
+          <StatCard
+            title="Personal"
+            value={assignments.filter((assignment) => getAssignmentTypeLabel(assignment) === "Personal").length}
+            icon={User}
+            iconBgColor="bg-green-100 dark:bg-green-900/30"
+            iconColor="text-green-600 dark:text-green-400"
+          />
+          <StatCard
+            title="Department"
+            value={assignments.filter((assignment) => getAssignmentTypeLabel(assignment) === "Department").length}
+            icon={Building2}
+            iconBgColor="bg-purple-100 dark:bg-purple-900/30"
+            iconColor="text-purple-600 dark:text-purple-400"
+          />
+          <StatCard
+            title="Office"
+            value={assignments.filter((assignment) => getAssignmentTypeLabel(assignment) === "Office").length}
+            icon={Package}
+            iconBgColor="bg-orange-100 dark:bg-orange-900/30"
+            iconColor="text-orange-600 dark:text-orange-400"
+          />
         </div>
+      }
+      filters={
+        <Card className="border-2">
+          <CardContent className="p-4">
+            <div className="grid gap-3 lg:grid-cols-[1.2fr_220px_220px]">
+              <div className="relative">
+                <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+                <Input
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="Search by asset name, code, model, serial, year, or assigner..."
+                  className="pl-9"
+                />
+              </div>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger>
+                  <div className="flex items-center gap-2">
+                    <Filter className="h-4 w-4" />
+                    <SelectValue placeholder="All status" />
+                  </div>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="assigned">Assigned</SelectItem>
+                  <SelectItem value="maintenance">Maintenance</SelectItem>
+                  <SelectItem value="available">Available</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={assignmentTypeFilter} onValueChange={setAssignmentTypeFilter}>
+                <SelectTrigger>
+                  <div className="flex items-center gap-2">
+                    <Package className="h-4 w-4" />
+                    <SelectValue placeholder="All assignment types" />
+                  </div>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Assignment Types</SelectItem>
+                  <SelectItem value="Personal">Personal</SelectItem>
+                  <SelectItem value="Department">Department</SelectItem>
+                  <SelectItem value="Office">Office</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
       }
     >
       {/* Assets List/Grid */}
-      {assignments.length > 0 ? (
+      {filteredAssignments.length > 0 ? (
         viewMode === "list" ? (
           <Card className="border-2">
             <div className="overflow-x-auto">
@@ -139,7 +235,7 @@ export function AssetsContent({ initialAssignments, initialError }: AssetsConten
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {assignments.map((assignment, index) => {
+                  {filteredAssignments.map((assignment, index) => {
                     const assignmentType = getAssignmentTypeLabel(assignment)
                     return (
                       <TableRow key={assignment.id}>
@@ -182,7 +278,7 @@ export function AssetsContent({ initialAssignments, initialError }: AssetsConten
           </Card>
         ) : (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {assignments.map((assignment) => {
+            {filteredAssignments.map((assignment) => {
               const assignmentType = getAssignmentTypeLabel(assignment)
               return (
                 <Card key={assignment.id} className="border-2 shadow-lg transition-shadow hover:shadow-xl">
@@ -273,8 +369,12 @@ export function AssetsContent({ initialAssignments, initialError }: AssetsConten
         )
       ) : (
         <EmptyState
-          title="No Assets Assigned"
-          description="You don't have any assets assigned to you at the moment."
+          title="No Assets Found"
+          description={
+            assignments.length === 0
+              ? "You don't have any assets assigned to you at the moment."
+              : "No assets match your current filters."
+          }
           icon={Package}
         />
       )}

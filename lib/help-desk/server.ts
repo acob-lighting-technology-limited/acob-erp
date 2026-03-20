@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server"
 import { resolveAdminScope } from "@/lib/admin/rbac"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { BUSINESS_HOUR_START, BUSINESS_HOUR_END, HELP_DESK_SLA } from "@/lib/org-config"
+import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import type { SupabaseClient } from "@supabase/supabase-js"
 
 /** Minimal profile shape used in help-desk access-control helpers */
@@ -24,12 +25,16 @@ export interface HelpDeskTicketRow {
   id: string
   title: string
   ticket_number: string
+  description?: string | null
   status: string
   priority: string
   service_department: string | null
   requester_department: string | null
   requester_id: string
+  created_by?: string | null
   assigned_to: string | null
+  assigned_by?: string | null
+  task_id?: string | null
   assigned_at?: string | null
   sla_target_at?: string | null
   started_at?: string | null
@@ -82,6 +87,14 @@ export type HelpDeskPriority = (typeof HELP_DESK_PRIORITIES)[number]
 export type HelpDeskStatus = (typeof HELP_DESK_STATUSES)[number]
 export type HelpDeskSupportMode = (typeof HELP_DESK_SUPPORT_MODES)[number]
 export type HelpDeskHandlingMode = (typeof HELP_DESK_HANDLING_MODES)[number]
+
+type TaskStatus = "pending" | "in_progress" | "completed" | "cancelled"
+type TaskAssignmentType = "individual" | "department"
+
+type SyncedTaskRow = {
+  id: string
+  work_item_number: string | null
+}
 
 export function addBusinessHours(baseDate: Date, hours: number): Date {
   const date = new Date(baseDate)
@@ -238,4 +251,115 @@ export async function appendAuditLog(params: {
       critical: params.critical,
     }
   )
+}
+
+function normalizeTaskStatusFromTicket(ticketStatus: string): TaskStatus | null {
+  switch (ticketStatus) {
+    case "department_queue":
+    case "department_assigned":
+    case "assigned":
+    case "approved_for_procurement":
+      return "pending"
+    case "in_progress":
+      return "in_progress"
+    case "resolved":
+    case "closed":
+      return "completed"
+    case "rejected":
+    case "cancelled":
+      return "cancelled"
+    default:
+      return null
+  }
+}
+
+function normalizeTaskAssignmentType(ticket: HelpDeskTicketRow): TaskAssignmentType {
+  return ticket.handling_mode === "individual" && ticket.assigned_to ? "individual" : "department"
+}
+
+function normalizeTaskDueDate(value: string | null | undefined): string | null {
+  if (!value) return null
+  return value.includes("T") ? value.split("T")[0] || null : value
+}
+
+export function generateFallbackHelpDeskTicketNumber(): string {
+  const epochMillis = Date.now().toString()
+  const randomSuffix = parseInt(crypto.randomUUID().replace(/-/g, "").slice(0, 3), 16).toString().padStart(3, "0")
+  return `TSK-${epochMillis}${randomSuffix}`
+}
+
+export async function syncHelpDeskTicketTask(params: {
+  ticket: HelpDeskTicketRow
+  actorId: string
+}): Promise<{ taskId: string; workItemNumber: string | null } | null> {
+  const taskStatus = normalizeTaskStatusFromTicket(params.ticket.status)
+  if (!taskStatus) return null
+
+  const supabase = await createClient()
+  const dataClient = getServiceRoleClientOrFallback(supabase)
+
+  let existingTask: SyncedTaskRow | null = null
+
+  if (params.ticket.task_id) {
+    const { data } = await dataClient
+      .from("tasks")
+      .select("id, work_item_number")
+      .eq("id", params.ticket.task_id)
+      .maybeSingle<SyncedTaskRow>()
+    existingTask = data ?? null
+  }
+
+  if (!existingTask) {
+    const { data } = await dataClient
+      .from("tasks")
+      .select("id, work_item_number")
+      .eq("source_type", "help_desk")
+      .eq("source_id", params.ticket.id)
+      .maybeSingle<SyncedTaskRow>()
+    existingTask = data ?? null
+  }
+
+  const assignmentType = normalizeTaskAssignmentType(params.ticket)
+  const taskPayload = {
+    title: params.ticket.title,
+    description: params.ticket.description ?? null,
+    priority: params.ticket.priority,
+    status: taskStatus,
+    assigned_to: assignmentType === "individual" ? params.ticket.assigned_to : null,
+    assigned_by: params.ticket.assigned_by || params.ticket.created_by || params.ticket.requester_id || params.actorId,
+    department: params.ticket.service_department || params.ticket.requester_department || null,
+    due_date: normalizeTaskDueDate(params.ticket.sla_target_at),
+    started_at: params.ticket.started_at || null,
+    completed_at:
+      taskStatus === "completed" ? params.ticket.resolved_at || params.ticket.closed_at || new Date().toISOString() : null,
+    source_type: "help_desk" as const,
+    source_id: params.ticket.id,
+    assignment_type: assignmentType,
+    work_item_number: params.ticket.ticket_number?.startsWith("TSK-") ? params.ticket.ticket_number : null,
+  }
+
+  const { data: syncedTask, error } = existingTask
+    ? await dataClient.from("tasks").update(taskPayload).eq("id", existingTask.id).select("id, work_item_number").single<SyncedTaskRow>()
+    : await dataClient.from("tasks").insert(taskPayload).select("id, work_item_number").single<SyncedTaskRow>()
+
+  if (error || !syncedTask) {
+    throw error || new Error("Failed to sync help desk task")
+  }
+
+  const ticketUpdates: Record<string, unknown> = {}
+  if (params.ticket.task_id !== syncedTask.id) {
+    ticketUpdates.task_id = syncedTask.id
+  }
+  if (syncedTask.work_item_number && params.ticket.ticket_number !== syncedTask.work_item_number) {
+    ticketUpdates.ticket_number = syncedTask.work_item_number
+  }
+
+  if (Object.keys(ticketUpdates).length > 0) {
+    await dataClient.from("help_desk_tickets").update(ticketUpdates).eq("id", params.ticket.id)
+  }
+
+  return {
+    taskId: syncedTask.id,
+    workItemNumber: syncedTask.work_item_number,
+  }
 }

@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { Button } from "@/components/ui/button"
+import { ItemInfoButton } from "@/components/ui/item-info-button"
 import { PageHeader, PageWrapper } from "@/components/layout"
 import { toast } from "sonner"
 import { CalendarDays, Clock, Plus } from "lucide-react"
@@ -301,6 +302,27 @@ export function LeaveContent({
           backLink={{ href: "/profile", label: "Back to Dashboard" }}
           actions={
             <>
+              <ItemInfoButton
+                title="Leave page guide"
+                summary="This page helps you understand leave eligibility, your own requests, and any approvals waiting on you."
+                details={[
+                  {
+                    label: "What each area does",
+                    value:
+                      "Leave Types explains what you can apply for, My Leave Requests tracks your submissions, and Pending Reviews appears when someone else's leave needs your decision.",
+                  },
+                  {
+                    label: "Where to start",
+                    value:
+                      "Check Leave Types and Balances first, then create a new request with a clear reason, reliever, and handover note.",
+                  },
+                  {
+                    label: "What happens after submission",
+                    value:
+                      "Your request moves through the approval workflow and may pause if evidence is missing or if an approver needs a clearer handover.",
+                  },
+                ]}
+              />
               {pendingMyReviews > 0 && (
                 <Button
                   variant="outline"

@@ -6,6 +6,7 @@ import {
   canLeadDepartment,
   getAuthContext,
   isAdminRole,
+  syncHelpDeskTicketTask,
 } from "@/lib/help-desk/server"
 import { sendHelpDeskMail } from "@/lib/help-desk/mailer"
 import { logger } from "@/lib/logger"
@@ -86,6 +87,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
     const body = await request.json()
     const nextStatus = body?.status ? String(body.status) : null
+    const statusNote = body?.status_note ? String(body.status_note).trim() : null
     const csatRating = body?.csat_rating
     const csatFeedback = body?.csat_feedback ? String(body.csat_feedback) : null
 
@@ -139,13 +141,34 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
     if (updateError) throw updateError
 
+    if (nextStatus && statusNote) {
+      const { error: commentError } = await supabase.from("help_desk_comments").insert({
+        ticket_id: ticket.id,
+        actor_id: user.id,
+        body: statusNote,
+      })
+
+      if (commentError) throw commentError
+    }
+
+    const syncResult = nextStatus
+      ? await syncHelpDeskTicketTask({
+          ticket: updated,
+          actorId: user.id,
+        })
+      : null
+    const workItemNumber = syncResult?.workItemNumber || updated.ticket_number || ticket.ticket_number
+
     await appendHelpDeskEvent({
       ticketId: ticket.id,
       actorId: user.id,
       eventType: "ticket_updated",
       oldStatus: ticket.status,
       newStatus: updated.status,
-      details: updates,
+      details: {
+        ...updates,
+        status_note: statusNote,
+      },
     })
 
     const auditAction = nextStatus && nextStatus !== ticket.status ? "status_change" : "update"
@@ -167,22 +190,22 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
         p_type: "task_completed",
         p_category: "tasks",
         p_title: "Ticket resolved",
-        p_message: `${ticket.ticket_number} has been resolved. Please review and rate the service.`,
+        p_message: `${workItemNumber} has been resolved. Please review and rate the service.`,
         p_priority: "normal",
         p_link_url: "/help-desk",
         p_actor_id: user.id,
         p_entity_type: "help_desk_ticket",
         p_entity_id: ticket.id,
-        p_rich_content: { ticket_number: ticket.ticket_number },
+        p_rich_content: { ticket_number: workItemNumber },
       })
 
       try {
         await sendHelpDeskMail({
           userIds: [ticket.requester_id],
-          subject: `Ticket Resolved: ${ticket.ticket_number}`,
+          subject: `Ticket Resolved: ${workItemNumber}`,
           title: "Help Desk Ticket Resolved",
           message: `${ticket.title} has been resolved. Please confirm and provide your service rating.`,
-          ticketNumber: ticket.ticket_number,
+          ticketNumber: workItemNumber,
         })
       } catch (mailError) {
         log.error({ err: String(mailError) }, "Help desk mail error on resolve")

@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { StatCard } from "@/components/ui/stat-card"
 import { EmptyState } from "@/components/ui/patterns"
+import { PromptDialog } from "@/components/ui/prompt-dialog"
 import { Headset, Clock, AlertCircle, CheckCircle2 } from "lucide-react"
 import { TicketQueueTable } from "@/components/help-desk/ticket-queue-table"
 import type { HelpDeskTicket, EmployeeOption, LeadDirectoryMember } from "@/components/help-desk/ticket-queue-table"
@@ -35,6 +36,9 @@ export function AdminHelpDeskContent({ initialTickets, employees, leadDirectory,
   const [tickets, setTickets] = useState(initialTickets)
   const [assignmentMap, setAssignmentMap] = useState<Record<string, string>>({})
   const [loadingTicketId, setLoadingTicketId] = useState<string | null>(null)
+  const [approvalPrompt, setApprovalPrompt] = useState<{ ticketId: string; decision: "approved" | "rejected" } | null>(
+    null
+  )
 
   const stats = useMemo(() => {
     const now = Date.now()
@@ -178,12 +182,19 @@ export function AdminHelpDeskContent({ initialTickets, employees, leadDirectory,
   }
 
   async function approve(ticketId: string, decision: "approved" | "rejected") {
+    setApprovalPrompt({ ticketId, decision })
+  }
+
+  async function submitApproval(comments: string) {
+    if (!approvalPrompt) return
+
+    const { ticketId, decision } = approvalPrompt
     setLoadingTicketId(ticketId)
     try {
       const res = await fetch(`/api/help-desk/tickets/${ticketId}/approvals`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ decision }),
+        body: JSON.stringify({ decision, comments: comments || null }),
       })
       if (!res.ok) {
         const body = await res.json()
@@ -195,6 +206,7 @@ export function AdminHelpDeskContent({ initialTickets, employees, leadDirectory,
       toast.error(getErrorMessage(error, "Decision failed"))
     } finally {
       setLoadingTicketId(null)
+      setApprovalPrompt(null)
     }
   }
 
@@ -293,6 +305,22 @@ export function AdminHelpDeskContent({ initialTickets, employees, leadDirectory,
           </Card>
         </TabsContent>
       </Tabs>
+
+      <PromptDialog
+        open={approvalPrompt !== null}
+        onOpenChange={(open) => {
+          if (!open) setApprovalPrompt(null)
+        }}
+        title={approvalPrompt?.decision === "rejected" ? "Why are you rejecting this ticket?" : "Approval note"}
+        description="Add a note so the requester and team can understand this approval action."
+        label="Approver note"
+        placeholder="Write a short explanation..."
+        inputType="textarea"
+        required={approvalPrompt?.decision === "rejected"}
+        confirmLabel="Submit decision"
+        confirmVariant={approvalPrompt?.decision === "rejected" ? "destructive" : "default"}
+        onConfirm={submitApproval}
+      />
     </AdminTablePage>
   )
 }

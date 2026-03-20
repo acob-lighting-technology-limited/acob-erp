@@ -41,6 +41,7 @@ interface NavbarProps {
     email?: string
     user_metadata?: {
       first_name?: string
+      last_name?: string
     }
   }
   canAccessAdmin?: boolean
@@ -92,8 +93,11 @@ export function Navbar({ user, canAccessAdmin = false, isAdminMode = false }: Na
     router.push("/auth/login")
   }
 
-  // Extract initials from email (e.g., "i.chibuikem@..." -> "IC")
-  const getInitials = (email?: string): string => {
+  const getInitials = (email?: string, firstName?: string, lastName?: string): string => {
+    if (firstName || lastName) {
+      return `${firstName?.[0] || ""}${lastName?.[0] || ""}`.toUpperCase() || "U"
+    }
+
     if (!email) return "U"
 
     const localPart = email.split("@")[0] // Get part before @
@@ -112,11 +116,11 @@ export function Navbar({ user, canAccessAdmin = false, isAdminMode = false }: Na
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-10 w-10 rounded-full p-0 lg:h-11 lg:w-11">
-          <Avatar className="h-10 w-10 lg:h-11 lg:w-11">
-            <AvatarFallback className="bg-primary text-primary-foreground text-sm font-semibold lg:text-base">
-              {getInitials(user?.email)}
-            </AvatarFallback>
-          </Avatar>
+            <Avatar className="h-10 w-10 lg:h-11 lg:w-11">
+              <AvatarFallback className="bg-primary text-primary-foreground text-sm font-semibold lg:text-base">
+              {getInitials(user?.email, user?.user_metadata?.first_name, user?.user_metadata?.last_name)}
+              </AvatarFallback>
+            </Avatar>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56" align="end" forceMount>
@@ -287,7 +291,7 @@ export function Navbar({ user, canAccessAdmin = false, isAdminMode = false }: Na
           <div className={`flex items-center px-4 py-2 mb-2${isCollapsed ? "" : "gap-3"}`}>
             <Avatar className="h-10 w-10">
               <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
-                {getInitials(user?.email)}
+                {getInitials(user?.email, user?.user_metadata?.first_name, user?.user_metadata?.last_name)}
               </AvatarFallback>
             </Avatar>
             <div className="flex flex-col">

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { PromptDialog } from "@/components/ui/prompt-dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { ChevronDown, ChevronUp } from "lucide-react"
@@ -47,6 +48,10 @@ export function AdminCorrespondenceContent({
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [codeForm, setCodeForm] = useState({ department_name: "", department_code: "" })
   const [showMappings, setShowMappings] = useState(false)
+  const [decisionPrompt, setDecisionPrompt] = useState<{
+    recordId: string
+    decision: "approved" | "rejected" | "returned_for_correction"
+  } | null>(null)
 
   const filteredRecords = useMemo(() => {
     if (statusFilter === "all") return records
@@ -102,12 +107,19 @@ export function AdminCorrespondenceContent({
   }
 
   async function decide(recordId: string, decision: "approved" | "rejected" | "returned_for_correction") {
+    setDecisionPrompt({ recordId, decision })
+  }
+
+  async function submitDecisionNote(comments: string) {
+    if (!decisionPrompt) return
+
+    const { recordId, decision } = decisionPrompt
     setLoadingRecordId(recordId)
     try {
       const res = await fetch(`/api/correspondence/records/${recordId}/approvals`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ decision }),
+        body: JSON.stringify({ decision, comments: comments || null }),
       })
 
       const body = await res.json()
@@ -121,6 +133,7 @@ export function AdminCorrespondenceContent({
       toast.error(getErrorMessage(error, "Failed to apply decision"))
     } finally {
       setLoadingRecordId(null)
+      setDecisionPrompt(null)
     }
   }
 
@@ -316,6 +329,7 @@ export function AdminCorrespondenceContent({
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-14">S/N</TableHead>
                 <TableHead>Reference</TableHead>
                 <TableHead>Direction</TableHead>
                 <TableHead>Department</TableHead>
@@ -325,8 +339,9 @@ export function AdminCorrespondenceContent({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredRecords.map((record) => (
+              {filteredRecords.map((record, index) => (
                 <TableRow key={record.id}>
+                  <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
                   <TableCell>
                     <div className="font-medium">{record.reference_number}</div>
                     <div className="text-muted-foreground text-xs">{record.subject}</div>
@@ -429,6 +444,28 @@ export function AdminCorrespondenceContent({
           </Table>
         </CardContent>
       </Card>
+
+      <PromptDialog
+        open={decisionPrompt !== null}
+        onOpenChange={(open) => {
+          if (!open) setDecisionPrompt(null)
+        }}
+        title={
+          decisionPrompt?.decision === "approved"
+            ? "Approval note"
+            : decisionPrompt?.decision === "rejected"
+              ? "Why are you rejecting this reference?"
+              : "Why are you returning this reference?"
+        }
+        description="Add a note so the requester can see why this action was taken."
+        label="Approver note"
+        placeholder="Write a short explanation..."
+        inputType="textarea"
+        required={decisionPrompt?.decision !== "approved"}
+        confirmLabel="Submit decision"
+        confirmVariant={decisionPrompt?.decision === "rejected" ? "destructive" : "default"}
+        onConfirm={submitDecisionNote}
+      />
     </div>
   )
 }

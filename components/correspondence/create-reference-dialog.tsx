@@ -13,6 +13,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import { ItemInfoButton } from "@/components/ui/item-info-button"
 import { Plus } from "lucide-react"
 
 interface DepartmentCodeOption {
@@ -61,11 +62,34 @@ export function CreateReferenceDialog({
           Create Reference
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-3xl">
-        <DialogHeader>
-          <DialogTitle>Create Reference</DialogTitle>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+          <div className="flex items-center gap-2">
+            <DialogTitle>Create Reference</DialogTitle>
+            <ItemInfoButton
+              title="Reference workflow guide"
+              summary="A reference is a tracked correspondence item that can move through review, approval, and dispatch."
+              details={[
+                {
+                  label: "What you are creating",
+                  value:
+                    "This form creates a formal reference number and correspondence record for a letter, approval request, notice, or other tracked document.",
+                },
+                {
+                  label: "What happens after submission",
+                  value:
+                    "The reference will stay in workflow so reviewers and approvers can act on it before the final dispatch step.",
+                },
+                {
+                  label: "How to fill it well",
+                  value:
+                    "Use a clear subject, correct department, real recipient, and enough notes for the next approver or department to understand the purpose quickly.",
+                },
+              ]}
+            />
+          </div>
           <DialogDescription>Fill the correspondence details and submit.</DialogDescription>
-        </DialogHeader>
+          </DialogHeader>
         <form className="grid gap-4 md:grid-cols-2" onSubmit={onSubmit}>
           <div className="space-y-2">
             <Label>Department</Label>

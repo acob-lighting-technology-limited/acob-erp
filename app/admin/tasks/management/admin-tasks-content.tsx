@@ -3,10 +3,11 @@
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { formatName } from "@/lib/utils"
-import { ClipboardList, Plus, List, LayoutGrid } from "lucide-react"
+import { ClipboardList, Plus, List, LayoutGrid, ArrowRight } from "lucide-react"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { isAssignableProfile } from "@/lib/workforce/assignment-policy"
 import { logger } from "@/lib/logger"
@@ -17,6 +18,8 @@ import { TaskListView } from "@/components/tasks/TaskListView"
 import { TaskFilterBar } from "@/components/tasks/TaskFilterBar"
 import { TaskWorkflowTabs } from "@/components/tasks/TaskWorkflowTabs"
 import { TaskStatsCards } from "@/components/tasks/TaskStatsCards"
+import { ResponsiveModal } from "@/components/ui/patterns/responsive-modal"
+import { ItemInfoButton } from "@/components/ui/item-info-button"
 import {
   enrichTaskWithUsers,
   filterByDepartments,
@@ -138,6 +141,7 @@ export function AdminTasksContent({
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [isWorkflowOpen, setIsWorkflowOpen] = useState(false)
 
   const [taskForm, setTaskForm] = useState<TaskFormState>(INITIAL_TASK_FORM)
 
@@ -230,6 +234,7 @@ export function AdminTasksContent({
         project_id: taskForm.project_id || null,
         task_start_date: taskForm.task_start_date || null,
         task_end_date: taskForm.task_end_date || null,
+        source_type: taskForm.project_id ? "project_task" : "manual",
       }
 
       if (selectedTask) {
@@ -339,10 +344,13 @@ export function AdminTasksContent({
   return (
     <AdminTablePage
       title="Task Management"
-      description="Create and manage tasks for your team"
+      description="Manage one clear task list, then open workflow guidance only when you need it."
       icon={ClipboardList}
       actions={
         <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => setIsWorkflowOpen(true)} className="gap-2">
+            Workflow Guide
+          </Button>
           <div className="flex items-center rounded-lg border p-1">
             <Button
               variant={viewMode === "list" ? "default" : "ghost"}
@@ -390,12 +398,55 @@ export function AdminTasksContent({
       }
       filtersInCard={false}
     >
-      <TaskWorkflowTabs
-        allPendingWorkflowTasks={allPendingWorkflowTasks}
-        myTaskActionQueue={myTaskActionQueue}
-        taskHistory={taskHistory}
-        workflowOwnerLabel={workflowOwnerLabel}
-      />
+      <Card className="border-dashed">
+        <CardContent className="flex flex-col gap-4 p-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <div className="text-sm font-semibold">Task workflow at a glance</div>
+              <ItemInfoButton
+                title="Task workflow guide"
+                summary="Tasks can come from help desk, meetings, projects, or direct assignment, but they should still feel like one flow."
+                details={[
+                  {
+                    label: "How to read this page",
+                    value:
+                      "The main list below is the working source of truth. Use it to search, edit, assign, and complete tasks.",
+                  },
+                  {
+                    label: "Where the other queues went",
+                    value:
+                      "Pending queue, your action queue, and history are still available, but they now live under Workflow Guide so the page stays easier to understand.",
+                  },
+                  {
+                    label: "What the info icon means",
+                    value:
+                      "Use the info icon on any task, help desk ticket, reference, project task, or leave item when you need a quick explanation of what it is and what should happen next.",
+                  },
+                ]}
+              />
+            </div>
+            <p className="text-muted-foreground max-w-3xl text-sm">
+              Keep the main list as the place where work gets done. Open the workflow guide only when you want the
+              queue breakdown or history view.
+            </p>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-lg border px-4 py-3">
+              <div className="text-muted-foreground text-xs uppercase">Pending Queue</div>
+              <div className="mt-1 text-2xl font-semibold">{allPendingWorkflowTasks.length}</div>
+            </div>
+            <div className="rounded-lg border px-4 py-3">
+              <div className="text-muted-foreground text-xs uppercase">My Action Queue</div>
+              <div className="mt-1 text-2xl font-semibold">{myTaskActionQueue.length}</div>
+            </div>
+            <div className="rounded-lg border px-4 py-3">
+              <div className="text-muted-foreground text-xs uppercase">History</div>
+              <div className="mt-1 text-2xl font-semibold">{taskHistory.length}</div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Tasks List */}
       <TaskListView
@@ -410,6 +461,28 @@ export function AdminTasksContent({
         statusFilter={statusFilter}
         priorityFilter={priorityFilter}
       />
+
+      <ResponsiveModal
+        open={isWorkflowOpen}
+        onOpenChange={setIsWorkflowOpen}
+        title="Task Workflow Guide"
+        description="Use this when you want to inspect queue ownership and completed history without crowding the main task manager."
+        desktopClassName="max-w-6xl"
+      >
+        <div className="space-y-4">
+          <div className="bg-muted/40 flex items-center gap-2 rounded-lg border px-4 py-3 text-sm">
+            <ArrowRight className="h-4 w-4" />
+            Pending queue shows all live work, My Action Queue shows what needs your attention, and History shows
+            finished or closed items.
+          </div>
+          <TaskWorkflowTabs
+            allPendingWorkflowTasks={allPendingWorkflowTasks}
+            myTaskActionQueue={myTaskActionQueue}
+            taskHistory={taskHistory}
+            workflowOwnerLabel={workflowOwnerLabel}
+          />
+        </div>
+      </ResponsiveModal>
 
       <TaskFormDialog
         isOpen={isTaskDialogOpen}

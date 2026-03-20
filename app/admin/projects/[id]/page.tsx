@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
-import { ArrowLeft, Users, Package } from "lucide-react"
+import { ArrowLeft, Users, Package, ClipboardList } from "lucide-react"
 import Link from "next/link"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { PageHeader } from "@/components/layout/page-header"
@@ -24,13 +24,28 @@ import { PageLoader } from "@/components/ui/query-states"
 import { ProjectSummaryCard } from "@/components/projects/project-summary-card"
 import { MembersTab } from "@/components/projects/members-tab"
 import { ItemsTab } from "@/components/projects/items-tab"
+import { ProjectTasksTab } from "@/components/projects/project-tasks-tab"
 import { AddMemberDialog, type MemberForm } from "@/components/projects/add-member-dialog"
 import { ItemDialog, type ItemForm } from "@/components/projects/item-dialog"
+import { ProjectFormDialog, type ProjectFormState } from "@/components/projects/project-form-dialog"
 import { fetchAdminProjectDetail, type ProjectMember, type ProjectItem } from "@/components/projects/project-data"
+import { dateValidation } from "@/lib/validation"
 
 import { logger } from "@/lib/logger"
 
 const log = logger("projects")
+
+const EMPTY_PROJECT_FORM: ProjectFormState = {
+  project_name: "",
+  location: "",
+  deployment_start_date: "",
+  deployment_end_date: "",
+  capacity_w: "",
+  technology_type: "",
+  project_manager_id: "",
+  description: "",
+  status: "planning",
+}
 
 const getItemStatusColor = (status: string) => {
   switch (status) {
@@ -47,6 +62,36 @@ const getItemStatusColor = (status: string) => {
   }
 }
 
+const getTaskStatusColor = (status: string) => {
+  switch (status) {
+    case "completed":
+      return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+    case "in_progress":
+      return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
+    case "pending":
+      return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
+    case "cancelled":
+      return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
+    default:
+      return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
+  }
+}
+
+const getTaskPriorityColor = (priority: string) => {
+  switch (priority) {
+    case "urgent":
+      return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
+    case "high":
+      return "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400"
+    case "medium":
+      return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
+    case "low":
+      return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+    default:
+      return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
+  }
+}
+
 export default function AdminProjectDetailPage() {
   const params = useParams()
   const projectId = params.id as string
@@ -56,7 +101,9 @@ export default function AdminProjectDetailPage() {
   const [memberForm, setMemberForm] = useState<MemberForm>({ user_id: "", role: "member" })
 
   const [isItemDialogOpen, setIsItemDialogOpen] = useState(false)
+  const [isProjectDialogOpen, setIsProjectDialogOpen] = useState(false)
   const [selectedItem, setSelectedItem] = useState<ProjectItem | null>(null)
+  const [projectForm, setProjectForm] = useState<ProjectFormState>(EMPTY_PROJECT_FORM)
   const [itemForm, setItemForm] = useState<ItemForm>({
     item_name: "",
     description: "",
@@ -72,6 +119,7 @@ export default function AdminProjectDetailPage() {
   const [isAddingMember, setIsAddingMember] = useState(false)
   const [isRemovingMember, setIsRemovingMember] = useState(false)
   const [isSavingItem, setIsSavingItem] = useState(false)
+  const [isSavingProject, setIsSavingProject] = useState(false)
   const [isDeletingItem, setIsDeletingItem] = useState(false)
 
   const supabase = createClient()
@@ -86,6 +134,7 @@ export default function AdminProjectDetailPage() {
   const employees = pageData?.employees ?? []
   const members = pageData?.members ?? []
   const items = pageData?.items ?? []
+  const tasks = pageData?.tasks ?? []
 
   const handleAddMember = async () => {
     if (isAddingMember) return
@@ -177,6 +226,75 @@ export default function AdminProjectDetailPage() {
     setIsItemDialogOpen(true)
   }
 
+  const handleOpenProjectDialog = () => {
+    if (!project) return
+
+    setProjectForm({
+      project_name: project.project_name,
+      location: project.location,
+      deployment_start_date: project.deployment_start_date,
+      deployment_end_date: project.deployment_end_date,
+      capacity_w: project.capacity_w?.toString() || "",
+      technology_type: project.technology_type || "",
+      project_manager_id: project.project_manager_id || "",
+      description: project.description || "",
+      status: project.status,
+    })
+    setIsProjectDialogOpen(true)
+  }
+
+  const handleSaveProject = async () => {
+    if (!project) return
+    if (
+      !projectForm.project_name ||
+      !projectForm.location ||
+      !projectForm.deployment_start_date ||
+      !projectForm.deployment_end_date
+    ) {
+      toast.error("Please fill in all required fields")
+      return
+    }
+
+    const dateError = dateValidation.validateDateRange(
+      projectForm.deployment_start_date,
+      projectForm.deployment_end_date,
+      "deployment date"
+    )
+    if (dateError) {
+      toast.error(dateError)
+      return
+    }
+
+    setIsSavingProject(true)
+    try {
+      const { error } = await supabase
+        .from("projects")
+        .update({
+          project_name: projectForm.project_name,
+          location: projectForm.location,
+          deployment_start_date: projectForm.deployment_start_date,
+          deployment_end_date: projectForm.deployment_end_date,
+          capacity_w: projectForm.capacity_w ? parseFloat(projectForm.capacity_w) : null,
+          technology_type: projectForm.technology_type || null,
+          project_manager_id: projectForm.project_manager_id || null,
+          description: projectForm.description || null,
+          status: projectForm.status,
+        })
+        .eq("id", project.id)
+
+      if (error) throw error
+
+      toast.success("Project updated successfully")
+      setIsProjectDialogOpen(false)
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminProjectDetail(projectId) })
+    } catch (error) {
+      log.error("Error updating project:", error)
+      toast.error("Failed to update project")
+    } finally {
+      setIsSavingProject(false)
+    }
+  }
+
   const handleSaveItem = async () => {
     if (isSavingItem) return
     if (!itemForm.item_name) {
@@ -261,6 +379,11 @@ export default function AdminProjectDetailPage() {
         title={project.project_name}
         description="Manage project members and items"
         backLink={{ href: "/admin/projects", label: "Back to Projects" }}
+        actions={
+          <Button variant="outline" onClick={handleOpenProjectDialog}>
+            Edit Project
+          </Button>
+        }
       />
 
       <ProjectSummaryCard project={project} />
@@ -274,6 +397,10 @@ export default function AdminProjectDetailPage() {
           <TabsTrigger value="items" className="flex items-center gap-2">
             <Package className="h-4 w-4" />
             Items ({items.length})
+          </TabsTrigger>
+          <TabsTrigger value="tasks" className="flex items-center gap-2">
+            <ClipboardList className="h-4 w-4" />
+            Tasks ({tasks.length})
           </TabsTrigger>
         </TabsList>
 
@@ -295,6 +422,20 @@ export default function AdminProjectDetailPage() {
             onDeleteItem={setItemToDelete}
           />
         </TabsContent>
+
+        <TabsContent value="tasks" className="space-y-4">
+          <ProjectTasksTab
+            tasks={tasks}
+            members={members}
+            projectId={projectId}
+            canManageTasks
+            taskLinkBase="/admin/tasks"
+            getStatusColor={getTaskStatusColor}
+            getPriorityColor={getTaskPriorityColor}
+            formatDate={(value) => new Date(value).toLocaleDateString("en-US")}
+            onTaskCreated={() => queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminProjectDetail(projectId) })}
+          />
+        </TabsContent>
       </Tabs>
 
       <AddMemberDialog
@@ -305,6 +446,17 @@ export default function AdminProjectDetailPage() {
         onFormChange={setMemberForm}
         onSubmit={handleAddMember}
         isSubmitting={isAddingMember}
+      />
+
+      <ProjectFormDialog
+        open={isProjectDialogOpen}
+        onOpenChange={setIsProjectDialogOpen}
+        isEditing
+        form={projectForm}
+        onFormChange={setProjectForm}
+        onSave={handleSaveProject}
+        isSaving={isSavingProject}
+        activeEmployees={employees}
       />
 
       <ItemDialog

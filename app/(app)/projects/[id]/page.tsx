@@ -40,10 +40,22 @@ import { logger } from "@/lib/logger"
 
 const log = logger("projects")
 
-async function fetchProjectData(projectId: string): Promise<ProjectDetailData> {
+type ProjectPageQueryData = ProjectDetailData & {
+  canManageTasks: boolean
+}
+
+async function fetchProjectData(projectId: string): Promise<ProjectPageQueryData> {
   const supabase = createClient()
 
-  const [projectResult, membersResult, itemsResult, updatesResult, tasksResult] = await Promise.allSettled([
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    throw new Error("Unauthorized")
+  }
+
+  const [projectResult, currentMemberResult] = await Promise.all([
     supabase
       .from("projects")
       .select(
@@ -55,8 +67,29 @@ async function fetchProjectData(projectId: string): Promise<ProjectDetailData> {
       .single(),
     supabase
       .from("project_members")
+      .select("role")
+      .eq("project_id", projectId)
+      .eq("user_id", user.id)
+      .eq("is_active", true)
+      .maybeSingle(),
+  ])
+
+  if (projectResult.error || !projectResult.data) {
+    throw new Error(projectResult.error?.message ?? "Failed to load project")
+  }
+
+  const canViewProject =
+    projectResult.data.project_manager_id === user.id || projectResult.data.created_by === user.id || !!currentMemberResult.data
+
+  if (!canViewProject) {
+    throw new Error("Forbidden")
+  }
+
+  const [membersResult, itemsResult, updatesResult, tasksResult] = await Promise.allSettled([
+    supabase
+      .from("project_members")
       .select(
-        `id, role, assigned_at,
+        `id, user_id, role, assigned_at,
         user:profiles!project_members_user_id_fkey (first_name, last_name, company_email, department)`
       )
       .eq("project_id", projectId)
@@ -74,20 +107,12 @@ async function fetchProjectData(projectId: string): Promise<ProjectDetailData> {
     supabase
       .from("tasks")
       .select(
-        `id, title, description, priority, status, progress, due_date, task_start_date, task_end_date,
+        `id, title, work_item_number, description, priority, status, progress, due_date, task_start_date, task_end_date,
         assigned_to_user:profiles!tasks_assigned_to_fkey (first_name, last_name)`
       )
       .eq("project_id", projectId)
       .order("created_at", { ascending: false }),
   ])
-
-  if (projectResult.status === "rejected" || projectResult.value.error) {
-    throw new Error(
-      projectResult.status === "rejected"
-        ? String(projectResult.reason)
-        : (projectResult.value.error?.message ?? "Failed to load project")
-    )
-  }
 
   const hasSecondaryError = [membersResult, itemsResult, updatesResult, tasksResult].some(
     (r) => r.status === "rejected" || (r.status === "fulfilled" && r.value.error)
@@ -98,7 +123,7 @@ async function fetchProjectData(projectId: string): Promise<ProjectDetailData> {
 
   return {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    project: projectResult.value.data as any,
+    project: projectResult.data as any,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     members: (membersResult.status === "fulfilled" ? (membersResult.value.data as any) : null) ?? [],
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -107,6 +132,10 @@ async function fetchProjectData(projectId: string): Promise<ProjectDetailData> {
     updates: (updatesResult.status === "fulfilled" ? (updatesResult.value.data as any) : null) ?? [],
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     tasks: (tasksResult.status === "fulfilled" ? (tasksResult.value.data as any) : null) ?? [],
+    canManageTasks:
+      projectResult.data.project_manager_id === user.id ||
+      projectResult.data.created_by === user.id ||
+      currentMemberResult.data?.role === "lead",
   }
 }
 
@@ -148,6 +177,7 @@ export default function ProjectDetailPage() {
   const items = projectData?.items ?? []
   const updates = projectData?.updates ?? []
   const tasks = projectData?.tasks ?? []
+  const canManageTasks = Boolean(projectData?.canManageTasks)
 
   const handleAddComment = async () => {
     if (!newComment.trim()) return
@@ -254,9 +284,13 @@ export default function ProjectDetailPage() {
         <TabsContent value="tasks" className="space-y-4">
           <ProjectTasksTab
             tasks={tasks}
+            members={members}
+            projectId={projectId}
+            canManageTasks={canManageTasks}
             getStatusColor={getProjectStatusColor}
             getPriorityColor={getProjectPriorityColor}
             formatDate={formatProjectDate}
+            onTaskCreated={() => queryClient.invalidateQueries({ queryKey: QUERY_KEYS.appProjectDetail(projectId) })}
           />
         </TabsContent>
 

@@ -69,30 +69,43 @@ export function ActionTrackerTable({
   statusColor,
 }: ActionTrackerTableProps) {
   const deptsPresent = Array.from(new Set(tasks.map((t) => t.department))).sort()
-  const formatDueDate = (task: ActionTask) => {
+
+  const resolveDueDate = (task: ActionTask) => {
     if (task.due_date) {
       const explicitDueDate = new Date(task.due_date)
       if (!Number.isNaN(explicitDueDate.getTime())) {
-        return explicitDueDate.toLocaleString("en-GB", {
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
-        })
+        return explicitDueDate
       }
     }
 
     const sunday = getOfficeWeekMonday(task.week_number, task.year)
     sunday.setDate(sunday.getDate() + 6)
     sunday.setHours(23, 59, 0, 0)
-    return sunday.toLocaleString("en-GB", {
+    return sunday
+  }
+
+  const formatDueDate = (task: ActionTask) => {
+    return resolveDueDate(task).toLocaleString("en-GB", {
       day: "2-digit",
       month: "short",
       year: "numeric",
       hour: "2-digit",
       minute: "2-digit",
     })
+  }
+
+  const getDueDateClassName = (task: ActionTask) => {
+    const status = task.status.toLowerCase()
+    if (status === "completed") {
+      return "font-medium text-green-600 dark:text-green-400"
+    }
+
+    const dueDate = resolveDueDate(task)
+    if (dueDate.getTime() < Date.now()) {
+      return "font-semibold text-red-600 dark:text-red-400"
+    }
+
+    return "font-semibold text-yellow-600 dark:text-yellow-400"
   }
 
   return (
@@ -296,7 +309,7 @@ export function ActionTrackerTable({
                                         </SelectContent>
                                       </Select>
                                     </TableCell>
-                                    <TableCell className="text-muted-foreground text-xs font-medium">
+                                    <TableCell className={cn("text-xs", getDueDateClassName(task))}>
                                       {formatDueDate(task)}
                                     </TableCell>
                                     <TableCell className="text-right">

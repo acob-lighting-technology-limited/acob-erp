@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { EmptyState } from "@/components/ui/patterns"
+import { ItemInfoButton } from "@/components/ui/item-info-button"
 import {
   ClipboardList,
   Edit,
@@ -103,6 +104,47 @@ function getSourceBadge(sourceType?: string) {
   }
 }
 
+function buildTaskInfo(task: Task) {
+  const sourceLabel =
+    task.source_type === "help_desk"
+      ? "Help Desk request"
+      : task.source_type === "action_item"
+        ? "Meeting action point"
+        : task.source_type === "project_task"
+          ? "Project task"
+          : "Manual task"
+
+  const ownerLabel =
+    task.assignment_type === "multiple" && task.assigned_users
+      ? `${task.assigned_users.length} people are responsible for this item.`
+      : task.assignment_type === "department" && task.department
+        ? `${task.department} department is responsible for moving this item forward.`
+        : task.assigned_to_user
+          ? `${formatName((task.assigned_to_user as TaskAssignee)?.first_name)} ${formatName((task.assigned_to_user as TaskAssignee)?.last_name)} is currently responsible.`
+          : "This item has not been assigned yet."
+
+  return {
+    title: task.work_item_number ? `${task.work_item_number} task guide` : "Task guide",
+    summary: "This explains what the task is, where it came from, and what the next handler is expected to do.",
+    details: [
+      { label: "What this item is", value: `${task.title} is tracked as a ${sourceLabel.toLowerCase()}.` },
+      {
+        label: "Current responsibility",
+        value: ownerLabel,
+      },
+      {
+        label: "What to do next",
+        value:
+          task.status === "completed"
+            ? "This item is already finished. Reopen it only if there is more work to do or the completion needs correction."
+            : task.status === "cancelled"
+              ? "This item has been stopped. Review the timeline or notes before restarting it."
+              : "Review the description, carry out the work or requested change, then update the status and leave a note if the next person needs context.",
+      },
+    ],
+  }
+}
+
 export function TaskListView({
   filteredTasks,
   viewMode,
@@ -157,6 +199,7 @@ export function TaskListView({
                       <div className="flex items-center gap-2">
                         <span className="text-foreground font-medium">{task.title}</span>
                         {getSourceBadge(task.source_type)}
+                        <ItemInfoButton {...buildTaskInfo(task)} />
                       </div>
                       {task.description && (
                         <div className="text-muted-foreground mt-1 line-clamp-1 text-sm">{task.description}</div>
@@ -254,7 +297,10 @@ export function TaskListView({
           <CardHeader className="from-primary/5 to-background border-b bg-gradient-to-r">
             <div className="flex items-start justify-between">
               <div className="flex-1">
-                <CardTitle className="text-lg">{task.title}</CardTitle>
+                <div className="flex items-start gap-2">
+                  <CardTitle className="text-lg">{task.title}</CardTitle>
+                  <ItemInfoButton {...buildTaskInfo(task)} />
+                </div>
                 <div className="mt-2 flex items-center gap-2">
                   <Badge className={getStatusColor(task.status)}>{task.status.replace("_", " ")}</Badge>
                   <Badge className={getPriorityColor(task.priority)}>{task.priority}</Badge>

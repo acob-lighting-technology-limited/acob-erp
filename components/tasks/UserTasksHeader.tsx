@@ -1,16 +1,33 @@
 "use client"
 
+import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ClipboardList } from "lucide-react"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { ClipboardList, Search } from "lucide-react"
 
 interface UserTasksHeaderProps {
+  searchQuery: string
+  setSearchQuery: (value: string) => void
   filterStatus: string
   setFilterStatus: (value: string) => void
+  assignmentFilter: string
+  setAssignmentFilter: (value: string) => void
+  taskView: "ongoing" | "history"
+  setTaskView: (value: "ongoing" | "history") => void
 }
 
-export function UserTasksHeader({ filterStatus, setFilterStatus }: UserTasksHeaderProps) {
+export function UserTasksHeader({
+  searchQuery,
+  setSearchQuery,
+  filterStatus,
+  setFilterStatus,
+  assignmentFilter,
+  setAssignmentFilter,
+  taskView,
+  setTaskView,
+}: UserTasksHeaderProps) {
   return (
-    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-4">
       <div>
         <h1 className="text-foreground flex items-center gap-2 text-2xl font-bold sm:gap-3 sm:text-3xl">
           <ClipboardList className="text-primary h-6 w-6 sm:h-8 sm:w-8" />
@@ -18,17 +35,52 @@ export function UserTasksHeader({ filterStatus, setFilterStatus }: UserTasksHead
         </h1>
         <p className="text-muted-foreground mt-2">Track and manage your assigned tasks</p>
       </div>
-      <Select value={filterStatus} onValueChange={setFilterStatus}>
-        <SelectTrigger className="w-[180px]">
-          <SelectValue placeholder="Filter by status" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All Tasks</SelectItem>
-          <SelectItem value="pending">Pending</SelectItem>
-          <SelectItem value="in_progress">In Progress</SelectItem>
-          <SelectItem value="completed">Completed</SelectItem>
-        </SelectContent>
-      </Select>
+
+      <Tabs value={taskView} onValueChange={(value) => setTaskView(value as "ongoing" | "history")}>
+        <TabsList className="grid w-full max-w-sm grid-cols-2">
+          <TabsTrigger value="ongoing">Ongoing</TabsTrigger>
+          <TabsTrigger value="history">History</TabsTrigger>
+        </TabsList>
+      </Tabs>
+
+      <div className="flex flex-col gap-3 xl:flex-row">
+        <div className="relative flex-1">
+          <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+          <Input
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="Search by task, project, or work item"
+            className="pl-10"
+          />
+        </div>
+
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <Select value={filterStatus} onValueChange={setFilterStatus}>
+            <SelectTrigger className="w-full sm:w-[200px]">
+              <SelectValue placeholder="Filter by status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Statuses</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="in_progress">In Progress</SelectItem>
+              <SelectItem value="completed">Completed</SelectItem>
+              <SelectItem value="cancelled">Cancelled</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={assignmentFilter} onValueChange={setAssignmentFilter}>
+            <SelectTrigger className="w-full sm:w-[200px]">
+              <SelectValue placeholder="Filter by type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              <SelectItem value="individual">Individual</SelectItem>
+              <SelectItem value="department">Dept</SelectItem>
+              <SelectItem value="multiple">Group</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
     </div>
   )
 }

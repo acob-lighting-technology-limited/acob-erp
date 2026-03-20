@@ -3,6 +3,7 @@
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { ItemInfoButton } from "@/components/ui/item-info-button"
 import { Upload } from "lucide-react"
 import type { LeaveRequest } from "@/app/(app)/leave/page"
 
@@ -60,7 +61,30 @@ export function LeaveRequestsCard({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>My Leave Requests</CardTitle>
+        <div className="flex items-center gap-2">
+          <CardTitle>My Leave Requests</CardTitle>
+          <ItemInfoButton
+            title="Leave requests guide"
+            summary="This section shows your leave requests, where they are in workflow, and what action may still be needed."
+            details={[
+              {
+                label: "Ongoing vs history",
+                value:
+                  "Ongoing shows requests still active in workflow or approved leave that has not yet finished. History shows completed, rejected, or cancelled requests.",
+              },
+              {
+                label: "What the badges mean",
+                value:
+                  "The status badge shows the overall result, while the stage badge shows the current approval step or the last workflow stage reached.",
+              },
+              {
+                label: "What to do next",
+                value:
+                  "If your request needs evidence, upload it. If the request is still waiting at reliever stage, you can edit or delete it before it moves forward.",
+              },
+            ]}
+          />
+        </div>
         <CardDescription>Track ongoing requests separately from completed history.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -128,7 +152,39 @@ export function LeaveRequestsCard({
           displayedRequests.map((request) => (
             <div key={request.id} className="rounded-md border p-3">
               <div className="flex items-center justify-between gap-2">
-                <p className="font-medium">{request.leave_type?.name || "Leave Request"}</p>
+                <div className="flex items-center gap-1">
+                  <p className="font-medium">{request.leave_type?.name || "Leave Request"}</p>
+                  <ItemInfoButton
+                    title={`${request.leave_type?.name || "Leave"} request guide`}
+                    summary="This explains the current meaning of this leave request and what is still expected."
+                    details={[
+                      {
+                        label: "Current workflow meaning",
+                        value: `This request is currently ${request.status.replaceAll("_", " ")} and is at ${
+                          STAGE_LABELS[request.current_stage_code || request.approval_stage] ||
+                          request.current_stage_code ||
+                          request.approval_stage ||
+                          "the current workflow stage"
+                        }.`,
+                      },
+                      {
+                        label: "Coverage and timing",
+                        value: `${request.start_date} to ${request.end_date}, resuming ${request.resume_date}, with ${
+                          request.reliever?.full_name || request.reliever?.company_email || "no reliever yet"
+                        } as reliever.`,
+                      },
+                      {
+                        label: "What to do next",
+                        value:
+                          request.status === "pending_evidence"
+                            ? "Upload the missing evidence so the request can continue through approval."
+                            : isRequesterEditable(request)
+                              ? "You can still edit or delete this request because it has not moved past reliever stage."
+                              : "Wait for the next approver action, or review the final result if the workflow is complete.",
+                      },
+                    ]}
+                  />
+                </div>
                 <div className="flex gap-2">
                   <Badge
                     variant={

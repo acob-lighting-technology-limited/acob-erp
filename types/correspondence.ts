@@ -48,7 +48,6 @@ export interface CorrespondenceRecord {
   approved_at: string | null
   sent_at: string | null
   received_at: string | null
-  incoming_reference_id: string | null
   current_version: number
   is_locked: boolean
   metadata: Record<string, unknown> | null
@@ -132,8 +131,4 @@ export interface DispatchInput {
   dispatch_method: DispatchMethod
   proof_of_delivery_path?: string | null
   recipient_name?: string | null
-}
-
-export interface LinkResponseInput {
-  incoming_reference_id: string
 }

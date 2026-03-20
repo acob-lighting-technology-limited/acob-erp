@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/client"
 import type { Task, TaskUserProfile } from "@/app/(app)/tasks/management/tasks-content"
+import { getOfficeWeekMonday } from "@/lib/meeting-week"
 
 type TaskAssignmentRow = {
   task_id: string
@@ -10,6 +11,33 @@ type BasicProfile = {
   id: string
   first_name: string
   last_name: string
+}
+
+type ActionItemDueDateRow = {
+  id: string
+  due_date?: string | null
+  week_number: number
+  year: number
+}
+
+function toLocalDueDateString(date: Date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, "0")
+  const day = String(date.getDate()).padStart(2, "0")
+  const hours = String(date.getHours()).padStart(2, "0")
+  const minutes = String(date.getMinutes()).padStart(2, "0")
+  const seconds = String(date.getSeconds()).padStart(2, "0")
+  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`
+}
+
+function resolveActionItemDueDate(actionItem?: ActionItemDueDateRow | null) {
+  if (!actionItem) return undefined
+  if (actionItem.due_date) return actionItem.due_date
+
+  const sunday = getOfficeWeekMonday(actionItem.week_number, actionItem.year)
+  sunday.setDate(sunday.getDate() + 6)
+  sunday.setHours(23, 59, 0, 0)
+  return toLocalDueDateString(sunday)
 }
 
 export async function loadUserTasks(
@@ -41,10 +69,29 @@ export async function loadUserTasks(
 
   const allTasks = [...(individualTasks || []), ...(multipleTasks || []), ...(departmentTasks || [])]
   const uniqueTasks = Array.from(new Map(allTasks.map((t) => [t.id, t])).values()) as Task[]
+  const actionItemIds = uniqueTasks
+    .filter((task) => task.source_type === "action_item" && task.source_id)
+    .map((task) => String(task.source_id))
+
+  const { data: actionItems } =
+    actionItemIds.length > 0
+      ? await supabase
+          .from("action_items")
+          .select("id, due_date, week_number, year")
+          .in("id", actionItemIds)
+      : { data: [] }
+
+  const actionItemDueDateMap = new Map(
+    ((actionItems as ActionItemDueDateRow[] | null) || []).map((item) => [item.id, item] as const)
+  )
 
   const tasksWithUsers = await Promise.all(
     uniqueTasks.map(async (task) => {
       const taskData: Task = { ...task }
+
+      if (task.source_type === "action_item" && task.source_id) {
+        taskData.due_date = resolveActionItemDueDate(actionItemDueDateMap.get(String(task.source_id))) || task.due_date
+      }
 
       if (task.assigned_by) {
         const { data: profile } = await supabase

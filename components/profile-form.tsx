@@ -24,9 +24,11 @@ interface ProfileFormProps {
     id: string
   }
   profile: ProfileRecord | null
+  hideBackButton?: boolean
+  onSaved?: () => void
 }
 
-export function ProfileForm({ user, profile }: ProfileFormProps) {
+export function ProfileForm({ user, profile, hideBackButton = false, onSaved }: ProfileFormProps) {
   const { departments: DEPARTMENTS } = useDepartments()
   const [formData, setFormData] = useState({
     firstName: profile?.first_name || "",
@@ -93,6 +95,7 @@ export function ProfileForm({ user, profile }: ProfileFormProps) {
 
       if (error) throw error
       toast.success("Profile updated successfully!")
+      onSaved?.()
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Failed to update profile"
       toast.error(message)
@@ -312,9 +315,11 @@ export function ProfileForm({ user, profile }: ProfileFormProps) {
               <Button type="submit" loading={isLoading}>
                 Save Changes
               </Button>
-              <Link href="/profile">
-                <Button variant="outline">Back to Home</Button>
-              </Link>
+              {!hideBackButton && (
+                <Link href="/profile">
+                  <Button variant="outline">Back to Home</Button>
+                </Link>
+              )}
             </div>
           </form>
         </CardContent>
