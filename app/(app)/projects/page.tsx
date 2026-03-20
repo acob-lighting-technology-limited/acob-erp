@@ -39,7 +39,6 @@ async function getProjectsData() {
     return { redirect: "/auth/login" as const }
   }
 
-  // Get projects where user is a member, manager, or creator
   const { data: memberProjects, error: memberError } = await supabase
     .from("project_members")
     .select("project_id")
@@ -50,7 +49,26 @@ async function getProjectsData() {
     log.error("Error loading member projects:", memberError)
   }
 
-  const projectIds = memberProjects?.map((m) => m.project_id) || []
+  const memberProjectIds = memberProjects?.map((member) => member.project_id) || []
+
+  const { data: ownedProjects, error: ownedProjectsError } = await supabase
+    .from("projects")
+    .select("id")
+    .or(`project_manager_id.eq.${user.id},created_by.eq.${user.id}`)
+
+  if (ownedProjectsError) {
+    log.error("Error loading owned projects:", ownedProjectsError)
+  }
+
+  const accessibleProjectIds = Array.from(
+    new Set([...(memberProjectIds || []), ...((ownedProjects || []).map((project) => project.id) || [])])
+  )
+
+  if (accessibleProjectIds.length === 0) {
+    return {
+      projects: [],
+    }
+  }
 
   const { data, error } = await supabase
     .from("projects")
@@ -76,7 +94,7 @@ async function getProjectsData() {
       )
     `
     )
-    .or(`id.in.(${projectIds.join(",")}),project_manager_id.eq.${user.id},created_by.eq.${user.id}`)
+    .in("id", accessibleProjectIds)
     .order("created_at", { ascending: false })
     .returns<Project[]>()
 

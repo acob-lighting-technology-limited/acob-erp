@@ -4,6 +4,7 @@ import {
   getAuthContext,
   HelpDeskProfile,
   HelpDeskTicketRow,
+  generateFallbackHelpDeskTicketNumber,
   getSlaTarget,
   isAdminRole,
   appendHelpDeskEvent,
@@ -46,12 +47,6 @@ function describeError(error: unknown): string {
     }
   }
   return "Unknown error"
-}
-
-function generateFallbackHelpDeskTicketNumber() {
-  const epochMillis = Date.now().toString()
-  const randomSuffix = parseInt(crypto.randomUUID().replace(/-/g, "").slice(0, 3), 16).toString().padStart(3, "0")
-  return `HD-${epochMillis}${randomSuffix}`
 }
 
 function isTicketNumberConflict(error: ErrorWithCode | null | undefined) {

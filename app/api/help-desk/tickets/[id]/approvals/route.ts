@@ -6,6 +6,7 @@ import {
   HelpDeskApprovalRow,
   HelpDeskProfile,
   resolveLeadForDepartment,
+  syncHelpDeskTicketTask,
 } from "@/lib/help-desk/server"
 import { sendHelpDeskMail } from "@/lib/help-desk/mailer"
 import { logger } from "@/lib/logger"
@@ -135,13 +136,25 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     if (updateApprovalError) throw updateApprovalError
 
     let finalStatus = ticket.status
+    let latestTicket = ticket
 
     if (normalizedDecision === "rejected") {
       finalStatus = "rejected"
-      await supabase
+      const { data: rejectedTicket } = await supabase
         .from("help_desk_tickets")
         .update({ status: "rejected", current_approval_stage: null })
         .eq("id", ticket.id)
+        .select("*")
+        .single()
+
+      if (rejectedTicket) {
+        latestTicket = rejectedTicket
+      }
+
+      await syncHelpDeskTicketTask({
+        ticket: latestTicket,
+        actorId: user.id,
+      })
 
       await supabase.rpc("create_notification", {
         p_user_id: ticket.requester_id,
@@ -173,7 +186,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
       if (!upcomingStage) {
         finalStatus = "approved_for_procurement"
-        await supabase
+        const { data: approvedTicket } = await supabase
           .from("help_desk_tickets")
           .update({
             status: "approved_for_procurement",
@@ -182,6 +195,18 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
             current_approval_stage: null,
           })
           .eq("id", ticket.id)
+          .select("*")
+          .single()
+
+        if (approvedTicket) {
+          latestTicket = approvedTicket
+        }
+
+        const syncResult = await syncHelpDeskTicketTask({
+          ticket: latestTicket,
+          actorId: user.id,
+        })
+        const workItemNumber = syncResult?.workItemNumber || latestTicket.ticket_number || ticket.ticket_number
 
         const notificationTargets = [ticket.requester_id, ticket.assigned_to].filter(Boolean)
         for (const targetId of notificationTargets) {
@@ -190,7 +215,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
             p_type: "approval_granted",
             p_category: "approvals",
             p_title: "Procurement approved",
-            p_message: `${ticket.ticket_number} has completed all approval stages`,
+            p_message: `${workItemNumber} has completed all approval stages`,
             p_priority: "normal",
             p_link_url: "/help-desk",
             p_actor_id: user.id,
@@ -203,10 +228,10 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         try {
           await sendHelpDeskMail({
             userIds: notificationTargets as string[],
-            subject: `Procurement Approved: ${ticket.ticket_number}`,
+            subject: `Procurement Approved: ${workItemNumber}`,
             title: "Ticket Procurement Fully Approved",
             message: `${ticket.title} has passed all approval levels and work can continue.`,
-            ticketNumber: ticket.ticket_number,
+            ticketNumber: workItemNumber,
           })
         } catch (mailError) {
           log.error({ err: String(mailError) }, "Help desk mail error (final approval):")
@@ -247,7 +272,16 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
           )
         })()
 
-        await supabase.from("help_desk_tickets").update({ current_approval_stage: upcomingStage }).eq("id", ticket.id)
+        const { data: stagedTicket } = await supabase
+          .from("help_desk_tickets")
+          .update({ current_approval_stage: upcomingStage })
+          .eq("id", ticket.id)
+          .select("*")
+          .single()
+
+        if (stagedTicket) {
+          latestTicket = stagedTicket
+        }
 
         if (nextApprover?.id) {
           await supabase.rpc("create_notification", {

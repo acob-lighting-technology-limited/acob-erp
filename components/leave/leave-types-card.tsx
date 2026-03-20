@@ -4,6 +4,7 @@ import { useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { ItemInfoButton } from "@/components/ui/item-info-button"
 import { ChevronDown, ChevronRight } from "lucide-react"
 import type { LeaveBalance, LeaveType } from "@/app/(app)/leave/page"
 
@@ -36,7 +37,30 @@ export function LeaveTypesCard({ leaveTypes, balanceMap }: LeaveTypesCardProps) 
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <CardTitle>Leave Types and Balances</CardTitle>
+            <div className="flex items-center gap-2">
+              <CardTitle>Leave Types and Balances</CardTitle>
+              <ItemInfoButton
+                title="Leave types and balances guide"
+                summary="This section explains which leave types you can request and what the current eligibility or evidence rules mean."
+                details={[
+                  {
+                    label: "What you are seeing",
+                    value:
+                      "Each leave type shows your allocation, usage, remaining balance, and whether you are currently eligible to submit that kind of leave.",
+                  },
+                  {
+                    label: "What missing evidence means",
+                    value:
+                      "It means the leave type may be allowed, but supporting documents are still required before the approval flow can complete cleanly.",
+                  },
+                  {
+                    label: "How to use this section",
+                    value:
+                      "Check this first before creating a new leave request so you know which leave type to choose and whether any documents are needed.",
+                  },
+                ]}
+              />
+            </div>
             <CardDescription>Professional governance: policy + evidence + transparent eligibility</CardDescription>
           </div>
           <Button type="button" variant="outline" size="sm" onClick={() => setShowLeavePolicy((prev) => !prev)}>

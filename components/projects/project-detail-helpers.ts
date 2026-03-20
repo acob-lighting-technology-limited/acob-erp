@@ -9,6 +9,8 @@ export interface ProjectDetailProject {
   description?: string
   status: string
   created_at: string
+  project_manager_id?: string | null
+  created_by?: string | null
   project_manager?: {
     first_name: string
     last_name: string
@@ -22,6 +24,7 @@ export interface ProjectDetailProject {
 
 export interface ProjectDetailMember {
   id: string
+  user_id: string
   user: {
     first_name: string
     last_name: string
@@ -56,17 +59,18 @@ export interface ProjectDetailUpdate {
 export interface ProjectDetailTask {
   id: string
   title: string
+  work_item_number?: string | null
   description?: string
   priority: string
   status: string
-  progress: number
+  progress?: number | null
   due_date?: string
   task_start_date?: string
   task_end_date?: string
-  assigned_to_user: {
+  assigned_to_user?: {
     first_name: string
     last_name: string
-  }
+  } | null
 }
 
 export interface ProjectDetailData {

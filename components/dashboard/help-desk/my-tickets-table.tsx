@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ListToolbar } from "@/components/ui/patterns"
+import { ItemInfoButton } from "@/components/ui/item-info-button"
 import { PriorityBadge, TicketStatusBadge } from "@/components/dashboard/help-desk/ticket-badges"
 
 export interface MyHelpDeskTicket {
@@ -48,6 +49,34 @@ function belongsToTab(ticket: MyHelpDeskTicket, tab: TicketTab) {
   if (tab === "pending") return PENDING_STATUSES.has(ticket.status)
   if (tab === "resolved") return RESOLVED_STATUSES.has(ticket.status)
   return CLOSED_STATUSES.has(ticket.status)
+}
+
+function buildHelpDeskInfo(ticket: MyHelpDeskTicket) {
+  const nextStep =
+    ticket.status === "resolved"
+      ? "The requester should confirm the fix worked or give a rating and close the loop."
+      : ticket.status === "closed" || ticket.status === "cancelled" || ticket.status === "rejected"
+        ? "This request is no longer active. Review its history before reopening or recreating it."
+        : "The assigned handler or reviewing department should act on the request, then update the ticket status with progress."
+
+  return {
+    title: `${ticket.ticket_number} help desk guide`,
+    summary: "This explains what the help desk ticket means and what should happen next.",
+    details: [
+      {
+        label: "What this item is",
+        value: `${ticket.title} is a help desk request sent to ${ticket.service_department}.`,
+      },
+      {
+        label: "Current workflow meaning",
+        value: `Status is ${ticket.status.replaceAll("_", " ")}. Priority is ${ticket.priority}.`,
+      },
+      {
+        label: "What to do next",
+        value: nextStep,
+      },
+    ],
+  }
 }
 
 export function MyTicketsTable({ tickets, userId, onSetStatus, onRateTicket, onViewTicket }: MyTicketsTableProps) {
@@ -166,13 +195,16 @@ export function MyTicketsTable({ tickets, userId, onSetStatus, onRateTicket, onV
               <TableRow key={ticket.id}>
                 <TableCell className="text-muted-foreground">{index + 1}</TableCell>
                 <TableCell>
-                  <button
-                    type="button"
-                    onClick={() => onViewTicket(ticket.id)}
-                    className="text-left font-medium underline-offset-2 hover:underline"
-                  >
-                    {ticket.ticket_number}
-                  </button>
+                  <div className="flex items-start gap-1">
+                    <button
+                      type="button"
+                      onClick={() => onViewTicket(ticket.id)}
+                      className="text-left font-medium underline-offset-2 hover:underline"
+                    >
+                      {ticket.ticket_number}
+                    </button>
+                    <ItemInfoButton {...buildHelpDeskInfo(ticket)} />
+                  </div>
                   <div className="text-muted-foreground text-xs">{ticket.title}</div>
                 </TableCell>
                 <TableCell>{ticket.service_department}</TableCell>

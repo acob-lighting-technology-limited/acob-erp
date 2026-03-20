@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { ItemInfoButton } from "@/components/ui/item-info-button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { SearchableSelect } from "@/components/ui/searchable-select"
 import { Textarea } from "@/components/ui/textarea"
@@ -69,6 +70,27 @@ export function LeaveRequestFormDialog({
           <DialogTitle className="flex items-center gap-2">
             <CalendarDays className="h-5 w-5" />
             {editingRequestId ? "Edit Leave Request" : "Submit Leave Request"}
+            <ItemInfoButton
+              title="Leave request workflow guide"
+              summary="Leave requests move through approval stages, so the requester, reliever, and approvers all need enough context from the start."
+              details={[
+                {
+                  label: "What happens after submission",
+                  value:
+                    "The request goes into approval flow, starting with the reliever and then moving through the relevant approvers until it is approved or rejected.",
+                },
+                {
+                  label: "What approvers care about",
+                  value:
+                    "They need to know the leave type, exact dates, business impact, reliever coverage, and whether the handover is strong enough.",
+                },
+                {
+                  label: "How to avoid rework",
+                  value:
+                    "Choose the right leave type, give a real reason, set a reliever, and write a useful handover note so the next person can decide quickly.",
+                },
+              ]}
+            />
           </DialogTitle>
           <DialogDescription>
             Request flow: Reliever {"->"} Supervisor {"->"} HR. Changes are allowed only before reliever approval.

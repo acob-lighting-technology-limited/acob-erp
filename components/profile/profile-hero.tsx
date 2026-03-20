@@ -1,17 +1,17 @@
 "use client"
 
-import { useRouter } from "next/navigation"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Edit, Briefcase, Building2, Clock } from "lucide-react"
 import { formatName } from "@/lib/utils"
-import { getRoleDisplayName } from "@/lib/permissions"
+import { getRoleBadgeColor, getRoleDisplayName } from "@/lib/permissions"
 import type { UserRole } from "@/types/database"
 
 interface ProfileHeroProps {
   profile: {
+    id: string
     first_name?: string | null
     last_name?: string | null
     other_names?: string | null
@@ -21,60 +21,20 @@ interface ProfileHeroProps {
     is_department_lead?: boolean | null
     employment_date?: string | null
   }
-}
-
-const roleColors: Record<string, { bg: string; border: string; dot: string; text: string }> = {
-  super_admin: {
-    bg: "bg-red-500/10",
-    border: "border-red-500/20",
-    dot: "bg-red-500",
-    text: "text-red-600 dark:text-red-400",
-  },
-  admin: {
-    bg: "bg-purple-500/10",
-    border: "border-purple-500/20",
-    dot: "bg-purple-500",
-    text: "text-purple-600 dark:text-purple-400",
-  },
-  lead: {
-    bg: "bg-blue-500/10",
-    border: "border-blue-500/20",
-    dot: "bg-blue-500",
-    text: "text-blue-600 dark:text-blue-400",
-  },
-  employee: {
-    bg: "bg-gray-500/10",
-    border: "border-gray-500/20",
-    dot: "bg-gray-500",
-    text: "text-gray-600 dark:text-gray-400",
-  },
-  visitor: {
-    bg: "bg-slate-500/10",
-    border: "border-slate-500/20",
-    dot: "bg-slate-500",
-    text: "text-slate-600 dark:text-slate-400",
-  },
+  onEdit: () => void
 }
 
 function getInitials(firstName?: string | null, lastName?: string | null): string {
   return `${firstName?.[0] || ""}${lastName?.[0] || ""}`.toUpperCase()
 }
 
-export function ProfileHero({ profile }: ProfileHeroProps) {
-  const router = useRouter()
-
+export function ProfileHero({ profile, onEdit }: ProfileHeroProps) {
   const employmentDate = profile.employment_date ? new Date(profile.employment_date) : null
   const daysAtAcob = employmentDate ? Math.floor((Date.now() - employmentDate.getTime()) / (1000 * 60 * 60 * 24)) : null
 
-  const colors = roleColors[profile.role] || roleColors.employee
-
   return (
     <Card className="relative overflow-hidden">
-      <Button
-        onClick={() => router.push("/profile/edit")}
-        variant="outline"
-        className="bg-background/80 absolute top-4 right-4 z-10 gap-2 backdrop-blur-sm"
-      >
+      <Button onClick={onEdit} variant="outline" className="bg-background/80 absolute top-4 right-4 z-10 gap-2 backdrop-blur-sm">
         <Edit className="h-4 w-4" />
         Edit Profile
       </Button>
@@ -108,12 +68,9 @@ export function ProfileHero({ profile }: ProfileHeroProps) {
         </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-3">
-          <div className={`flex items-center gap-2 rounded-full px-3 py-1.5 ${colors.bg} border ${colors.border}`}>
-            <div className={`h-2 w-2 rounded-full ${colors.dot} animate-pulse`} />
-            <span className={`text-sm font-semibold ${colors.text}`}>
-              {getRoleDisplayName(profile.role as UserRole)}
-            </span>
-          </div>
+          <Badge variant="outline" className={getRoleBadgeColor(profile.role as UserRole)}>
+            {getRoleDisplayName(profile.role as UserRole)}
+          </Badge>
 
           {profile.is_department_lead && (
             <div className="flex items-center gap-2 rounded-full border border-amber-500/20 bg-amber-500/10 px-3 py-1.5">

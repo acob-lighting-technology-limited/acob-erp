@@ -13,6 +13,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import { ItemInfoButton } from "@/components/ui/item-info-button"
 import { Plus } from "lucide-react"
 
 export interface CreateTicketForm {
@@ -54,7 +55,30 @@ export function CreateTicketDialog({
       </DialogTrigger>
       <DialogContent className="max-h-[90vh] w-[95vw] max-w-2xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Submit Help Desk Ticket</DialogTitle>
+          <div className="flex items-center gap-2">
+            <DialogTitle>Submit Help Desk Ticket</DialogTitle>
+            <ItemInfoButton
+              title="Help desk workflow guide"
+              summary="Help desk tickets are requests sent to another department for support, review, assignment, and resolution."
+              details={[
+                {
+                  label: "What you are creating",
+                  value:
+                    "This ticket tells another department what support, fix, purchase, or action you need from them.",
+                },
+                {
+                  label: "What happens after submission",
+                  value:
+                    "The receiving department reviews it, approves or assigns it, works on it, and updates the ticket until it is resolved or closed.",
+                },
+                {
+                  label: "How to avoid delays",
+                  value:
+                    "Write the issue clearly, pick the correct department, and include enough detail so the next handler can act without chasing basic context.",
+                },
+              ]}
+            />
+          </div>
           <DialogDescription>Fill in the details and submit your ticket.</DialogDescription>
         </DialogHeader>
         <form onSubmit={onSubmit} className="grid gap-4 md:grid-cols-2">

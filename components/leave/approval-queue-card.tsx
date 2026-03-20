@@ -4,6 +4,7 @@ import { forwardRef } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { ItemInfoButton } from "@/components/ui/item-info-button"
 import type { LeaveRequest } from "@/app/(app)/leave/page"
 
 const STAGE_LABELS: Record<string, string> = {
@@ -25,6 +26,35 @@ interface ApprovalQueueCardProps {
   onAction: (requestId: string, action: "approve" | "reject") => void
 }
 
+function buildLeaveInfo(item: LeaveRequest) {
+  const stageLabel =
+    STAGE_LABELS[item.current_stage_code || item.approval_stage] ||
+    item.current_stage_code ||
+    item.approval_stage ||
+    "In review"
+
+  return {
+    title: `${item.leave_type?.name || "Leave"} request guide`,
+    summary: "This explains why the leave request is in your queue and what decision is needed from you.",
+    details: [
+      {
+        label: "Why you are seeing this",
+        value: `This request is currently at ${stageLabel.toLowerCase()} and needs approval workflow attention.`,
+      },
+      {
+        label: "What to review",
+        value:
+          "Check the leave dates, reason, reliever, and any handover note so you can tell whether the request is workable for the business.",
+      },
+      {
+        label: "What to do next",
+        value:
+          "Approve if the request is acceptable and well covered, or reject it with a clear reason so the requester knows what must change.",
+      },
+    ],
+  }
+}
+
 export const ApprovalQueueCard = forwardRef<HTMLDivElement, ApprovalQueueCardProps>(
   ({ approverQueue, onAction }, ref) => {
     if (approverQueue.length === 0) return null
@@ -39,7 +69,10 @@ export const ApprovalQueueCard = forwardRef<HTMLDivElement, ApprovalQueueCardPro
           {approverQueue.map((item) => (
             <div key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-md border p-3">
               <div className="space-y-1">
-                <p className="font-medium">{item.leave_type?.name || "Leave Request"}</p>
+                <div className="flex items-center gap-1">
+                  <p className="font-medium">{item.leave_type?.name || "Leave Request"}</p>
+                  <ItemInfoButton {...buildLeaveInfo(item)} />
+                </div>
                 <p className="text-muted-foreground text-sm">
                   {item.start_date} to {item.end_date} ({item.days_count} days)
                 </p>

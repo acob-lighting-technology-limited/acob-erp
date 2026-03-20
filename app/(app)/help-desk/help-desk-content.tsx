@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useRef, useState } from "react"
+import { useMemo, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { toast } from "sonner"
@@ -53,7 +53,7 @@ export function HelpDeskContent({
   const [viewTicketSaving, setViewTicketSaving] = useState(false)
   const [viewTicketData, setViewTicketData] = useState<HelpDeskTicketDetailResponse | null>(null)
   const [viewTicketStatus, setViewTicketStatus] = useState<string>("")
-  const pendingRef = useRef<HTMLDivElement | null>(null)
+  const [pendingApprovalsOpen, setPendingApprovalsOpen] = useState(false)
   const [form, setForm] = useState<CreateTicketForm>({
     title: "",
     description: "",
@@ -267,10 +267,7 @@ export function HelpDeskContent({
         actions={
           <>
             {pendingReviewCount > 0 && (
-              <Button
-                variant="outline"
-                onClick={() => pendingRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
-              >
+              <Button variant="outline" onClick={() => setPendingApprovalsOpen(true)}>
                 Pending Reviews ({pendingReviewCount})
               </Button>
             )}
@@ -294,7 +291,13 @@ export function HelpDeskContent({
         avgCsat={avgCsat}
       />
 
-      {pendingReviewCount > 0 && <PendingApprovalsCard ref={pendingRef} tickets={pendingApprovals} />}
+      {pendingReviewCount > 0 && (
+        <PendingApprovalsCard
+          open={pendingApprovalsOpen}
+          onOpenChange={setPendingApprovalsOpen}
+          tickets={pendingApprovals}
+        />
+      )}
 
       <Card>
         <CardHeader>

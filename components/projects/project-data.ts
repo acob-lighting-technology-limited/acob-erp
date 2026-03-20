@@ -50,6 +50,22 @@ export interface ProjectPageData {
   employees: Employee[]
   members: ProjectMember[]
   items: ProjectItem[]
+  tasks: Array<{
+    id: string
+    title: string
+    work_item_number?: string | null
+    description?: string
+    priority: string
+    status: string
+    progress?: number | null
+    due_date?: string
+    task_start_date?: string
+    task_end_date?: string
+    assigned_to_user?: {
+      first_name: string
+      last_name: string
+    } | null
+  }>
 }
 
 export async function fetchAdminProjectDetail(projectId: string): Promise<ProjectPageData> {
@@ -59,6 +75,7 @@ export async function fetchAdminProjectDetail(projectId: string): Promise<Projec
     { data: employeesData, error: employeesError },
     { data: membersData, error: membersError },
     { data: itemsData, error: itemsError },
+    { data: tasksData, error: tasksError },
   ] = await Promise.all([
     supabase
       .from("projects")
@@ -78,16 +95,27 @@ export async function fetchAdminProjectDetail(projectId: string): Promise<Projec
       .eq("is_active", true)
       .order("assigned_at", { ascending: false }),
     supabase.from("project_items").select("*").eq("project_id", projectId).order("created_at", { ascending: false }),
+    supabase
+      .from("tasks")
+      .select(
+        `id, title, work_item_number, description, priority, status, progress, due_date, task_start_date, task_end_date,
+        assigned_to_user:profiles!tasks_assigned_to_fkey (first_name, last_name)`
+      )
+      .eq("project_id", projectId)
+      .order("created_at", { ascending: false }),
   ])
   if (projectError) throw new Error(projectError.message)
   if (employeesError) throw new Error(employeesError.message)
   if (membersError) throw new Error(membersError.message)
   if (itemsError) throw new Error(itemsError.message)
+  if (tasksError) throw new Error(tasksError.message)
   return {
     project: projectData,
     employees: employeesData || [],
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     members: (membersData as any) || [],
     items: itemsData || [],
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    tasks: (tasksData as any) || [],
   }
 }

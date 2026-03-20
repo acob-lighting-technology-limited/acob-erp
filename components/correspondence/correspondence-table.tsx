@@ -3,32 +3,48 @@
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { ItemInfoButton } from "@/components/ui/item-info-button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import type { CorrespondenceRecord } from "@/types/correspondence"
 
 interface CorrespondenceTableProps {
   records: CorrespondenceRecord[]
-  incomingOptions: CorrespondenceRecord[]
-  linkReference: Record<string, string>
-  onLinkReferenceChange: (recordId: string, value: string) => void
   dispatchingId: string | null
-  linkingId: string | null
   onUpdateStatus: (recordId: string, status: string) => void
   onDispatch: (recordId: string) => void
-  onLinkResponse: (recordId: string) => void
+}
+
+function buildReferenceInfo(record: CorrespondenceRecord) {
+  return {
+    title: `${record.reference_number} reference guide`,
+    summary: "This explains what this reference is for and what action is expected from the current handler.",
+    details: [
+      {
+        label: "What this item is",
+        value: `${record.reference_number} is a ${record.direction.toLowerCase()} correspondence item for ${record.department_name || record.assigned_department_name || "the selected department"}.`,
+      },
+      {
+        label: "Current workflow meaning",
+        value: `Status is ${record.status.replaceAll("_", " ")} and the subject is "${record.subject}".`,
+      },
+      {
+        label: "What to do next",
+        value:
+          record.status === "draft"
+            ? "Review the draft details, then send it for review when the reference is ready to leave draft state."
+            : record.status === "approved"
+              ? "This reference is approved and can be dispatched when the final outgoing action is ready."
+              : "Check the latest review state and any approver note so the next department action is clear.",
+      },
+    ],
+  }
 }
 
 export function CorrespondenceTable({
   records,
-  incomingOptions,
-  linkReference,
-  onLinkReferenceChange,
   dispatchingId,
-  linkingId,
   onUpdateStatus,
   onDispatch,
-  onLinkResponse,
 }: CorrespondenceTableProps) {
   return (
     <Card>
@@ -39,6 +55,7 @@ export function CorrespondenceTable({
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-14">S/N</TableHead>
               <TableHead>Reference</TableHead>
               <TableHead>Direction</TableHead>
               <TableHead>Department</TableHead>
@@ -48,9 +65,15 @@ export function CorrespondenceTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {records.map((record) => (
+            {records.map((record, index) => (
               <TableRow key={record.id}>
-                <TableCell className="font-medium">{record.reference_number}</TableCell>
+                <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
+                <TableCell className="font-medium">
+                  <div className="flex items-center gap-1">
+                    <span>{record.reference_number}</span>
+                    <ItemInfoButton {...buildReferenceInfo(record)} />
+                  </div>
+                </TableCell>
                 <TableCell>
                   <Badge variant="outline">{record.direction}</Badge>
                 </TableCell>
@@ -75,33 +98,6 @@ export function CorrespondenceTable({
                       >
                         {dispatchingId === record.id ? "Dispatching..." : "Dispatch"}
                       </Button>
-                    )}
-                    {record.direction === "outgoing" && (
-                      <>
-                        <Select
-                          value={linkReference[record.id] || ""}
-                          onValueChange={(value) => onLinkReferenceChange(record.id, value)}
-                        >
-                          <SelectTrigger className="w-[210px]">
-                            <SelectValue placeholder="Link incoming reference" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {incomingOptions.map((incoming) => (
-                              <SelectItem key={incoming.id} value={incoming.id}>
-                                {incoming.reference_number}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => onLinkResponse(record.id)}
-                          disabled={linkingId === record.id}
-                        >
-                          {linkingId === record.id ? "Linking..." : "Link"}
-                        </Button>
-                      </>
                     )}
                   </div>
                 </TableCell>

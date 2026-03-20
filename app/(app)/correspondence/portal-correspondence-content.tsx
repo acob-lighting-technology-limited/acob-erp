@@ -46,9 +46,7 @@ export function PortalCorrespondenceContent({
   const [isSaving, setIsSaving] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
   const [dispatchingId, setDispatchingId] = useState<string | null>(null)
-  const [linkingId, setLinkingId] = useState<string | null>(null)
   const pendingRef = useRef<HTMLDivElement | null>(null)
-  const [linkReference, setLinkReference] = useState<Record<string, string>>({})
   const [form, setForm] = useState({
     department_name: initialDepartment,
     letter_type: "external",
@@ -171,32 +169,6 @@ export function PortalCorrespondenceContent({
     }
   }
 
-  async function linkResponse(recordId: string) {
-    const incomingReferenceId = linkReference[recordId]
-    if (!incomingReferenceId) {
-      toast.error("Select an incoming reference first")
-      return
-    }
-    setLinkingId(recordId)
-    try {
-      const res = await fetch(`/api/correspondence/records/${recordId}/link-response`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ incoming_reference_id: incomingReferenceId }),
-      })
-      const body = await res.json()
-      if (!res.ok) throw new Error(body.error || "Failed to link response")
-      toast.success("Outgoing reference linked to incoming correspondence")
-      await refreshRecords()
-    } catch (error: unknown) {
-      toast.error(getErrorMessage(error, "Failed to link response"))
-    } finally {
-      setLinkingId(null)
-    }
-  }
-
-  const incomingOptions = records.filter((r) => r.direction === "incoming")
-
   return (
     <PageWrapper maxWidth="full" background="gradient">
       <PageHeader
@@ -250,14 +222,9 @@ export function PortalCorrespondenceContent({
 
       <CorrespondenceTable
         records={records}
-        incomingOptions={incomingOptions}
-        linkReference={linkReference}
-        onLinkReferenceChange={(id, value) => setLinkReference((prev) => ({ ...prev, [id]: value }))}
         dispatchingId={dispatchingId}
-        linkingId={linkingId}
         onUpdateStatus={updateStatus}
         onDispatch={dispatchRecord}
-        onLinkResponse={linkResponse}
       />
     </PageWrapper>
   )

@@ -69,6 +69,41 @@ async function toBase64FromBlob(blob: Blob): Promise<string> {
   return btoa(binary)
 }
 
+async function fetchActionPointsAttachment(params: {
+  actions: unknown[]
+  week: number
+  year: number
+  meetingDate?: string
+}): Promise<{ blob: Blob; filename: string }> {
+  const response = await fetch("/api/reports/action-points-export", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      format: "pdf",
+      actions: params.actions,
+      week: params.week,
+      year: params.year,
+      meetingDate: params.meetingDate,
+    }),
+  })
+
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "")
+    throw new Error(detail || "Failed to generate Action Points PDF")
+  }
+
+  const exportBlob = await response.blob()
+  return {
+    blob: exportBlob,
+    filename: readFilenameFromDisposition(
+      response.headers.get("Content-Disposition"),
+      `ACOB Action Points - Week ${params.week}.pdf`
+    ),
+  }
+}
+
 export function useWeeklySummarySend({
   resolvedRecipients,
   selectedContentChoices,
@@ -171,30 +206,15 @@ export function useWeeklySummarySend({
           throw new Error(meetingDateError.message || "Failed to resolve meeting date")
         }
 
-        const exportRes = await fetch("/api/reports/action-points-export", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            format: "pdf",
-            actions: actions || [],
-            week: weekNumber,
-            year: yearNumber,
-            meetingDate: meetingDate ? String(meetingDate) : undefined,
-          }),
+        const exportFile = await fetchActionPointsAttachment({
+          actions: actions || [],
+          week: weekNumber,
+          year: yearNumber,
+          meetingDate: meetingDate ? String(meetingDate) : undefined,
         })
 
-        if (!exportRes.ok) {
-          throw new Error("Failed to generate Action Points PDF")
-        }
-
-        const exportBlob = await exportRes.blob()
-        payload.actionTrackerBase64 = await toBase64FromBlob(exportBlob)
-        payload.actionTrackerFilename = readFilenameFromDisposition(
-          exportRes.headers.get("Content-Disposition"),
-          `ACOB Action Points - Week ${weekNumber}.pdf`
-        )
+        payload.actionTrackerBase64 = await toBase64FromBlob(exportFile.blob)
+        payload.actionTrackerFilename = exportFile.filename
       }
 
       const res = await fetch(`${supabaseUrl}/functions/v1/send-weekly-report`, {

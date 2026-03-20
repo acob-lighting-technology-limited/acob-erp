@@ -3,6 +3,7 @@
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { ItemInfoButton } from "@/components/ui/item-info-button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
   ClipboardList,
@@ -15,6 +16,7 @@ import {
   CheckCircle2,
   Clock,
   Eye,
+  HeadphonesIcon,
 } from "lucide-react"
 import { formatName } from "@/lib/utils"
 import type { Task } from "@/app/(app)/tasks/management/tasks-content"
@@ -64,12 +66,74 @@ function getStatusIcon(status: string) {
   }
 }
 
-function formatDate(dateString: string) {
-  return new Date(dateString).toLocaleDateString("en-US", {
+function formatDueDate(dateString: string) {
+  return new Date(dateString).toLocaleString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
   })
+}
+
+function getDueDateClassName(task: Task) {
+  if (!task.due_date) return "text-muted-foreground"
+
+  const status = String(task.status || "").toLowerCase()
+  if (["completed", "cancelled", "closed", "archived"].includes(status)) {
+    return "font-medium text-green-600 dark:text-green-400"
+  }
+
+  const dueDate = new Date(task.due_date)
+  if (Number.isNaN(dueDate.getTime())) {
+    return "text-muted-foreground"
+  }
+
+  if (dueDate.getTime() < Date.now()) {
+    return "font-semibold text-red-600 dark:text-red-400"
+  }
+
+  return "font-semibold text-yellow-600 dark:text-yellow-400"
+}
+
+function buildTaskInfo(task: Task) {
+  const sourceLabel =
+    task.source_type === "help_desk"
+      ? "help desk request"
+      : task.source_type === "action_item"
+        ? "meeting action point"
+        : task.source_type === "project_task"
+          ? "project task"
+          : "task"
+
+  const assignmentLabel =
+    task.assignment_type === "department"
+      ? "Dept"
+      : task.assignment_type === "multiple"
+        ? "Group"
+        : "Individual"
+
+  return {
+    title: task.work_item_number ? `${task.work_item_number} task guide` : "Task guide",
+    summary: "This explains what the task means and what should happen next.",
+    details: [
+      {
+        label: "What this item is",
+        value: `${task.title} is tracked as a ${sourceLabel}.`,
+      },
+      {
+        label: "Assignment type",
+        value: `This is a ${assignmentLabel.toLowerCase()} task and is currently in ${task.status.replace("_", " ")} status.`,
+      },
+      {
+        label: "What to do next",
+        value:
+          task.status === "completed"
+            ? "This task is already complete. Reopen it only if more work is needed."
+            : "Open the task, review the description, carry out the work, and update the status with a clear note when progress changes.",
+      },
+    ],
+  }
 }
 
 interface UserTaskTableProps {
@@ -103,7 +167,7 @@ export function UserTaskTable({ filteredTasks, filterStatus, onViewTask }: UserT
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-12">#</TableHead>
+              <TableHead className="w-16">S/N</TableHead>
               <TableHead>Task</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Priority</TableHead>
@@ -122,7 +186,19 @@ export function UserTaskTable({ filteredTasks, filterStatus, onViewTask }: UserT
                     <div className="bg-primary/10 rounded-lg p-2">
                       <ClipboardList className="text-primary h-4 w-4" />
                     </div>
-                    <span className="text-foreground font-medium">{task.title}</span>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-foreground font-medium">{task.title}</span>
+                        <ItemInfoButton {...buildTaskInfo(task)} />
+                        {task.source_type === "help_desk" && (
+                          <Badge variant="outline" className="gap-1 text-[10px]">
+                            <HeadphonesIcon className="h-2.5 w-2.5" />
+                            Help Desk
+                          </Badge>
+                        )}
+                      </div>
+                      {task.work_item_number && <div className="text-muted-foreground text-xs">{task.work_item_number}</div>}
+                    </div>
                   </div>
                 </TableCell>
                 <TableCell>
@@ -146,7 +222,7 @@ export function UserTaskTable({ filteredTasks, filterStatus, onViewTask }: UserT
                   {task.assignment_type === "department" && (
                     <Badge variant="outline" className="flex w-fit items-center gap-1">
                       <Building2 className="h-3 w-3" />
-                      {task.department}
+                      Dept
                     </Badge>
                   )}
                   {task.assignment_type === "individual" && (
@@ -158,9 +234,9 @@ export function UserTaskTable({ filteredTasks, filterStatus, onViewTask }: UserT
                 </TableCell>
                 <TableCell>
                   {task.due_date ? (
-                    <div className="flex items-center gap-1 text-sm">
+                    <div className={`flex items-center gap-1 text-sm ${getDueDateClassName(task)}`}>
                       <Calendar className="text-muted-foreground h-3 w-3" />
-                      <span>{formatDate(task.due_date)}</span>
+                      <span>{formatDueDate(task.due_date)}</span>
                     </div>
                   ) : (
                     <span className="text-muted-foreground text-sm">-</span>

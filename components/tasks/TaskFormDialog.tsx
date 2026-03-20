@@ -18,6 +18,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Card, CardContent } from "@/components/ui/card"
 import { EmptyState } from "@/components/ui/patterns"
+import { ItemInfoButton } from "@/components/ui/item-info-button"
 import { User, Users, Building2 } from "lucide-react"
 import type { Task, employee, Project } from "@/app/admin/tasks/management/admin-tasks-content"
 
@@ -65,7 +66,30 @@ export function TaskFormDialog({
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>{selectedTask ? "Edit Task" : "Create New Task"}</DialogTitle>
+          <div className="flex items-center gap-2">
+            <DialogTitle>{selectedTask ? "Edit Task" : "Create New Task"}</DialogTitle>
+            <ItemInfoButton
+              title="Task workflow guide"
+              summary="Tasks are work items that can be assigned to one person, multiple people, or a department."
+              details={[
+                {
+                  label: "What happens after creation",
+                  value:
+                    "The selected assignee, team, or department will see the task in their workflow and should update status as the work moves forward.",
+                },
+                {
+                  label: "When to link a project",
+                  value:
+                    "Choose a project when the task belongs to a specific project so it stays visible both in project context and in the assignee's task list.",
+                },
+                {
+                  label: "How to make the task clear",
+                  value:
+                    "Write the expected outcome, add timing if it matters, and assign it to the person or team that should actually complete it.",
+                },
+              ]}
+            />
+          </div>
           <DialogDescription>
             {selectedTask ? "Update the task information below" : "Enter the details for the new task"}
           </DialogDescription>

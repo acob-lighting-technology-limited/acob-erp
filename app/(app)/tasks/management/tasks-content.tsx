@@ -18,12 +18,15 @@ export interface Task {
   id: string
   title: string
   description?: string
+  work_item_number?: string
   priority: string
   status: string
   due_date?: string
   started_at?: string
   completed_at?: string
   created_at: string
+  source_type?: "manual" | "help_desk" | "action_item" | "project_task"
+  source_id?: string
   assignment_type?: "individual" | "multiple" | "department"
   assigned_by?: string
   assigned_by_user?: {
@@ -69,6 +72,22 @@ interface TasksContentProps {
   userProfile: TaskUserProfile | null
 }
 
+const FINAL_TASK_STATUSES = new Set(["completed", "cancelled", "archived", "closed"])
+
+function isFinalTaskStatus(status: string | undefined) {
+  return FINAL_TASK_STATUSES.has(String(status || "").toLowerCase())
+}
+
+function mapTaskStatusToHelpDeskStatus(task: Task, status: string): string {
+  if (status === "completed") return "resolved"
+  if (status === "in_progress") return "in_progress"
+  if (status === "cancelled") return "cancelled"
+  if (status === "pending") {
+    return task.assignment_type === "department" ? "department_assigned" : "assigned"
+  }
+  return status
+}
+
 export function TasksContent({ initialTasks, userId, userProfile }: TasksContentProps) {
   const [tasks, setTasks] = useState<Task[]>(initialTasks)
   const [filteredTasks, setFilteredTasks] = useState<Task[]>(initialTasks)
@@ -77,27 +96,45 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
   const [isDetailsOpen, setIsDetailsOpen] = useState(false)
   const [newComment, setNewComment] = useState("")
   const [isSaving, setIsSaving] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
   const [filterStatus, setFilterStatus] = useState("all")
+  const [assignmentFilter, setAssignmentFilter] = useState("all")
+  const [taskView, setTaskView] = useState<"ongoing" | "history">("ongoing")
   const [newStatus, setNewStatus] = useState("")
   const supabase = createClient()
 
   useEffect(() => {
-    if (filterStatus === "all") {
-      setFilteredTasks(tasks)
-    } else {
-      setFilteredTasks(tasks.filter((t) => t.status === filterStatus))
-    }
-  }, [filterStatus, tasks])
+    const scopedTasks = tasks.filter((task) =>
+      taskView === "history" ? isFinalTaskStatus(task.status) : !isFinalTaskStatus(task.status)
+    )
+    const normalizedSearch = searchQuery.trim().toLowerCase()
+
+    const nextFiltered = scopedTasks.filter((task) => {
+      const matchesStatus = filterStatus === "all" || task.status === filterStatus
+      const matchesAssignment = assignmentFilter === "all" || task.assignment_type === assignmentFilter
+      const matchesSearch =
+        normalizedSearch.length === 0 ||
+        task.title.toLowerCase().includes(normalizedSearch) ||
+        task.description?.toLowerCase().includes(normalizedSearch) ||
+        task.work_item_number?.toLowerCase().includes(normalizedSearch)
+
+      return matchesStatus && matchesAssignment && matchesSearch
+    })
+
+    setFilteredTasks(nextFiltered)
+  }, [assignmentFilter, filterStatus, searchQuery, taskView, tasks])
 
   const loadTasks = async () => {
     try {
       const loaded = await loadUserTasks(supabase, userId, userProfile)
       setTasks(loaded)
       setFilteredTasks(loaded)
+      return loaded
     } catch (error: unknown) {
       log.error("Error loading tasks:", error)
       const errorMessage = error instanceof Error ? error.message : String(error) || "Failed to load tasks"
       toast.error(`Failed to load tasks: ${errorMessage}`)
+      return null
     }
   }
 
@@ -225,6 +262,7 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
 
     setIsSaving(true)
     try {
+      const statusNote = newComment.trim()
       const updates: Partial<Task> = { status }
       if (status === "in_progress" && !selectedTask.started_at) {
         updates.started_at = new Date().toISOString()
@@ -232,24 +270,49 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
         updates.completed_at = new Date().toISOString()
       }
 
-      const { error } = await supabase.from("tasks").update(updates).eq("id", selectedTask.id)
+      if (selectedTask.source_type === "help_desk" && selectedTask.source_id) {
+        const response = await fetch(`/api/help-desk/tickets/${selectedTask.source_id}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            status: mapTaskStatusToHelpDeskStatus(selectedTask, status),
+            status_note: statusNote || null,
+          }),
+        })
 
-      if (error) throw error
+        if (!response.ok) {
+          const payload = (await response.json().catch(() => null)) as { error?: string } | null
+          throw new Error(payload?.error || "Failed to update linked help desk task")
+        }
+      } else {
+        const { error } = await supabase.from("tasks").update(updates).eq("id", selectedTask.id)
+
+        if (error) throw error
+      }
 
       await supabase.from("task_updates").insert({
         task_id: selectedTask.id,
         user_id: userId,
         update_type: "status_change",
-        content: `Status changed from ${selectedTask.status} to ${status}`,
+        content: statusNote
+          ? `Status changed from ${selectedTask.status} to ${status}. Note: ${statusNote}`
+          : `Status changed from ${selectedTask.status} to ${status}`,
         old_value: selectedTask.status,
         new_value: status,
       })
 
       toast.success("Status updated")
-      await loadTasks()
-      setSelectedTask({ ...selectedTask, status, ...updates })
+      setTasks((currentTasks) =>
+        currentTasks.map((task) => (task.id === selectedTask.id ? { ...task, ...updates, status } : task))
+      )
+      const reloadedTasks = await loadTasks()
+      const refreshedTask = reloadedTasks?.find((task) => task.id === selectedTask.id) || null
+      setSelectedTask(refreshedTask || { ...selectedTask, status, ...updates })
       await loadTaskUpdates(selectedTask.id)
       setNewStatus(status)
+      setNewComment("")
     } catch (error) {
       log.error("Error updating status:", error)
       toast.error("Failed to update status")
@@ -268,7 +331,16 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
   return (
     <div className="from-background via-background to-muted/20 min-h-screen bg-gradient-to-br p-4 md:p-8">
       <div className="mx-auto max-w-6xl space-y-6">
-        <UserTasksHeader filterStatus={filterStatus} setFilterStatus={setFilterStatus} />
+        <UserTasksHeader
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          filterStatus={filterStatus}
+          setFilterStatus={setFilterStatus}
+          assignmentFilter={assignmentFilter}
+          setAssignmentFilter={setAssignmentFilter}
+          taskView={taskView}
+          setTaskView={setTaskView}
+        />
 
         <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-4 lg:grid-cols-4">
           <StatCard
