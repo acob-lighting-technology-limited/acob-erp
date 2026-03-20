@@ -3,13 +3,8 @@
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { FileSpreadsheet, FileText, File as FileIcon, Presentation, ExternalLink } from "lucide-react"
-import {
-  exportActionTrackerToPDF,
-  exportActionTrackerToPPTX,
-  exportActionTrackerToDocx,
-  exportActionTrackerToXLSX,
-  type ActionItem,
-} from "@/lib/export-utils"
+import { exportActionPointsDocx, exportActionPointsPdf } from "@/lib/action-points-export"
+import { exportActionTrackerToPPTX, exportActionTrackerToXLSX, type ActionItem } from "@/lib/export-utils"
 
 interface ActionTrackerExportButtonsProps {
   items: ActionItem[]
@@ -28,7 +23,7 @@ export function ActionTrackerExportButtons({
     <div className="flex items-center gap-2">
       <Button
         variant="outline"
-        onClick={() => exportActionTrackerToPDF(items, weekFilter, yearFilter, meetingDate)}
+        onClick={() => exportActionPointsPdf(items, weekFilter, yearFilter, meetingDate)}
         className="gap-2 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-900/30 dark:hover:bg-red-950/20"
       >
         <FileText className="h-4 w-4" /> <span className="hidden sm:inline">PDF</span>
@@ -42,7 +37,7 @@ export function ActionTrackerExportButtons({
       </Button>
       <Button
         variant="outline"
-        onClick={() => exportActionTrackerToDocx(items, weekFilter, yearFilter, meetingDate)}
+        onClick={() => exportActionPointsDocx(items, weekFilter, yearFilter, meetingDate)}
         className="gap-2 border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700 dark:border-blue-900/30 dark:hover:bg-blue-950/20"
       >
         <FileIcon className="h-4 w-4" /> <span className="hidden sm:inline">Word</span>

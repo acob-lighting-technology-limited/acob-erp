@@ -9,7 +9,7 @@ const securityHeaders = [
   // Prevent browsers from sniffing a different MIME type than declared
   { key: "X-Content-Type-Options", value: "nosniff" },
 
-  // Block page from being framed by other origins (clickjacking protection)
+  // Prevent clickjacking while still allowing same-origin presentation routes to embed ERP pages
   { key: "X-Frame-Options", value: "SAMEORIGIN" },
 
   // Enforce HTTPS for 1 year, including subdomains
@@ -53,8 +53,10 @@ const securityHeaders = [
       "font-src 'self'",
       // API calls: self + Supabase
       `connect-src 'self' ${supabaseHost} wss://itqegqxeqkeogwrvlzlj.supabase.co https://vitals.vercel-insights.com`,
-      // No frames from external origins
-      "frame-src 'none'",
+      // Allow embedding only from the same origin, including same-origin presentation routes
+      "frame-ancestors 'self'",
+      // Allow same-origin frame content such as ERP KSS presentation routes
+      "frame-src 'self'",
       // No plugins
       "object-src 'none'",
       // Base URI restricted to self

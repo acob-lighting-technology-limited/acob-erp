@@ -9,7 +9,7 @@ export default function CommunicationsMeetingsPage() {
   const cards = [
     {
       title: "Meeting Mailings",
-      description: "Send meeting packs (weekly reports + action tracker) one-time or recurring.",
+      description: "Send meeting packs with weekly reports and Action Points one-time or recurring.",
       href: "/admin/communications/meetings/mail",
       icon: Mail,
       color: "text-indigo-600 dark:text-indigo-400",

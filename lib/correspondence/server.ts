@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { resolveAdminScope } from "@/lib/admin/rbac"
+import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { CorrespondenceRecord, CorrespondenceStatus } from "@/types/correspondence"
 import { writeAuditLog } from "@/lib/audit/write-audit"
@@ -33,13 +34,14 @@ export function isAdminRole(role?: string | null): boolean {
 
 export async function getAuthContext() {
   const supabase = await createClient()
+  const dataClient = getServiceRoleClientOrFallback(supabase)
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
   if (!user) return { supabase, user: null, profile: null }
 
-  const [{ data: profile }, scope] = await Promise.all([
+  const [{ data: scopedProfile }, scope] = await Promise.all([
     supabase
       .from("profiles")
       .select("id, role, department, lead_departments, is_department_lead, first_name, last_name, full_name")
@@ -47,6 +49,15 @@ export async function getAuthContext() {
       .single(),
     resolveAdminScope(supabase as unknown as SupabaseClient, user.id),
   ])
+  const { data: fallbackProfile } = scopedProfile
+    ? { data: null }
+    : await dataClient
+        .from("profiles")
+        .select("id, role, department, lead_departments, is_department_lead, first_name, last_name, full_name")
+        .eq("id", user.id)
+        .single()
+
+  const profile = scopedProfile ?? fallbackProfile ?? null
 
   const managedDepartments = scope?.managedDepartments ?? []
 
@@ -76,7 +87,11 @@ export function canAccessDepartment(profile: ProfileLike | null | undefined, dep
   return managedDepartments.includes(department) || profile?.department === department
 }
 
-export function canAccessRecord(profile: ProfileLike | null | undefined, userId: string, record: Partial<CorrespondenceRecord>): boolean {
+export function canAccessRecord(
+  profile: ProfileLike | null | undefined,
+  userId: string,
+  record: Partial<CorrespondenceRecord>
+): boolean {
   if (isAdminRole(profile?.role)) return true
   if (record.originator_id === userId) return true
   if (record.responsible_officer_id === userId) return true
@@ -140,7 +155,8 @@ export async function appendCorrespondenceAuditLog(params: {
 
 export async function getDepartmentCodeByName(departmentName: string): Promise<string | null> {
   const supabase = await createClient()
-  const { data, error } = await supabase
+  const dataClient = getServiceRoleClientOrFallback(supabase)
+  const { data, error } = await dataClient
     .from("correspondence_department_codes")
     .select("department_code")
     .eq("department_name", departmentName)

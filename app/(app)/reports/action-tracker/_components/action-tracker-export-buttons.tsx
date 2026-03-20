@@ -2,13 +2,8 @@
 
 import { Button } from "@/components/ui/button"
 import { FileSpreadsheet, FileText, File as FileIcon, Presentation } from "lucide-react"
-import {
-  exportActionTrackerToPDF,
-  exportActionTrackerToPPTX,
-  exportActionTrackerToDocx,
-  exportActionTrackerToXLSX,
-  type ActionItem,
-} from "@/lib/export-utils"
+import { exportActionPointsDocx, exportActionPointsPdf } from "@/lib/action-points-export"
+import { exportActionTrackerToPPTX, exportActionTrackerToXLSX, type ActionItem } from "@/lib/export-utils"
 
 interface ActionTrackerExportButtonsProps {
   actionItems: ActionItem[]
@@ -23,7 +18,7 @@ export function ActionTrackerExportButtons({ actionItems, week, year, meetingDat
       <Button
         variant="outline"
         size="sm"
-        onClick={() => exportActionTrackerToPDF(actionItems, week, year, meetingDate)}
+        onClick={() => exportActionPointsPdf(actionItems, week, year, meetingDate)}
         className="gap-2 border-red-200 text-red-600"
       >
         <FileText className="h-4 w-4" /> PDF
@@ -39,7 +34,7 @@ export function ActionTrackerExportButtons({ actionItems, week, year, meetingDat
       <Button
         variant="outline"
         size="sm"
-        onClick={() => exportActionTrackerToDocx(actionItems, week, year, meetingDate)}
+        onClick={() => exportActionPointsDocx(actionItems, week, year, meetingDate)}
         className="gap-2 border-blue-200 text-blue-600"
       >
         <FileIcon className="h-4 w-4" /> Word

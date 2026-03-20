@@ -85,6 +85,13 @@ const formatMeetingDateForFilename = (week: number, year: number, meetingDate?: 
     year: "numeric",
   }).format(resolveExportMeetingDate(week, year, meetingDate))
 
+const formatActionPointsDate = (week: number, year: number, meetingDate?: string) =>
+  new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(resolveExportMeetingDate(week, year, meetingDate))
+
 const buildWeeklyReportFilename = ({
   week,
   year: _year,
@@ -753,6 +760,34 @@ const formatStatusLabel = (status: string) =>
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ")
 
+const getActionPointsDepartmentHeading = (department: string) => {
+  const normalized = department.trim().toLowerCase()
+  if (normalized === "accounts") return "ACCOUNTS DEPARTMENT:"
+  if (normalized === "admin & hr") return "ADMIN/HR:"
+  if (normalized === "business, growth and innovation") return "BUSINESS GROWTH AND INNOVATION:"
+  if (normalized === "it and communications") return "IT & COMMUNICATIONS DEPARTMENT:"
+  if (normalized === "operations") return "OPERATIONS DEPARTMENT:"
+  if (normalized === "project") return "PROJECT DEPARTMENT:"
+  if (normalized === "technical") return "TECHNICAL DEPARTMENT:"
+  if (normalized === "legal, regulatory and compliance") return "REGULATORY & COMPLIANCE DEPARTMENT:"
+  return `${department.toUpperCase()}:`
+}
+
+const groupActionItemsByDepartment = (actions: ActionItem[]) => {
+  const grouped: Record<string, ActionItem[]> = {}
+  actions.forEach((action) => {
+    if (!grouped[action.department]) grouped[action.department] = []
+    grouped[action.department].push(action)
+  })
+
+  const departments = DEPARTMENT_ORDER.filter((dept) => grouped[dept])
+  Object.keys(grouped).forEach((dept) => {
+    if (!departments.includes(dept)) departments.push(dept)
+  })
+
+  return { grouped, departments }
+}
+
 /** Draws a single Action Tracker content page for a department. */
 const pdfActionTrackerPage = (
   doc: jsPDF,
@@ -908,7 +943,8 @@ const pdfActionTrackerPage = (
 export const exportActionTrackerToPDFBase64 = async (
   actions: ActionItem[],
   week: number,
-  year: number
+  year: number,
+  _meetingDate?: string
 ): Promise<string> => {
   const doc = new jsPDF()
   // Action Tracker week IS the current week (no +1 needed)
@@ -957,9 +993,88 @@ export const exportActionTrackerToPDF = async (
   meetingDate?: string,
   department?: string
 ): Promise<void> => {
-  const base64 = await exportActionTrackerToPDFBase64(actions, week, year)
-  const blob = new Blob([Uint8Array.from(atob(base64), (c) => c.charCodeAt(0))], { type: "application/pdf" })
-  saveAs(blob, buildActionTrackerFilename({ week, year, meetingDate, extension: "pdf", department }))
+  const doc = new jsPDF()
+  const pageWidth = 210
+  const left = 18
+  const contentWidth = 170
+  const topMargin = 20
+  const nextPageTop = 18
+  const bottomLimit = 274
+  const meetingDateLabel = formatActionPointsDate(week, year, meetingDate)
+  const { grouped, departments } = groupActionItemsByDepartment(actions)
+
+  let pageNumber = 1
+  let y = topMargin
+
+  const renderFooter = () => {
+    doc.setFillColor(...PDF_GREEN)
+    doc.rect(0, 283, pageWidth, 14, "F")
+    doc.setFontSize(8)
+    doc.setTextColor(...PDF_WHITE)
+    doc.setFont("helvetica", "normal")
+    doc.text("Confidential - ACOB Internal Use Only", 14, 292)
+    doc.setFont("helvetica", "bold")
+    doc.text(String(pageNumber), pageWidth / 2, 292, { align: "center" })
+  }
+
+  const startPage = (isFirstPage: boolean) => {
+    if (!isFirstPage) {
+      renderFooter()
+      doc.addPage()
+      pageNumber += 1
+    }
+
+    doc.setTextColor(...PDF_DARK)
+    if (isFirstPage) {
+      doc.setFont("helvetica", "bold")
+      doc.setFontSize(18)
+      doc.text("ACTION POINTS", pageWidth / 2, 16, { align: "center" })
+      doc.setFont("helvetica", "normal")
+      doc.setFontSize(11)
+      doc.setTextColor(...PDF_MUTED)
+      doc.text(`Date: ${meetingDateLabel}`, left, 26)
+      y = 34
+      return
+    }
+
+    y = nextPageTop
+  }
+
+  startPage(true)
+
+  departments.forEach((dept, deptIndex) => {
+    const deptHeading = `${deptIndex + 1}. ${getActionPointsDepartmentHeading(dept)}`
+    const deptActions = grouped[dept] || []
+
+    if (y > bottomLimit - 12) startPage(false)
+
+    doc.setFont("helvetica", "bold")
+    doc.setFontSize(12)
+    doc.setTextColor(...PDF_DARK)
+    doc.text(deptHeading, left, y)
+    y += 8
+
+    deptActions.forEach((action) => {
+      const lines = doc.splitTextToSize(action.title || "", contentWidth)
+      const rowHeight = Math.max(6, lines.length * 5)
+
+      if (y + rowHeight > bottomLimit) startPage(false)
+
+      doc.setFillColor(...PDF_DARK)
+      doc.circle(left + 3, y - 1.5, 0.8, "F")
+      doc.setFont("helvetica", "normal")
+      doc.setFontSize(11)
+      doc.setTextColor(...PDF_SLATE)
+      doc.text(lines, left + 10, y)
+      y += rowHeight + 2
+    })
+
+    y += 4
+  })
+
+  renderFooter()
+
+  saveAs(doc.output("blob"), buildActionTrackerFilename({ week, year, meetingDate, extension: "pdf", department }))
 }
 
 /**

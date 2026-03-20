@@ -27,6 +27,10 @@ export function HeaderWrapper({ user, canAccessAdmin = false }: HeaderWrapperPro
     return null
   }
 
+  if (pathname?.startsWith("/erp-kss-presentation")) {
+    return null
+  }
+
   const isAdminMode = pathname?.startsWith("/admin")
 
   return <Navbar user={user} canAccessAdmin={canAccessAdmin} isAdminMode={isAdminMode} />

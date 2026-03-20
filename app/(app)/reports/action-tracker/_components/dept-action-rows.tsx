@@ -16,13 +16,8 @@ import {
   MoreVertical,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import {
-  exportActionTrackerToPDF,
-  exportActionTrackerToPPTX,
-  exportActionTrackerToDocx,
-  exportActionTrackerToXLSX,
-  type ActionItem,
-} from "@/lib/export-utils"
+import { exportActionTrackerToPPTX, exportActionTrackerToXLSX, type ActionItem } from "@/lib/export-utils"
+import { exportActionPointsDocx, exportActionPointsPdf } from "@/lib/action-points-export"
 import type { ActionTask } from "../_lib/queries"
 
 interface DeptStatus {
@@ -114,16 +109,12 @@ export function DeptActionRows({
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem
-                        onClick={() =>
-                          exportActionTrackerToPDF(deptActionItemsForExport, week, year, meetingDate, dept)
-                        }
+                        onClick={() => exportActionPointsPdf(deptActionItemsForExport, week, year, meetingDate, dept)}
                       >
                         <FileText className="mr-2 h-4 w-4" /> Export PDF
                       </DropdownMenuItem>
                       <DropdownMenuItem
-                        onClick={() =>
-                          exportActionTrackerToDocx(deptActionItemsForExport, week, year, meetingDate, dept)
-                        }
+                        onClick={() => exportActionPointsDocx(deptActionItemsForExport, week, year, meetingDate, dept)}
                       >
                         <FileIcon className="mr-2 h-4 w-4" /> Export Word
                       </DropdownMenuItem>
