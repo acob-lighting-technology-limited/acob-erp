@@ -1,0 +1,52 @@
+import { saveAs } from "file-saver"
+import type { ActionItem } from "@/lib/export-utils"
+
+async function downloadActionPointsExport(
+  format: "docx" | "pdf",
+  actions: ActionItem[],
+  week: number,
+  year: number,
+  meetingDate?: string,
+  department?: string
+) {
+  const response = await fetch("/api/reports/action-points-export", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      format,
+      actions,
+      week,
+      year,
+      meetingDate,
+      department,
+    }),
+  })
+
+  if (!response.ok) {
+    throw new Error(`Failed to export Action Points as ${format.toUpperCase()}`)
+  }
+
+  const blob = await response.blob()
+  const disposition = response.headers.get("Content-Disposition") || ""
+  const fileNameMatch = disposition.match(/filename="([^"]+)"/i)
+  const fileName = fileNameMatch?.[1] || `action-points.${format}`
+  saveAs(blob, fileName)
+}
+
+export const exportActionPointsDocx = (
+  actions: ActionItem[],
+  week: number,
+  year: number,
+  meetingDate?: string,
+  department?: string
+) => downloadActionPointsExport("docx", actions, week, year, meetingDate, department)
+
+export const exportActionPointsPdf = (
+  actions: ActionItem[],
+  week: number,
+  year: number,
+  meetingDate?: string,
+  department?: string
+) => downloadActionPointsExport("pdf", actions, week, year, meetingDate, department)

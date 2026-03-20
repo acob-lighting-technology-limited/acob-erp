@@ -25,10 +25,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { TableSkeleton } from "@/components/ui/query-states"
 import { createClient } from "@/lib/supabase/client"
 import { getCurrentOfficeWeek } from "@/lib/meeting-week"
+import { buildMeetingDocumentFileName } from "@/lib/reports/meeting-date"
 import { REPORT_DOC_MAX_SIZE_BYTES, formatLimitMb } from "@/lib/reports/document-upload-limits"
 import { Download, FileText, Loader2, Pencil, Plus, Search, Trash2 } from "lucide-react"
 
-type DocumentType = "minutes" | "action_points"
+type DocumentType = "minutes"
 
 type MeetingDocument = {
   id: string
@@ -53,11 +54,6 @@ interface Props {
   backHref: string
   backLabel: string
   readOnly?: boolean
-}
-
-function getAdminReportsHref(documentType: DocumentType): string {
-  if (documentType === "minutes") return "/admin/reports/minutes-of-meeting"
-  return "/admin/reports/action-points-manual"
 }
 
 function compareWeekYear(aWeek: number, aYear: number, bWeek: number, bYear: number): number {
@@ -145,6 +141,11 @@ export function MeetingDocumentTypeTable({
   })
 
   const isSelectedWeekLocked = Boolean(selectedWeekLockState)
+  const selectedWeekExistingRow = useMemo(
+    () => rows.find((row) => row.meeting_week === weekNumber && row.meeting_year === yearNumber) || null,
+    [rows, weekNumber, yearNumber]
+  )
+  const isCreateBlockedForSelectedWeek = !editingDoc && isSelectedWeekLocked && Boolean(selectedWeekExistingRow)
 
   const filteredRows = useMemo(() => {
     const q = searchQuery.trim().toLowerCase()
@@ -180,7 +181,7 @@ export function MeetingDocumentTypeTable({
       toast.error(`File exceeds max size of ${formatLimitMb(REPORT_DOC_MAX_SIZE_BYTES)}`)
       return
     }
-    if (isSelectedWeekLocked) {
+    if (editingDoc ? isSelectedWeekLocked : isCreateBlockedForSelectedWeek) {
       toast.error(`Week ${weekNumber}, ${yearNumber} is locked and can no longer be changed`)
       return
     }
@@ -265,7 +266,12 @@ export function MeetingDocumentTypeTable({
       const objectUrl = URL.createObjectURL(blob)
       const anchor = document.createElement("a")
       anchor.href = objectUrl
-      anchor.download = row.file_name
+      anchor.download = buildMeetingDocumentFileName({
+        documentType: row.document_type,
+        meetingDate: row.meeting_date || `${row.meeting_year}-01-01`,
+        meetingWeek: row.meeting_week,
+        extension: "pdf",
+      })
       document.body.appendChild(anchor)
       anchor.click()
       anchor.remove()
@@ -410,7 +416,7 @@ export function MeetingDocumentTypeTable({
               <Select
                 value={String(weekNumber)}
                 onValueChange={(v) => setWeekNumber(Number(v))}
-                disabled={Boolean(editingDoc) || isSelectedWeekLocked}
+                disabled={Boolean(editingDoc)}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -429,7 +435,7 @@ export function MeetingDocumentTypeTable({
               <Select
                 value={String(yearNumber)}
                 onValueChange={(v) => setYearNumber(Number(v))}
-                disabled={Boolean(editingDoc) || isSelectedWeekLocked}
+                disabled={Boolean(editingDoc)}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -461,22 +467,35 @@ export function MeetingDocumentTypeTable({
                   }
                   setFile(selected)
                 }}
-                disabled={isSelectedWeekLocked}
+                disabled={editingDoc ? isSelectedWeekLocked : isCreateBlockedForSelectedWeek}
               />
               <p className="text-muted-foreground text-xs">
                 Accepted: PDF, DOCX. DOCX uploads are converted to PDF before storage. Max file size:{" "}
                 {formatLimitMb(REPORT_DOC_MAX_SIZE_BYTES)}
               </p>
-              {isSelectedWeekLocked ? (
+              {editingDoc && isSelectedWeekLocked ? (
                 <p className="text-muted-foreground text-xs">
                   This week is locked after the meeting grace window, so past records are read-only.
+                </p>
+              ) : null}
+              {!editingDoc && isCreateBlockedForSelectedWeek ? (
+                <p className="text-muted-foreground text-xs">
+                  This week is locked and already has a document, so only download is allowed.
+                </p>
+              ) : null}
+              {!editingDoc && isSelectedWeekLocked && !selectedWeekExistingRow ? (
+                <p className="text-muted-foreground text-xs">
+                  This week is locked, but first-time upload is still allowed because no document exists yet.
                 </p>
               ) : null}
             </div>
           </div>
 
           <div className="mt-4 flex gap-2">
-            <Button onClick={upload} disabled={saving || isSelectedWeekLocked}>
+            <Button
+              onClick={upload}
+              disabled={saving || (editingDoc ? isSelectedWeekLocked : isCreateBlockedForSelectedWeek)}
+            >
               {saving ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -491,7 +510,7 @@ export function MeetingDocumentTypeTable({
             </Button>
             {readOnly ? (
               <Button variant="secondary" asChild>
-                <Link href={getAdminReportsHref(documentType)}>Open Admin Reports</Link>
+                <Link href="/admin/reports/minutes-of-meeting">Open Admin Reports</Link>
               </Button>
             ) : null}
           </div>

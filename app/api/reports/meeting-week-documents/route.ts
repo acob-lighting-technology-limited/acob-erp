@@ -17,7 +17,7 @@ const BUCKET = "meeting_documents"
 
 type ReportsClient = Awaited<ReturnType<typeof createClient>>
 
-type DocumentType = "knowledge_sharing_session" | "minutes" | "action_points"
+type DocumentType = "knowledge_sharing_session" | "minutes"
 
 const KSS_ALLOWED = new Set([
   "application/pdf",
@@ -74,7 +74,7 @@ function hasGlobalReportsWriteAccess(scope: NonNullable<Awaited<ReturnType<typeo
 }
 
 function parseDocumentType(value: unknown): DocumentType | null {
-  if (value === "knowledge_sharing_session" || value === "minutes" || value === "action_points") return value
+  if (value === "knowledge_sharing_session" || value === "minutes") return value
   return null
 }
 
@@ -90,6 +90,45 @@ async function assertWeekIsMutable(supabase: ReportsClient, meetingWeek: number,
 
   if (!data) {
     throw new Error(`Week ${meetingWeek}, ${meetingYear} is locked and can no longer be changed`)
+  }
+}
+
+async function assertWeekAllowsDocumentCreate(
+  supabase: ReportsClient,
+  params: {
+    meetingWeek: number
+    meetingYear: number
+    documentType: DocumentType
+    department: string | null
+  }
+) {
+  const { data, error } = await supabase.rpc("weekly_report_can_mutate", {
+    p_week: params.meetingWeek,
+    p_year: params.meetingYear,
+  })
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  if (data) return
+
+  const { data: existingRow, error: existingError } = await supabase
+    .from("meeting_week_documents")
+    .select("id")
+    .eq("meeting_week", params.meetingWeek)
+    .eq("meeting_year", params.meetingYear)
+    .eq("document_type", params.documentType)
+    .eq("department", params.department)
+    .eq("is_current", true)
+    .maybeSingle()
+
+  if (existingError) {
+    throw new Error(existingError.message)
+  }
+
+  if (existingRow) {
+    throw new Error(`Week ${params.meetingWeek}, ${params.meetingYear} is locked and can no longer be changed`)
   }
 }
 
@@ -230,7 +269,12 @@ export async function POST(request: Request) {
     }
     if (!documentType) return NextResponse.json({ error: "Invalid documentType" }, { status: 400 })
 
-    await assertWeekIsMutable(supabase, meetingWeek, meetingYear)
+    await assertWeekAllowsDocumentCreate(supabase, {
+      meetingWeek,
+      meetingYear,
+      documentType,
+      department,
+    })
 
     if (documentType === "knowledge_sharing_session") {
       if (!department) {
@@ -253,7 +297,7 @@ export async function POST(request: Request) {
       }
     } else {
       if (!["application/pdf", DOCX_MIME].includes(file.type)) {
-        return NextResponse.json({ error: "Minutes and action points must be PDF or DOCX" }, { status: 400 })
+        return NextResponse.json({ error: "Minutes files must be PDF or DOCX" }, { status: 400 })
       }
     }
 

@@ -98,7 +98,7 @@ export function buildMeetingDocumentFileName(params: {
   }
 
   if (params.documentType === "minutes") {
-    return `ACOB Minutes of General Meeting - ${dateLabel} - W${params.meetingWeek}.${extension}`
+    return `ACOB Minutes of Meeting - ${dateLabel} - W${params.meetingWeek}.${extension}`
   }
 
   return `ACOB Action Points - ${dateLabel} - W${params.meetingWeek}.${extension}`

@@ -33,7 +33,7 @@ type KssRosterEntry = {
 
 type MeetingWeekDocument = {
   id: string
-  document_type: "knowledge_sharing_session" | "minutes" | "action_points"
+  document_type: "knowledge_sharing_session" | "minutes"
   department: string | null
   file_name: string
   version_no: number
@@ -57,12 +57,9 @@ export function MeetingDocumentLibrary({ employees, backHref, backLabel, title =
   const [kssNotes, setKssNotes] = useState("")
   const [kssFile, setKssFile] = useState<File | null>(null)
   const [minutesFile, setMinutesFile] = useState<File | null>(null)
-  const [actionPointsFile, setActionPointsFile] = useState<File | null>(null)
 
   const [savingRoster, setSavingRoster] = useState(false)
-  const [uploadingDocType, setUploadingDocType] = useState<
-    "knowledge_sharing_session" | "minutes" | "action_points" | null
-  >(null)
+  const [uploadingDocType, setUploadingDocType] = useState<"knowledge_sharing_session" | "minutes" | null>(null)
 
   const weekOptions = Array.from({ length: 53 }, (_, i) => i + 1)
   const yearOptions = [currentOfficeWeek.year - 1, currentOfficeWeek.year, currentOfficeWeek.year + 1]
@@ -144,8 +141,8 @@ export function MeetingDocumentLibrary({ employees, backHref, backLabel, title =
     }
   }
 
-  const uploadMeetingDocument = async (kind: "knowledge_sharing_session" | "minutes" | "action_points") => {
-    const file = kind === "knowledge_sharing_session" ? kssFile : kind === "minutes" ? minutesFile : actionPointsFile
+  const uploadMeetingDocument = async (kind: "knowledge_sharing_session" | "minutes") => {
+    const file = kind === "knowledge_sharing_session" ? kssFile : minutesFile
     if (!file) {
       toast.error("Please choose a file first")
       return
@@ -181,7 +178,6 @@ export function MeetingDocumentLibrary({ employees, backHref, backLabel, title =
 
       if (kind === "knowledge_sharing_session") setKssFile(null)
       if (kind === "minutes") setMinutesFile(null)
-      if (kind === "action_points") setActionPointsFile(null)
 
       toast.success(
         payload?.converted ? "Document uploaded and converted to PDF" : "Document uploaded and saved for this week"
@@ -255,7 +251,7 @@ export function MeetingDocumentLibrary({ employees, backHref, backLabel, title =
             <CardDescription>Set department and optional presenter for the selected week.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label>Presenting Department</Label>
                 <Select
@@ -391,43 +387,6 @@ export function MeetingDocumentLibrary({ employees, backHref, backLabel, title =
                     <Upload className="mr-2 h-4 w-4" />
                   )}
                   Upload Minutes of Meeting
-                </Button>
-              </div>
-              <div className="space-y-2">
-                <Label>Action Points (PDF/DOCX)</Label>
-                <Input
-                  type="file"
-                  accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                  onChange={(e) => {
-                    const selected = e.target.files?.[0] || null
-                    if (selected && selected.size > REPORT_DOC_MAX_SIZE_BYTES) {
-                      toast.error(`File exceeds max size of ${formatLimitMb(REPORT_DOC_MAX_SIZE_BYTES)}`)
-                      e.currentTarget.value = ""
-                      setActionPointsFile(null)
-                      return
-                    }
-                    if (selected?.type === DOCX_MIME) {
-                      toast.info("This DOCX file will be converted to PDF before it is stored.")
-                    }
-                    setActionPointsFile(selected)
-                  }}
-                />
-                <p className="text-muted-foreground text-xs">
-                  Accepted: PDF, DOCX. DOCX uploads are converted to PDF before storage. Max file size:{" "}
-                  {formatLimitMb(REPORT_DOC_MAX_SIZE_BYTES)}
-                </p>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => uploadMeetingDocument("action_points")}
-                  disabled={uploadingDocType === "action_points"}
-                >
-                  {uploadingDocType === "action_points" ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Upload className="mr-2 h-4 w-4" />
-                  )}
-                  Upload Action Points (Manual)
                 </Button>
               </div>
             </div>

@@ -40,14 +40,6 @@ export default function AdminReportsPage() {
       color: "text-amber-600 dark:text-amber-400",
       bgColor: "bg-amber-100 dark:bg-amber-900/30",
     },
-    {
-      title: "Action Points (Manual)",
-      description: "Upload and keep the manual Action Points PDF for each meeting week.",
-      href: "/admin/reports/action-points-manual",
-      icon: ClipboardList,
-      color: "text-rose-600 dark:text-rose-400",
-      bgColor: "bg-rose-100 dark:bg-rose-900/30",
-    },
   ]
 
   return (

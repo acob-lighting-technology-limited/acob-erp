@@ -760,29 +760,17 @@ async function buildWeeklyReportPDF(
   return doc.save()
 }
 
-async function buildActionTrackerPDF(
+async function buildActionTrackerPdf(
   actions: ActionItemRow[],
   meetingWeek: number,
   meetingYear: number,
-  meetingDateLabel: string,
-  coverLogoBytes: Uint8Array | null,
+  _meetingDateLabel: string,
+  _coverLogoBytes: Uint8Array | null,
   headerLogoBytes: Uint8Array | null
 ): Promise<Uint8Array> {
   const doc = await PDFDocument.create()
   const bold = await doc.embedFont(StandardFonts.HelveticaBold)
   const regular = await doc.embedFont(StandardFonts.Helvetica)
-
-  await addCoverPage(
-    doc,
-    bold,
-    regular,
-    meetingWeek,
-    meetingYear,
-    meetingDateLabel,
-    "Action Tracker",
-    "Action Tracker",
-    coverLogoBytes
-  )
 
   const grouped: Record<string, ActionItemRow[]> = {}
   for (const a of actions) {
@@ -853,10 +841,10 @@ function buildEmailHtml(
   </div>
   <div class="wrapper">
     <span class="week-badge">Week ${meetingWeek} &bull; ${meetingYear}</span>
-    <div class="title">General Meeting Minutes &amp; Action Points</div>
+    <div class="title">General Meeting Minutes &amp; Action Tracker</div>
     <p class="text">Dear All,</p>
     <p class="text">
-      Please find attached the Minutes and Action Points of the General Meeting held on <strong>${meetingDate}</strong>.
+      Please find attached the Minutes and Action Tracker of the General Meeting held on <strong>${meetingDate}</strong>.
     </p>
     <p class="text">
       Kindly review and share any observations or questions you may have ahead of the next General Meeting on <strong>${nextMeetingDate}</strong>.
@@ -1087,7 +1075,7 @@ serve(async (req) => {
             )
           : Promise.resolve<Uint8Array | null>(null),
         includeActionTracker && !trackerPdfBase64
-          ? buildActionTrackerPDF(
+          ? buildActionTrackerPdf(
               actionRows,
               meetingWeek,
               meetingYear,
@@ -1117,7 +1105,7 @@ serve(async (req) => {
 
     const subject = withSubjectPrefix(
       "Reports",
-      `Minutes and Action Points of the General Meeting - ${meetingDateLabel}`
+      `Minutes and Action Tracker of the General Meeting - ${meetingDateLabel}`
     )
     const html = buildEmailHtml(
       meetingWeek,
