@@ -5,7 +5,7 @@ import { join } from "node:path"
 import JSZip from "jszip"
 import type { ActionItem } from "@/lib/export-utils"
 
-const TEMPLATE_FILE = join(process.cwd(), "ACTION POINTS - 9TH MARCH 2026(1).docx")
+const TEMPLATE_FILE = join(process.cwd(), "ACTION POINTS - 9TH MARCH 2026.docx")
 const SAFE_SECTION_SPACER_XML =
   '<w:p><w:pPr><w:pStyle w:val="BodyText"/><w:spacing w:before="25"/><w:ind w:left="0" w:firstLine="0"/></w:pPr></w:p>'
 const DEPARTMENT_ORDER = [
