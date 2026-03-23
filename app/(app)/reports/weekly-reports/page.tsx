@@ -209,6 +209,7 @@ export default function WeeklyReportsPortal() {
       icon={FileBarChart}
       backLinkHref="/reports"
       backLinkLabel="Back to Reports"
+      actionsPlacement="below"
       actions={
         <ReportExportActions
           filteredReports={filteredReports}

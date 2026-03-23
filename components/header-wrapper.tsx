@@ -27,7 +27,7 @@ export function HeaderWrapper({ user, canAccessAdmin = false }: HeaderWrapperPro
     return null
   }
 
-  if (pathname?.startsWith("/erp-kss-presentation")) {
+  if (pathname?.startsWith("/kss")) {
     return null
   }
 

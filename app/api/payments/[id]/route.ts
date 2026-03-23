@@ -94,6 +94,10 @@ export async function GET(request: Request, { params }: { params: { id: string }
         }
       }
     } else {
+      if (payment?.created_by === user.id) {
+        return NextResponse.json({ data: payment })
+      }
+
       if (!isFinanceDepartment(profile?.department)) {
         return NextResponse.json({ error: "Forbidden: finance access required" }, { status: 403 })
       }
@@ -130,21 +134,26 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
     // Check permissions (scoped admin/lead or department member)
     if (!scope) {
-      if (!isFinanceDepartment(profile?.department)) {
-        return NextResponse.json({ error: "Forbidden: finance access required" }, { status: 403 })
-      }
-
       const { data: payment } = await dataClient
         .from("department_payments")
         .select("department:departments(name), created_by")
         .eq("id", id)
         .single()
 
-      const paymentDept = getRelatedDepartmentName(payment)
-      const userDept = profile?.department
+      const isOwner = payment?.created_by === user.id
+      if (isOwner) {
+        // Owners can edit their own payments regardless of admin/finance role.
+      } else {
+        if (!isFinanceDepartment(profile?.department)) {
+          return NextResponse.json({ error: "Forbidden: finance access required" }, { status: 403 })
+        }
 
-      if (normalizeDepartment(paymentDept) !== normalizeDepartment(userDept)) {
-        return NextResponse.json({ error: "Forbidden: Department mismatch" }, { status: 403 })
+        const paymentDept = getRelatedDepartmentName(payment)
+        const userDept = profile?.department
+
+        if (normalizeDepartment(paymentDept) !== normalizeDepartment(userDept)) {
+          return NextResponse.json({ error: "Forbidden: Department mismatch" }, { status: 403 })
+        }
       }
 
       // Determine if this is a "status update" or "full edit"
@@ -160,7 +169,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         bodyKeys.every((key) => allowedStatusKeys.includes(key))
 
       // If it's a full edit (not just status update), enforce creator check
-      if (!isStatusUpdate && payment?.created_by !== user.id) {
+      if (!isStatusUpdate && !isOwner) {
         return NextResponse.json({ error: "Forbidden: You can only edit payments you created" }, { status: 403 })
       }
     } else if (scope) {
@@ -219,7 +228,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   }
 }
 
-// DELETE /api/payments/[id] - Delete a payment
+// DELETE /api/payments/[id] - Soft delete a payment
 export async function DELETE(request: Request, { params }: { params: { id: string } }) {
   try {
     const supabase = await createClient()
@@ -262,7 +271,15 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
       }
     }
 
-    const { error } = await dataClient.from("department_payments").delete().eq("id", id)
+    const { data: softDeletedPayment, error } = await dataClient
+      .from("department_payments")
+      .update({
+        status: "cancelled",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id)
+      .select("id")
+      .single()
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 })
@@ -274,12 +291,13 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
         action: "delete",
         entityType: "payment",
         entityId: id,
+        newValues: { status: "cancelled" },
         context: { actorId: user.id, source: "api", route: `/api/payments/${id}` },
       },
       { failOpen: true }
     )
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ success: true, data: softDeletedPayment })
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Internal Server Error"
     return NextResponse.json({ error: message }, { status: 500 })

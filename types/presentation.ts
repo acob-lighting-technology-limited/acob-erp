@@ -1,6 +1,6 @@
 export type SceneTheme = "aurora" | "vault" | "ember" | "lumen" | "summit"
 
-export type SceneLayout = "hero" | "insight" | "spotlight" | "erp" | "closing"
+export type SceneLayout = "hero" | "insight" | "spotlight" | "erp" | "closing" | "cover" | "titleOnly"
 
 export interface SceneMetric {
   label: string
@@ -18,6 +18,12 @@ export interface SceneBullet {
   body: string
 }
 
+export interface SceneCoverMeta {
+  presenter: string
+  department: string
+  date: string
+}
+
 export interface SceneConfig {
   id: string
   eyebrow: string
@@ -30,11 +36,17 @@ export interface SceneConfig {
   metrics?: SceneMetric[]
   cards?: SceneCard[]
   bullets?: SceneBullet[]
+  coverMeta?: SceneCoverMeta
   asideTitle?: string
   asideBody?: string
   quote?: {
     text: string
     author: string
+  }
+  visual?: {
+    src: string
+    alt: string
+    caption?: string
   }
 }
 

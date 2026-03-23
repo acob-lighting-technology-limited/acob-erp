@@ -7,7 +7,8 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { FileText, ClipboardList, CalendarDays } from "lucide-react"
+import { SearchableMultiSelect } from "@/components/ui/searchable-multi-select"
+import { CalendarDays, FileText, ClipboardList } from "lucide-react"
 
 type ContentChoice =
   | "weekly_report"
@@ -27,12 +28,15 @@ interface ContentOption {
 }
 
 interface WeeklySummaryFormProps {
-  weekNumber: number
+  selectedWeeks: Set<number>
   yearNumber: number
-  setWeekNumber: (w: number) => void
+  toggleWeek: (w: number) => void
+  selectAllWeeks: () => void
+  deselectAllWeeks: () => void
   setYearNumber: (y: number) => void
   weekOptions: number[]
   yearOptions: number[]
+  currentWeekNumber: number
   contentOptions: ContentOption[]
   selectedContentChoices: Set<ContentChoice>
   toggleContentChoice: (choice: ContentChoice, disabled?: boolean) => void
@@ -42,12 +46,15 @@ interface WeeklySummaryFormProps {
 }
 
 export function WeeklySummaryForm({
-  weekNumber,
+  selectedWeeks,
   yearNumber,
-  setWeekNumber,
+  toggleWeek,
+  selectAllWeeks,
+  deselectAllWeeks,
   setYearNumber,
   weekOptions,
   yearOptions,
+  currentWeekNumber,
   contentOptions,
   selectedContentChoices,
   toggleContentChoice,
@@ -55,6 +62,26 @@ export function WeeklySummaryForm({
   selectedPreparedBy,
   setSelectedPreparedBy,
 }: WeeklySummaryFormProps) {
+  // Build options for SearchableMultiSelect — mark the current week
+  const weekSelectOptions = weekOptions.map((w) => ({
+    value: String(w),
+    label: w === currentWeekNumber ? `Week ${w} (current)` : `Week ${w}`,
+  }))
+
+  const selectedWeekValues = Array.from(selectedWeeks).map(String)
+
+  const handleWeeksChange = (values: string[]) => {
+    const next = new Set(values.map(Number))
+    // Sync with parent: remove deselected, add newly selected
+    const current = new Set(selectedWeeks)
+    for (const w of Array.from(current)) {
+      if (!next.has(w)) toggleWeek(w)
+    }
+    for (const w of Array.from(next)) {
+      if (!current.has(w)) toggleWeek(w)
+    }
+  }
+
   return (
     <>
       {/* Week Selection */}
@@ -62,28 +89,14 @@ export function WeeklySummaryForm({
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-lg">
             <CalendarDays className="h-5 w-5 text-green-600" />
-            Meeting Week
+            Meeting Weeks
           </CardTitle>
-          <CardDescription>Choose which general meeting week to send</CardDescription>
+          <CardDescription>Select one or more weeks to include in this mailing</CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap items-end gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="week-select">Meeting Week</Label>
-              <Select value={String(weekNumber)} onValueChange={(v) => setWeekNumber(Number(v))}>
-                <SelectTrigger id="week-select" className="w-[140px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {weekOptions.map((w) => (
-                    <SelectItem key={w} value={String(w)}>
-                      Week {w}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap items-end gap-3">
+            {/* Year selector */}
+            <div className="space-y-1.5">
               <Label htmlFor="year-select">Year</Label>
               <Select value={String(yearNumber)} onValueChange={(v) => setYearNumber(Number(v))}>
                 <SelectTrigger id="year-select" className="w-[120px]">
@@ -98,12 +111,33 @@ export function WeeklySummaryForm({
                 </SelectContent>
               </Select>
             </div>
-            <div className="text-muted-foreground space-y-1 text-sm">
-              <p>
-                All Content: <Badge variant="outline">Week {weekNumber}</Badge>
-              </p>
+
+            {/* Week multi-select — same SearchableMultiSelect as HR/Employees status filter */}
+            <div className="flex-1 space-y-1.5" style={{ minWidth: 220 }}>
+              <Label>Weeks</Label>
+              <SearchableMultiSelect
+                label="Meeting Weeks"
+                values={selectedWeekValues}
+                options={weekSelectOptions}
+                onChange={handleWeeksChange}
+                placeholder="Select weeks…"
+                searchPlaceholder="Search week…"
+              />
+            </div>
+
+            <div className="flex gap-2 pb-0.5">
+              <Button type="button" variant="outline" size="sm" onClick={selectAllWeeks}>
+                All
+              </Button>
+              <Button type="button" variant="ghost" size="sm" onClick={deselectAllWeeks}>
+                Clear
+              </Button>
             </div>
           </div>
+
+          {selectedWeeks.size === 0 && (
+            <p className="text-muted-foreground text-xs">No weeks selected — pick at least one week above.</p>
+          )}
         </CardContent>
       </Card>
 

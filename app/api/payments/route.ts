@@ -122,6 +122,9 @@ export async function GET(request: Request) {
     }
     if (status) {
       query = query.eq("status", status)
+    } else {
+      // Soft-deleted payments are marked as cancelled and hidden by default.
+      query = query.neq("status", "cancelled")
     }
 
     const { data: payments, error } = await query

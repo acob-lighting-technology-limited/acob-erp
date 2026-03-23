@@ -8,6 +8,7 @@ export interface TablePageProps {
   description?: string
   icon?: LucideIcon
   actions?: ReactNode
+  actionsPlacement?: "inline" | "below"
   backLinkHref?: string | null
   backLinkLabel?: string
   stats?: ReactNode
@@ -21,6 +22,7 @@ export function TablePage({
   description,
   icon,
   actions,
+  actionsPlacement = "inline",
   backLinkHref,
   backLinkLabel,
   stats,
@@ -32,7 +34,14 @@ export function TablePage({
 
   return (
     <PageWrapper maxWidth="full" background="gradient">
-      <PageHeader title={title} description={description} icon={icon} backLink={backLink} actions={actions} />
+      <PageHeader
+        title={title}
+        description={description}
+        icon={icon}
+        backLink={backLink}
+        actions={actions}
+        actionsPlacement={actionsPlacement}
+      />
       {stats}
       {filters ? (
         filtersInCard ? (

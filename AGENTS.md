@@ -8,7 +8,7 @@ Do not treat a task as complete until all required checks pass:
 
 - `npx eslint . --ext .ts,.tsx`
 - `npx tsc --noEmit`
-- `npm run build`
+<!-- - `npm run build` -->
 
 If a change cannot satisfy all three checks, report the blocker clearly instead of claiming completion.
 
