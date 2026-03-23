@@ -332,22 +332,30 @@ export async function POST(request: Request) {
     })
 
     if (shouldConvertToPdf) {
-      const converted = await convertOfficeDocumentToPdf(
-        uploadBuffer,
-        baseNameWithoutExtension(normalizedFileName),
-        file.type === PPTX_MIME ? "pptx" : "docx"
-      )
-      uploadBuffer = converted.buffer
-      uploadMimeType = converted.mimeType
-      normalizedFileName = buildMeetingDocumentFileName({
-        documentType,
-        meetingDate,
-        meetingWeek,
-        extension: "pdf",
-        department,
-        presenterName,
-      })
-      convertedFrom = converted.sourceKind
+      try {
+        const converted = await convertOfficeDocumentToPdf(
+          uploadBuffer,
+          baseNameWithoutExtension(normalizedFileName),
+          file.type === PPTX_MIME ? "pptx" : "docx"
+        )
+        uploadBuffer = converted.buffer
+        uploadMimeType = converted.mimeType
+        normalizedFileName = buildMeetingDocumentFileName({
+          documentType,
+          meetingDate,
+          meetingWeek,
+          extension: "pdf",
+          department,
+          presenterName,
+        })
+        convertedFrom = converted.sourceKind
+      } catch (conversionError) {
+        log.warn({ err: String(conversionError) }, "Document conversion failed")
+        return NextResponse.json(
+          { error: "We couldn't convert this file to PDF on the server. Please upload a PDF instead." },
+          { status: 400 }
+        )
+      }
     }
 
     const deptPath = department ? sanitizeName(sanitizeStoragePathSegment(department)) : "all"
@@ -443,9 +451,10 @@ export async function POST(request: Request) {
     )
 
     return NextResponse.json({ data: saved, converted: Boolean(convertedFrom), convertedFrom }, { status: 201 })
-  } catch (error) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Internal Server Error"
     log.error({ err: String(error) }, "POST /api/reports/meeting-week-documents failed")
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
 

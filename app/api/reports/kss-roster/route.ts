@@ -5,6 +5,7 @@ import { resolveAdminScope, getDepartmentScope, normalizeDepartmentName } from "
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { resolveEffectiveMeetingDateIso } from "@/lib/reports/meeting-date"
 import { logger } from "@/lib/logger"
+import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 
 const log = logger("api-reports-kss-roster")
 
@@ -51,6 +52,34 @@ async function assertWeekIsMutable(supabase: ReportsClient, meetingWeek: number,
   }
 }
 
+async function assertWeekAllowsRosterCreate(supabase: ReportsClient, meetingWeek: number, meetingYear: number) {
+  const { data, error } = await supabase.rpc("weekly_report_can_mutate", {
+    p_week: meetingWeek,
+    p_year: meetingYear,
+  })
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  if (data) return
+
+  const { data: existingRow, error: existingError } = await supabase
+    .from("kss_weekly_roster")
+    .select("id")
+    .eq("meeting_week", meetingWeek)
+    .eq("meeting_year", meetingYear)
+    .maybeSingle()
+
+  if (existingError) {
+    throw new Error(existingError.message)
+  }
+
+  if (existingRow) {
+    throw new Error(`Week ${meetingWeek}, ${meetingYear} is locked and can no longer be changed`)
+  }
+}
+
 export async function GET(request: Request) {
   try {
     const supabase = await createClient()
@@ -62,12 +91,13 @@ export async function GET(request: Request) {
 
     const scope = await resolveAdminScope(supabase as ReportsClient, user.id)
     if (!scope) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    const dataClient = getServiceRoleClientOrFallback(supabase as ReportsClient)
 
     const { searchParams } = new URL(request.url)
     const week = Number(searchParams.get("week") || "")
     const year = Number(searchParams.get("year") || "")
 
-    let query = supabase
+    let query = dataClient
       .from("kss_weekly_roster")
       .select(
         "id, meeting_week, meeting_year, department, presenter_id, notes, is_active, created_by, created_at, updated_at"
@@ -84,8 +114,12 @@ export async function GET(request: Request) {
     const rows = data || []
     const withLockState = await Promise.all(
       rows.map(async (row) => {
-        const meetingDate = await resolveEffectiveMeetingDateIso(supabase, row.meeting_week, row.meeting_year)
-        const { data: canMutate } = await supabase.rpc("weekly_report_can_mutate", {
+        const meetingDate = await resolveEffectiveMeetingDateIso(
+          dataClient as ReportsClient,
+          row.meeting_week,
+          row.meeting_year
+        )
+        const { data: canMutate } = await dataClient.rpc("weekly_report_can_mutate", {
           p_week: row.meeting_week,
           p_year: row.meeting_year,
         })
@@ -119,6 +153,7 @@ export async function POST(request: Request) {
     if (!hasGlobalReportsWriteAccess(scope)) {
       return NextResponse.json({ error: "Only reports admins can create KSS roster entries" }, { status: 403 })
     }
+    const dataClient = getServiceRoleClientOrFallback(supabase as ReportsClient)
 
     const body = await request.json()
     const meetingWeek = Number(body?.meetingWeek)
@@ -137,22 +172,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "department is required" }, { status: 400 })
     }
 
-    await assertWeekIsMutable(supabase, meetingWeek, meetingYear)
+    await assertWeekAllowsRosterCreate(dataClient as ReportsClient, meetingWeek, meetingYear)
 
-    const { data: saved, error } = await supabase
+    const { data: saved, error } = await dataClient
       .from("kss_weekly_roster")
-      .upsert(
-        {
-          meeting_week: meetingWeek,
-          meeting_year: meetingYear,
-          department,
-          presenter_id: presenterId,
-          notes,
-          is_active: true,
-          created_by: user.id,
-        },
-        { onConflict: "meeting_week,meeting_year" }
-      )
+      .insert({
+        meeting_week: meetingWeek,
+        meeting_year: meetingYear,
+        department,
+        presenter_id: presenterId,
+        notes,
+        is_active: true,
+        created_by: user.id,
+      })
       .select(
         "id, meeting_week, meeting_year, department, presenter_id, notes, is_active, created_by, created_at, updated_at"
       )
@@ -167,7 +199,7 @@ export async function POST(request: Request) {
         entityType: "communications_mail",
         entityId: saved.id,
         metadata: {
-          event: "kss_roster_upserted",
+          event: "kss_roster_created",
           meeting_week: meetingWeek,
           meeting_year: meetingYear,
           department,
@@ -184,9 +216,13 @@ export async function POST(request: Request) {
     )
 
     return NextResponse.json({ data: saved }, { status: 201 })
-  } catch (error) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Internal Server Error"
     log.error({ err: String(error) }, "POST /api/reports/kss-roster failed")
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })
+    if (message.includes("locked and can no longer be changed")) {
+      return NextResponse.json({ error: message }, { status: 409 })
+    }
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
 
@@ -204,12 +240,13 @@ export async function PATCH(request: Request) {
     if (!hasGlobalReportsWriteAccess(scope)) {
       return NextResponse.json({ error: "Only reports admins can update KSS roster entries" }, { status: 403 })
     }
+    const dataClient = getServiceRoleClientOrFallback(supabase as ReportsClient)
 
     const body = await request.json()
     const id = String(body?.id || "")
     if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 })
 
-    const { data: existing, error: fetchError } = await supabase
+    const { data: existing, error: fetchError } = await dataClient
       .from("kss_weekly_roster")
       .select("id, department, meeting_week, meeting_year")
       .eq("id", id)
@@ -219,7 +256,7 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Roster entry not found" }, { status: 404 })
     }
 
-    await assertWeekIsMutable(supabase, existing.meeting_week, existing.meeting_year)
+    await assertWeekIsMutable(dataClient as ReportsClient, existing.meeting_week, existing.meeting_year)
 
     const patch: Record<string, unknown> = {}
     if (typeof body?.department === "string" && body.department.trim()) {
@@ -233,7 +270,7 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "No patch fields provided" }, { status: 400 })
     }
 
-    const { data: updated, error } = await supabase
+    const { data: updated, error } = await dataClient
       .from("kss_weekly_roster")
       .update(patch)
       .eq("id", id)
@@ -285,12 +322,13 @@ export async function DELETE(request: Request) {
     if (!hasGlobalReportsWriteAccess(scope)) {
       return NextResponse.json({ error: "Only reports admins can delete KSS roster entries" }, { status: 403 })
     }
+    const dataClient = getServiceRoleClientOrFallback(supabase as ReportsClient)
 
     const { searchParams } = new URL(request.url)
     const id = String(searchParams.get("id") || "")
     if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 })
 
-    const { data: existing, error: fetchError } = await supabase
+    const { data: existing, error: fetchError } = await dataClient
       .from("kss_weekly_roster")
       .select("id, department, meeting_week, meeting_year")
       .eq("id", id)
@@ -300,8 +338,8 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "Roster entry not found" }, { status: 404 })
     }
 
-    await assertWeekIsMutable(supabase, existing.meeting_week, existing.meeting_year)
-    const { error } = await supabase.from("kss_weekly_roster").delete().eq("id", id)
+    await assertWeekIsMutable(dataClient as ReportsClient, existing.meeting_week, existing.meeting_year)
+    const { error } = await dataClient.from("kss_weekly_roster").delete().eq("id", id)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
     await writeAuditLog(

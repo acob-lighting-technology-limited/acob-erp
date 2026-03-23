@@ -25,6 +25,11 @@ type Employee = {
   employment_status: string | null
 }
 
+type PresenterRef = {
+  id: string
+  full_name: string
+}
+
 type RecipientMode = "all" | "select" | "manual" | "all_plus"
 type ContentChoice =
   | "weekly_report"
@@ -75,6 +80,7 @@ function buildMeetingDocumentDisplayName(document: MeetingWeekDocument, presente
 
 interface Props {
   employees: Employee[]
+  presenterDirectory?: PresenterRef[]
   currentUser?: {
     id: string
     full_name: string | null
@@ -82,7 +88,15 @@ interface Props {
   }
 }
 
-export function WeeklySummaryContent({ employees, currentUser }: Props) {
+function parsePresenterFromKssFileName(fileName: string): string | null {
+  const parts = String(fileName || "").split(" - ")
+  if (parts.length < 5) return null
+  const candidate = parts[2]?.trim() || ""
+  if (!candidate || candidate.toLowerCase() === "unknown presenter") return null
+  return candidate
+}
+
+export function WeeklySummaryContent({ employees, presenterDirectory = [], currentUser }: Props) {
   const supabase = createClient()
   const currentOfficeWeek = getCurrentOfficeWeek()
 
@@ -168,7 +182,10 @@ export function WeeklySummaryContent({ employees, currentUser }: Props) {
       if (!document) return null
       const presenterName =
         document.presenter_id && document.document_type === "knowledge_sharing_session"
-          ? employees.find((employee) => employee.id === document.presenter_id)?.full_name || null
+          ? presenterDirectory.find((employee) => employee.id === document.presenter_id)?.full_name ||
+            employees.find((employee) => employee.id === document.presenter_id)?.full_name ||
+            parsePresenterFromKssFileName(document.file_name) ||
+            null
           : null
       return {
         id: document.id,
@@ -176,7 +193,7 @@ export function WeeklySummaryContent({ employees, currentUser }: Props) {
         display_name: buildMeetingDocumentDisplayName(document, presenterName),
       }
     },
-    [employees]
+    [employees, presenterDirectory]
   )
 
   // All KSS docs across all selected weeks (one per week, is_current)
