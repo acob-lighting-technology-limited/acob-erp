@@ -90,6 +90,8 @@ type WeeklyReportRequestBody = {
   weeklyReportDocumentId?: string
   actionTrackerDocumentId?: string
   additionalDocumentIds?: unknown[]
+  actionTrackerAttachments?: Array<{ base64: string; filename: string; week: number }>
+  meetingWeeks?: number[]
   preparedByName?: string
   requestedByUserId?: string
 }
@@ -232,11 +234,12 @@ async function resolveStoredMeetingDocument(
   supabase: ReturnType<typeof createClient>,
   documentId: string
 ): Promise<{ base64: string; filename: string } | null> {
+  // Note: no .eq("is_current", true) filter here — we look up by specific ID so
+  // is_current is irrelevant. Filtering by it caused non-current KSS docs to silently fail.
   const { data: doc, error } = await supabase
     .from("meeting_week_documents")
     .select("id, meeting_week, meeting_year, document_type, department, presenter_id, file_path, file_name, mime_type")
     .eq("id", documentId)
-    .eq("is_current", true)
     .single()
 
   if (error || !doc?.file_path) return null
@@ -802,21 +805,119 @@ async function buildActionTrackerPdf(
   return doc.save()
 }
 
+type EmailContentContext = {
+  includeWeeklyReport: boolean
+  includeActionTracker: boolean
+  includeKss: boolean
+  includeMinutes: boolean
+  weekLabels: string[] // e.g. ["Week 3", "Week 4"]
+}
+
+// Formats ["Week 7"] → "Week 7"
+// ["Week 7", "Week 8"] → "Week 7 and Week 8"
+// ["Week 7", "Week 8", "Week 9"] → "Week 7, Week 8, and Week 9"
+function oxfordWeekList(weekLabels: string[]): string {
+  if (weekLabels.length === 0) return ""
+  if (weekLabels.length === 1) return weekLabels[0]
+  if (weekLabels.length === 2) return `${weekLabels[0]} and ${weekLabels[1]}`
+  const last = weekLabels[weekLabels.length - 1]
+  return weekLabels.slice(0, -1).join(", ") + ", and " + last
+}
+
+function buildEmailSubject(ctx: EmailContentContext): string {
+  const parts: string[] = []
+  if (ctx.includeMinutes) parts.push("Minutes of Meeting")
+  if (ctx.includeActionTracker) parts.push("Action Tracker")
+  if (ctx.includeWeeklyReport) parts.push(ctx.weekLabels.length > 1 ? "Weekly Reports" : "Weekly Report")
+  if (ctx.includeKss) parts.push(ctx.weekLabels.length > 1 ? "Knowledge Sharing Sessions" : "Knowledge Sharing Session")
+
+  const contentLabel = parts.length > 0 ? parts.join(" & ") : "General Meeting Documents"
+  const weekLabel = oxfordWeekList(ctx.weekLabels)
+  return withSubjectPrefix("Reports", `${contentLabel} — ${weekLabel}`)
+}
+
+function buildEmailTitle(ctx: EmailContentContext): string {
+  const parts: string[] = []
+  if (ctx.includeMinutes) parts.push("Minutes of Meeting")
+  if (ctx.includeActionTracker) parts.push("Action Tracker")
+  if (ctx.includeWeeklyReport) parts.push(ctx.weekLabels.length > 1 ? "Weekly Reports" : "Weekly Report")
+  if (ctx.includeKss) parts.push(ctx.weekLabels.length > 1 ? "Knowledge Sharing Sessions" : "Knowledge Sharing Session")
+  if (parts.length === 0) return "General Meeting Documents"
+  if (parts.length === 1) return parts[0]
+  const last = parts.pop()!
+  return parts.join(", ") + " &amp; " + escapeHtml(last)
+}
+
+function buildEmailBody(meetingDate: string, nextMeetingDate: string, ctx: EmailContentContext): string {
+  const isMultiWeek = ctx.weekLabels.length > 1
+  const weekPhrase = `<strong>${escapeHtml(oxfordWeekList(ctx.weekLabels))}</strong>`
+
+  // Build the attached-content phrase
+  const attachedParts: string[] = []
+  if (ctx.includeMinutes) attachedParts.push(isMultiWeek ? "the Minutes of Meeting" : "the Minutes of Meeting")
+  if (ctx.includeActionTracker) attachedParts.push("the Action Tracker")
+  if (ctx.includeWeeklyReport) attachedParts.push(isMultiWeek ? "the Weekly Reports" : "the Weekly Report")
+  if (ctx.includeKss)
+    attachedParts.push(
+      isMultiWeek ? "the Knowledge Sharing Session documents" : "the Knowledge Sharing Session document"
+    )
+
+  let attachedPhrase: string
+  if (attachedParts.length === 0) {
+    attachedPhrase = "the meeting documents"
+  } else if (attachedParts.length === 1) {
+    attachedPhrase = attachedParts[0]
+  } else {
+    const last = attachedParts.pop()!
+    attachedPhrase = attachedParts.join(", ") + " and " + last
+  }
+
+  const lines: string[] = []
+
+  if (isMultiWeek) {
+    // Batch send — no meeting date, no next-meeting date
+    lines.push(`Please find attached ${attachedPhrase} for ${weekPhrase}.`)
+  } else {
+    // Single week
+    if (ctx.includeMinutes || ctx.includeActionTracker) {
+      // Classic formal send — include meeting date
+      lines.push(
+        `Please find attached ${attachedPhrase} for ${weekPhrase} of the General Meeting held on <strong>${meetingDate}</strong>.`
+      )
+      lines.push(
+        `Kindly review and share any observations or questions you may have ahead of the next General Meeting on <strong>${nextMeetingDate}</strong>.`
+      )
+    } else {
+      // KSS / Weekly Report only — no dates needed
+      lines.push(`Please find attached ${attachedPhrase} for ${weekPhrase}.`)
+    }
+  }
+
+  lines.push("Thank you.")
+  return lines.map((l) => `    <p class="text">${l}</p>`).join("\n")
+}
+
 function buildEmailHtml(
-  meetingWeek: number,
   meetingYear: number,
   meetingDate: string,
   nextMeetingDate: string,
-  preparedByName: string
+  preparedByName: string,
+  ctx: EmailContentContext
 ): string {
   const safePreparedBy = escapeHtml((preparedByName || "").trim() || "Terna")
+  const title = buildEmailTitle(ctx)
+  const weekBadge =
+    ctx.weekLabels.length <= 3
+      ? ctx.weekLabels.map(escapeHtml).join(" &bull; ") + ` &bull; ${meetingYear}`
+      : `${ctx.weekLabels.length} Weeks &bull; ${meetingYear}`
+  const bodyHtml = buildEmailBody(meetingDate, nextMeetingDate, ctx)
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Weekly Report &amp; Action Tracker</title>
+  <title>${title}</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { margin: 0; padding: 0; background: #fff; font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif; }
@@ -826,8 +927,6 @@ function buildEmailHtml(
     .week-badge { display: inline-block; background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; padding: 4px 12px; border-radius: 20px; text-transform: uppercase; margin-bottom: 16px; }
     .title { font-size: 24px; font-weight: 700; color: #111827; margin-bottom: 14px; }
     .text { font-size: 15px; color: #374151; line-height: 1.6; margin: 0 0 18px 0; }
-    .cta { text-align: center; margin-top: 32px; }
-    .button { display: inline-block; background: #000; color: #fff; text-decoration: none; padding: 14px 32px; border-radius: 6px; font-weight: 600; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; }
     .footer { background: #0f2d1f; padding: 20px; text-align: center; font-size: 11px; color: #9ca3af; border-top: 3px solid #16a34a; }
     .footer strong { color: #fff; }
     .footer-system { color: #16a34a; font-weight: 600; }
@@ -840,16 +939,10 @@ function buildEmailHtml(
     <img src="https://erp.acoblighting.com/images/acob-logo-dark.png" height="40" alt="ACOB Lighting">
   </div>
   <div class="wrapper">
-    <span class="week-badge">Week ${meetingWeek} &bull; ${meetingYear}</span>
-    <div class="title">General Meeting Minutes &amp; Action Tracker</div>
+    <span class="week-badge">${weekBadge}</span>
+    <div class="title">${title}</div>
     <p class="text">Dear All,</p>
-    <p class="text">
-      Please find attached the Minutes and Action Tracker of the General Meeting held on <strong>${meetingDate}</strong>.
-    </p>
-    <p class="text">
-      Kindly review and share any observations or questions you may have ahead of the next General Meeting on <strong>${nextMeetingDate}</strong>.
-    </p>
-    <p class="text">Thank you.</p>
+${bodyHtml}
   </div>
   <div class="footer" style="background-color:#0f2d1f;">
     <strong>ACOB Lighting Technology Limited</strong><br>
@@ -893,9 +986,11 @@ serve(async (req) => {
       recipients: bodyRecipients,
       weeklyReportBase64,
       actionTrackerBase64,
+      actionTrackerAttachments: bodyActionTrackerAttachments,
       // NEW: meetingWeek is the week of the meeting (what shows on cover page)
       meetingWeek: bodyMeetingWeek,
       meetingYear: bodyMeetingYear,
+      meetingWeeks: bodyMeetingWeeks,
       // LEGACY: forceWeek (kept for backwards compat with old callers)
       forceWeek,
       forceYear,
@@ -1103,18 +1198,6 @@ serve(async (req) => {
           ? [testEmail]
           : ["i.chibuikem@org.acoblighting.com"]
 
-    const subject = withSubjectPrefix(
-      "Reports",
-      `Minutes and Action Tracker of the General Meeting - ${meetingDateLabel}`
-    )
-    const html = buildEmailHtml(
-      meetingWeek,
-      meetingYear,
-      meetingDateLabel,
-      nextMeetingDateLabel,
-      preparedByName || "Terna"
-    )
-
     const attachments: AttachmentPayload[] = []
     if (includeWeeklyReport && reportPdfBase64) {
       attachments.push({
@@ -1122,7 +1205,15 @@ serve(async (req) => {
         content: reportPdfBase64,
       })
     }
-    if (includeActionTracker && trackerPdfBase64) {
+
+    // Support multi-week action tracker attachments (one per week)
+    if (Array.isArray(bodyActionTrackerAttachments) && bodyActionTrackerAttachments.length > 0) {
+      for (const att of bodyActionTrackerAttachments) {
+        if (att?.base64 && att?.filename) {
+          attachments.push({ filename: att.filename, content: att.base64 })
+        }
+      }
+    } else if (includeActionTracker && trackerPdfBase64) {
       attachments.push({
         filename: resolvedActionTrackerFilename || buildActionTrackerAttachmentName(meetingDateLabel, meetingWeek),
         content: trackerPdfBase64,
@@ -1132,6 +1223,34 @@ serve(async (req) => {
       attachments.push(attachment)
     }
     if (attachments.length === 0) throw new Error("No attachments to send")
+
+    // ── Build dynamic email context ──────────────────────────────────────
+    const hasKss = additionalAttachments.some(
+      (a) => a.filename?.toLowerCase().includes("kss") || a.filename?.toLowerCase().includes("knowledge")
+    )
+    const hasMinutes = additionalAttachments.some((a) => a.filename?.toLowerCase().includes("minutes"))
+    const allWeeks: number[] =
+      Array.isArray(bodyMeetingWeeks) && bodyMeetingWeeks.length > 0 ? bodyMeetingWeeks : [meetingWeek]
+    const weekLabels = allWeeks.map((w) => `Week ${w}`)
+
+    const emailCtx: EmailContentContext = {
+      includeWeeklyReport,
+      includeActionTracker:
+        includeActionTracker ||
+        (Array.isArray(bodyActionTrackerAttachments) && bodyActionTrackerAttachments.length > 0),
+      includeKss: hasKss,
+      includeMinutes: hasMinutes,
+      weekLabels,
+    }
+
+    const subject = buildEmailSubject(emailCtx)
+    const html = buildEmailHtml(
+      meetingYear,
+      meetingDateLabel,
+      nextMeetingDateLabel,
+      preparedByName || "Terna",
+      emailCtx
+    )
 
     const results: DeliveryResult[] = []
     for (const to of recipients) {

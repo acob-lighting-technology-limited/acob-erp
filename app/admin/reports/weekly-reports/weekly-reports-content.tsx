@@ -409,6 +409,7 @@ export function WeeklyReportsContent({
       icon={FileBarChart}
       backLinkHref="/admin/reports"
       backLinkLabel="Back to Reports"
+      actionsPlacement="below"
       actions={
         <WeeklyReportExportActions
           filteredReports={filteredReports}

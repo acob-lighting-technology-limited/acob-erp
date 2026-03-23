@@ -14,6 +14,7 @@ type DepartmentRelation = { name?: string | null } | Array<{ name?: string | nul
 
 type PaymentDepartmentRecord = {
   department?: DepartmentRelation
+  created_by?: string | null
 }
 
 async function createClient() {
@@ -50,7 +51,7 @@ async function assertPaymentAccess(supabase: PaymentsClient, userId: string, pay
 
   const { data: payment } = await dataClient
     .from("department_payments")
-    .select("department:departments(name)")
+    .select("department:departments(name), created_by")
     .eq("id", paymentId)
     .single()
 
@@ -61,8 +62,12 @@ async function assertPaymentAccess(supabase: PaymentsClient, userId: string, pay
     return { allowed: false as const, status: 404, error: "Payment not found" }
   }
 
+  if ((payment as PaymentDepartmentRecord | null)?.created_by === userId) {
+    return { allowed: true as const }
+  }
+
   if (scope) {
-    const scopedDepartments = getDepartmentScope(scope, "finance")
+    const scopedDepartments = getDepartmentScope(scope, "general")
     if (scopedDepartments) {
       const inScope = scopedDepartments.some(
         (dept) => normalizeDepartment(dept) === normalizeDepartment(paymentDepartment)
@@ -133,6 +138,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
 export async function POST(request: Request, { params }: { params: { id: string } }) {
   try {
     const supabase = await createClient()
+    const dataClient = getServiceRoleClientOrFallback(supabase)
     const { id: paymentId } = params
 
     const {
@@ -170,7 +176,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     }
 
     // Insert new document record
-    const { data: newDocument, error: dbError } = await supabase
+    const { data: newDocument, error: dbError } = await dataClient
       .from("payment_documents")
       .insert({
         payment_id: paymentId,
@@ -193,7 +199,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
     // If replacing an existing document, archive the old one
     if (replaceDocumentId) {
-      const { error: archiveError } = await supabase
+      const { error: archiveError } = await dataClient
         .from("payment_documents")
         .update({
           is_archived: true,
@@ -213,7 +219,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       const onedrive = getOneDriveService()
       if (onedrive.isEnabled()) {
         // Get payment details for folder structure
-        const { data: payment } = await supabase
+        const { data: payment } = await dataClient
           .from("department_payments")
           .select("id, title, department:departments(name)")
           .eq("id", paymentId)

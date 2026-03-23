@@ -18,6 +18,8 @@ interface PageHeaderProps {
   backLink?: BackLink
   /** Actions (buttons, dropdowns) shown on the right */
   actions?: React.ReactNode
+  /** Controls whether actions sit beside the title block or below it */
+  actionsPlacement?: "inline" | "below"
   /** Additional classes for the container */
   className?: string
 }
@@ -46,9 +48,26 @@ interface PageHeaderProps {
  *   actions={<Button>Save</Button>}
  * />
  */
-export function PageHeader({ title, description, icon: Icon, backLink, actions, className }: PageHeaderProps) {
+export function PageHeader({
+  title,
+  description,
+  icon: Icon,
+  backLink,
+  actions,
+  actionsPlacement = "inline",
+  className,
+}: PageHeaderProps) {
+  const renderActions = actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null
+
   return (
-    <div className={cn("flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between", className)}>
+    <div
+      className={cn(
+        actionsPlacement === "below"
+          ? "flex flex-col gap-4"
+          : "flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between",
+        className
+      )}
+    >
       <div className="space-y-1">
         {backLink && (
           <Link
@@ -65,7 +84,7 @@ export function PageHeader({ title, description, icon: Icon, backLink, actions, 
         </div>
         {description && <p className="text-muted-foreground text-sm">{description}</p>}
       </div>
-      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+      {renderActions}
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import type { Metadata } from "next"
-import "./kss.css"
+import "../../../kss.css"
 
 export const metadata: Metadata = {
   title: "ACOB ERP Knowledge Sharing Session",

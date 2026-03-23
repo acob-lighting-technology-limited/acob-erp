@@ -106,6 +106,25 @@ function SlideCard({ title, body, label, value }: { title?: string; body: string
 }
 
 function SlideBody({ scene }: { scene: SceneConfig }) {
+  if (scene.layout === "cover") {
+    return (
+      <div className="slide slide--cover">
+        <h1 className="slide__title slide__title--hero">{scene.title}</h1>
+        <div className="slide__cover-meta" aria-label="Presentation metadata">
+          <p>
+            <span>Presenter:</span> {scene.coverMeta?.presenter || "Presenter Name"}
+          </p>
+          <p>
+            <span>Department:</span> {scene.coverMeta?.department || "IT & Infrastructure Department"}
+          </p>
+          <p>
+            <span>Date:</span> {scene.coverMeta?.date || "Date"}
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   if (scene.layout === "erp") {
     const sceneConfig: ErpSceneConfig = scene.erpPath
       ? {
@@ -136,6 +155,14 @@ function SlideBody({ scene }: { scene: SceneConfig }) {
             <SlideCard key={item.title} title={item.title} body={item.body} />
           ))}
         </AnimatedGrid>
+      </div>
+    )
+  }
+
+  if (scene.layout === "titleOnly") {
+    return (
+      <div className="slide slide--title-only">
+        <h1 className="slide__title slide__title--hero">{scene.title}</h1>
       </div>
     )
   }
@@ -176,13 +203,13 @@ function SlideBody({ scene }: { scene: SceneConfig }) {
   )
 }
 
-export function PresentationDeck() {
+export function PresentationDeck({ scenes = presentationScenes }: { scenes?: SceneConfig[] }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [activeIndex, setActiveIndex] = useState(0)
   const [direction, setDirection] = useState(1)
   const reduceMotion = useReducedMotion()
   const previousIndexRef = useRef(0)
-  const activeScene = useMemo(() => presentationScenes[activeIndex], [activeIndex])
+  const activeScene = useMemo(() => scenes[activeIndex] || scenes[0], [activeIndex, scenes])
 
   useEffect(() => {
     const container = containerRef.current
@@ -202,7 +229,7 @@ export function PresentationDeck() {
     const handleScroll = () => {
       const width = window.innerWidth || 1
       const index = Math.round(container.scrollLeft / width)
-      const nextIndex = Math.max(0, Math.min(index, presentationScenes.length - 1))
+      const nextIndex = Math.max(0, Math.min(index, scenes.length - 1))
 
       if (nextIndex !== previousIndexRef.current) {
         setDirection(nextIndex > previousIndexRef.current ? 1 : -1)
@@ -220,7 +247,7 @@ export function PresentationDeck() {
       window.removeEventListener("wheel", handleWheel)
       container.removeEventListener("scroll", handleScroll)
     }
-  }, [reduceMotion])
+  }, [reduceMotion, scenes.length])
 
   useEffect(() => {
     const container = containerRef.current
@@ -240,7 +267,7 @@ export function PresentationDeck() {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "ArrowRight") {
         event.preventDefault()
-        goToScene(Math.min(activeIndex + 1, presentationScenes.length - 1))
+        goToScene(Math.min(activeIndex + 1, scenes.length - 1))
       }
 
       if (event.key === "ArrowLeft") {
@@ -253,7 +280,7 @@ export function PresentationDeck() {
       const directionDetail = (event as CustomEvent<"previous" | "next">).detail
 
       if (directionDetail === "next") {
-        goToScene(Math.min(activeIndex + 1, presentationScenes.length - 1))
+        goToScene(Math.min(activeIndex + 1, scenes.length - 1))
       }
 
       if (directionDetail === "previous") {
@@ -268,7 +295,7 @@ export function PresentationDeck() {
       window.removeEventListener("keydown", handleKeyDown)
       window.removeEventListener("erp-kss:navigate", handleIframeNavigation as EventListener)
     }
-  }, [activeIndex, reduceMotion])
+  }, [activeIndex, reduceMotion, scenes.length])
 
   return (
     <main className="presentation-shell">
@@ -284,7 +311,7 @@ export function PresentationDeck() {
         />
       </AnimatePresence>
 
-      {activeScene.layout !== "erp" ? (
+      {activeScene.layout !== "erp" && activeScene.layout !== "cover" ? (
         <>
           <div className="deck-fixed-topbar">
             <div className="deck-fixed-topbar__topic">{activeScene.eyebrow}</div>
@@ -313,17 +340,17 @@ export function PresentationDeck() {
           </div>
 
           <div className="deck-progress-top" aria-hidden="true">
-            <span style={{ width: `${((activeIndex + 1) / presentationScenes.length) * 100}%` }} />
+            <span style={{ width: `${scenes.length > 1 ? (activeIndex / (scenes.length - 1)) * 100 : 0}%` }} />
           </div>
 
           <div className="deck-page-count" aria-hidden="true">
-            {String(activeIndex + 1).padStart(2, "0")}/{String(presentationScenes.length).padStart(2, "0")}
+            {String(activeIndex + 1).padStart(2, "0")}/{String(scenes.length).padStart(2, "0")}
           </div>
         </>
       ) : null}
 
       <div className="deck-scroll" ref={containerRef}>
-        {presentationScenes.map((scene) => (
+        {scenes.map((scene) => (
           <section key={scene.id} className="scene" aria-label={scene.title} />
         ))}
       </div>

@@ -24,7 +24,7 @@ export function ReportExportActions({
   onSubmitNew,
 }: ReportExportActionsProps) {
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
       {filteredReports.length > 0 && (
         <>
           <Button
