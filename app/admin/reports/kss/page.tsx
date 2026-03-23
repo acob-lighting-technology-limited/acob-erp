@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import { isAssignableEmploymentStatus } from "@/lib/workforce/assignment-policy"
 import { KssRosterTable } from "@/components/reports/kss-roster-table"
 
 export default async function AdminKssPage() {
@@ -28,17 +27,16 @@ export default async function AdminKssPage() {
     .select("id, full_name, department, employment_status")
     .order("full_name")
 
-  const assignableEmployees = (employees || []).filter((employee) =>
-    isAssignableEmploymentStatus(employee.employment_status, { allowLegacyNullStatus: false })
-  )
-
   return (
     <KssRosterTable
-      employees={assignableEmployees.map((e: { id: string; full_name: string; department: string | null }) => ({
-        id: e.id,
-        full_name: e.full_name,
-        department: e.department,
-      }))}
+      employees={(employees || []).map(
+        (e: { id: string; full_name: string; department: string | null; employment_status?: string | null }) => ({
+          id: e.id,
+          full_name: e.full_name,
+          department: e.department,
+          employment_status: e.employment_status || null,
+        })
+      )}
       backHref="/admin/reports"
       backLabel="Back to Reports"
       title="Knowledge Sharing Session"

@@ -38,6 +38,10 @@ export default async function CommunicationsMeetingsMailPage() {
   return (
     <WeeklySummaryContent
       employees={assignableEmployees}
+      presenterDirectory={(employees || []).map((employee) => ({
+        id: employee.id,
+        full_name: employee.full_name || "",
+      }))}
       currentUser={{
         id: user.id,
         full_name: profile?.full_name || null,

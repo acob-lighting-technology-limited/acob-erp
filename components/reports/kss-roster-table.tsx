@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { TablePage } from "@/components/admin/admin-table-page"
@@ -26,6 +26,7 @@ import {
 import { TableSkeleton } from "@/components/ui/query-states"
 import { createClient } from "@/lib/supabase/client"
 import { getCurrentOfficeWeek } from "@/lib/meeting-week"
+import { isAssignableEmploymentStatus } from "@/lib/workforce/assignment-policy"
 import { REPORT_DOC_MAX_SIZE_BYTES, formatLimitMb } from "@/lib/reports/document-upload-limits"
 import { buildMeetingDocumentFileName } from "@/lib/reports/meeting-date"
 import { Download, Loader2, Pencil, Plus, Presentation, Search, Trash2 } from "lucide-react"
@@ -34,6 +35,7 @@ type Employee = {
   id: string
   full_name: string
   department: string | null
+  employment_status?: string | null
 }
 
 type KssRosterEntry = {
@@ -148,11 +150,6 @@ export function KssRosterTable({
     )
   }, [employees])
 
-  const presenterOptions = useMemo(() => {
-    if (department === "none") return []
-    return employees.filter((e) => e.department === department).sort((a, b) => a.full_name.localeCompare(b.full_name))
-  }, [department, employees])
-
   const employeeNameById = useMemo(() => {
     return new Map(employees.map((e) => [e.id, e.full_name]))
   }, [employees])
@@ -201,12 +198,44 @@ export function KssRosterTable({
   })
 
   const isSelectedWeekLocked = Boolean(selectedWeekLockState)
+  const isHistoricalSelection =
+    compareWeekYear(weekNumber, yearNumber, currentOfficeWeek.week, currentOfficeWeek.year) < 0
+  const allowInactivePresentersForSelection = isHistoricalSelection || isSelectedWeekLocked
+  const presenterOptions = useMemo(() => {
+    if (department === "none") return []
+    return employees
+      .filter((e) => e.department === department)
+      .filter(
+        (e) =>
+          allowInactivePresentersForSelection ||
+          isAssignableEmploymentStatus(e.employment_status, { allowLegacyNullStatus: false })
+      )
+      .sort((a, b) => a.full_name.localeCompare(b.full_name))
+  }, [allowInactivePresentersForSelection, department, employees])
+
+  const selectedWeekExistingRow = useMemo(
+    () => roster.find((row) => row.meeting_week === weekNumber && row.meeting_year === yearNumber) || null,
+    [roster, weekNumber, yearNumber]
+  )
 
   const docByWeekYear = useMemo(() => {
     const map = new Map<string, KssDocument>()
     docs.forEach((d) => map.set(`${d.meeting_year}-${d.meeting_week}`, d))
     return map
   }, [docs])
+  const selectedWeekDoc = docByWeekYear.get(`${yearNumber}-${weekNumber}`) || null
+  const canUploadMissingForLockedWeek =
+    isSelectedWeekLocked && Boolean(selectedWeekExistingRow) && !selectedWeekDoc && !readOnly
+  const isFormLocked = Boolean(editingId)
+    ? isSelectedWeekLocked && Boolean(selectedWeekDoc)
+    : isSelectedWeekLocked && Boolean(selectedWeekExistingRow) && Boolean(selectedWeekDoc)
+
+  useEffect(() => {
+    if (!canUploadMissingForLockedWeek || !selectedWeekExistingRow || editingId) return
+    setDepartment(selectedWeekExistingRow.department || "none")
+    setPresenterId(selectedWeekExistingRow.presenter_id || "none")
+    setNotes(selectedWeekExistingRow.notes || "")
+  }, [canUploadMissingForLockedWeek, selectedWeekExistingRow, editingId])
 
   const rows = useMemo(() => {
     const q = searchQuery.trim().toLowerCase()
@@ -266,11 +295,13 @@ export function KssRosterTable({
   }
 
   const openEdit = (row: KssRosterEntry) => {
-    const isPastRow =
-      compareWeekYear(row.meeting_week, row.meeting_year, currentOfficeWeek.week, currentOfficeWeek.year) < 0
-    if (row.is_locked || isPastRow) {
+    const doc = docByWeekYear.get(`${row.meeting_year}-${row.meeting_week}`)
+    if (row.is_locked && doc) {
       toast.error(`Week ${row.meeting_week}, ${row.meeting_year} is locked and can no longer be edited`)
       return
+    }
+    if (row.is_locked && !doc) {
+      toast.info("This week is locked. You can only upload the missing KSS file.")
     }
     setShowCreate(true)
     setEditingId(row.id)
@@ -287,7 +318,7 @@ export function KssRosterTable({
       toast.error("You can only add or edit from Admin Reports.")
       return
     }
-    if (isSelectedWeekLocked) {
+    if (isFormLocked) {
       toast.error(`Week ${weekNumber}, ${yearNumber} is locked and can no longer be changed`)
       return
     }
@@ -307,38 +338,56 @@ export function KssRosterTable({
     setSaving(true)
     setUploadPhase("saving")
     try {
-      const rosterRes = await fetch("/api/reports/kss-roster", {
-        method: editingId ? "PATCH" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(
-          editingId
-            ? {
-                id: editingId,
-                department,
-                presenterId,
-                notes: notes || null,
-              }
-            : {
-                meetingWeek: weekNumber,
-                meetingYear: yearNumber,
-                department,
-                presenterId,
-                notes: notes || null,
-              }
-        ),
-      })
-      const rosterPayload = await rosterRes.json()
-      if (!rosterRes.ok) throw new Error(rosterPayload.error || "Failed to save roster")
+      let savedRoster: {
+        meeting_week: number
+        meeting_year: number
+        department?: string | null
+        presenter_id?: string | null
+      } | null = null
+
+      const skipRosterWrite =
+        isSelectedWeekLocked && !selectedWeekDoc && (Boolean(editingId) || canUploadMissingForLockedWeek)
+
+      if (skipRosterWrite) {
+        if (!selectedWeekExistingRow) {
+          throw new Error("Unable to resolve existing roster row for locked week")
+        }
+        savedRoster = selectedWeekExistingRow
+      } else {
+        const rosterRes = await fetch("/api/reports/kss-roster", {
+          method: editingId ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(
+            editingId
+              ? {
+                  id: editingId,
+                  department,
+                  presenterId,
+                  notes: notes || null,
+                }
+              : {
+                  meetingWeek: weekNumber,
+                  meetingYear: yearNumber,
+                  department,
+                  presenterId,
+                  notes: notes || null,
+                }
+          ),
+        })
+        const rosterPayload = await rosterRes.json()
+        if (!rosterRes.ok) throw new Error(rosterPayload.error || "Failed to save roster")
+        savedRoster = rosterPayload.data
+      }
 
       if (file) {
         const requiresConversion = [DOCX_MIME, PPTX_MIME].includes(file.type)
         const fd = new FormData()
         fd.append("file", file)
-        fd.append("meetingWeek", String(editingId ? rosterPayload.data.meeting_week : weekNumber))
-        fd.append("meetingYear", String(editingId ? rosterPayload.data.meeting_year : yearNumber))
+        fd.append("meetingWeek", String(savedRoster?.meeting_week || weekNumber))
+        fd.append("meetingYear", String(savedRoster?.meeting_year || yearNumber))
         fd.append("documentType", "knowledge_sharing_session")
-        fd.append("department", department)
-        fd.append("presenterId", presenterId)
+        fd.append("department", String(savedRoster?.department || department))
+        fd.append("presenterId", String(savedRoster?.presenter_id || presenterId))
         if (notes.trim()) fd.append("notes", notes.trim())
 
         if (requiresConversion) {
@@ -386,9 +435,7 @@ export function KssRosterTable({
       toast.error("You can only delete from Admin Reports.")
       return
     }
-    const isPastRow =
-      compareWeekYear(row.meeting_week, row.meeting_year, currentOfficeWeek.week, currentOfficeWeek.year) < 0
-    if (row.is_locked || isPastRow) {
+    if (row.is_locked) {
       toast.error(`Week ${row.meeting_week}, ${row.meeting_year} is locked and can no longer be changed`)
       return
     }
@@ -605,7 +652,7 @@ export function KssRosterTable({
                 <Select
                   value={String(weekNumber)}
                   onValueChange={(v) => setWeekNumber(Number(v))}
-                  disabled={Boolean(editingId) || isSelectedWeekLocked}
+                  disabled={Boolean(editingId) || isFormLocked}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -625,7 +672,7 @@ export function KssRosterTable({
                 <Select
                   value={String(yearNumber)}
                   onValueChange={(v) => setYearNumber(Number(v))}
-                  disabled={Boolean(editingId) || isSelectedWeekLocked}
+                  disabled={Boolean(editingId) || isFormLocked}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -642,7 +689,11 @@ export function KssRosterTable({
 
               <div className="space-y-2">
                 <Label>Department</Label>
-                <Select value={department} onValueChange={setDepartment} disabled={isSelectedWeekLocked}>
+                <Select
+                  value={department}
+                  onValueChange={setDepartment}
+                  disabled={isFormLocked || canUploadMissingForLockedWeek}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select department" />
                   </SelectTrigger>
@@ -662,7 +713,7 @@ export function KssRosterTable({
                 <Select
                   value={presenterId}
                   onValueChange={setPresenterId}
-                  disabled={isSelectedWeekLocked || department === "none"}
+                  disabled={isFormLocked || canUploadMissingForLockedWeek || department === "none"}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select presenter" />
@@ -672,6 +723,9 @@ export function KssRosterTable({
                     {presenterOptions.map((emp) => (
                       <SelectItem key={emp.id} value={emp.id}>
                         {emp.full_name}
+                        {!isAssignableEmploymentStatus(emp.employment_status, { allowLegacyNullStatus: false })
+                          ? " (separated)"
+                          : ""}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -684,7 +738,7 @@ export function KssRosterTable({
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Optional"
-                  disabled={isSelectedWeekLocked}
+                  disabled={isFormLocked || canUploadMissingForLockedWeek}
                 />
               </div>
 
@@ -706,22 +760,27 @@ export function KssRosterTable({
                     }
                     setFile(selected)
                   }}
-                  disabled={isSelectedWeekLocked}
+                  disabled={isFormLocked}
                 />
                 <p className="text-muted-foreground text-xs">
                   Accepted: PDF, PPTX, DOCX. PPTX and DOCX uploads are converted to PDF before storage. Max file size:{" "}
                   {formatLimitMb(REPORT_DOC_MAX_SIZE_BYTES)}
                 </p>
-                {isSelectedWeekLocked ? (
+                {isFormLocked ? (
                   <p className="text-muted-foreground text-xs">
                     This week is locked after the meeting grace window, so past KSS records are read-only.
+                  </p>
+                ) : null}
+                {canUploadMissingForLockedWeek ? (
+                  <p className="text-muted-foreground text-xs">
+                    This week is locked. You can only upload the missing KSS file for the existing roster entry.
                   </p>
                 ) : null}
               </div>
             </div>
 
             <div className="mt-4 flex gap-2">
-              <Button onClick={handleSave} disabled={saving || isSelectedWeekLocked}>
+              <Button onClick={handleSave} disabled={saving || isFormLocked}>
                 {saving ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -776,14 +835,8 @@ export function KssRosterTable({
                   rows.map((row, index) => {
                     const doc = docByWeekYear.get(`${row.meeting_year}-${row.meeting_week}`)
                     const presenterName = row.presenter_id ? employeeNameById.get(row.presenter_id) || "Unknown" : "-"
-                    const isPastRow =
-                      compareWeekYear(
-                        row.meeting_week,
-                        row.meeting_year,
-                        currentOfficeWeek.week,
-                        currentOfficeWeek.year
-                      ) < 0
-                    const isActionLocked = isPastRow || Boolean(row.is_locked)
+                    const isActionLocked = Boolean(row.is_locked)
+                    const canUploadMissing = isActionLocked && !doc
                     const submittedBy = row.created_by ? employeeNameById.get(row.created_by) || "Unknown" : "-"
                     const submittedDate = row.created_at
                       ? new Date(row.created_at).toLocaleString("en-GB", {
@@ -806,7 +859,7 @@ export function KssRosterTable({
                         <TableCell>{submittedDate}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1">
-                            {!readOnly && !isActionLocked ? (
+                            {!readOnly && (!isActionLocked || canUploadMissing) ? (
                               <Button variant="ghost" size="icon" onClick={() => openEdit(row)} title="Edit">
                                 <Pencil className="h-4 w-4" />
                               </Button>
