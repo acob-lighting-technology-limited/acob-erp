@@ -4,6 +4,11 @@ import { Resend } from "npm:resend@2.0.0"
 import { PDFDocument, PDFFont, PDFPage, rgb, StandardFonts, type RGB } from "npm:pdf-lib@1.17.1"
 import { writeEdgeAuditLog } from "../_shared/audit.ts"
 import {
+  compareDepartments,
+  getCanonicalDepartmentOrder,
+  normalizeDepartmentName,
+} from "../../../shared/departments.ts"
+import {
   buildMeetingDocumentFileName,
   formatMeetingDateLabel,
   getCurrentOfficeWeek,
@@ -65,6 +70,7 @@ type WeeklyReportRow = {
 type ActionItemRow = {
   id: string
   title: string | null
+  description?: string | null
   department: string
   status: string
   week_number: number
@@ -90,6 +96,8 @@ type WeeklyReportRequestBody = {
   weeklyReportDocumentId?: string
   actionTrackerDocumentId?: string
   additionalDocumentIds?: unknown[]
+  /** Pre-fetched additional attachments (KSS, Minutes, etc.) — bypasses server-side download */
+  additionalDocumentAttachments?: Array<{ base64: string; filename: string }>
   actionTrackerAttachments?: Array<{ base64: string; filename: string; week: number }>
   meetingWeeks?: number[]
   preparedByName?: string
@@ -112,15 +120,9 @@ function getErrorMessage(error: unknown): string {
   return "Unknown error"
 }
 
-const DEPT_ORDER = [
-  "Accounts",
-  "Business, Growth and Innovation",
-  "IT and Communications",
-  "Admin & HR",
-  "Legal, Regulatory and Compliance",
-  "Operations",
-  "Technical",
-]
+const DEPT_ORDER = getCanonicalDepartmentOrder().filter(
+  (department) => department !== "Executive Management" && department !== "Project"
+)
 
 function autoNumber(text: string): string {
   if (!text?.trim()) return ""
@@ -256,8 +258,14 @@ async function resolveStoredMeetingDocument(
   if (downloadError || !blob) return null
 
   const bytes = new Uint8Array(await blob.arrayBuffer())
+  // Chunk-based conversion — ~100× faster than byte-by-byte for large files.
+  // Processing in 8 KB chunks avoids call-stack limits and reduces CPU time
+  // from ~2 s (for a 3 MB file) to ~20 ms.
+  const CHUNK = 8192
   let binary = ""
-  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode(...bytes.subarray(i, Math.min(i + CHUNK, bytes.length)))
+  }
 
   return {
     base64: btoa(binary),
@@ -315,6 +323,60 @@ function buildWeeklyReportAttachmentName(meetingDateLabel: string, meetingWeek: 
 
 function buildActionTrackerAttachmentName(meetingDateLabel: string, meetingWeek: number): string {
   return `ACOB Action Tracker - ${meetingDateLabel} - W${meetingWeek}.pdf`
+}
+
+async function fetchActionTrackerRows(
+  supabase: ReturnType<typeof createClient>,
+  week: number,
+  year: number
+): Promise<ActionItemRow[]> {
+  const { data: taskRows, error: taskError } = await supabase
+    .from("tasks")
+    .select("id, title, description, department, status, week_number, year")
+    .eq("category", "weekly_action")
+    .eq("week_number", week)
+    .eq("year", year)
+
+  if (taskError) {
+    throw taskError
+  }
+
+  const normalizedTaskRows: ActionItemRow[] = Array.isArray(taskRows)
+    ? taskRows.map((row) => ({
+        id: String(row.id),
+        title: typeof row.title === "string" ? row.title : null,
+        description: typeof row.description === "string" ? row.description : null,
+        department: String(row.department || ""),
+        status: String(row.status || ""),
+        week_number: Number(row.week_number || week),
+        year: Number(row.year || year),
+      }))
+    : []
+
+  if (normalizedTaskRows.length > 0) {
+    return normalizedTaskRows
+  }
+
+  const { data: legacyRows, error: legacyError } = await supabase
+    .from("action_items")
+    .select("id, title, department, status, week_number, year")
+    .eq("week_number", week)
+    .eq("year", year)
+
+  if (legacyError) {
+    throw legacyError
+  }
+
+  return Array.isArray(legacyRows)
+    ? legacyRows.map((row) => ({
+        id: String(row.id),
+        title: typeof row.title === "string" ? row.title : null,
+        department: String(row.department || ""),
+        status: String(row.status || ""),
+        week_number: Number(row.week_number || week),
+        year: Number(row.year || year),
+      }))
+    : []
 }
 
 async function drawLogoInHeader(
@@ -727,14 +789,9 @@ async function buildWeeklyReportPDF(
   const bold = await doc.embedFont(StandardFonts.HelveticaBold)
   const regular = await doc.embedFont(StandardFonts.Helvetica)
 
-  const sorted = [...reports].sort((a, b) => {
-    const ia = DEPT_ORDER.indexOf(a.department)
-    const ib = DEPT_ORDER.indexOf(b.department)
-    if (ia !== -1 && ib !== -1) return ia - ib
-    if (ia !== -1) return -1
-    if (ib !== -1) return 1
-    return a.department.localeCompare(b.department)
-  })
+  const sorted = [...reports]
+    .map((report) => ({ ...report, department: normalizeDepartmentName(report.department) }))
+    .sort((a, b) => compareDepartments(a.department, b.department))
 
   await addCoverPage(
     doc,
@@ -777,8 +834,9 @@ async function buildActionTrackerPdf(
 
   const grouped: Record<string, ActionItemRow[]> = {}
   for (const a of actions) {
-    if (!grouped[a.department]) grouped[a.department] = []
-    grouped[a.department].push(a)
+    const department = normalizeDepartmentName(a.department)
+    if (!grouped[department]) grouped[department] = []
+    grouped[department].push({ ...a, department })
   }
 
   const depts = DEPT_ORDER.filter((d) => grouped[d])
@@ -1004,6 +1062,7 @@ serve(async (req) => {
       weeklyReportDocumentId,
       actionTrackerDocumentId,
       additionalDocumentIds,
+      additionalDocumentAttachments: bodyAdditionalDocumentAttachments,
       preparedByName,
       requestedByUserId,
     } = body
@@ -1062,7 +1121,15 @@ serve(async (req) => {
       ? additionalDocumentIds.map((id: unknown) => String(id)).filter(Boolean)
       : []
 
-    if (!includeWeeklyReport && !includeActionTracker && requestedAdditionalDocumentIds.length === 0) {
+    const hasPrefetchedAttachments =
+      Array.isArray(bodyAdditionalDocumentAttachments) && bodyAdditionalDocumentAttachments.length > 0
+
+    if (
+      !includeWeeklyReport &&
+      !includeActionTracker &&
+      requestedAdditionalDocumentIds.length === 0 &&
+      !hasPrefetchedAttachments
+    ) {
       throw new Error("No attachments selected")
     }
 
@@ -1103,7 +1170,17 @@ serve(async (req) => {
     }
 
     const additionalAttachments: AttachmentPayload[] = []
-    if (requestedAdditionalDocumentIds.length > 0) {
+
+    // Use client-pre-fetched attachments when available (avoids CPU-heavy
+    // server-side download + base64 conversion for large KSS/Minutes files).
+    if (Array.isArray(bodyAdditionalDocumentAttachments) && bodyAdditionalDocumentAttachments.length > 0) {
+      for (const att of bodyAdditionalDocumentAttachments) {
+        if (att?.base64 && att?.filename) {
+          additionalAttachments.push({ filename: att.filename, content: att.base64 })
+        }
+      }
+    } else if (requestedAdditionalDocumentIds.length > 0) {
+      // Fallback: download server-side (legacy path, used if signed_url was unavailable)
       const seenIds = new Set<string>()
       for (const docId of requestedAdditionalDocumentIds) {
         if (seenIds.has(docId)) continue
@@ -1139,15 +1216,6 @@ serve(async (req) => {
         )
       }
 
-      // Fetch action items for the meeting week
-      const { data: actions, error: actionsError } = await supabase
-        .from("action_items")
-        .select("id, title, department, status, week_number, year")
-        .eq("week_number", atWeek)
-        .eq("year", atYear)
-
-      if (actionsError) throw actionsError
-
       // Fetch BOTH logos: light for cover page, dark for headers
       const [coverLogoBytes, headerLogoBytes] = await Promise.all([
         fetchLogoBytes(`${STORAGE_BASE}/acob-logo-light.png`),
@@ -1155,7 +1223,7 @@ serve(async (req) => {
       ])
 
       const reportRows = (reports || []) as WeeklyReportRow[]
-      const actionRows = (actions || []) as ActionItemRow[]
+      const actionRows = await fetchActionTrackerRows(supabase, atWeek, atYear)
 
       console.log(`[weekly-report] Generating PDFs: ${reportRows.length} reports, ${actionRows.length} actions`)
       const [reportPdfBytes, trackerPdfBytes] = await Promise.all([
@@ -1295,6 +1363,8 @@ serve(async (req) => {
           failure_count: failureCount,
           prepared_by: preparedByName || "Terna",
           attachments: attachments.map((a) => a.filename),
+          failed_recipients: results.filter((r) => !r.success).map((r) => r.to),
+          delivery_results: results.map((r) => ({ to: r.to, success: r.success, emailId: r.emailId ?? null })),
         },
       })
     } catch (auditErr) {

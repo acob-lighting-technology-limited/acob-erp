@@ -47,6 +47,18 @@ async function fetchDepartmentNames(): Promise<string[]> {
   return (data || []).map((d) => d.name)
 }
 
+async function fetchOfficeLocations(): Promise<string[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("office_location")
+    .not("office_location", "is", null)
+    .neq("office_location", "")
+  if (error) throw new Error(error.message)
+  const unique = Array.from(new Set((data || []).map((r) => r.office_location as string).filter(Boolean)))
+  return unique.sort()
+}
+
 export default function EmployeeOnboardingForm() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSuccess, setIsSuccess] = useState(false)
@@ -55,6 +67,11 @@ export default function EmployeeOnboardingForm() {
   const { data: departments = [] } = useQuery({
     queryKey: QUERY_KEYS.employeeOnboardingDepartments(),
     queryFn: fetchDepartmentNames,
+  })
+
+  const { data: officeLocations = [] } = useQuery({
+    queryKey: QUERY_KEYS.employeeOnboardingOfficeLocations(),
+    queryFn: fetchOfficeLocations,
   })
 
   const {
@@ -354,11 +371,18 @@ export default function EmployeeOnboardingForm() {
                     <label className="text-foreground text-sm font-medium">
                       Office Location <span className="text-destructive">*</span>
                     </label>
-                    <Input
-                      className="h-11"
-                      placeholder="e.g. Head Office / Lekki Site"
-                      {...register("office_location")}
-                    />
+                    <Select onValueChange={(val) => setValue("office_location", val)}>
+                      <SelectTrigger className="h-11">
+                        <SelectValue placeholder="Select Office Location" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {officeLocations.map((loc) => (
+                          <SelectItem key={loc} value={loc}>
+                            {loc}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     {errors.office_location && (
                       <p className="text-destructive mt-1 text-sm">{errors.office_location.message}</p>
                     )}

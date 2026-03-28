@@ -1,6 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
+import {
+  normalizeDepartmentName as normalizeCanonicalDepartmentName,
+  normalizeDepartmentList as normalizeCanonicalDepartmentList,
+} from "@/shared/departments"
 
 export type AdminRole = "developer" | "super_admin" | "admin" | "employee" | "visitor" | string
 export type AdminDomain = "hr" | "finance" | "assets" | "reports" | "tasks" | "projects" | "communications"
@@ -90,12 +94,11 @@ function unique(values: string[]): string[] {
  * Single source of truth — import from here, do not copy locally.
  */
 export function normalizeDepartmentName(value: string): string {
-  if (value.toLowerCase() === "finance") return "Accounts"
-  return value
+  return normalizeCanonicalDepartmentName(value)
 }
 
 export function normalizeDepartmentList(values: string[]): string[] {
-  return unique(values.map(normalizeDepartmentName))
+  return unique(normalizeCanonicalDepartmentList(values))
 }
 
 export function isAdminLikeRole(role: string | null | undefined): boolean {

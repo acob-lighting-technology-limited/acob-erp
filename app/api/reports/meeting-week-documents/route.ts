@@ -27,6 +27,7 @@ const KSS_ALLOWED = new Set([
 
 const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 const PPTX_MIME = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+const CAN_CONVERT_OFFICE_TO_PDF = process.platform === "win32"
 
 async function createClient() {
   const cookieStore = await cookies()
@@ -330,6 +331,15 @@ export async function POST(request: Request) {
       department,
       presenterName,
     })
+
+    if (shouldConvertToPdf && !CAN_CONVERT_OFFICE_TO_PDF) {
+      return NextResponse.json(
+        {
+          error: "This deployment cannot convert PPTX or DOCX files to PDF automatically. Please upload a PDF instead.",
+        },
+        { status: 400 }
+      )
+    }
 
     if (shouldConvertToPdf) {
       try {

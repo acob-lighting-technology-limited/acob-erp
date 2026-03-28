@@ -6,7 +6,8 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Users, UserPlus, Mail, Plus, Search, X } from "lucide-react"
+import { Users, UserPlus, Mail, Plus, Search, X, RotateCcw } from "lucide-react"
+import { Textarea } from "@/components/ui/textarea"
 
 type Employee = {
   id: string
@@ -17,7 +18,7 @@ type Employee = {
   employment_status: string | null
 }
 
-type RecipientMode = "all" | "select" | "manual" | "all_plus"
+type RecipientMode = "all" | "select" | "manual" | "all_plus" | "resend_missed"
 
 interface RecipientSelectorProps {
   employees: Employee[]
@@ -35,6 +36,11 @@ interface RecipientSelectorProps {
   setManualInput: (v: string) => void
   addManualEmail: () => void
   removeManualEmail: (email: string) => void
+  /** Resend-missed mode: the raw text of already-delivered emails pasted by the user */
+  deliveredEmailsText: string
+  setDeliveredEmailsText: (v: string) => void
+  /** Emails that will be sent to in resend_missed mode (computed outside) */
+  missedRecipients: string[]
 }
 
 export function RecipientSelector({
@@ -53,12 +59,16 @@ export function RecipientSelector({
   setManualInput,
   addManualEmail,
   removeManualEmail,
+  deliveredEmailsText,
+  setDeliveredEmailsText,
+  missedRecipients,
 }: RecipientSelectorProps) {
   const modes = [
     { value: "all" as RecipientMode, label: "All Employees", icon: Users },
     { value: "select" as RecipientMode, label: "Select Specific", icon: UserPlus },
     { value: "manual" as RecipientMode, label: "Enter Manually", icon: Mail },
     { value: "all_plus" as RecipientMode, label: "All + Add More", icon: Plus },
+    { value: "resend_missed" as RecipientMode, label: "Resend Missed", icon: RotateCcw },
   ]
 
   const handleKeyDown = useCallback(
@@ -196,6 +206,43 @@ export function RecipientSelector({
           <p className="text-muted-foreground text-sm">
             The weekly report will be sent to all <strong>{employees.length}</strong> active employees.
           </p>
+        )}
+
+        {/* Resend Missed Mode */}
+        {recipientMode === "resend_missed" && (
+          <div className="space-y-3">
+            <p className="text-muted-foreground text-sm">
+              Paste the email addresses that <strong>already received</strong> the report (one per line, or
+              comma-separated). The system will send <strong>only to the employees not in that list</strong>.
+            </p>
+            <Textarea
+              placeholder={`Paste delivered emails here, e.g.\nd.abdulsamad@org.acoblighting.com\na.nurudeen@org.acoblighting.com\n...`}
+              value={deliveredEmailsText}
+              onChange={(e) => setDeliveredEmailsText(e.target.value)}
+              className="font-mono text-xs"
+              rows={8}
+            />
+            {missedRecipients.length > 0 ? (
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-orange-600">
+                  {missedRecipients.length} missed recipient{missedRecipients.length !== 1 ? "s" : ""} found:
+                </p>
+                <div className="max-h-[200px] overflow-y-auto rounded-lg border bg-orange-50 p-3 dark:bg-orange-950/20">
+                  {missedRecipients.map((email) => (
+                    <div key={email} className="py-0.5 font-mono text-xs text-orange-800 dark:text-orange-300">
+                      {email}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : deliveredEmailsText.trim() ? (
+              <p className="text-sm text-green-600">✅ All active employees appear to have received the email.</p>
+            ) : (
+              <p className="text-muted-foreground text-xs">
+                Start pasting delivered emails above to compute who was missed.
+              </p>
+            )}
+          </div>
         )}
       </CardContent>
     </Card>

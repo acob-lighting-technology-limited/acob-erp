@@ -57,7 +57,9 @@ serve(async (req) => {
       signature === LEGACY_TRIGGER_SECRET
 
     if (!isServiceRole && !isSecretValid) {
-      console.error(`[AUTH] Unauthorized webhook signature. Signature prefix: ${signature?.slice(0, 5) ?? "none"}`)
+      console.error(
+        `[AUTH FAIL] sig="${signature?.slice(0, 10) ?? "none"}" db_secret="${DB_TRIGGER_SECRET?.slice(0, 10) ?? "UNSET"}" legacy="${LEGACY_TRIGGER_SECRET?.slice(0, 10) ?? "UNSET"}" webhook="${webhookSecret?.slice(0, 10) ?? "UNSET"}" bearer_match=${isServiceRole}`
+      )
       return new Response("Unauthorized", { status: 401 })
     }
 

@@ -176,7 +176,7 @@ export const DEPARTMENTS = [
   "Legal, Regulatory and Compliance",
   "Logistics",
   "Monitoring and Evaluation",
-  "Operations",
+  "Operations and Maintenance",
   "Project",
   "Technical",
 ] as const
@@ -192,7 +192,7 @@ export const OFFICE_LOCATIONS = [
   "Legal, Regulatory and Compliance",
   "MD Conference Room",
   "MD Office",
-  "Operations",
+  "Operations and Maintenance",
   "Reception",
   "Site",
   "Technical",

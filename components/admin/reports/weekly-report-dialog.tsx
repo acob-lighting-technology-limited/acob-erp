@@ -66,6 +66,7 @@ export function WeeklyReportAdminDialog({
   const [departments, setDepartments] = useState<string[]>([])
   const [isNextWeekActive, setIsNextWeekActive] = useState(false)
   const [lockState, setLockState] = useState<WeeklyReportLockState | null>(null)
+  const [selectedExistingReportId, setSelectedExistingReportId] = useState<string | null>(report?.id || null)
   const currentOfficeWeek = getCurrentOfficeWeek()
   const [formData, setFormData] = useState({
     user_id: "",
@@ -114,7 +115,7 @@ export function WeeklyReportAdminDialog({
       if (!report) {
         const { data: existingReport } = await supabase
           .from("weekly_reports")
-          .select("user_id, work_done, tasks_new_week, challenges, status")
+          .select("id, user_id, work_done, tasks_new_week, challenges, status")
           .eq("department", formData.department)
           .eq("week_number", formData.week_number)
           .eq("year", formData.year)
@@ -124,6 +125,7 @@ export function WeeklyReportAdminDialog({
 
         if (existingReport) {
           hasExistingWeeklyReport = true
+          setSelectedExistingReportId(existingReport.id || null)
           setFormData((prev) => ({
             ...prev,
             user_id: existingReport.user_id || prev.user_id || currentUser.id || "",
@@ -133,6 +135,7 @@ export function WeeklyReportAdminDialog({
             status: existingReport.status || prev.status,
           }))
         } else {
+          setSelectedExistingReportId(null)
           // Critical reset: moving to a week with no report should not keep stale text
           setFormData((prev) => ({
             ...prev,
@@ -167,6 +170,7 @@ export function WeeklyReportAdminDialog({
 
   useEffect(() => {
     if (report) {
+      setSelectedExistingReportId(report.id)
       setFormData({
         user_id: report.user_id,
         department: isLead ? currentUser.department || report.department : report.department,
@@ -178,6 +182,7 @@ export function WeeklyReportAdminDialog({
         status: report.status || "submitted",
       })
     } else {
+      setSelectedExistingReportId(null)
       setFormData((prev) => ({
         ...prev,
         user_id: currentUser.id || "",
@@ -191,11 +196,15 @@ export function WeeklyReportAdminDialog({
     }
   }, [currentUser.department, currentUser.id, currentOfficeWeek.week, currentOfficeWeek.year, isLead, report, isOpen])
 
+  const isLockedForExistingReport = Boolean(lockState?.isLocked && selectedExistingReportId)
+
   const handleSubmit = async () => {
     const state = await fetchWeeklyReportLockState(supabase, formData.week_number, formData.year)
     setLockState(state)
-    if (state.isLocked) {
-      toast.error("This report week is locked. Ask admin to set a temporary unlock window.")
+    if (state.isLocked && selectedExistingReportId) {
+      toast.error(
+        "This report already exists and the grace window has closed. Only missing reports can still be created."
+      )
       return
     }
 
@@ -210,18 +219,26 @@ export function WeeklyReportAdminDialog({
       }
 
       const safeFormData = {
+        id: report?.id || selectedExistingReportId || undefined,
         ...formData,
         user_id: isLead ? currentUser.id : formData.user_id,
         department: isLead ? currentUser.department || formData.department : formData.department,
       }
 
-      const { data: savedReport, error: reportError } = await supabase
-        .from("weekly_reports")
-        .upsert(safeFormData, { onConflict: "department,week_number,year" })
-        .select("id")
-        .single()
-      if (reportError) throw reportError
-      void savedReport
+      const response = await fetch("/api/reports/weekly-reports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(safeFormData),
+      })
+      const raw = await response.text()
+      let payload: { error?: string } = {}
+      try {
+        payload = raw ? (JSON.parse(raw) as { error?: string }) : {}
+      } catch {
+        payload = {}
+      }
+      if (!response.ok) throw new Error(payload.error || `Failed to save report (${response.status})`)
+
       toast.success(report ? "Updated" : "Saved")
       onSuccess()
       onClose()
@@ -269,9 +286,9 @@ export function WeeklyReportAdminDialog({
           <DialogDescription>
             {report ? "Update this weekly report&apos;s details" : "Add a new departmental weekly report"}
           </DialogDescription>
-          {lockState?.isLocked && (
+          {isLockedForExistingReport && (
             <p className="text-destructive text-xs">
-              Locked after meeting date {lockState.meetingDate}. Editing is now closed for this week.
+              Locked after meeting date {lockState?.meetingDate}. Editing is now closed for existing reports this week.
             </p>
           )}
         </DialogHeader>
@@ -334,7 +351,7 @@ export function WeeklyReportAdminDialog({
           <Button variant="outline" onClick={onClose} disabled={loading}>
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={loading || !!lockState?.isLocked}>
+          <Button onClick={handleSubmit} disabled={loading || isLockedForExistingReport}>
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {report ? "Update Report" : "Create Report"}
           </Button>
