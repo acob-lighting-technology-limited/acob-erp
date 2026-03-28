@@ -16,6 +16,10 @@ export interface Goal {
   priority: string
   due_date: string
   created_at: string
+  // PMS: approval workflow
+  approval_status: "pending" | "approved" | "rejected"
+  approved_by?: string | null
+  approved_at?: string | null
 }
 
 async function getGoalsData() {

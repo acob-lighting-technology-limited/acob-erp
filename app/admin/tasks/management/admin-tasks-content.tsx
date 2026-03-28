@@ -112,6 +112,7 @@ const INITIAL_TASK_FORM: TaskFormState = {
   assignment_type: "individual",
   assigned_users: [],
   project_id: "",
+  goal_id: "",
   task_start_date: "",
   task_end_date: "",
 }
@@ -192,6 +193,7 @@ export function AdminTasksContent({
         assignment_type: task.assignment_type || "individual",
         assigned_users: assignedUsers,
         project_id: task.project_id || "",
+        goal_id: (task as any).goal_id || "",
         task_start_date: task.task_start_date || "",
         task_end_date: task.task_end_date || "",
       })
@@ -232,6 +234,7 @@ export function AdminTasksContent({
         assigned_to: taskForm.assignment_type === "individual" ? taskForm.assigned_to : null,
         assigned_by: user.id,
         project_id: taskForm.project_id || null,
+        goal_id: taskForm.goal_id || null,
         task_start_date: taskForm.task_start_date || null,
         task_end_date: taskForm.task_end_date || null,
         source_type: taskForm.project_id ? "project_task" : "manual",
@@ -426,8 +429,8 @@ export function AdminTasksContent({
               />
             </div>
             <p className="text-muted-foreground max-w-3xl text-sm">
-              Keep the main list as the place where work gets done. Open the workflow guide only when you want the
-              queue breakdown or history view.
+              Keep the main list as the place where work gets done. Open the workflow guide only when you want the queue
+              breakdown or history view.
             </p>
           </div>
 

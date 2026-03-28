@@ -20,7 +20,13 @@ import { Card, CardContent } from "@/components/ui/card"
 import { EmptyState } from "@/components/ui/patterns"
 import { ItemInfoButton } from "@/components/ui/item-info-button"
 import { User, Users, Building2 } from "lucide-react"
+import { useEffect, useState } from "react"
 import type { Task, employee, Project } from "@/app/admin/tasks/management/admin-tasks-content"
+
+interface KpiOption {
+  id: string
+  title: string
+}
 
 export interface TaskFormState {
   title: string
@@ -33,6 +39,7 @@ export interface TaskFormState {
   assignment_type: "individual" | "multiple" | "department"
   assigned_users: string[]
   project_id: string
+  goal_id: string // PMS: optional KPI link
   task_start_date: string
   task_end_date: string
 }
@@ -62,6 +69,25 @@ export function TaskFormDialog({
   departments,
   projects,
 }: TaskFormDialogProps) {
+  const [kpiOptions, setKpiOptions] = useState<KpiOption[]>([])
+
+  // Load approved KPIs for the selected assignee
+  useEffect(() => {
+    if (taskForm.assignment_type !== "individual" || !taskForm.assigned_to) {
+      setKpiOptions([])
+      return
+    }
+    fetch(`/api/hr/performance/goals?user_id=${taskForm.assigned_to}`)
+      .then((r) => r.json())
+      .then((json) => {
+        const approved = (json.data ?? json.goals ?? []).filter(
+          (g: { approval_status: string }) => g.approval_status === "approved"
+        )
+        setKpiOptions(approved.map((g: { id: string; title: string }) => ({ id: g.id, title: g.title })))
+      })
+      .catch(() => setKpiOptions([]))
+  }, [taskForm.assigned_to, taskForm.assignment_type])
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
@@ -321,6 +347,29 @@ export function TaskFormDialog({
               </SelectContent>
             </Select>
           </div>
+
+          {/* KPI Link — only for individual tasks with approved KPIs */}
+          {taskForm.assignment_type === "individual" && kpiOptions.length > 0 && (
+            <div>
+              <Label htmlFor="goal_id">Link to KPI (Optional)</Label>
+              <Select value={taskForm.goal_id} onValueChange={(value) => setTaskForm({ ...taskForm, goal_id: value })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a KPI this task contributes to" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">None</SelectItem>
+                  {kpiOptions.map((kpi) => (
+                    <SelectItem key={kpi.id} value={kpi.id}>
+                      {kpi.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-muted-foreground mt-1 text-xs">
+                Completing this task will count toward the selected KPI achievement score.
+              </p>
+            </div>
+          )}
 
           <div>
             <Label htmlFor="due_date">Due Date</Label>

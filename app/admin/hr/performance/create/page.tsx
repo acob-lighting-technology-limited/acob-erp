@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Star, FileText } from "lucide-react"
+import { FileText, Zap } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { PageHeader } from "@/components/layout/page-header"
@@ -32,6 +32,15 @@ interface ReviewCycle {
 interface PerformanceCreateData {
   users: User[]
   cycles: ReviewCycle[]
+}
+
+interface BehaviourCompetencies {
+  collaboration: number
+  accountability: number
+  communication: number
+  teamwork: number
+  loyalty: number
+  professional_conduct: number
 }
 
 async function fetchPerformanceCreateData(supabase: ReturnType<typeof createClient>): Promise<PerformanceCreateData> {
@@ -76,7 +85,58 @@ export default function CreateReviewPage() {
     goals_achieved: 0,
     goals_total: 0,
     manager_comments: "",
+    // PMS 4-component scores
+    kpi_score: 0,
+    cbt_score: 0,
+    attendance_score: 0,
+    behaviour_score: 0,
   })
+
+  const [competencies, setCompetencies] = useState<BehaviourCompetencies>({
+    collaboration: 0,
+    accountability: 0,
+    communication: 0,
+    teamwork: 0,
+    loyalty: 0,
+    professional_conduct: 0,
+  })
+
+  const [loadingScore, setLoadingScore] = useState(false)
+
+  const behaviourAvg = Math.round(
+    Object.values(competencies).reduce((s, v) => s + v, 0) / Object.keys(competencies).length
+  )
+
+  const finalScore = Math.round(
+    formData.kpi_score * 0.7 + formData.cbt_score * 0.1 + formData.attendance_score * 0.1 + behaviourAvg * 0.1
+  )
+
+  async function autoFillScores() {
+    if (!formData.user_id || !formData.review_cycle_id) {
+      toast.error("Select employee and review cycle first")
+      return
+    }
+    setLoadingScore(true)
+    try {
+      const res = await fetch(
+        `/api/hr/performance/score?user_id=${formData.user_id}&cycle_id=${formData.review_cycle_id}`
+      )
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error)
+      const d = json.data
+      setFormData((prev) => ({
+        ...prev,
+        kpi_score: d.kpi_score ?? 0,
+        cbt_score: d.cbt_score ?? 0,
+        attendance_score: d.attendance_score ?? 0,
+      }))
+      toast.success("KPI and attendance scores auto-filled from ERP data")
+    } catch {
+      toast.error("Failed to auto-fill scores")
+    } finally {
+      setLoadingScore(false)
+    }
+  }
 
   const { data, isLoading: loading } = useQuery({
     queryKey: QUERY_KEYS.performanceCreateData(),
@@ -94,7 +154,11 @@ export default function CreateReviewPage() {
       const response = await fetch("/api/hr/performance/reviews", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          behaviour_score: behaviourAvg,
+          behaviour_competencies: competencies,
+        }),
       })
 
       const responseData = await response.json()
@@ -111,29 +175,6 @@ export default function CreateReviewPage() {
     } finally {
       setSaving(false)
     }
-  }
-
-  function renderRatingSelector() {
-    return (
-      <div className="flex gap-2">
-        {[1, 2, 3, 4, 5].map((rating) => (
-          <button
-            key={rating}
-            type="button"
-            onClick={() => setFormData({ ...formData, overall_rating: rating })}
-            className="p-1"
-          >
-            <Star
-              className={`h-8 w-8 transition-colors ${
-                rating <= formData.overall_rating
-                  ? "fill-yellow-500 text-yellow-500"
-                  : "text-gray-300 hover:text-yellow-300"
-              }`}
-            />
-          </button>
-        ))}
-      </div>
-    )
   }
 
   if (loading) return <PageLoader />
@@ -192,13 +233,115 @@ export default function CreateReviewPage() {
               </Select>
             </FormFieldGroup>
 
-            {/* Overall Rating */}
-            <FormFieldGroup label="Overall Rating">
-              {renderRatingSelector()}
-              <p className="text-muted-foreground text-sm">
-                {formData.overall_rating === 0 ? "Click to rate" : `${formData.overall_rating} out of 5`}
-              </p>
-            </FormFieldGroup>
+            {/* PMS 4-Component Scoring */}
+            <div className="space-y-4 rounded-lg border p-4">
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold">Performance Score Components</h3>
+                <Button type="button" variant="outline" size="sm" onClick={autoFillScores} loading={loadingScore}>
+                  <Zap className="mr-1 h-3 w-3" />
+                  Auto-fill from ERP
+                </Button>
+              </div>
+
+              {/* KPI Achievement 70% */}
+              <FormFieldGroup label="KPI Achievement Score (70%)">
+                <div className="flex items-center gap-3">
+                  <Input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={formData.kpi_score}
+                    onChange={(e) =>
+                      setFormData({ ...formData, kpi_score: Math.min(100, Math.max(0, parseInt(e.target.value) || 0)) })
+                    }
+                    className="w-24"
+                  />
+                  <span className="text-muted-foreground text-sm">/ 100</span>
+                  <span className="text-muted-foreground text-xs">
+                    (contributes {Math.round(formData.kpi_score * 0.7)}pts)
+                  </span>
+                </div>
+              </FormFieldGroup>
+
+              {/* CBT 10% */}
+              <FormFieldGroup label="Knowledge Assessment / CBT Score (10%)">
+                <div className="flex items-center gap-3">
+                  <Input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={formData.cbt_score}
+                    onChange={(e) =>
+                      setFormData({ ...formData, cbt_score: Math.min(100, Math.max(0, parseInt(e.target.value) || 0)) })
+                    }
+                    className="w-24"
+                  />
+                  <span className="text-muted-foreground text-sm">/ 100</span>
+                  <span className="text-muted-foreground text-xs">
+                    (contributes {Math.round(formData.cbt_score * 0.1)}pts)
+                  </span>
+                </div>
+              </FormFieldGroup>
+
+              {/* Attendance 10% */}
+              <FormFieldGroup label="Attendance Score (10%)">
+                <div className="flex items-center gap-3">
+                  <Input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={formData.attendance_score}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        attendance_score: Math.min(100, Math.max(0, parseInt(e.target.value) || 0)),
+                      })
+                    }
+                    className="w-24"
+                  />
+                  <span className="text-muted-foreground text-sm">/ 100</span>
+                  <span className="text-muted-foreground text-xs">
+                    (contributes {Math.round(formData.attendance_score * 0.1)}pts)
+                  </span>
+                </div>
+              </FormFieldGroup>
+
+              {/* Behavioural 10% — per-competency */}
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Behavioural Assessment (10%) — rate each competency 0–100</p>
+                {(Object.keys(competencies) as Array<keyof BehaviourCompetencies>).map((key) => (
+                  <div key={key} className="flex items-center gap-3">
+                    <span className="w-40 text-sm capitalize">{key.replace("_", " ")}</span>
+                    <Input
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={competencies[key]}
+                      onChange={(e) =>
+                        setCompetencies({
+                          ...competencies,
+                          [key]: Math.min(100, Math.max(0, parseInt(e.target.value) || 0)),
+                        })
+                      }
+                      className="w-24"
+                    />
+                  </div>
+                ))}
+                <p className="text-muted-foreground text-xs">
+                  Behaviour avg: {behaviourAvg} / 100 (contributes {Math.round(behaviourAvg * 0.1)}pts)
+                </p>
+              </div>
+
+              {/* Final score preview */}
+              <div className="bg-muted flex items-center justify-between rounded-md p-3">
+                <span className="font-semibold">Computed Final Score</span>
+                <span
+                  className={`text-2xl font-bold ${finalScore >= 70 ? "text-green-600" : finalScore >= 50 ? "text-yellow-600" : "text-red-600"}`}
+                >
+                  {finalScore} / 100
+                </span>
+              </div>
+            </div>
 
             {/* Goals */}
             <div className="grid grid-cols-2 gap-4">
@@ -250,7 +393,11 @@ export default function CreateReviewPage() {
               />
             </FormFieldGroup>
 
-            <Button type="submit" className="w-full" disabled={saving || !formData.user_id || !formData.overall_rating}>
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={saving || !formData.user_id || !formData.review_cycle_id}
+            >
               {saving ? "Saving..." : "Submit Review"}
             </Button>
           </form>
