@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client"
 import { getCurrentOfficeWeek } from "@/lib/meeting-week"
 import { toast } from "sonner"
 import { fetchWeeklyReportLockState, getDefaultMeetingDateIso } from "@/lib/weekly-report-lock"
+import { getDepartmentAliases, normalizeDepartmentName } from "@/shared/departments"
 
 import { FileBarChart } from "lucide-react"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
@@ -30,6 +31,18 @@ interface AdminWeeklyReportsData {
   trackingData: TrackerStatus[]
 }
 
+function expandDepartmentScope(departments: string[]) {
+  const scoped = new Set<string>()
+  departments.forEach((department) => {
+    getDepartmentAliases(department).forEach((alias) => scoped.add(alias))
+  })
+  return Array.from(scoped)
+}
+
+function getDepartmentFilterValues(department: string) {
+  return getDepartmentAliases(department)
+}
+
 async function fetchAdminWeeklyReports(
   supabase: ReturnType<typeof createClient>,
   weekFilter: number,
@@ -48,12 +61,16 @@ async function fetchAdminWeeklyReports(
     .order("department", { ascending: true })
 
   if (deptFilter !== "all") {
-    query = query.eq("department", deptFilter)
+    query = query.in("department", getDepartmentFilterValues(deptFilter))
   }
   const { data, error } = await query
   if (error) throw new Error(error.message)
 
-  const sortedData = sortReportsByDepartment(data || [])
+  const normalizedReports = (data || []).map((report) => ({
+    ...report,
+    department: normalizeDepartmentName(report.department),
+  }))
+  const sortedData = sortReportsByDepartment(normalizedReports)
 
   const { data: actions, error: actionsError } = await supabase
     .from("tasks")
@@ -61,11 +78,16 @@ async function fetchAdminWeeklyReports(
     .eq("category", "weekly_action")
     .eq("week_number", weekFilter)
     .eq("year", yearFilter)
-    .in("department", initialDepartments)
+    .in("department", expandDepartmentScope(initialDepartments))
 
   return {
     reports: sortedData,
-    trackingData: actionsError ? [] : actions || [],
+    trackingData: actionsError
+      ? []
+      : (actions || []).map((action) => ({
+          ...action,
+          department: normalizeDepartmentName(action.department),
+        })),
   }
 }
 
@@ -245,7 +267,7 @@ export function WeeklyReportsContent({
   }, [isAdminRole, weekSetupData])
 
   const presenterOptions = employees
-    .filter((employee) => employee.department === kssDepartmentInput)
+    .filter((employee) => normalizeDepartmentName(employee.department) === normalizeDepartmentName(kssDepartmentInput))
     .sort((a, b) => a.full_name.localeCompare(b.full_name))
 
   const kssDocument = selectedWeekDocuments.find((doc) => doc.document_type === "knowledge_sharing_session") || null

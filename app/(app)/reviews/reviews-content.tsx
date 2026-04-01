@@ -3,7 +3,8 @@
 import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Star, FileText } from "lucide-react"
+import { ArrowLeft, Star, FileText, Target, BookOpen, CalendarCheck, Users } from "lucide-react"
+import { Progress } from "@/components/ui/progress"
 import Link from "next/link"
 import type { Review } from "./page"
 
@@ -118,12 +119,63 @@ export function ReviewsContent({ initialReviews }: ReviewsContentProps) {
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* Rating */}
-                <div className="flex items-center gap-4">
-                  <span className="text-sm font-medium">Overall Rating:</span>
-                  {renderStars(review.overall_rating || 0)}
-                  <span className="text-lg font-bold">{review.overall_rating || 0}/5</span>
-                </div>
+                {/* PMS 4-component score breakdown */}
+                {review.final_score != null ? (
+                  <div className="space-y-3 rounded-lg border p-4">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold">Final Score</span>
+                      <span
+                        className={`text-2xl font-bold ${(review.final_score ?? 0) >= 70 ? "text-green-600" : (review.final_score ?? 0) >= 50 ? "text-yellow-600" : "text-red-600"}`}
+                      >
+                        {review.final_score} / 100
+                      </span>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {[
+                        { label: "KPI Achievement", value: review.kpi_score, weight: 70, icon: Target },
+                        { label: "Knowledge (CBT)", value: review.cbt_score, weight: 10, icon: BookOpen },
+                        { label: "Attendance", value: review.attendance_score, weight: 10, icon: CalendarCheck },
+                        { label: "Behaviour", value: review.behaviour_score, weight: 10, icon: Users },
+                      ].map(({ label, value, weight, icon: Icon }) => (
+                        <div key={label} className="space-y-1">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="flex items-center gap-1">
+                              <Icon className="h-3.5 w-3.5" />
+                              {label} <span className="text-muted-foreground">({weight}%)</span>
+                            </span>
+                            <span className="font-medium">
+                              {value ?? "-"}
+                              {value != null ? "/100" : ""}
+                            </span>
+                          </div>
+                          <Progress value={value ?? 0} className="h-2" />
+                        </div>
+                      ))}
+                    </div>
+                    {review.behaviour_competencies && (
+                      <details className="text-sm">
+                        <summary className="cursor-pointer text-xs text-blue-600">
+                          View behavioural competency breakdown
+                        </summary>
+                        <div className="mt-2 grid grid-cols-2 gap-1">
+                          {Object.entries(review.behaviour_competencies).map(([k, v]) => (
+                            <div key={k} className="odd:bg-muted/50 flex justify-between rounded px-2 py-1">
+                              <span className="capitalize">{k.replace("_", " ")}</span>
+                              <span className="font-medium">{v}/100</span>
+                            </div>
+                          ))}
+                        </div>
+                      </details>
+                    )}
+                  </div>
+                ) : (
+                  /* Fallback: legacy star rating */
+                  <div className="flex items-center gap-4">
+                    <span className="text-sm font-medium">Overall Rating:</span>
+                    {renderStars(review.overall_rating || 0)}
+                    <span className="text-lg font-bold">{review.overall_rating || 0}/5</span>
+                  </div>
+                )}
 
                 {/* Goals Progress */}
                 {review.goals_total > 0 && (

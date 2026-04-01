@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Target, Plus, CheckCircle } from "lucide-react"
+import { Target, Plus, CheckCircle, Clock, XCircle } from "lucide-react"
 import { PageHeader, PageWrapper } from "@/components/layout"
 import { toast } from "sonner"
 import {
@@ -103,6 +103,41 @@ export function GoalsContent({ initialGoals, userId }: GoalsContentProps) {
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : "Failed to update goal")
     }
+  }
+
+  async function handleRequestApproval(goalId: string) {
+    try {
+      const response = await fetch("/api/hr/performance/goals", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: goalId, approval_status: "pending" }),
+      })
+      if (!response.ok) throw new Error("Failed to request approval")
+      toast.success("Approval request sent to your line manager")
+      fetchGoals()
+    } catch {
+      toast.error("Failed to request approval")
+    }
+  }
+
+  function getApprovalBadge(approval_status: string) {
+    if (approval_status === "approved")
+      return (
+        <Badge className="flex items-center gap-1 bg-green-100 text-green-800">
+          <CheckCircle className="h-3 w-3" /> KPI Approved
+        </Badge>
+      )
+    if (approval_status === "rejected")
+      return (
+        <Badge className="flex items-center gap-1 bg-red-100 text-red-800">
+          <XCircle className="h-3 w-3" /> KPI Rejected
+        </Badge>
+      )
+    return (
+      <Badge className="flex items-center gap-1 bg-yellow-100 text-yellow-800">
+        <Clock className="h-3 w-3" /> Pending Approval
+      </Badge>
+    )
   }
 
   function getStatusBadge(status: string) {
@@ -255,9 +290,10 @@ export function GoalsContent({ initialGoals, userId }: GoalsContentProps) {
                     )}
                     {goal.title}
                   </CardTitle>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <Badge className={getPriorityBadge(goal.priority)}>{goal.priority}</Badge>
                     <Badge className={getStatusBadge(goal.status)}>{goal.status.replace("_", " ")}</Badge>
+                    {getApprovalBadge(goal.approval_status ?? "pending")}
                   </div>
                 </div>
                 {goal.description && <CardDescription>{goal.description}</CardDescription>}
@@ -292,6 +328,17 @@ export function GoalsContent({ initialGoals, userId }: GoalsContentProps) {
                   )}
                   {goal.due_date && (
                     <p className="text-muted-foreground text-sm">Due: {new Date(goal.due_date).toLocaleDateString()}</p>
+                  )}
+                  {/* Approval action — only show for pending goals not yet completed */}
+                  {(goal.approval_status ?? "pending") === "pending" && goal.status !== "completed" && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-1 w-full sm:w-auto"
+                      onClick={() => handleRequestApproval(goal.id)}
+                    >
+                      Request KPI Approval
+                    </Button>
                   )}
                 </div>
               </CardContent>

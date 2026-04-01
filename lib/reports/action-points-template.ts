@@ -4,31 +4,30 @@ import { readFile } from "node:fs/promises"
 import { join } from "node:path"
 import JSZip from "jszip"
 import type { ActionItem } from "@/lib/export-utils"
+import {
+  getActionPointsDepartmentHeading,
+  getCanonicalDepartmentOrder,
+  normalizeDepartmentName,
+} from "@/shared/departments"
 
 const TEMPLATE_FILE = join(process.cwd(), "ACTION POINTS - 9TH MARCH 2026.docx")
 const SAFE_SECTION_SPACER_XML =
   '<w:p><w:pPr><w:pStyle w:val="BodyText"/><w:spacing w:before="25"/><w:ind w:left="0" w:firstLine="0"/></w:pPr></w:p>'
-const DEPARTMENT_ORDER = [
-  "Accounts",
-  "Business, Growth and Innovation",
-  "IT and Communications",
-  "Admin & HR",
-  "Legal, Regulatory and Compliance",
-  "Operations",
-  "Project",
-  "Technical",
-]
+const DEPARTMENT_ORDER = getCanonicalDepartmentOrder().filter((department) => department !== "Executive Management")
 
 const TEMPLATE_HEADINGS = [
-  "ACCOUNTS DEPARTMEMT:",
-  "ADMIN/HR:",
-  "BUSINESS GROWTH AND INNOVATION:",
-  "IT & COMMUNICATIONS DEPARTMENT:",
-  "OPERATIONS DEPARTMENT:",
-  "PROJECT DEPARTMENT:",
-  "REGULATORY & COMPLIANCE DEPARTMENT:",
-  "TECHNICAL DEPARTMENT",
-]
+  { output: "ACCOUNTS DEPARTMEMT:", candidates: ["ACCOUNTS DEPARTMEMT:"] },
+  { output: "ADMIN/HR:", candidates: ["ADMIN/HR:"] },
+  { output: "BUSINESS GROWTH AND INNOVATION:", candidates: ["BUSINESS GROWTH AND INNOVATION:"] },
+  { output: "IT & COMMUNICATIONS DEPARTMENT:", candidates: ["IT & COMMUNICATIONS DEPARTMENT:"] },
+  {
+    output: "OPERATIONS AND MAINTENANCE DEPARTMENT:",
+    candidates: ["OPERATIONS AND MAINTENANCE DEPARTMENT:", "OPERATIONS DEPARTMENT:"],
+  },
+  { output: "PROJECT DEPARTMENT:", candidates: ["PROJECT DEPARTMENT:"] },
+  { output: "REGULATORY & COMPLIANCE DEPARTMENT:", candidates: ["REGULATORY & COMPLIANCE DEPARTMENT:"] },
+  { output: "TECHNICAL DEPARTMENT", candidates: ["TECHNICAL DEPARTMENT"] },
+] as const
 
 const decodeXml = (value: string) =>
   value
@@ -69,8 +68,9 @@ const replaceParagraphText = (paragraphXml: string, text: string) => {
 const groupActionItemsByDepartment = (actions: ActionItem[]) => {
   const grouped: Record<string, ActionItem[]> = {}
   actions.forEach((action) => {
-    if (!grouped[action.department]) grouped[action.department] = []
-    grouped[action.department].push(action)
+    const department = normalizeDepartmentName(action.department)
+    if (!grouped[department]) grouped[department] = []
+    grouped[department].push({ ...action, department })
   })
 
   const departments = DEPARTMENT_ORDER.filter((dept) => grouped[dept])
@@ -81,18 +81,7 @@ const groupActionItemsByDepartment = (actions: ActionItem[]) => {
   return { grouped, departments }
 }
 
-const getTemplateHeading = (department: string) => {
-  const normalized = department.trim().toLowerCase()
-  if (normalized === "accounts") return "ACCOUNTS DEPARTMEMT:"
-  if (normalized === "admin & hr") return "ADMIN/HR:"
-  if (normalized === "business, growth and innovation") return "BUSINESS GROWTH AND INNOVATION:"
-  if (normalized === "it and communications") return "IT & COMMUNICATIONS DEPARTMENT:"
-  if (normalized === "operations") return "OPERATIONS DEPARTMENT:"
-  if (normalized === "project") return "PROJECT DEPARTMENT:"
-  if (normalized === "technical") return "TECHNICAL DEPARTMENT"
-  if (normalized === "legal, regulatory and compliance") return "REGULATORY & COMPLIANCE DEPARTMENT:"
-  return `${department.toUpperCase()}:`
-}
+const getTemplateHeading = (department: string) => getActionPointsDepartmentHeading(department)
 
 const formatActionPointsDate = (week: number, year: number, meetingDate?: string) => {
   if (meetingDate) {
@@ -127,24 +116,25 @@ export async function generateActionPointsDocxBuffer(
   const dateParagraphIndex = paragraphInfo.find((item) => item.text.startsWith("Date:"))?.index
   if (typeof dateParagraphIndex !== "number") throw new Error("Template date paragraph not found")
 
-  const headingIndices = TEMPLATE_HEADINGS.map((heading) => {
-    const found = paragraphInfo.find((item) => item.text === heading)
-    if (!found) throw new Error(`Template heading not found: ${heading}`)
-    return found.index
+  const headingMatches = TEMPLATE_HEADINGS.map((heading) => {
+    const found = paragraphInfo.find((item) => heading.candidates.some((candidate) => candidate === item.text))
+    if (!found) throw new Error(`Template heading not found: ${heading.output}`)
+    return { ...heading, index: found.index }
   })
 
-  const sections = headingIndices.map((headingIndex, idx) => {
-    const nextHeadingIndex = headingIndices[idx + 1] ?? paragraphs.length
-    const headingXml = paragraphs[headingIndex]
+  const sections = headingMatches.map((headingMatch, idx) => {
+    const headingIndex = headingMatch.index
+    const nextHeadingIndex = headingMatches[idx + 1]?.index ?? paragraphs.length
+    const headingXml = paragraphs[headingMatch.index]
     const sectionParagraphs = paragraphs.slice(headingIndex + 1, nextHeadingIndex)
     const bulletParagraphs = sectionParagraphs.filter((xml) => getParagraphText(xml).length > 0)
     const blankParagraphXml =
       sectionParagraphs.find((xml) => getParagraphText(xml).length === 0 && !xml.includes("<w:sectPr>")) ??
       SAFE_SECTION_SPACER_XML
     if (bulletParagraphs.length === 0)
-      throw new Error(`Template section has no bullet paragraph: ${TEMPLATE_HEADINGS[idx]}`)
+      throw new Error(`Template section has no bullet paragraph: ${headingMatch.output}`)
     return {
-      headingText: TEMPLATE_HEADINGS[idx],
+      headingText: headingMatch.output,
       headingXml,
       bulletTemplateXml: bulletParagraphs[0],
       blankParagraphXml,
@@ -155,7 +145,7 @@ export async function generateActionPointsDocxBuffer(
   const builtParagraphs: string[] = []
 
   paragraphs.forEach((xml, index) => {
-    if (index < headingIndices[0]) {
+    if (index < headingMatches[0].index) {
       if (index === dateParagraphIndex) {
         builtParagraphs.push(replaceParagraphText(xml, `Date: ${formatActionPointsDate(week, year, meetingDate)}`))
       } else {

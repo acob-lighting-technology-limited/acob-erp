@@ -16,6 +16,13 @@ import {
   ShadingType,
 } from "docx"
 import { formatOfficeDateWithOrdinal, getOfficeWeekMonday } from "./meeting-week"
+import {
+  compareDepartments,
+  getActionPointsDepartmentHeading,
+  getCanonicalDepartmentOrder,
+  getDepartmentAliases,
+  normalizeDepartmentName,
+} from "@/shared/departments"
 
 // Load pptxgenjs from the installed npm package via dynamic import.
 // Dynamic import keeps it out of the SSR bundle (it requires browser APIs).
@@ -111,7 +118,7 @@ const buildWeeklyReportFilename = ({
 }) => {
   const parts = [
     allDepartments ? "ACOB Weekly Reports" : "ACOB Weekly Report",
-    department ? sanitizeFilenameSegment(department) : null,
+    department ? sanitizeFilenameSegment(normalizeDepartmentName(department)) : null,
     formatMeetingDateForFilename(week, _year, meetingDate),
     `W${week}`,
     theme === "dark" ? "Dark Theme" : null,
@@ -135,7 +142,7 @@ const buildActionTrackerFilename = ({
 }) => {
   const parts = [
     "ACOB Action Tracker",
-    department ? sanitizeFilenameSegment(department) : null,
+    department ? sanitizeFilenameSegment(normalizeDepartmentName(department)) : null,
     formatMeetingDateForFilename(week, _year, meetingDate),
     `W${week}`,
   ].filter(Boolean)
@@ -144,52 +151,18 @@ const buildActionTrackerFilename = ({
 }
 
 // ─── Constants & Sorting ──────────────────────────────────────────────────
-export const DEPARTMENT_ORDER = [
-  "Accounts",
-  "Business, Growth and Innovation",
-  DEPT_EXECUTIVE_MANAGEMENT,
-  "IT and Communications",
-  "Admin & HR",
-  "Legal, Regulatory and Compliance",
-  "Operations",
-  "Project",
-  "Technical",
-]
-
-/**
- * Normalizes department name for comparison
- */
-const normalizeDept = (dept: string) => {
-  return dept
-    .toLowerCase()
-    .replace(/&/g, "and")
-    .replace(/\./g, "") // Remove dots
-    .replace(/coms/g, "communications")
-    .replace(/operation/g, "operations") // Standardize to plural
-    .replace(/growth.*/, "growth") // Match "Business growth..."
-    .replace(/legal,?\s*/, "") // Remove "Legal, " prefix if present
-    .trim()
-}
-
-const NORMALIZED_ORDER = DEPARTMENT_ORDER.map(normalizeDept)
+export const DEPARTMENT_ORDER = getCanonicalDepartmentOrder().map((department) =>
+  department === "Executive Management" ? DEPT_EXECUTIVE_MANAGEMENT : department
+)
 
 /**
  * Sorts reports based on the official ACOB department hierarchy.
  * Departments not in the list appear alphabetically at the end.
  */
 export const sortReportsByDepartment = (reports: WeeklyReport[]) => {
-  return [...reports].sort((a, b) => {
-    const normA = normalizeDept(a.department)
-    const normB = normalizeDept(b.department)
-
-    const indexA = NORMALIZED_ORDER.findIndex((d) => normA.includes(d) || d.includes(normA))
-    const indexB = NORMALIZED_ORDER.findIndex((d) => normB.includes(d) || d.includes(normB))
-
-    if (indexA !== -1 && indexB !== -1) return indexA - indexB
-    if (indexA !== -1) return -1
-    if (indexB !== -1) return 1
-    return a.department.localeCompare(b.department)
-  })
+  return [...reports]
+    .map((report) => ({ ...report, department: normalizeDepartmentName(report.department) }))
+    .sort((a, b) => compareDepartments(a.department, b.department))
 }
 
 /**
@@ -645,9 +618,10 @@ const pdfContentPage = (
 
 export const exportToPDF = async (report: WeeklyReport, meetingDate?: string) => {
   const doc = new jsPDF()
+  const normalizedReport = { ...report, department: normalizeDepartmentName(report.department) }
   // Cover shows the CURRENT week (week being reported IN = report week + 1)
-  const currentWeek = report.week_number + 1
-  const currentYear = currentWeek > 52 ? report.year + 1 : report.year
+  const currentWeek = normalizedReport.week_number + 1
+  const currentYear = currentWeek > 52 ? normalizedReport.year + 1 : normalizedReport.year
   const mondayDate = getWeekMonday(currentWeek, currentYear)
 
   const [logoFull, logoDark] = await Promise.all([
@@ -656,19 +630,19 @@ export const exportToPDF = async (report: WeeklyReport, meetingDate?: string) =>
   ])
 
   // Page 1 — Cover (shows current week / meeting date)
-  pdfCoverPage(doc, currentWeek, currentYear, mondayDate, logoFull, report.department)
+  pdfCoverPage(doc, currentWeek, currentYear, mondayDate, logoFull, normalizedReport.department)
 
   // Page 2 — Content (no separate dept header page)
   doc.addPage()
-  pdfContentPage(doc, report.department, report, logoDark)
+  pdfContentPage(doc, normalizedReport.department, normalizedReport, logoDark)
 
   doc.save(
     buildWeeklyReportFilename({
-      week: report.week_number,
-      year: report.year,
+      week: normalizedReport.week_number,
+      year: normalizedReport.year,
       meetingDate,
       extension: "pdf",
-      department: report.department,
+      department: normalizedReport.department,
     })
   )
 }
@@ -760,24 +734,12 @@ const formatStatusLabel = (status: string) =>
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ")
 
-const getActionPointsDepartmentHeading = (department: string) => {
-  const normalized = department.trim().toLowerCase()
-  if (normalized === "accounts") return "ACCOUNTS DEPARTMENT:"
-  if (normalized === "admin & hr") return "ADMIN/HR:"
-  if (normalized === "business, growth and innovation") return "BUSINESS GROWTH AND INNOVATION:"
-  if (normalized === "it and communications") return "IT & COMMUNICATIONS DEPARTMENT:"
-  if (normalized === "operations") return "OPERATIONS DEPARTMENT:"
-  if (normalized === "project") return "PROJECT DEPARTMENT:"
-  if (normalized === "technical") return "TECHNICAL DEPARTMENT:"
-  if (normalized === "legal, regulatory and compliance") return "REGULATORY & COMPLIANCE DEPARTMENT:"
-  return `${department.toUpperCase()}:`
-}
-
 const groupActionItemsByDepartment = (actions: ActionItem[]) => {
   const grouped: Record<string, ActionItem[]> = {}
   actions.forEach((action) => {
-    if (!grouped[action.department]) grouped[action.department] = []
-    grouped[action.department].push(action)
+    const department = normalizeDepartmentName(action.department)
+    if (!grouped[department]) grouped[department] = []
+    grouped[department].push({ ...action, department })
   })
 
   const departments = DEPARTMENT_ORDER.filter((dept) => grouped[dept])
@@ -959,16 +921,7 @@ export const exportActionTrackerToPDFBase64 = async (
   pdfCoverPage(doc, week, year, mondayDate, logoFull, "Action Tracker")
 
   // Group actions by department (in DEPARTMENT_ORDER)
-  const grouped: Record<string, ActionItem[]> = {}
-  actions.forEach((a) => {
-    if (!grouped[a.department]) grouped[a.department] = []
-    grouped[a.department].push(a)
-  })
-
-  const departments = DEPARTMENT_ORDER.filter((d) => grouped[d])
-  Object.keys(grouped).forEach((d) => {
-    if (!departments.includes(d)) departments.push(d)
-  })
+  const { grouped, departments } = groupActionItemsByDepartment(actions)
 
   // Page 2 — Dept index / TOC
   doc.addPage()
@@ -1095,16 +1048,7 @@ export const exportActionTrackerToPPTX = async (
   addCoverSlide(pres, week, year, "Action Tracker")
 
   // Group by department
-  const grouped: Record<string, ActionItem[]> = {}
-  actions.forEach((a) => {
-    if (!grouped[a.department]) grouped[a.department] = []
-    grouped[a.department].push(a)
-  })
-
-  const departments = DEPARTMENT_ORDER.filter((d) => grouped[d])
-  Object.keys(grouped).forEach((d) => {
-    if (!departments.includes(d)) departments.push(d)
-  })
+  const { grouped, departments } = groupActionItemsByDepartment(actions)
 
   // TOC slide
   addDeptIndexSlide(pres, departments, week, year)
@@ -1324,9 +1268,10 @@ const docxNumberedItems = (text: string, fallback: string) => {
 }
 
 export const exportToDocx = async (report: WeeklyReport, meetingDate?: string) => {
-  const p = Array.isArray(report.profiles) ? report.profiles[0] : report.profiles
+  const normalizedReport = { ...report, department: normalizeDepartmentName(report.department) }
+  const p = Array.isArray(normalizedReport.profiles) ? normalizedReport.profiles[0] : normalizedReport.profiles
   const name = p ? `${p.first_name} ${p.last_name}` : "Employee"
-  const mondayDate = getWeekMonday(report.week_number, report.year)
+  const mondayDate = getWeekMonday(normalizedReport.week_number, normalizedReport.year)
 
   const doc = new Document({
     sections: [
@@ -1363,7 +1308,7 @@ export const exportToDocx = async (report: WeeklyReport, meetingDate?: string) =
             spacing: { after: 60 },
           }),
           new Paragraph({
-            children: [new TextRun({ text: report.department, italics: true, size: 20, color: "1A7A4A" })],
+            children: [new TextRun({ text: normalizedReport.department, italics: true, size: 20, color: "1A7A4A" })],
             alignment: AlignmentType.CENTER,
             spacing: { after: 300 },
           }),
@@ -1376,7 +1321,7 @@ export const exportToDocx = async (report: WeeklyReport, meetingDate?: string) =
                     children: [new Paragraph({ children: [new TextRun({ text: "Department", bold: true })] })],
                     width: { size: 30, type: WidthType.PERCENTAGE },
                   }),
-                  new TableCell({ children: [new Paragraph(report.department)] }),
+                  new TableCell({ children: [new Paragraph(normalizedReport.department)] }),
                 ],
               }),
               new TableRow({
@@ -1392,20 +1337,22 @@ export const exportToDocx = async (report: WeeklyReport, meetingDate?: string) =
                   new TableCell({
                     children: [new Paragraph({ children: [new TextRun({ text: "Period", bold: true })] })],
                   }),
-                  new TableCell({ children: [new Paragraph(`Week ${report.week_number}, ${report.year}`)] }),
+                  new TableCell({
+                    children: [new Paragraph(`Week ${normalizedReport.week_number}, ${normalizedReport.year}`)],
+                  }),
                 ],
               }),
             ],
           }),
           new Paragraph({ text: "", spacing: { after: 200 } }),
           docxSectionHeading("WORK DONE", "1A7A4A"),
-          ...docxNumberedItems(report.work_done, "No data provided."),
+          ...docxNumberedItems(normalizedReport.work_done, "No data provided."),
           new Paragraph({ text: "", spacing: { after: 120 } }),
           docxSectionHeading("TASKS FOR NEW WEEK", "1D6A96"),
-          ...docxNumberedItems(report.tasks_new_week, "No data provided."),
+          ...docxNumberedItems(normalizedReport.tasks_new_week, "No data provided."),
           new Paragraph({ text: "", spacing: { after: 120 } }),
           docxSectionHeading("CHALLENGES", "B91C1C"),
-          ...docxNumberedItems(report.challenges, "No challenges reported."),
+          ...docxNumberedItems(normalizedReport.challenges, "No challenges reported."),
         ],
       },
     ],
@@ -1415,11 +1362,11 @@ export const exportToDocx = async (report: WeeklyReport, meetingDate?: string) =
   saveAs(
     blob,
     buildWeeklyReportFilename({
-      week: report.week_number,
-      year: report.year,
+      week: normalizedReport.week_number,
+      year: normalizedReport.year,
       meetingDate,
       extension: "docx",
-      department: report.department,
+      department: normalizedReport.department,
     })
   )
 }
@@ -1436,15 +1383,7 @@ export const exportActionTrackerToDocx = async (
 ) => {
   const mondayDate = getWeekMonday(week, year)
 
-  const grouped: Record<string, ActionItem[]> = {}
-  actions.forEach((a) => {
-    if (!grouped[a.department]) grouped[a.department] = []
-    grouped[a.department].push(a)
-  })
-  const departments = DEPARTMENT_ORDER.filter((d) => grouped[d])
-  Object.keys(grouped).forEach((d) => {
-    if (!departments.includes(d)) departments.push(d)
-  })
+  const { grouped, departments } = groupActionItemsByDepartment(actions)
 
   const pageFooter = new Footer({
     children: [
@@ -1574,11 +1513,13 @@ export const exportActionTrackerToXLSX = async (
   meetingDate?: string
 ) => {
   const XLSX = await import("xlsx")
-  const filteredActions = department ? actions.filter((item) => item.department === department) : actions
+  const filteredActions = department
+    ? actions.filter((item) => getDepartmentAliases(department).includes(normalizeDepartmentName(item.department)))
+    : actions
 
   const rows = filteredActions.map((item, index) => ({
     "S/N": index + 1,
-    Department: item.department,
+    Department: normalizeDepartmentName(item.department),
     "Action Item": item.title,
     Description: item.description || "",
     Status: formatStatusLabel(item.status),
@@ -1705,6 +1646,7 @@ export const exportAllToDocx = async (reports: WeeklyReport[], week: number, yea
 }
 
 export const exportToXLSX = async (report: WeeklyReport, meetingDate?: string) => {
+  const normalizedReport = { ...report, department: normalizeDepartmentName(report.department) }
   const buildSectionRows = (section: string, text: string) => {
     const lines = autoNumberLines(text || "")
       .split("\n")
@@ -1714,9 +1656,9 @@ export const exportToXLSX = async (report: WeeklyReport, meetingDate?: string) =
     if (lines.length === 0) {
       return [
         {
-          Department: report.department,
-          Week: report.week_number,
-          Year: report.year,
+          Department: normalizedReport.department,
+          Week: normalizedReport.week_number,
+          Year: normalizedReport.year,
           Section: section,
           "Item #": "",
           Item: "No entry",
@@ -1725,9 +1667,9 @@ export const exportToXLSX = async (report: WeeklyReport, meetingDate?: string) =
     }
 
     return lines.map((line, index) => ({
-      Department: report.department,
-      Week: report.week_number,
-      Year: report.year,
+      Department: normalizedReport.department,
+      Week: normalizedReport.week_number,
+      Year: normalizedReport.year,
       Section: section,
       "Item #": index + 1,
       Item: line.replace(/^\d+[.)]\s*/, "").trim(),
@@ -1736,9 +1678,9 @@ export const exportToXLSX = async (report: WeeklyReport, meetingDate?: string) =
 
   const XLSX = await import("xlsx")
   const rows = [
-    ...buildSectionRows("Work Done", report.work_done || ""),
-    ...buildSectionRows("Tasks for New Week", report.tasks_new_week || ""),
-    ...buildSectionRows("Challenges", report.challenges || ""),
+    ...buildSectionRows("Work Done", normalizedReport.work_done || ""),
+    ...buildSectionRows("Tasks for New Week", normalizedReport.tasks_new_week || ""),
+    ...buildSectionRows("Challenges", normalizedReport.challenges || ""),
   ]
 
   const worksheet = XLSX.utils.json_to_sheet(rows)
@@ -1752,11 +1694,11 @@ export const exportToXLSX = async (report: WeeklyReport, meetingDate?: string) =
       type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     }),
     buildWeeklyReportFilename({
-      week: report.week_number,
-      year: report.year,
+      week: normalizedReport.week_number,
+      year: normalizedReport.year,
       meetingDate,
       extension: "xlsx",
-      department: report.department,
+      department: normalizedReport.department,
     })
   )
 }

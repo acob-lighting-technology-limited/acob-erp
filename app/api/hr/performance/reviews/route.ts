@@ -106,6 +106,12 @@ export async function POST(request: NextRequest) {
       goals_achieved,
       goals_total,
       manager_comments,
+      // PMS 4-component scores
+      kpi_score,
+      cbt_score,
+      attendance_score,
+      behaviour_score,
+      behaviour_competencies,
     } = body
 
     if (!user_id || !review_cycle_id) {
@@ -125,6 +131,12 @@ export async function POST(request: NextRequest) {
         goals_achieved,
         goals_total,
         manager_comments,
+        kpi_score,
+        cbt_score,
+        attendance_score,
+        behaviour_score,
+        behaviour_competencies: behaviour_competencies ?? null,
+        // final_score is auto-computed by DB trigger
         status: "draft",
       })
       .select(
@@ -156,7 +168,16 @@ export async function POST(request: NextRequest) {
         action: "create",
         entityType: "performance_review",
         entityId: review.id,
-        newValues: { user_id, review_cycle_id, overall_rating, status: "draft" },
+        newValues: {
+          user_id,
+          review_cycle_id,
+          overall_rating,
+          kpi_score,
+          cbt_score,
+          attendance_score,
+          behaviour_score,
+          status: "draft",
+        },
         context: { actorId: user.id, source: "api", route: "/api/hr/performance/reviews" },
       },
       { failOpen: true }

@@ -19,6 +19,8 @@ type SendTiming = "now" | "scheduled" | "recurring"
 interface DocRef {
   id: string
   file_name: string
+  display_name?: string
+  signed_url?: string | null
 }
 
 interface UseSendParams {
@@ -36,6 +38,16 @@ interface UseSendParams {
   selectedPreparedBy: string
   currentUser?: { id?: string; department?: string | null; full_name?: string | null }
   fetchSchedules: () => void
+}
+
+type ActionTrackerMailRow = {
+  id: string
+  title: string | null
+  description?: string | null
+  department: string
+  status: string
+  week_number: number
+  year: number
 }
 
 function capitalize(s: string): string {
@@ -100,6 +112,90 @@ async function fetchActionPointsAttachment(params: {
   }
 }
 
+/**
+ * Downloads a stored meeting document (KSS, Minutes, etc.) via its signed URL
+ * and converts it to base64 — client-side, so the edge function never has to
+ * do the CPU-heavy byte-by-byte conversion itself.
+ */
+async function fetchWeeklyReportAttachment(params: {
+  week: number
+  year: number
+}): Promise<{ blob: Blob; filename: string }> {
+  const response = await fetch("/api/reports/weekly-report-export", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ week: params.week, year: params.year, type: "weekly_report" }),
+  })
+
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "")
+    throw new Error(detail || "Failed to generate Weekly Report PDF")
+  }
+
+  const exportBlob = await response.blob()
+  return {
+    blob: exportBlob,
+    filename: readFilenameFromDisposition(
+      response.headers.get("Content-Disposition"),
+      `ACOB Weekly Reports - Week ${params.week}.pdf`
+    ),
+  }
+}
+
+async function fetchActionTrackerRows(
+  supabase: ReturnType<typeof createClient>,
+  week: number,
+  year: number
+): Promise<ActionTrackerMailRow[]> {
+  const { data: taskRows, error: taskError } = await supabase
+    .from("tasks")
+    .select("id, title, description, department, status, week_number, year")
+    .eq("category", "weekly_action")
+    .eq("week_number", week)
+    .eq("year", year)
+
+  if (taskError) {
+    throw new Error(taskError.message || `Failed to load action tracker rows for Week ${week}`)
+  }
+
+  const normalizedTaskRows: ActionTrackerMailRow[] = Array.isArray(taskRows)
+    ? taskRows.map((row) => ({
+        id: String(row.id),
+        title: typeof row.title === "string" ? row.title : null,
+        description: typeof row.description === "string" ? row.description : null,
+        department: String(row.department || ""),
+        status: String(row.status || ""),
+        week_number: Number(row.week_number || week),
+        year: Number(row.year || year),
+      }))
+    : []
+
+  if (normalizedTaskRows.length > 0) {
+    return normalizedTaskRows
+  }
+
+  const { data: legacyRows, error: legacyError } = await supabase
+    .from("action_items")
+    .select("id, title, department, status, week_number, year")
+    .eq("week_number", week)
+    .eq("year", year)
+
+  if (legacyError) {
+    throw new Error(legacyError.message || `Failed to load legacy action items for Week ${week}`)
+  }
+
+  return Array.isArray(legacyRows)
+    ? legacyRows.map((row) => ({
+        id: String(row.id),
+        title: typeof row.title === "string" ? row.title : null,
+        department: String(row.department || ""),
+        status: String(row.status || ""),
+        week_number: Number(row.week_number || week),
+        year: Number(row.year || year),
+      }))
+    : []
+}
+
 export function useWeeklySummarySend({
   resolvedRecipients,
   selectedContentChoices,
@@ -162,20 +258,33 @@ export function useWeeklySummarySend({
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
       const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
+      // ── Pre-generate Weekly Report PDF client-side ──────────────────────────
+      // This moves the CPU-heavy pdf-lib work out of the edge function so it
+      // never hits Supabase's 2-second CPU limit mid-send.
+      let weeklyReportBase64: string | undefined
+      let weeklyReportFilename: string | undefined
+
+      if (selectedContentChoices.has("weekly_report")) {
+        const reportFile = await fetchWeeklyReportAttachment({
+          week: weekNumbers[0],
+          year: yearNumber,
+        })
+        weeklyReportBase64 = await toBase64FromBlob(reportFile.blob)
+        weeklyReportFilename = reportFile.filename
+      }
+
+      // ── KSS / Minutes: pass document IDs to the edge function ─────────────
+      // The edge function now uses a chunk-based base64 conversion that is
+      // ~100× faster than the old byte-by-byte loop, so server-side download
+      // is fast and avoids uploading large file payloads over the user's
+      // internet connection.
+
       // ── Build per-week action points attachments ────────────────────────────
       const actionTrackerAttachments: Array<{ base64: string; filename: string; week: number }> = []
 
       if (selectedContentChoices.has("action_points_autogenerated")) {
         for (const weekNum of weekNumbers) {
-          const { data: actions, error: actionsError } = await supabase
-            .from("action_items")
-            .select("id, title, department, status, week_number, year")
-            .eq("week_number", weekNum)
-            .eq("year", yearNumber)
-
-          if (actionsError) {
-            throw new Error(actionsError.message || `Failed to load action items for Week ${weekNum}`)
-          }
+          const actions = await fetchActionTrackerRows(supabase, weekNum, yearNumber)
 
           const { data: meetingDate, error: meetingDateError } = await supabase.rpc(
             "weekly_report_effective_meeting_date",
@@ -187,7 +296,7 @@ export function useWeeklySummarySend({
           }
 
           const exportFile = await fetchActionPointsAttachment({
-            actions: actions || [],
+            actions,
             week: weekNum,
             year: yearNumber,
             meetingDate: meetingDate ? String(meetingDate) : undefined,
@@ -216,7 +325,8 @@ export function useWeeklySummarySend({
         skipActionTracker: !selectedContentChoices.has("action_points_autogenerated"),
       }
 
-      // Collect IDs from ALL selected weeks' KSS and Minutes docs
+      // Collect document IDs for KSS and Minutes — edge function downloads
+      // and converts them server-side using the fast chunk-based method.
       const additionalDocumentIds: string[] = []
       if (selectedContentChoices.has("knowledge_sharing_session")) {
         allKssDocs.forEach((d) => {
@@ -230,6 +340,13 @@ export function useWeeklySummarySend({
       }
       if (additionalDocumentIds.length > 0) {
         payload.additionalDocumentIds = additionalDocumentIds
+      }
+
+      // Pass the pre-generated weekly report PDF so the edge function skips
+      // its own (CPU-expensive) PDF generation entirely.
+      if (weeklyReportBase64) {
+        payload.weeklyReportBase64 = weeklyReportBase64
+        payload.weeklyReportFilename = weeklyReportFilename
       }
 
       if (actionTrackerAttachments.length > 0) {

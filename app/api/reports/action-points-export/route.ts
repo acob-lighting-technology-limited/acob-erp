@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { Buffer } from "node:buffer"
-import { convertOfficeDocumentToPdf } from "@/lib/reports/office-pdf"
+import { generateActionPointsPdfBuffer } from "@/lib/reports/action-points-pdf"
 import { generateActionPointsDocxBuffer } from "@/lib/reports/action-points-template"
 import type { ActionItem } from "@/lib/export-utils"
+import { normalizeDepartmentName } from "@/shared/departments"
 
 const INVALID_FILENAME_CHARS = /[<>:"/\\|?*\u0000-\u001F]+/g
 
@@ -39,7 +40,12 @@ const buildActionPointsFilename = ({
     year: "numeric",
   }).format(resolveMeetingDate(week, year, meetingDate))
 
-  return [`ACOB Action Points`, department ? sanitizeFilenameSegment(department) : null, dateLabel, `W${week}`]
+  return [
+    `ACOB Action Points`,
+    department ? sanitizeFilenameSegment(normalizeDepartmentName(department)) : null,
+    dateLabel,
+    `W${week}`,
+  ]
     .filter(Boolean)
     .join(" ")
     .concat(`.${extension}`)
@@ -57,22 +63,19 @@ type ExportBody = {
 export async function POST(request: NextRequest) {
   const body = (await request.json()) as ExportBody
   const { actions, week, year, meetingDate, department, format } = body
-  const docxBuffer = await generateActionPointsDocxBuffer(actions, week, year, meetingDate)
 
   if (format === "pdf") {
-    const converted = await convertOfficeDocumentToPdf(
-      new Uint8Array(docxBuffer),
-      buildActionPointsFilename({ week, year, meetingDate, extension: "pdf", department }).replace(/\.pdf$/, ""),
-      "docx"
-    )
+    const pdfBuffer = await generateActionPointsPdfBuffer(actions, week, year, meetingDate)
 
-    return new NextResponse(new Blob([Buffer.from(converted.buffer)], { type: converted.mimeType }), {
+    return new NextResponse(new Blob([Buffer.from(pdfBuffer)], { type: "application/pdf" }), {
       headers: {
-        "Content-Type": converted.mimeType,
-        "Content-Disposition": `attachment; filename="${converted.fileName}"`,
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `attachment; filename="${buildActionPointsFilename({ week, year, meetingDate, extension: "pdf", department })}"`,
       },
     })
   }
+
+  const docxBuffer = await generateActionPointsDocxBuffer(actions, week, year, meetingDate)
 
   return new NextResponse(
     new Blob([Buffer.from(docxBuffer)], {
