@@ -14,6 +14,7 @@ import { AdminTablePage } from "@/components/admin/admin-table-page"
 import {
   exportAllToPPTX,
   sortReportsByDepartment,
+  type WeeklyDeptOrder,
   type WeeklyPptxMode,
   type WeeklyPptxTheme,
   type WeeklyReport,
@@ -411,11 +412,15 @@ export function WeeklyReportsContent({
     setPptxModeDialogOpen(true)
   }
 
-  const runPptxExport = async (mode: WeeklyPptxMode, theme: WeeklyPptxTheme = "light") => {
+  const runPptxExport = async (
+    mode: WeeklyPptxMode,
+    theme: WeeklyPptxTheme = "light",
+    order: WeeklyDeptOrder = "default"
+  ) => {
     if (!pendingPptxExport) return
     const exportMeetingDate = lockState?.meetingDate || meetingDateInput
     if (pendingPptxExport.kind === "all") {
-      await exportAllToPPTX(filteredReports, weekFilter, yearFilter, mode, theme, exportMeetingDate)
+      await exportAllToPPTX(filteredReports, weekFilter, yearFilter, mode, theme, exportMeetingDate, order)
     } else {
       const { exportToPPTX } = await import("@/lib/export-utils")
       await exportToPPTX(pendingPptxExport.report, mode, theme, exportMeetingDate)
@@ -520,6 +525,7 @@ export function WeeklyReportsContent({
           if (!open) setPendingPptxExport(null)
         }}
         onSelect={runPptxExport}
+        showOrderStep={pendingPptxExport?.kind === "all"}
       />
     </AdminTablePage>
   )

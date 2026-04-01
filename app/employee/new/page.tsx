@@ -27,36 +27,23 @@ const formSchema = z.object({
   first_name: z.string().min(2, "First name must be at least 2 characters"),
   last_name: z.string().min(2, "Last name must be at least 2 characters"),
   other_names: z.string().optional(),
-  department: z.string().min(1, "Please select a department"),
+  department: z.string().optional(),
   other_department: z.string().optional(),
   company_role: z.string().min(2, "Company role is required"),
   personal_email: z.string().email("Invalid email address"),
   phone_number: z.string().regex(/^0[789][01]\d{8}$/, "Must be a valid Nigerian phone number (e.g., 08012345678)"),
   additional_phone_number: z.string().optional(),
   residential_address: z.string().min(5, "Address is required"),
-  office_location: z.string().min(1, "Office location is required"),
+  office_location: z.string().optional(),
   honeypot: z.string().optional(),
 })
 
 type FormValues = z.infer<typeof formSchema>
 
-async function fetchDepartmentNames(): Promise<string[]> {
-  const supabase = createClient()
-  const { data, error } = await supabase.from("departments").select("name").order("name")
-  if (error) throw new Error(error.message)
-  return (data || []).map((d) => d.name)
-}
-
-async function fetchOfficeLocations(): Promise<string[]> {
-  const supabase = createClient()
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("office_location")
-    .not("office_location", "is", null)
-    .neq("office_location", "")
-  if (error) throw new Error(error.message)
-  const unique = Array.from(new Set((data || []).map((r) => r.office_location as string).filter(Boolean)))
-  return unique.sort()
+async function fetchOnboardingOptions(): Promise<{ departments: string[]; officeLocations: string[] }> {
+  const res = await fetch("/api/public/onboarding-options")
+  if (!res.ok) throw new Error("Failed to load form options")
+  return res.json()
 }
 
 export default function EmployeeOnboardingForm() {
@@ -64,15 +51,13 @@ export default function EmployeeOnboardingForm() {
   const [isSuccess, setIsSuccess] = useState(false)
   const supabase = createClient()
 
-  const { data: departments = [] } = useQuery({
+  const { data: onboardingOptions } = useQuery({
     queryKey: QUERY_KEYS.employeeOnboardingDepartments(),
-    queryFn: fetchDepartmentNames,
+    queryFn: fetchOnboardingOptions,
   })
 
-  const { data: officeLocations = [] } = useQuery({
-    queryKey: QUERY_KEYS.employeeOnboardingOfficeLocations(),
-    queryFn: fetchOfficeLocations,
-  })
+  const departments = onboardingOptions?.departments ?? []
+  const officeLocations = onboardingOptions?.officeLocations ?? []
 
   const {
     register,
@@ -94,6 +79,7 @@ export default function EmployeeOnboardingForm() {
   const firstName = watch("first_name")
   const lastName = watch("last_name")
   const selectedDepartment = watch("department")
+  const selectedOfficeLocation = watch("office_location")
 
   const sanitize = (s: string) =>
     s
@@ -112,8 +98,7 @@ export default function EmployeeOnboardingForm() {
     setIsSubmitting(true)
 
     try {
-      const actualDepartment = data.department === "Other" ? data.other_department : data.department
-      if (!actualDepartment) throw new Error("Please specify your department")
+      const actualDepartment = data.department === "Other" ? data.other_department || null : data.department || null
       if (!safeFirst || !safeLast) throw new Error("Please use alphabetic characters for your first and last name")
 
       const record = {
@@ -330,7 +315,7 @@ export default function EmployeeOnboardingForm() {
                   </div>
                   <div className="space-y-2">
                     <label className="text-foreground text-sm font-medium">
-                      Department <span className="text-destructive">*</span>
+                      Department <span className="text-muted-foreground text-xs">(optional)</span>
                     </label>
                     <Select onValueChange={(val) => setValue("department", val)} defaultValue={selectedDepartment}>
                       <SelectTrigger className="h-11">
@@ -350,9 +335,7 @@ export default function EmployeeOnboardingForm() {
                 </div>
                 {selectedDepartment === "Other" && (
                   <div className="animate-in fade-in slide-in-from-top-2 space-y-2">
-                    <label className="text-foreground text-sm font-medium">
-                      Specify Department <span className="text-destructive">*</span>
-                    </label>
+                    <label className="text-foreground text-sm font-medium">Specify Department</label>
                     <Input
                       className="h-11"
                       placeholder="Enter your department name"
@@ -369,9 +352,9 @@ export default function EmployeeOnboardingForm() {
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <label className="text-foreground text-sm font-medium">
-                      Office Location <span className="text-destructive">*</span>
+                      Office Location <span className="text-muted-foreground text-xs">(optional)</span>
                     </label>
-                    <Select onValueChange={(val) => setValue("office_location", val)}>
+                    <Select onValueChange={(val) => setValue("office_location", val)} value={selectedOfficeLocation}>
                       <SelectTrigger className="h-11">
                         <SelectValue placeholder="Select Office Location" />
                       </SelectTrigger>

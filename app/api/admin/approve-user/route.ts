@@ -1,16 +1,13 @@
 import { createClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
+import { buildApprovalEmailPreview } from "@/lib/onboarding/approval-email-preview"
 import { createClient as createServerClient } from "@/lib/supabase/server"
 import { rateLimit, getClientId } from "@/lib/rate-limit"
 import { logger } from "@/lib/logger"
-import { renderWelcomeEmail } from "@/lib/email-templates/welcome"
-import { renderInternalNotificationEmail } from "@/lib/email-templates/internal-notification"
-import { resolveActiveLeadRecipients, sendNotificationEmail } from "@/lib/notifications/email-gateway"
-import { isSystemNotificationChannelEnabled, resolveChannelEligibleUserIds } from "@/lib/notifications/delivery-policy"
-import { withSubjectPrefix } from "@/lib/notifications/subject-policy"
+import { sendNotificationEmail } from "@/lib/notifications/email-gateway"
+import { isSystemNotificationChannelEnabled } from "@/lib/notifications/delivery-policy"
 import { syncEmploymentStatusToAuth } from "@/lib/supabase/admin"
 import { writeAuditLog } from "@/lib/audit/write-audit"
-import { ORG } from "@/config/constants"
 
 const log = logger("approve-user")
 
@@ -77,7 +74,6 @@ export async function POST(req: Request) {
 
     // 2. Determine Employee ID — use DB sequence for atomic, collision-free generation
     let employeeId = manualEmployeeId
-    const currentYear = new Date().getFullYear()
 
     if (employeeId) {
       const empNumPattern = /^ACOB\/[0-9]{4}\/[0-9]{3}$/
@@ -98,8 +94,10 @@ export async function POST(req: Request) {
       employeeId = seqRow as string
     }
 
-    const tempPassword = `Welcome${currentYear}!`
-    const portalUrl = ORG.MAIL_PORTAL_URL
+    const emailPreview = await buildApprovalEmailPreview({
+      supabase: supabaseAdmin,
+      pendingUser,
+    })
 
     // 3. Create or Update Auth User
     // First check if user already exists
@@ -114,7 +112,7 @@ export async function POST(req: Request) {
     if (!authUserId) {
       const { data: newAuthUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
         email: pendingUser.company_email,
-        password: tempPassword,
+        password: emailPreview.tempPassword,
         email_confirm: true,
         user_metadata: {
           first_name: pendingUser.first_name,
@@ -129,7 +127,7 @@ export async function POST(req: Request) {
       authUserId = newAuthUser.user.id
     } else {
       const { error: updateAuthError } = await supabaseAdmin.auth.admin.updateUserById(authUserId, {
-        password: tempPassword,
+        password: emailPreview.tempPassword,
         email_confirm: true,
       })
       if (updateAuthError) {
@@ -172,9 +170,9 @@ export async function POST(req: Request) {
       const onboardingMailEnabled = await isSystemNotificationChannelEnabled(supabaseAdmin, "onboarding", "email")
       if (onboardingMailEnabled) {
         await sendNotificationEmail({
-          to: [pendingUser.personal_email],
-          subject: withSubjectPrefix("Onboarding", "Welcome to ACOB - Login Credentials"),
-          html: renderWelcomeEmail({ pendingUser, employeeId, tempPassword, portalUrl }),
+          to: emailPreview.welcome.recipients,
+          subject: emailPreview.welcome.subject,
+          html: emailPreview.welcome.html,
         })
       }
     } catch (emailError) {
@@ -184,27 +182,12 @@ export async function POST(req: Request) {
     // 7. Send Internal Confirmation Email to Department Leads
     try {
       const onboardingMailEnabled = await isSystemNotificationChannelEnabled(supabaseAdmin, "onboarding", "email")
-      if (onboardingMailEnabled) {
-        const leadRecipients = await resolveActiveLeadRecipients(supabaseAdmin)
-        const leadIds = leadRecipients.map((lead) => lead.id)
-        const allowedLeadIds = await resolveChannelEligibleUserIds(supabaseAdmin, {
-          userIds: leadIds,
-          notificationKey: "onboarding",
-          channel: "email",
+      if (onboardingMailEnabled && emailPreview.internal.recipients.length > 0) {
+        await sendNotificationEmail({
+          to: emailPreview.internal.recipients,
+          subject: emailPreview.internal.subject,
+          html: emailPreview.internal.html,
         })
-        const allowedIdSet = new Set(allowedLeadIds)
-        const leadEmails = leadRecipients.filter((lead) => allowedIdSet.has(lead.id)).flatMap((lead) => lead.emails)
-
-        if (leadEmails.length > 0) {
-          await sendNotificationEmail({
-            to: leadEmails,
-            subject: withSubjectPrefix(
-              "Onboarding",
-              `New Employee Onboarded - ${pendingUser.first_name.replace(/[\r\n]/g, "")} ${pendingUser.last_name.replace(/[\r\n]/g, "")}`
-            ),
-            html: renderInternalNotificationEmail({ pendingUser, employeeId }),
-          })
-        }
       }
     } catch (emailError) {
       log.error({ err: String(emailError) }, "Failed to send stakeholder notification emails")

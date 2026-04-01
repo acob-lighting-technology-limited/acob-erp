@@ -23,6 +23,7 @@ import { WeeklyReportFilters } from "./_components/weekly-report-filters"
 import {
   exportAllToPPTX,
   sortReportsByDepartment,
+  type WeeklyDeptOrder,
   type WeeklyPptxMode,
   type WeeklyPptxTheme,
   type WeeklyReport,
@@ -187,10 +188,14 @@ export default function WeeklyReportsPortal() {
     setPptxModeDialogOpen(true)
   }
 
-  const runPptxExport = async (mode: WeeklyPptxMode, theme: WeeklyPptxTheme = "light") => {
+  const runPptxExport = async (
+    mode: WeeklyPptxMode,
+    theme: WeeklyPptxTheme = "light",
+    order: WeeklyDeptOrder = "default"
+  ) => {
     if (!pendingPptxExport) return
     if (pendingPptxExport.kind === "all") {
-      await exportAllToPPTX(filteredReports, weekFilter, yearFilter, mode, theme, meetingDate)
+      await exportAllToPPTX(filteredReports, weekFilter, yearFilter, mode, theme, meetingDate, order)
     } else {
       const { exportToPPTX } = await import("@/lib/export-utils")
       await exportToPPTX(pendingPptxExport.report, mode, theme, meetingDate)
@@ -303,6 +308,7 @@ export default function WeeklyReportsPortal() {
           if (!open) setPendingPptxExport(null)
         }}
         onExport={runPptxExport}
+        showOrderStep={pendingPptxExport?.kind === "all"}
       />
     </AdminTablePage>
   )

@@ -3,6 +3,7 @@
 import type React from "react"
 import { useState } from "react"
 import { useDepartments } from "@/hooks/use-departments"
+import { useOfficeLocations } from "@/hooks/use-office-locations"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -30,6 +31,7 @@ interface ProfileFormProps {
 
 export function ProfileForm({ user, profile, hideBackButton = false, onSaved }: ProfileFormProps) {
   const { departments: DEPARTMENTS } = useDepartments()
+  const { officeLocations } = useOfficeLocations()
   const [formData, setFormData] = useState({
     firstName: profile?.first_name || "",
     lastName: profile?.last_name || "",
@@ -238,8 +240,11 @@ export function ProfileForm({ user, profile, hideBackButton = false, onSaved }: 
                     <SelectValue placeholder="Select location" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Office">Office</SelectItem>
-                    <SelectItem value="Site">Site</SelectItem>
+                    {officeLocations.map((loc) => (
+                      <SelectItem key={loc} value={loc}>
+                        {loc}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

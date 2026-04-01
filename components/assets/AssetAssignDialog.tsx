@@ -15,7 +15,7 @@ import {
 import { SearchableSelect } from "@/components/ui/searchable-select"
 import { formatName } from "@/lib/utils"
 import { ASSET_TYPE_MAP } from "@/lib/asset-types"
-import { OFFICE_LOCATIONS } from "@/lib/permissions"
+import { useOfficeLocations } from "@/hooks/use-office-locations"
 import { User, Building2, Building } from "lucide-react"
 import type { Asset, Employee } from "@/app/admin/assets/admin-assets-content"
 
@@ -70,6 +70,7 @@ export function AssetAssignDialog({
   departments,
   isAssigning,
 }: AssetAssignDialogProps) {
+  const { officeLocations } = useOfficeLocations()
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] w-[95vw] max-w-2xl overflow-y-auto">
@@ -181,13 +182,13 @@ export function AssetAssignDialog({
                 placeholder="Select office location"
                 searchPlaceholder="Search office locations..."
                 icon={<Building className="h-4 w-4" />}
-                options={OFFICE_LOCATIONS.map((location) => ({
+                options={officeLocations.map((location) => ({
                   value: location,
                   label: location,
                   icon: <Building className="h-3 w-3" />,
                 }))}
               />
-              <p className="text-muted-foreground mt-1 text-xs">{OFFICE_LOCATIONS.length} office locations available</p>
+              <p className="text-muted-foreground mt-1 text-xs">{officeLocations.length} office locations available</p>
             </div>
           )}
 

@@ -144,7 +144,13 @@ export async function updateSession(request: NextRequest) {
   // Allow unauthenticated access to auth pages, public routes, and the form
   // Maintenance mode check must run before this block so non-authenticated users
   // are redirected to /maintenance when maintenance is enabled.
-  if (pathname !== "/" && !user && !pathname.startsWith("/auth") && !pathname.startsWith("/employee/new")) {
+  if (
+    pathname !== "/" &&
+    !user &&
+    !pathname.startsWith("/auth") &&
+    !pathname.startsWith("/employee/new") &&
+    !pathname.startsWith("/api/public")
+  ) {
     const url = request.nextUrl.clone()
     url.pathname = "/auth/login"
     url.searchParams.set("next", intendedPath || "/profile")

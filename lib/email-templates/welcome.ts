@@ -7,24 +7,23 @@ export interface PendingUser {
   company_role: string
   company_email: string
   personal_email: string
+  phone_number?: string
   office_location?: string
 }
 
 interface WelcomeEmailProps {
   pendingUser: PendingUser
-  employeeId: string
   tempPassword: string
   portalUrl: string
 }
 
-export function renderWelcomeEmail({ pendingUser, employeeId, tempPassword, portalUrl }: WelcomeEmailProps) {
+export function renderWelcomeEmail({ pendingUser, tempPassword, portalUrl }: WelcomeEmailProps) {
   const firstName = escapeHtml(pendingUser.first_name)
   const lastName = escapeHtml(pendingUser.last_name)
   const dept = escapeHtml(pendingUser.department)
   const role = escapeHtml(pendingUser.company_role)
   const email = escapeHtml(pendingUser.company_email)
   const officeLoc = pendingUser.office_location ? escapeHtml(pendingUser.office_location) : "N/A"
-  const empId = escapeHtml(employeeId)
   const safeTempPassword = escapeHtml(tempPassword)
   const safePortalUrl = escapeHtml(portalUrl)
 
@@ -78,10 +77,6 @@ export function renderWelcomeEmail({ pendingUser, employeeId, tempPassword, port
                 <tr>
                     <td class="label">Full Name</td>
                     <td class="value">${firstName} ${lastName}</td>
-                </tr>
-                 <tr>
-                    <td class="label">Employee ID</td>
-                    <td class="value">${empId}</td>
                 </tr>
                 <tr>
                     <td class="label">Department</td>
