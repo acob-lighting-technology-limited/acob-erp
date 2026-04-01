@@ -1778,22 +1778,23 @@ const LOGO_FULL = "/images/acob-logo-light.webp" // full ACOB LIGHTING logo
 const LOGO_ICON = "/images/acob-logo-dark.webp" // green-only icon variant
 
 export type WeeklyPptxTheme = "light" | "dark"
+export type WeeklyDeptOrder = "default" | "alpha" | "random"
 
 const getWeeklyPptxThemeColors = (theme: WeeklyPptxTheme = "light") => {
   if (theme === "dark") {
     return {
-      canvas: "0B1220",
-      header: "020617",
+      canvas: "111111",
+      header: "000000",
       accent: ACOB_GREEN,
       footer: ACOB_GREEN,
-      textPrimary: "E2E8F0",
-      textMuted: "94A3B8",
+      textPrimary: "F5F5F5",
+      textMuted: "A3A3A3",
       textInverse: ACOB_WHITE,
-      card: "111827",
-      cardBorder: "1F2937",
-      separator: "334155",
-      sectionText: "E2E8F0",
-      titleFill: "134E4A",
+      card: "1C1C1C",
+      cardBorder: "2C2C2C",
+      separator: "3A3A3A",
+      sectionText: "E5E7EB",
+      titleFill: ACOB_GREEN,
     }
   }
 
@@ -2906,13 +2907,23 @@ export const exportAllToPPTX = async (
   year: number,
   mode: WeeklyPptxMode = "full",
   theme: WeeklyPptxTheme = "light",
-  meetingDate?: string
+  meetingDate?: string,
+  order: WeeklyDeptOrder = "default"
 ) => {
   const PptxConstructor = await loadPptxGenJS()
   const pres = new PptxConstructor()
   pres.layout = "LAYOUT_WIDE"
 
-  const sortedReports = sortReportsByDepartment(reports)
+  const sortedReports =
+    order === "alpha"
+      ? [...reports]
+          .map((r) => ({ ...r, department: normalizeDepartmentName(r.department) }))
+          .sort((a, b) => a.department.localeCompare(b.department))
+      : order === "random"
+        ? [...reports]
+            .map((r) => ({ ...r, department: normalizeDepartmentName(r.department) }))
+            .sort(() => Math.random() - 0.5)
+        : sortReportsByDepartment(reports)
   const departments = sortedReports.map((entry) => entry.department)
 
   // Slide 1 — Cover

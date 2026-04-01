@@ -15,7 +15,7 @@ import {
 import { SearchableSelect } from "@/components/ui/searchable-select"
 import { toast } from "sonner"
 import { formatName } from "@/lib/utils"
-import { OFFICE_LOCATIONS } from "@/lib/permissions"
+import { useOfficeLocations } from "@/hooks/use-office-locations"
 import { generateUniqueCodePreview } from "@/lib/asset-types"
 import { Plus, User, Building2, Building } from "lucide-react"
 import type { Asset, Employee } from "@/app/admin/assets/admin-assets-content"
@@ -77,6 +77,7 @@ export function AssetFormDialog({
   batchQuantity,
   setBatchQuantity,
 }: AssetFormDialogProps) {
+  const { officeLocations } = useOfficeLocations()
   const getUniqueCodePreview = () => {
     if (!assetForm.asset_type || !assetForm.acquisition_year) {
       return "ACOB/HQ/???/????/???"
@@ -302,7 +303,7 @@ export function AssetFormDialog({
                     placeholder="Select office location"
                     searchPlaceholder="Search office locations..."
                     icon={<Building className="h-4 w-4" />}
-                    options={OFFICE_LOCATIONS.map((location) => ({
+                    options={officeLocations.map((location) => ({
                       value: location,
                       label: location,
                       icon: <Building className="h-3 w-3" />,

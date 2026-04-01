@@ -45,8 +45,9 @@ import {
   UserCircle,
 } from "lucide-react"
 import type { UserRole, EmploymentStatus } from "@/types/database"
-import { getRoleDisplayName, getRoleBadgeColor, OFFICE_LOCATIONS } from "@/lib/permissions"
+import { getRoleDisplayName, getRoleBadgeColor } from "@/lib/permissions"
 import { useDepartments } from "@/hooks/use-departments"
+import { useOfficeLocations } from "@/hooks/use-office-locations"
 import { createClient } from "@/lib/supabase/client"
 import type { UserProfile } from "@/app/admin/hr/employees/admin-employee-content"
 import type { EmployeeAssignedItems, EmployeeProfile, EmployeeStatusSummary, EmployeeViewData } from "./types"
@@ -122,6 +123,7 @@ export function EmployeeViewModal({
   getAvailableRoles,
 }: EmployeeViewModalProps) {
   const { departments: DEPARTMENTS } = useDepartments()
+  const { officeLocations } = useOfficeLocations()
   const supabase = createClient()
 
   const viewEmployeeProfile = employee
@@ -729,7 +731,7 @@ export function EmployeeViewModal({
                     value={editForm.office_location}
                     onValueChange={(value) => setEditForm({ ...editForm, office_location: value })}
                     placeholder="Select office location"
-                    options={OFFICE_LOCATIONS.map((location) => ({
+                    options={officeLocations.map((location) => ({
                       value: location,
                       label: location,
                     }))}

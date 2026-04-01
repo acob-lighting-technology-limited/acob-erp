@@ -73,6 +73,7 @@ interface OfficeLocationsData {
   locations: OfficeLocation[]
   locationEmployees: Record<string, LocationEmployee[]>
   canManageLocations: boolean
+  departments: string[]
 }
 
 async function fetchOfficeLocationsData(): Promise<OfficeLocationsData> {
@@ -88,7 +89,10 @@ async function fetchOfficeLocationsData(): Promise<OfficeLocationsData> {
     canManageLocations = ["developer", "super_admin", "admin"].includes(profile?.role || "")
   }
 
-  const { data: locs, error } = await supabase.from("office_locations").select("*").order("name")
+  const [{ data: locs, error }, { data: depts }] = await Promise.all([
+    supabase.from("office_locations").select("*").order("name"),
+    supabase.from("departments").select("name").eq("is_active", true).order("name"),
+  ])
   if (error) throw new Error(error.message)
 
   const { data: profiles } = await supabase
@@ -115,6 +119,7 @@ async function fetchOfficeLocationsData(): Promise<OfficeLocationsData> {
     locations: locsWithCounts,
     locationEmployees: byLocation,
     canManageLocations,
+    departments: (depts || []).map((d) => d.name),
   }
 }
 
@@ -139,6 +144,7 @@ export default function OfficeLocationsPage() {
   const locations = data?.locations ?? []
   const locationEmployees = data?.locationEmployees ?? {}
   const canManageLocations = data?.canManageLocations ?? false
+  const departments = data?.departments ?? []
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -154,7 +160,7 @@ export default function OfficeLocationsPage() {
         const oldName = editingLocation.name
         const newName = formData.name.trim()
 
-        const { error } = await supabase
+        const { error, data: updatedRows } = await supabase
           .from("office_locations")
           .update({
             name: newName,
@@ -165,20 +171,13 @@ export default function OfficeLocationsPage() {
             updated_at: new Date().toISOString(),
           })
           .eq("id", editingLocation.id)
+          .select()
 
         if (error) throw error
-
-        // If name changed, bulk-update all employee profiles referencing the old name
-        if (oldName !== newName) {
-          const { error: profilesError } = await supabase
-            .from("profiles")
-            .update({ office_location: newName })
-            .eq("office_location", oldName)
-
-          if (profilesError) {
-            log.error("Failed to update employee office_location references:", profilesError)
-            toast.warning("Location renamed, but some employee records may need a manual update.")
-          }
+        if (!updatedRows || updatedRows.length === 0) {
+          throw new Error(
+            "Update was blocked by a database policy. Check that your account has permission to modify office locations."
+          )
         }
 
         toast.success("Office location updated successfully")
@@ -201,7 +200,11 @@ export default function OfficeLocationsPage() {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminOfficeLocations() })
     } catch (error: unknown) {
       log.error("Error saving office location:", error)
-      toast.error(error instanceof Error ? error.message : "Failed to save office location")
+      const msg =
+        error instanceof Error
+          ? error.message
+          : ((error as { message?: string })?.message ?? "Failed to save office location")
+      toast.error(msg)
     }
   }
 
@@ -296,12 +299,22 @@ export default function OfficeLocationsPage() {
                     <Label htmlFor="department">
                       Linked Department <span className="text-muted-foreground text-xs">(optional)</span>
                     </Label>
-                    <Input
-                      id="department"
-                      value={formData.department}
-                      onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                      placeholder="e.g., Technical, Admin & HR"
-                    />
+                    <Select
+                      value={formData.department || "__none__"}
+                      onValueChange={(val) => setFormData({ ...formData, department: val === "__none__" ? "" : val })}
+                    >
+                      <SelectTrigger id="department">
+                        <SelectValue placeholder="Select department" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">None</SelectItem>
+                        {departments.map((dept) => (
+                          <SelectItem key={dept} value={dept}>
+                            {dept}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="description">Description</Label>

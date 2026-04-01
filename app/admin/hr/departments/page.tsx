@@ -135,18 +135,29 @@ export default function DepartmentsPage() {
       const supabase = createClient()
 
       if (editingDepartment) {
+        const oldName = editingDepartment.name
+        const newName = formData.name.trim()
+
         // Update existing department
-        const { error } = await supabase
+        const { error, data: updatedRows } = await supabase
           .from("departments")
           .update({
-            name: formData.name,
+            name: newName,
             description: formData.description || null,
             is_active: formData.is_active,
             updated_at: new Date().toISOString(),
           })
           .eq("id", editingDepartment.id)
+          .select()
 
         if (error) throw error
+        if (!updatedRows || updatedRows.length === 0) {
+          // Supabase RLS silently blocked the update — no rows were changed
+          throw new Error(
+            "Update was blocked by a database policy. Check that your account has permission to modify departments."
+          )
+        }
+
         toast.success("Department updated successfully")
       } else {
         // Create new department
@@ -166,7 +177,11 @@ export default function DepartmentsPage() {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminDepartmentsPage() })
     } catch (error: unknown) {
       log.error("Error saving department:", error)
-      toast.error(error instanceof Error ? error.message : "Failed to save department")
+      const msg =
+        error instanceof Error
+          ? error.message
+          : ((error as { message?: string })?.message ?? "Failed to save department")
+      toast.error(msg)
     }
   }
 
@@ -227,7 +242,7 @@ export default function DepartmentsPage() {
                   <DialogTitle>{editingDepartment ? "Edit Department" : "Create Department"}</DialogTitle>
                   <DialogDescription>
                     {editingDepartment
-                      ? "Update the department details below."
+                      ? "Update the department details below. Renaming will automatically update all assigned employee records."
                       : "Add a new department to your organization."}
                   </DialogDescription>
                 </DialogHeader>
