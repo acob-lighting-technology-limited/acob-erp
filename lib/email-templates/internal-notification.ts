@@ -80,8 +80,9 @@ export function renderInternalNotificationEmail({ pendingUser }: InternalNotific
 
     </div>
     <div class="footer" style="background-color:#0f2d1f;">
+        <span style="color:#d1d5db;">Prepared by Admin &amp; HR</span><br>
+        Admin &amp; HR Department<br>
         <strong>ACOB Lighting Technology Limited</strong><br>
-        Admin & HR Department<br>
         <span class="footer-system">Employee Management System</span>
         <br><br>
         <i class="footer-note">This is an automated system notification. Please do not reply directly to this email.</i>

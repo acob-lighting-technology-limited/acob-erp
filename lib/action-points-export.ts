@@ -25,7 +25,13 @@ async function downloadActionPointsExport(
   })
 
   if (!response.ok) {
-    throw new Error(`Failed to export Action Points as ${format.toUpperCase()}`)
+    const detail = await response.text().catch(() => "")
+    try {
+      const parsed = JSON.parse(detail) as { error?: string }
+      throw new Error(parsed.error || `Failed to export Action Points as ${format.toUpperCase()}`)
+    } catch {
+      throw new Error(detail || `Failed to export Action Points as ${format.toUpperCase()}`)
+    }
   }
 
   const blob = await response.blob()

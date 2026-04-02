@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { Buffer } from "node:buffer"
-import { generateActionPointsPdfBuffer } from "@/lib/reports/action-points-pdf"
 import { generateActionPointsDocxBuffer } from "@/lib/reports/action-points-template"
+import { generateActionPointsPdfFromDocxBuffer } from "@/lib/reports/action-points-word-pdf"
 import type { ActionItem } from "@/lib/export-utils"
 import { normalizeDepartmentName } from "@/shared/departments"
 
@@ -61,31 +61,46 @@ type ExportBody = {
 }
 
 export async function POST(request: NextRequest) {
-  const body = (await request.json()) as ExportBody
-  const { actions, week, year, meetingDate, department, format } = body
+  try {
+    const body = (await request.json()) as ExportBody
+    const { actions, week, year, meetingDate, department, format } = body
 
-  if (format === "pdf") {
-    const pdfBuffer = await generateActionPointsPdfBuffer(actions, week, year, meetingDate)
+    if (format === "pdf") {
+      const normalizedActions: ActionItem[] = (Array.isArray(actions) ? actions : []).map((action) => ({
+        id: String(action.id),
+        title: typeof action.title === "string" ? action.title : "",
+        description: typeof action.description === "string" ? action.description : undefined,
+        department: String(action.department || ""),
+        status: String(action.status || "pending"),
+        week_number: Number(action.week_number || week),
+        year: Number(action.year || year),
+      }))
 
-    return new NextResponse(new Blob([Buffer.from(pdfBuffer)], { type: "application/pdf" }), {
-      headers: {
-        "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="${buildActionPointsFilename({ week, year, meetingDate, extension: "pdf", department })}"`,
-      },
-    })
-  }
+      const pdfBuffer = await generateActionPointsPdfFromDocxBuffer(normalizedActions, week, year, meetingDate)
 
-  const docxBuffer = await generateActionPointsDocxBuffer(actions, week, year, meetingDate)
-
-  return new NextResponse(
-    new Blob([Buffer.from(docxBuffer)], {
-      type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    }),
-    {
-      headers: {
-        "Content-Type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        "Content-Disposition": `attachment; filename="${buildActionPointsFilename({ week, year, meetingDate, extension: "docx", department })}"`,
-      },
+      return new NextResponse(new Blob([Buffer.from(pdfBuffer)], { type: "application/pdf" }), {
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": `attachment; filename="${buildActionPointsFilename({ week, year, meetingDate, extension: "pdf", department })}"`,
+        },
+      })
     }
-  )
+
+    const docxBuffer = await generateActionPointsDocxBuffer(actions, week, year, meetingDate)
+
+    return new NextResponse(
+      new Blob([Buffer.from(docxBuffer)], {
+        type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      }),
+      {
+        headers: {
+          "Content-Type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "Content-Disposition": `attachment; filename="${buildActionPointsFilename({ week, year, meetingDate, extension: "docx", department })}"`,
+        },
+      }
+    )
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Failed to export Action Points"
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
 }

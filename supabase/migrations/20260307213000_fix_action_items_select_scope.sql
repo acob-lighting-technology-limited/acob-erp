@@ -1,4 +1,4 @@
--- Fix Action Tracker visibility scope.
+-- Fix Action Point visibility scope.
 -- Previous select policy only allowed own department or has_role('lead'),
 -- which excluded developer/super_admin global access in practice.
 

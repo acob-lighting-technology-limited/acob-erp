@@ -54,7 +54,7 @@ async function getAdminTasksData() {
     managed_departments: scope.managedDepartments,
   }
 
-  // Build query based on role - exclude weekly action tracker items
+  // Build query based on role - exclude weekly action point items
   const tasksQuery = dataClient
     .from("tasks")
     .select("*")

@@ -16,7 +16,7 @@ const corsHeaders = {
 const RESEND_MAX_REQ_PER_SEC = 2
 const SEND_INTERVAL_MS = Math.ceil(1000 / RESEND_MAX_REQ_PER_SEC) + 100
 const MAX_429_RETRIES = 5
-const DEFAULT_SENDER = "ACOB Internal Systems <notifications@acoblighting.com>"
+const DEFAULT_SENDER_EMAIL = "notifications@acoblighting.com"
 
 type RateLimitErrorLike = {
   statusCode?: number | string
@@ -37,6 +37,10 @@ type BroadcastRequestBody = {
   broadcastDepartment?: string
   broadcastPreparedByName?: string
   requestedByUserId?: string
+  attachments?: {
+    filename?: string
+    content?: string
+  }[]
 }
 
 type DeliveryResult = {
@@ -44,6 +48,11 @@ type DeliveryResult = {
   success: boolean
   emailId?: string | null
   error?: unknown
+}
+
+type MailAttachment = {
+  filename: string
+  content: string
 }
 
 function getErrorMessage(error: unknown): string {
@@ -72,7 +81,8 @@ async function sendWithRetry(
   from: string,
   to: string,
   subject: string,
-  html: string
+  html: string,
+  attachments: MailAttachment[]
 ): Promise<SendEmailResponse> {
   let attempt = 0
   while (attempt <= MAX_429_RETRIES) {
@@ -81,6 +91,7 @@ async function sendWithRetry(
       to,
       subject,
       html,
+      attachments,
     })
 
     if (!error) return { data }
@@ -109,6 +120,15 @@ function escapeHtml(input: string): string {
     .replace(/'/g, "&#39;")
 }
 
+function normalizeDepartmentLabel(input: string): string {
+  return input.replace(/^ACOB\s+/i, "").trim() || "Admin & HR"
+}
+
+function buildBroadcastSender(department: string): string {
+  const senderDepartment = normalizeDepartmentLabel(department)
+  return `ACOB ${senderDepartment} <${DEFAULT_SENDER_EMAIL}>`
+}
+
 function sanitizeBroadcastHtml(rawHtml: string): string {
   if (!rawHtml?.trim()) return ""
   return rawHtml
@@ -126,8 +146,8 @@ function withSubjectPrefix(moduleName: string, subject: string): string {
 }
 
 function buildAdminBroadcastHtml(title: string, bodyHtml: string, department: string, preparedByName: string): string {
-  const safeDepartment = escapeHtml(department.trim() || "Admin & HR")
-  const displayDepartment = safeDepartment.replace(/^ACOB\s+/i, "")
+  const displayDepartment = normalizeDepartmentLabel(department)
+  const safeDepartment = escapeHtml(displayDepartment)
   const safeTitle = escapeHtml(title)
   const safePreparedBy = escapeHtml(preparedByName.trim() || "ACOB Team")
 
@@ -165,13 +185,12 @@ function buildAdminBroadcastHtml(title: string, bodyHtml: string, department: st
     "</div>" +
     '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#0f2d1f" style="background:#0f2d1f !important;background-color:#0f2d1f !important;border-top:3px solid #16a34a;">' +
     '<tr><td align="center" style="padding:20px;background:#0f2d1f !important;background-color:#0f2d1f !important;font-size:11px;color:#9ca3af;">' +
-    '<strong style="color:#fff;">ACOB Lighting Technology Limited</strong><br>' +
     '<span style="color:#d1d5db;">Prepared by ' +
     safePreparedBy +
     "</span><br>" +
-    displayDepartment +
-    " Department<br>" +
-    '<span style="color:#16a34a;font-weight:600;">Communications System</span>' +
+    safeDepartment +
+    "<br>" +
+    '<strong style="color:#fff;">ACOB Lighting Technology Limited</strong>' +
     "<br><br>" +
     '<i style="color:#9ca3af;">This is an automated system notification. Please do not reply directly to this email.</i>' +
     "</td></tr></table>" +
@@ -205,6 +224,14 @@ serve(async (req) => {
     const broadcastDepartment = body.broadcastDepartment as string | undefined
     const broadcastPreparedByName = body.broadcastPreparedByName as string | undefined
     const requestedByUserId = (body.requestedByUserId as string | undefined) || null
+    const attachments = Array.isArray(body.attachments)
+      ? body.attachments
+          .map((attachment) => ({
+            filename: String(attachment?.filename || "").trim(),
+            content: String(attachment?.content || "").trim(),
+          }))
+          .filter((attachment): attachment is MailAttachment => Boolean(attachment.filename && attachment.content))
+      : []
 
     if (!recipients || recipients.length === 0) {
       return new Response(JSON.stringify({ error: "No recipients" }), { status: 400 })
@@ -222,13 +249,13 @@ serve(async (req) => {
       (broadcastSubject || "Administrative Notice").trim() || "Administrative Notice"
     )
     const html = buildAdminBroadcastHtml(subject, cleanBody, department, preparedBy)
-    const from = DEFAULT_SENDER
+    const from = buildBroadcastSender(department)
 
     console.log("[communications-mail] Sending admin_broadcast to " + recipients.length + " recipients")
 
     const results: DeliveryResult[] = []
     for (const to of recipients) {
-      const { data, error } = await sendWithRetry(resend, from, to, subject, html)
+      const { data, error } = await sendWithRetry(resend, from, to, subject, html, attachments)
       if (error) {
         console.error("[communications-mail] Failed to send to " + to + ":", JSON.stringify(error))
         results.push({ to, success: false, error })
@@ -259,6 +286,7 @@ serve(async (req) => {
           failure_count: failureCount,
           subject,
           prepared_by: preparedBy,
+          attachment_count: attachments.length,
         },
       })
     } catch (auditErr) {

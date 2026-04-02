@@ -16,17 +16,17 @@ const SAFE_SECTION_SPACER_XML =
 const DEPARTMENT_ORDER = getCanonicalDepartmentOrder().filter((department) => department !== "Executive Management")
 
 const TEMPLATE_HEADINGS = [
-  { output: "ACCOUNTS DEPARTMEMT:", candidates: ["ACCOUNTS DEPARTMEMT:"] },
-  { output: "ADMIN/HR:", candidates: ["ADMIN/HR:"] },
-  { output: "BUSINESS GROWTH AND INNOVATION:", candidates: ["BUSINESS GROWTH AND INNOVATION:"] },
-  { output: "IT & COMMUNICATIONS DEPARTMENT:", candidates: ["IT & COMMUNICATIONS DEPARTMENT:"] },
+  { key: "Accounts", candidates: ["ACCOUNTS DEPARTMEMT:"] },
+  { key: "Admin & HR", candidates: ["ADMIN/HR:"] },
+  { key: "Business, Growth and Innovation", candidates: ["BUSINESS GROWTH AND INNOVATION:"] },
+  { key: "IT and Communications", candidates: ["IT & COMMUNICATIONS DEPARTMENT:"] },
   {
-    output: "OPERATIONS AND MAINTENANCE DEPARTMENT:",
+    key: "Operations and Maintenance",
     candidates: ["OPERATIONS AND MAINTENANCE DEPARTMENT:", "OPERATIONS DEPARTMENT:"],
   },
-  { output: "PROJECT DEPARTMENT:", candidates: ["PROJECT DEPARTMENT:"] },
-  { output: "REGULATORY & COMPLIANCE DEPARTMENT:", candidates: ["REGULATORY & COMPLIANCE DEPARTMENT:"] },
-  { output: "TECHNICAL DEPARTMENT", candidates: ["TECHNICAL DEPARTMENT"] },
+  { key: "Project", candidates: ["PROJECT DEPARTMENT:"] },
+  { key: "Legal, Regulatory and Compliance", candidates: ["REGULATORY & COMPLIANCE DEPARTMENT:"] },
+  { key: "Technical", candidates: ["TECHNICAL DEPARTMENT"] },
 ] as const
 
 const decodeXml = (value: string) =>
@@ -45,6 +45,14 @@ const escapeXml = (value: string) =>
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;")
+
+const normalizeTemplateText = (value: unknown) =>
+  String(value ?? "")
+    .replace(/\f/g, " ") // Ctrl+L (form feed) → space
+    .replace(/[\x00-\x09\x0B\x0E-\x1F]/g, "") // strip remaining control chars (keep \n \r \t)
+    .replace(/\r\n|\r|\n/g, " ") // collapse line breaks into spaces (single bullet line)
+    .replace(/\s+/g, " ") // collapse multiple spaces
+    .trim()
 
 const getParagraphs = (documentXml: string) => documentXml.match(/<w:p\b[\s\S]*?<\/w:p>/g) ?? []
 
@@ -65,6 +73,20 @@ const replaceParagraphText = (paragraphXml: string, text: string) => {
   })
 }
 
+const setParagraphAlignment = (paragraphXml: string, alignment: "left" | "both") => {
+  const alignmentXml = `<w:jc w:val="${alignment}"/>`
+
+  if (paragraphXml.includes("<w:pPr")) {
+    if (paragraphXml.match(/<w:jc\b[^>]*\/>/)) {
+      return paragraphXml.replace(/<w:jc\b[^>]*\/>/, alignmentXml)
+    }
+
+    return paragraphXml.replace("<w:pPr>", `<w:pPr>${alignmentXml}`)
+  }
+
+  return paragraphXml.replace("<w:p>", `<w:p><w:pPr>${alignmentXml}</w:pPr>`)
+}
+
 const groupActionItemsByDepartment = (actions: ActionItem[]) => {
   const grouped: Record<string, ActionItem[]> = {}
   actions.forEach((action) => {
@@ -80,8 +102,6 @@ const groupActionItemsByDepartment = (actions: ActionItem[]) => {
 
   return { grouped, departments }
 }
-
-const getTemplateHeading = (department: string) => getActionPointsDepartmentHeading(department)
 
 const formatActionPointsDate = (week: number, year: number, meetingDate?: string) => {
   if (meetingDate) {
@@ -118,7 +138,7 @@ export async function generateActionPointsDocxBuffer(
 
   const headingMatches = TEMPLATE_HEADINGS.map((heading) => {
     const found = paragraphInfo.find((item) => heading.candidates.some((candidate) => candidate === item.text))
-    if (!found) throw new Error(`Template heading not found: ${heading.output}`)
+    if (!found) throw new Error(`Template heading not found for: ${heading.key}`)
     return { ...heading, index: found.index }
   })
 
@@ -129,17 +149,18 @@ export async function generateActionPointsDocxBuffer(
     const sectionParagraphs = paragraphs.slice(headingIndex + 1, nextHeadingIndex)
     const bulletParagraphs = sectionParagraphs.filter((xml) => getParagraphText(xml).length > 0)
     const blankParagraphXml =
-      sectionParagraphs.find((xml) => getParagraphText(xml).length === 0 && !xml.includes("<w:sectPr>")) ??
+      sectionParagraphs.find((xml) => getParagraphText(xml).length === 0 && !xml.includes("<w:sectPr")) ??
       SAFE_SECTION_SPACER_XML
     if (bulletParagraphs.length === 0)
-      throw new Error(`Template section has no bullet paragraph: ${headingMatch.output}`)
+      throw new Error(`Template section has no bullet paragraph for: ${headingMatch.key}`)
     return {
-      headingText: headingMatch.output,
+      headingKey: headingMatch.key,
       headingXml,
       bulletTemplateXml: bulletParagraphs[0],
       blankParagraphXml,
     }
   })
+  const fallbackSection = sections[0]
 
   const { grouped, departments } = groupActionItemsByDepartment(actions)
   const builtParagraphs: string[] = []
@@ -147,22 +168,33 @@ export async function generateActionPointsDocxBuffer(
   paragraphs.forEach((xml, index) => {
     if (index < headingMatches[0].index) {
       if (index === dateParagraphIndex) {
-        builtParagraphs.push(replaceParagraphText(xml, `Date: ${formatActionPointsDate(week, year, meetingDate)}`))
+        builtParagraphs.push(
+          setParagraphAlignment(
+            replaceParagraphText(xml, `Date: ${formatActionPointsDate(week, year, meetingDate)}`),
+            "both"
+          )
+        )
       } else {
-        builtParagraphs.push(xml)
+        builtParagraphs.push(setParagraphAlignment(xml, "both"))
       }
     }
   })
 
   departments.forEach((department) => {
-    const section = sections.find((item) => item.headingText === getTemplateHeading(department))
+    const dynamicHeading = getActionPointsDepartmentHeading(department)
+    const section = sections.find((item) => item.headingKey === normalizeDepartmentName(department)) || fallbackSection
     if (!section) throw new Error(`No template section available for department: ${department}`)
 
-    builtParagraphs.push(replaceParagraphText(section.headingXml, getTemplateHeading(department)))
+    builtParagraphs.push(setParagraphAlignment(replaceParagraphText(section.headingXml, dynamicHeading), "both"))
     ;(grouped[department] || []).forEach((action) => {
-      builtParagraphs.push(replaceParagraphText(section.bulletTemplateXml, action.title))
+      builtParagraphs.push(
+        setParagraphAlignment(
+          replaceParagraphText(section.bulletTemplateXml, normalizeTemplateText(action.title)),
+          "both"
+        )
+      )
     })
-    builtParagraphs.push(section.blankParagraphXml)
+    builtParagraphs.push(setParagraphAlignment(section.blankParagraphXml, "both"))
   })
 
   const rebuiltDocumentXml =

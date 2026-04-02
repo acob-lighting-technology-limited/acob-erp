@@ -66,6 +66,12 @@ interface ApprovalEmailPreview {
   }
 }
 
+interface ApprovalEmailWarning {
+  audience: "employee" | "management"
+  reason: string
+  recipients: string[]
+}
+
 async function fetchPendingApplications(supabase: ReturnType<typeof createClient>): Promise<PendingUser[]> {
   const { data, error } = await supabase
     .from("pending_users")
@@ -188,7 +194,16 @@ export function PendingApplicationsModal({ onEmployeeCreated }: PendingApplicati
         throw new Error(result.error || "Failed to approve user")
       }
 
-      toast.success("User approved and account created successfully")
+      const emailWarnings = Array.isArray(result.emailWarnings) ? (result.emailWarnings as ApprovalEmailWarning[]) : []
+
+      if (emailWarnings.length > 0) {
+        toast.warning("User approved, but some emails were not sent", {
+          description: emailWarnings.map((warning) => `${warning.audience}: ${warning.reason}`).join(" | "),
+        })
+      } else {
+        toast.success("User approved and account created successfully")
+      }
+
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.pendingApplications() })
       const remaining = pendingUsers.filter((u) => u.id !== selectedUser.id)
       if (remaining.length > 0) {

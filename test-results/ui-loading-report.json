@@ -40,8 +40,8 @@
       "type": "detail"
     },
     {
-      "dir": "app/(app)/dashboard/reports/action-tracker",
-      "loading": "app/(app)/dashboard/reports/action-tracker/loading.tsx",
+      "dir": "app/(app)/dashboard/reports/action-point",
+      "loading": "app/(app)/dashboard/reports/action-point/loading.tsx",
       "type": "table"
     },
     {
@@ -315,8 +315,8 @@
       "type": "table"
     },
     {
-      "dir": "app/admin/reports/action-tracker",
-      "loading": "app/admin/reports/action-tracker/loading.tsx",
+      "dir": "app/admin/reports/action-point",
+      "loading": "app/admin/reports/action-point/loading.tsx",
       "type": "table"
     },
     {

@@ -1,7 +1,7 @@
 /**
  * POST /api/reports/weekly-report-export
  *
- * Pre-generates the Weekly Report PDF (and optionally the Action Tracker PDF)
+ * Pre-generates the Weekly Report PDF (and optionally the Action Points PDF)
  * server-side inside a Next.js API route, returning the raw PDF bytes.
  *
  * The send flow calls this BEFORE invoking the edge function so that the edge
@@ -11,21 +11,72 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
+import type { ActionItem } from "@/lib/export-utils"
 import { createClient } from "@/lib/supabase/server"
 import {
   buildWeeklyReportPDF,
-  buildActionTrackerPdf,
   fetchLogoPair,
   type WeeklyReportRow,
   type ActionItemRow,
 } from "@/lib/reports/weekly-report-pdf"
 import { resolveEffectiveMeetingDateIso, formatMeetingDateLabel } from "@/lib/reports/meeting-date"
+import { generateActionPointsPdfFromDocxBuffer } from "@/lib/reports/action-points-word-pdf"
 
 type RequestBody = {
   week: number
   year: number
-  /** "weekly_report" | "action_tracker" — defaults to "weekly_report" */
-  type?: "weekly_report" | "action_tracker"
+  /** "weekly_report" | "action_point" — defaults to "weekly_report" */
+  type?: "weekly_report" | "action_point"
+}
+
+type ActionPointRouteRow = {
+  id: string
+  title: string | null
+  department: string
+  status: string
+  week_number: number
+  year: number
+}
+
+async function fetchActionPointRows(supabase: Awaited<ReturnType<typeof createClient>>, week: number, year: number) {
+  const { data: taskRows, error: taskError } = await supabase
+    .from("tasks")
+    .select("id, title, department, status, week_number, year")
+    .eq("category", "weekly_action")
+    .eq("week_number", week)
+    .eq("year", year)
+
+  if (taskError) throw new Error(taskError.message)
+
+  const normalizedTaskRows: ActionItemRow[] = Array.isArray(taskRows)
+    ? taskRows.map((row) => ({
+        id: String(row.id),
+        title: typeof row.title === "string" ? row.title : null,
+        department: String(row.department || ""),
+        status: String(row.status || ""),
+        week_number: Number(row.week_number || week),
+        year: Number(row.year || year),
+      }))
+    : []
+
+  if (normalizedTaskRows.length > 0) return normalizedTaskRows
+
+  const { data: legacyRows, error: legacyError } = await supabase
+    .from("action_items")
+    .select("id, title, department, status, week_number, year")
+    .eq("week_number", week)
+    .eq("year", year)
+
+  if (legacyError) throw new Error(legacyError.message)
+
+  return (Array.isArray(legacyRows) ? legacyRows : []).map((row: ActionPointRouteRow) => ({
+    id: String(row.id),
+    title: typeof row.title === "string" ? row.title : null,
+    department: String(row.department || ""),
+    status: String(row.status || ""),
+    week_number: Number(row.week_number || week),
+    year: Number(row.year || year),
+  }))
 }
 
 export async function POST(request: NextRequest) {
@@ -43,7 +94,6 @@ export async function POST(request: NextRequest) {
     const meetingDateIso = await resolveEffectiveMeetingDateIso(supabase, week, year)
     const meetingDateLabel = formatMeetingDateLabel(meetingDateIso)
 
-    // ── Fetch logos in parallel with data ───────────────────────────────────
     const [{ coverLogoBytes, headerLogoBytes }, reportsResult, actionsResult] = await Promise.all([
       fetchLogoPair(),
       type === "weekly_report"
@@ -54,13 +104,7 @@ export async function POST(request: NextRequest) {
             .eq("year", year)
             .eq("status", "submitted")
         : Promise.resolve({ data: [], error: null }),
-      type === "action_tracker"
-        ? supabase
-            .from("action_items")
-            .select("id, title, department, status, week_number, year")
-            .eq("week_number", week)
-            .eq("year", year)
-        : Promise.resolve({ data: [], error: null }),
+      type === "action_point" ? fetchActionPointRows(supabase, week, year) : Promise.resolve([] as ActionItemRow[]),
     ])
 
     // ── Generate the requested PDF ──────────────────────────────────────────
@@ -78,11 +122,17 @@ export async function POST(request: NextRequest) {
       pdfBytes = await buildWeeklyReportPDF(reports, week, year, meetingDateLabel, coverLogoBytes, headerLogoBytes)
       filename = `ACOB Weekly Reports - ${meetingDateLabel} - W${week}.pdf`
     } else {
-      if (actionsResult.error) throw new Error(actionsResult.error.message)
-
-      const actions = (actionsResult.data ?? []) as ActionItemRow[]
-      pdfBytes = await buildActionTrackerPdf(actions, week, year, headerLogoBytes)
-      filename = `ACOB Action Tracker - ${meetingDateLabel} - W${week}.pdf`
+      const actions = actionsResult as ActionItemRow[]
+      const normalizedActions: ActionItem[] = actions.map((action) => ({
+        id: String(action.id),
+        title: typeof action.title === "string" ? action.title : "",
+        department: String(action.department || ""),
+        status: String(action.status || ""),
+        week_number: Number(action.week_number || week),
+        year: Number(action.year || year),
+      }))
+      pdfBytes = await generateActionPointsPdfFromDocxBuffer(normalizedActions, week, year, meetingDateIso)
+      filename = `ACOB Action Points - ${meetingDateLabel} - W${week}.pdf`
     }
 
     const safeFilename = encodeURIComponent(filename)

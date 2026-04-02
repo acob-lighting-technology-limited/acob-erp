@@ -1,5 +1,5 @@
 /**
- * Weekly Report & Action Tracker PDF generation — shared Node.js library.
+ * Weekly Report & Action Points PDF generation — shared Node.js library.
  *
  * This is a direct port of the PDF generation code that previously lived only
  * inside the `send-weekly-report` Supabase Edge Function.  Moving it here lets
@@ -7,8 +7,8 @@
  * function, keeping the edge function well inside its 2-second CPU budget.
  */
 
-import { PDFDocument, PDFFont, PDFPage, rgb, StandardFonts, type RGB } from "pdf-lib"
-import { compareDepartments, getCanonicalDepartmentOrder, normalizeDepartmentName } from "@/shared/departments"
+import { PDFDocument, PDFFont, PDFPage, rgb, StandardFonts } from "pdf-lib"
+import { compareDepartments, normalizeDepartmentName } from "@/shared/departments"
 
 // ─── Colour palette (mirrors edge function) ────────────────────────────────
 const GREEN = rgb(0.102, 0.478, 0.29)
@@ -18,12 +18,8 @@ const SLATE = rgb(0.2, 0.255, 0.333)
 const MUTED = rgb(0.392, 0.455, 0.545)
 const BLUE = rgb(0.114, 0.416, 0.588)
 const RED = rgb(0.725, 0.11, 0.11)
-const LIGHT = rgb(0.976, 0.984, 0.992)
 
 // ─── Department ordering ────────────────────────────────────────────────────
-const DEPT_ORDER = getCanonicalDepartmentOrder().filter(
-  (department) => department !== "Executive Management" && department !== "Project"
-)
 
 // ─── Row types ──────────────────────────────────────────────────────────────
 export type WeeklyReportRow = {
@@ -76,6 +72,7 @@ function sanitizeForPdf(text: string, font: PDFFont): string {
   let out = ""
   for (const ch of text) {
     if (ch === "\r") continue
+    if (ch === "\f") continue // Ctrl+L (form feed) — drop
     if (ch === "\n") {
       out += "\n"
       continue
@@ -402,117 +399,7 @@ async function addWeeklyReportContentPage(
   page.drawText(pn, { x: W / 2 - pnW / 2, y: 14, size: 9, font: bold, color: WHITE })
 }
 
-// ─── Action tracker page ─────────────────────────────────────────────────────
-
-async function addActionTrackerPage(
-  doc: PDFDocument,
-  bold: PDFFont,
-  regular: PDFFont,
-  department: string,
-  actions: ActionItemRow[],
-  week: number,
-  year: number,
-  headerLogoBytes: Uint8Array | null,
-  pageNumber: number
-) {
-  const page = doc.addPage([595, 842])
-  const { width: W, height: H } = page.getSize()
-  const footerH = 40
-  const headerH = 52
-
-  page.drawRectangle({ x: 0, y: H - headerH, width: W, height: headerH, color: DARK })
-  page.drawRectangle({ x: 0, y: H - headerH - 4, width: W, height: 4, color: GREEN })
-  page.drawText(sanitizeForPdf(department.toUpperCase(), bold), { x: 22, y: H - 32, size: 9, font: bold, color: WHITE })
-  await drawLogoInHeader(doc, page, headerLogoBytes, headerH, H, W)
-
-  const badgeW = 85
-  const badgeH = 20
-  page.drawRectangle({
-    x: W - 20 - badgeW,
-    y: H - headerH - 4 - badgeH - 8,
-    width: badgeW,
-    height: badgeH,
-    color: GREEN,
-  })
-  page.drawText(`Week ${week}, ${year}`, {
-    x: W - 20 - badgeW / 2 - 22,
-    y: H - headerH - 4 - badgeH - 8 + 6,
-    size: 8,
-    font: bold,
-    color: WHITE,
-  })
-
-  page.drawText("ACTION TRACKER", { x: 20, y: H - headerH - 4 - 30, size: 12, font: bold, color: DARK })
-  page.drawRectangle({ x: 20, y: H - headerH - 4 - 36, width: W - 40, height: 1.5, color: GREEN })
-
-  const snX = 20
-  const snW = 30
-  const actionX = snX + snW
-  const statusW = 100
-  const statusX = W - 20 - statusW
-  const headerY = H - headerH - 58
-  page.drawRectangle({ x: 20, y: headerY - 4, width: W - 40, height: 20, color: GREEN })
-  page.drawText("S/N", { x: snX + 6, y: headerY + 2, size: 8, font: bold, color: WHITE })
-  page.drawText("ACTION ITEM", { x: actionX + 6, y: headerY + 2, size: 8, font: bold, color: WHITE })
-  page.drawText("STATUS", { x: statusX + 6, y: headerY + 2, size: 8, font: bold, color: WHITE })
-
-  const statusColors: Record<string, RGB> = {
-    completed: rgb(0.086, 0.396, 0.204),
-    in_progress: rgb(0.114, 0.306, 0.847),
-    not_started: rgb(0.706, 0.325, 0.035),
-    pending: rgb(0.392, 0.455, 0.545),
-  }
-  const statusLabels: Record<string, string> = {
-    completed: "Completed",
-    in_progress: "In Progress",
-    not_started: "Not Started",
-    pending: "Pending",
-  }
-
-  let rowTop = headerY - 20
-  const minRowH = 20
-  const lineH = 8
-  const maxTitleLines = 3
-
-  for (let i = 0; i < actions.length; i++) {
-    const action = actions[i]
-    const titleLinesRaw = wrapText(sanitizeForPdf(action.title || "", regular), 60)
-    const titleLines = titleLinesRaw.slice(0, maxTitleLines)
-    if (titleLinesRaw.length > maxTitleLines && titleLines.length > 0) {
-      titleLines[titleLines.length - 1] = `${titleLines[titleLines.length - 1]}...`
-    }
-    const rH = Math.max(minRowH, titleLines.length * lineH + 8)
-    const rowBottom = rowTop - rH
-    if (rowBottom < footerH + 10) break
-
-    if (i % 2 === 0) {
-      page.drawRectangle({ x: 20, y: rowBottom, width: W - 40, height: rH, color: LIGHT })
-    }
-    page.drawText(`${i + 1}`, { x: snX + 10, y: rowBottom + rH - 12, size: 8, font: bold, color: SLATE })
-    titleLines.forEach((line, lineIdx) => {
-      page.drawText(line, {
-        x: actionX + 6,
-        y: rowBottom + rH - 12 - lineIdx * lineH,
-        size: 8,
-        font: regular,
-        color: SLATE,
-      })
-    })
-    const sc = statusColors[action.status] || statusColors.pending
-    const sl = statusLabels[action.status] || action.status
-    const badgeY = rowBottom + (rH - 14) / 2
-    page.drawRectangle({ x: statusX + 4, y: badgeY, width: statusW - 8, height: 14, color: sc })
-    page.drawText(sl, { x: statusX + 8, y: badgeY + 5, size: 7, font: bold, color: WHITE })
-    page.drawRectangle({ x: 20, y: rowBottom, width: W - 40, height: 0.5, color: rgb(0.886, 0.906, 0.941) })
-    rowTop = rowBottom
-  }
-
-  page.drawRectangle({ x: 0, y: 0, width: W, height: footerH, color: GREEN })
-  page.drawText("Confidential \u2014 ACOB Internal Use Only", { x: 20, y: 14, size: 8, font: regular, color: WHITE })
-  const pn = String(pageNumber)
-  const pnW = bold.widthOfTextAtSize(pn, 9)
-  page.drawText(pn, { x: W / 2 - pnW / 2, y: 14, size: 9, font: bold, color: WHITE })
-}
+// ─── Action point page ─────────────────────────────────────────────────────
 
 // ─── Public builders ─────────────────────────────────────────────────────────
 
@@ -553,46 +440,6 @@ export async function buildWeeklyReportPDF(
   )
   for (let i = 0; i < sorted.length; i++) {
     await addWeeklyReportContentPage(doc, bold, regular, sorted[i].department, sorted[i], headerLogoBytes, i + 3)
-  }
-
-  return doc.save()
-}
-
-export async function buildActionTrackerPdf(
-  actions: ActionItemRow[],
-  meetingWeek: number,
-  meetingYear: number,
-  headerLogoBytes: Uint8Array | null
-): Promise<Uint8Array> {
-  const doc = await PDFDocument.create()
-  const bold = await doc.embedFont(StandardFonts.HelveticaBold)
-  const regular = await doc.embedFont(StandardFonts.Helvetica)
-
-  const grouped: Record<string, ActionItemRow[]> = {}
-  for (const a of actions) {
-    const department = normalizeDepartmentName(a.department)
-    if (!grouped[department]) grouped[department] = []
-    grouped[department].push({ ...a, department })
-  }
-
-  const depts = DEPT_ORDER.filter((d) => grouped[d])
-  for (const d of Object.keys(grouped)) {
-    if (!depts.includes(d)) depts.push(d)
-  }
-
-  await addTOCPage(doc, bold, regular, `Action Tracker — Week ${meetingWeek}, ${meetingYear}`, depts, headerLogoBytes)
-  for (let i = 0; i < depts.length; i++) {
-    await addActionTrackerPage(
-      doc,
-      bold,
-      regular,
-      depts[i],
-      grouped[depts[i]],
-      meetingWeek,
-      meetingYear,
-      headerLogoBytes,
-      i + 3
-    )
   }
 
   return doc.save()

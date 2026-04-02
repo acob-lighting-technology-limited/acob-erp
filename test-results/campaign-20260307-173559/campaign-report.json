@@ -698,7 +698,7 @@
       "reason": "HTTP 307 -> /maintenance"
     },
     {
-      "target": "/admin/reports/action-tracker",
+      "target": "/admin/reports/action-point",
       "type": "page",
       "role": "unauthenticated",
       "status": "pass",
@@ -992,7 +992,7 @@
       "reason": "HTTP 307 -> /maintenance"
     },
     {
-      "target": "/dashboard/reports/action-tracker",
+      "target": "/dashboard/reports/action-point",
       "type": "page",
       "role": "unauthenticated",
       "status": "pass",
@@ -2063,7 +2063,7 @@
       "reason": "No loading.tsx in route segment directory."
     },
     {
-      "target": "/dashboard/reports/action-tracker",
+      "target": "/dashboard/reports/action-point",
       "type": "static",
       "role": "system",
       "status": "skip",
@@ -2462,7 +2462,7 @@
       "reason": "No loading.tsx in route segment directory."
     },
     {
-      "target": "/admin/reports/action-tracker",
+      "target": "/admin/reports/action-point",
       "type": "static",
       "role": "system",
       "status": "skip",
@@ -3697,8 +3697,8 @@
       "classification": "admin"
     },
     {
-      "file": "app/admin/reports/action-tracker/page.tsx",
-      "route": "/admin/reports/action-tracker",
+      "file": "app/admin/reports/action-point/page.tsx",
+      "route": "/admin/reports/action-point",
       "kind": "page",
       "classification": "admin"
     },
@@ -3949,8 +3949,8 @@
       "classification": "employee_app"
     },
     {
-      "file": "app/(app)/dashboard/reports/action-tracker/page.tsx",
-      "route": "/dashboard/reports/action-tracker",
+      "file": "app/(app)/dashboard/reports/action-point/page.tsx",
+      "route": "/dashboard/reports/action-point",
       "kind": "page",
       "classification": "employee_app"
     },

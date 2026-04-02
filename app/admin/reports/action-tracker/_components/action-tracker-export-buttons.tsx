@@ -4,7 +4,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { FileSpreadsheet, FileText, File as FileIcon, Presentation, ExternalLink } from "lucide-react"
 import { exportActionPointsDocx, exportActionPointsPdf } from "@/lib/action-points-export"
-import { exportActionTrackerToPPTX, exportActionTrackerToXLSX, type ActionItem } from "@/lib/export-utils"
+import { exportActionPointToPPTX, exportActionPointToXLSX, type ActionItem } from "@/lib/export-utils"
 
 interface ActionTrackerExportButtonsProps {
   items: ActionItem[]
@@ -30,7 +30,7 @@ export function ActionTrackerExportButtons({
       </Button>
       <Button
         variant="outline"
-        onClick={() => exportActionTrackerToPPTX(items, weekFilter, yearFilter, meetingDate)}
+        onClick={() => exportActionPointToPPTX(items, weekFilter, yearFilter, meetingDate)}
         className="gap-2 border-orange-200 text-orange-600 hover:bg-orange-50 hover:text-orange-700 dark:border-orange-900/30 dark:hover:bg-orange-950/20"
       >
         <Presentation className="h-4 w-4" /> <span className="hidden sm:inline">PPTX</span>
@@ -44,7 +44,7 @@ export function ActionTrackerExportButtons({
       </Button>
       <Button
         variant="outline"
-        onClick={() => exportActionTrackerToXLSX(items, weekFilter, yearFilter, undefined, meetingDate)}
+        onClick={() => exportActionPointToXLSX(items, weekFilter, yearFilter, undefined, meetingDate)}
         className="gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 dark:border-emerald-900/30 dark:hover:bg-emerald-950/20"
       >
         <FileSpreadsheet className="h-4 w-4" /> <span className="hidden sm:inline">XLSX</span>

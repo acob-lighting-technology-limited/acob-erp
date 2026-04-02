@@ -13,6 +13,18 @@ interface SendEmailInput {
   from?: string
 }
 
+export type SendNotificationEmailResult =
+  | {
+      sent: true
+      recipients: string[]
+    }
+  | {
+      sent: false
+      reason: "missing_resend_key" | "no_recipients" | "send_failed"
+      recipients?: string[]
+      error?: string
+    }
+
 function normalizeRecipientEmails(emails: Array<string | null | undefined>): string[] {
   return Array.from(
     new Set(
@@ -29,7 +41,7 @@ export function getResendClient() {
   return new Resend(apiKey)
 }
 
-export async function sendNotificationEmail(input: SendEmailInput) {
+export async function sendNotificationEmail(input: SendEmailInput): Promise<SendNotificationEmailResult> {
   const resend = getResendClient()
   if (!resend) return { sent: false as const, reason: "missing_resend_key" as const }
 
@@ -45,6 +57,74 @@ export async function sendNotificationEmail(input: SendEmailInput) {
 
   if (error) throw new Error(error.message || "Failed to send email")
   return { sent: true as const, recipients }
+}
+
+export async function sendNotificationEmailWithRetry(
+  input: SendEmailInput,
+  maxAttempts = 2
+): Promise<SendNotificationEmailResult> {
+  let lastError: unknown = null
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const result = await sendNotificationEmail(input)
+      if (result.sent || result.reason === "missing_resend_key" || result.reason === "no_recipients") {
+        return result
+      }
+    } catch (error) {
+      lastError = error
+      if (attempt < maxAttempts) {
+        await new Promise((resolve) => setTimeout(resolve, 500 * attempt))
+        continue
+      }
+    }
+  }
+
+  return {
+    sent: false,
+    reason: "send_failed",
+    recipients: normalizeRecipientEmails(input.to),
+    error: lastError instanceof Error ? lastError.message : String(lastError ?? "unknown error"),
+  }
+}
+
+export async function sendNotificationEmailsIndividuallyWithRetry(
+  input: SendEmailInput,
+  maxAttempts = 2
+): Promise<{
+  sent: boolean
+  deliveredRecipients: string[]
+  failedRecipients: Array<{ recipient: string; reason: string }>
+}> {
+  const recipients = normalizeRecipientEmails(input.to)
+  const deliveredRecipients: string[] = []
+  const failedRecipients: Array<{ recipient: string; reason: string }> = []
+
+  for (const recipient of recipients) {
+    const result = await sendNotificationEmailWithRetry(
+      {
+        ...input,
+        to: [recipient],
+      },
+      maxAttempts
+    )
+
+    if (result.sent) {
+      deliveredRecipients.push(recipient)
+      continue
+    }
+
+    failedRecipients.push({
+      recipient,
+      reason: result.error || result.reason,
+    })
+  }
+
+  return {
+    sent: failedRecipients.length === 0,
+    deliveredRecipients,
+    failedRecipients,
+  }
 }
 
 export async function resolveActiveLeadRecipientEmails(supabaseClient: SupabaseClient<Database>) {

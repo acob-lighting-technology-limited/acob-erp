@@ -401,8 +401,9 @@ serve(async (req) => {
         <div class="support">${supportText}</div>
     </div>
     <div class="footer" style="background-color:#0f2d1f;">
+        <span style="color:#d1d5db;">Prepared by IT &amp; Communications</span><br>
+        IT &amp; Communications Department<br>
         <strong>ACOB Lighting Technology Limited</strong><br>
-        IT & Communications Department<br>
         <span class="footer-system">Asset Management System</span>
         <br><br>
         <i class="footer-note">This is an automated system notification. Please do not reply directly to this email.</i>

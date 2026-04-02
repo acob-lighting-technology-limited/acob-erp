@@ -17,6 +17,7 @@ interface SendSummaryProps {
   sessionTime: string
   broadcastDepartment: string
   broadcastSubject: string
+  broadcastAttachmentCount: number
   selectedMeetingPreparedByName: string | null
   selectedBroadcastPreparedByName: string | null
   selectedPresenterName: string | null
@@ -41,6 +42,7 @@ export function SendSummary({
   sessionTime,
   broadcastDepartment,
   broadcastSubject,
+  broadcastAttachmentCount,
   selectedMeetingPreparedByName,
   selectedBroadcastPreparedByName,
   selectedPresenterName,
@@ -129,6 +131,12 @@ export function SendSummary({
                   <span className="text-muted-foreground shrink-0">Subject</span>
                   <Badge variant="secondary" className="max-w-[68%] truncate">
                     {broadcastSubject.trim() || "Not set"}
+                  </Badge>
+                </div>
+                <div className="flex min-w-0 items-center justify-between gap-2 text-sm">
+                  <span className="text-muted-foreground shrink-0">Attachments</span>
+                  <Badge variant="secondary" className="max-w-[68%] truncate">
+                    {broadcastAttachmentCount}
                   </Badge>
                 </div>
               </>

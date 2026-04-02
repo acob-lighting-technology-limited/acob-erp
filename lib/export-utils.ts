@@ -127,7 +127,7 @@ const buildWeeklyReportFilename = ({
   return `${parts.join(" - ")}.${extension}`
 }
 
-const buildActionTrackerFilename = ({
+const buildActionPointFilename = ({
   week,
   year: _year,
   meetingDate,
@@ -141,7 +141,7 @@ const buildActionTrackerFilename = ({
   department?: string
 }) => {
   const parts = [
-    "ACOB Action Tracker",
+    "ACOB Action Points",
     department ? sanitizeFilenameSegment(normalizeDepartmentName(department)) : null,
     formatMeetingDateForFilename(week, _year, meetingDate),
     `W${week}`,
@@ -360,7 +360,7 @@ const pdfCoverPage = (
   doc.setFont("helvetica", "normal")
   doc.text(mondayDate, W / 2, pillY + 18, { align: "center" })
 
-  // Optional subtitle (dept name or "Action Tracker")
+  // Optional subtitle (dept name or "Action Points")
   if (subtitle) {
     doc.setFontSize(10)
     doc.setTextColor(...PDF_GREEN)
@@ -715,7 +715,7 @@ export const exportAllToPDFBase64 = async (reports: WeeklyReport[], week: number
   return doc.output("datauristring").split(",")[1]
 }
 
-// ─── Action Tracker PDF ───────────────────────────────────────────────────────
+// ─── Action Point PDF ───────────────────────────────────────────────────────
 
 export interface ActionItem {
   id: string
@@ -750,8 +750,8 @@ const groupActionItemsByDepartment = (actions: ActionItem[]) => {
   return { grouped, departments }
 }
 
-/** Draws a single Action Tracker content page for a department. */
-const pdfActionTrackerPage = (
+/** Draws a single Action Point content page for a department. */
+const pdfActionPointPage = (
   doc: jsPDF,
   department: string,
   actions: ActionItem[],
@@ -798,7 +798,7 @@ const pdfActionTrackerPage = (
   doc.setFontSize(13)
   doc.setTextColor(...PDF_DARK)
   doc.setFont("helvetica", "bold")
-  doc.text("ACTION TRACKER", 14, headerH + 18)
+  doc.text("ACTION POINTS", 14, headerH + 18)
   doc.setDrawColor(...PDF_GREEN)
   doc.setLineWidth(0.5)
   doc.line(14, headerH + 20, W - 14, headerH + 20)
@@ -900,16 +900,16 @@ const pdfActionTrackerPage = (
 }
 
 /**
- * Generates the Action Tracker PDF and returns it as a base64 string (for email attachment).
+ * Generates the Action Point PDF and returns it as a base64 string (for email attachment).
  */
-export const exportActionTrackerToPDFBase64 = async (
+export const exportActionPointToPDFBase64 = async (
   actions: ActionItem[],
   week: number,
   year: number,
   _meetingDate?: string
 ): Promise<string> => {
   const doc = new jsPDF()
-  // Action Tracker week IS the current week (no +1 needed)
+  // Action Point week IS the current week (no +1 needed)
   const mondayDate = getWeekMonday(week, year)
 
   const [logoFull, logoDark] = await Promise.all([
@@ -917,8 +917,8 @@ export const exportActionTrackerToPDFBase64 = async (
     fetchImageAsBase64("/images/acob-logo-dark.webp"),
   ])
 
-  // Cover page — shows current week with "Action Tracker" subtitle
-  pdfCoverPage(doc, week, year, mondayDate, logoFull, "Action Tracker")
+  // Cover page — shows current week with "Action Points" subtitle
+  pdfCoverPage(doc, week, year, mondayDate, logoFull, "Action Points")
 
   // Group actions by department (in DEPARTMENT_ORDER)
   const { grouped, departments } = groupActionItemsByDepartment(actions)
@@ -930,16 +930,16 @@ export const exportActionTrackerToPDFBase64 = async (
   departments.forEach((dept, idx) => {
     const deptActions = grouped[dept] || []
     doc.addPage()
-    pdfActionTrackerPage(doc, dept, deptActions, logoDark, week, year, idx + 3)
+    pdfActionPointPage(doc, dept, deptActions, logoDark, week, year, idx + 3)
   })
 
   return doc.output("datauristring").split(",")[1]
 }
 
 /**
- * Saves the Action Tracker as a downloadable PDF file.
+ * Saves the Action Point as a downloadable PDF file.
  */
-export const exportActionTrackerToPDF = async (
+export const exportActionPointToPDF = async (
   actions: ActionItem[],
   week: number,
   year: number,
@@ -1027,13 +1027,13 @@ export const exportActionTrackerToPDF = async (
 
   renderFooter()
 
-  saveAs(doc.output("blob"), buildActionTrackerFilename({ week, year, meetingDate, extension: "pdf", department }))
+  saveAs(doc.output("blob"), buildActionPointFilename({ week, year, meetingDate, extension: "pdf", department }))
 }
 
 /**
- * Exports the Action Tracker as a PPTX presentation.
+ * Exports the Action Point as a PPTX presentation.
  */
-export const exportActionTrackerToPPTX = async (
+export const exportActionPointToPPTX = async (
   actions: ActionItem[],
   week: number,
   year: number,
@@ -1045,7 +1045,7 @@ export const exportActionTrackerToPPTX = async (
   pres.layout = "LAYOUT_WIDE"
 
   // Cover slide
-  addCoverSlide(pres, week, year, "Action Tracker")
+  addCoverSlide(pres, week, year, "Action Points")
 
   // Group by department
   const { grouped, departments } = groupActionItemsByDepartment(actions)
@@ -1232,7 +1232,7 @@ export const exportActionTrackerToPPTX = async (
   })
 
   await pres.writeFile({
-    fileName: buildActionTrackerFilename({ week, year, meetingDate, extension: "pptx", department }),
+    fileName: buildActionPointFilename({ week, year, meetingDate, extension: "pptx", department }),
   })
 }
 
@@ -1372,9 +1372,9 @@ export const exportToDocx = async (report: WeeklyReport, meetingDate?: string) =
 }
 
 /**
- * Exports the Action Tracker to a DOCX document.
+ * Exports the Action Point to a DOCX document.
  */
-export const exportActionTrackerToDocx = async (
+export const exportActionPointToDocx = async (
   actions: ActionItem[],
   week: number,
   year: number,
@@ -1469,7 +1469,7 @@ export const exportActionTrackerToDocx = async (
             spacing: { after: 120 },
           }),
           new Paragraph({
-            children: [new TextRun({ text: "General Meeting  ·  Action Tracker", size: 26, color: "334155" })],
+            children: [new TextRun({ text: "General Meeting  ·  Action Points", size: 26, color: "334155" })],
             alignment: AlignmentType.CENTER,
             spacing: { after: 80 },
           }),
@@ -1502,10 +1502,10 @@ export const exportActionTrackerToDocx = async (
   })
 
   const blob = await Packer.toBlob(doc)
-  saveAs(blob, buildActionTrackerFilename({ week, year, meetingDate, extension: "docx", department }))
+  saveAs(blob, buildActionPointFilename({ week, year, meetingDate, extension: "docx", department }))
 }
 
-export const exportActionTrackerToXLSX = async (
+export const exportActionPointToXLSX = async (
   actions: ActionItem[],
   week: number,
   year: number,
@@ -1529,14 +1529,14 @@ export const exportActionTrackerToXLSX = async (
 
   const worksheet = XLSX.utils.json_to_sheet(rows.length > 0 ? rows : [{ Message: "No action items to export." }])
   const workbook = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Action Tracker")
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Action Points")
 
   const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" })
   saveAs(
     new Blob([excelBuffer], {
       type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     }),
-    buildActionTrackerFilename({
+    buildActionPointFilename({
       week,
       year,
       meetingDate,
