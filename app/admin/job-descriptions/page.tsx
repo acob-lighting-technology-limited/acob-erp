@@ -53,7 +53,7 @@ interface Profile {
   last_name: string
   company_email: string
   department: string
-  company_role: string | null
+  designation: string | null
   phone_number: string | null
   role: UserRole
   job_description: string | null
@@ -95,7 +95,7 @@ export default function AdminJobDescriptionsPage() {
         profile.first_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         profile.last_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         profile.company_email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        profile.company_role?.toLowerCase().includes(searchQuery.toLowerCase())
+        profile.designation?.toLowerCase().includes(searchQuery.toLowerCase())
 
       const matchesDepartment = departmentFilter === "all" || profile.department === departmentFilter
       const matchesEmployee = employeeFilter === "all" || profile.id === employeeFilter

@@ -66,7 +66,7 @@ export interface Employee {
   company_email: string
   additional_email: string | null
   department: string
-  company_role: string | null
+  designation: string | null
   role: UserRole
   admin_domains?: string[] | null
   phone_number: string | null
@@ -142,7 +142,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
     "Additional Email": true,
     Department: true,
     Role: true,
-    Position: true,
+    Designation: true,
     "Phone Number": true,
     "Residential Address": true,
     "Office Location": true,
@@ -178,7 +178,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
     is_department_lead: false,
     department: "",
     office_location: "",
-    company_role: "",
+    designation: "",
     lead_departments: [] as string[],
     // Expanded fields
     employee_number: "",
@@ -238,7 +238,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
             is_department_lead: Boolean(fullProfile.is_department_lead),
             department: fullProfile.department || "",
             office_location: fullProfile.office_location || "",
-            company_role: fullProfile.company_role || "",
+            designation: fullProfile.designation || "",
             lead_departments: fullProfile.lead_departments || [],
             // Expanded fields
             employee_number: fullProfile.employee_number || "",
@@ -265,7 +265,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
             is_department_lead: Boolean(employee.is_department_lead),
             department: employee.department,
             office_location: employee.office_location || "",
-            company_role: employee.company_role || "",
+            designation: employee.designation || "",
             lead_departments: employee.lead_departments || [],
             employee_number: employee.employee_number || "",
             first_name: employee.first_name || "",
@@ -482,7 +482,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         admin_domains: editForm.role === "admin" ? editForm.admin_domains : null,
         department: editForm.department,
         office_location: editForm.office_location || null,
-        company_role: editForm.company_role || null,
+        designation: editForm.designation || null,
         is_department_lead: isLead,
         lead_departments: isLead ? editForm.lead_departments : [],
         updated_at: new Date().toISOString(),
@@ -627,7 +627,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         (member.last_name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
         (member.company_email || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
         (member.additional_email || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (member.company_role || "").toLowerCase().includes(searchQuery.toLowerCase())
+        (member.designation || "").toLowerCase().includes(searchQuery.toLowerCase())
 
       const matchesDepartment = departmentFilter.length === 0 || departmentFilter.includes(member.department)
 

@@ -144,7 +144,7 @@ async function generateHostedSafePdf(actions: ActionItem[], week: number, year: 
   for (let departmentIndex = 0; departmentIndex < departments.length; departmentIndex += 1) {
     const department = departments[departmentIndex]
     const heading = `${departmentIndex + 1}. ${getActionPointsDepartmentHeading(department)}`
-    ensureSpace(24)
+    ensureSpace(24 + LINE_GAP + 6)
     page.drawText(heading, {
       x: PAGE_MARGIN_X,
       y: cursorY,

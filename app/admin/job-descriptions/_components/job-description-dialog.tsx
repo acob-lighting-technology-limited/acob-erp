@@ -15,7 +15,7 @@ interface Profile {
   last_name: string
   company_email: string
   department: string
-  company_role: string | null
+  designation: string | null
   phone_number: string | null
   role: UserRole
   job_description: string | null
@@ -71,7 +71,7 @@ export function JobDescriptionDialog({ profile, isOpen, onOpenChange }: JobDescr
           <DialogDescription>
             <div className="mt-2 flex flex-wrap items-center gap-3">
               <span className="text-sm">{profile?.department}</span>
-              {profile?.company_role && <span className="text-sm">&quot; {profile.company_role}</span>}
+              {profile?.designation && <span className="text-sm">&quot; {profile.designation}</span>}
               <Badge className={getRoleBadgeColor(profile?.role || "employee")}>
                 {getRoleDisplayName(profile?.role || "employee")}
               </Badge>

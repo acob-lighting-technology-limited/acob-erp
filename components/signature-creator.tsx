@@ -12,7 +12,7 @@ interface SignatureCreatorProps {
     first_name?: string | null
     other_names?: string | null
     last_name?: string | null
-    company_role?: string | null
+    designation?: string | null
     phone_number?: string | null
     company_email?: string | null
   } | null
@@ -35,7 +35,7 @@ export function SignatureCreator({ profile, variant = "default" }: SignatureCrea
     firstName: profile?.first_name || "",
     middleName: profile?.other_names || "",
     lastName: profile?.last_name || "",
-    companyRole: profile?.company_role || "",
+    companyRole: profile?.designation || "",
     phoneNumber: profile?.phone_number || "",
     companyEmail: profile?.company_email || "",
   })
@@ -333,7 +333,7 @@ export function SignatureCreator({ profile, variant = "default" }: SignatureCrea
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="companyRole">Company Role *</Label>
+            <Label htmlFor="companyRole">Designation *</Label>
             <Input
               id="companyRole"
               value={formData.companyRole}

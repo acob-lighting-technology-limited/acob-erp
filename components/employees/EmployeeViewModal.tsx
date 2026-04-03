@@ -58,7 +58,7 @@ interface EditForm {
   is_department_lead: boolean
   department: string
   office_location: string
-  company_role: string
+  designation: string
   lead_departments: string[]
   employee_number: string
   first_name: string
@@ -253,8 +253,8 @@ export function EmployeeViewModal({
                       <div className="flex items-center gap-3">
                         <UserIcon className="text-muted-foreground h-5 w-5" />
                         <div>
-                          <p className="text-muted-foreground text-sm">Position</p>
-                          <p className="font-medium">{viewEmployeeProfile.company_role || "N/A"}</p>
+                          <p className="text-muted-foreground text-sm">Designation</p>
+                          <p className="font-medium">{viewEmployeeProfile.designation || "N/A"}</p>
                         </div>
                       </div>
 
@@ -739,11 +739,11 @@ export function EmployeeViewModal({
                 </div>
 
                 <div>
-                  <Label htmlFor="company_role">Position/Title</Label>
+                  <Label htmlFor="designation">Designation</Label>
                   <Input
-                    id="company_role"
-                    value={editForm.company_role}
-                    onChange={(e) => setEditForm({ ...editForm, company_role: e.target.value })}
+                    id="designation"
+                    value={editForm.designation}
+                    onChange={(e) => setEditForm({ ...editForm, designation: e.target.value })}
                     placeholder="e.g., Senior Developer"
                   />
                 </div>

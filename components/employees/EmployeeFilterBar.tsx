@@ -34,7 +34,7 @@ export function EmployeeFilterBar({ filters, onFilterChange, departments, employ
           <div className="relative w-full">
             <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform" />
             <Input
-              placeholder="Search employees by name, email, or position..."
+              placeholder="Search employees by name, email, or designation..."
               value={filters.searchQuery}
               onChange={(e) => onFilterChange({ searchQuery: e.target.value })}
               className="pl-10"

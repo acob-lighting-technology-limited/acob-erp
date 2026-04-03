@@ -11,7 +11,7 @@ export interface ApprovalPreviewPendingUser {
   first_name: string
   last_name: string
   department: string
-  company_role: string
+  designation: string
   company_email: string
   personal_email: string
   phone_number?: string | null

@@ -18,7 +18,7 @@ export interface Employee {
   other_names?: string
   department?: string
   department_id?: string | null
-  company_role?: string
+  designation?: string
   phone_number?: string
   additional_phone?: string
   residential_address?: string
@@ -67,7 +67,7 @@ export interface EmployeeFormData {
   other_names?: string
   department?: string
   department_id?: string
-  company_role?: string
+  designation?: string
   phone_number?: string
   additional_phone?: string
   residential_address?: string

@@ -9,7 +9,7 @@ export function renderInternalNotificationEmail({ pendingUser }: InternalNotific
   const firstName = escapeHtml(pendingUser.first_name)
   const lastName = escapeHtml(pendingUser.last_name)
   const dept = escapeHtml(pendingUser.department)
-  const role = escapeHtml(pendingUser.company_role)
+  const role = escapeHtml(pendingUser.designation)
   const email = escapeHtml(pendingUser.company_email)
   const phoneNumber = pendingUser.phone_number ? escapeHtml(pendingUser.phone_number) : "N/A"
   return `
@@ -67,7 +67,7 @@ export function renderInternalNotificationEmail({ pendingUser }: InternalNotific
                     <td class="value">${email}</td>
                 </tr>
                 <tr>
-                    <td class="label">Company Role</td>
+                    <td class="label">Designation</td>
                     <td class="value">${role}</td>
                 </tr>
                 <tr>
@@ -81,6 +81,7 @@ export function renderInternalNotificationEmail({ pendingUser }: InternalNotific
     </div>
     <div class="footer" style="background-color:#0f2d1f;">
         <span style="color:#d1d5db;">Prepared by Admin &amp; HR</span><br>
+        Administrative Team<br>
         Admin &amp; HR Department<br>
         <strong>ACOB Lighting Technology Limited</strong><br>
         <span class="footer-system">Employee Management System</span>

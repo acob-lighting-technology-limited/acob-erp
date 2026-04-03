@@ -74,7 +74,7 @@ export async function POST(req: Request) {
     }
 
     // 1b. Validate Required Fields
-    const requiredFields = ["company_email", "personal_email", "first_name", "last_name", "department", "company_role"]
+    const requiredFields = ["company_email", "personal_email", "first_name", "last_name", "department", "designation"]
     const missingFields = requiredFields.filter((field) => !pendingUser[field])
 
     if (missingFields.length > 0) {
@@ -154,7 +154,7 @@ export async function POST(req: Request) {
       p_last_name: pendingUser.last_name,
       p_other_names: pendingUser.other_names ?? null,
       p_department: pendingUser.department,
-      p_company_role: pendingUser.company_role,
+      p_designation: pendingUser.designation,
       p_company_email: pendingUser.company_email,
       p_personal_email: pendingUser.personal_email,
       p_phone_number: pendingUser.phone_number ?? null,

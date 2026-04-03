@@ -16,7 +16,7 @@ interface AdminUserModalProps {
     first_name?: string | null
     last_name?: string | null
     department?: string | null
-    company_role?: string | null
+    designation?: string | null
     phone_number?: string | null
   }
   onClose: () => void
@@ -29,7 +29,7 @@ export function AdminUserModal({ user, onClose, onSave }: AdminUserModalProps) {
     firstName: user.first_name || "",
     lastName: user.last_name || "",
     department: user.department || "",
-    companyRole: user.company_role || "",
+    companyRole: user.designation || "",
     phoneNumber: user.phone_number || "",
   })
   const [isLoading, setIsLoading] = useState(false)
@@ -48,7 +48,7 @@ export function AdminUserModal({ user, onClose, onSave }: AdminUserModalProps) {
           first_name: formData.firstName,
           last_name: formData.lastName,
           department: formData.department,
-          company_role: formData.companyRole,
+          designation: formData.companyRole,
           phone_number: phoneNumber,
           updated_at: new Date().toISOString(),
         })
@@ -122,7 +122,7 @@ export function AdminUserModal({ user, onClose, onSave }: AdminUserModalProps) {
           </div>
 
           <div>
-            <Label htmlFor="companyRole">Company Role</Label>
+            <Label htmlFor="companyRole">Designation</Label>
             <Input
               id="companyRole"
               value={formData.companyRole}

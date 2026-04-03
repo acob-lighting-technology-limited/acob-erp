@@ -107,7 +107,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
       // CRITICAL: Downgrade permissions and remove roles upon separation
       updateData.role = "visitor"
-      updateData.company_role = null
+      updateData.designation = null
       updateData.is_department_lead = false
       updateData.lead_departments = []
     } else {

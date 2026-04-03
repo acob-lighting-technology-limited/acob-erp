@@ -50,6 +50,8 @@ type ReminderRequestBody = {
   teamsLink?: string
   agenda?: string[]
   meetingPreparedByName?: string
+  meetingPreparedByDesignation?: string
+  meetingPreparedByDepartment?: string
   sessionDate?: string
   sessionTime?: string
   duration?: string
@@ -178,11 +180,15 @@ function buildMeetingReminderHtml(
   meetingTime: string,
   teamsLink: string,
   agenda: string[],
-  preparedByName?: string
+  preparedByName?: string,
+  preparedByDesignation?: string,
+  preparedByDepartment?: string
 ): string {
   const { timingPhrase, effectiveDate } = getMeetingReminderDescriptor(meetingDate, meetingTime)
   const displayTime = formatTimeWithMeridiem(meetingTime)
   const preparedBy = escapeHtml(preparedByName?.trim() || "ACOB Team")
+  const designation = escapeHtml(preparedByDesignation?.trim() || "")
+  const department = escapeHtml(preparedByDepartment?.trim() || "Admin & HR Department")
   let agendaHtml = ""
   for (let i = 0; i < agenda.length; i++) {
     agendaHtml +=
@@ -267,7 +273,9 @@ function buildMeetingReminderHtml(
     '<span style="color:#d1d5db;">Prepared by ' +
     preparedBy +
     "</span><br>" +
-    "Admin &amp; HR Department<br>" +
+    (designation ? designation + "<br>" : "") +
+    department +
+    "<br>" +
     '<strong style="color:#fff;">ACOB Lighting Technology Limited</strong><br>' +
     '<span style="color:#16a34a;font-weight:600;">Meeting Management System</span>' +
     "<br><br>" +
@@ -351,6 +359,7 @@ function buildKnowledgeSharingHtml(sessionDate: string, sessionTime: string, dur
     '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#0f2d1f" style="background:#0f2d1f !important;background-color:#0f2d1f !important;border-top:3px solid #16a34a;">' +
     '<tr><td align="center" style="padding:20px;background:#0f2d1f !important;background-color:#0f2d1f !important;font-size:11px;color:#9ca3af;">' +
     '<span style="color:#d1d5db;">Prepared by Admin &amp; HR</span><br>' +
+    "Administrative Team<br>" +
     "Admin &amp; HR Department<br>" +
     '<strong style="color:#fff;">ACOB Lighting Technology Limited</strong><br>' +
     '<span style="color:#16a34a;font-weight:600;">Meeting Management System</span>' +
@@ -529,6 +538,8 @@ serve(async (req) => {
       teamsLink,
       agenda,
       meetingPreparedByName,
+      meetingPreparedByDesignation,
+      meetingPreparedByDepartment,
       sessionDate,
       sessionTime,
       duration,
@@ -583,7 +594,9 @@ serve(async (req) => {
         meetingTime || "8:30 AM",
         teamsLink || "",
         normalizedAgenda,
-        meetingPreparedByName
+        meetingPreparedByName,
+        meetingPreparedByDesignation,
+        meetingPreparedByDepartment
       )
     } else {
       subject = withSubjectPrefix("Meetings", "Reminder: Knowledge Sharing Session")
@@ -631,6 +644,8 @@ serve(async (req) => {
           knowledge_sharing_presenter: knowledgeSharingPresenter?.full_name || null,
           kss_roster_status: kssRosterStatus || null,
           prepared_by: meetingPreparedByName || null,
+          prepared_by_designation: meetingPreparedByDesignation || null,
+          prepared_by_department: meetingPreparedByDepartment || "Admin & HR Department",
         },
       })
     } catch (auditErr) {
