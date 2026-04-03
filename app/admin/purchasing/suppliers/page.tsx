@@ -8,7 +8,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,15 +18,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Textarea } from "@/components/ui/textarea"
-import { Switch } from "@/components/ui/switch"
 import { Plus, Pencil, Trash2, Users, Search, Eye, Building2, CheckCircle2, Ban } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { StatCard } from "@/components/ui/stat-card"
-import { EmptyState, FormFieldGroup, ListToolbar, StatusBadge } from "@/components/ui/patterns"
+import { EmptyState, ListToolbar, StatusBadge } from "@/components/ui/patterns"
 import { TableSkeleton } from "@/components/ui/query-states"
+import { SupplierFormDialog } from "./_components/supplier-form-dialog"
+import { useSearchParams } from "next/navigation"
 
 interface Supplier {
   id: string
@@ -55,57 +54,16 @@ async function fetchSuppliersList(): Promise<Supplier[]> {
 
 export default function SuppliersPage() {
   const queryClient = useQueryClient()
+  const searchParams = useSearchParams()
   const [searchQuery, setSearchQuery] = useState("")
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [isDialogOpen, setIsDialogOpen] = useState(searchParams.get("openCreate") === "1")
   const [editing, setEditing] = useState<Supplier | null>(null)
   const [pendingDelete, setPendingDelete] = useState<Supplier | null>(null)
-  const [formData, setFormData] = useState({
-    name: "",
-    code: "",
-    email: "",
-    phone: "",
-    address: "",
-    contact_person: "",
-    is_active: true,
-  })
 
   const { data: suppliers = [], isLoading: loading } = useQuery({
     queryKey: QUERY_KEYS.adminSuppliers(),
     queryFn: fetchSuppliersList,
   })
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    try {
-      const supabase = createClient()
-      const payload = {
-        name: formData.name,
-        code: formData.code,
-        email: formData.email || null,
-        phone: formData.phone || null,
-        address: formData.address || null,
-        contact_person: formData.contact_person || null,
-        is_active: formData.is_active,
-      }
-
-      if (editing) {
-        const { error } = await supabase.from("suppliers").update(payload).eq("id", editing.id)
-        if (error) throw error
-        toast.success("Supplier updated")
-      } else {
-        const { error } = await supabase.from("suppliers").insert(payload)
-        if (error) throw error
-        toast.success("Supplier created")
-      }
-
-      setIsDialogOpen(false)
-      setEditing(null)
-      setFormData({ name: "", code: "", email: "", phone: "", address: "", contact_person: "", is_active: true })
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminSuppliers() })
-    } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : "Failed to save")
-    }
-  }
 
   async function handleDelete(s: Supplier) {
     try {
@@ -121,21 +79,11 @@ export default function SuppliersPage() {
 
   function openEdit(s: Supplier) {
     setEditing(s)
-    setFormData({
-      name: s.name,
-      code: s.code,
-      email: s.email || "",
-      phone: s.phone || "",
-      address: s.address || "",
-      contact_person: s.contact_person || "",
-      is_active: s.is_active,
-    })
     setIsDialogOpen(true)
   }
 
   function openCreate() {
     setEditing(null)
-    setFormData({ name: "", code: "", email: "", phone: "", address: "", contact_person: "", is_active: true })
     setIsDialogOpen(true)
   }
 
@@ -158,82 +106,10 @@ export default function SuppliersPage() {
       backLinkHref="/admin/purchasing"
       backLinkLabel="Back to Purchasing"
       actions={
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={openCreate}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Supplier
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-h-[90vh] w-[95vw] max-w-lg overflow-y-auto">
-            <form onSubmit={handleSubmit}>
-              <DialogHeader>
-                <DialogTitle>{editing ? "Edit" : "Add"} Supplier</DialogTitle>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <FormFieldGroup label="Name *">
-                    <Input
-                      value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      required
-                    />
-                  </FormFieldGroup>
-                  <FormFieldGroup label="Code *">
-                    <Input
-                      value={formData.code}
-                      onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                      placeholder="e.g., SUP-001"
-                      required
-                    />
-                  </FormFieldGroup>
-                </div>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <FormFieldGroup label="Email">
-                    <Input
-                      type="email"
-                      value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    />
-                  </FormFieldGroup>
-                  <FormFieldGroup label="Phone">
-                    <Input
-                      value={formData.phone}
-                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    />
-                  </FormFieldGroup>
-                </div>
-                <FormFieldGroup label="Contact Person">
-                  <Input
-                    value={formData.contact_person}
-                    onChange={(e) => setFormData({ ...formData, contact_person: e.target.value })}
-                  />
-                </FormFieldGroup>
-                <FormFieldGroup label="Address">
-                  <Textarea
-                    value={formData.address}
-                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                    rows={2}
-                  />
-                </FormFieldGroup>
-                <FormFieldGroup label="Active">
-                  <div className="flex items-center justify-end">
-                    <Switch
-                      checked={formData.is_active}
-                      onCheckedChange={(v) => setFormData({ ...formData, is_active: v })}
-                    />
-                  </div>
-                </FormFieldGroup>
-              </div>
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button type="submit">{editing ? "Update" : "Create"}</Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
+        <Button onClick={openCreate}>
+          <Plus className="mr-2 h-4 w-4" />
+          Add Supplier
+        </Button>
       }
       stats={
         <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 md:gap-4">
@@ -353,6 +229,28 @@ export default function SuppliersPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <SupplierFormDialog
+        open={isDialogOpen}
+        onOpenChange={(open) => {
+          setIsDialogOpen(open)
+          if (!open) setEditing(null)
+        }}
+        queryClient={queryClient}
+        supplier={
+          editing
+            ? {
+                id: editing.id,
+                name: editing.name,
+                code: editing.code,
+                email: editing.email || "",
+                phone: editing.phone || "",
+                address: editing.address || "",
+                contact_person: editing.contact_person || "",
+                is_active: editing.is_active,
+              }
+            : null
+        }
+      />
     </AdminTablePage>
   )
 }

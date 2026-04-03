@@ -99,7 +99,7 @@ export default function PurchasingDashboard() {
               <Link href="/admin/purchasing/suppliers">
                 <Button className="w-full">View Suppliers ({stats.totalSuppliers})</Button>
               </Link>
-              <Link href="/admin/purchasing/suppliers/new">
+              <Link href="/admin/purchasing/suppliers?openCreate=1">
                 <Button className="w-full" variant="outline">
                   Add Supplier
                 </Button>
@@ -119,7 +119,7 @@ export default function PurchasingDashboard() {
               <Link href="/admin/purchasing/orders">
                 <Button className="w-full">View Orders</Button>
               </Link>
-              <Link href="/admin/purchasing/orders/new">
+              <Link href="/admin/purchasing/orders?openCreate=1">
                 <Button className="w-full" variant="outline">
                   Create PO
                 </Button>

@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
+import { useQueryClient } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
@@ -16,6 +17,8 @@ import Link from "next/link"
 import { StatCard } from "@/components/ui/stat-card"
 import { EmptyState } from "@/components/ui/empty-state"
 import { TableSkeleton } from "@/components/ui/query-states"
+import { BillFormDialog } from "./_components/bill-form-dialog"
+import { useSearchParams } from "next/navigation"
 
 import { logger } from "@/lib/logger"
 
@@ -59,8 +62,11 @@ const statusColors: Record<Bill["status"], BillStatusVariant> = {
 }
 
 export default function BillsPage() {
+  const queryClient = useQueryClient()
+  const searchParams = useSearchParams()
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
+  const [isCreateOpen, setIsCreateOpen] = useState(searchParams.get("openCreate") === "1")
 
   const { data: bills = [], isLoading: loading } = useQuery({
     queryKey: QUERY_KEYS.adminBills(),
@@ -110,12 +116,10 @@ export default function BillsPage() {
       backLinkHref="/admin"
       backLinkLabel="Back to Admin"
       actions={
-        <Link href="/admin/finance/bills/new">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Bill
-          </Button>
-        </Link>
+        <Button onClick={() => setIsCreateOpen(true)}>
+          <Plus className="mr-2 h-4 w-4" />
+          Add Bill
+        </Button>
       }
     >
       {/* Stats */}
@@ -192,7 +196,7 @@ export default function BillsPage() {
               icon={Receipt}
               title="No bills yet"
               description="Add your first bill to start tracking expenses."
-              action={{ label: "Add Bill", href: "/admin/finance/bills/new", icon: Plus }}
+              action={{ label: "Add Bill", href: "/admin/finance/bills?openCreate=1", icon: Plus }}
             />
           ) : (
             <Table>
@@ -250,6 +254,7 @@ export default function BillsPage() {
           )}
         </CardContent>
       </Card>
+      <BillFormDialog open={isCreateOpen} onOpenChange={setIsCreateOpen} queryClient={queryClient} />
     </AdminTablePage>
   )
 }

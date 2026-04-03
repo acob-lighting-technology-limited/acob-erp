@@ -1,22 +1,20 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useParams, useRouter } from "next/navigation"
-import { useQuery } from "@tanstack/react-query"
-import { QUERY_KEYS } from "@/lib/query-keys"
+import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
-import { Save } from "lucide-react"
-import { toast } from "sonner"
-import { PageHeader } from "@/components/layout/page-header"
 import { FormFieldGroup } from "@/components/ui/patterns"
-import { PageLoader } from "@/components/ui/query-states"
+import { QUERY_KEYS } from "@/lib/query-keys"
+import { toast } from "sonner"
+import type { QueryClient } from "@tanstack/react-query"
 
-interface SupplierFormData {
+export interface SupplierFormValues {
+  id?: string
   name: string
   code: string
   email: string
@@ -26,94 +24,77 @@ interface SupplierFormData {
   is_active: boolean
 }
 
-async function fetchSupplier(id: string): Promise<SupplierFormData> {
-  const supabase = createClient()
-  const { data, error } = await supabase.from("suppliers").select("*").eq("id", id).single()
-  if (error) throw new Error(error.message)
-  return {
-    name: data.name,
-    code: data.code,
-    email: data.email || "",
-    phone: data.phone || "",
-    address: data.address || "",
-    contact_person: data.contact_person || "",
-    is_active: data.is_active,
-  }
+interface SupplierFormDialogProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  queryClient?: QueryClient
+  supplier?: SupplierFormValues | null
 }
 
-export default function EditSupplierPage() {
-  const params = useParams()
-  const router = useRouter()
-  const id = params.id as string
-  const [saving, setSaving] = useState(false)
-  const [formData, setFormData] = useState<SupplierFormData>({
-    name: "",
-    code: "",
-    email: "",
-    phone: "",
-    address: "",
-    contact_person: "",
-    is_active: true,
-  })
+const defaultValues: SupplierFormValues = {
+  name: "",
+  code: "",
+  email: "",
+  phone: "",
+  address: "",
+  contact_person: "",
+  is_active: true,
+}
 
-  const { data: supplierData, isLoading } = useQuery({
-    queryKey: QUERY_KEYS.adminSupplierDetail(id),
-    queryFn: () => fetchSupplier(id),
-  })
+export function SupplierFormDialog({ open, onOpenChange, queryClient, supplier = null }: SupplierFormDialogProps) {
+  const router = useRouter()
+  const [saving, setSaving] = useState(false)
+  const [formData, setFormData] = useState<SupplierFormValues>(defaultValues)
 
   useEffect(() => {
-    if (supplierData) setFormData(supplierData)
-  }, [supplierData])
+    if (!open) return
+    setFormData(supplier ? { ...supplier } : defaultValues)
+  }, [open, supplier])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true)
     try {
       const supabase = createClient()
-      const { error } = await supabase
-        .from("suppliers")
-        .update({
-          name: formData.name,
-          code: formData.code,
-          email: formData.email || null,
-          phone: formData.phone || null,
-          address: formData.address || null,
-          contact_person: formData.contact_person || null,
-          is_active: formData.is_active,
-        })
-        .eq("id", id)
+      const payload = {
+        name: formData.name,
+        code: formData.code,
+        email: formData.email || null,
+        phone: formData.phone || null,
+        address: formData.address || null,
+        contact_person: formData.contact_person || null,
+        is_active: formData.is_active,
+      }
 
-      if (error) throw error
-      toast.success("Supplier updated")
-      router.push(`/admin/purchasing/suppliers/${id}`)
+      if (supplier?.id) {
+        const { error } = await supabase.from("suppliers").update(payload).eq("id", supplier.id)
+        if (error) throw error
+        toast.success("Supplier updated")
+        await queryClient?.invalidateQueries({ queryKey: QUERY_KEYS.adminSupplierDetail(supplier.id) })
+      } else {
+        const { error } = await supabase.from("suppliers").insert(payload)
+        if (error) throw error
+        toast.success("Supplier created")
+      }
+
+      await queryClient?.invalidateQueries({ queryKey: QUERY_KEYS.adminSuppliers() })
+      onOpenChange(false)
+      router.refresh()
     } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : "Failed to update")
+      toast.error(error instanceof Error ? error.message : "Failed to save")
     } finally {
       setSaving(false)
     }
   }
 
-  if (isLoading) return <PageLoader />
-
   return (
-    <div className="container mx-auto max-w-2xl space-y-6 p-6">
-      <PageHeader
-        title="Edit Supplier"
-        backLink={{ href: `/admin/purchasing/suppliers/${id}`, label: "Back to Supplier" }}
-        actions={
-          <Button onClick={handleSubmit} disabled={saving}>
-            <Save className="mr-2 h-4 w-4" />
-            Save Changes
-          </Button>
-        }
-      />
-
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Supplier Details</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[90vh] w-[95vw] max-w-lg overflow-y-auto">
+        <form onSubmit={handleSubmit}>
+          <DialogHeader>
+            <DialogTitle>{supplier?.id ? "Edit" : "Add"} Supplier</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <FormFieldGroup label="Name *">
                 <Input
@@ -126,6 +107,7 @@ export default function EditSupplierPage() {
                 <Input
                   value={formData.code}
                   onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                  placeholder="e.g., SUP-001"
                   required
                 />
               </FormFieldGroup>
@@ -155,7 +137,7 @@ export default function EditSupplierPage() {
                 rows={2}
               />
             </FormFieldGroup>
-            <FormFieldGroup label="Active Status" className="pt-2">
+            <FormFieldGroup label="Active">
               <div className="flex items-center justify-end">
                 <Switch
                   checked={formData.is_active}
@@ -163,9 +145,17 @@ export default function EditSupplierPage() {
                 />
               </div>
             </FormFieldGroup>
-          </CardContent>
-        </Card>
-      </form>
-    </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={saving}>
+              {supplier?.id ? "Update" : "Create"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   )
 }

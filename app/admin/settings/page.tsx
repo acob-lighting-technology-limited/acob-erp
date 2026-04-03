@@ -53,7 +53,10 @@ export default async function AdminSettingsPage() {
             <Link href="/admin/settings/users" className={cn(buttonVariants({ variant: "default" }), "w-full")}>
               Manage Users
             </Link>
-            <Link href="/admin/settings/users/invite" className={cn(buttonVariants({ variant: "outline" }), "w-full")}>
+            <Link
+              href="/admin/settings/users?invite=1"
+              className={cn(buttonVariants({ variant: "outline" }), "w-full")}
+            >
               Invite User
             </Link>
           </CardContent>
