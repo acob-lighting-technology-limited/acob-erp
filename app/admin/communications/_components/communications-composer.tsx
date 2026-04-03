@@ -1,18 +1,16 @@
 "use client"
 
 import { useState, useMemo, useCallback, useEffect } from "react"
-import { logger } from "@/lib/logger"
-
-const log = logger("communications-composer")
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { QUERY_KEYS } from "@/lib/query-keys"
 import { toast } from "sonner"
-import { createClient } from "@/lib/supabase/client"
-import { writeAuditLogClient } from "@/lib/audit/client"
 import { PageWrapper, PageHeader } from "@/components/layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Megaphone, Users, Calendar, Clock } from "lucide-react"
+import { writeAuditLogClient } from "@/lib/audit/client"
+import { logger } from "@/lib/logger"
 import { DEFAULT_TEAMS_LINK, DEFAULT_AGENDA, formatDateNice, capitalize, stripHtmlToText } from "./composer-utils"
+import { QUERY_KEYS } from "@/lib/query-keys"
+import { createClient } from "@/lib/supabase/client"
 import { MeetingReminderForm } from "./MeetingReminderForm"
 import { KnowledgeSessionForm } from "./KnowledgeSessionForm"
 import { BroadcastForm } from "./BroadcastForm"
@@ -22,6 +20,8 @@ import { SendSummary } from "./SendSummary"
 import { ReminderTypeSelector } from "./ReminderTypeSelector"
 import { getCurrentOfficeWeek, getOfficeWeekFromDate } from "@/lib/meeting-week"
 import { getDefaultMeetingDateIso } from "@/lib/weekly-report-lock"
+
+const log = logger("communications-composer")
 
 type Employee = {
   id: string
@@ -35,6 +35,10 @@ type Employee = {
 type RecipientMode = "all" | "select" | "manual" | "all_plus"
 type ReminderType = "meeting" | "knowledge_sharing" | "admin_broadcast"
 type SendTiming = "now" | "scheduled" | "recurring"
+type BroadcastAttachmentPayload = {
+  filename: string
+  content: string
+}
 
 interface Props {
   employees: Employee[]
@@ -85,6 +89,7 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
   const [broadcastBodyHtml, setBroadcastBodyHtml] = useState("<p>Type your message here...</p>")
   const [broadcastDepartment, setBroadcastDepartment] = useState(currentUser?.department || "Admin & HR")
   const [broadcastPreparedById, setBroadcastPreparedById] = useState("none")
+  const [broadcastAttachments, setBroadcastAttachments] = useState<File[]>([])
 
   // Delivery timing
   const [sendTiming, setSendTiming] = useState<SendTiming>("now")
@@ -189,11 +194,6 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
       setMeetingPreparedById(preferred || meetingPreparedByOptions[0].id)
     }
   }, [currentUserName, isCurrentUserAdminHr, meetingPreparedById, meetingPreparedByOptions])
-
-  useEffect(() => {
-    if (mode !== "communications" || !currentUserDept || broadcastDepartment === currentUserDept) return
-    setBroadcastDepartment(currentUserDept)
-  }, [broadcastDepartment, currentUserDept, mode])
 
   useEffect(() => {
     if (broadcastPreparedByOptions.length === 0) return
@@ -398,6 +398,32 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
     }
   }, [])
 
+  const encodeFileToBase64 = useCallback((file: File): Promise<BroadcastAttachmentPayload> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => {
+        const result = reader.result
+        if (typeof result !== "string") {
+          reject(new Error(`Failed to read attachment ${file.name}`))
+          return
+        }
+
+        const base64Content = result.includes(",") ? result.split(",")[1] || "" : result
+        if (!base64Content) {
+          reject(new Error(`Attachment ${file.name} is empty or invalid`))
+          return
+        }
+
+        resolve({
+          filename: file.name,
+          content: base64Content,
+        })
+      }
+      reader.onerror = () => reject(new Error(`Failed to read attachment ${file.name}`))
+      reader.readAsDataURL(file)
+    })
+  }, [])
+
   const handleSend = async () => {
     if (resolvedRecipients.length === 0) {
       toast.error("No recipients selected")
@@ -425,6 +451,11 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
 
     if (reminderType === "meeting" && !selectedMeetingPreparedBy?.full_name) {
       toast.error("Prepared by is required")
+      return
+    }
+
+    if (reminderType === "admin_broadcast" && broadcastAttachments.length > 0 && sendTiming !== "now") {
+      toast.error("Attachments are currently supported only for Send Now broadcasts")
       return
     }
 
@@ -481,6 +512,10 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
             broadcastDepartment: reminderType === "admin_broadcast" ? broadcastDepartment : undefined,
             broadcastPreparedByName:
               reminderType === "admin_broadcast" ? selectedBroadcastPreparedBy?.full_name || null : undefined,
+            attachments:
+              reminderType === "admin_broadcast" && broadcastAttachments.length > 0
+                ? broadcastAttachments.map((file) => file.name)
+                : undefined,
           },
         }
 
@@ -572,6 +607,9 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
         payload.broadcastBodyHtml = broadcastBodyHtml
         payload.broadcastDepartment = broadcastDepartment
         payload.broadcastPreparedByName = selectedBroadcastPreparedBy?.full_name || null
+        if (broadcastAttachments.length > 0) {
+          payload.attachments = await Promise.all(broadcastAttachments.map((file) => encodeFileToBase64(file)))
+        }
       }
 
       const targetFunction = reminderType === "admin_broadcast" ? "send-communications-mail" : "send-meeting-reminder"
@@ -610,6 +648,7 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
             reminderType === "admin_broadcast"
               ? selectedBroadcastPreparedBy?.full_name || null
               : selectedMeetingPreparedBy?.full_name || null,
+          attachment_count: reminderType === "admin_broadcast" ? broadcastAttachments.length : 0,
         },
       })
     } catch (err: unknown) {
@@ -700,6 +739,7 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
               ) : (
                 <BroadcastForm
                   broadcastDepartment={broadcastDepartment}
+                  setBroadcastDepartment={setBroadcastDepartment}
                   broadcastPreparedById={broadcastPreparedById}
                   setBroadcastPreparedById={setBroadcastPreparedById}
                   broadcastSubject={broadcastSubject}
@@ -707,6 +747,9 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
                   broadcastBodyHtml={broadcastBodyHtml}
                   setBroadcastBodyHtml={setBroadcastBodyHtml}
                   broadcastPreparedByOptions={broadcastPreparedByOptions}
+                  departmentOptions={departmentOptions}
+                  attachments={broadcastAttachments}
+                  setAttachments={setBroadcastAttachments}
                 />
               )}
             </CardContent>
@@ -783,6 +826,7 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
           selectedBroadcastPreparedByName={selectedBroadcastPreparedBy?.full_name ?? null}
           selectedPresenterName={selectedPresenter?.full_name ?? null}
           knowledgeDepartment={knowledgeDepartment}
+          broadcastAttachmentCount={broadcastAttachments.length}
           resolvedRecipients={resolvedRecipients}
           sendTiming={sendTiming}
           scheduledDate={scheduledDate}

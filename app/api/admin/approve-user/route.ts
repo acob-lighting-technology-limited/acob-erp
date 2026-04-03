@@ -4,7 +4,10 @@ import { buildApprovalEmailPreview } from "@/lib/onboarding/approval-email-previ
 import { createClient as createServerClient } from "@/lib/supabase/server"
 import { rateLimit, getClientId } from "@/lib/rate-limit"
 import { logger } from "@/lib/logger"
-import { sendNotificationEmail } from "@/lib/notifications/email-gateway"
+import {
+  sendNotificationEmailWithRetry,
+  sendNotificationEmailsIndividuallyWithRetry,
+} from "@/lib/notifications/email-gateway"
 import { isSystemNotificationChannelEnabled } from "@/lib/notifications/delivery-policy"
 import { syncEmploymentStatusToAuth } from "@/lib/supabase/admin"
 import { writeAuditLog } from "@/lib/audit/write-audit"
@@ -34,6 +37,12 @@ export async function POST(req: Request) {
 
   log.info({ callerId: caller.id }, "Starting approval process")
   try {
+    const emailWarnings: Array<{
+      audience: "employee" | "management"
+      reason: string
+      recipients: string[]
+    }> = []
+
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
@@ -169,13 +178,30 @@ export async function POST(req: Request) {
     try {
       const onboardingMailEnabled = await isSystemNotificationChannelEnabled(supabaseAdmin, "onboarding", "email")
       if (onboardingMailEnabled) {
-        await sendNotificationEmail({
+        const result = await sendNotificationEmailWithRetry({
           to: emailPreview.welcome.recipients,
           subject: emailPreview.welcome.subject,
           html: emailPreview.welcome.html,
         })
+
+        if (!result.sent) {
+          emailWarnings.push({
+            audience: "employee",
+            reason: result.reason,
+            recipients: emailPreview.welcome.recipients,
+          })
+          log.error(
+            { reason: result.reason, recipients: emailPreview.welcome.recipients },
+            "Welcome email was not sent"
+          )
+        }
       }
     } catch (emailError) {
+      emailWarnings.push({
+        audience: "employee",
+        reason: emailError instanceof Error ? emailError.message : String(emailError),
+        recipients: emailPreview.welcome.recipients,
+      })
       log.error({ err: String(emailError) }, "Failed to send welcome email")
     }
 
@@ -183,13 +209,33 @@ export async function POST(req: Request) {
     try {
       const onboardingMailEnabled = await isSystemNotificationChannelEnabled(supabaseAdmin, "onboarding", "email")
       if (onboardingMailEnabled && emailPreview.internal.recipients.length > 0) {
-        await sendNotificationEmail({
+        const result = await sendNotificationEmailsIndividuallyWithRetry({
           to: emailPreview.internal.recipients,
           subject: emailPreview.internal.subject,
           html: emailPreview.internal.html,
         })
+
+        if (!result.sent) {
+          const failureSummary = result.failedRecipients
+            .map((failure) => `${failure.recipient}: ${failure.reason}`)
+            .join("; ")
+          emailWarnings.push({
+            audience: "management",
+            reason: failureSummary || "failed to send to one or more recipients",
+            recipients: result.failedRecipients.map((failure) => failure.recipient),
+          })
+          log.error(
+            { failedRecipients: result.failedRecipients, deliveredRecipients: result.deliveredRecipients },
+            "Internal onboarding email failed for one or more recipients"
+          )
+        }
       }
     } catch (emailError) {
+      emailWarnings.push({
+        audience: "management",
+        reason: emailError instanceof Error ? emailError.message : String(emailError),
+        recipients: emailPreview.internal.recipients,
+      })
       log.error({ err: String(emailError) }, "Failed to send stakeholder notification emails")
     }
 
@@ -212,12 +258,12 @@ export async function POST(req: Request) {
           role: "employee",
           employment_status: "active",
         },
-        metadata: { source: "approve-user", pending_user_id: pendingUserId },
+        metadata: { source: "approve-user", pending_user_id: pendingUserId, email_warnings: emailWarnings },
       },
       { failOpen: true }
     )
 
-    return NextResponse.json({ success: true, employeeId })
+    return NextResponse.json({ success: true, employeeId, emailWarnings })
   } catch (error: unknown) {
     log.error({ err: String(error) }, "Approval process failed")
     // Redact internal error details from the client

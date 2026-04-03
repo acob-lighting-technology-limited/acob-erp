@@ -85,7 +85,7 @@ set
   end
 where wr.year = 2026;
 
--- Action tracker items
+-- Action point items
 update public.action_items ai
 set
   week_number = case

@@ -17,18 +17,6 @@ const DEPARTMENT_ALIASES: Partial<Record<CanonicalDepartment, readonly string[]>
   "Operations and Maintenance": ["Operations"],
 } as const
 
-const ACTION_POINTS_HEADINGS: Record<CanonicalDepartment, string> = {
-  Accounts: "ACCOUNTS DEPARTMEMT:",
-  "Business, Growth and Innovation": "BUSINESS GROWTH AND INNOVATION:",
-  "Executive Management": "EXECUTIVE MANAGEMENT:",
-  "IT and Communications": "IT & COMMUNICATIONS DEPARTMENT:",
-  "Admin & HR": "ADMIN/HR:",
-  "Legal, Regulatory and Compliance": "REGULATORY & COMPLIANCE DEPARTMENT:",
-  "Operations and Maintenance": "OPERATIONS AND MAINTENANCE DEPARTMENT:",
-  Project: "PROJECT DEPARTMENT:",
-  Technical: "TECHNICAL DEPARTMENT",
-}
-
 function comparableDepartmentValue(value: string): string {
   return String(value || "")
     .trim()
@@ -83,6 +71,5 @@ export function compareDepartments(a: string, b: string): number {
 }
 
 export function getActionPointsDepartmentHeading(value: string): string {
-  const canonical = normalizeDepartmentName(value) as CanonicalDepartment
-  return ACTION_POINTS_HEADINGS[canonical] ?? `${normalizeDepartmentName(value).toUpperCase()}:`
+  return `${normalizeDepartmentName(value).toUpperCase()}:`
 }

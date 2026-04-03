@@ -19,7 +19,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { TableSkeleton } from "@/components/ui/query-states"
-import { exportActionTrackerToPPTX, exportActionTrackerToXLSX, type ActionItem } from "@/lib/export-utils"
+import { exportActionPointToPPTX, exportActionPointToXLSX, type ActionItem } from "@/lib/export-utils"
 import { exportActionPointsDocx, exportActionPointsPdf } from "@/lib/action-points-export"
 import { getOfficeWeekMonday } from "@/lib/meeting-week"
 
@@ -215,7 +215,7 @@ export function ActionTrackerTable({
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() =>
-                                exportActionTrackerToPPTX(
+                                exportActionPointToPPTX(
                                   deptActionItemsForExport,
                                   weekFilter,
                                   yearFilter,
@@ -228,7 +228,7 @@ export function ActionTrackerTable({
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() =>
-                                exportActionTrackerToXLSX(
+                                exportActionPointToXLSX(
                                   deptActionItemsForExport,
                                   weekFilter,
                                   yearFilter,

@@ -16,7 +16,7 @@ import {
   MoreVertical,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { exportActionTrackerToPPTX, exportActionTrackerToXLSX, type ActionItem } from "@/lib/export-utils"
+import { exportActionPointToPPTX, exportActionPointToXLSX, type ActionItem } from "@/lib/export-utils"
 import { exportActionPointsDocx, exportActionPointsPdf } from "@/lib/action-points-export"
 import type { ActionTask } from "../_lib/queries"
 
@@ -119,16 +119,12 @@ export function DeptActionRows({
                         <FileIcon className="mr-2 h-4 w-4" /> Export Word
                       </DropdownMenuItem>
                       <DropdownMenuItem
-                        onClick={() =>
-                          exportActionTrackerToPPTX(deptActionItemsForExport, week, year, meetingDate, dept)
-                        }
+                        onClick={() => exportActionPointToPPTX(deptActionItemsForExport, week, year, meetingDate, dept)}
                       >
                         <Presentation className="mr-2 h-4 w-4" /> Export PPTX
                       </DropdownMenuItem>
                       <DropdownMenuItem
-                        onClick={() =>
-                          exportActionTrackerToXLSX(deptActionItemsForExport, week, year, dept, meetingDate)
-                        }
+                        onClick={() => exportActionPointToXLSX(deptActionItemsForExport, week, year, dept, meetingDate)}
                       >
                         <FileSpreadsheet className="mr-2 h-4 w-4" /> Export XLSX
                       </DropdownMenuItem>

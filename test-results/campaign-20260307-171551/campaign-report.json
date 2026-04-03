@@ -1110,8 +1110,8 @@
       "classification": "admin"
     },
     {
-      "file": "app/admin/reports/action-tracker/page.tsx",
-      "route": "/admin/reports/action-tracker",
+      "file": "app/admin/reports/action-point/page.tsx",
+      "route": "/admin/reports/action-point",
       "kind": "page",
       "classification": "admin"
     },
@@ -1362,8 +1362,8 @@
       "classification": "employee_app"
     },
     {
-      "file": "app/(app)/dashboard/reports/action-tracker/page.tsx",
-      "route": "/dashboard/reports/action-tracker",
+      "file": "app/(app)/dashboard/reports/action-point/page.tsx",
+      "route": "/dashboard/reports/action-point",
       "kind": "page",
       "classification": "employee_app"
     },

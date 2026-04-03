@@ -1,4 +1,4 @@
--- Enable the action tracker and weekly reports features
+-- Enable the action point and weekly reports features
 
 -- 1. Enhance tasks table
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS category text DEFAULT 'general';

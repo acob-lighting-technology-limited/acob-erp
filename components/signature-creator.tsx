@@ -16,6 +16,7 @@ interface SignatureCreatorProps {
     phone_number?: string | null
     company_email?: string | null
   } | null
+  variant?: "default" | "anniversary"
 }
 
 interface FormData {
@@ -27,7 +28,9 @@ interface FormData {
   companyEmail: string
 }
 
-export function SignatureCreator({ profile }: SignatureCreatorProps) {
+const DEFAULT_ASSET_BASE_URL = "https://erp.acoblighting.com"
+
+export function SignatureCreator({ profile, variant = "default" }: SignatureCreatorProps) {
   const [formData, setFormData] = useState<FormData>({
     firstName: profile?.first_name || "",
     middleName: profile?.other_names || "",
@@ -97,16 +100,12 @@ export function SignatureCreator({ profile }: SignatureCreatorProps) {
       .join(" ")
   }
 
-  const generateSignature = () => {
-    const formattedFirstName = formatNameProperly(formData.firstName)
-    const formattedMiddleName = formData.middleName ? formatNameProperly(formData.middleName) : ""
-    const formattedLastName = formatNameProperly(formData.lastName)
+  const getAssetUrl = (path: string) => {
+    const baseUrl = typeof window !== "undefined" ? window.location.origin : DEFAULT_ASSET_BASE_URL
+    return `${baseUrl}${path}`
+  }
 
-    const fullName = `${formattedFirstName}${
-      formattedMiddleName ? " " + formattedMiddleName : ""
-    } ${formattedLastName}`.trim()
-    const formattedPhone = formatPhoneNumber(formData.phoneNumber)
-
+  const generateDefaultSignature = (fullName: string, formattedPhone: string) => {
     return `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; max-width: 1000px; margin: 0; padding: 12px 0; line-height: 1.5;">
   <!-- Thin green line -->
   <div style="color: #000000;">&mdash;&mdash;</div>
@@ -122,31 +121,31 @@ export function SignatureCreator({ profile }: SignatureCreatorProps) {
     <!-- Contact details -->
     <div style="font-size: 14px; color: #374151; line-height: 1.3;">
       <div style="margin: 0 0 1px 0;">
-        <img src="https://www.acoblighting.com/images/signature/phone.png" width="18" height="18" style="vertical-align: middle; opacity: 0.8; margin-right: 6px; display: inline-block;" alt="Phone" /><a href="tel:${formData.phoneNumber.replace(
+        <img src="${getAssetUrl("/images/signature/phone.png")}" width="18" height="18" style="vertical-align: middle; opacity: 0.8; margin-right: 6px; display: inline-block;" alt="Phone" /><a href="tel:${formData.phoneNumber.replace(
           /\s+/g,
           ""
         )}" style="color: #1f2937; text-decoration: none; vertical-align: middle;">${formattedPhone}</a>
       </div>
       <div style="margin: 0 0 1px 0;">
-        <img src="https://www.acoblighting.com/images/signature/mail.png" width="18" height="18" style="vertical-align: middle; opacity: 0.8; margin-right: 6px; display: inline-block;" alt="Email" /><a href="mailto:${
+        <img src="${getAssetUrl("/images/signature/mail.png")}" width="18" height="18" style="vertical-align: middle; opacity: 0.8; margin-right: 6px; display: inline-block;" alt="Email" /><a href="mailto:${
           formData.companyEmail
         }" style="color: #1f2937; text-decoration: none; vertical-align: middle;">${formData.companyEmail}</a>
       </div>
       <div>
-        <img src="https://www.acoblighting.com/images/signature/web.png" width="18" height="18" style="vertical-align: middle; opacity: 0.8; margin-right: 6px; display: inline-block;" alt="Website" /><a href="http://www.acoblighting.com" style="color: #1f2937; text-decoration: none; vertical-align: middle;">www.acoblighting.com</a>
+        <img src="${getAssetUrl("/images/signature/web.png")}" width="18" height="18" style="vertical-align: middle; opacity: 0.8; margin-right: 6px; display: inline-block;" alt="Website" /><a href="https://www.acoblighting.com" style="color: #1f2937; text-decoration: none; vertical-align: middle;">www.acoblighting.com</a>
       </div>
     </div>
   </div>
   
   <!-- Logo + Socials (stacked vertically) -->
   <div style="margin-bottom: 8px;">
-    <img src="https://www.acoblighting.com/images/signature/acob-logo.png" width="200" height="47" alt="ACOB Lighting Technology Limited" style="display: block; margin-bottom: 8px;" />
+    <img src="${getAssetUrl("/images/signature/acob-logo.png")}" width="200" height="47" alt="ACOB Lighting Technology Limited" style="display: block; margin-bottom: 8px;" />
     
    <div style="display: inline-block;">
-  <a href="https://www.linkedin.com/company/acob-lighting-technology-limited" style="text-decoration: none; display: inline-block;"><img src="https://www.acoblighting.com/images/signature/linkedin.png" width="22" height="22" alt="LinkedIn" style="border-radius: 4px; display: inline-block;" /></a>
-  <a href="https://twitter.com/AcobLimited" style="text-decoration: none; display: inline-block; margin-left: 4px;"><img src="https://www.acoblighting.com/images/signature/x.png" width="22" height="22" alt="X (Twitter)" style="border-radius: 4px; display: inline-block;" /></a>
-  <a href="https://www.facebook.com/acoblightingtechltd" style="text-decoration: none; display: inline-block; margin-left: 4px;"><img src="https://www.acoblighting.com/images/signature/facebook.png" width="22" height="22" alt="Facebook" style="border-radius: 4px; display: inline-block;" /></a>
-  <a href="https://www.instagram.com/acob_lighting/" style="text-decoration: none; display: inline-block; margin-left: 4px;"><img src="https://www.acoblighting.com/images/signature/instagram.png" width="22" height="22" alt="Instagram" style="border-radius: 4px; display: inline-block;" /></a>
+  <a href="https://www.linkedin.com/company/acob-lighting-technology-limited" style="text-decoration: none; display: inline-block;"><img src="${getAssetUrl("/images/signature/linkedin.png")}" width="22" height="22" alt="LinkedIn" style="border-radius: 4px; display: inline-block;" /></a>
+  <a href="https://twitter.com/AcobLimited" style="text-decoration: none; display: inline-block; margin-left: 4px;"><img src="${getAssetUrl("/images/signature/x.png")}" width="22" height="22" alt="X (Twitter)" style="border-radius: 4px; display: inline-block;" /></a>
+  <a href="https://www.facebook.com/acoblightingtechltd" style="text-decoration: none; display: inline-block; margin-left: 4px;"><img src="${getAssetUrl("/images/signature/facebook.png")}" width="22" height="22" alt="Facebook" style="border-radius: 4px; display: inline-block;" /></a>
+  <a href="https://www.instagram.com/acob_lighting/" style="text-decoration: none; display: inline-block; margin-left: 4px;"><img src="${getAssetUrl("/images/signature/instagram.png")}" width="22" height="22" alt="Instagram" style="border-radius: 4px; display: inline-block;" /></a>
 </div>
   </div>
   
@@ -158,6 +157,79 @@ export function SignatureCreator({ profile }: SignatureCreatorProps) {
     <p style="margin: 0; font-weight: 600; font-style: italic;">Lighting up Nigeria!</p>
   </div>
 </div>`
+  }
+
+  const generateAnniversarySignature = (fullName: string, formattedPhone: string) => {
+    return `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; max-width: 1000px; margin: 0; padding: 12px 0; line-height: 1.5; color: #1f2937;">
+  <div style="color: #0f5c4d;">&mdash;&mdash;</div>
+
+  <p style="margin: 0 0 4px 0; font-size: 14px; color: #4b5563; font-style: italic;">Best Regards,</p>
+
+  <div style="border-bottom: 1.5px solid #d6c07b; padding-bottom: 8px; margin-bottom: 10px;">
+    <p style="margin: 0; line-height: 1; font-size: 20px; font-weight: 700; color: #0f172a; letter-spacing: -0.025em;">${fullName}</p>
+    <p style="margin: 0 0 10px 0; font-size: 14px; font-weight: 600; color: #0f5c4d;">${formData.companyRole}</p>
+
+    <div style="font-size: 14px; color: #374151; line-height: 1.3;">
+      <div style="margin: 0 0 1px 0;">
+        <img src="${getAssetUrl("/images/signature/phone.png")}" width="18" height="18" style="vertical-align: middle; opacity: 0.8; margin-right: 6px; display: inline-block;" alt="Phone" /><a href="tel:${formData.phoneNumber.replace(
+          /\s+/g,
+          ""
+        )}" style="color: #1f2937; text-decoration: none; vertical-align: middle;">${formattedPhone}</a>
+      </div>
+      <div style="margin: 0 0 1px 0;">
+        <img src="${getAssetUrl("/images/signature/mail.png")}" width="18" height="18" style="vertical-align: middle; opacity: 0.8; margin-right: 6px; display: inline-block;" alt="Email" /><a href="mailto:${
+          formData.companyEmail
+        }" style="color: #1f2937; text-decoration: none; vertical-align: middle;">${formData.companyEmail}</a>
+      </div>
+      <div>
+        <img src="${getAssetUrl("/images/signature/web.png")}" width="18" height="18" style="vertical-align: middle; opacity: 0.8; margin-right: 6px; display: inline-block;" alt="Website" /><a href="https://www.acoblighting.com" style="color: #1f2937; text-decoration: none; vertical-align: middle;">www.acoblighting.com</a>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-bottom: 10px; border: 1px solid #d6c07b; border-radius: 16px; overflow: hidden; background: #fffdf7;">
+    <div style="background: #0f5c4d; padding: 10px 14px;">
+      <p style="margin: 0; font-size: 12px; font-weight: 700; color: #f8f4e6; letter-spacing: 0.08em; text-transform: uppercase;">ACOB Lighting Technology Limited</p>
+    </div>
+    <div style="padding: 14px;">
+      <img src="${getAssetUrl("/images/signature/acob-10th-anniversary.jpg")}" width="190" height="238" alt="ACOB Lighting 10 Years Anniversary" style="display: block; width: 190px; max-width: 100%; height: auto; margin-bottom: 10px;" />
+      <p style="margin: 0 0 6px 0; font-size: 16px; font-weight: 700; color: #8a6a12;">Celebrating 10 Years of Impact</p>
+      <p style="margin: 0 0 6px 0; font-size: 13px; font-weight: 600; color: #0f5c4d;">A decade of purpose, progress, and power.</p>
+      <p style="margin: 0 0 6px 0; font-size: 12px; color: #374151;">Honouring 10 remarkable years of lighting up communities, driving innovation, and creating lasting impact across Nigeria.</p>
+      <p style="margin: 0; font-size: 12px; font-weight: 700; color: #1f2937;">2016 - 2026 | Lighting Up Nigeria</p>
+    </div>
+  </div>
+
+  <div style="margin-bottom: 8px;">
+    <div style="display: inline-block;">
+      <a href="https://www.linkedin.com/company/acob-lighting-technology-limited" style="text-decoration: none; display: inline-block;"><img src="${getAssetUrl("/images/signature/linkedin.png")}" width="22" height="22" alt="LinkedIn" style="border-radius: 4px; display: inline-block;" /></a>
+      <a href="https://twitter.com/AcobLimited" style="text-decoration: none; display: inline-block; margin-left: 4px;"><img src="${getAssetUrl("/images/signature/x.png")}" width="22" height="22" alt="X (Twitter)" style="border-radius: 4px; display: inline-block;" /></a>
+      <a href="https://www.facebook.com/acoblightingtechltd" style="text-decoration: none; display: inline-block; margin-left: 4px;"><img src="${getAssetUrl("/images/signature/facebook.png")}" width="22" height="22" alt="Facebook" style="border-radius: 4px; display: inline-block;" /></a>
+      <a href="https://www.instagram.com/acob_lighting/" style="text-decoration: none; display: inline-block; margin-left: 4px;"><img src="${getAssetUrl("/images/signature/instagram.png")}" width="22" height="22" alt="Instagram" style="border-radius: 4px; display: inline-block;" /></a>
+    </div>
+  </div>
+
+  <div style="border-top: 1px solid #e7dec2; padding-top: 6px; font-size: 11px; color: #6b7280; line-height: 1.35;">
+    <p style="margin: 0; font-weight: 600; font-style: italic;">Celebrating 10 Years of Impact | Lighting up Nigeria!</p>
+  </div>
+</div>`
+  }
+
+  const generateSignature = () => {
+    const formattedFirstName = formatNameProperly(formData.firstName)
+    const formattedMiddleName = formData.middleName ? formatNameProperly(formData.middleName) : ""
+    const formattedLastName = formatNameProperly(formData.lastName)
+
+    const fullName = `${formattedFirstName}${
+      formattedMiddleName ? " " + formattedMiddleName : ""
+    } ${formattedLastName}`.trim()
+    const formattedPhone = formatPhoneNumber(formData.phoneNumber)
+
+    if (variant === "anniversary") {
+      return generateAnniversarySignature(fullName, formattedPhone)
+    }
+
+    return generateDefaultSignature(fullName, formattedPhone)
   }
 
   const copyToClipboard = async () => {
@@ -208,13 +280,25 @@ export function SignatureCreator({ profile }: SignatureCreatorProps) {
     !emailError &&
     !phoneError
 
+  const pageTitle = variant === "anniversary" ? "10th Anniversary Signature" : "Personal Information"
+  const pageDescription =
+    variant === "anniversary"
+      ? "Generate the temporary 10th anniversary email signature"
+      : "Fill in your details to generate your signature"
+  const previewTitle = variant === "anniversary" ? "Anniversary Preview" : "Signature Preview"
+  const previewDescription =
+    variant === "anniversary"
+      ? "This is how your temporary anniversary signature will look"
+      : "This is how your signature will look"
+  const copyButtonLabel = variant === "anniversary" ? "Copy Anniversary Signature" : "Copy Signature"
+
   return (
     <div className="grid gap-8 lg:grid-cols-2">
       {/* Form */}
       <Card>
         <CardHeader>
-          <CardTitle>Personal Information</CardTitle>
-          <CardDescription>Fill in your details to generate your signature</CardDescription>
+          <CardTitle>{pageTitle}</CardTitle>
+          <CardDescription>{pageDescription}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
@@ -284,7 +368,7 @@ export function SignatureCreator({ profile }: SignatureCreatorProps) {
           <div className="flex">
             <Button onClick={copyToClipboard} disabled={!isFormValid} className="flex-1">
               <Copy className="mr-2 h-4 w-4" />
-              Copy Signature
+              {copyButtonLabel}
             </Button>
           </div>
         </CardContent>
@@ -293,8 +377,8 @@ export function SignatureCreator({ profile }: SignatureCreatorProps) {
       {/* Preview */}
       <Card>
         <CardHeader>
-          <CardTitle>Signature Preview</CardTitle>
-          <CardDescription>This is how your signature will look</CardDescription>
+          <CardTitle>{previewTitle}</CardTitle>
+          <CardDescription>{previewDescription}</CardDescription>
         </CardHeader>
         <CardContent>
           {isFormValid ? (
