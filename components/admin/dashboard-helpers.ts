@@ -40,8 +40,7 @@ export function normalizeAdminDomains(domains: string[] | null | undefined): Adm
 
 export function getDomainForAdminPath(path: string): AdminDomain | null {
   if (path.startsWith("/admin/hr")) return "hr"
-  if (path.startsWith("/admin/finance") || path.startsWith("/admin/purchasing") || path.startsWith("/admin/payments"))
-    return "finance"
+  if (path.startsWith("/admin/finance") || path.startsWith("/admin/purchasing")) return "finance"
   if (path.startsWith("/admin/assets") || path.startsWith("/admin/inventory")) return "assets"
   if (path.startsWith("/admin/reports") || path.startsWith("/admin/audit-logs")) return "reports"
   if (path.startsWith("/admin/tasks")) return "tasks"

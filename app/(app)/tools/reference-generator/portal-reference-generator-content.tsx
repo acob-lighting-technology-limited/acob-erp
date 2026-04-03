@@ -17,7 +17,7 @@ interface DepartmentCodeOption {
   department_code: string
 }
 
-interface PortalCorrespondenceContentProps {
+interface PortalReferenceGeneratorContentProps {
   userId: string
   currentViewerName: string
   currentViewerDepartment: string
@@ -31,13 +31,13 @@ function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback
 }
 
-export function PortalCorrespondenceContent({
+export function PortalReferenceGeneratorContent({
   currentViewerName,
   currentViewerDepartment,
   isDepartmentLead,
   initialRecords,
   departmentCodes,
-}: PortalCorrespondenceContentProps) {
+}: PortalReferenceGeneratorContentProps) {
   const initialDepartment = departmentCodes.some((d) => d.department_name === currentViewerDepartment)
     ? currentViewerDepartment
     : ""

@@ -20,7 +20,6 @@ function isAdminDashboardNavigation(fromHref: string, toHref: string): boolean {
     "/tools/signature",
     "/tools/watermark",
     "/documentation",
-    "/job-description",
   ]
 
   const isFromAdmin = adminPaths.some((p) => fromPath.startsWith(p))

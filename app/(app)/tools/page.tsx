@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { FileSignature, Droplet, ArrowRight, Wrench, Hash } from "lucide-react"
+import { FileSignature, Droplet, ArrowRight, Wrench, Hash, Briefcase } from "lucide-react"
 import { PageHeader, PageWrapper } from "@/components/layout"
 
 const tools = [
@@ -37,6 +37,14 @@ const tools = [
     icon: Hash,
     color: "text-violet-500",
     bgColor: "bg-violet-50 dark:bg-violet-950/30",
+  },
+  {
+    name: "Job Description",
+    description: "View, edit, and print your job description from the tools workspace",
+    href: "/tools/job-description",
+    icon: Briefcase,
+    color: "text-emerald-600",
+    bgColor: "bg-emerald-50 dark:bg-emerald-950/30",
   },
 ]
 

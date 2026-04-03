@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import { PortalCorrespondenceContent } from "../../correspondence/portal-correspondence-content"
+import { PortalReferenceGeneratorContent } from "./portal-reference-generator-content"
 import type { CorrespondenceRecord } from "@/types/correspondence"
 
 interface DepartmentCodeOption {
@@ -93,7 +93,7 @@ export default async function ToolsReferenceGeneratorPage() {
   }
 
   return (
-    <PortalCorrespondenceContent
+    <PortalReferenceGeneratorContent
       userId={data.userId}
       currentViewerRole={data.currentViewerRole}
       isDepartmentLead={data.isDepartmentLead}
