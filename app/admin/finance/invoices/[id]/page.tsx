@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { useParams } from "next/navigation"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
@@ -11,9 +12,9 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Download, Send, Printer, CheckCircle, Pencil, FileText } from "lucide-react"
-import Link from "next/link"
 import { toast } from "sonner"
 import { PageLoader } from "@/components/ui/query-states"
+import { InvoiceFormDialog } from "../_components/invoice-form-dialog"
 
 import { logger } from "@/lib/logger"
 
@@ -79,6 +80,7 @@ export default function InvoiceDetailPage() {
   const params = useParams()
   const id = params.id as string
   const queryClient = useQueryClient()
+  const [isEditOpen, setIsEditOpen] = useState(false)
 
   const { data, isLoading } = useQuery({
     queryKey: QUERY_KEYS.adminInvoiceDetail(id),
@@ -144,12 +146,10 @@ export default function InvoiceDetailPage() {
           </Badge>
           {invoice.status === "draft" && (
             <>
-              <Link href={`/admin/finance/invoices/${invoice.id}/edit`}>
-                <Button variant="outline">
-                  <Pencil className="mr-2 h-4 w-4" />
-                  Edit
-                </Button>
-              </Link>
+              <Button variant="outline" onClick={() => setIsEditOpen(true)}>
+                <Pencil className="mr-2 h-4 w-4" />
+                Edit
+              </Button>
               <Button onClick={markAsSent}>
                 <Send className="mr-2 h-4 w-4" />
                 Mark as Sent
@@ -173,6 +173,23 @@ export default function InvoiceDetailPage() {
         </div>
       }
     >
+      <InvoiceFormDialog
+        open={isEditOpen}
+        onOpenChange={setIsEditOpen}
+        queryClient={queryClient}
+        invoice={{
+          id: invoice.id,
+          customer_name: invoice.customer_name,
+          customer_email: invoice.customer_email,
+          customer_address: invoice.customer_address,
+          issue_date: invoice.issue_date,
+          due_date: invoice.due_date,
+          currency: invoice.currency,
+          notes: invoice.notes,
+          terms: invoice.terms,
+        }}
+        initialItems={items.map((item) => ({ ...item }))}
+      />
       {/* Invoice Preview */}
       <Card>
         <CardContent className="p-8">

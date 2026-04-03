@@ -27,7 +27,7 @@ export default async function CommunicationsMeetingsRemindersPage() {
 
   const { data: employees } = await supabase
     .from("profiles")
-    .select("id, full_name, company_email, additional_email, department, employment_status")
+    .select("id, full_name, company_email, additional_email, department, designation, employment_status")
     .or("company_email.not.is.null,additional_email.not.is.null")
     .order("full_name")
 

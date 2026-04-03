@@ -35,7 +35,7 @@ interface PendingUser {
   last_name: string
   other_names?: string
   department: string
-  company_role: string
+  designation: string
   company_email: string
   personal_email: string
   phone_number: string
@@ -380,7 +380,7 @@ export function PendingApplicationsModal({ onEmployeeCreated }: PendingApplicati
                         </div>
                         <div className="grid grid-cols-1">
                           <DetailRow label="Department" value={selectedUser.department} />
-                          <DetailRow label="Company Role" value={selectedUser.company_role} />
+                          <DetailRow label="Designation" value={selectedUser.designation} />
                           <DetailRow label="System Email" value={selectedUser.company_email} />
                           <DetailRow label="Assigned ID" value={employeeId} />
                           <DetailRow label="Office Location" value={selectedUser.office_location || "N/A"} />

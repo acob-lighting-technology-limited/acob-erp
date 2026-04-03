@@ -224,9 +224,9 @@ export function CreateUserDialog({
           )}
 
           <div>
-            <Label htmlFor="create_company_role">Position/Title</Label>
+            <Label htmlFor="create_designation">Designation</Label>
             <Input
-              id="create_company_role"
+              id="create_designation"
               value={form.companyRole}
               onChange={(e) => setForm({ ...form, companyRole: e.target.value })}
               placeholder="e.g., Senior Developer, Manager"

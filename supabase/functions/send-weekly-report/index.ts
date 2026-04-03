@@ -33,6 +33,8 @@ const SEND_INTERVAL_MS = Math.ceil(1000 / RESEND_MAX_REQ_PER_SEC) + 100 // ~0.6s
 const MAX_429_RETRIES = 5
 const DEFAULT_SENDER = "ACOB Internal Systems <notifications@acoblighting.com>"
 const MEETING_DOCS_BUCKET = "meeting_documents"
+const OFFICE_WEEK_ANCHOR_MONTH_INDEX = 0
+const OFFICE_WEEK_ANCHOR_DAY = 12
 
 type AttachmentPayload = {
   filename: string
@@ -62,6 +64,26 @@ type WeeklyReportRow = {
   status: string | null
 }
 
+function getOfficeYearStart(year: number): Date {
+  return new Date(year, OFFICE_WEEK_ANCHOR_MONTH_INDEX, OFFICE_WEEK_ANCHOR_DAY)
+}
+
+function getWeeksInOfficeYear(year: number): number {
+  const start = getOfficeYearStart(year)
+  const nextStart = getOfficeYearStart(year + 1)
+  const diffMs = nextStart.getTime() - start.getTime()
+  return Math.ceil(diffMs / (7 * 24 * 60 * 60 * 1000))
+}
+
+function getNextOfficeWeek(week: number, year: number): { week: number; year: number } {
+  const weeksInYear = getWeeksInOfficeYear(year)
+  if (week < weeksInYear) {
+    return { week: week + 1, year }
+  }
+
+  return { week: 1, year: year + 1 }
+}
+
 type WeeklyReportRequestBody = {
   testEmail?: string
   recipients?: string[]
@@ -86,6 +108,8 @@ type WeeklyReportRequestBody = {
   actionPointAttachments?: Array<{ base64: string; filename: string; week: number }>
   meetingWeeks?: number[]
   preparedByName?: string
+  preparedByDesignation?: string
+  preparedByDepartment?: string
   requestedByUserId?: string
 }
 
@@ -736,9 +760,13 @@ function buildEmailHtml(
   meetingDate: string,
   nextMeetingDate: string,
   preparedByName: string,
+  preparedByDesignation: string | null | undefined,
+  preparedByDepartment: string | null | undefined,
   ctx: EmailContentContext
 ): string {
   const safePreparedBy = escapeHtml((preparedByName || "").trim() || "Terna")
+  const safeDesignation = escapeHtml((preparedByDesignation || "").trim())
+  const safeDepartment = escapeHtml((preparedByDepartment || "").trim() || "Admin & HR Department")
   const title = buildEmailTitle(ctx)
   const weekBadge =
     ctx.weekLabels.length <= 3
@@ -780,9 +808,9 @@ ${bodyHtml}
   </div>
   <div class="footer" style="background-color:#0f2d1f;">
     <span style="color:#d1d5db;">Prepared by ${safePreparedBy}</span><br>
-    Admin &amp; HR Department<br>
+    ${safeDesignation ? `${safeDesignation}<br>` : ""}${safeDepartment}<br>
     <strong>ACOB Lighting Technology Limited</strong><br>
-    <span class="footer-system">Reports &amp; Meeting Management System</span>
+    <span class="footer-system">Reports Management System</span>
     <br><br>
     <i class="footer-note">This is an automated system notification. Please do not reply directly to this email.</i>
   </div>
@@ -840,6 +868,8 @@ serve(async (req) => {
       additionalDocumentIds,
       additionalDocumentAttachments: bodyAdditionalDocumentAttachments,
       preparedByName,
+      preparedByDesignation,
+      preparedByDepartment,
       requestedByUserId,
     } = body
 
@@ -868,9 +898,9 @@ serve(async (req) => {
 
     const meetingDateIso = await resolveEffectiveMeetingDateIso(supabase, meetingWeek, meetingYear)
     const meetingDateLabel = formatMeetingDateLabel(meetingDateIso)
-    const nextMeetingDate = new Date(`${meetingDateIso}T00:00:00Z`)
-    nextMeetingDate.setUTCDate(nextMeetingDate.getUTCDate() + 7)
-    const nextMeetingDateLabel = formatMeetingDateLabel(nextMeetingDate)
+    const nextOfficeWeek = getNextOfficeWeek(meetingWeek, meetingYear)
+    const nextMeetingDateIso = await resolveEffectiveMeetingDateIso(supabase, nextOfficeWeek.week, nextOfficeWeek.year)
+    const nextMeetingDateLabel = formatMeetingDateLabel(nextMeetingDateIso)
 
     // ── Data weeks ──────────────────────────────────────────────────────
     // Everything uses the same meeting week — no previous-week offset
@@ -1079,6 +1109,8 @@ serve(async (req) => {
       meetingDateLabel,
       nextMeetingDateLabel,
       preparedByName || "Terna",
+      preparedByDesignation || null,
+      preparedByDepartment || "Admin & HR Department",
       emailCtx
     )
 
@@ -1124,6 +1156,8 @@ serve(async (req) => {
           success_count: successCount,
           failure_count: failureCount,
           prepared_by: preparedByName || "Terna",
+          prepared_by_designation: preparedByDesignation || null,
+          prepared_by_department: preparedByDepartment || "Admin & HR Department",
           attachments: attachments.map((a) => a.filename),
           failed_recipients: results.filter((r) => !r.success).map((r) => r.to),
           delivery_results: results.map((r) => ({ to: r.to, success: r.success, emailId: r.emailId ?? null })),

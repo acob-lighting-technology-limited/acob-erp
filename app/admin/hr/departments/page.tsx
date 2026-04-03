@@ -59,7 +59,7 @@ async function fetchDepartmentsData(): Promise<DepartmentsData> {
 
   const { data: profiles } = await supabase
     .from("profiles")
-    .select("id, first_name, last_name, company_email, additional_email, company_role, employment_status, department")
+    .select("id, first_name, last_name, company_email, additional_email, designation, employment_status, department")
 
   const employeesByDepartment: Record<string, DepartmentEmployee[]> = {}
   for (const profile of ((profiles || []) as DepartmentEmployee[]).filter((employee) =>
@@ -98,7 +98,7 @@ interface DepartmentEmployee {
   last_name: string | null
   company_email: string | null
   additional_email: string | null
-  company_role: string | null
+  designation: string | null
   employment_status: string | null
   department: string | null
 }
@@ -135,7 +135,6 @@ export default function DepartmentsPage() {
       const supabase = createClient()
 
       if (editingDepartment) {
-        const oldName = editingDepartment.name
         const newName = formData.name.trim()
 
         // Update existing department
@@ -444,7 +443,7 @@ export default function DepartmentsPage() {
                                           </TableCell>
                                           <TableCell>
                                             <Badge variant="outline" className="text-xs">
-                                              {member.company_role || "Employee"}
+                                              {member.designation || "Employee"}
                                             </Badge>
                                           </TableCell>
                                           <TableCell className="text-right">

@@ -36,6 +36,8 @@ type BroadcastRequestBody = {
   broadcastBodyHtml?: string
   broadcastDepartment?: string
   broadcastPreparedByName?: string
+  broadcastPreparedByDesignation?: string
+  broadcastPreparedByDepartment?: string
   requestedByUserId?: string
   attachments?: {
     filename?: string
@@ -145,11 +147,19 @@ function withSubjectPrefix(moduleName: string, subject: string): string {
   return String(subject || "").trim() || "Notification"
 }
 
-function buildAdminBroadcastHtml(title: string, bodyHtml: string, department: string, preparedByName: string): string {
-  const displayDepartment = normalizeDepartmentLabel(department)
+function buildAdminBroadcastHtml(
+  title: string,
+  bodyHtml: string,
+  department: string,
+  preparedByName: string,
+  preparedByDesignation?: string | null,
+  preparedByDepartment?: string | null
+): string {
+  const displayDepartment = normalizeDepartmentLabel(preparedByDepartment || department)
   const safeDepartment = escapeHtml(displayDepartment)
   const safeTitle = escapeHtml(title)
   const safePreparedBy = escapeHtml(preparedByName.trim() || "ACOB Team")
+  const safeDesignation = escapeHtml((preparedByDesignation || "").trim())
 
   return (
     "<!DOCTYPE html>" +
@@ -188,6 +198,7 @@ function buildAdminBroadcastHtml(title: string, bodyHtml: string, department: st
     '<span style="color:#d1d5db;">Prepared by ' +
     safePreparedBy +
     "</span><br>" +
+    (safeDesignation ? safeDesignation + "<br>" : "") +
     safeDepartment +
     "<br>" +
     '<strong style="color:#fff;">ACOB Lighting Technology Limited</strong>' +
@@ -223,6 +234,8 @@ serve(async (req) => {
     const broadcastBodyHtml = body.broadcastBodyHtml as string | undefined
     const broadcastDepartment = body.broadcastDepartment as string | undefined
     const broadcastPreparedByName = body.broadcastPreparedByName as string | undefined
+    const broadcastPreparedByDesignation = body.broadcastPreparedByDesignation as string | undefined
+    const broadcastPreparedByDepartment = body.broadcastPreparedByDepartment as string | undefined
     const requestedByUserId = (body.requestedByUserId as string | undefined) || null
     const attachments = Array.isArray(body.attachments)
       ? body.attachments
@@ -248,7 +261,14 @@ serve(async (req) => {
       "Communications",
       (broadcastSubject || "Administrative Notice").trim() || "Administrative Notice"
     )
-    const html = buildAdminBroadcastHtml(subject, cleanBody, department, preparedBy)
+    const html = buildAdminBroadcastHtml(
+      subject,
+      cleanBody,
+      department,
+      preparedBy,
+      broadcastPreparedByDesignation,
+      broadcastPreparedByDepartment
+    )
     const from = buildBroadcastSender(department)
 
     console.log("[communications-mail] Sending admin_broadcast to " + recipients.length + " recipients")
@@ -286,6 +306,8 @@ serve(async (req) => {
           failure_count: failureCount,
           subject,
           prepared_by: preparedBy,
+          prepared_by_designation: broadcastPreparedByDesignation || null,
+          prepared_by_department: broadcastPreparedByDepartment || department,
           attachment_count: attachments.length,
         },
       })

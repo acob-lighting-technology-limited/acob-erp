@@ -66,8 +66,8 @@ export function EmployeeProfileCard({ profile, fullName, initials }: EmployeePro
           <div className="flex items-center gap-3">
             <User className="text-muted-foreground h-5 w-5" />
             <div>
-              <p className="text-muted-foreground text-sm">Position</p>
-              <p className="font-medium">{profile.company_role || "N/A"}</p>
+              <p className="text-muted-foreground text-sm">Designation</p>
+              <p className="font-medium">{profile.designation || "N/A"}</p>
             </div>
           </div>
 

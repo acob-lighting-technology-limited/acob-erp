@@ -29,6 +29,7 @@ type Employee = {
   company_email: string | null
   additional_email: string | null
   department: string | null
+  designation: string | null
   employment_status: string | null
 }
 
@@ -504,6 +505,10 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
                 : undefined,
             meetingPreparedByName:
               reminderType === "meeting" ? selectedMeetingPreparedBy?.full_name || "ACOB Team" : undefined,
+            meetingPreparedByDesignation:
+              reminderType === "meeting" ? selectedMeetingPreparedBy?.designation || null : undefined,
+            meetingPreparedByDepartment:
+              reminderType === "meeting" ? selectedMeetingPreparedBy?.department || "Admin & HR" : undefined,
             sessionDate: reminderType === "knowledge_sharing" ? sessionDate : undefined,
             sessionTime: reminderType === "knowledge_sharing" ? sessionTime : undefined,
             duration: reminderType === "knowledge_sharing" ? duration : undefined,
@@ -512,6 +517,12 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
             broadcastDepartment: reminderType === "admin_broadcast" ? broadcastDepartment : undefined,
             broadcastPreparedByName:
               reminderType === "admin_broadcast" ? selectedBroadcastPreparedBy?.full_name || null : undefined,
+            broadcastPreparedByDesignation:
+              reminderType === "admin_broadcast" ? selectedBroadcastPreparedBy?.designation || null : undefined,
+            broadcastPreparedByDepartment:
+              reminderType === "admin_broadcast"
+                ? selectedBroadcastPreparedBy?.department || broadcastDepartment
+                : undefined,
             attachments:
               reminderType === "admin_broadcast" && broadcastAttachments.length > 0
                 ? broadcastAttachments.map((file) => file.name)
@@ -598,6 +609,8 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
             department: selectedPresenter.department,
           }
         payload.meetingPreparedByName = selectedMeetingPreparedBy?.full_name || "ACOB Team"
+        payload.meetingPreparedByDesignation = selectedMeetingPreparedBy?.designation || null
+        payload.meetingPreparedByDepartment = selectedMeetingPreparedBy?.department || "Admin & HR"
       } else if (reminderType === "knowledge_sharing") {
         payload.sessionDate = formatDateNice(sessionDate)
         payload.sessionTime = sessionTime
@@ -607,6 +620,8 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
         payload.broadcastBodyHtml = broadcastBodyHtml
         payload.broadcastDepartment = broadcastDepartment
         payload.broadcastPreparedByName = selectedBroadcastPreparedBy?.full_name || null
+        payload.broadcastPreparedByDesignation = selectedBroadcastPreparedBy?.designation || null
+        payload.broadcastPreparedByDepartment = selectedBroadcastPreparedBy?.department || broadcastDepartment
         if (broadcastAttachments.length > 0) {
           payload.attachments = await Promise.all(broadcastAttachments.map((file) => encodeFileToBase64(file)))
         }

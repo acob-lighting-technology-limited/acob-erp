@@ -114,7 +114,7 @@ interface PaymentsTableProps {
     department_id: string | null
     isAdmin: boolean
   }
-  /** Base path for detail pages - default "/admin/payments" for admin, "/payments" for users */
+  /** Base path for detail pages - default "/admin/finance/payments" for admin, "/payments" for users */
   basePath?: string
 }
 
@@ -124,7 +124,7 @@ export function PaymentsTable({
   initialCategories = [],
   initialError = null,
   currentUser,
-  basePath = currentUser.isAdmin ? "/admin/payments" : "/payments",
+  basePath = currentUser.isAdmin ? "/admin/finance/payments" : "/payments",
 }: PaymentsTableProps) {
   const router = useRouter()
   const queryClient = useQueryClient()

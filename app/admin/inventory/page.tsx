@@ -111,7 +111,7 @@ export default function InventoryDashboard() {
               <Link href="/admin/inventory/products">
                 <Button className="w-full">View Products ({stats.totalProducts})</Button>
               </Link>
-              <Link href="/admin/inventory/products/new">
+              <Link href="/admin/inventory/products?openCreate=1">
                 <Button className="w-full" variant="outline">
                   Add Product
                 </Button>

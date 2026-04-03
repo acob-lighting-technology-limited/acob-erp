@@ -87,6 +87,20 @@ const setParagraphAlignment = (paragraphXml: string, alignment: "left" | "both")
   return paragraphXml.replace("<w:p>", `<w:p><w:pPr>${alignmentXml}</w:pPr>`)
 }
 
+const setParagraphKeepNext = (paragraphXml: string) => {
+  if (paragraphXml.includes("<w:keepNext")) return paragraphXml
+  if (paragraphXml.includes("<w:pPr")) {
+    return paragraphXml.replace(/<w:pPr[^>]*>/, "$&<w:keepNext/>")
+  }
+  return paragraphXml.replace(/<w:p(\s[^>]*)?>/, "$&<w:pPr><w:keepNext/></w:pPr>")
+}
+
+const normalizeBulletSpacing = (paragraphXml: string) =>
+  paragraphXml.replace(/<w:spacing[^/]*\/>/, '<w:spacing w:before="57" w:line="290" w:lineRule="auto"/>')
+
+const normalizeSpacerSpacing = (paragraphXml: string) =>
+  paragraphXml.replace(/<w:spacing[^/]*\/>/, '<w:spacing w:before="25"/>')
+
 const groupActionItemsByDepartment = (actions: ActionItem[]) => {
   const grouped: Record<string, ActionItem[]> = {}
   actions.forEach((action) => {
@@ -156,8 +170,8 @@ export async function generateActionPointsDocxBuffer(
     return {
       headingKey: headingMatch.key,
       headingXml,
-      bulletTemplateXml: bulletParagraphs[0],
-      blankParagraphXml,
+      bulletTemplateXml: normalizeBulletSpacing(bulletParagraphs[0]),
+      blankParagraphXml: normalizeSpacerSpacing(blankParagraphXml),
     }
   })
   const fallbackSection = sections[0]
@@ -185,7 +199,9 @@ export async function generateActionPointsDocxBuffer(
     const section = sections.find((item) => item.headingKey === normalizeDepartmentName(department)) || fallbackSection
     if (!section) throw new Error(`No template section available for department: ${department}`)
 
-    builtParagraphs.push(setParagraphAlignment(replaceParagraphText(section.headingXml, dynamicHeading), "both"))
+    builtParagraphs.push(
+      setParagraphKeepNext(setParagraphAlignment(replaceParagraphText(section.headingXml, dynamicHeading), "both"))
+    )
     ;(grouped[department] || []).forEach((action) => {
       builtParagraphs.push(
         setParagraphAlignment(

@@ -37,7 +37,7 @@ export function ProfileForm({ user, profile, hideBackButton = false, onSaved }: 
     lastName: profile?.last_name || "",
     otherNames: profile?.other_names || "",
     department: profile?.department || "",
-    companyRole: profile?.company_role || "",
+    companyRole: profile?.designation || "",
     phoneNumber: profile?.phone_number || "",
     additionalPhone: profile?.additional_phone || "",
     residentialAddress: profile?.residential_address || "",
@@ -80,7 +80,7 @@ export function ProfileForm({ user, profile, hideBackButton = false, onSaved }: 
           last_name: formData.lastName,
           other_names: formData.otherNames,
           department: formData.department,
-          company_role: formData.companyRole,
+          designation: formData.companyRole,
           phone_number: phoneNumber,
           additional_phone: additionalPhone,
           residential_address: formData.residentialAddress,
@@ -165,7 +165,7 @@ export function ProfileForm({ user, profile, hideBackButton = false, onSaved }: 
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="companyRole">Company Role</Label>
+                  <Label htmlFor="companyRole">Designation</Label>
                   <Input
                     id="companyRole"
                     value={formData.companyRole}

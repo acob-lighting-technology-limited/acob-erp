@@ -5,7 +5,7 @@ export interface UserProfile {
   other_names: string | null
   company_email: string
   department: string
-  company_role: string | null
+  designation: string | null
   role: string
   phone_number: string | null
   additional_phone: string | null

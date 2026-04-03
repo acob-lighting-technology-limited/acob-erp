@@ -4,7 +4,7 @@ export interface PendingUser {
   first_name: string
   last_name: string
   department: string
-  company_role: string
+  designation: string
   company_email: string
   personal_email: string
   phone_number?: string
@@ -21,7 +21,7 @@ export function renderWelcomeEmail({ pendingUser, tempPassword, portalUrl }: Wel
   const firstName = escapeHtml(pendingUser.first_name)
   const lastName = escapeHtml(pendingUser.last_name)
   const dept = escapeHtml(pendingUser.department)
-  const role = escapeHtml(pendingUser.company_role)
+  const role = escapeHtml(pendingUser.designation)
   const email = escapeHtml(pendingUser.company_email)
   const officeLoc = pendingUser.office_location ? escapeHtml(pendingUser.office_location) : "N/A"
   const safeTempPassword = escapeHtml(tempPassword)
@@ -83,7 +83,7 @@ export function renderWelcomeEmail({ pendingUser, tempPassword, portalUrl }: Wel
                     <td class="value">${dept}</td>
                 </tr>
                 <tr>
-                    <td class="label">Role</td>
+                    <td class="label">Designation</td>
                     <td class="value">${role}</td>
                 </tr>
                 <tr>
@@ -121,6 +121,7 @@ export function renderWelcomeEmail({ pendingUser, tempPassword, portalUrl }: Wel
     </div>
     <div class="footer" style="background-color:#0f2d1f;">
         <span style="color:#d1d5db;">Prepared by Admin &amp; HR</span><br>
+        Administrative Team<br>
         Admin &amp; HR Department<br>
         <strong>ACOB Lighting Technology Limited</strong><br>
         <span class="footer-system">Employee Management System</span>

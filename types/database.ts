@@ -14,7 +14,7 @@ export type Database = {
           other_names: string | null
           department: string | null // DEPRECATED: Use department_id
           department_id: string | null // NEW: Foreign key to departments
-          company_role: string | null
+          designation: string | null
           phone_number: string | null
           additional_phone: string | null
           residential_address: string | null
@@ -55,7 +55,7 @@ export type Database = {
           other_names?: string | null
           department?: string | null
           department_id?: string | null
-          company_role?: string | null
+          designation?: string | null
           phone_number?: string | null
           additional_phone?: string | null
           residential_address?: string | null
@@ -89,7 +89,7 @@ export type Database = {
           other_names?: string | null
           department?: string | null
           department_id?: string | null
-          company_role?: string | null
+          designation?: string | null
           phone_number?: string | null
           additional_phone?: string | null
           residential_address?: string | null
@@ -290,7 +290,7 @@ export interface Profile {
   other_names?: string
   department?: string // DEPRECATED: Use department_id
   department_id?: string | null // NEW: Foreign key
-  company_role?: string
+  designation?: string
   phone_number?: string
   additional_phone?: string
   residential_address?: string

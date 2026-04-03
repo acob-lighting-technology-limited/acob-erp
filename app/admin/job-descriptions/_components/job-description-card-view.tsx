@@ -14,7 +14,7 @@ interface Profile {
   last_name: string
   company_email: string
   department: string
-  company_role: string | null
+  designation: string | null
   phone_number: string | null
   role: UserRole
   job_description: string | null
@@ -73,10 +73,10 @@ export function JobDescriptionCardView({ profiles, onView }: JobDescriptionCardV
               <span>{profile.department}</span>
             </div>
 
-            {profile.company_role && (
+            {profile.designation && (
               <div className="text-muted-foreground flex items-center gap-2 text-sm">
                 <Briefcase className="h-4 w-4" />
-                <span>{profile.company_role}</span>
+                <span>{profile.designation}</span>
               </div>
             )}
 

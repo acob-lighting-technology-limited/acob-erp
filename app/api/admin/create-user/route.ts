@@ -53,7 +53,8 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json()
-    const { firstName, lastName, otherNames, email, department, companyRole, phoneNumber, role, employeeNumber } = body
+    const { firstName, lastName, otherNames, email, department, designation, phoneNumber, role, employeeNumber } = body
+    const resolvedDesignation = String(designation ?? body?.companyRole ?? "").trim()
     const adminDomains = Array.isArray(body?.admin_domains)
       ? body.admin_domains
           .map((value: unknown) =>
@@ -216,7 +217,7 @@ export async function POST(request: NextRequest) {
         other_names: otherNames || null,
         company_email: email,
         department: department,
-        company_role: companyRole || null,
+        designation: resolvedDesignation || null,
         phone_number: phoneNumber || null,
         role: targetRole,
         admin_domains: targetRole === "admin" ? adminDomains : null,

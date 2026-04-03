@@ -45,7 +45,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   const { data: pendingUser, error } = await supabaseAdmin
     .from("pending_users")
     .select(
-      "first_name, last_name, department, company_role, company_email, personal_email, phone_number, office_location"
+      "first_name, last_name, department, designation, company_email, personal_email, phone_number, office_location"
     )
     .eq("id", params.id)
     .single()
@@ -60,7 +60,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     "first_name",
     "last_name",
     "department",
-    "company_role",
+    "designation",
   ] as const
   const missingFields = requiredFields.filter((field) => !pendingUser[field])
 

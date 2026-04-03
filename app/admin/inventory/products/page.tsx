@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
+import { useQueryClient } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -17,6 +18,8 @@ import { StatCard } from "@/components/ui/stat-card"
 import { EmptyState } from "@/components/ui/empty-state"
 import { TableSkeleton } from "@/components/ui/query-states"
 import type { BadgeProps } from "@/components/ui/badge"
+import { ProductFormDialog } from "./_components/product-form-dialog"
+import { useSearchParams } from "next/navigation"
 
 import { logger } from "@/lib/logger"
 
@@ -68,8 +71,12 @@ async function fetchProductsList(): Promise<Product[]> {
 }
 
 export default function ProductsPage() {
+  const queryClient = useQueryClient()
+  const searchParams = useSearchParams()
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
+  const [isCreateOpen, setIsCreateOpen] = useState(searchParams.get("openCreate") === "1")
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null)
 
   const { data: products = [], isLoading: loading } = useQuery({
     queryKey: QUERY_KEYS.adminProducts(),
@@ -108,12 +115,10 @@ export default function ProductsPage() {
       backLinkHref="/admin"
       backLinkLabel="Back to Admin"
       actions={
-        <Link href="/admin/inventory/products/new">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Product
-          </Button>
-        </Link>
+        <Button onClick={() => setIsCreateOpen(true)}>
+          <Plus className="mr-2 h-4 w-4" />
+          Add Product
+        </Button>
       }
     >
       {/* Stats */}
@@ -181,7 +186,7 @@ export default function ProductsPage() {
               icon={Package}
               title="No products yet"
               description="Add your first product to start managing inventory."
-              action={{ label: "Add Product", href: "/admin/inventory/products/new", icon: Plus }}
+              action={{ label: "Add Product", href: "/admin/inventory/products?openCreate=1", icon: Plus }}
             />
           ) : (
             <Table>
@@ -226,11 +231,9 @@ export default function ProductsPage() {
                             <Eye className="h-4 w-4" />
                           </Button>
                         </Link>
-                        <Link href={`/admin/inventory/products/${product.id}/edit`}>
-                          <Button variant="ghost" size="icon">
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                        </Link>
+                        <Button variant="ghost" size="icon" onClick={() => setEditingProduct(product)}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -240,6 +243,28 @@ export default function ProductsPage() {
           )}
         </CardContent>
       </Card>
+      <ProductFormDialog open={isCreateOpen} onOpenChange={setIsCreateOpen} queryClient={queryClient} />
+      <ProductFormDialog
+        open={editingProduct !== null}
+        onOpenChange={(open) => !open && setEditingProduct(null)}
+        queryClient={queryClient}
+        product={
+          editingProduct
+            ? {
+                id: editingProduct.id,
+                sku: editingProduct.sku,
+                name: editingProduct.name,
+                description: editingProduct.description || "",
+                category_id: editingProduct.category_id || "",
+                unit_cost: editingProduct.unit_cost,
+                selling_price: editingProduct.selling_price,
+                quantity_on_hand: editingProduct.quantity_on_hand,
+                reorder_level: editingProduct.reorder_level,
+                status: editingProduct.status,
+              }
+            : null
+        }
+      />
     </AdminTablePage>
   )
 }

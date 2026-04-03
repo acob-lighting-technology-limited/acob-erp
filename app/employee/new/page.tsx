@@ -29,7 +29,7 @@ const formSchema = z.object({
   other_names: z.string().optional(),
   department: z.string().optional(),
   other_department: z.string().optional(),
-  company_role: z.string().min(2, "Company role is required"),
+  designation: z.string().min(2, "Designation is required"),
   personal_email: z.string().email("Invalid email address"),
   phone_number: z.string().regex(/^0[789][01]\d{8}$/, "Must be a valid Nigerian phone number (e.g., 08012345678)"),
   additional_phone_number: z.string().optional(),
@@ -106,7 +106,7 @@ export default function EmployeeOnboardingForm() {
         last_name: data.last_name,
         other_names: data.other_names || null,
         department: actualDepartment,
-        company_role: data.company_role,
+        designation: data.designation,
         company_email: companyEmail,
         personal_email: data.personal_email,
         email: data.personal_email, // MANDATORY: Map to the 'email' column which has a Not-Null constraint
@@ -308,9 +308,9 @@ export default function EmployeeOnboardingForm() {
                     <label className="text-foreground text-sm font-medium">
                       Job Title / Role <span className="text-destructive">*</span>
                     </label>
-                    <Input className="h-11" placeholder="e.g. Electrical Engineer" {...register("company_role")} />
-                    {errors.company_role && (
-                      <p className="text-destructive mt-1 text-sm">{errors.company_role.message}</p>
+                    <Input className="h-11" placeholder="e.g. Electrical Engineer" {...register("designation")} />
+                    {errors.designation && (
+                      <p className="text-destructive mt-1 text-sm">{errors.designation.message}</p>
                     )}
                   </div>
                   <div className="space-y-2">

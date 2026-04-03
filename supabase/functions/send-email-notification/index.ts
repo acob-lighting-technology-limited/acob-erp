@@ -402,6 +402,7 @@ serve(async (req) => {
     </div>
     <div class="footer" style="background-color:#0f2d1f;">
         <span style="color:#d1d5db;">Prepared by IT &amp; Communications</span><br>
+        ICT Support Team<br>
         IT &amp; Communications Department<br>
         <strong>ACOB Lighting Technology Limited</strong><br>
         <span class="footer-system">Asset Management System</span>

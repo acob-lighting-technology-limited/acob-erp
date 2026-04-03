@@ -64,7 +64,7 @@ interface LocationEmployee {
   last_name: string | null
   company_email: string | null
   additional_email: string | null
-  company_role: string | null
+  designation: string | null
   office_location: string | null
   employment_status?: string | null
 }
@@ -98,7 +98,7 @@ async function fetchOfficeLocationsData(): Promise<OfficeLocationsData> {
   const { data: profiles } = await supabase
     .from("profiles")
     .select(
-      "id, first_name, last_name, company_email, additional_email, company_role, office_location, employment_status"
+      "id, first_name, last_name, company_email, additional_email, designation, office_location, employment_status"
     )
 
   const byLocation: Record<string, LocationEmployee[]> = {}
@@ -157,7 +157,6 @@ export default function OfficeLocationsPage() {
       const supabase = createClient()
 
       if (editingLocation) {
-        const oldName = editingLocation.name
         const newName = formData.name.trim()
 
         const { error, data: updatedRows } = await supabase
@@ -507,7 +506,7 @@ export default function OfficeLocationsPage() {
                                           </TableCell>
                                           <TableCell>
                                             <Badge variant="outline" className="text-xs">
-                                              {member.company_role || "Employee"}
+                                              {member.designation || "Employee"}
                                             </Badge>
                                           </TableCell>
                                           <TableCell className="text-right">

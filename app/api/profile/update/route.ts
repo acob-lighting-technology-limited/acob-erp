@@ -22,7 +22,7 @@ export async function POST(request: Request) {
       last_name: body.last_name ?? null,
       other_names: body.other_names ?? null,
       department: body.department ?? null,
-      company_role: body.company_role ?? null,
+      designation: body.designation ?? null,
       phone_number: body.phone_number ?? null,
       additional_phone: body.additional_phone ?? null,
       residential_address: body.residential_address ?? null,

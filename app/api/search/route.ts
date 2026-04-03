@@ -106,10 +106,7 @@ export async function GET(request: NextRequest) {
     if (profiles && profiles.length > 0) {
       const profileIds = profiles.map((p) => p.id)
       const profileNameMap = new Map(
-        profiles.map((p) => [
-          p.id,
-          `${p.first_name || ""} ${p.last_name || ""}`.trim() || p.company_email || "Unknown",
-        ])
+        profiles.map((p) => [p.id, `${p.first_name || ""} ${p.last_name || ""}`.trim() || p.company_email || "Unknown"])
       )
 
       // Add profile results
@@ -120,17 +117,13 @@ export async function GET(request: NextRequest) {
           title: profileNameMap.get(profile.id)!,
           subtitle: profile.company_email || undefined,
           description: `${profile.department || ""} ${profile.role || ""}`.trim() || undefined,
-          href: `/admin/employees/${profile.id}`,
+          href: `/admin/hr/employees/${profile.id}`,
           metadata: profile as Record<string, unknown>,
         })
       })
 
       // Batch fetch all related items for all profiles in parallel
-      const [
-        { data: profileTasks },
-        { data: profileAssetAssignments },
-        { data: profileDocs },
-      ] = await Promise.all([
+      const [{ data: profileTasks }, { data: profileAssetAssignments }, { data: profileDocs }] = await Promise.all([
         supabase
           .from("tasks")
           .select("id, title, status, department, assigned_to")
