@@ -1,11 +1,12 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.3"
-import { Resend } from "npm:resend@2.0.0"
 import { canEdgeUserReceiveEmail, normalizeRecipientEmails } from "../_shared/notification-gateway.ts"
+import { sendEmail } from "../_shared/email.ts"
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")
+const NOTIFICATION_SENDER_EMAIL = Deno.env.get("NOTIFICATION_SENDER_EMAIL") || "notifications@acoblighting.com"
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -27,6 +28,8 @@ type PaymentRow = {
 type ProfileRow = {
   id: string
   full_name: string | null
+  first_name: string | null
+  last_name: string | null
   company_email: string | null
   additional_email: string | null
 }
@@ -100,7 +103,6 @@ serve(async (req) => {
     }
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
-    const resend = new Resend(RESEND_API_KEY)
     const appUrl = Deno.env.get("APP_BASE_URL") || Deno.env.get("NEXT_PUBLIC_APP_URL") || SUPABASE_URL
     const todayKey = new Date().toISOString().slice(0, 10)
 
@@ -166,7 +168,7 @@ serve(async (req) => {
     const creatorIds = Array.from(new Set(allEvents.map((event) => event.creatorId)))
     const { data: profileRows, error: profileError } = await supabase
       .from("profiles")
-      .select("id, full_name, company_email, additional_email")
+      .select("id, full_name, first_name, last_name, company_email, additional_email")
       .in("id", creatorIds)
 
     if (profileError) throw profileError
@@ -181,11 +183,9 @@ serve(async (req) => {
     for (const event of allEvents) {
       try {
         const profile = profileMap.get(event.creatorId)
-        const authUser = await supabase.auth.admin.getUserById(event.creatorId)
         const recipientEmails = normalizeRecipientEmails([
           profile?.company_email || null,
           profile?.additional_email || null,
-          authUser.data.user?.email || null,
         ])
 
         if (recipientEmails.length === 0) continue
@@ -201,7 +201,8 @@ serve(async (req) => {
             ? `System: Payment Due Today - ${paymentTitle}`
             : `System: Payment Overdue - ${paymentTitle}`
         const html = buildPaymentEmailHtml({
-          recipientName: profile?.full_name || "Team Member",
+          recipientName:
+            profile?.full_name || [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || "Team Member",
           event: event.event,
           paymentTitle,
           category,
@@ -211,13 +212,12 @@ serve(async (req) => {
           appUrl,
         })
 
-        const { error: emailError } = await resend.emails.send({
-          from: "ACOB Internal Systems <notifications@acoblighting.com>",
+        await sendEmail({
+          from: `ACOB Internal Systems <${NOTIFICATION_SENDER_EMAIL}>`,
           to: recipientEmails,
           subject,
           html,
         })
-        if (emailError) throw new Error(emailError.message || "Failed to send payment reminder email")
 
         const notificationTitle = event.event === "due" ? "Payment Due Today" : "Payment Overdue"
         const notificationMessage =

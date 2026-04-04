@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { NextRequest, NextResponse } from "next/server"
+import { z } from "zod"
 import type { EmploymentStatus } from "@/types/database"
 import { getSeparationBlockers } from "@/lib/hr/separation-blockers"
 import { canAccessAdminSection, resolveAdminScope } from "@/lib/admin/rbac"
@@ -23,6 +24,19 @@ interface StatusUpdateBody {
   suspension_end_date?: string
   separation_date?: string
 }
+
+const UpdateEmployeeStatusSchema = z.object({
+  status: z.enum(["active", "suspended", "separated", "on_leave"], {
+    errorMap: () => ({ message: "Invalid status" }),
+  }),
+  reason: z.string().optional(),
+  reason_code: z.string().optional(),
+  reason_label: z.string().optional(),
+  leave_type_id: z.string().optional(),
+  leave_type_name: z.string().optional(),
+  suspension_end_date: z.string().optional(),
+  separation_date: z.string().optional(),
+})
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -48,6 +62,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
 
     const body: StatusUpdateBody = await request.json()
+    const parsed = UpdateEmployeeStatusSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid request body" }, { status: 400 })
+    }
     const {
       status,
       reason,
@@ -57,14 +75,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       leave_type_name,
       suspension_end_date,
       separation_date,
-    } = body
+    } = parsed.data
     const selectedReason = reason_label || reason_code || reason || null
-
-    // Validate status
-    const validStatuses: EmploymentStatus[] = ["active", "suspended", "separated", "on_leave"]
-    if (!validStatuses.includes(status)) {
-      return NextResponse.json({ error: "Invalid status" }, { status: 400 })
-    }
 
     // Get current employee status for audit
     const { data: currentEmployee } = await supabase

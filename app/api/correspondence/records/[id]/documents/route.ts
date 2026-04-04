@@ -6,6 +6,11 @@ import {
   appendCorrespondenceAuditLog,
 } from "@/lib/correspondence/server"
 import { logger } from "@/lib/logger"
+import { getOneDriveService } from "@/lib/onedrive"
+import {
+  buildCorrespondenceDocumentPath,
+  isOneDriveCorrespondenceDocumentPath,
+} from "@/lib/correspondence/document-storage"
 
 const log = logger("correspondence-records-documents")
 
@@ -17,8 +22,15 @@ function sanitizeName(name: string): string {
   return name.replace(/[^a-zA-Z0-9._-]/g, "_")
 }
 
+function resolveKindFromPath(filePath: string): DocumentType {
+  if (filePath.includes("/supporting/")) return "supporting"
+  if (filePath.includes("/proof/")) return "proof"
+  return "draft"
+}
+
 export async function GET(_request: Request, { params }: { params: { id: string } }) {
   try {
+    const requestUrl = new URL(_request.url)
     const { supabase, user, profile } = await getAuthContext()
 
     if (!user || !profile) {
@@ -39,6 +51,24 @@ export async function GET(_request: Request, { params }: { params: { id: string 
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
+    const mode = requestUrl.searchParams.get("mode")
+    const filePath = requestUrl.searchParams.get("path")
+
+    if (mode === "download" && filePath) {
+      if (isOneDriveCorrespondenceDocumentPath(filePath)) {
+        const onedrive = getOneDriveService()
+        const downloadUrl = await onedrive.getDownloadUrl(filePath)
+        return NextResponse.redirect(downloadUrl)
+      }
+
+      const { data: signed, error: signedError } = await supabase.storage.from(BUCKET).createSignedUrl(filePath, 3600)
+      if (signedError || !signed?.signedUrl) {
+        return NextResponse.json({ error: signedError?.message || "Failed to create download link" }, { status: 500 })
+      }
+
+      return NextResponse.redirect(signed.signedUrl)
+    }
+
     const { data: versions, error: versionError } = await supabase
       .from("correspondence_versions")
       .select("*")
@@ -54,28 +84,20 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     for (const version of versions || []) {
       if (!version.file_path) continue
 
-      const { data: signed, error: signedError } = await supabase.storage
-        .from(BUCKET)
-        .createSignedUrl(version.file_path, 3600)
-
       files.push({
-        kind: "draft",
+        kind: resolveKindFromPath(version.file_path),
         version_no: version.version_no,
         file_path: version.file_path,
-        signed_url: signedError ? null : signed?.signedUrl || null,
+        signed_url: `/api/correspondence/records/${record.id}/documents?mode=download&path=${encodeURIComponent(version.file_path)}`,
         created_at: version.created_at,
       })
     }
 
     if (record.proof_of_delivery_path) {
-      const { data: proofSigned, error: proofError } = await supabase.storage
-        .from(BUCKET)
-        .createSignedUrl(record.proof_of_delivery_path, 3600)
-
       files.push({
         kind: "proof",
         file_path: record.proof_of_delivery_path,
-        signed_url: proofError ? null : proofSigned?.signedUrl || null,
+        signed_url: `/api/correspondence/records/${record.id}/documents?mode=download&path=${encodeURIComponent(record.proof_of_delivery_path)}`,
         created_at: record.sent_at || record.updated_at,
       })
     }
@@ -124,18 +146,36 @@ export async function POST(request: Request, { params }: { params: { id: string 
     }
 
     const safeName = sanitizeName(file.name)
-    const basePath =
-      documentType === "proof"
-        ? `${record.id}/proof`
-        : documentType === "supporting"
-          ? `${record.id}/supporting`
-          : `${record.id}/drafts`
-    const filePath = `${basePath}/${Date.now()}-${safeName}`
+    const onedriveFilePath = buildCorrespondenceDocumentPath(record.id, documentType, safeName)
+    let filePath = onedriveFilePath
+    const onedrive = getOneDriveService()
 
-    const { error: uploadError } = await supabase.storage.from(BUCKET).upload(filePath, file)
+    if (onedrive.isEnabled()) {
+      try {
+        const folderPath = onedriveFilePath.slice(0, onedriveFilePath.lastIndexOf("/"))
+        await onedrive.createFolder(folderPath)
+        const buffer = await file.arrayBuffer()
+        await onedrive.uploadFile(onedriveFilePath, buffer, file.type)
+      } catch (uploadError) {
+        return NextResponse.json(
+          { error: uploadError instanceof Error ? uploadError.message : "Failed to upload file" },
+          { status: 500 }
+        )
+      }
+    } else {
+      const basePath =
+        documentType === "proof"
+          ? `${record.id}/proof`
+          : documentType === "supporting"
+            ? `${record.id}/supporting`
+            : `${record.id}/drafts`
+      filePath = `${basePath}/${Date.now()}-${safeName}`
 
-    if (uploadError) {
-      return NextResponse.json({ error: uploadError.message || "Failed to upload file" }, { status: 500 })
+      const { error: uploadError } = await supabase.storage.from(BUCKET).upload(filePath, file)
+
+      if (uploadError) {
+        return NextResponse.json({ error: uploadError.message || "Failed to upload file" }, { status: 500 })
+      }
     }
 
     if (documentType === "proof") {
@@ -229,3 +269,6 @@ export async function POST(request: Request, { params }: { params: { id: string 
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }
+
+// POST kept for backwards compat — prefer PATCH
+export { POST as PATCH }

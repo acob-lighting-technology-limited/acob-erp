@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { z } from "zod"
 import {
   appendAuditLog,
   appendHelpDeskEvent,
@@ -13,6 +14,9 @@ import { logger } from "@/lib/logger"
 
 const log = logger("help-desk-tickets-pivot")
 export const dynamic = "force-dynamic"
+const PivotHelpDeskTicketSchema = z.object({
+  reason: z.string().optional().nullable(),
+})
 
 type ApprovalProfileRow = Pick<
   HelpDeskProfile,
@@ -40,8 +44,12 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { reason } = await request.json()
-    const pivotReason = reason ? String(reason).trim() : "Procurement required to proceed"
+    const body = await request.json()
+    const parsed = PivotHelpDeskTicketSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid request body" }, { status: 400 })
+    }
+    const pivotReason = parsed.data.reason ? String(parsed.data.reason).trim() : "Procurement required to proceed"
 
     const { data: ticket, error: ticketError } = await supabase
       .from("help_desk_tickets")
@@ -144,3 +152,6 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     return NextResponse.json({ error: "Failed to pivot ticket" }, { status: 500 })
   }
 }
+
+// POST kept for backwards compat — prefer PATCH
+export { POST as PATCH }

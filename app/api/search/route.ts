@@ -20,7 +20,7 @@ interface SearchResult {
 }
 
 export async function GET(request: NextRequest) {
-  const rl = rateLimit(`search:${getClientId(request)}`, { limit: 30, windowSec: 60 })
+  const rl = await rateLimit(`search:${getClientId(request)}`, { limit: 30, windowSec: 60 })
   if (!rl.allowed) {
     return NextResponse.json({ error: "Too many requests. Please slow down." }, { status: 429 })
   }

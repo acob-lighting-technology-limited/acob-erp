@@ -1,32 +1,42 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { createClient } from "@/lib/supabase/client"
 import { dateValidation } from "@/lib/validation"
 import type { TaskFormState } from "@/components/tasks/TaskFormDialog"
-import type { Task, employee, UserProfile } from "./admin-tasks-content"
+import type { Task } from "@/types/task"
+import type { employee, UserProfile } from "./admin-tasks-content"
 
 export type SupabaseClient = ReturnType<typeof createClient>
 
-export async function enrichTaskWithUsers(supabase: SupabaseClient, task: any): Promise<any> {
-  const taskData: any = { ...task }
+type TaskAssignmentRow = { user_id: string }
+type ProfileRow = { id: string; first_name: string; last_name: string; department?: string | null }
+type CompletionRow = { user_id: string }
+type TaskAssignedUser = NonNullable<Task["assigned_users"]>[number]
+type NotificationPriority = "low" | "medium" | "high" | "urgent"
+
+export async function enrichTaskWithUsers(supabase: SupabaseClient, task: Task): Promise<Task> {
+  const taskData: Task = { ...task }
   if (task.assignment_type === "individual" && task.assigned_to) {
     const { data } = await supabase
       .from("profiles")
-      .select("first_name, last_name, department")
+      .select("id, first_name, last_name, department")
       .eq("id", task.assigned_to)
       .single()
-    taskData.assigned_to_user = data
+    taskData.assigned_to_user = data || undefined
   }
   if (task.assignment_type === "multiple") {
     const { data: assignments } = await supabase.from("task_assignments").select("user_id").eq("task_id", task.id)
     if (assignments && assignments.length > 0) {
-      const userIds = assignments.map((a: any) => a.user_id)
+      const userIds = assignments.map((a) => (a as TaskAssignmentRow).user_id)
       const { data: userProfiles } = await supabase
         .from("profiles")
         .select("id, first_name, last_name, department")
         .in("id", userIds)
       const { data: completions } = await supabase.from("task_user_completion").select("user_id").eq("task_id", task.id)
-      const completedIds = new Set(completions?.map((c: any) => c.user_id) || [])
-      taskData.assigned_users = userProfiles?.map((p: any) => ({ ...p, completed: completedIds.has(p.id) })) || []
+      const completedIds = new Set((completions as CompletionRow[] | null)?.map((c) => c.user_id) || [])
+      taskData.assigned_users =
+        (userProfiles as ProfileRow[] | null)?.map((profile) => ({
+          ...profile,
+          completed: completedIds.has(profile.id),
+        })) || []
     }
   }
   return taskData
@@ -85,7 +95,9 @@ export function applyTaskFilters(
         matchesDepartment =
           scopedDepartments.includes(task.department || "") ||
           (task.assigned_to_user ? scopedDepartments.includes(task.assigned_to_user.department || "") : false) ||
-          task.assigned_users?.some((u: any) => u.department && scopedDepartments.includes(u.department)) ||
+          task.assigned_users?.some(
+            (user: TaskAssignedUser) => user.department && scopedDepartments.includes(user.department)
+          ) ||
           false
       }
     } else {
@@ -99,7 +111,7 @@ export function applyTaskFilters(
     const matchesEmployee =
       employeeFilter === "all" ||
       task.assigned_to === employeeFilter ||
-      task.assigned_users?.some((u: any) => u.id === employeeFilter)
+      task.assigned_users?.some((user: TaskAssignedUser) => user.id === employeeFilter)
     return matchesSearch && matchesStatus && matchesPriority && matchesDepartment && matchesEmployee
   })
 }
@@ -117,11 +129,11 @@ export function validateTaskForm(form: TaskFormState): string | null {
   return null
 }
 
-export function filterByDepartments(tasks: any[], scopedDepartments: string[]): any[] {
+export function filterByDepartments(tasks: Task[], scopedDepartments: string[]): Task[] {
   return tasks.filter((task) => {
     if (task.department && scopedDepartments.includes(task.department)) return true
     if (task.assigned_to_user?.department && scopedDepartments.includes(task.assigned_to_user.department)) return true
-    if (task.assigned_users?.some((u: any) => u.department && scopedDepartments.includes(u.department))) return true
+    if (task.assigned_users?.some((user) => user.department && scopedDepartments.includes(user.department))) return true
     return false
   })
 }
@@ -131,7 +143,7 @@ export async function persistTaskUpdate(
   form: TaskFormState,
   taskId: string,
   userId: string,
-  taskData: any
+  taskData: Record<string, unknown>
 ) {
   const { error: taskError } = await supabase.from("tasks").update(taskData).eq("id", taskId)
   if (taskError) throw taskError
@@ -149,7 +161,11 @@ export async function persistTaskUpdate(
     .insert({ task_id: taskId, user_id: userId, update_type: "task_updated", content: "Task details updated by admin" })
 }
 
-export async function persistTaskCreate(supabase: SupabaseClient, form: TaskFormState, taskData: any) {
+export async function persistTaskCreate(
+  supabase: SupabaseClient,
+  form: TaskFormState,
+  taskData: Record<string, unknown>
+) {
   const { data: newTask, error: taskError } = await supabase.from("tasks").insert(taskData).select().single()
   if (taskError) throw taskError
   if (form.assignment_type === "multiple" && form.assigned_users.length > 0) {
@@ -171,7 +187,7 @@ export async function sendUpdateNotifications(form: TaskFormState, selectedTask:
         taskId: selectedTask.id,
         taskTitle: form.title,
         assignedBy: userId,
-        priority: form.priority as any,
+        priority: form.priority as NotificationPriority,
       })
     } else if (form.assigned_to) {
       await notifyTaskUpdated({
@@ -197,7 +213,7 @@ export async function sendUpdateNotifications(form: TaskFormState, selectedTask:
   }
 }
 
-export async function sendCreateNotifications(form: TaskFormState, newTask: any, userId: string) {
+export async function sendCreateNotifications(form: TaskFormState, newTask: Task, userId: string) {
   const { notifyTaskAssigned } = await import("@/lib/notifications")
   if (form.assignment_type === "individual" && form.assigned_to) {
     await notifyTaskAssigned({
@@ -205,7 +221,7 @@ export async function sendCreateNotifications(form: TaskFormState, newTask: any,
       taskId: newTask.id,
       taskTitle: newTask.title,
       assignedBy: userId,
-      priority: newTask.priority as any,
+      priority: newTask.priority as NotificationPriority,
     })
   } else if (form.assignment_type === "multiple" && form.assigned_users.length > 0) {
     await Promise.all(
@@ -215,7 +231,7 @@ export async function sendCreateNotifications(form: TaskFormState, newTask: any,
           taskId: newTask.id,
           taskTitle: newTask.title,
           assignedBy: userId,
-          priority: newTask.priority as any,
+          priority: newTask.priority as NotificationPriority,
         })
       )
     )

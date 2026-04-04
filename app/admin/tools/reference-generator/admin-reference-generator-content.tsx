@@ -1,6 +1,9 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { z } from "zod"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -37,6 +40,13 @@ function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback
 }
 
+const DepartmentCodeFormSchema = z.object({
+  department_name: z.string().min(1, "Department name is required"),
+  department_code: z.string().min(1, "Department code is required"),
+})
+
+type DepartmentCodeFormValues = z.infer<typeof DepartmentCodeFormSchema>
+
 export function AdminReferenceGeneratorContent({
   initialRecords,
   employees,
@@ -46,7 +56,13 @@ export function AdminReferenceGeneratorContent({
   const [loadingRecordId, setLoadingRecordId] = useState<string | null>(null)
   const [assignments, setAssignments] = useState<Record<string, string>>({})
   const [statusFilter, setStatusFilter] = useState<string>("all")
-  const [codeForm, setCodeForm] = useState({ department_name: "", department_code: "" })
+  const [searchQuery, setSearchQuery] = useState("")
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(initialRecords.length)
+  const codeForm = useForm<DepartmentCodeFormValues>({
+    resolver: zodResolver(DepartmentCodeFormSchema),
+    defaultValues: { department_name: "", department_code: "" },
+  })
   const [showMappings, setShowMappings] = useState(false)
   const [decisionPrompt, setDecisionPrompt] = useState<{
     recordId: string
@@ -54,9 +70,8 @@ export function AdminReferenceGeneratorContent({
   } | null>(null)
 
   const filteredRecords = useMemo(() => {
-    if (statusFilter === "all") return records
-    return records.filter((record) => record.status === statusFilter)
-  }, [records, statusFilter])
+    return records
+  }, [records])
 
   const stats = useMemo(() => {
     return {
@@ -68,11 +83,25 @@ export function AdminReferenceGeneratorContent({
     }
   }, [records])
 
-  async function refresh() {
-    const res = await fetch("/api/correspondence/records", { cache: "no-store" })
-    const json = await res.json()
-    setRecords(json.data || [])
-  }
+  useEffect(() => {
+    async function loadRecords() {
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: "50",
+      })
+      if (statusFilter !== "all") params.set("status", statusFilter)
+      if (searchQuery.trim()) params.set("search", searchQuery.trim())
+
+      const res = await fetch(`/api/correspondence/records?${params.toString()}`, { cache: "no-store" })
+      const json = await res.json()
+      setRecords(json.data || [])
+      setTotal(Number(json.total || 0))
+    }
+
+    void loadRecords()
+  }, [page, searchQuery, statusFilter])
+
+  const totalPages = Math.max(1, Math.ceil(total / 50))
 
   async function assignOfficer(recordId: string) {
     const responsibleOfficerId = assignments[recordId]
@@ -98,7 +127,13 @@ export function AdminReferenceGeneratorContent({
       }
 
       toast.success("Responsible officer assigned")
-      await refresh()
+      setRecords((current) =>
+        current.map((record) =>
+          record.id === recordId
+            ? { ...record, responsible_officer_id: responsibleOfficerId, status: "assigned_action_pending" }
+            : record
+        )
+      )
     } catch (error: unknown) {
       toast.error(getErrorMessage(error, "Failed to assign officer"))
     } finally {
@@ -128,7 +163,9 @@ export function AdminReferenceGeneratorContent({
       }
 
       toast.success(`Record ${decision.replaceAll("_", " ")}`)
-      await refresh()
+      setRecords((current) =>
+        current.map((record) => (record.id === recordId ? { ...record, status: decision } : record))
+      )
     } catch (error: unknown) {
       toast.error(getErrorMessage(error, "Failed to apply decision"))
     } finally {
@@ -155,7 +192,9 @@ export function AdminReferenceGeneratorContent({
       }
 
       toast.success(`Record marked ${finalStatus}`)
-      await refresh()
+      setRecords((current) =>
+        current.map((record) => (record.id === recordId ? { ...record, status: finalStatus } : record))
+      )
     } catch (error: unknown) {
       toast.error(getErrorMessage(error, "Failed to finalize dispatch"))
     } finally {
@@ -163,20 +202,14 @@ export function AdminReferenceGeneratorContent({
     }
   }
 
-  async function updateDepartmentCode(e: React.FormEvent) {
-    e.preventDefault()
-    if (!codeForm.department_name.trim() || !codeForm.department_code.trim()) {
-      toast.error("Department name and code are required")
-      return
-    }
-
+  const updateDepartmentCode = codeForm.handleSubmit(async (data) => {
     try {
       const res = await fetch("/api/correspondence/department-codes", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          department_name: codeForm.department_name.trim(),
-          department_code: codeForm.department_code.trim().toUpperCase(),
+          department_name: data.department_name.trim(),
+          department_code: data.department_code.trim().toUpperCase(),
           is_active: true,
         }),
       })
@@ -187,11 +220,11 @@ export function AdminReferenceGeneratorContent({
       }
 
       toast.success("Department code updated")
-      setCodeForm({ department_name: "", department_code: "" })
+      codeForm.reset({ department_name: "", department_code: "" })
     } catch (error: unknown) {
       toast.error(getErrorMessage(error, "Failed to update department code"))
     }
-  }
+  })
 
   return (
     <div className="space-y-6 p-6">
@@ -246,17 +279,17 @@ export function AdminReferenceGeneratorContent({
           <form onSubmit={updateDepartmentCode} className="grid gap-4 md:grid-cols-3">
             <div className="space-y-2">
               <Label>Department Name</Label>
-              <Input
-                value={codeForm.department_name}
-                onChange={(e) => setCodeForm((prev) => ({ ...prev, department_name: e.target.value }))}
-              />
+              <Input {...codeForm.register("department_name")} />
+              {codeForm.formState.errors.department_name && (
+                <p className="text-destructive text-sm">{codeForm.formState.errors.department_name.message}</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label>Department Code</Label>
-              <Input
-                value={codeForm.department_code}
-                onChange={(e) => setCodeForm((prev) => ({ ...prev, department_code: e.target.value }))}
-              />
+              <Input {...codeForm.register("department_code")} />
+              {codeForm.formState.errors.department_code && (
+                <p className="text-destructive text-sm">{codeForm.formState.errors.department_code.message}</p>
+              )}
             </div>
             <div className="flex items-end">
               <Button type="submit">Save Code</Button>
@@ -307,23 +340,40 @@ export function AdminReferenceGeneratorContent({
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Reference Generator Queue</CardTitle>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[220px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All statuses</SelectItem>
-              <SelectItem value="draft">Draft</SelectItem>
-              <SelectItem value="under_review">Under review</SelectItem>
-              <SelectItem value="approved">Approved</SelectItem>
-              <SelectItem value="rejected">Rejected</SelectItem>
-              <SelectItem value="returned_for_correction">Returned for correction</SelectItem>
-              <SelectItem value="assigned_action_pending">Assigned action pending</SelectItem>
-              <SelectItem value="open">Open</SelectItem>
-              <SelectItem value="sent">Sent</SelectItem>
-              <SelectItem value="filed">Filed</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex flex-col gap-3 md:flex-row">
+            <Input
+              value={searchQuery}
+              onChange={(event) => {
+                setPage(1)
+                setSearchQuery(event.target.value)
+              }}
+              placeholder="Search reference, subject, recipient, or sender"
+              className="md:w-[280px]"
+            />
+            <Select
+              value={statusFilter}
+              onValueChange={(value) => {
+                setPage(1)
+                setStatusFilter(value)
+              }}
+            >
+              <SelectTrigger className="w-[220px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All statuses</SelectItem>
+                <SelectItem value="draft">Draft</SelectItem>
+                <SelectItem value="under_review">Under review</SelectItem>
+                <SelectItem value="approved">Approved</SelectItem>
+                <SelectItem value="rejected">Rejected</SelectItem>
+                <SelectItem value="returned_for_correction">Returned for correction</SelectItem>
+                <SelectItem value="assigned_action_pending">Assigned action pending</SelectItem>
+                <SelectItem value="open">Open</SelectItem>
+                <SelectItem value="sent">Sent</SelectItem>
+                <SelectItem value="filed">Filed</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </CardHeader>
         <CardContent>
           <Table>
@@ -444,6 +494,25 @@ export function AdminReferenceGeneratorContent({
           </Table>
         </CardContent>
       </Card>
+
+      <div className="flex items-center justify-between text-sm text-slate-500">
+        <span>
+          Page {page} of {totalPages}
+        </span>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((current) => current - 1)}>
+            Previous
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page >= totalPages}
+            onClick={() => setPage((current) => current + 1)}
+          >
+            Next
+          </Button>
+        </div>
+      </div>
 
       <PromptDialog
         open={decisionPrompt !== null}

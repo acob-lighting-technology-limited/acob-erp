@@ -2,7 +2,7 @@ import type { LeaveBalance, LeaveRequest, LeaveType } from "@/app/(app)/leave/pa
 
 export async function fetchLeaveData(currentUserId: string) {
   const [requestRes, queueRes, typesRes, relieversRes] = await Promise.all([
-    fetch("/api/hr/leave/requests"),
+    fetch("/api/hr/leave/requests?limit=100"),
     fetch("/api/hr/leave/queue"),
     fetch("/api/hr/leave/types"),
     fetch("/api/hr/leave/relievers"),

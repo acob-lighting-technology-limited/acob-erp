@@ -20,7 +20,7 @@ export default async function AdminKssPage() {
 
   const role = String(profile?.role || "").toLowerCase()
   const isAllowed = ["developer", "super_admin", "admin"].includes(role) || profile?.is_department_lead === true
-  if (!isAllowed) redirect("/admin/reports")
+  if (!isAllowed) redirect("/admin/reports/general-meeting")
 
   const { data: employees } = await supabase
     .from("profiles")
@@ -37,9 +37,11 @@ export default async function AdminKssPage() {
           employment_status: e.employment_status || null,
         })
       )}
-      backHref="/admin/reports"
-      backLabel="Back to Reports"
+      backHref="/admin/reports/general-meeting"
+      backLabel="Back to General Meeting"
       title="Knowledge Sharing Session"
+      currentUserId={user.id}
+      enableScoring
     />
   )
 }

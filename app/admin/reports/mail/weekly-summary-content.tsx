@@ -264,7 +264,7 @@ export function WeeklySummaryContent({ employees, presenterDirectory = [], curre
         icon: FileText,
         desc: "Uses uploaded Knowledge Sharing Session file from Reports",
         disabled: !currentDocByType.knowledgeSharingSession,
-        helperHref: "/admin/reports/kss",
+        helperHref: "/admin/reports/general-meeting/kss",
         helperLabel: "Go to KSS",
       },
       {
@@ -273,7 +273,7 @@ export function WeeklySummaryContent({ employees, presenterDirectory = [], curre
         icon: FileText,
         desc: "Uses uploaded Minutes of Meeting PDF from Reports",
         disabled: !currentDocByType.minutesOfMeeting,
-        helperHref: "/admin/reports/minutes-of-meeting",
+        helperHref: "/admin/reports/general-meeting/minutes-of-meeting",
         helperLabel: "Go to Minutes",
       },
     ],

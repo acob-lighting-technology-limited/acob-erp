@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { z } from "zod"
 import {
   appendCorrespondenceAuditLog,
   appendCorrespondenceEvent,
@@ -9,6 +10,8 @@ import {
 } from "@/lib/correspondence/server"
 import { logger } from "@/lib/logger"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
+import { getPaginationRange, paginatedResponse, PaginationSchema } from "@/lib/pagination"
+import { checkIdempotency, getIdempotencyKey, storeIdempotencyKey } from "@/lib/idempotency"
 
 const log = logger("correspondence-records")
 
@@ -25,6 +28,27 @@ type CorrespondenceLeadCandidate = {
   is_department_lead?: boolean | null
 }
 
+const CreateCorrespondenceRecordSchema = z.object({
+  subject: z.string().trim().min(1, "subject is required"),
+  department_name: z.string().trim().optional(),
+  letter_type: z.string().optional().nullable(),
+  category: z.string().optional().nullable(),
+  recipient_name: z.string().optional().nullable(),
+  sender_name: z.string().optional().nullable(),
+  action_required: z.boolean().optional().default(false),
+  due_date: z.string().optional().nullable(),
+  responsible_officer_id: z.string().optional().nullable(),
+  source_mode: z.string().optional().nullable(),
+  metadata: z.unknown().optional().nullable(),
+})
+
+const CorrespondenceListSchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+  search: z.string().optional().default(""),
+  status: z.string().optional().default(""),
+})
+
 export async function GET(request: NextRequest) {
   try {
     const { supabase, user, profile } = await getAuthContext()
@@ -34,13 +58,29 @@ export async function GET(request: NextRequest) {
     }
 
     const searchParams = request.nextUrl.searchParams
+    const paginationParsed = CorrespondenceListSchema.safeParse(Object.fromEntries(searchParams))
+    if (!paginationParsed.success) {
+      return NextResponse.json(
+        { error: paginationParsed.error.issues[0]?.message ?? "Invalid pagination params" },
+        { status: 400 }
+      )
+    }
+    const pagination = PaginationSchema.parse({
+      page: paginationParsed.data.page,
+      per_page: paginationParsed.data.limit,
+    })
+    const { from, to } = getPaginationRange(pagination)
     const direction = searchParams.get("direction")
-    const status = searchParams.get("status")
+    const status = paginationParsed.data.status || searchParams.get("status")
     const department = searchParams.get("department")
     const dateFrom = searchParams.get("date_from")
     const dateTo = searchParams.get("date_to")
+    const search = paginationParsed.data.search.trim()
 
-    let query = supabase.from("correspondence_records").select("*").order("created_at", { ascending: false })
+    let query = supabase
+      .from("correspondence_records")
+      .select("*", { count: "exact" })
+      .order("created_at", { ascending: false })
 
     if (direction === "incoming" || direction === "outgoing") {
       query = query.eq("direction", direction)
@@ -58,15 +98,26 @@ export async function GET(request: NextRequest) {
       query = query.lte("created_at", dateTo)
     }
 
-    const { data, error } = await query
+    if (department) {
+      query = query.or(`department_name.eq.${department},assigned_department_name.eq.${department}`)
+    }
+
+    if (search) {
+      query = query.or(
+        `reference_number.ilike.%${search}%,subject.ilike.%${search}%,recipient_name.ilike.%${search}%,sender_name.ilike.%${search}%`
+      )
+    }
+
+    const { data, error, count } = await query.range(from, to)
     if (error) throw error
 
-    const filtered = ((data || []) as CorrespondenceListRecord[]).filter((record) => {
-      if (!department) return true
-      return record.department_name === department || record.assigned_department_name === department
+    return NextResponse.json({
+      data: (data || []) as CorrespondenceListRecord[],
+      total: count || 0,
+      page: paginationParsed.data.page,
+      limit: paginationParsed.data.limit,
+      pagination: paginatedResponse((data || []) as CorrespondenceListRecord[], count || 0, pagination).pagination,
     })
-
-    return NextResponse.json({ data: filtered })
   } catch (error) {
     log.error({ err: String(error) }, "Error in GET /api/correspondence/records:")
     return NextResponse.json({ error: "Failed to fetch correspondence records" }, { status: 500 })
@@ -82,16 +133,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const body = await request.json()
-    const direction = "outgoing"
-    const subject = String(body?.subject || "").trim()
-    const profileDepartment = profile?.department ? String(profile.department).trim() : null
-    const departmentName = body?.department_name ? String(body.department_name).trim() : profileDepartment
-    const assignedDepartmentName = departmentName
-
-    if (!subject) {
-      return NextResponse.json({ error: "subject is required" }, { status: 400 })
+    const idempotencyKey = getIdempotencyKey(request)
+    if (idempotencyKey) {
+      const { isDuplicate, cachedResponse } = await checkIdempotency(dataClient, idempotencyKey)
+      if (isDuplicate) {
+        return NextResponse.json(cachedResponse, { status: 200 })
+      }
     }
+
+    const body = await request.json()
+    const parsed = CreateCorrespondenceRecordSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid request body" }, { status: 400 })
+    }
+
+    const direction = "outgoing"
+    const subject = parsed.data.subject
+    const profileDepartment = profile?.department ? String(profile.department).trim() : null
+    const departmentName = parsed.data.department_name ? String(parsed.data.department_name).trim() : profileDepartment
+    const assignedDepartmentName = departmentName
 
     if (direction === "outgoing" && !departmentName) {
       return NextResponse.json({ error: "department_name is required for outgoing correspondence" }, { status: 400 })
@@ -115,7 +175,6 @@ export async function POST(request: NextRequest) {
 
     const initialStatus = "draft"
     const senderName =
-      (body?.sender_name ? String(body.sender_name).trim() : "") ||
       profile?.full_name ||
       [profile?.first_name, profile?.last_name].filter(Boolean).join(" ").trim() ||
       user.email ||
@@ -126,16 +185,16 @@ export async function POST(request: NextRequest) {
       subject,
       department_name: resolvedDepartmentName,
       department_code: departmentCode,
-      letter_type: body?.letter_type || null,
-      category: body?.category || null,
-      recipient_name: body?.recipient_name ? String(body.recipient_name).trim() : null,
+      letter_type: parsed.data.letter_type || null,
+      category: parsed.data.category || null,
+      recipient_name: parsed.data.recipient_name ? String(parsed.data.recipient_name).trim() : null,
       sender_name: senderName,
-      action_required: Boolean(body?.action_required),
-      due_date: body?.due_date || null,
-      responsible_officer_id: body?.responsible_officer_id || null,
+      action_required: parsed.data.action_required,
+      due_date: parsed.data.due_date || null,
+      responsible_officer_id: parsed.data.responsible_officer_id || null,
       assigned_department_name: assignedDepartmentName,
-      source_mode: body?.source_mode || null,
-      metadata: body?.metadata || null,
+      source_mode: parsed.data.source_mode || null,
+      metadata: parsed.data.metadata || null,
       status: initialStatus,
       originator_id: user.id,
       submitted_at: new Date().toISOString(),
@@ -208,7 +267,12 @@ export async function POST(request: NextRequest) {
       log.error({ err: String(notifyError) }, "Correspondence notification error:")
     }
 
-    return NextResponse.json({ data: created }, { status: 201 })
+    const responsePayload = { data: created }
+    if (idempotencyKey) {
+      await storeIdempotencyKey(dataClient, idempotencyKey, responsePayload)
+    }
+
+    return NextResponse.json(responsePayload, { status: 201 })
   } catch (error) {
     log.error({ err: String(error) }, "Error in POST /api/correspondence/records:")
     const details = error as { message?: string; details?: string; hint?: string; code?: string }

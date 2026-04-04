@@ -9,6 +9,16 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
@@ -131,6 +141,7 @@ export function NotificationBell({ isAdmin = false }: NotificationBellProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("all")
   const [searchQuery, setSearchQuery] = useState("")
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
 
   // Real-time subscription ref
   const subscriptionRef = useRef<RealtimeChannel | null>(null)
@@ -317,253 +328,279 @@ export function NotificationBell({ isAdmin = false }: NotificationBellProps) {
   }
 
   return (
-    <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="Notifications"
-          className="hover:bg-muted relative h-10 w-10 rounded-full transition-colors"
-        >
-          <Bell className="h-5 w-5" />
-          {unreadCount > 0 && (
-            <Badge
-              variant="destructive"
-              className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center p-0 text-[10px] font-bold"
-            >
-              {unreadCount > 99 ? "99+" : unreadCount}
-            </Badge>
-          )}
-        </Button>
-      </DropdownMenuTrigger>
-
-      <DropdownMenuContent
-        align="end"
-        className="w-[calc(100vw-2rem)] border-2 p-0 shadow-xl sm:w-[460px]"
-        onCloseAutoFocus={(e) => e.preventDefault()}
-      >
-        {/* Header */}
-        <div className="bg-muted/30 flex items-center justify-between border-b p-3">
-          <div className="flex items-center gap-2">
-            <Bell className="text-foreground h-5 w-5" />
-            <h3 className="text-base font-semibold">Notifications</h3>
+    <>
+      <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Notifications"
+            className="hover:bg-muted relative h-10 w-10 rounded-full transition-colors"
+          >
+            <Bell className="h-5 w-5" />
             {unreadCount > 0 && (
-              <Badge variant="secondary" className="px-2 text-xs font-semibold">
-                {unreadCount} new
+              <Badge
+                variant="destructive"
+                className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center p-0 text-[10px] font-bold"
+              >
+                {unreadCount > 99 ? "99+" : unreadCount}
               </Badge>
             )}
-          </div>
+          </Button>
+        </DropdownMenuTrigger>
 
-          <div className="flex items-center gap-2">
-            {unreadCount > 0 && (
-              <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={markAllAsRead}>
-                <CheckCheck className="mr-1 h-4 w-4" />
-                Mark all read
-              </Button>
-            )}
-
-            <Link href={isAdmin ? "/admin/notifications" : "/notifications"}>
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label="Notification settings"
-                className="h-8 w-8"
-                onClick={() => setIsOpen(false)}
-              >
-                <Settings className="h-4 w-4" />
-              </Button>
-            </Link>
-          </div>
-        </div>
-
-        {/* Search */}
-        <div className="border-b p-2.5">
-          <div className="relative">
-            <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-            <Input
-              placeholder="Search notifications..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-8 pl-9"
-            />
-          </div>
-        </div>
-
-        {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="h-auto w-full justify-start rounded-none border-b bg-transparent p-0">
-            <TabsTrigger
-              value="all"
-              className="data-[state=active]:border-primary rounded-none border-b-2 border-transparent px-3 py-2 data-[state=active]:bg-transparent data-[state=active]:shadow-none"
-            >
-              All{" "}
-              {categoryCounts.all > 0 && (
-                <Badge variant="secondary" className="ml-2 px-1.5 text-xs">
-                  {categoryCounts.all}
+        <DropdownMenuContent
+          align="end"
+          className="w-[calc(100vw-2rem)] border-2 p-0 shadow-xl sm:w-[460px]"
+          onCloseAutoFocus={(e) => e.preventDefault()}
+        >
+          {/* Header */}
+          <div className="bg-muted/30 flex items-center justify-between border-b p-3">
+            <div className="flex items-center gap-2">
+              <Bell className="text-foreground h-5 w-5" />
+              <h3 className="text-base font-semibold">Notifications</h3>
+              {unreadCount > 0 && (
+                <Badge variant="secondary" className="px-2 text-xs font-semibold">
+                  {unreadCount} new
                 </Badge>
               )}
-            </TabsTrigger>
+            </div>
 
-            <TabsTrigger
-              value="unread"
-              className="data-[state=active]:border-primary rounded-none border-b-2 border-transparent px-3 py-2 data-[state=active]:bg-transparent data-[state=active]:shadow-none"
-            >
-              Unread{" "}
-              {categoryCounts.unread > 0 && (
-                <Badge variant="destructive" className="ml-2 px-1.5 text-xs">
-                  {categoryCounts.unread}
-                </Badge>
+            <div className="flex items-center gap-2">
+              {unreadCount > 0 && (
+                <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={markAllAsRead}>
+                  <CheckCheck className="mr-1 h-4 w-4" />
+                  Mark all read
+                </Button>
               )}
-            </TabsTrigger>
 
-            {categoryCounts.mentions > 0 && (
+              <Link href={isAdmin ? "/admin/notifications" : "/notifications"}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Notification settings"
+                  className="h-8 w-8"
+                  onClick={() => setIsOpen(false)}
+                >
+                  <Settings className="h-4 w-4" />
+                </Button>
+              </Link>
+            </div>
+          </div>
+
+          {/* Search */}
+          <div className="border-b p-2.5">
+            <div className="relative">
+              <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+              <Input
+                placeholder="Search notifications..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="h-8 pl-9"
+              />
+            </div>
+          </div>
+
+          {/* Tabs */}
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="h-auto w-full justify-start rounded-none border-b bg-transparent p-0">
               <TabsTrigger
-                value="mentions"
+                value="all"
                 className="data-[state=active]:border-primary rounded-none border-b-2 border-transparent px-3 py-2 data-[state=active]:bg-transparent data-[state=active]:shadow-none"
               >
-                <MessageSquare className="mr-1 h-4 w-4" />
-                Mentions{" "}
-                {categoryCounts.mentions > 0 && (
+                All{" "}
+                {categoryCounts.all > 0 && (
                   <Badge variant="secondary" className="ml-2 px-1.5 text-xs">
-                    {categoryCounts.mentions}
+                    {categoryCounts.all}
                   </Badge>
                 )}
               </TabsTrigger>
-            )}
-          </TabsList>
 
-          <TabsContent value={activeTab} className="mt-0">
-            <ScrollArea className="h-[430px]">
-              {filteredNotifications.length > 0 ? (
-                <div className="divide-y">
-                  {filteredNotifications.map((notification) => {
-                    const Icon = typeIcons[notification.type as keyof typeof typeIcons] || Info
+              <TabsTrigger
+                value="unread"
+                className="data-[state=active]:border-primary rounded-none border-b-2 border-transparent px-3 py-2 data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+              >
+                Unread{" "}
+                {categoryCounts.unread > 0 && (
+                  <Badge variant="destructive" className="ml-2 px-1.5 text-xs">
+                    {categoryCounts.unread}
+                  </Badge>
+                )}
+              </TabsTrigger>
 
-                    return (
-                      <div
-                        key={notification.id}
-                        className={cn(
-                          "group hover:bg-muted/30 relative cursor-pointer px-3 py-2.5 transition-all",
-                          !notification.read && "bg-blue-50/30 dark:bg-blue-950/10"
-                        )}
-                        onClick={() => handleNotificationClick(notification)}
-                      >
-                        <div className="flex gap-2.5">
-                          {/* Actor Avatar or Icon */}
-                          {notification.actor_avatar || notification.actor_name ? (
-                            <Avatar className="h-8 w-8 shrink-0">
-                              {notification.actor_avatar && (
-                                <AvatarImage src={notification.actor_avatar} alt={notification.actor_name} />
-                              )}
-                              <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
-                                {getInitials(notification.actor_name)}
-                              </AvatarFallback>
-                            </Avatar>
-                          ) : (
-                            <div
-                              className={cn(
-                                "flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
-                                "bg-muted",
-                                priorityColors[notification.priority as keyof typeof priorityColors]
-                              )}
-                            >
-                              <Icon className="h-4 w-4" />
-                            </div>
+              {categoryCounts.mentions > 0 && (
+                <TabsTrigger
+                  value="mentions"
+                  className="data-[state=active]:border-primary rounded-none border-b-2 border-transparent px-3 py-2 data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+                >
+                  <MessageSquare className="mr-1 h-4 w-4" />
+                  Mentions{" "}
+                  {categoryCounts.mentions > 0 && (
+                    <Badge variant="secondary" className="ml-2 px-1.5 text-xs">
+                      {categoryCounts.mentions}
+                    </Badge>
+                  )}
+                </TabsTrigger>
+              )}
+            </TabsList>
+
+            <TabsContent value={activeTab} className="mt-0">
+              <ScrollArea className="h-[430px]">
+                {filteredNotifications.length > 0 ? (
+                  <div className="divide-y">
+                    {filteredNotifications.map((notification) => {
+                      const Icon = typeIcons[notification.type as keyof typeof typeIcons] || Info
+
+                      return (
+                        <div
+                          key={notification.id}
+                          className={cn(
+                            "group hover:bg-muted/30 relative cursor-pointer px-3 py-2.5 transition-all",
+                            !notification.read && "bg-blue-50/30 dark:bg-blue-950/10"
                           )}
-
-                          {/* Content */}
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="flex-1">
-                                <p className={cn("text-sm leading-tight", !notification.read && "font-semibold")}>
-                                  {notification.title}
-                                </p>
-                                <p className="text-muted-foreground mt-0.5 line-clamp-2 text-xs leading-snug">
-                                  {notification.message}
-                                </p>
-
-                                {/* Link indicator */}
-                                {notification.action_url && (
-                                  <div className="text-primary mt-0.5 flex items-center gap-1 text-xs font-medium">
-                                    View details
-                                    <ChevronRight className="h-3 w-3" />
-                                  </div>
+                          onClick={() => handleNotificationClick(notification)}
+                        >
+                          <div className="flex gap-2.5">
+                            {/* Actor Avatar or Icon */}
+                            {notification.actor_avatar || notification.actor_name ? (
+                              <Avatar className="h-8 w-8 shrink-0">
+                                {notification.actor_avatar && (
+                                  <AvatarImage src={notification.actor_avatar} alt={notification.actor_name} />
                                 )}
+                                <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
+                                  {getInitials(notification.actor_name)}
+                                </AvatarFallback>
+                              </Avatar>
+                            ) : (
+                              <div
+                                className={cn(
+                                  "flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
+                                  "bg-muted",
+                                  priorityColors[notification.priority as keyof typeof priorityColors]
+                                )}
+                              >
+                                <Icon className="h-4 w-4" />
+                              </div>
+                            )}
+
+                            {/* Content */}
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex-1">
+                                  <p className={cn("text-sm leading-tight", !notification.read && "font-semibold")}>
+                                    {notification.title}
+                                  </p>
+                                  <p className="text-muted-foreground mt-0.5 line-clamp-2 text-xs leading-snug">
+                                    {notification.message}
+                                  </p>
+
+                                  {/* Link indicator */}
+                                  {notification.action_url && (
+                                    <div className="text-primary mt-0.5 flex items-center gap-1 text-xs font-medium">
+                                      View details
+                                      <ChevronRight className="h-3 w-3" />
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                  <span className="text-muted-foreground text-xs whitespace-nowrap">
+                                    {formatRelativeTime(notification.created_at)}
+                                  </span>
+                                </div>
                               </div>
 
-                              <div className="flex items-center gap-2">
-                                <span className="text-muted-foreground text-xs whitespace-nowrap">
-                                  {formatRelativeTime(notification.created_at)}
-                                </span>
-                              </div>
-                            </div>
+                              {/* Action buttons (hidden, show on hover) */}
+                              <div className="mt-1.5 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                                {!notification.read && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-6 px-2 text-[11px]"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      markAsRead(notification.id)
+                                    }}
+                                  >
+                                    <CheckCheck className="mr-1 h-3 w-3" />
+                                    Mark read
+                                  </Button>
+                                )}
 
-                            {/* Action buttons (hidden, show on hover) */}
-                            <div className="mt-1.5 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                              {!notification.read && (
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  className="h-6 px-2 text-[11px]"
+                                  className="text-destructive hover:text-destructive hover:bg-destructive/10 h-6 px-2 text-[11px]"
                                   onClick={(e) => {
                                     e.stopPropagation()
-                                    markAsRead(notification.id)
+                                    setPendingDeleteId(notification.id)
                                   }}
                                 >
-                                  <CheckCheck className="mr-1 h-3 w-3" />
-                                  Mark read
+                                  <Trash2 className="h-3 w-3" />
                                 </Button>
-                              )}
-
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="text-destructive hover:text-destructive hover:bg-destructive/10 h-6 px-2 text-[11px]"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  deleteNotification(notification.id)
-                                }}
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
+                              </div>
                             </div>
                           </div>
                         </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center px-4 py-16">
-                  <div className="bg-muted mb-4 rounded-full p-4">
-                    <Bell className="text-muted-foreground h-12 w-12 opacity-50" />
+                      )
+                    })}
                   </div>
-                  <p className="text-foreground mb-1 text-sm font-semibold">
-                    {searchQuery ? "No matching notifications" : "No notifications"}
-                  </p>
-                  <p className="text-muted-foreground max-w-sm text-center text-xs">
-                    {searchQuery
-                      ? "Try adjusting your search terms"
-                      : "You're all caught up! We'll notify you when something important happens."}
-                  </p>
-                </div>
-              )}
-            </ScrollArea>
-          </TabsContent>
-        </Tabs>
+                ) : (
+                  <div className="flex flex-col items-center justify-center px-4 py-16">
+                    <div className="bg-muted mb-4 rounded-full p-4">
+                      <Bell className="text-muted-foreground h-12 w-12 opacity-50" />
+                    </div>
+                    <p className="text-foreground mb-1 text-sm font-semibold">
+                      {searchQuery ? "No matching notifications" : "No notifications"}
+                    </p>
+                    <p className="text-muted-foreground max-w-sm text-center text-xs">
+                      {searchQuery
+                        ? "Try adjusting your search terms"
+                        : "You're all caught up! We'll notify you when something important happens."}
+                    </p>
+                  </div>
+                )}
+              </ScrollArea>
+            </TabsContent>
+          </Tabs>
 
-        {/* Footer */}
-        <DropdownMenuSeparator className="my-0" />
-        <div className="bg-muted/20 p-3">
-          <Link
-            href={isAdmin ? "/admin/notifications" : "/notifications"}
-            onClick={() => setIsOpen(false)}
-            className="text-primary block w-full py-1 text-center text-xs font-medium hover:underline"
-          >
-            View all notifications →
-          </Link>
-        </div>
-      </DropdownMenuContent>
-    </DropdownMenu>
+          {/* Footer */}
+          <DropdownMenuSeparator className="my-0" />
+          <div className="bg-muted/20 p-3">
+            <Link
+              href={isAdmin ? "/admin/notifications" : "/notifications"}
+              onClick={() => setIsOpen(false)}
+              className="text-primary block w-full py-1 text-center text-xs font-medium hover:underline"
+            >
+              View all notifications →
+            </Link>
+          </div>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <AlertDialog open={pendingDeleteId !== null} onOpenChange={(open) => !open && setPendingDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete notification</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this notification? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (pendingDeleteId) {
+                  void deleteNotification(pendingDeleteId)
+                }
+                setPendingDeleteId(null)
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   )
 }

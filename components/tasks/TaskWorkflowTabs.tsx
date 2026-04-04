@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Ticket, HeadphonesIcon, FolderKanban } from "lucide-react"
-import type { Task } from "@/app/admin/tasks/management/admin-tasks-content"
+import type { Task } from "@/types/task"
 
 function getStatusColor(status: string) {
   switch (status) {

@@ -1,10 +1,8 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0"
-import { Resend } from "npm:resend@2.0.0"
 import { canEdgeUserReceiveEmail, sendEdgeNotificationEmail } from "../_shared/notification-gateway.ts"
 import { normalizeAssetMailEventType, resolveAssetMailRecipientContext } from "../_shared/asset-mail-resolver.ts"
 
-const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
 const DB_TRIGGER_SECRET = Deno.env.get("DB_TRIGGER_SECRET")
@@ -14,6 +12,7 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 }
+const ICT_SUPPORT_EMAIL = Deno.env.get("ICT_SUPPORT_EMAIL") || "ict@acoblighting.com"
 
 type AssetNotificationPayload = {
   asset_code?: string
@@ -43,7 +42,6 @@ serve(async (req) => {
 
   try {
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!)
-    const resend = new Resend(RESEND_API_KEY!)
     const webhookSecret = Deno.env.get("WEBHOOK_SECRET")
     const signature = req.headers.get("x-webhook-secret")
     const authHeader = req.headers.get("Authorization")
@@ -179,8 +177,7 @@ serve(async (req) => {
     let introText = "You have a new asset notification."
     let headerText = "Details"
     let headerColorClass = "status-header-neutral"
-    const supportText =
-      'If you experience any issue, please contact <br><a href="mailto:ict@acoblighting.com">ict@acoblighting.com</a>'
+    const supportText = `If you experience any issue, please contact <br><a href="mailto:${ICT_SUPPORT_EMAIL}">${ICT_SUPPORT_EMAIL}</a>`
 
     if (mailAudience === "oversight") {
       switch (emailType) {
@@ -414,7 +411,6 @@ serve(async (req) => {
 </html>`
 
     await sendEdgeNotificationEmail({
-      resend,
       to: recipientEmails,
       subject,
       html: emailHtml,

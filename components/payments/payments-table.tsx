@@ -7,11 +7,31 @@ const log = logger("payments-table")
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { useRouter } from "next/navigation"
-import { Plus, Search, Download, CreditCard, Eye, FileSpreadsheet, FileIcon, Printer, ArrowUpDown } from "lucide-react"
+import {
+  Plus,
+  Search,
+  Download,
+  CreditCard,
+  Eye,
+  FileSpreadsheet,
+  FileIcon,
+  Printer,
+  ArrowUpDown,
+  Upload,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
+import { Label } from "@/components/ui/label"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,7 +43,6 @@ import {
 import { toast } from "sonner"
 import { format, parseISO, isValid, differenceInDays, isBefore, startOfDay } from "date-fns"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { createClient } from "@/lib/supabase/client"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { CreatePaymentDialog } from "./create-payment-dialog"
 import { ExportColumnsDialog } from "./export-columns-dialog"
@@ -80,6 +99,8 @@ interface PaymentsTableData {
   departments: Department[]
   categories: Category[]
 }
+
+type PaymentTableDocument = NonNullable<Payment["documents"]>[number]
 
 async function fetchPaymentsTableData(): Promise<PaymentsTableData> {
   const [paymentsRes, deptRes, catRes] = await Promise.all([
@@ -161,6 +182,10 @@ export function PaymentsTable({
   // Receipt Selection Dialog
   const [receiptDialogOpen, setReceiptDialogOpen] = useState(false)
   const [selectedPaymentForReceipt, setSelectedPaymentForReceipt] = useState<Payment | null>(null)
+  const [receiptUploadDialogOpen, setReceiptUploadDialogOpen] = useState(false)
+  const [selectedPaymentForReceiptUpload, setSelectedPaymentForReceiptUpload] = useState<Payment | null>(null)
+  const [receiptUploadFile, setReceiptUploadFile] = useState<File | null>(null)
+  const [receiptUploading, setReceiptUploading] = useState(false)
 
   // Export dialog state
   const [exportDialogOpen, setExportDialogOpen] = useState(false)
@@ -262,7 +287,7 @@ export function PaymentsTable({
           formDataUpload.append("document_type", "receipt")
           formDataUpload.append("applicable_date", formData.payment_date)
 
-          const uploadResponse = await fetch("/api/payments/documents", {
+          const uploadResponse = await fetch(`/api/payments/${paymentId}/documents`, {
             method: "POST",
             body: formDataUpload,
           })
@@ -451,24 +476,33 @@ export function PaymentsTable({
 
   const downloadFile = async (url: string, filename: string) => {
     try {
-      const response = await fetch(url)
-      if (!response.ok) throw new Error("Failed to fetch file")
-
-      const blob = await response.blob()
-      const blobUrl = window.URL.createObjectURL(blob)
       const link = document.createElement("a")
-      link.href = blobUrl
+      link.href = url
       link.download = filename
       link.style.display = "none"
+      link.rel = "noopener noreferrer"
       document.body.appendChild(link)
       link.click()
 
       setTimeout(() => {
         document.body.removeChild(link)
-        window.URL.revokeObjectURL(blobUrl)
       }, 100)
     } catch (error: unknown) {
       log.error("Error downloading file:", error)
+      throw error
+    }
+  }
+
+  const downloadPaymentDocument = async (paymentId: string, doc: PaymentTableDocument) => {
+    const filename = doc.file_name || `${doc.document_type}_${paymentId.substring(0, 8)}`
+    const toastId = toast.loading("Preparing download...")
+    try {
+      await downloadFile(`/api/payments/${paymentId}/documents/${doc.id}/download`, filename)
+      window.setTimeout(() => {
+        toast.dismiss(toastId)
+      }, 6000)
+    } catch (error) {
+      toast.dismiss(toastId)
       throw error
     }
   }
@@ -482,16 +516,7 @@ export function PaymentsTable({
         return
       } else if (receipts.length === 1) {
         try {
-          const supabase = createClient()
-          const { data } = await supabase.storage.from("payment_documents").createSignedUrl(receipts[0].file_path, 3600)
-          if (data?.signedUrl) {
-            const filename =
-              receipts[0].file_name || `receipt_${payment.payment_reference || payment.id.substring(0, 8)}.pdf`
-            await downloadFile(data.signedUrl, filename)
-            toast.success("Receipt downloaded successfully")
-          } else {
-            toast.error("Could not get document URL")
-          }
+          await downloadPaymentDocument(payment.id, receipts[0])
         } catch {
           toast.error("Error downloading document")
         }
@@ -502,36 +527,69 @@ export function PaymentsTable({
     const doc = payment.documents?.find((d) => d.document_type === type)
     if (doc) {
       try {
-        const supabase = createClient()
-        const { data } = await supabase.storage.from("payment_documents").createSignedUrl(doc.file_path, 3600)
-        if (data?.signedUrl) {
-          const filename = doc.file_name || `${type}_${payment.payment_reference || payment.id.substring(0, 8)}.pdf`
-          await downloadFile(data.signedUrl, filename)
-          toast.success(`${type.charAt(0).toUpperCase() + type.slice(1)} downloaded successfully`)
-        } else {
-          toast.error("Could not get document URL")
-        }
+        await downloadPaymentDocument(payment.id, doc)
       } catch {
         toast.error("Error downloading document")
       }
     }
   }
 
-  const handleViewReceipt = async (receiptPath: string) => {
+  const handleViewReceipt = async (receipt: PaymentTableDocument) => {
+    if (!selectedPaymentForReceipt) return
+
     try {
-      const supabase = createClient()
-      const { data } = await supabase.storage.from("payment_documents").createSignedUrl(receiptPath, 3600)
-      if (data?.signedUrl) {
-        setReceiptDialogOpen(false)
-        const filename = receiptPath.split("/").pop() || "receipt.pdf"
-        await new Promise((resolve) => setTimeout(resolve, 100))
-        await downloadFile(data.signedUrl, filename)
-        toast.success("Receipt downloaded successfully")
-      } else {
-        toast.error("Could not get document URL")
-      }
+      setReceiptDialogOpen(false)
+      await new Promise((resolve) => setTimeout(resolve, 100))
+      await downloadPaymentDocument(selectedPaymentForReceipt.id, receipt)
     } catch {
       toast.error("Error downloading document")
+    }
+  }
+
+  const hasReceipt = (payment: Payment) => payment.documents?.some((d) => d.document_type === "receipt") ?? false
+
+  const handleOpenReceiptUpload = (payment: Payment) => {
+    setSelectedPaymentForReceiptUpload(payment)
+    setReceiptUploadFile(null)
+    setReceiptUploadDialogOpen(true)
+  }
+
+  const handleUploadMissingReceipt = async () => {
+    if (!selectedPaymentForReceiptUpload || !receiptUploadFile) {
+      toast.error("Choose a receipt file to continue")
+      return
+    }
+
+    setReceiptUploading(true)
+    try {
+      const uploadData = new FormData()
+      uploadData.append("file", receiptUploadFile)
+      uploadData.append("payment_id", selectedPaymentForReceiptUpload.id)
+      uploadData.append("document_type", "receipt")
+      if (selectedPaymentForReceiptUpload.payment_date) {
+        uploadData.append("applicable_date", selectedPaymentForReceiptUpload.payment_date)
+      }
+
+      const response = await fetch(`/api/payments/${selectedPaymentForReceiptUpload.id}/documents`, {
+        method: "POST",
+        body: uploadData,
+      })
+
+      if (!response.ok) {
+        const data = (await response.json().catch(() => ({}))) as { error?: string }
+        throw new Error(data.error || "Failed to upload receipt")
+      }
+
+      toast.success("Receipt uploaded successfully")
+      setReceiptUploadDialogOpen(false)
+      setSelectedPaymentForReceiptUpload(null)
+      setReceiptUploadFile(null)
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.paymentsTable() })
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Failed to upload receipt"
+      toast.error(message)
+    } finally {
+      setReceiptUploading(false)
     }
   }
 
@@ -722,7 +780,19 @@ export function PaymentsTable({
                       {payment.payment_type === "recurring" ? "Recurring" : "One-time"}
                     </Badge>
                   </TableCell>
-                  <TableCell className="font-medium">{payment.title}</TableCell>
+                  <TableCell className="font-medium">
+                    <div className="flex flex-col gap-1">
+                      <span>{payment.title}</span>
+                      {payment.payment_type === "one-time" && !hasReceipt(payment) ? (
+                        <Badge
+                          variant="outline"
+                          className="w-fit border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-300"
+                        >
+                          Receipt missing
+                        </Badge>
+                      ) : null}
+                    </div>
+                  </TableCell>
                   <TableCell>
                     <div className="flex flex-col">
                       <span className="text-sm font-medium">{payment.issuer_name || "N/A"}</span>
@@ -788,6 +858,14 @@ export function PaymentsTable({
                           >
                             Print Receipt
                           </DropdownMenuItem>
+                          {payment.payment_type === "one-time" && !hasReceipt(payment) ? (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => handleOpenReceiptUpload(payment)}>
+                                Upload Receipt
+                              </DropdownMenuItem>
+                            </>
+                          ) : null}
                         </DropdownMenuContent>
                       </DropdownMenu>
                       <Button
@@ -830,6 +908,49 @@ export function PaymentsTable({
         payment={selectedPaymentForReceipt}
         onSelectReceipt={handleViewReceipt}
       />
+
+      <Dialog open={receiptUploadDialogOpen} onOpenChange={setReceiptUploadDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Upload Missing Receipt</DialogTitle>
+            <DialogDescription>
+              Add the missing receipt for {selectedPaymentForReceiptUpload?.title || "this payment"}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label htmlFor="missing-receipt-file">Receipt file</Label>
+              <Input
+                id="missing-receipt-file"
+                type="file"
+                accept="image/*,.pdf"
+                onChange={(e) => setReceiptUploadFile(e.target.files?.[0] || null)}
+                className="cursor-pointer"
+              />
+            </div>
+            {receiptUploadFile ? (
+              <p className="text-muted-foreground text-sm">Selected: {receiptUploadFile.name}</p>
+            ) : null}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setReceiptUploadDialogOpen(false)
+                setSelectedPaymentForReceiptUpload(null)
+                setReceiptUploadFile(null)
+              }}
+              disabled={receiptUploading}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleUploadMissingReceipt} disabled={!receiptUploadFile || receiptUploading}>
+              <Upload className="mr-2 h-4 w-4" />
+              {receiptUploading ? "Uploading..." : "Upload Receipt"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <ExportColumnsDialog
         open={exportDialogOpen}

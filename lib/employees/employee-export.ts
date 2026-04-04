@@ -1,3 +1,8 @@
+/**
+ * @deprecated Client-side exports expose sensitive data to the browser.
+ * Use the server-side endpoint POST /api/admin/employees/export instead.
+ * This file is kept for backwards compatibility during migration.
+ */
 import { formatName } from "@/lib/utils"
 import { getRoleDisplayName } from "@/lib/permissions"
 import { logger } from "@/lib/logger"

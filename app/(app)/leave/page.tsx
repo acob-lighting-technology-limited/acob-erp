@@ -108,12 +108,14 @@ async function getLeaveData() {
         .select(
           `
         *,
-        leave_type:leave_types(name)
+        leave_type:leave_types(name),
+        reliever:profiles!leave_requests_reliever_id_fkey(id, full_name, company_email),
+        supervisor:profiles!leave_requests_supervisor_id_fkey(id, full_name, company_email)
       `
         )
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
-        .limit(20),
+        .limit(100),
       supabase
         .from("leave_balances")
         .select("leave_type_id, allocated_days, used_days, balance_days")

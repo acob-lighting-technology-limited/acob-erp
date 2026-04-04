@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { createClient as createAdminClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
+import { z } from "zod"
 import {
   ASSIGNABLE_ROLES,
   canAssignRole,
@@ -25,12 +26,16 @@ type ProfileInvitePayload = {
   department?: string
 }
 
-function isValidRole(role: string): role is AllowedRole {
-  return ASSIGNABLE_ROLES.includes(role as (typeof ASSIGNABLE_ROLES)[number])
-}
+const InviteUserSchema = z.object({
+  email: z.string().trim().min(1, "Email is required"),
+  first_name: z.string().optional(),
+  last_name: z.string().optional(),
+  role: z.enum(ASSIGNABLE_ROLES).optional(),
+  department: z.string().optional(),
+})
 
-export async function POST(request: Request) {
-  const rl = rateLimit(`invite:${getClientId(request)}`, { limit: 10, windowSec: 600 })
+export async function PATCH(request: Request) {
+  const rl = await rateLimit(`invite:${getClientId(request)}`, { limit: 10, windowSec: 600 })
   if (!rl.allowed) {
     return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 })
   }
@@ -62,22 +67,18 @@ export async function POST(request: Request) {
     }
 
     // 2. Parse body
-    const { email: rawEmail, first_name, last_name, role, department } = await request.json()
+    const body = await request.json()
+    const parsed = InviteUserSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid request body" }, { status: 400 })
+    }
 
-    if (typeof rawEmail !== "string") {
-      return NextResponse.json({ error: "Email is required" }, { status: 400 })
-    }
+    const { email: rawEmail, first_name, last_name, role, department } = parsed.data
     const email = rawEmail.trim()
-    if (!email) {
-      return NextResponse.json({ error: "Email is required" }, { status: 400 })
-    }
     const emailNormalized = email.toLowerCase()
 
     // 3. Validate role against allowlist
     const roleProvided = role !== undefined
-    if (roleProvided && !isValidRole(role)) {
-      return NextResponse.json({ error: `Invalid role: ${role}` }, { status: 400 })
-    }
 
     // 4. Role assignment guardrails
     if (roleProvided && !canAssignRole(profile?.role || "", role)) {
@@ -233,4 +234,9 @@ export async function POST(request: Request) {
     log.error({ err: String(error) }, "Invite error:")
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
+}
+
+// POST kept for backwards compat — prefer PATCH
+export async function POST(request: Request) {
+  return PATCH(request)
 }

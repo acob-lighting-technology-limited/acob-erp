@@ -21,6 +21,7 @@ async function downloadActionPointsExport(
       year,
       meetingDate,
       department,
+      persist: format === "pdf",
     }),
   })
 

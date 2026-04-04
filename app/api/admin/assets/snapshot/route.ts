@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
 import { listAssignableProfiles } from "@/lib/workforce/assignment-policy"
+import { getPaginationRange, paginatedResponse, PaginationSchema } from "@/lib/pagination"
 
 type AdminAssetsSnapshotClient = Awaited<ReturnType<typeof createClient>>
 
@@ -34,7 +35,7 @@ type AssetRow = {
   id: string
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const supabase = await createClient()
   const {
     data: { user },
@@ -51,6 +52,16 @@ export async function GET() {
   }
 
   const departmentScope = getDepartmentScope(scope, "general")
+  const { searchParams } = new URL(request.url)
+  const paginationParsed = PaginationSchema.safeParse(Object.fromEntries(searchParams))
+  if (!paginationParsed.success) {
+    return NextResponse.json(
+      { error: paginationParsed.error.issues[0]?.message ?? "Invalid pagination params" },
+      { status: 400 }
+    )
+  }
+  const pagination = paginationParsed.data
+  const { from, to } = getPaginationRange(pagination)
 
   const dataClient = getServiceRoleClientOrFallback(supabase as AdminAssetsSnapshotClient)
 
@@ -135,5 +146,8 @@ export async function GET() {
     }
   })
 
-  return NextResponse.json({ assets, employees })
+  return NextResponse.json({
+    ...paginatedResponse(assets.slice(from, to + 1), assets.length, pagination),
+    employees,
+  })
 }

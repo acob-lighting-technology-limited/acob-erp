@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import {
   LEAVE_PENDING_STAGES,
@@ -11,6 +12,13 @@ import { logger } from "@/lib/logger"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 
 const log = logger("hr-leave-lifecycle")
+const LeaveLifecycleSchema = z.object({
+  leave_request_id: z.string().trim().min(1, "leave_request_id and action are required"),
+  action: z.string().trim().min(1, "leave_request_id and action are required"),
+  reason: z.string().optional().nullable(),
+  extension_days: z.coerce.number().optional(),
+  early_return_date: z.string().optional().nullable(),
+})
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>
 
@@ -33,7 +41,7 @@ async function restoreBalance(supabase: SupabaseServerClient, userId: string, le
     .eq("id", balance.id)
 }
 
-export async function POST(request: NextRequest) {
+export async function PATCH(request: NextRequest) {
   try {
     const supabase = await createClient()
 
@@ -44,11 +52,11 @@ export async function POST(request: NextRequest) {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const body = await request.json()
-    const { leave_request_id, action, reason, extension_days, early_return_date } = body
-
-    if (!leave_request_id || !action) {
-      return NextResponse.json({ error: "leave_request_id and action are required" }, { status: 400 })
+    const parsed = LeaveLifecycleSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid request body" }, { status: 400 })
     }
+    const { leave_request_id, action, reason, extension_days, early_return_date } = parsed.data
 
     const { data: actorProfile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
     const isHR = ["developer", "admin", "super_admin"].includes(actorProfile?.role)
@@ -245,4 +253,9 @@ export async function POST(request: NextRequest) {
     log.error({ err: String(error) }, "Error in POST /api/hr/leave/lifecycle:")
     return NextResponse.json({ error: error instanceof Error ? error.message : "An error occurred" }, { status: 500 })
   }
+}
+
+// POST kept for backwards compat — prefer PATCH
+export async function POST(request: NextRequest) {
+  return PATCH(request)
 }

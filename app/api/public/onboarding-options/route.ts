@@ -3,7 +3,7 @@ import { NextResponse } from "next/server"
 import { rateLimit, getClientId } from "@/lib/rate-limit"
 
 export async function GET(req: Request) {
-  const rl = rateLimit(`onboarding-options:${getClientId(req)}`, { limit: 60, windowSec: 60 })
+  const rl = await rateLimit(`onboarding-options:${getClientId(req)}`, { limit: 60, windowSec: 60 })
   if (!rl.allowed) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 })
   }

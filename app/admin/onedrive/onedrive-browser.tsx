@@ -147,6 +147,10 @@ export function OneDriveBrowser({
   }
 
   const formatDate = (dateString: string): string => {
+    if (Number.isNaN(Date.parse(dateString))) {
+      return "-"
+    }
+
     return new Date(dateString).toLocaleDateString(undefined, {
       year: "numeric",
       month: "short",

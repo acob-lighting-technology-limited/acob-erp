@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { logger } from "@/lib/logger"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
@@ -19,8 +20,29 @@ import {
   stageCodeForRole,
 } from "@/lib/hr/leave-routing"
 import { writeAuditLog } from "@/lib/audit/write-audit"
+import { getPaginationRange, PaginationSchema } from "@/lib/pagination"
 
 const log = logger("leave-requests")
+const CreateLeaveRequestSchema = z.object({
+  leave_type_id: z.string().trim().min(1, "Missing required fields"),
+  start_date: z.string().trim().min(1, "Missing required fields"),
+  days_count: z.unknown().optional(),
+  end_date: z.string().optional().nullable(),
+  reason: z.string().trim().min(1, "Missing required fields"),
+  reliever_identifier: z.string().trim().min(1, "Missing required fields"),
+  handover_note: z.string().trim().min(1, "Missing required fields"),
+})
+
+const UpdateLeaveRequestSchema = z.object({
+  id: z.string().trim().min(1, "Leave request ID is required"),
+  leave_type_id: z.string().optional(),
+  start_date: z.string().optional(),
+  days_count: z.unknown().optional(),
+  end_date: z.string().optional().nullable(),
+  reason: z.string().optional(),
+  reliever_identifier: z.string().optional(),
+  handover_note: z.string().optional(),
+})
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>
 
@@ -38,6 +60,7 @@ type ProfileReferenceRow = {
   full_name?: string | null
   company_email?: string | null
   department_id?: string | null
+  department?: string | null
 }
 
 type LeaveTypeReferenceRow = {
@@ -211,9 +234,32 @@ export async function GET(request: NextRequest) {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const { searchParams } = new URL(request.url)
+    const paginationParsed = PaginationSchema.safeParse({
+      page: searchParams.get("page") || "1",
+      per_page: searchParams.get("limit") || "20",
+    })
+    if (!paginationParsed.success) {
+      return NextResponse.json({ error: "Invalid pagination params" }, { status: 400 })
+    }
     const status = searchParams.get("status")
     const userId = searchParams.get("user_id")
     const all = searchParams.get("all") === "true"
+    const { data: requesterProfile } = await supabase
+      .from("profiles")
+      .select("role, department, is_department_lead, lead_departments")
+      .eq("id", user.id)
+      .single<{
+        role?: string | null
+        department?: string | null
+        is_department_lead?: boolean | null
+        lead_departments?: string[] | null
+      }>()
+
+    const role = String(requesterProfile?.role || "").toLowerCase()
+    const isAdminLike = ["developer", "admin", "super_admin"].includes(role)
+    const managedDepartments = Array.isArray(requesterProfile?.lead_departments)
+      ? requesterProfile.lead_departments
+      : []
 
     let query = supabase
       .from("leave_requests")
@@ -229,7 +275,8 @@ export async function GET(request: NextRequest) {
         approvals:leave_approvals (
           id, approver_id, status, stage_code, approved_at, comments
         )
-      `
+      `,
+        { count: "exact" }
       )
       .order("created_at", { ascending: false })
 
@@ -237,17 +284,23 @@ export async function GET(request: NextRequest) {
 
     const targetUserId = userId || user.id
 
-    if (!all) {
+    if (all) {
+      if (!isAdminLike && !requesterProfile?.is_department_lead) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+      }
+    } else {
       query = query.eq("user_id", targetUserId)
     }
 
-    const { data: requests, error } = await query
+    const { from, to } = getPaginationRange(paginationParsed.data)
+    const { data: requests, error, count } = await query.range(from, to)
     if (error) {
       return NextResponse.json({ error: `Failed to fetch leave requests: ${error.message}` }, { status: 500 })
     }
 
-    const requestRowsRaw = (requests || []) as LeaveRequestRow[]
-    const requestRows = all ? requestRowsRaw : requestRowsRaw.filter((row) => row.user_id === targetUserId)
+    const requestRows = ((requests || []) as LeaveRequestRow[]).filter((row) =>
+      all ? true : row.user_id === targetUserId
+    )
     const requestIds = requestRows.map((row) => row.id).filter(Boolean)
 
     const { data: balanceRows } = await supabase
@@ -304,7 +357,7 @@ export async function GET(request: NextRequest) {
     if (profileIds.length > 0) {
       const { data } = await supabase
         .from("profiles")
-        .select("id, first_name, last_name, full_name, company_email, department_id")
+        .select("id, first_name, last_name, full_name, company_email, department_id, department")
         .in("id", profileIds)
       profileRows = data || []
     }
@@ -319,6 +372,16 @@ export async function GET(request: NextRequest) {
 
     const profileMap = new Map((profileRows || []).map((row) => [row.id, row] as const))
     const leaveTypeMap = new Map((leaveTypeRows || []).map((row) => [row.id, row] as const))
+    const filteredRequestRows =
+      all && !isAdminLike
+        ? requestRows.filter((row) => {
+            const requesterDepartment = row.user_id ? profileMap.get(row.user_id)?.department || null : null
+            if (!requesterDepartment) return false
+            return (
+              requesterDepartment === requesterProfile?.department || managedDepartments.includes(requesterDepartment)
+            )
+          })
+        : requestRows
     const evidenceByRequest = new Map<string, LeaveEvidenceRow[]>()
     const approvalsByRequest = new Map<string, Array<LeaveApprovalRow & { approver: ProfileReferenceRow | null }>>()
 
@@ -350,7 +413,7 @@ export async function GET(request: NextRequest) {
 
     // Check evidence completeness for all requests in parallel
     const enriched = await Promise.all(
-      requestRows.map(async (leaveRequest) => {
+      filteredRequestRows.map(async (leaveRequest) => {
         const policy = (policyMap.get(leaveRequest.leave_type_id) ?? { required_documents: [] }) as LeavePolicySummary
         const requiredDocs = policy.required_documents || []
         const evidence = await areRequiredDocumentsVerified(supabase, leaveRequest.id, requiredDocs)
@@ -402,7 +465,17 @@ export async function GET(request: NextRequest) {
       relieverCommitments = relieverRows || []
     }
 
-    return NextResponse.json({ data: enriched, balances: balances || [], reliever_commitments: relieverCommitments })
+    return NextResponse.json({
+      data: enriched,
+      balances: balances || [],
+      reliever_commitments: relieverCommitments,
+      pagination: {
+        page: paginationParsed.data.page,
+        limit: paginationParsed.data.per_page,
+        total: count || 0,
+        total_pages: count ? Math.ceil(count / paginationParsed.data.per_page) : 0,
+      },
+    })
   } catch (error) {
     log.error({ err: String(error) }, "Unhandled error in GET")
     return NextResponse.json({ error: "An error occurred" }, { status: 500 })
@@ -420,11 +493,11 @@ export async function POST(request: NextRequest) {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const body = await request.json()
-    const { leave_type_id, start_date, days_count, end_date, reason, reliever_identifier, handover_note } = body
-
-    if (!leave_type_id || !start_date || !reason || !handover_note || !reliever_identifier) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
+    const parsed = CreateLeaveRequestSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid request body" }, { status: 400 })
     }
+    const { leave_type_id, start_date, days_count, end_date, reason, reliever_identifier, handover_note } = parsed.data
 
     const parsedDays = Number(days_count)
     const fallbackDays = end_date
@@ -496,16 +569,28 @@ export async function POST(request: NextRequest) {
     await assertRequesterNotBlockedByRelieverCommitment(validationClient, user.id, start_date, endDate)
     await assertRelieverAvailability(validationClient, reliever.id, start_date, endDate)
 
-    const { data: balance } = await supabase
-      .from("leave_balances")
-      .select("balance_days")
-      .eq("user_id", user.id)
-      .eq("leave_type_id", leave_type_id)
-      .single()
+    const [{ data: balance }, { data: balanceReserved, error: reserveError }] = await Promise.all([
+      supabase
+        .from("leave_balances")
+        .select("balance_days")
+        .eq("user_id", user.id)
+        .eq("leave_type_id", leave_type_id)
+        .single(),
+      supabase.rpc("check_and_reserve_leave_balance", {
+        p_user_id: user.id,
+        p_leave_type_id: leave_type_id,
+        p_days: effectiveDays,
+      }),
+    ])
 
-    if (balance && effectiveDays > balance.balance_days) {
+    if (reserveError) {
+      return NextResponse.json({ error: "Failed to validate leave balance" }, { status: 500 })
+    }
+
+    if (!balanceReserved) {
+      const remainingDays = balance?.balance_days ?? 0
       return NextResponse.json(
-        { error: `Insufficient leave balance. You have ${balance.balance_days} days remaining.` },
+        { error: `Insufficient leave balance. You have ${remainingDays} days remaining.` },
         { status: 400 }
       )
     }
@@ -648,7 +733,8 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function PUT(request: NextRequest) {
+// POST kept for backwards compat — prefer PATCH
+export async function PATCH(request: NextRequest) {
   try {
     const supabase = await createClient()
     const validationClient = getServiceRoleClientOrFallback(supabase)
@@ -659,9 +745,12 @@ export async function PUT(request: NextRequest) {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const body = await request.json()
-    const { id, leave_type_id, start_date, days_count, end_date, reason, reliever_identifier, handover_note } = body
-
-    if (!id) return NextResponse.json({ error: "Leave request ID is required" }, { status: 400 })
+    const parsed = UpdateLeaveRequestSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid request body" }, { status: 400 })
+    }
+    const { id, leave_type_id, start_date, days_count, end_date, reason, reliever_identifier, handover_note } =
+      parsed.data
 
     const { data: existingRequest, error: fetchError } = await supabase
       .from("leave_requests")
@@ -828,16 +917,27 @@ export async function PUT(request: NextRequest) {
     await assertRequesterNotBlockedByRelieverCommitment(validationClient, user.id, targetStartDate, endDate, id)
     await assertRelieverAvailability(validationClient, relieverId, targetStartDate, endDate, id)
 
-    const { data: balance } = await supabase
-      .from("leave_balances")
-      .select("balance_days")
-      .eq("user_id", user.id)
-      .eq("leave_type_id", targetLeaveTypeId)
-      .single()
+    const [{ data: balance }, { data: balanceReserved, error: reserveError }] = await Promise.all([
+      supabase
+        .from("leave_balances")
+        .select("balance_days")
+        .eq("user_id", user.id)
+        .eq("leave_type_id", targetLeaveTypeId)
+        .single(),
+      supabase.rpc("check_and_reserve_leave_balance", {
+        p_user_id: user.id,
+        p_leave_type_id: targetLeaveTypeId,
+        p_days: targetDays,
+      }),
+    ])
 
-    if (balance && targetDays > balance.balance_days) {
+    if (reserveError) {
+      return NextResponse.json({ error: "Failed to validate leave balance" }, { status: 500 })
+    }
+
+    if (!balanceReserved) {
       return NextResponse.json(
-        { error: `Insufficient leave balance. You have ${balance.balance_days} days remaining.` },
+        { error: `Insufficient leave balance. You have ${balance?.balance_days ?? 0} days remaining.` },
         { status: 400 }
       )
     }
@@ -912,7 +1012,7 @@ export async function PUT(request: NextRequest) {
       message: "Leave request updated successfully",
     })
   } catch (error) {
-    log.error({ err: String(error) }, "Unhandled error in PUT")
+    log.error({ err: String(error) }, "Unhandled error in PATCH")
     const message = error instanceof Error ? error.message : "An error occurred"
     const status =
       message.startsWith("LEAVE_APPROVER_NOT_CONFIGURED:") ||
@@ -977,3 +1077,5 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: "An error occurred" }, { status: 500 })
   }
 }
+
+export { PATCH as PUT }

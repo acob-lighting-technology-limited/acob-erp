@@ -30,8 +30,14 @@ interface DeptActionRowsProps {
   filteredTasks: ActionTask[]
   expandedDepts: Set<string>
   onToggleDept: (dept: string) => void
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  profile: any
+  profile: {
+    id?: string
+    role?: string | null
+    department?: string | null
+    is_department_lead?: boolean | null
+    lead_departments?: string[] | null
+    admin_domains?: string[] | null
+  } | null
   week: number
   year: number
   meetingDate?: string

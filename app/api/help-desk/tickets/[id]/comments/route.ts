@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { z } from "zod"
 import {
   appendAuditLog,
   appendHelpDeskEvent,
@@ -9,6 +10,10 @@ import {
 import { logger } from "@/lib/logger"
 
 const log = logger("help-desk-tickets-comments")
+const CreateHelpDeskCommentSchema = z.object({
+  comment: z.string().trim().min(1, "comment is required"),
+  visibility: z.string().optional(),
+})
 
 export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -62,11 +67,14 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { comment, visibility } = await request.json()
-
-    if (!comment || !String(comment).trim()) {
-      return NextResponse.json({ error: "comment is required" }, { status: 400 })
+    const body = await request.json()
+    const parsed = CreateHelpDeskCommentSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid request body" }, { status: 400 })
     }
+
+    const comment = parsed.data.comment
+    const visibility = parsed.data.visibility
 
     const { data: ticket, error: ticketError } = await supabase
       .from("help_desk_tickets")
@@ -96,7 +104,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       .insert({
         ticket_id: ticket.id,
         author_id: user.id,
-        comment: String(comment).trim(),
+        comment: comment,
         visibility: commentVisibility,
       })
       .select("*")

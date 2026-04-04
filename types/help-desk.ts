@@ -2,6 +2,11 @@ export type HelpDeskPriority = "low" | "medium" | "high" | "urgent"
 
 export type HelpDeskStatus =
   | "new"
+  | "department_queue"
+  | "department_assigned"
+  | "returned"
+  | "paused"
+  | "pending_lead_review"
   | "assigned"
   | "in_progress"
   | "pending_approval"
@@ -25,6 +30,9 @@ export interface HelpDeskTicket {
   created_by: string
   assigned_to: string | null
   assigned_by: string | null
+  requester_department?: string | null
+  handling_mode?: string | null
+  support_mode?: string | null
   approval_required: boolean
   sla_target_at: string | null
   submitted_at: string

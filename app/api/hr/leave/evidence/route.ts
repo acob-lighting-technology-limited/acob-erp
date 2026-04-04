@@ -1,12 +1,19 @@
 import { NextRequest, NextResponse } from "next/server"
+import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { areRequiredDocumentsVerified, getLeavePolicy, notifyUsers } from "@/lib/hr/leave-workflow"
 import { logger } from "@/lib/logger"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 
 const log = logger("hr-leave-evidence")
+const UploadLeaveEvidenceSchema = z.object({
+  leave_request_id: z.string().trim().min(1, "leave_request_id, document_type and file_url are required"),
+  document_type: z.string().trim().min(1, "leave_request_id, document_type and file_url are required"),
+  file_url: z.string().trim().min(1, "leave_request_id, document_type and file_url are required"),
+  notes: z.string().optional().nullable(),
+})
 
-export async function POST(request: NextRequest) {
+export async function PATCH(request: NextRequest) {
   try {
     const supabase = await createClient()
     const {
@@ -16,11 +23,11 @@ export async function POST(request: NextRequest) {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const body = await request.json()
-    const { leave_request_id, document_type, file_url, notes } = body
-
-    if (!leave_request_id || !document_type || !file_url) {
-      return NextResponse.json({ error: "leave_request_id, document_type and file_url are required" }, { status: 400 })
+    const parsed = UploadLeaveEvidenceSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid request body" }, { status: 400 })
     }
+    const { leave_request_id, document_type, file_url, notes } = parsed.data
 
     const { data: leaveRequest } = await supabase
       .from("leave_requests")
@@ -83,4 +90,9 @@ export async function POST(request: NextRequest) {
     log.error({ err: String(error) }, "Error in POST /api/hr/leave/evidence:")
     return NextResponse.json({ error: error instanceof Error ? error.message : "An error occurred" }, { status: 500 })
   }
+}
+
+// POST kept for backwards compat — prefer PATCH
+export async function POST(request: NextRequest) {
+  return PATCH(request)
 }

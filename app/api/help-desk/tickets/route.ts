@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { z } from "zod"
 import {
   HELP_DESK_PRIORITIES,
   getAuthContext,
@@ -13,6 +14,9 @@ import {
 } from "@/lib/help-desk/server"
 import { sendHelpDeskMail } from "@/lib/help-desk/mailer"
 import { logger } from "@/lib/logger"
+import { getPaginationRange, paginatedResponse, PaginationSchema } from "@/lib/pagination"
+import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
+import { checkIdempotency, getIdempotencyKey, storeIdempotencyKey } from "@/lib/idempotency"
 
 const log = logger("help-desk-tickets")
 export const dynamic = "force-dynamic"
@@ -27,6 +31,14 @@ type InsertTicketResult = {
   data: HelpDeskTicketRow | null
   error: ErrorWithCode | null
 }
+
+const CreateTicketSchema = z.object({
+  title: z.string().trim().min(1, "title and service_department are required"),
+  description: z.string().optional(),
+  service_department: z.string().trim().min(1, "title and service_department are required"),
+  request_type: z.enum(["procurement", "support"]).optional().default("support"),
+  priority: z.enum(HELP_DESK_PRIORITIES).optional().default("medium"),
+})
 
 function describeError(error: unknown): string {
   if (error instanceof Error) return error.message
@@ -69,10 +81,22 @@ export async function GET(request: NextRequest) {
     }
 
     const searchParams = request.nextUrl.searchParams
+    const paginationParsed = PaginationSchema.safeParse(Object.fromEntries(searchParams))
+    if (!paginationParsed.success) {
+      return NextResponse.json(
+        { error: paginationParsed.error.issues[0]?.message ?? "Invalid pagination params" },
+        { status: 400 }
+      )
+    }
+    const pagination = paginationParsed.data
+    const { from, to } = getPaginationRange(pagination)
     const scope = searchParams.get("scope") || "mine"
     const status = searchParams.get("status")
 
-    let query = supabase.from("help_desk_tickets").select("*").order("created_at", { ascending: false })
+    let query = supabase
+      .from("help_desk_tickets")
+      .select("*", { count: "exact" })
+      .order("created_at", { ascending: false })
 
     const managedDepartments = getManagedDepartments(profile as HelpDeskProfile)
 
@@ -86,7 +110,10 @@ export async function GET(request: NextRequest) {
       if (isAdminRole(profile.role)) {
         // Admin can see all departments in this scope.
       } else if (!managedDepartments.length) {
-        return NextResponse.json({ data: [] })
+        return NextResponse.json(paginatedResponse([], 0, pagination))
+      } else {
+        const scopedDepartments = managedDepartments.join(",")
+        query = query.or(`service_department.in.(${scopedDepartments}),requester_department.in.(${scopedDepartments})`)
       }
     }
 
@@ -94,20 +121,10 @@ export async function GET(request: NextRequest) {
       query = query.eq("status", status)
     }
 
-    const { data, error } = await query
+    const { data, error, count } = await query.range(from, to)
     if (error) throw error
 
-    let rows: HelpDeskTicketRow[] = (data as HelpDeskTicketRow[] | null) || []
-    if (scope === "department" && !isAdminRole(profile.role)) {
-      const managedDepartments = getManagedDepartments(profile as HelpDeskProfile)
-      rows = rows.filter(
-        (row) =>
-          managedDepartments.includes(row.service_department ?? "") ||
-          managedDepartments.includes(row.requester_department ?? "")
-      )
-    }
-
-    return NextResponse.json({ data: rows })
+    return NextResponse.json(paginatedResponse((data as HelpDeskTicketRow[] | null) || [], count || 0, pagination))
   } catch (error) {
     log.error({ err: String(error) }, "Unhandled error in GET")
     return NextResponse.json({ error: `Failed to fetch tickets: ${describeError(error)}` }, { status: 500 })
@@ -117,25 +134,31 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const { supabase, user, profile } = await getAuthContext()
+    const idempotencyClient = getServiceRoleClientOrFallback(supabase)
 
     if (!user || !profile) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    const idempotencyKey = getIdempotencyKey(request)
+    if (idempotencyKey) {
+      const { isDuplicate, cachedResponse } = await checkIdempotency(idempotencyClient, idempotencyKey)
+      if (isDuplicate) {
+        return NextResponse.json(cachedResponse, { status: 200 })
+      }
+    }
+
     const body = await request.json()
-    const title = String(body?.title || "").trim()
-    const description = String(body?.description || "").trim()
-    const serviceDepartment = String(body?.service_department || "").trim()
-    const requestType = body?.request_type === "procurement" ? "procurement" : "support"
-    const priority = body?.priority ? String(body.priority).toLowerCase() : "medium"
-
-    if (!title || !serviceDepartment) {
-      return NextResponse.json({ error: "title and service_department are required" }, { status: 400 })
+    const parsed = CreateTicketSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid request body" }, { status: 400 })
     }
 
-    if (!HELP_DESK_PRIORITIES.includes(priority as (typeof HELP_DESK_PRIORITIES)[number])) {
-      return NextResponse.json({ error: "Invalid priority" }, { status: 400 })
-    }
+    const title = parsed.data.title
+    const description = (parsed.data.description || "").trim()
+    const serviceDepartment = parsed.data.service_department
+    const requestType = parsed.data.request_type
+    const priority = parsed.data.priority
 
     const managedDepartments = getManagedDepartments(profile as HelpDeskProfile)
     if (
@@ -147,7 +170,7 @@ export async function POST(request: NextRequest) {
     }
 
     const submittedAt = new Date()
-    const slaTarget = getSlaTarget(priority as (typeof HELP_DESK_PRIORITIES)[number], submittedAt)
+    const slaTarget = getSlaTarget(priority, submittedAt)
     const approvalRequired = requestType === "procurement"
     const supportMode: "open_queue" | "lead_review_required" | null = requestType === "support" ? "open_queue" : null
 
@@ -322,7 +345,12 @@ export async function POST(request: NextRequest) {
       log.error({ err: String(mailError) }, "Help desk mail error on create")
     }
 
-    return NextResponse.json({ data: created }, { status: 201 })
+    const responsePayload = { data: created }
+    if (idempotencyKey) {
+      await storeIdempotencyKey(idempotencyClient, idempotencyKey, responsePayload)
+    }
+
+    return NextResponse.json(responsePayload, { status: 201 })
   } catch (error) {
     log.error({ err: String(error) }, "Unhandled error in POST")
     return NextResponse.json({ error: `Failed to create ticket: ${describeError(error)}` }, { status: 500 })

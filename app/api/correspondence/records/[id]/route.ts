@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { z } from "zod"
 import {
   CORRESPONDENCE_STATUSES,
   appendCorrespondenceAuditLog,
@@ -7,9 +8,27 @@ import {
   getAuthContext,
 } from "@/lib/correspondence/server"
 import { logger } from "@/lib/logger"
-import type { CorrespondenceStatus } from "@/types/correspondence"
 
 const log = logger("correspondence-records")
+
+const UpdateCorrespondenceRecordSchema = z.object({
+  status: z.enum(CORRESPONDENCE_STATUSES as [string, ...string[]]).optional(),
+  letter_type: z.string().optional().nullable(),
+  category: z.string().optional().nullable(),
+  subject: z.string().optional(),
+  recipient_name: z.string().optional().nullable(),
+  sender_name: z.string().optional().nullable(),
+  action_required: z.boolean().optional(),
+  due_date: z.string().optional().nullable(),
+  responsible_officer_id: z.string().optional().nullable(),
+  assigned_department_name: z.string().optional().nullable(),
+  source_mode: z.string().optional().nullable(),
+  metadata: z.unknown().optional().nullable(),
+  is_locked: z.boolean().optional(),
+  current_version: z.coerce.number().optional(),
+  version_file_path: z.string().optional().nullable(),
+  change_summary: z.string().optional().nullable(),
+})
 
 export async function GET(_request: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -83,12 +102,13 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     }
 
     const body = await request.json()
-    const nextStatus = body?.status ? String(body.status) : null
-    const shouldCreateVersion = Boolean(body?.version_file_path || body?.change_summary)
-
-    if (nextStatus && !CORRESPONDENCE_STATUSES.includes(nextStatus as CorrespondenceStatus)) {
-      return NextResponse.json({ error: "Invalid status" }, { status: 400 })
+    const parsed = UpdateCorrespondenceRecordSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid request body" }, { status: 400 })
     }
+
+    const nextStatus = parsed.data.status ? String(parsed.data.status) : null
+    const shouldCreateVersion = Boolean(parsed.data.version_file_path || parsed.data.change_summary)
 
     const allowedFields = [
       "status",
@@ -109,8 +129,8 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
     const updatePayload: Record<string, unknown> = {}
     for (const key of allowedFields) {
-      if (key in body) {
-        updatePayload[key] = body[key]
+      if (key in parsed.data) {
+        updatePayload[key] = parsed.data[key as keyof typeof parsed.data]
       }
     }
 
@@ -135,8 +155,8 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       await supabase.from("correspondence_versions").insert({
         correspondence_id: record.id,
         version_no: updated.current_version,
-        file_path: body?.version_file_path ? String(body.version_file_path).trim() : null,
-        change_summary: body?.change_summary ? String(body.change_summary).trim() : null,
+        file_path: parsed.data.version_file_path ? String(parsed.data.version_file_path).trim() : null,
+        change_summary: parsed.data.change_summary ? String(parsed.data.change_summary).trim() : null,
         uploaded_by: user.id,
       })
     }

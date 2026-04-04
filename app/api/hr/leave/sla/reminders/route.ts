@@ -35,7 +35,7 @@ const LEGACY_SLA_STAGE_MAP: Record<string, string> = {
   pending_hcs: "hr_pending",
 }
 
-export async function POST() {
+export async function PATCH() {
   try {
     const supabase = await createClient()
     const cronSecret = process.env.CRON_SECRET
@@ -165,4 +165,9 @@ export async function POST() {
     log.error({ err: String(error) }, "Error in POST /api/hr/leave/sla/reminders:")
     return NextResponse.json({ error: "An error occurred" }, { status: 500 })
   }
+}
+
+// POST kept for backwards compat — prefer PATCH
+export async function POST() {
+  return PATCH()
 }

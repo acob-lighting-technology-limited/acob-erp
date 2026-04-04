@@ -1,7 +1,9 @@
 "use client"
 
-import type React from "react"
 import { useState } from "react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { z } from "zod"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -21,35 +23,39 @@ interface FeedbackFormProps {
   variant?: "card" | "modal"
 }
 
+const FeedbackFormSchema = z.object({
+  feedbackType: z.string().min(1, "Feedback type is required"),
+  title: z.string().min(1, "Title is required"),
+  description: z.string().optional(),
+})
+
+type FeedbackFormValues = z.infer<typeof FeedbackFormSchema>
+
 export function FeedbackForm({ userId, onFeedbackSubmitted, variant = "card" }: FeedbackFormProps) {
-  const [formData, setFormData] = useState({
-    feedbackType: "",
-    title: "",
-    description: "",
+  const form = useForm<FeedbackFormValues>({
+    resolver: zodResolver(FeedbackFormSchema),
+    defaultValues: {
+      feedbackType: "",
+      title: "",
+      description: "",
+    },
   })
   const [isAnonymous, setIsAnonymous] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const onSubmit = form.handleSubmit(async (data) => {
     const supabase = createClient()
     setIsLoading(true)
 
     try {
-      if (!formData.feedbackType || !formData.title) {
-        toast.error("Please fill in all required fields")
-        setIsLoading(false)
-        return
-      }
-
       // Insert feedback - set user_id to null if anonymous
-      const { data, error } = await supabase
+      const { data: createdFeedback, error } = await supabase
         .from("feedback")
         .insert({
           user_id: isAnonymous ? null : userId,
-          feedback_type: formData.feedbackType,
-          title: formData.title,
-          description: formData.description,
+          feedback_type: data.feedbackType,
+          title: data.title,
+          description: data.description,
           status: "open",
           is_anonymous: isAnonymous,
         })
@@ -58,17 +64,17 @@ export function FeedbackForm({ userId, onFeedbackSubmitted, variant = "card" }: 
       if (error) throw error
 
       // Log audit for all feedback - anonymous ones will show as "Anonymous" in the audit log
-      if (data && data.length > 0) {
+      if (createdFeedback && createdFeedback.length > 0) {
         await writeAuditLogClient(
           supabase,
           {
             action: "create",
             entityType: "feedback",
-            entityId: data[0].id,
+            entityId: createdFeedback[0].id,
             newValues: {
-              feedback_type: formData.feedbackType,
-              title: formData.title,
-              description: formData.description,
+              feedback_type: data.feedbackType,
+              title: data.title,
+              description: data.description,
               status: "open",
               is_anonymous: isAnonymous,
             },
@@ -82,15 +88,15 @@ export function FeedbackForm({ userId, onFeedbackSubmitted, variant = "card" }: 
       }
 
       toast.success(isAnonymous ? "Anonymous feedback submitted" : "Feedback submitted successfully!")
-      setFormData({
+      form.reset({
         feedbackType: "",
         title: "",
         description: "",
       })
       setIsAnonymous(false)
 
-      if (onFeedbackSubmitted && data && data.length > 0) {
-        onFeedbackSubmitted(data[0])
+      if (onFeedbackSubmitted && createdFeedback && createdFeedback.length > 0) {
+        onFeedbackSubmitted(createdFeedback[0])
       }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Failed to submit feedback"
@@ -98,10 +104,10 @@ export function FeedbackForm({ userId, onFeedbackSubmitted, variant = "card" }: 
     } finally {
       setIsLoading(false)
     }
-  }
+  })
 
-  const form = (
-    <form onSubmit={handleSubmit} className="space-y-4">
+  const formContent = (
+    <form onSubmit={onSubmit} className="space-y-4">
       {/* Anonymous Toggle */}
       <div className="flex items-center justify-between rounded-lg border p-3">
         <div className="flex items-center gap-2">
@@ -115,10 +121,7 @@ export function FeedbackForm({ userId, onFeedbackSubmitted, variant = "card" }: 
 
       <div className="space-y-2">
         <Label htmlFor="feedbackType">Feedback Type *</Label>
-        <Select
-          value={formData.feedbackType}
-          onValueChange={(value) => setFormData({ ...formData, feedbackType: value })}
-        >
+        <Select value={form.watch("feedbackType")} onValueChange={(value) => form.setValue("feedbackType", value)}>
           <SelectTrigger id="feedbackType">
             <SelectValue placeholder="Select type" />
           </SelectTrigger>
@@ -129,25 +132,24 @@ export function FeedbackForm({ userId, onFeedbackSubmitted, variant = "card" }: 
             <SelectItem value="required_item">Required Item</SelectItem>
           </SelectContent>
         </Select>
+        {form.formState.errors.feedbackType && (
+          <p className="text-destructive text-sm">{form.formState.errors.feedbackType.message}</p>
+        )}
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="title">Title *</Label>
-        <Input
-          id="title"
-          value={formData.title}
-          onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-          placeholder="Brief title of your feedback"
-          required
-        />
+        <Input id="title" {...form.register("title")} placeholder="Brief title of your feedback" />
+        {form.formState.errors.title && (
+          <p className="text-destructive text-sm">{form.formState.errors.title.message}</p>
+        )}
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="description">Description</Label>
         <Textarea
           id="description"
-          value={formData.description}
-          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+          {...form.register("description")}
           placeholder="Provide more details about your feedback..."
           rows={4}
         />
@@ -160,7 +162,7 @@ export function FeedbackForm({ userId, onFeedbackSubmitted, variant = "card" }: 
   )
 
   if (variant === "modal") {
-    return form
+    return formContent
   }
 
   return (
@@ -169,7 +171,7 @@ export function FeedbackForm({ userId, onFeedbackSubmitted, variant = "card" }: 
         <CardTitle>Submit Feedback</CardTitle>
         <CardDescription>Share your thoughts with us</CardDescription>
       </CardHeader>
-      <CardContent>{form}</CardContent>
+      <CardContent>{formContent}</CardContent>
     </Card>
   )
 }

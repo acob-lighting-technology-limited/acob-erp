@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -18,7 +18,6 @@ interface DepartmentCodeOption {
 }
 
 interface PortalReferenceGeneratorContentProps {
-  userId: string
   currentViewerName: string
   currentViewerDepartment: string
   currentViewerRole?: string
@@ -46,6 +45,10 @@ export function PortalReferenceGeneratorContent({
   const [isSaving, setIsSaving] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
   const [dispatchingId, setDispatchingId] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [statusFilter, setStatusFilter] = useState("all")
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(initialRecords.length)
   const pendingRef = useRef<HTMLDivElement | null>(null)
   const [form, setForm] = useState({
     department_name: initialDepartment,
@@ -76,11 +79,25 @@ export function PortalReferenceGeneratorContent({
     [records]
   )
 
-  async function refreshRecords() {
-    const res = await fetch("/api/correspondence/records", { cache: "no-store" })
-    const json = await res.json()
-    setRecords(json.data || [])
-  }
+  const totalPages = Math.max(1, Math.ceil(total / 50))
+
+  useEffect(() => {
+    async function loadRecords() {
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: "50",
+      })
+      if (searchQuery.trim()) params.set("search", searchQuery.trim())
+      if (statusFilter !== "all") params.set("status", statusFilter)
+
+      const res = await fetch(`/api/correspondence/records?${params.toString()}`, { cache: "no-store" })
+      const json = await res.json()
+      setRecords(json.data || [])
+      setTotal(Number(json.total || 0))
+    }
+
+    void loadRecords()
+  }, [page, searchQuery, statusFilter])
 
   async function createRecord(e: React.FormEvent) {
     e.preventDefault()
@@ -126,7 +143,7 @@ export function PortalReferenceGeneratorContent({
         due_date: "",
         metadata_text: "",
       })
-      await refreshRecords()
+      setPage(1)
     } catch (error: unknown) {
       toast.error(getErrorMessage(error, "Failed to create correspondence"))
     } finally {
@@ -144,7 +161,11 @@ export function PortalReferenceGeneratorContent({
       const body = await res.json()
       if (!res.ok) throw new Error(body.error || "Failed to update status")
       toast.success("Status updated")
-      await refreshRecords()
+      setRecords((current) =>
+        current.map((record) =>
+          record.id === recordId ? { ...record, status: status as typeof record.status } : record
+        )
+      )
     } catch (error: unknown) {
       toast.error(getErrorMessage(error, "Failed to update status"))
     }
@@ -161,7 +182,9 @@ export function PortalReferenceGeneratorContent({
       const body = await res.json()
       if (!res.ok) throw new Error(body.error || "Failed to dispatch correspondence")
       toast.success("Correspondence dispatched")
-      await refreshRecords()
+      setRecords((current) =>
+        current.map((record) => (record.id === recordId ? { ...record, status: "sent" } : record))
+      )
     } catch (error: unknown) {
       toast.error(getErrorMessage(error, "Failed to dispatch correspondence"))
     } finally {
@@ -201,6 +224,38 @@ export function PortalReferenceGeneratorContent({
 
       <CorrespondenceStats {...stats} />
 
+      <Card>
+        <CardContent className="flex flex-col gap-3 pt-6 md:flex-row">
+          <input
+            value={searchQuery}
+            onChange={(event) => {
+              setPage(1)
+              setSearchQuery(event.target.value)
+            }}
+            placeholder="Search reference, subject, recipient, or sender"
+            className="border-input bg-background ring-offset-background placeholder:text-muted-foreground flex h-10 w-full rounded-md border px-3 py-2 text-sm"
+          />
+          <select
+            value={statusFilter}
+            onChange={(event) => {
+              setPage(1)
+              setStatusFilter(event.target.value)
+            }}
+            className="border-input bg-background h-10 rounded-md border px-3 text-sm md:w-56"
+          >
+            <option value="all">All statuses</option>
+            <option value="draft">Draft</option>
+            <option value="under_review">Under review</option>
+            <option value="approved">Approved</option>
+            <option value="assigned_action_pending">Assigned action pending</option>
+            <option value="open">Open</option>
+            <option value="sent">Sent</option>
+            <option value="filed">Filed</option>
+            <option value="closed">Closed</option>
+          </select>
+        </CardContent>
+      </Card>
+
       {isLead && pendingRecords.length > 0 && (
         <Card ref={pendingRef}>
           <CardHeader>
@@ -226,6 +281,25 @@ export function PortalReferenceGeneratorContent({
         onUpdateStatus={updateStatus}
         onDispatch={dispatchRecord}
       />
+
+      <div className="flex items-center justify-between text-sm text-slate-500">
+        <span>
+          Page {page} of {totalPages}
+        </span>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((current) => current - 1)}>
+            Previous
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page >= totalPages}
+            onClick={() => setPage((current) => current + 1)}
+          >
+            Next
+          </Button>
+        </div>
+      </div>
     </PageWrapper>
   )
 }

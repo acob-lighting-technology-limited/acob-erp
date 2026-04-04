@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { NOTIFICATION_KEYS, isNotificationKey } from "@/lib/notifications/delivery-policy"
@@ -13,6 +14,17 @@ type PolicyUpdatePayload = {
 }
 
 type MailSettingsClient = Awaited<ReturnType<typeof createClient>>
+const MailPolicySchema = z.object({
+  notification_key: z.string(),
+  in_app_enabled: z.boolean().optional(),
+  email_enabled: z.boolean().optional(),
+  in_app_mandatory: z.boolean().optional(),
+  email_mandatory: z.boolean().optional(),
+})
+
+const UpdateMailPoliciesSchema = z.object({
+  policies: z.array(MailPolicySchema).min(1, "No policies provided"),
+})
 
 async function requirePrivilegedActor(supabase: MailSettingsClient) {
   const {
@@ -61,11 +73,11 @@ export async function PUT(request: NextRequest) {
     if (auth.error) return auth.error
 
     const body = await request.json()
-    const inputPolicies = Array.isArray(body?.policies) ? (body.policies as PolicyUpdatePayload[]) : []
-
-    if (inputPolicies.length === 0) {
-      return NextResponse.json({ error: "No policies provided" }, { status: 400 })
+    const parsed = UpdateMailPoliciesSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid request body" }, { status: 400 })
     }
+    const inputPolicies = parsed.data.policies as PolicyUpdatePayload[]
 
     const payload = inputPolicies
       .filter((row) => isNotificationKey(String(row.notification_key || "")))

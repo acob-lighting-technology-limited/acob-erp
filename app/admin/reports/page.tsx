@@ -1,7 +1,7 @@
 "use client"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { ShieldCheck, ClipboardList, FileText, ChevronRight, Presentation } from "lucide-react"
+import { ShieldCheck, Send, Users, ChevronRight } from "lucide-react"
 import Link from "next/link"
 import { PageWrapper, PageHeader } from "@/components/layout"
 import { PageSection } from "@/components/ui/patterns"
@@ -9,36 +9,20 @@ import { PageSection } from "@/components/ui/patterns"
 export default function AdminReportsPage() {
   const reportCards = [
     {
-      title: "Action Tracker Management",
-      description: "Oversee project progress, track pending actions across all departments, and manage status updates.",
-      href: "/admin/reports/action-tracker",
-      icon: ClipboardList,
-      color: "text-blue-600 dark:text-blue-400",
-      bgColor: "bg-blue-100 dark:bg-blue-900/30",
-    },
-    {
-      title: "Weekly Reports Administration",
-      description: "Review, manage, and export weekly status updates and performance summaries from all employees.",
-      href: "/admin/reports/weekly-reports",
-      icon: FileText,
-      color: "text-green-600 dark:text-green-400",
-      bgColor: "bg-green-100 dark:bg-green-900/30",
-    },
-    {
-      title: "Knowledge Sharing Session",
-      description: "Upload weekly Knowledge Sharing Session files and capture department/presenter details.",
-      href: "/admin/reports/kss",
-      icon: Presentation,
+      title: "General Meeting",
+      description: "Open the weekly reports, action tracker, KSS, and minutes tools that support your general meeting.",
+      href: "/admin/reports/general-meeting",
+      icon: Users,
       color: "text-indigo-600 dark:text-indigo-400",
       bgColor: "bg-indigo-100 dark:bg-indigo-900/30",
     },
     {
-      title: "Minutes of Meeting",
-      description: "Upload and store weekly Minutes of Meeting PDFs for reference and mailing.",
-      href: "/admin/reports/minutes-of-meeting",
-      icon: FileText,
-      color: "text-amber-600 dark:text-amber-400",
-      bgColor: "bg-amber-100 dark:bg-amber-900/30",
+      title: "Meeting Mail",
+      description: "Prepare and send the weekly meeting summary mail with the stored report documents.",
+      href: "/admin/communications/meetings/mail",
+      icon: Send,
+      color: "text-emerald-600 dark:text-emerald-400",
+      bgColor: "bg-emerald-100 dark:bg-emerald-900/30",
     },
   ]
 

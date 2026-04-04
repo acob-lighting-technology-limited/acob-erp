@@ -1,8 +1,8 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0"
-import { Resend } from "npm:resend@2.0.0"
 import { PDFDocument, PDFFont, PDFPage, rgb, StandardFonts } from "npm:pdf-lib@1.17.1"
 import { writeEdgeAuditLog } from "../_shared/audit.ts"
+import { sendEmail } from "../_shared/email.ts"
 import { compareDepartments, normalizeDepartmentName } from "../../../shared/departments.ts"
 import {
   buildMeetingDocumentFileName,
@@ -12,7 +12,6 @@ import {
 } from "../_shared/meeting-date.ts"
 import { isEdgeSystemEmailEnabled } from "../_shared/notification-gateway.ts"
 
-const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")!
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
 
@@ -28,10 +27,8 @@ const SLATE = rgb(0.2, 0.255, 0.333)
 const MUTED = rgb(0.392, 0.455, 0.545)
 const BLUE = rgb(0.114, 0.416, 0.588)
 const RED = rgb(0.725, 0.11, 0.11)
-const RESEND_MAX_REQ_PER_SEC = 2
-const SEND_INTERVAL_MS = Math.ceil(1000 / RESEND_MAX_REQ_PER_SEC) + 100 // ~0.6s with safety margin
-const MAX_429_RETRIES = 5
-const DEFAULT_SENDER = "ACOB Internal Systems <notifications@acoblighting.com>"
+const DEFAULT_SENDER_EMAIL = Deno.env.get("NOTIFICATION_SENDER_EMAIL") || "notifications@acoblighting.com"
+const DEFAULT_SENDER = `ACOB Internal Systems <${DEFAULT_SENDER_EMAIL}>`
 const MEETING_DOCS_BUCKET = "meeting_documents"
 const OFFICE_WEEK_ANCHOR_MONTH_INDEX = 0
 const OFFICE_WEEK_ANCHOR_DAY = 12
@@ -39,18 +36,6 @@ const OFFICE_WEEK_ANCHOR_DAY = 12
 type AttachmentPayload = {
   filename: string
   content: string
-}
-
-type RateLimitErrorLike = {
-  statusCode?: number | string
-  status?: number | string
-  name?: string
-  message?: string
-}
-
-type SendEmailResponse = {
-  data?: { id?: string | null } | null
-  error?: { message?: string | null } | null
 }
 
 type WeeklyReportRow = {
@@ -62,6 +47,18 @@ type WeeklyReportRow = {
   tasks_new_week: string | null
   challenges: string | null
   status: string | null
+}
+
+type MeetingDocumentRow = {
+  id: string
+  meeting_week: number
+  meeting_year: number
+  document_type: string
+  department: string | null
+  presenter_id: string | null
+  file_path: string | null
+  file_name: string | null
+  mime_type: string | null
 }
 
 function getOfficeYearStart(year: number): Date {
@@ -185,10 +182,6 @@ function escapeHtml(input: string): string {
     .replace(/'/g, "&#39;")
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms))
-}
-
 function encodeBytesToBase64(bytes: Uint8Array): string {
   const CHUNK = 8192
   let binary = ""
@@ -202,39 +195,6 @@ function encodeBytesToBase64(bytes: Uint8Array): string {
 
 function withSubjectPrefix(moduleName: string, subject: string): string {
   return String(subject || "").trim() || "Notification"
-}
-
-function isRateLimitError(error: RateLimitErrorLike | null | undefined): boolean {
-  if (!error) return false
-  const statusCode = Number(error?.statusCode || error?.status || 0)
-  const name = String(error?.name || "").toLowerCase()
-  const msg = String(error?.message || "").toLowerCase()
-  return statusCode === 429 || name.includes("rate_limit") || msg.includes("too many requests")
-}
-
-async function sendWithRetry(
-  resend: Resend,
-  payload: {
-    from: string
-    to: string
-    subject: string
-    html: string
-    attachments: AttachmentPayload[]
-  }
-): Promise<SendEmailResponse> {
-  let attempt = 0
-  while (attempt <= MAX_429_RETRIES) {
-    const { data, error } = await resend.emails.send(payload)
-    if (!error) return { data }
-    if (!isRateLimitError(error) || attempt === MAX_429_RETRIES) return { error }
-    const backoffMs = 1000 * (attempt + 1)
-    console.warn(
-      `[weekly-report] Rate limit for ${payload.to}. Retry ${attempt + 1}/${MAX_429_RETRIES} in ${backoffMs}ms`
-    )
-    await sleep(backoffMs)
-    attempt += 1
-  }
-  return { error: { message: "Unexpected retry flow termination" } }
 }
 
 const STORAGE_BASE = "https://itqegqxeqkeogwrvlzlj.supabase.co/storage/v1/object/public/assets/logos"
@@ -253,33 +213,69 @@ async function resolveStoredMeetingDocument(
   supabase: ReturnType<typeof createClient>,
   documentId: string
 ): Promise<{ base64: string; filename: string } | null> {
+  const attachments = await resolveStoredMeetingDocuments(supabase, [documentId])
+  return attachments.get(documentId) || null
+}
+
+async function resolveStoredMeetingDocuments(
+  supabase: ReturnType<typeof createClient>,
+  documentIds: string[]
+): Promise<Map<string, { base64: string; filename: string }>> {
+  const uniqueDocumentIds = Array.from(new Set(documentIds.filter(Boolean)))
+  const attachments = new Map<string, { base64: string; filename: string }>()
+
+  if (uniqueDocumentIds.length === 0) return attachments
+
   // Note: no .eq("is_current", true) filter here — we look up by specific ID so
   // is_current is irrelevant. Filtering by it caused non-current KSS docs to silently fail.
-  const { data: doc, error } = await supabase
+  const { data: docs, error } = await supabase
     .from("meeting_week_documents")
     .select("id, meeting_week, meeting_year, document_type, department, presenter_id, file_path, file_name, mime_type")
-    .eq("id", documentId)
-    .single()
+    .in("id", uniqueDocumentIds)
 
-  if (error || !doc?.file_path) return null
+  if (error || !docs?.length) return attachments
 
-  let presenterName: string | null = null
-  if (doc.document_type === "knowledge_sharing_session" && doc.presenter_id) {
-    const { data: presenter } = await supabase.from("profiles").select("full_name").eq("id", doc.presenter_id).single()
-    presenterName = presenter?.full_name || null
+  const docRows = (docs || []).filter((doc): doc is MeetingDocumentRow => Boolean(doc?.id && doc?.file_path))
+  const presenterIds = Array.from(
+    new Set(
+      docRows
+        .filter((doc) => doc.document_type === "knowledge_sharing_session" && doc.presenter_id)
+        .map((doc) => doc.presenter_id as string)
+    )
+  )
+  const presenterMap = new Map<string, string>()
+
+  if (presenterIds.length > 0) {
+    const { data: presenters } = await supabase.from("profiles").select("id, full_name").in("id", presenterIds)
+
+    for (const presenter of presenters || []) {
+      if (presenter?.id && presenter?.full_name) {
+        presenterMap.set(presenter.id, presenter.full_name)
+      }
+    }
   }
 
-  const meetingDate = await resolveEffectiveMeetingDateIso(supabase, doc.meeting_week, doc.meeting_year)
+  for (const doc of docRows) {
+    const presenterName =
+      doc.document_type === "knowledge_sharing_session" && doc.presenter_id
+        ? presenterMap.get(doc.presenter_id) || null
+        : null
 
-  const { data: blob, error: downloadError } = await supabase.storage.from(MEETING_DOCS_BUCKET).download(doc.file_path)
-  if (downloadError || !blob) return null
+    const meetingDate = await resolveEffectiveMeetingDateIso(supabase, doc.meeting_week, doc.meeting_year)
 
-  const bytes = new Uint8Array(await blob.arrayBuffer())
+    const { data: blob, error: downloadError } = await supabase.storage
+      .from(MEETING_DOCS_BUCKET)
+      .download(doc.file_path)
+    if (downloadError || !blob) continue
 
-  return {
-    base64: encodeBytesToBase64(bytes),
-    filename: buildAttachmentFilename(doc, meetingDate, presenterName),
+    const bytes = new Uint8Array(await blob.arrayBuffer())
+    attachments.set(doc.id, {
+      base64: encodeBytesToBase64(bytes),
+      filename: buildAttachmentFilename(doc, meetingDate, presenterName),
+    })
   }
+
+  return attachments
 }
 
 function extensionFromDocument(fileName: string | null | undefined, mimeType: string | null | undefined): string {
@@ -828,7 +824,6 @@ serve(async (req) => {
     if (!authHeader) return new Response("Unauthorized", { status: 401 })
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
-    const resend = new Resend(RESEND_API_KEY)
     const reportsMailEnabled = await isEdgeSystemEmailEnabled(supabase, "reports")
     if (!reportsMailEnabled) {
       return new Response(JSON.stringify({ success: true, skipped: true, reason: "reports_email_disabled" }), {
@@ -987,11 +982,10 @@ serve(async (req) => {
       }
     } else if (requestedAdditionalDocumentIds.length > 0) {
       // Fallback: download server-side (legacy path, used if signed_url was unavailable)
-      const seenIds = new Set<string>()
-      for (const docId of requestedAdditionalDocumentIds) {
-        if (seenIds.has(docId)) continue
-        seenIds.add(docId)
-        const stored = await resolveStoredMeetingDocument(supabase, docId)
+      const uniqueDocumentIds = Array.from(new Set(requestedAdditionalDocumentIds))
+      const storedAttachments = await resolveStoredMeetingDocuments(supabase, uniqueDocumentIds)
+      for (const docId of uniqueDocumentIds) {
+        const stored = storedAttachments.get(docId)
         if (stored) {
           additionalAttachments.push({
             filename: stored.filename || `meeting-document-${docId}.pdf`,
@@ -1116,21 +1110,20 @@ serve(async (req) => {
 
     const results: DeliveryResult[] = []
     for (const to of recipients) {
-      const { data, error } = await sendWithRetry(resend, {
-        from: DEFAULT_SENDER,
-        to,
-        subject,
-        html,
-        attachments,
-      })
-      if (error) {
+      try {
+        const data = await sendEmail({
+          from: DEFAULT_SENDER,
+          to,
+          subject,
+          html,
+          attachments,
+        })
+        console.log(`[weekly-report] Sent to ${to}. ID: ${data.id}`)
+        results.push({ to, success: true, emailId: data.id })
+      } catch (error) {
         console.error(`[weekly-report] Failed to send to ${to}:`, JSON.stringify(error))
         results.push({ to, success: false, error })
-      } else {
-        console.log(`[weekly-report] Sent to ${to}. ID: ${data?.id}`)
-        results.push({ to, success: true, emailId: data?.id })
       }
-      await sleep(SEND_INTERVAL_MS)
     }
 
     try {

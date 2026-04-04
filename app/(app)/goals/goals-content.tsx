@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -21,6 +21,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import type { Goal } from "./page"
+import { ChevronDown } from "lucide-react"
 
 import { logger } from "@/lib/logger"
 
@@ -33,6 +34,19 @@ interface GoalsContentProps {
 
 export function GoalsContent({ initialGoals, userId }: GoalsContentProps) {
   const [goals, setGoals] = useState<Goal[]>(initialGoals)
+  const [linkedTasks, setLinkedTasks] = useState<
+    Record<
+      string,
+      Array<{
+        id: string
+        title: string
+        status: string
+        work_item_number?: string | null
+        source_type?: string | null
+      }>
+    >
+  >({})
+  const [expandedGoals, setExpandedGoals] = useState<Record<string, boolean>>({})
   const [showAddDialog, setShowAddDialog] = useState(false)
   const [saving, setSaving] = useState(false)
   const [newGoal, setNewGoal] = useState({
@@ -54,6 +68,29 @@ export function GoalsContent({ initialGoals, userId }: GoalsContentProps) {
       log.error("Error fetching goals:", error)
     }
   }
+
+  useEffect(() => {
+    async function loadLinkedTasks() {
+      const approvedGoals = goals.filter((goal) => goal.approval_status === "approved")
+      const entries = await Promise.all(
+        approvedGoals.map(async (goal) => {
+          const response = await fetch(`/api/hr/performance/goals/${goal.id}/tasks`, { cache: "no-store" })
+          const payload = (await response.json().catch(() => null)) as {
+            data?: Array<{
+              id: string
+              title: string
+              status: string
+              work_item_number?: string | null
+              source_type?: string | null
+            }>
+          } | null
+          return [goal.id, payload?.data || []] as const
+        })
+      )
+      setLinkedTasks(Object.fromEntries(entries))
+    }
+    void loadLinkedTasks()
+  }, [goals])
 
   async function handleAddGoal() {
     setSaving(true)
@@ -161,6 +198,13 @@ export function GoalsContent({ initialGoals, userId }: GoalsContentProps) {
 
   const inProgress = goals.filter((g) => g.status === "in_progress").length
   const completed = goals.filter((g) => g.status === "completed").length
+
+  function toggleGoalTasks(goalId: string) {
+    setExpandedGoals((current) => ({
+      ...current,
+      [goalId]: !current[goalId],
+    }))
+  }
 
   return (
     <PageWrapper maxWidth="full" background="gradient">
@@ -300,32 +344,88 @@ export function GoalsContent({ initialGoals, userId }: GoalsContentProps) {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  <div>
-                    <div className="mb-2 flex justify-between text-sm">
-                      <span>Progress</span>
-                      <span>{goal.achieved_value || 0}%</span>
-                    </div>
-                    <Progress value={goal.achieved_value || 0} />
-                  </div>
-                  {goal.status !== "completed" && (
-                    <div className="flex gap-2">
-                      <Input
-                        type="number"
-                        min="0"
-                        max="100"
-                        placeholder="Update progress %"
-                        className="w-32"
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            updateGoalProgress(goal.id, parseInt((e.target as HTMLInputElement).value))
-                          }
-                        }}
-                      />
-                      <Button variant="outline" size="sm" onClick={() => updateGoalProgress(goal.id, 100)}>
-                        Mark Complete
-                      </Button>
-                    </div>
-                  )}
+                  {(() => {
+                    const goalTasks = linkedTasks[goal.id] || []
+                    const completedTasks = goalTasks.filter((task) => task.status === "completed").length
+                    const taskProgress =
+                      goalTasks.length > 0 ? Math.round((completedTasks / goalTasks.length) * 100) : null
+                    const progressValue = taskProgress ?? (goal.achieved_value || 0)
+                    const isExpanded = Boolean(expandedGoals[goal.id])
+                    return (
+                      <>
+                        <div>
+                          <div className="mb-2 flex justify-between text-sm">
+                            <span>Progress</span>
+                            <span>{progressValue}%</span>
+                          </div>
+                          <Progress value={progressValue} />
+                        </div>
+                        {goalTasks.length === 0 && goal.status !== "completed" && (
+                          <div className="flex gap-2">
+                            <Input
+                              type="number"
+                              min="0"
+                              max="100"
+                              placeholder="Update progress %"
+                              className="w-32"
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  updateGoalProgress(goal.id, parseInt((e.target as HTMLInputElement).value))
+                                }
+                              }}
+                            />
+                            <Button variant="outline" size="sm" onClick={() => updateGoalProgress(goal.id, 100)}>
+                              Mark Complete
+                            </Button>
+                          </div>
+                        )}
+                        {goalTasks.length === 0 ? (
+                          <p className="text-sm text-amber-700">No linked tasks - progress is self-reported</p>
+                        ) : (
+                          <div className="space-y-3">
+                            <button
+                              type="button"
+                              className="flex w-full items-center justify-between rounded-lg border px-3 py-2 text-left"
+                              onClick={() => toggleGoalTasks(goal.id)}
+                            >
+                              <div>
+                                <div className="font-medium">Linked Tasks</div>
+                                <div className="text-sm text-slate-500">
+                                  {completedTasks} of {goalTasks.length} tasks completed ({taskProgress}%)
+                                </div>
+                              </div>
+                              <ChevronDown
+                                className={`h-4 w-4 transition-transform ${isExpanded ? "rotate-180" : ""}`}
+                              />
+                            </button>
+                            {isExpanded ? (
+                              <div className="space-y-2 pt-1">
+                                {goalTasks.map((task) => (
+                                  <div
+                                    key={task.id}
+                                    className="flex items-center justify-between rounded-lg border p-3"
+                                  >
+                                    <div>
+                                      <div className="font-mono text-xs text-slate-500">
+                                        {task.work_item_number || "Task"}
+                                      </div>
+                                      <div className="font-medium">{task.title}</div>
+                                    </div>
+                                    <div className="flex gap-2">
+                                      <Badge variant="outline">{task.status.replace("_", " ")}</Badge>
+                                      {task.source_type ? (
+                                        <Badge variant="outline">{task.source_type.replace("_", " ")}</Badge>
+                                      ) : null}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : null}
+                          </div>
+                        )}
+                      </>
+                    )
+                  })()}
                   {goal.due_date && (
                     <p className="text-muted-foreground text-sm">Due: {new Date(goal.due_date).toLocaleDateString()}</p>
                   )}

@@ -11,6 +11,8 @@ import {
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
 import { writeAuditLog } from "@/lib/audit/write-audit"
+import { getPaginationRange, paginatedResponse, PaginationSchema } from "@/lib/pagination"
+import { checkIdempotency, getIdempotencyKey, storeIdempotencyKey } from "@/lib/idempotency"
 
 type FleetBookingAttachmentRow = {
   id: string
@@ -26,8 +28,19 @@ type FleetBookingRow = {
   id: string
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url)
+    const paginationParsed = PaginationSchema.safeParse(Object.fromEntries(searchParams))
+    if (!paginationParsed.success) {
+      return NextResponse.json(
+        { error: paginationParsed.error.issues[0]?.message ?? "Invalid pagination params" },
+        { status: 400 }
+      )
+    }
+    const pagination = paginationParsed.data
+    const { from, to } = getPaginationRange(pagination)
+
     const supabase = await createClient()
     const validationClient = getServiceRoleClientOrFallback(supabase)
     const {
@@ -38,13 +51,19 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { data: bookings, error } = await supabase
+    const {
+      data: bookings,
+      error,
+      count,
+    } = await supabase
       .from("fleet_bookings")
       .select(
-        "id, resource_id, requester_id, start_at, end_at, reason, status, admin_note, reviewed_by, reviewed_at, created_at, updated_at, resource:fleet_resources(id, name, resource_type, is_active)"
+        "id, resource_id, requester_id, start_at, end_at, reason, status, admin_note, reviewed_by, reviewed_at, created_at, updated_at, resource:fleet_resources(id, name, resource_type, is_active)",
+        { count: "exact" }
       )
       .eq("requester_id", user.id)
       .order("start_at", { ascending: true })
+      .range(from, to)
 
     if (error) {
       return NextResponse.json({ error: error.message || "Failed to load bookings" }, { status: 500 })
@@ -82,7 +101,10 @@ export async function GET() {
       .order("start_at", { ascending: true })
       .limit(500)
 
-    return NextResponse.json({ data, resource_schedule: resourceSchedule || [] })
+    return NextResponse.json({
+      ...paginatedResponse(data, count || 0, pagination),
+      resource_schedule: resourceSchedule || [],
+    })
   } catch (error) {
     const message = error instanceof Error ? error.message : "Internal server error"
     return NextResponse.json({ error: message }, { status: 500 })
@@ -100,6 +122,14 @@ export async function POST(request: NextRequest) {
 
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const idempotencyKey = getIdempotencyKey(request)
+    if (idempotencyKey) {
+      const { isDuplicate, cachedResponse } = await checkIdempotency(validationClient, idempotencyKey)
+      if (isDuplicate) {
+        return NextResponse.json(cachedResponse, { status: 200 })
+      }
     }
 
     const formData = await request.formData()
@@ -225,7 +255,12 @@ export async function POST(request: NextRequest) {
       { failOpen: true }
     )
 
-    return NextResponse.json({ data: booking }, { status: 201 })
+    const responsePayload = { data: booking }
+    if (idempotencyKey) {
+      await storeIdempotencyKey(validationClient, idempotencyKey, responsePayload)
+    }
+
+    return NextResponse.json(responsePayload, { status: 201 })
   } catch (error) {
     if (uploadedPaths.length > 0) {
       try {

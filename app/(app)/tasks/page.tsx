@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import { TasksContent, type Task } from "./management/tasks-content"
+import { TasksContent } from "./management/tasks-content"
+import type { Task } from "@/types/task"
 
 type UserProfile = {
   department: string | null
@@ -94,19 +95,21 @@ async function getTasksData() {
       ? await supabase.from("task_user_completion").select("task_id, user_id").in("task_id", allTaskIds)
       : { data: [] }
 
-  const assignmentsByTask = new Map()
+  const assignmentsByTask = new Map<string, string[]>()
   allAssignments?.forEach((a) => {
-    if (!assignmentsByTask.has(a.task_id)) assignmentsByTask.set(a.task_id, [])
-    assignmentsByTask.get(a.task_id).push(a.user_id)
+    const existingAssignments = assignmentsByTask.get(a.task_id) || []
+    existingAssignments.push(a.user_id)
+    assignmentsByTask.set(a.task_id, existingAssignments)
   })
 
-  const completionsByTask = new Map()
+  const completionsByTask = new Map<string, Set<string>>()
   allCompletions?.forEach((c) => {
-    if (!completionsByTask.has(c.task_id)) completionsByTask.set(c.task_id, new Set())
-    completionsByTask.get(c.task_id).add(c.user_id)
+    const existingCompletions = completionsByTask.get(c.task_id) || new Set<string>()
+    existingCompletions.add(c.user_id)
+    completionsByTask.set(c.task_id, existingCompletions)
   })
 
-  const tasksWithUsers = await Promise.all(
+  const tasksWithUsers: Task[] = await Promise.all(
     uniqueTasks.map(async (task) => {
       const taskData: Task = { ...task }
 
@@ -118,13 +121,16 @@ async function getTasksData() {
         const userIds = assignmentsByTask.get(task.id) || []
         const taskCompletions = completionsByTask.get(task.id) || new Set()
 
-        taskData.assigned_users = userIds.map((uid: string) => {
+        const assignedUsers: NonNullable<Task["assigned_users"]> = []
+        for (const uid of userIds) {
           const profile = userProfileMap.get(uid)
-          return {
+          if (!profile) continue
+          assignedUsers.push({
             ...profile,
             completed: taskCompletions.has(uid),
-          }
-        })
+          })
+        }
+        taskData.assigned_users = assignedUsers
         taskData.user_completed = taskCompletions.has(user.id)
       }
 
@@ -140,7 +146,7 @@ async function getTasksData() {
     })
   )
 
-  tasksWithUsers.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+  tasksWithUsers.sort((a: Task, b: Task) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 
   return {
     tasks: tasksWithUsers as Task[],

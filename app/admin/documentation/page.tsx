@@ -50,7 +50,7 @@ export default async function AdminDocumentationPage() {
               <CardDescription>Confidential department files stored in OneDrive.</CardDescription>
             </CardHeader>
             <CardContent>
-              <Link href="/admin/documentation/department-documents">
+              <Link href="/admin/documentation/department">
                 <Button className="w-full" disabled={!pageData.departmentDocs.enabled}>
                   {pageData.departmentDocs.enabled ? "Open Department Documents" : "Unavailable"}
                 </Button>

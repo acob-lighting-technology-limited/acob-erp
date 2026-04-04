@@ -9,7 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Receipt, Printer } from "lucide-react"
+import { Receipt, Download } from "lucide-react"
 import { format } from "date-fns"
 import { EmptyState } from "@/components/ui/patterns"
 import { logger } from "@/lib/logger"
@@ -21,10 +21,10 @@ interface PrintReceiptDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   schedule: ScheduleItem[]
-  onViewDocument: (e: React.MouseEvent, doc: PaymentDocument) => Promise<void>
+  onDownloadDocument: (doc: PaymentDocument) => void
 }
 
-export function PrintReceiptDialog({ open, onOpenChange, schedule, onViewDocument }: PrintReceiptDialogProps) {
+export function PrintReceiptDialog({ open, onOpenChange, schedule, onDownloadDocument }: PrintReceiptDialogProps) {
   const receiptItems = schedule.flatMap((item) =>
     item.documents
       .filter((d) => d.document_type === "receipt")
@@ -35,8 +35,8 @@ export function PrintReceiptDialog({ open, onOpenChange, schedule, onViewDocumen
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] w-[95vw] max-w-md overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Select Receipt to Print</DialogTitle>
-          <DialogDescription>Choose a receipt from the list below to view and print.</DialogDescription>
+          <DialogTitle>Select Receipt to Download</DialogTitle>
+          <DialogDescription>Choose a receipt from the list below to download.</DialogDescription>
         </DialogHeader>
         <div className="max-h-[60vh] space-y-2 overflow-y-auto py-4">
           {receiptItems.length > 0 ? (
@@ -54,19 +54,18 @@ export function PrintReceiptDialog({ open, onOpenChange, schedule, onViewDocumen
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={async (e) => {
+                  onClick={() => {
                     try {
                       onOpenChange(false)
-                      await new Promise((resolve) => setTimeout(resolve, 100))
-                      await onViewDocument(e, item.doc)
+                      onDownloadDocument(item.doc)
                     } catch (error) {
                       log.error("Error in print dialog:", error)
                       onOpenChange(false)
                     }
                   }}
                 >
-                  <Printer className="mr-1 h-4 w-4" />
-                  Open
+                  <Download className="mr-1 h-4 w-4" />
+                  Download
                 </Button>
               </div>
             ))

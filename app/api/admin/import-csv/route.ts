@@ -10,7 +10,7 @@ const log = logger("import-csv")
 type AdminImportClient = Awaited<ReturnType<typeof createClient>>
 type CsvRecord = Record<string, string>
 
-export async function POST(_request: Request) {
+export async function PATCH(_request: Request) {
   try {
     const supabase = await createClient()
 
@@ -317,4 +317,9 @@ export async function POST(_request: Request) {
       { status: 500 }
     )
   }
+}
+
+// POST kept for backwards compat — prefer PATCH
+export async function POST(_request: Request) {
+  return PATCH(_request)
 }

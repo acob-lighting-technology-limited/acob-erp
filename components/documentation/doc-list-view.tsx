@@ -56,31 +56,31 @@ export function DocListView({ docs, getStatusColor, formatDate, onView, onEdit, 
                         variant="ghost"
                         size="sm"
                         onClick={() => onView(doc)}
-                        className="h-8 w-8 gap-1 p-0 sm:h-auto sm:w-auto sm:gap-2 sm:p-2"
+                        className="h-8 w-8 p-0"
                         title="View document"
+                        aria-label="View document"
                       >
-                        <Eye className="h-3 w-3 sm:h-4 sm:w-4" />
-                        <span className="hidden sm:inline">View</span>
+                        <Eye className="h-4 w-4" />
                       </Button>
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => onEdit(doc)}
-                        className="h-8 w-8 gap-1 p-0 sm:h-auto sm:w-auto sm:gap-2 sm:p-2"
+                        className="h-8 w-8 p-0"
                         title="Edit document"
+                        aria-label="Edit document"
                       >
-                        <Edit2 className="h-3 w-3 sm:h-4 sm:w-4" />
-                        <span className="hidden sm:inline">Edit</span>
+                        <Edit2 className="h-4 w-4" />
                       </Button>
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => onDelete(doc)}
-                        className="h-8 w-8 gap-1 p-0 text-red-600 hover:text-red-700 sm:h-auto sm:w-auto sm:gap-2 sm:p-2"
+                        className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
                         title="Delete document"
+                        aria-label="Delete document"
                       >
-                        <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
-                        <span className="hidden sm:inline">Delete</span>
+                        <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
                   </TableCell>

@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
+import { z } from "zod"
 import { canAccessAdminSection, normalizeDepartmentName, resolveAdminScope } from "@/lib/admin/rbac"
 import { logger } from "@/lib/logger"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
@@ -20,6 +21,21 @@ type WeeklyReportPayload = {
   challenges?: string
   status?: string
 }
+
+const SaveWeeklyReportSchema = z.object({
+  id: z.string().optional(),
+  department: z.string().trim().min(1, "Required: Department and Work Done"),
+  week_number: z.coerce.number().int().min(1, "Week must be between 1 and 53").max(53, "Week must be between 1 and 53"),
+  year: z.coerce
+    .number()
+    .int()
+    .min(2000, "Year must be between 2000 and 2100")
+    .max(2100, "Year must be between 2000 and 2100"),
+  work_done: z.string().trim().min(1, "Required: Department and Work Done"),
+  tasks_new_week: z.string().optional().default(""),
+  challenges: z.string().optional().default(""),
+  status: z.string().trim().optional().default("submitted"),
+})
 
 async function createClient() {
   const cookieStore = await cookies()
@@ -49,7 +65,7 @@ async function canMutateWeek(supabase: ReportsClient, week: number, year: number
   return Boolean(data)
 }
 
-export async function POST(request: Request) {
+export async function PATCH(request: Request) {
   try {
     const supabase = await createClient()
     const {
@@ -65,29 +81,21 @@ export async function POST(request: Request) {
 
     const dataClient = getServiceRoleClientOrFallback(supabase as ReportsClient)
     const body = (await request.json()) as WeeklyReportPayload
+    const parsed = SaveWeeklyReportSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid request body" }, { status: 400 })
+    }
+
     log.info({ body }, "Weekly report save request received")
 
-    const department = normalizeDepartmentName(String(body.department || "").trim())
-    const weekNumber = Number(body.week_number)
-    const yearNumber = Number(body.year)
-    const workDone = String(body.work_done || "").trim()
-    const tasksNewWeek = String(body.tasks_new_week || "").trim()
-    const challenges = String(body.challenges || "").trim()
-    const status = String(body.status || "submitted").trim() || "submitted"
-    const reportId = String(body.id || "").trim()
-
-    if (!department || !workDone) {
-      log.warn({ department, hasWorkDone: Boolean(workDone) }, "Weekly report validation failed")
-      return NextResponse.json({ error: "Required: Department and Work Done" }, { status: 400 })
-    }
-    if (!Number.isFinite(weekNumber) || weekNumber < 1 || weekNumber > 53) {
-      log.warn({ weekNumber }, "Weekly report validation failed: invalid week")
-      return NextResponse.json({ error: "Week must be between 1 and 53" }, { status: 400 })
-    }
-    if (!Number.isFinite(yearNumber) || yearNumber < 2000 || yearNumber > 2100) {
-      log.warn({ yearNumber }, "Weekly report validation failed: invalid year")
-      return NextResponse.json({ error: "Year must be between 2000 and 2100" }, { status: 400 })
-    }
+    const department = normalizeDepartmentName(parsed.data.department)
+    const weekNumber = parsed.data.week_number
+    const yearNumber = parsed.data.year
+    const workDone = parsed.data.work_done
+    const tasksNewWeek = parsed.data.tasks_new_week.trim()
+    const challenges = parsed.data.challenges.trim()
+    const status = parsed.data.status || "submitted"
+    const reportId = String(parsed.data.id || "").trim()
 
     const isGlobalReportsEditor =
       scope.role === "developer" ||
@@ -102,13 +110,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "You cannot manage reports for this department" }, { status: 403 })
     }
 
-    const { data: existingByKey, error: existingByKeyError } = await dataClient
+    const { data: deptRow } = await dataClient.from("departments").select("id").eq("name", department).single()
+
+    const weeklyReportQuery = dataClient
       .from("weekly_reports")
       .select("id, user_id, department, week_number, year")
-      .eq("department", department)
       .eq("week_number", weekNumber)
       .eq("year", yearNumber)
-      .maybeSingle()
+
+    const { data: existingByKey, error: existingByKeyError } = await (
+      deptRow?.id ? weeklyReportQuery.eq("department_id", deptRow.id) : weeklyReportQuery.eq("department", department)
+    ).maybeSingle()
 
     if (existingByKeyError) {
       log.error({ err: existingByKeyError, department, weekNumber, yearNumber }, "Failed to look up existing report")
@@ -193,4 +205,9 @@ export async function POST(request: Request) {
     log.error({ err: String(error) }, "POST /api/reports/weekly-reports failed")
     return NextResponse.json({ error: message }, { status: 500 })
   }
+}
+
+// POST kept for backwards compat — prefer PATCH
+export async function POST(request: Request) {
+  return PATCH(request)
 }

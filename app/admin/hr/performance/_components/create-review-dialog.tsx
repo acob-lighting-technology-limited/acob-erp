@@ -124,7 +124,7 @@ export function CreateReviewDialog({ open, onOpenChange, queryClient }: CreateRe
         cbt_score: scoreData.cbt_score ?? 0,
         attendance_score: scoreData.attendance_score ?? 0,
       }))
-      toast.success("KPI and attendance scores auto-filled from ERP data")
+      toast.success("KPI, KSS, and attendance scores auto-filled from ERP data")
     } catch {
       toast.error("Failed to auto-fill scores")
     } finally {

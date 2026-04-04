@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { z } from "zod"
 import { createClient as createAdminClient } from "@supabase/supabase-js"
 import { rateLimit, getClientId } from "@/lib/rate-limit"
 import {
@@ -13,6 +14,39 @@ import { logger } from "@/lib/logger"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 
 const log = logger("hr-leave-approve")
+
+const ApproveLeaveRequestSchema = z
+  .object({
+    leave_request_id: z.string().trim().min(1, "Missing required fields"),
+    action: z.enum(["approve", "reject"]).optional(),
+    status: z.enum(["approved", "rejected"]).optional(),
+    comments: z.string().optional(),
+    override_evidence: z.boolean().optional(),
+  })
+  .superRefine((value, ctx) => {
+    const normalizedAction =
+      value.action === "approve" || value.status === "approved"
+        ? "approved"
+        : value.action === "reject" || value.status === "rejected"
+          ? "rejected"
+          : null
+
+    if (!normalizedAction) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Missing required fields",
+        path: ["action"],
+      })
+    }
+
+    if (normalizedAction === "rejected" && !value.comments?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Comments are required when rejecting a leave request",
+        path: ["comments"],
+      })
+    }
+  })
 
 type LeaveRequestStageSnapshot = {
   stage_order: number
@@ -85,8 +119,8 @@ function humanStage(stageCode: string) {
   }
 }
 
-export async function POST(request: NextRequest) {
-  const rl = rateLimit(`leave-approve:${getClientId(request)}`, { limit: 30, windowSec: 600 })
+export async function PATCH(request: NextRequest) {
+  const rl = await rateLimit(`leave-approve:${getClientId(request)}`, { limit: 30, windowSec: 600 })
   if (!rl.allowed) {
     return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 })
   }
@@ -108,16 +142,13 @@ export async function POST(request: NextRequest) {
         : supabase
 
     const body = await request.json()
-    const { leave_request_id, comments, override_evidence } = body
-    const action = normalizeAction(body)
-
-    if (!leave_request_id || !action) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
+    const parsed = ApproveLeaveRequestSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid request body" }, { status: 400 })
     }
 
-    if (action === "rejected" && !comments?.trim()) {
-      return NextResponse.json({ error: "Comments are required when rejecting a leave request" }, { status: 400 })
-    }
+    const { leave_request_id, comments, override_evidence } = parsed.data
+    const action = normalizeAction(parsed.data)
 
     const { data: actorProfile } = await supabase
       .from("profiles")
@@ -447,4 +478,9 @@ export async function POST(request: NextRequest) {
     log.error({ err: String(error) }, "Error in POST /api/hr/leave/approve:")
     return NextResponse.json({ error: error instanceof Error ? error.message : "An error occurred" }, { status: 500 })
   }
+}
+
+// POST kept for backwards compat — prefer PATCH
+export async function POST(request: NextRequest) {
+  return PATCH(request)
 }

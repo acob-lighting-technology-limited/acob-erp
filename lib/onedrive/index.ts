@@ -10,6 +10,8 @@ export type {
   OneDriveFolderResponse,
   OneDriveUploadResult,
   AzureTokenResponse,
+  OneDriveDrive,
+  OneDriveDriveResponse,
   OneDriveConfig,
   FileItem,
   FileCategory,

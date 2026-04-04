@@ -1,6 +1,7 @@
 import "server-only"
 
 import { readFile } from "node:fs/promises"
+import { existsSync } from "node:fs"
 import { join } from "node:path"
 import JSZip from "jszip"
 import type { ActionItem } from "@/lib/export-utils"
@@ -10,7 +11,11 @@ import {
   normalizeDepartmentName,
 } from "@/shared/departments"
 
-const TEMPLATE_FILE = join(process.cwd(), "ACTION POINTS - 9TH MARCH 2026.docx")
+const TEMPLATE_CANDIDATES = [
+  join(process.cwd(), "action-points-template.docx"),
+  join(process.cwd(), "templates", "action-points-template.docx"),
+  join(process.cwd(), "ACTION POINTS - 9TH MARCH 2026.docx"),
+]
 const SAFE_SECTION_SPACER_XML =
   '<w:p><w:pPr><w:pStyle w:val="BodyText"/><w:spacing w:before="25"/><w:ind w:left="0" w:firstLine="0"/></w:pPr></w:p>'
 const DEPARTMENT_ORDER = getCanonicalDepartmentOrder().filter((department) => department !== "Executive Management")
@@ -136,7 +141,12 @@ export async function generateActionPointsDocxBuffer(
   year: number,
   meetingDate?: string
 ) {
-  const templateBuffer = await readFile(TEMPLATE_FILE)
+  const templateFile = TEMPLATE_CANDIDATES.find((candidate) => existsSync(candidate))
+  if (!templateFile) {
+    throw new Error("Action Points template file is missing")
+  }
+
+  const templateBuffer = await readFile(templateFile)
   const zip = await JSZip.loadAsync(templateBuffer)
   const documentXml = await zip.file("word/document.xml")?.async("string")
   if (!documentXml) throw new Error("Action Points template is missing word/document.xml")

@@ -75,7 +75,7 @@ async function fetchLeaveApprovalData(): Promise<{
   const [myQueueRes, allQueueRes, requestsRes] = await Promise.all([
     fetch("/api/hr/leave/queue"),
     fetch("/api/hr/leave/queue?all=true"),
-    fetch("/api/hr/leave/requests?all=true"),
+    fetch("/api/hr/leave/requests?all=true&limit=200"),
   ])
   if (!myQueueRes.ok || !allQueueRes.ok || !requestsRes.ok) throw new Error("Failed to load leave data")
   const myQueuePayload = await myQueueRes.json()

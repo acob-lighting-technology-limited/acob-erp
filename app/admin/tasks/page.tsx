@@ -2,14 +2,10 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
-import {
-  AdminTasksContent,
-  type Task,
-  type employee,
-  type Project,
-  type UserProfile,
-} from "./management/admin-tasks-content"
+import { AdminTasksContent, type employee, type Project, type UserProfile } from "./management/admin-tasks-content"
+import type { Task } from "@/types/task"
 import { listAssignableProfiles } from "@/lib/workforce/assignment-policy"
+import { hasGlobalTaskAssignmentAuthority } from "@/lib/tasks/assignment-scope"
 
 import { logger } from "@/lib/logger"
 
@@ -44,14 +40,22 @@ async function getAdminTasksData() {
   if (!scope) {
     return { redirect: "/profile" as const }
   }
-  const departmentScope = getDepartmentScope(scope, "general")
+  const isGlobalTaskAssigner = hasGlobalTaskAssignmentAuthority({
+    id: user.id,
+    department: scope.department,
+    is_department_lead: scope.isDepartmentLead,
+    lead_departments: scope.leadDepartments,
+  })
+  const departmentScope = isGlobalTaskAssigner ? null : getDepartmentScope(scope, "general")
 
   const userProfile: UserProfile = {
     id: user.id,
     role: scope.role,
     department: scope.department,
+    is_department_lead: scope.isDepartmentLead,
     lead_departments: scope.leadDepartments,
     managed_departments: scope.managedDepartments,
+    is_global_task_assigner: isGlobalTaskAssigner,
   }
 
   // Build query based on role - exclude weekly action point items
@@ -120,16 +124,18 @@ async function getAdminTasksData() {
       : { data: [] }
 
   // Grouping logic
-  const assignmentsByTask = new Map()
+  const assignmentsByTask = new Map<string, string[]>()
   allTaskAssignments?.forEach((a) => {
-    if (!assignmentsByTask.has(a.task_id)) assignmentsByTask.set(a.task_id, [])
-    assignmentsByTask.get(a.task_id).push(a.user_id)
+    const existingAssignments = assignmentsByTask.get(a.task_id) || []
+    existingAssignments.push(a.user_id)
+    assignmentsByTask.set(a.task_id, existingAssignments)
   })
 
-  const completionsByTask = new Map()
+  const completionsByTask = new Map<string, Set<string>>()
   allCompletions?.forEach((c) => {
-    if (!completionsByTask.has(c.task_id)) completionsByTask.set(c.task_id, new Set())
-    completionsByTask.get(c.task_id).add(c.user_id)
+    const existingCompletions = completionsByTask.get(c.task_id) || new Set<string>()
+    existingCompletions.add(c.user_id)
+    completionsByTask.set(c.task_id, existingCompletions)
   })
 
   // 6. Reconstruct tasksWithUsers
@@ -149,14 +155,17 @@ async function getAdminTasksData() {
     if (task.assignment_type === "multiple") {
       const userIds = assignmentsByTask.get(task.id) || []
       const taskComps = completionsByTask.get(task.id) || new Set()
-      taskData.assigned_users = userIds.map((uid: string) => {
+      const assignedUsers: NonNullable<Task["assigned_users"]> = []
+      for (const uid of userIds) {
         const prof = multProfileMap.get(uid)
-        return {
+        if (!prof) continue
+        assignedUsers.push({
           ...prof,
-          department: prof?.department || "",
+          department: prof.department || "",
           completed: taskComps.has(uid),
-        }
-      })
+        })
+      }
+      taskData.assigned_users = assignedUsers
     }
     return taskData
   }) as Task[]

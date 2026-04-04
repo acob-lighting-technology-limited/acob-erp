@@ -1,3 +1,4 @@
+import crypto from "crypto"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { ORG } from "@/config/constants"
 import { renderInternalNotificationEmail } from "@/lib/email-templates/internal-notification"
@@ -54,8 +55,7 @@ export async function buildApprovalEmailPreview({
     phone_number: pendingUser.phone_number || undefined,
     office_location: pendingUser.office_location || undefined,
   }
-  const currentYear = new Date().getFullYear()
-  const tempPassword = `Welcome${currentYear}!`
+  const tempPassword = crypto.randomBytes(12).toString("base64url").slice(0, 16)
   const portalUrl = ORG.MAIL_PORTAL_URL
   const onboardingMailEnabled = await isSystemNotificationChannelEnabled(supabase, "onboarding", "email")
 

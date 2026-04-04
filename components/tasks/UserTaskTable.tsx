@@ -19,7 +19,7 @@ import {
   HeadphonesIcon,
 } from "lucide-react"
 import { formatName } from "@/lib/utils"
-import type { Task } from "@/app/(app)/tasks/management/tasks-content"
+import type { Task } from "@/types/task"
 
 function getPriorityColor(priority: string) {
   switch (priority) {
@@ -107,11 +107,7 @@ function buildTaskInfo(task: Task) {
           : "task"
 
   const assignmentLabel =
-    task.assignment_type === "department"
-      ? "Dept"
-      : task.assignment_type === "multiple"
-        ? "Group"
-        : "Individual"
+    task.assignment_type === "department" ? "Dept" : task.assignment_type === "multiple" ? "Group" : "Individual"
 
   return {
     title: task.work_item_number ? `${task.work_item_number} task guide` : "Task guide",
@@ -197,7 +193,9 @@ export function UserTaskTable({ filteredTasks, filterStatus, onViewTask }: UserT
                           </Badge>
                         )}
                       </div>
-                      {task.work_item_number && <div className="text-muted-foreground text-xs">{task.work_item_number}</div>}
+                      {task.work_item_number && (
+                        <div className="text-muted-foreground text-xs">{task.work_item_number}</div>
+                      )}
                     </div>
                   </div>
                 </TableCell>

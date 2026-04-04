@@ -20,6 +20,8 @@ import { ActionTrackerFilters } from "./_components/action-tracker-filters"
 import { ActionTrackerExportButtons } from "./_components/action-tracker-export-buttons"
 import { DeptActionRows } from "./_components/dept-action-rows"
 import { fetchActionTrackerMetadata, fetchActionTrackerTasks, getDeptStatus, getStatusColor } from "./_lib/queries"
+import { ActionFormDialog } from "@/components/admin/action-tracker/action-form-dialog"
+import { Button } from "@/components/ui/button"
 
 const log = logger("dashboard-reports-action-tracker")
 
@@ -41,6 +43,7 @@ export default function ActionTrackerPortal() {
   const [deptFilter, setDeptFilter] = useState("all")
   const [searchQuery, setSearchQuery] = useState("")
   const [meetingDate, setMeetingDate] = useState<string | undefined>(undefined)
+  const [isFormOpen, setIsFormOpen] = useState(false)
 
   const { data: metaData } = useQuery({
     queryKey: QUERY_KEYS.actionTrackerMetadata(),
@@ -78,11 +81,13 @@ export default function ActionTrackerPortal() {
       return
     }
     try {
-      const { error } = await supabase
-        .from("tasks")
-        .update({ status: newStatus, updated_at: new Date().toISOString() })
-        .eq("id", taskId)
-      if (error) throw error
+      const response = await fetch(`/api/reports/action-tracker/${taskId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      })
+      const payload = (await response.json().catch(() => null)) as { error?: string } | null
+      if (!response.ok) throw new Error(payload?.error || "Failed to update status")
       toast.success("Status updated")
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.actionTrackerTasks({ week, year, deptFilter }) })
     } catch (error) {
@@ -129,17 +134,22 @@ export default function ActionTrackerPortal() {
       title="Action Tracker"
       description="Track departmental items and progress for the current week"
       icon={FileSpreadsheet}
-      backLinkHref="/reports"
-      backLinkLabel="Back to Reports"
+      backLinkHref="/reports/general-meeting"
+      backLinkLabel="Back to General Meeting"
       actions={
-        tasks.length > 0 ? (
-          <ActionTrackerExportButtons
-            actionItems={actionItemsForExport}
-            week={week}
-            year={year}
-            meetingDate={meetingDate}
-          />
-        ) : null
+        <div className="flex items-center gap-2">
+          {profile?.is_department_lead && profile.department ? (
+            <Button onClick={() => setIsFormOpen(true)}>Create Action Item</Button>
+          ) : null}
+          {tasks.length > 0 ? (
+            <ActionTrackerExportButtons
+              actionItems={actionItemsForExport}
+              week={week}
+              year={year}
+              meetingDate={meetingDate}
+            />
+          ) : null}
+        </div>
       }
       stats={
         <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-5 md:gap-4">
@@ -213,6 +223,18 @@ export default function ActionTrackerPortal() {
           </TableBody>
         </Table>
       </div>
+
+      <ActionFormDialog
+        isOpen={isFormOpen}
+        onClose={() => setIsFormOpen(false)}
+        onComplete={() =>
+          queryClient.invalidateQueries({ queryKey: QUERY_KEYS.actionTrackerTasks({ week, year, deptFilter }) })
+        }
+        departments={profile?.department ? [profile.department] : allDepartments}
+        defaultDept={profile?.department || undefined}
+        defaultWeek={week}
+        defaultYear={year}
+      />
     </AdminTablePage>
   )
 }

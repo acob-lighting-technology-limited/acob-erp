@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from "next/server"
+import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { logger } from "@/lib/logger"
 
 const log = logger("dev-login-log")
+const DevLoginLogSchema = z.object({
+  authMethod: z.enum(["otp", "password"]).optional(),
+})
 
 export async function POST(request: NextRequest) {
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json({ error: "Not available in production" }, { status: 404 })
+  }
+
   try {
     const supabase = await createClient()
     const {
@@ -18,8 +26,9 @@ export async function POST(request: NextRequest) {
     let authMethod = "password"
     try {
       const body = await request.json()
-      if (body?.authMethod === "otp" || body?.authMethod === "password") {
-        authMethod = body.authMethod
+      const parsed = DevLoginLogSchema.safeParse(body)
+      if (parsed.success && parsed.data.authMethod) {
+        authMethod = parsed.data.authMethod
       }
     } catch {
       // Body is optional for this endpoint.

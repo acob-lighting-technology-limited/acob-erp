@@ -33,10 +33,12 @@ export interface AdminScope {
   userId: string
   role: AdminRole
   department: string | null
+  departmentId: string | null
   officeLocation: string | null
   isDepartmentLead: boolean
   leadDepartments: string[]
   managedDepartments: string[]
+  managedDepartmentIds: string[]
   managedOffices: string[]
   isAdminLike: boolean
   adminDomains: AdminDomain[] | null
@@ -45,10 +47,16 @@ export interface AdminScope {
 interface ProfileShape {
   role: AdminRole | null
   department: string | null
+  department_id: string | null
   office_location: string | null
   admin_domains: string[] | null
   is_department_lead: boolean
   lead_departments: string[] | null
+}
+
+interface DepartmentRow {
+  id: string
+  name: string
 }
 
 const ADMIN_DOMAINS: AdminDomain[] = ["hr", "finance", "assets", "reports", "tasks", "projects", "communications"]
@@ -136,6 +144,21 @@ function scopeDepartments(profile: ProfileShape): string[] {
   return []
 }
 
+export function scopeDepartmentIds(profile: ProfileShape, departmentIdsByName: Map<string, string>): string[] {
+  const ids = new Set<string>()
+  const scopedDepartments = scopeDepartments(profile)
+
+  for (const departmentName of scopedDepartments) {
+    const normalizedName = normalizeDepartmentName(departmentName)
+    const departmentId = departmentIdsByName.get(normalizedName)
+    if (departmentId) ids.add(departmentId)
+  }
+
+  if (profile.department_id) ids.add(profile.department_id)
+
+  return Array.from(ids)
+}
+
 function normalizeAdminDomains(domains: string[] | null | undefined): AdminDomain[] | null {
   if (!Array.isArray(domains)) return null
   const normalized = Array.from(
@@ -161,6 +184,7 @@ async function resolveManagedOffices(
   if (ownOffice) offices.add(ownOffice)
 
   if (managedDepartments.length > 0) {
+    // TODO: migrate office_locations.department text filter to department_id FK
     const { data } = await supabase.from("office_locations").select("name").in("department", managedDepartments)
 
     for (const row of data || []) {
@@ -174,7 +198,7 @@ async function resolveManagedOffices(
 export async function resolveAdminScope(supabase: SupabaseClient, userId: string): Promise<AdminScope | null> {
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role, department, office_location, admin_domains, is_department_lead, lead_departments")
+    .select("role, department, department_id, office_location, admin_domains, is_department_lead, lead_departments")
     .eq("id", userId)
     .single<ProfileShape>()
 
@@ -185,6 +209,28 @@ export async function resolveAdminScope(supabase: SupabaseClient, userId: string
 
   const isAdminLike = isAdminLikeRole(normalizedRole)
   const managedDepartments = isAdminLike ? [] : scopeDepartments(profile)
+  const departmentNamesForLookup = Array.from(
+    new Set([
+      ...managedDepartments.map((departmentName) => normalizeDepartmentName(departmentName)),
+      ...(profile.department ? [normalizeDepartmentName(profile.department)] : []),
+    ])
+  )
+  const departmentIdsByName = new Map<string, string>()
+
+  if (departmentNamesForLookup.length > 0) {
+    const { data: departments } = await supabase
+      .from("departments")
+      .select("id, name")
+      .in("name", departmentNamesForLookup)
+
+    for (const department of (departments || []) as DepartmentRow[]) {
+      if (department.name) {
+        departmentIdsByName.set(normalizeDepartmentName(department.name), department.id)
+      }
+    }
+  }
+
+  const managedDepartmentIds = isAdminLike ? [] : scopeDepartmentIds(profile, departmentIdsByName)
   const managedOffices = isAdminLike
     ? []
     : await resolveManagedOffices(supabase, managedDepartments, profile.office_location ?? null)
@@ -199,10 +245,12 @@ export async function resolveAdminScope(supabase: SupabaseClient, userId: string
     userId,
     role: normalizedRole,
     department: profile.department ?? null,
+    departmentId: profile.department_id ?? null,
     officeLocation: profile.office_location ?? null,
     isDepartmentLead,
     leadDepartments: Array.isArray(profile.lead_departments) ? profile.lead_departments : [],
     managedDepartments,
+    managedDepartmentIds,
     managedOffices,
     isAdminLike,
     adminDomains,

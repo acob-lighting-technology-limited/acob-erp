@@ -8,6 +8,16 @@ import { useRouter } from "next/navigation"
 import { useQuery } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
@@ -100,6 +110,7 @@ export function ChangeStatusContent({ employee, onSuccess, onCancel }: ChangeSta
   const [suspensionEndDate, setSuspensionEndDate] = useState("")
   const [separationDate, setSeparationDate] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [confirmOpen, setConfirmOpen] = useState(false)
   const [selectedLeaveTypeId, setSelectedLeaveTypeId] = useState("")
   const [localBlockersOverride, setLocalBlockersOverride] = useState<SeparationBlockers | null>(null)
   const router = useRouter()
@@ -153,6 +164,15 @@ export function ChangeStatusContent({ employee, onSuccess, onCancel }: ChangeSta
       return
     }
 
+    if (status === "suspended" || status === "separated") {
+      setConfirmOpen(true)
+      return
+    }
+
+    await submitStatusChange()
+  }
+
+  const submitStatusChange = async () => {
     const selectedLeaveType = leaveTypeOptions.find((opt) => opt.id === selectedLeaveTypeId)
     const selectedReasonLabel =
       status === "separated"
@@ -163,6 +183,7 @@ export function ChangeStatusContent({ employee, onSuccess, onCancel }: ChangeSta
             ? selectedLeaveType?.name
             : undefined
 
+    setConfirmOpen(false)
     setIsLoading(true)
     try {
       const response = await fetch(`/api/v1/hr/employees/${employee.id}/status`, {
@@ -420,6 +441,29 @@ export function ChangeStatusContent({ employee, onSuccess, onCancel }: ChangeSta
           )}
         </Button>
       </div>
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{isSeparating ? "Confirm separation" : "Confirm suspension"}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {isSeparating
+                ? "This will remove the employee's access immediately. Are you sure?"
+                : "This will suspend the employee's access immediately. Are you sure?"}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isLoading}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={isLoading}
+              onClick={() => void submitStatusChange()}
+            >
+              Confirm
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

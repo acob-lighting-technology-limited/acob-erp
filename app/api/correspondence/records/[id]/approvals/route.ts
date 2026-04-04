@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { z } from "zod"
 import {
   appendCorrespondenceAuditLog,
   appendCorrespondenceEvent,
@@ -11,7 +12,12 @@ import { logger } from "@/lib/logger"
 
 const log = logger("correspondence-records-approvals")
 
-const APPROVAL_DECISIONS = ["approved", "rejected", "returned_for_correction"]
+const CreateCorrespondenceApprovalSchema = z.object({
+  decision: z.enum(["approved", "rejected", "returned_for_correction"], {
+    errorMap: () => ({ message: "decision must be one of approved, rejected, returned_for_correction" }),
+  }),
+  comments: z.string().optional().nullable(),
+})
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -36,15 +42,13 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     }
 
     const body = await request.json()
-    const decision = String(body?.decision || "").toLowerCase()
-    const comments = body?.comments ? String(body.comments).trim() : null
-
-    if (!APPROVAL_DECISIONS.includes(decision)) {
-      return NextResponse.json(
-        { error: "decision must be one of approved, rejected, returned_for_correction" },
-        { status: 400 }
-      )
+    const parsed = CreateCorrespondenceApprovalSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid request body" }, { status: 400 })
     }
+
+    const decision = parsed.data.decision
+    const comments = parsed.data.comments ? String(parsed.data.comments).trim() : null
 
     const approvalScopeDepartment = record.department_name || record.assigned_department_name
     const isApprover =
@@ -162,3 +166,6 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     return NextResponse.json({ error: "Failed to process approval" }, { status: 500 })
   }
 }
+
+// POST kept for backwards compat — prefer PATCH
+export { POST as PATCH }

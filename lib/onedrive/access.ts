@@ -8,12 +8,74 @@ interface OneDriveProfile {
   lead_departments: string[] | null
 }
 
+const explicitDepartmentMappings: Record<string, string> = {
+  accounts: "accounts",
+  "admin & hr": "admin-hr",
+  "business, growth and innovation": "business-growth-innovation",
+  "corporate services": "corporate-services",
+  "demo operations": "demo-operations",
+  "executive management": "executive-management",
+  "it and communications": "it-communications",
+  logistics: "logistics",
+  "monitoring and evaluation": "monitoring-evaluation",
+  "operations and maintenance": "operations-maintenance",
+  project: "project",
+  "regulatory and compliance": "regulatory-compliance",
+  technical: "technical",
+}
+
+const explicitLibraryMappings = Object.fromEntries(
+  Object.entries(explicitDepartmentMappings).map(([department, key]) => [key, department])
+)
+
+export function departmentToLibraryKey(department: string): string {
+  const normalizedDepartment = department.trim().toLowerCase()
+  return (
+    explicitDepartmentMappings[normalizedDepartment] ??
+    normalizedDepartment.replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")
+  )
+}
+
+export function libraryKeyToDepartment(libraryKey: string): string {
+  const normalizedKey = libraryKey.trim().toLowerCase()
+  const explicitDepartment = explicitLibraryMappings[normalizedKey]
+  if (explicitDepartment) {
+    return explicitDepartment
+      .split(" ")
+      .map((part) => (part === "&" ? part : part.charAt(0).toUpperCase() + part.slice(1)))
+      .join(" ")
+  }
+
+  return normalizedKey
+    .split("-")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ")
+}
+
+export function getDepartmentContextFromPath(path: string): { departmentKey: string; departmentName: string } | null {
+  const normalizedPath = normalizePath(path)
+  const [departmentKey] = normalizedPath.split("/").filter(Boolean)
+
+  if (!departmentKey) return null
+
+  return {
+    departmentKey,
+    departmentName: libraryKeyToDepartment(departmentKey),
+  }
+}
+
 export interface OneDriveAccessScope {
   isAdminLike: boolean
   managedDepartments: string[]
   allowedPrefixes: string[]
   defaultPath: string
   rootLabel: string
+}
+
+interface ResolveOneDriveAccessScopeOptions {
+  allowAdminLike?: boolean
+  allowManagedDepartments?: boolean
 }
 
 function normalizePath(path: string): string {
@@ -27,8 +89,10 @@ function uniqueDepartments(values: (string | null | undefined)[]): string[] {
 
 export async function resolveOneDriveAccessScope(
   supabase: SupabaseClient,
-  userId: string
+  userId: string,
+  options: ResolveOneDriveAccessScopeOptions = {}
 ): Promise<OneDriveAccessScope | null> {
+  const { allowAdminLike = true, allowManagedDepartments = true } = options
   const { data: profile } = await supabase
     .from("profiles")
     .select("role, department, is_department_lead, lead_departments")
@@ -37,38 +101,38 @@ export async function resolveOneDriveAccessScope(
 
   if (!profile) return null
 
-  if (isAdminLikeRole(profile.role)) {
+  if (allowAdminLike && isAdminLikeRole(profile.role)) {
     return {
       isAdminLike: true,
       managedDepartments: [],
-      allowedPrefixes: ["/Projects"],
-      defaultPath: "/Projects",
-      rootLabel: "Projects",
+      allowedPrefixes: ["/"],
+      defaultPath: "/",
+      rootLabel: "Department Libraries",
     }
   }
 
   const leadDepartments = Array.isArray(profile.lead_departments) ? profile.lead_departments : []
-  const managedDepartments = profile.is_department_lead
-    ? uniqueDepartments([...leadDepartments, profile.department])
-    : uniqueDepartments([profile.department])
+  const managedDepartments =
+    allowManagedDepartments && profile.is_department_lead
+      ? uniqueDepartments([...leadDepartments, profile.department])
+      : uniqueDepartments([profile.department])
 
   if (managedDepartments.length === 0) return null
 
-  const allowedPrefixes = managedDepartments.map((dept) => normalizePath(`/Projects/${dept}`))
+  const allowedPrefixes = managedDepartments.map((dept) => normalizePath(`/${departmentToLibraryKey(dept)}`))
   const defaultDepartment = managedDepartments[0]
 
   return {
     isAdminLike: false,
     managedDepartments,
     allowedPrefixes,
-    defaultPath: normalizePath(`/Projects/${defaultDepartment}`),
-    rootLabel: "Projects",
+    defaultPath: normalizePath(`/${departmentToLibraryKey(defaultDepartment)}`),
+    rootLabel: defaultDepartment,
   }
 }
 
 export function isPathAllowed(path: string, scope: OneDriveAccessScope): boolean {
   const normalizedPath = normalizePath(path)
-  if (!normalizedPath.startsWith("/Projects")) return false
   if (scope.isAdminLike) return true
   return scope.allowedPrefixes.some((prefix) => normalizedPath === prefix || normalizedPath.startsWith(`${prefix}/`))
 }

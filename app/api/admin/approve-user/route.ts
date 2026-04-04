@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
+import { z } from "zod"
 import { buildApprovalEmailPreview } from "@/lib/onboarding/approval-email-preview"
 import { createClient as createServerClient } from "@/lib/supabase/server"
 import { rateLimit, getClientId } from "@/lib/rate-limit"
@@ -14,8 +15,14 @@ import { writeAuditLog } from "@/lib/audit/write-audit"
 
 const log = logger("approve-user")
 
+const ApproveUserSchema = z.object({
+  pendingUserId: z.string().trim().min(1, "Missing pendingUserId"),
+  employeeId: z.string().trim().optional(),
+  hireDate: z.string().trim().nullable().optional(),
+})
+
 export async function POST(req: Request) {
-  const rl = rateLimit(`approve-user:${getClientId(req)}`, { limit: 20, windowSec: 600 })
+  const rl = await rateLimit(`approve-user:${getClientId(req)}`, { limit: 20, windowSec: 600 })
   if (!rl.allowed) {
     return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 })
   }
@@ -56,11 +63,12 @@ export async function POST(req: Request) {
     })
 
     const body = await req.json()
-    const { pendingUserId, employeeId: manualEmployeeId, hireDate } = body
-
-    if (!pendingUserId) {
-      return NextResponse.json({ error: "Missing pendingUserId" }, { status: 400 })
+    const parsed = ApproveUserSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid request body" }, { status: 400 })
     }
+
+    const { pendingUserId, employeeId: manualEmployeeId, hireDate } = parsed.data
 
     // 1. Fetch Pending User Details
     const { data: pendingUser, error: fetchError } = await supabaseAdmin

@@ -1,10 +1,13 @@
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
+import { z } from "zod"
 import { getDepartmentScope, resolveAdminScope, normalizeDepartmentName } from "@/lib/admin/rbac"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { logger } from "@/lib/logger"
 import { writeAuditLog } from "@/lib/audit/write-audit"
+import { getPaginationRange, paginatedResponse, PaginationSchema } from "@/lib/pagination"
+import { checkIdempotency, getIdempotencyKey, storeIdempotencyKey } from "@/lib/idempotency"
 
 const log = logger("payments")
 
@@ -18,6 +21,48 @@ type UserPaymentsProfile = {
 }
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+const CreatePaymentSchema = z
+  .object({
+    department_id: z.string().trim().min(1, "Missing required fields (including Issuer Name & Phone)"),
+    payment_type: z.enum(["one-time", "recurring"]).optional(),
+    category: z.enum(["one-time", "recurring"], {
+      errorMap: () => ({ message: "Category must be 'one-time' or 'recurring'" }),
+    }),
+    title: z.string().trim().min(1, "Missing required fields (including Issuer Name & Phone)"),
+    description: z.string().optional().nullable(),
+    amount: z.union([z.number(), z.string()]).refine((value) => String(value).trim().length > 0, {
+      message: "Missing required fields (including Issuer Name & Phone)",
+    }),
+    currency: z.string().optional().default("NGN"),
+    recurrence_period: z.string().optional().nullable(),
+    next_payment_due: z.string().optional().nullable(),
+    payment_date: z.string().optional().nullable(),
+    issuer_name: z.string().trim().min(1, "Missing required fields (including Issuer Name & Phone)"),
+    issuer_phone_number: z.string().trim().min(1, "Missing required fields (including Issuer Name & Phone)"),
+    issuer_address: z.string().optional().nullable(),
+    payment_reference: z.string().optional().nullable(),
+    notes: z.string().optional().nullable(),
+  })
+  .superRefine((value, ctx) => {
+    const derivedPaymentType = value.payment_type || value.category
+
+    if (derivedPaymentType === "recurring" && (!value.recurrence_period || !value.next_payment_due)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Recurring payments require recurrence_period and next_payment_due",
+        path: ["recurrence_period"],
+      })
+    }
+
+    if (derivedPaymentType === "one-time" && !value.payment_date) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "One-time payments require payment_date",
+        path: ["payment_date"],
+      })
+    }
+  })
 
 const normalizeDepartmentId = (value: unknown): string | null => {
   const raw = typeof value === "string" ? value.trim() : ""
@@ -52,6 +97,15 @@ export async function GET(request: Request) {
   try {
     const supabase = await createClient()
     const { searchParams } = new URL(request.url)
+    const paginationParsed = PaginationSchema.safeParse(Object.fromEntries(searchParams))
+    if (!paginationParsed.success) {
+      return NextResponse.json(
+        { error: paginationParsed.error.issues[0]?.message ?? "Invalid pagination params" },
+        { status: 400 }
+      )
+    }
+    const pagination = paginationParsed.data
+    const { from, to } = getPaginationRange(pagination)
 
     const departmentId = searchParams.get("department_id")
     const paymentType = searchParams.get("payment_type")
@@ -81,7 +135,8 @@ export async function GET(request: Request) {
                 *,
                 department:departments(*),
                 documents:payment_documents(id, document_type, file_path, file_name, applicable_date)
-            `
+            `,
+        { count: "exact" }
       )
       .order("created_at", { ascending: false })
 
@@ -127,11 +182,11 @@ export async function GET(request: Request) {
       query = query.neq("status", "cancelled")
     }
 
-    const { data: payments, error } = await query
+    const { data: payments, error, count } = await query.range(from, to)
 
     if (error) throw error
 
-    return NextResponse.json({ data: payments })
+    return NextResponse.json(paginatedResponse(payments || [], count || 0, pagination))
   } catch (error) {
     log.error({ err: String(error) }, "Error fetching payments:")
     return NextResponse.json({ error: "Failed to fetch payments" }, { status: 500 })
@@ -151,7 +206,21 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    const dataClient = getServiceRoleClientOrFallback(supabase)
+    const idempotencyKey = getIdempotencyKey(request)
+    if (idempotencyKey) {
+      const { isDuplicate, cachedResponse } = await checkIdempotency(dataClient, idempotencyKey)
+      if (isDuplicate) {
+        return NextResponse.json(cachedResponse, { status: 200 })
+      }
+    }
+
     const body = await request.json()
+    const parsed = CreatePaymentSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid request body" }, { status: 400 })
+    }
+
     const {
       department_id,
       payment_type,
@@ -159,7 +228,7 @@ export async function POST(request: Request) {
       title,
       description,
       amount,
-      currency = "NGN",
+      currency,
       recurrence_period,
       next_payment_due,
       payment_date,
@@ -168,32 +237,10 @@ export async function POST(request: Request) {
       issuer_address,
       payment_reference,
       notes,
-    } = body
-
-    // Validate required fields - category must be "one-time" or "recurring"
-    if (!department_id || !category || !title || !amount || !issuer_name || !issuer_phone_number) {
-      return NextResponse.json({ error: "Missing required fields (including Issuer Name & Phone)" }, { status: 400 })
-    }
-
-    // Validate category is one of the allowed values
-    if (category !== "one-time" && category !== "recurring") {
-      return NextResponse.json({ error: "Category must be 'one-time' or 'recurring'" }, { status: 400 })
-    }
+    } = parsed.data
 
     // Derive payment_type from category (they are now the same)
     const derivedPaymentType = payment_type || category
-
-    // Validate payment type specific fields
-    if (derivedPaymentType === "recurring" && (!recurrence_period || !next_payment_due)) {
-      return NextResponse.json(
-        { error: "Recurring payments require recurrence_period and next_payment_due" },
-        { status: 400 }
-      )
-    }
-
-    if (derivedPaymentType === "one-time" && !payment_date) {
-      return NextResponse.json({ error: "One-time payments require payment_date" }, { status: 400 })
-    }
 
     // Note: Categories are now fixed ("one-time" or "recurring"), no need to auto-create
 
@@ -203,7 +250,6 @@ export async function POST(request: Request) {
       .eq("id", user.id)
       .single()
     const scope = await resolveAdminScope(supabase, user.id)
-    const dataClient = getServiceRoleClientOrFallback(supabase)
 
     if (scope) {
       const scopedDepartments = getDepartmentScope(scope, "finance")
@@ -282,7 +328,12 @@ export async function POST(request: Request) {
       { failOpen: true }
     )
 
-    return NextResponse.json({ data: payment }, { status: 201 })
+    const responsePayload = { data: payment }
+    if (idempotencyKey) {
+      await storeIdempotencyKey(dataClient, idempotencyKey, responsePayload)
+    }
+
+    return NextResponse.json(responsePayload, { status: 201 })
   } catch (error: unknown) {
     log.error({ err: String(error) }, "Error creating payment:")
     const message = error instanceof Error ? error.message : "Failed to create payment"

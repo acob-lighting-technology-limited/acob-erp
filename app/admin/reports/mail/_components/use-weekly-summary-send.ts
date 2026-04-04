@@ -95,6 +95,8 @@ async function fetchActionPointsAttachment(params: {
       week: params.week,
       year: params.year,
       type: "action_point",
+      persist: true,
+      reuseStored: true,
     }),
   })
 
@@ -125,7 +127,13 @@ async function fetchWeeklyReportAttachment(params: {
   const response = await fetch("/api/reports/weekly-report-export", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ week: params.week, year: params.year, type: "weekly_report" }),
+    body: JSON.stringify({
+      week: params.week,
+      year: params.year,
+      type: "weekly_report",
+      persist: true,
+      reuseStored: true,
+    }),
   })
 
   if (!response.ok) {

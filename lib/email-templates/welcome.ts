@@ -1,5 +1,7 @@
 import { escapeHtml } from "./utils"
 
+const ICT_SUPPORT_EMAIL = process.env.ICT_SUPPORT_EMAIL || "ict@acoblighting.com"
+
 export interface PendingUser {
   first_name: string
   last_name: string
@@ -116,7 +118,7 @@ export function renderWelcomeEmail({ pendingUser, tempPassword, portalUrl }: Wel
         </div>
         <div class="support">
             Please log in and change your password immediately.<br>
-            If you have any questions, contact <a href="mailto:ict@acoblighting.com">ict@acoblighting.com</a>
+            If you have any questions, contact <a href="mailto:${ICT_SUPPORT_EMAIL}">${ICT_SUPPORT_EMAIL}</a>
         </div>
     </div>
     <div class="footer" style="background-color:#0f2d1f;">

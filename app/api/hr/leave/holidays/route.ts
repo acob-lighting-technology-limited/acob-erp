@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
+import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>
+const HolidayEntrySchema = z.record(z.unknown())
+const SaveHolidaysSchema = z.union([HolidayEntrySchema, z.array(HolidayEntrySchema)])
 
 async function assertHR(supabase: SupabaseServerClient, userId: string) {
   const { data } = await supabase.from("profiles").select("role").eq("id", userId).single()
@@ -32,7 +35,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function POST(request: NextRequest) {
+export async function PATCH(request: NextRequest) {
   try {
     const supabase = await createClient()
     const {
@@ -44,7 +47,11 @@ export async function POST(request: NextRequest) {
     if (!isHR) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
     const body = await request.json()
-    const payload = Array.isArray(body) ? body : [body]
+    const parsed = SaveHolidaysSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid request body" }, { status: 400 })
+    }
+    const payload = Array.isArray(parsed.data) ? parsed.data : [parsed.data]
 
     const { data, error } = await supabase
       .from("holiday_calendar")
@@ -69,4 +76,9 @@ export async function POST(request: NextRequest) {
   } catch {
     return NextResponse.json({ error: "An error occurred" }, { status: 500 })
   }
+}
+
+// POST kept for backwards compat — prefer PATCH
+export async function POST(request: NextRequest) {
+  return PATCH(request)
 }

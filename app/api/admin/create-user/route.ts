@@ -11,6 +11,7 @@ import {
 import { formValidation } from "@/lib/validation"
 import { logger } from "@/lib/logger"
 import { writeAuditLog } from "@/lib/audit/write-audit"
+import { checkIdempotency, getIdempotencyKey, storeIdempotencyKey } from "@/lib/idempotency"
 
 const log = logger("admin-create-user")
 
@@ -18,7 +19,7 @@ export const dynamic = "force-dynamic"
 
 type AdminCreateUserClient = Awaited<ReturnType<typeof createServerClient>>
 
-export async function POST(request: NextRequest) {
+export async function PATCH(request: NextRequest) {
   // First, verify the caller is authenticated and has user-management privileges
   const supabase = await createServerClient()
   const {
@@ -50,6 +51,14 @@ export async function POST(request: NextRequest) {
       persistSession: false,
     },
   })
+  const idempotencyKey = getIdempotencyKey(request)
+
+  if (idempotencyKey) {
+    const { isDuplicate, cachedResponse } = await checkIdempotency(serviceSupabase, idempotencyKey)
+    if (isDuplicate) {
+      return NextResponse.json(cachedResponse, { status: 200 })
+    }
+  }
 
   try {
     const body = await request.json()
@@ -253,15 +262,18 @@ export async function POST(request: NextRequest) {
       { failOpen: true }
     )
 
-    return NextResponse.json(
-      {
-        success: true,
-        message: "User created successfully. They can now login with their email and receive an OTP.",
-        userId: authData.user.id,
-        email: authData.user.email,
-      },
-      { status: 201 }
-    )
+    const responsePayload = {
+      success: true,
+      message: "User created successfully. They can now login with their email and receive an OTP.",
+      userId: authData.user.id,
+      email: authData.user.email,
+    }
+
+    if (idempotencyKey) {
+      await storeIdempotencyKey(serviceSupabase, idempotencyKey, responsePayload)
+    }
+
+    return NextResponse.json(responsePayload, { status: 201 })
   } catch (error) {
     log.error({ err: String(error) }, "[v0] Create user failed:")
     return NextResponse.json(
@@ -272,4 +284,9 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   }
+}
+
+// POST kept for backwards compat — prefer PATCH
+export async function POST(request: NextRequest) {
+  return PATCH(request)
 }

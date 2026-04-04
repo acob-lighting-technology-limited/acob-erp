@@ -41,7 +41,11 @@ function err(step: string, detail: string): StepResult {
   return { step, status: "error", detail }
 }
 
-export async function POST(request: NextRequest) {
+export async function PATCH(request: NextRequest) {
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json({ error: "Not available in production" }, { status: 404 })
+  }
+
   // ── Auth guard: developer only ──────────────────────────────────────────────
   const supabase = await createClient()
   const {
@@ -323,4 +327,9 @@ export async function POST(request: NextRequest) {
     const message = error instanceof Error ? error.message : "Unexpected error"
     return NextResponse.json({ ok: false, error: message, steps }, { status: 500 })
   }
+}
+
+// POST kept for backwards compat — prefer PATCH
+export async function POST(request: NextRequest) {
+  return PATCH(request)
 }

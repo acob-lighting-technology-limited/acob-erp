@@ -26,6 +26,7 @@ import { PptxModeDialog } from "./_components/pptx-mode-dialog"
 import { DeleteReportDialog } from "./_components/delete-report-dialog"
 import { WeeklyReportExportActions } from "./_components/weekly-report-export-actions"
 import { WeeklyReportTable } from "./_components/weekly-report-table"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
 interface AdminWeeklyReportsData {
   reports: WeeklyReport[]
@@ -128,6 +129,15 @@ interface WeeklyReportsContentProps {
   }
 }
 
+type OfficialBackfillStatus = {
+  state: "idle" | "running" | "success" | "error"
+  processed?: number
+  created?: number
+  existing?: number
+  skipped?: number
+  error?: string
+}
+
 export function WeeklyReportsContent({
   initialDepartments,
   employees,
@@ -156,6 +166,7 @@ export function WeeklyReportsContent({
   const [kssPresenterIdInput, setKssPresenterIdInput] = useState("none")
   const [savingMeetingWindow, setSavingMeetingWindow] = useState(false)
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
+  const [officialBackfillStatus, setOfficialBackfillStatus] = useState<OfficialBackfillStatus>({ state: "idle" })
 
   const supabase = createClient()
   const queryClient = useQueryClient()
@@ -267,6 +278,46 @@ export function WeeklyReportsContent({
     setKssPresenterIdInput(weekSetupData.kssPresenterId || "none")
   }, [isAdminRole, weekSetupData])
 
+  useEffect(() => {
+    if (!isAdminRole) return
+
+    setOfficialBackfillStatus({ state: "running" })
+    void fetch("/api/reports/official-exports", {
+      method: "POST",
+    })
+      .then(async (response) => {
+        const payload = (await response.json().catch(() => null)) as {
+          success?: boolean
+          processed?: number
+          results?: Array<{ status?: string }>
+          error?: string
+        } | null
+
+        if (!response.ok) {
+          throw new Error(payload?.error || "Failed to backfill official PDFs")
+        }
+
+        const results = payload?.results || []
+        const created = results.filter((item) => item.status === "created").length
+        const existing = results.filter((item) => item.status === "existing").length
+        const skipped = results.filter((item) => item.status === "skipped").length
+
+        setOfficialBackfillStatus({
+          state: "success",
+          processed: payload?.processed || 0,
+          created,
+          existing,
+          skipped,
+        })
+      })
+      .catch((error: unknown) => {
+        setOfficialBackfillStatus({
+          state: "error",
+          error: error instanceof Error ? error.message : "Failed to backfill official PDFs",
+        })
+      })
+  }, [isAdminRole])
+
   const presenterOptions = employees
     .filter((employee) => normalizeDepartmentName(employee.department) === normalizeDepartmentName(kssDepartmentInput))
     .sort((a, b) => a.full_name.localeCompare(b.full_name))
@@ -281,17 +332,16 @@ export function WeeklyReportsContent({
     }
 
     try {
-      const response = await fetch(meetingDocument.signed_url)
-      if (!response.ok) throw new Error("Failed to download document")
-      const blob = await response.blob()
-      const objectUrl = URL.createObjectURL(blob)
+      const toastId = toast.loading("Preparing download...")
       const anchor = document.createElement("a")
-      anchor.href = objectUrl
+      anchor.href = meetingDocument.signed_url
       anchor.download = meetingDocument.file_name
       document.body.appendChild(anchor)
       anchor.click()
       anchor.remove()
-      URL.revokeObjectURL(objectUrl)
+      window.setTimeout(() => {
+        toast.dismiss(toastId)
+      }, 6000)
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : "Failed to download document")
     }
@@ -434,8 +484,8 @@ export function WeeklyReportsContent({
       title="Weekly Reports"
       description="Review and export departmental reports"
       icon={FileBarChart}
-      backLinkHref="/admin/reports"
-      backLinkLabel="Back to Reports"
+      backLinkHref="/admin/reports/general-meeting"
+      backLinkLabel="Back to General Meeting"
       actionsPlacement="below"
       actions={
         <WeeklyReportExportActions
@@ -484,6 +534,33 @@ export function WeeklyReportsContent({
         />
       }
     >
+      {officialBackfillStatus.state !== "idle" ? (
+        <Alert
+          className={
+            officialBackfillStatus.state === "error"
+              ? "mb-4 border-red-200 bg-red-50 text-red-900"
+              : officialBackfillStatus.state === "running"
+                ? "mb-4 border-blue-200 bg-blue-50 text-blue-900"
+                : "mb-4 border-emerald-200 bg-emerald-50 text-emerald-900"
+          }
+        >
+          <AlertTitle>
+            {officialBackfillStatus.state === "running"
+              ? "Official PDFs backfilling"
+              : officialBackfillStatus.state === "error"
+                ? "Official PDF backfill failed"
+                : "Official PDFs synced"}
+          </AlertTitle>
+          <AlertDescription>
+            {officialBackfillStatus.state === "running"
+              ? "Locked weeks are being checked and stored in SharePoint in the background."
+              : officialBackfillStatus.state === "error"
+                ? officialBackfillStatus.error || "The backfill could not complete."
+                : `Processed ${officialBackfillStatus.processed || 0} export checks: ${officialBackfillStatus.created || 0} created, ${officialBackfillStatus.existing || 0} already present, ${officialBackfillStatus.skipped || 0} skipped.`}
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
       <WeeklyReportTable
         loading={loading}
         filteredReports={filteredReports}

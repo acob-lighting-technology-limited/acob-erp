@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { z } from "zod"
 import { canAccessAdminSection, resolveAdminScope } from "@/lib/admin/rbac"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
@@ -9,6 +10,12 @@ interface CreateAssetTypePayload {
   code?: string
   requiresSerialModel?: boolean
 }
+
+const CreateAssetTypeSchema = z.object({
+  label: z.string().trim().min(1, "Both label and code are required"),
+  code: z.string().trim().min(1, "Both label and code are required"),
+  requiresSerialModel: z.boolean().optional().default(false),
+})
 
 type AdminAssetTypesClient = Awaited<ReturnType<typeof createClient>>
 
@@ -69,16 +76,14 @@ export async function POST(request: NextRequest) {
   }
 
   const payload = (await request.json().catch(() => null)) as CreateAssetTypePayload | null
-  const label = String(payload?.label || "").trim()
-  const code = String(payload?.code || "")
-    .trim()
-    .toUpperCase()
-    .replace(/\s+/g, "")
-  const requiresSerialModel = Boolean(payload?.requiresSerialModel)
-
-  if (!label || !code) {
-    return NextResponse.json({ error: "Both label and code are required" }, { status: 400 })
+  const parsed = CreateAssetTypeSchema.safeParse(payload)
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid request body" }, { status: 400 })
   }
+
+  const label = parsed.data.label
+  const code = parsed.data.code.trim().toUpperCase().replace(/\s+/g, "")
+  const requiresSerialModel = parsed.data.requiresSerialModel
 
   const dataClient = getServiceRoleClientOrFallback(supabase as AdminAssetTypesClient)
   const { data, error } = await dataClient

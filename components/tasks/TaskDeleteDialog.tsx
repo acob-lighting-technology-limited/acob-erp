@@ -10,7 +10,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
-import type { Task } from "@/app/admin/tasks/management/admin-tasks-content"
+import type { Task } from "@/types/task"
 
 interface TaskDeleteDialogProps {
   isOpen: boolean

@@ -28,6 +28,7 @@ interface AdminDocumentationContentProps {
     rootLabel: string
     enabled: boolean
     lockToInitialPath?: boolean
+    accessMode?: "self" | "admin"
   }
   defaultTab?: "knowledge-docs" | "department-documents"
   hideTabList?: boolean
@@ -237,6 +238,7 @@ export function AdminDocumentationContent({
             initialPath={departmentDocs.initialPath}
             rootLabel={departmentDocs.rootLabel}
             lockToInitialPath={Boolean(departmentDocs.lockToInitialPath)}
+            accessMode={departmentDocs.accessMode ?? "admin"}
           />
         ) : (
           <Card className="border-2">

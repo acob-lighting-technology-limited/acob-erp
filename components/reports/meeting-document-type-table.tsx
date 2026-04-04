@@ -259,13 +259,10 @@ export function MeetingDocumentTypeTable({
 
   const handleDownload = async (row: MeetingDocument) => {
     if (!row.signed_url) return
+    const toastId = toast.loading("Preparing download...")
     try {
-      const response = await fetch(row.signed_url)
-      if (!response.ok) throw new Error("Failed to download document")
-      const blob = await response.blob()
-      const objectUrl = URL.createObjectURL(blob)
       const anchor = document.createElement("a")
-      anchor.href = objectUrl
+      anchor.href = row.signed_url
       anchor.download = buildMeetingDocumentFileName({
         documentType: row.document_type,
         meetingDate: row.meeting_date || `${row.meeting_year}-01-01`,
@@ -275,8 +272,11 @@ export function MeetingDocumentTypeTable({
       document.body.appendChild(anchor)
       anchor.click()
       anchor.remove()
-      URL.revokeObjectURL(objectUrl)
+      window.setTimeout(() => {
+        toast.dismiss(toastId)
+      }, 6000)
     } catch (error: unknown) {
+      toast.dismiss(toastId)
       toast.error(error instanceof Error ? error.message : "Download failed")
     }
   }
@@ -510,7 +510,7 @@ export function MeetingDocumentTypeTable({
             </Button>
             {readOnly ? (
               <Button variant="secondary" asChild>
-                <Link href="/admin/reports/minutes-of-meeting">Open Admin Reports</Link>
+                <Link href="/admin/reports/general-meeting/minutes-of-meeting">Open Admin Reports</Link>
               </Button>
             ) : null}
           </div>

@@ -22,6 +22,9 @@ export interface Review {
   attendance_score?: number | null
   behaviour_score?: number | null
   final_score?: number | null
+  acknowledged_at?: string | null
+  acknowledged_by?: string | null
+  employee_comments?: string | null
   behaviour_competencies?: {
     collaboration?: number
     accountability?: number

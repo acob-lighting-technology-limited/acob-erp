@@ -1,5 +1,9 @@
 "use client"
 
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { z } from "zod"
+import { useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -13,6 +17,14 @@ import {
 } from "@/components/ui/dialog"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Plus } from "lucide-react"
+
+const assetTypeSchema = z.object({
+  label: z.string().min(1, "Full name is required"),
+  code: z.string().min(1, "Short name is required"),
+  requiresSerialModel: z.boolean(),
+})
+
+type AssetTypeFormValues = z.infer<typeof assetTypeSchema>
 
 interface NewAssetType {
   label: string
@@ -37,6 +49,48 @@ export function AssetTypeDialog({
   onCreateAssetType,
   isCreatingAssetType,
 }: AssetTypeDialogProps) {
+  const form = useForm<AssetTypeFormValues>({
+    resolver: zodResolver(assetTypeSchema),
+    defaultValues: {
+      label: newAssetType.label,
+      code: newAssetType.code,
+      requiresSerialModel: newAssetType.requiresSerialModel,
+    },
+  })
+
+  const {
+    register,
+    watch,
+    setValue,
+    formState: { errors },
+  } = form
+
+  // Sync form state back to parent whenever values change
+  useEffect(() => {
+    const subscription = watch((values) => {
+      setNewAssetType({
+        label: values.label ?? "",
+        code: values.code ?? "",
+        requiresSerialModel: values.requiresSerialModel ?? false,
+      })
+    })
+    return () => subscription.unsubscribe()
+  }, [watch, setNewAssetType])
+
+  // Reset form when dialog opens with new data
+  useEffect(() => {
+    if (isOpen) {
+      form.reset({
+        label: newAssetType.label,
+        code: newAssetType.code,
+        requiresSerialModel: newAssetType.requiresSerialModel,
+      })
+    }
+  }, [isOpen]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const labelValue = watch("label")
+  const codeValue = watch("code")
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
@@ -59,10 +113,10 @@ export function AssetTypeDialog({
             <Input
               id="asset_type_label"
               placeholder="e.g., Office Chair, Desktop Computer"
-              value={newAssetType.label}
-              onChange={(e) => setNewAssetType({ ...newAssetType, label: e.target.value })}
+              {...register("label")}
               className="mt-1.5"
             />
+            {errors.label && <p className="text-destructive mt-1 text-xs">{errors.label.message}</p>}
             <p className="text-muted-foreground mt-1 text-xs">The full name of the asset type</p>
           </div>
           <div>
@@ -70,14 +124,15 @@ export function AssetTypeDialog({
             <Input
               id="asset_type_code"
               placeholder="e.g., CHAIR, DSKST"
-              value={newAssetType.code}
+              value={codeValue}
               onChange={(e) => {
                 const code = e.target.value.toUpperCase().replace(/\s+/g, "")
-                setNewAssetType({ ...newAssetType, code })
+                setValue("code", code)
               }}
               className="mt-1.5 font-mono"
               maxLength={20}
             />
+            {errors.code && <p className="text-destructive mt-1 text-xs">{errors.code.message}</p>}
             <p className="text-muted-foreground mt-1 text-xs">
               Short code used in unique asset codes (e.g., ACOB/HQ/CHAIR/24/001)
             </p>
@@ -85,8 +140,8 @@ export function AssetTypeDialog({
           <div className="bg-muted/50 flex items-center space-x-2 rounded-lg border p-3">
             <Checkbox
               id="requires_serial"
-              checked={newAssetType.requiresSerialModel}
-              onCheckedChange={(checked) => setNewAssetType({ ...newAssetType, requiresSerialModel: checked === true })}
+              checked={watch("requiresSerialModel")}
+              onCheckedChange={(checked) => setValue("requiresSerialModel", checked === true)}
             />
             <Label htmlFor="requires_serial" className="cursor-pointer text-sm font-normal">
               Requires Serial Number &amp; Model
@@ -97,10 +152,7 @@ export function AssetTypeDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button
-            onClick={onCreateAssetType}
-            disabled={isCreatingAssetType || !newAssetType.label.trim() || !newAssetType.code.trim()}
-          >
+          <Button onClick={onCreateAssetType} disabled={isCreatingAssetType || !labelValue.trim() || !codeValue.trim()}>
             {isCreatingAssetType ? "Creating..." : "Create Asset Type"}
           </Button>
         </DialogFooter>

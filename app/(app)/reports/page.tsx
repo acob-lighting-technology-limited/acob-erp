@@ -1,7 +1,7 @@
 "use client"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { FileBarChart, ClipboardList, FileText, ChevronRight, ArrowLeft, Presentation } from "lucide-react"
+import { FileBarChart, ChevronRight, ArrowLeft, Users } from "lucide-react"
 import Link from "next/link"
 import { PageWrapper, PageHeader } from "@/components/layout"
 import { Button } from "@/components/ui/button"
@@ -9,36 +9,12 @@ import { Button } from "@/components/ui/button"
 export default function PortalReportsPage() {
   const reportCards = [
     {
-      title: "Weekly Reports",
-      description: "View and submit weekly status updates and performance summaries for your department.",
-      href: "/reports/weekly-reports",
-      icon: FileText,
-      color: "text-green-600 dark:text-green-400",
-      bgColor: "bg-green-100 dark:bg-green-900/30",
-    },
-    {
-      title: "Action Tracker",
-      description: "Track project progress, pending actions, and update completion status for your team.",
-      href: "/reports/action-tracker",
-      icon: ClipboardList,
-      color: "text-blue-600 dark:text-blue-400",
-      bgColor: "bg-blue-100 dark:bg-blue-900/30",
-    },
-    {
-      title: "Knowledge Sharing Session",
-      description: "Upload weekly Knowledge Sharing Session files and track who presented by department.",
-      href: "/reports/kss",
-      icon: Presentation,
+      title: "General Meeting",
+      description: "Open the weekly reports, action tracker, KSS, and minutes tools used for your general meeting.",
+      href: "/reports/general-meeting",
+      icon: Users,
       color: "text-indigo-600 dark:text-indigo-400",
       bgColor: "bg-indigo-100 dark:bg-indigo-900/30",
-    },
-    {
-      title: "Minutes of Meeting",
-      description: "Upload and access weekly Minutes of Meeting PDFs for future reference.",
-      href: "/reports/minutes-of-meeting",
-      icon: FileText,
-      color: "text-amber-600 dark:text-amber-400",
-      bgColor: "bg-amber-100 dark:bg-amber-900/30",
     },
   ]
 

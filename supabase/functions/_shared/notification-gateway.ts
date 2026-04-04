@@ -1,6 +1,8 @@
-import { Resend } from "npm:resend@2.0.0"
+import { sendEmail } from "./email.ts"
 
-export const DEFAULT_NOTIFICATION_SENDER = "ACOB Internal Systems <notifications@acoblighting.com>"
+const notificationSenderEmail = Deno.env.get("NOTIFICATION_SENDER_EMAIL") || "notifications@acoblighting.com"
+
+export const DEFAULT_NOTIFICATION_SENDER = `ACOB Internal Systems <${notificationSenderEmail}>`
 
 export type NotificationModule =
   | "Onboarding"
@@ -22,7 +24,6 @@ export type NotificationKey =
   | "system"
 
 interface SendEdgeNotificationEmailInput {
-  resend: Resend
   to: Array<string | null | undefined>
   subject: string
   html: string
@@ -48,14 +49,12 @@ export async function sendEdgeNotificationEmail(input: SendEdgeNotificationEmail
   const recipients = normalizeRecipientEmails(input.to)
   if (!recipients.length) return { sent: false as const, reason: "no_recipients" as const }
 
-  const { error } = await input.resend.emails.send({
+  await sendEmail({
     from: input.from || DEFAULT_NOTIFICATION_SENDER,
     to: recipients,
     subject: withSubjectPrefix(input.moduleName, input.subject),
     html: input.html,
   })
-
-  if (error) throw new Error(error.message || "Failed to send email")
 
   return { sent: true as const, recipients }
 }
