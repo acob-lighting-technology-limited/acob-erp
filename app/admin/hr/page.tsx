@@ -1,6 +1,8 @@
 "use client"
 
+import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
+import { useQueryClient } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -11,6 +13,8 @@ import { StatCard } from "@/components/ui/stat-card"
 import { isAssignableEmploymentStatus } from "@/lib/workforce/assignment-policy"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import type { Database } from "@/types/database"
+import { useSearchParams } from "next/navigation"
+import { CreateReviewDialog } from "./performance/_components/create-review-dialog"
 
 interface DashboardStats {
   pendingLeaveRequests: number
@@ -123,6 +127,9 @@ async function fetchHrDashboardStats(): Promise<DashboardStats> {
 }
 
 export default function HRAdminDashboard() {
+  const queryClient = useQueryClient()
+  const searchParams = useSearchParams()
+  const [isCreateReviewOpen, setIsCreateReviewOpen] = useState(searchParams.get("openReview") === "1")
   const {
     data: stats = {
       pendingLeaveRequests: 0,
@@ -295,9 +302,9 @@ export default function HRAdminDashboard() {
               <CardDescription>Create and manage employee reviews</CardDescription>
             </CardHeader>
             <CardContent>
-              <Link href="/admin/hr/performance/create">
-                <Button className="w-full">Create Review</Button>
-              </Link>
+              <Button className="w-full" onClick={() => setIsCreateReviewOpen(true)}>
+                Create Review
+              </Button>
             </CardContent>
           </Card>
         </div>
@@ -338,7 +345,7 @@ export default function HRAdminDashboard() {
                     <p className="font-medium">{stats.upcomingReviews} reviews pending</p>
                     <p className="text-muted-foreground text-sm">Performance reviews to complete</p>
                   </div>
-                  <Link href="/admin/hr/performance/create">
+                  <Link href="/admin/hr?openReview=1">
                     <Button size="sm">Create</Button>
                   </Link>
                 </div>
@@ -354,6 +361,7 @@ export default function HRAdminDashboard() {
           </CardContent>
         </Card>
       </Section>
+      <CreateReviewDialog open={isCreateReviewOpen} onOpenChange={setIsCreateReviewOpen} queryClient={queryClient} />
     </PageWrapper>
   )
 }

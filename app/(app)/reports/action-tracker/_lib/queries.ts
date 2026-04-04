@@ -13,8 +13,14 @@ export interface ActionTask {
 }
 
 export interface ActionTrackerMetadata {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  profile: any
+  profile: {
+    id?: string
+    role?: string | null
+    department?: string | null
+    is_department_lead?: boolean | null
+    lead_departments?: string[] | null
+    admin_domains?: string[] | null
+  } | null
   allDepartments: string[]
 }
 
@@ -29,8 +35,7 @@ export async function fetchActionTrackerMetadata(
     data: { user },
   } = await supabase.auth.getUser()
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let profile: any = null
+  let profile: ActionTrackerMetadata["profile"] = null
   if (user) {
     const { data: p } = await supabase.from("profiles").select("*").eq("id", user.id).single()
     profile = p
@@ -52,21 +57,11 @@ export async function fetchActionTrackerTasks(
   year: number,
   deptFilter: string
 ): Promise<ActionTrackerTasksResult> {
-  let query = supabase
-    .from("tasks")
-    .select("*")
-    .eq("category", "weekly_action")
-    .eq("week_number", week)
-    .eq("year", year)
-    .order("department", { ascending: true })
-
-  if (deptFilter !== "all") {
-    query = query.eq("department", deptFilter)
-  }
-
-  const { data, error } = await query
-  if (error) throw new Error(error.message)
-  return { tasks: data || [] }
+  const params = new URLSearchParams({ week: String(week), year: String(year), dept: deptFilter })
+  const response = await fetch(`/api/reports/action-tracker?${params.toString()}`, { cache: "no-store" })
+  const payload = (await response.json().catch(() => null)) as { data?: ActionTask[]; error?: string } | null
+  if (!response.ok) throw new Error(payload?.error || "Failed to fetch action items")
+  return { tasks: payload?.data || [] }
 }
 
 export function getDeptStatus(tasks: ActionTask[], dept: string) {

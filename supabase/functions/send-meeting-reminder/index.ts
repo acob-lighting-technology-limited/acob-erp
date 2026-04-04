@@ -1,11 +1,10 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0"
-import { Resend } from "npm:resend@2.0.0"
 import { writeEdgeAuditLog } from "../_shared/audit.ts"
+import { sendEmail } from "../_shared/email.ts"
 import { getCurrentOfficeWeek, getOfficeWeekFromDate, resolveEffectiveMeetingDateIso } from "../_shared/meeting-date.ts"
 import { isEdgeSystemEmailEnabled } from "../_shared/notification-gateway.ts"
 
-const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")!
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
 
@@ -22,23 +21,10 @@ type KnowledgePresenter = {
   department?: string | null
 }
 
-const RESEND_MAX_REQ_PER_SEC = 2
-const SEND_INTERVAL_MS = Math.ceil(1000 / RESEND_MAX_REQ_PER_SEC) + 100 // safety margin
-const MAX_429_RETRIES = 5
 const DEFAULT_TIME_ZONE = "Africa/Lagos"
-const DEFAULT_SENDER = "ACOB Internal Systems <notifications@acoblighting.com>"
-
-type RateLimitErrorLike = {
-  statusCode?: number | string
-  status?: number | string
-  name?: string
-  message?: string
-}
-
-type SendEmailResponse = {
-  data?: { id?: string | null } | null
-  error?: { message?: string | null } | null
-}
+const DEFAULT_SENDER_EMAIL = Deno.env.get("NOTIFICATION_SENDER_EMAIL") || "notifications@acoblighting.com"
+const DEFAULT_SENDER = `ACOB Internal Systems <${DEFAULT_SENDER_EMAIL}>`
+const MEETING_CONTACT_EMAIL = Deno.env.get("MEETING_CONTACT_EMAIL") || "e.rafiat@org.acoblighting.com"
 
 type ReminderRequestBody = {
   type: ReminderType
@@ -50,6 +36,8 @@ type ReminderRequestBody = {
   teamsLink?: string
   agenda?: string[]
   meetingPreparedByName?: string
+  meetingPreparedByDesignation?: string
+  meetingPreparedByDepartment?: string
   sessionDate?: string
   sessionTime?: string
   duration?: string
@@ -75,52 +63,8 @@ function getErrorMessage(error: unknown): string {
   return "Unknown error"
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms))
-}
-
-function isRateLimitError(error: RateLimitErrorLike | null | undefined): boolean {
-  if (!error) return false
-  const statusCode = Number(error?.statusCode || error?.status || 0)
-  const name = String(error?.name || "").toLowerCase()
-  const msg = String(error?.message || "").toLowerCase()
-  return statusCode === 429 || name.includes("rate_limit") || msg.includes("too many requests")
-}
-
 function withSubjectPrefix(moduleName: string, subject: string): string {
   return String(subject || "").trim() || "Notification"
-}
-
-async function sendWithRetry(
-  resend: Resend,
-  from: string,
-  to: string,
-  subject: string,
-  html: string
-): Promise<SendEmailResponse> {
-  let attempt = 0
-  while (attempt <= MAX_429_RETRIES) {
-    const { data, error } = await resend.emails.send({
-      from,
-      to,
-      subject,
-      html,
-    })
-
-    if (!error) return { data }
-
-    if (!isRateLimitError(error) || attempt === MAX_429_RETRIES) {
-      return { error }
-    }
-
-    // Backoff: 1s, 2s, 3s... for 429 bursts.
-    const backoffMs = 1000 * (attempt + 1)
-    console.warn(`[meeting-reminder] Rate limit for ${to}. Retry ${attempt + 1}/${MAX_429_RETRIES} in ${backoffMs}ms`)
-    await sleep(backoffMs)
-    attempt += 1
-  }
-
-  return { error: { message: "Unexpected retry flow termination" } }
 }
 
 function buildKnowledgeSharingAgendaLabel(presenter?: KnowledgePresenter, department?: string): string {
@@ -178,11 +122,15 @@ function buildMeetingReminderHtml(
   meetingTime: string,
   teamsLink: string,
   agenda: string[],
-  preparedByName?: string
+  preparedByName?: string,
+  preparedByDesignation?: string,
+  preparedByDepartment?: string
 ): string {
   const { timingPhrase, effectiveDate } = getMeetingReminderDescriptor(meetingDate, meetingTime)
   const displayTime = formatTimeWithMeridiem(meetingTime)
   const preparedBy = escapeHtml(preparedByName?.trim() || "ACOB Team")
+  const designation = escapeHtml(preparedByDesignation?.trim() || "")
+  const department = escapeHtml(preparedByDepartment?.trim() || "Admin & HR Department")
   let agendaHtml = ""
   for (let i = 0; i < agenda.length; i++) {
     agendaHtml +=
@@ -258,17 +206,19 @@ function buildMeetingReminderHtml(
     "</div>" +
     '<div class="note-box">' +
     "<strong>Note:</strong> Your attendance is crucial to ensure we're all on the same page and can collaborate effectively. " +
-    'Please join on time, and feel free to reach out to <a href="mailto:e.rafiat@org.acoblighting.com" style="color:#1e40af;font-weight:600;text-decoration:none;">me</a> or any team member if you have questions or concerns.' +
+    `Please join on time, and feel free to reach out to <a href="mailto:${MEETING_CONTACT_EMAIL}" style="color:#1e40af;font-weight:600;text-decoration:none;">me</a> or any team member if you have questions or concerns.` +
     "</div>" +
     '<p class="text" style="text-align: center; font-weight: 600; color: #16a34a;">Looking forward to seeing you there.</p>' +
     "</div>" +
     '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#0f2d1f" style="background:#0f2d1f !important;background-color:#0f2d1f !important;border-top:3px solid #16a34a;">' +
     '<tr><td align="center" style="padding:20px;background:#0f2d1f !important;background-color:#0f2d1f !important;font-size:11px;color:#9ca3af;">' +
-    '<strong style="color:#fff;">ACOB Lighting Technology Limited</strong><br>' +
     '<span style="color:#d1d5db;">Prepared by ' +
     preparedBy +
     "</span><br>" +
-    "Admin &amp; HR Department<br>" +
+    (designation ? designation + "<br>" : "") +
+    department +
+    "<br>" +
+    '<strong style="color:#fff;">ACOB Lighting Technology Limited</strong><br>' +
     '<span style="color:#16a34a;font-weight:600;">Meeting Management System</span>' +
     "<br><br>" +
     '<i style="color:#9ca3af;">This is an automated system notification. Please do not reply directly to this email.</i>' +
@@ -350,8 +300,10 @@ function buildKnowledgeSharingHtml(sessionDate: string, sessionTime: string, dur
     "</div>" +
     '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#0f2d1f" style="background:#0f2d1f !important;background-color:#0f2d1f !important;border-top:3px solid #16a34a;">' +
     '<tr><td align="center" style="padding:20px;background:#0f2d1f !important;background-color:#0f2d1f !important;font-size:11px;color:#9ca3af;">' +
-    '<strong style="color:#fff;">ACOB Lighting Technology Limited</strong><br>' +
+    '<span style="color:#d1d5db;">Prepared by Admin &amp; HR</span><br>' +
+    "Administrative Team<br>" +
     "Admin &amp; HR Department<br>" +
+    '<strong style="color:#fff;">ACOB Lighting Technology Limited</strong><br>' +
     '<span style="color:#16a34a;font-weight:600;">Meeting Management System</span>' +
     "<br><br>" +
     '<i style="color:#9ca3af;">This is an automated system notification. Please do not reply directly to this email.</i>' +
@@ -509,7 +461,6 @@ serve(async (req) => {
     const authHeader = req.headers.get("Authorization")
     if (!authHeader) return new Response("Unauthorized", { status: 401 })
 
-    const resend = new Resend(RESEND_API_KEY)
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
     const meetingsMailEnabled = await isEdgeSystemEmailEnabled(supabase, "meetings")
     if (!meetingsMailEnabled) {
@@ -528,6 +479,8 @@ serve(async (req) => {
       teamsLink,
       agenda,
       meetingPreparedByName,
+      meetingPreparedByDesignation,
+      meetingPreparedByDepartment,
       sessionDate,
       sessionTime,
       duration,
@@ -582,7 +535,9 @@ serve(async (req) => {
         meetingTime || "8:30 AM",
         teamsLink || "",
         normalizedAgenda,
-        meetingPreparedByName
+        meetingPreparedByName,
+        meetingPreparedByDesignation,
+        meetingPreparedByDepartment
       )
     } else {
       subject = withSubjectPrefix("Meetings", "Reminder: Knowledge Sharing Session")
@@ -593,17 +548,14 @@ serve(async (req) => {
 
     const results: DeliveryResult[] = []
     for (const to of recipients) {
-      const { data, error } = await sendWithRetry(resend, from, to, subject, html)
-      if (error) {
+      try {
+        const data = await sendEmail({ from, to, subject, html })
+        console.log("[meeting-reminder] Sent to " + to + ". ID: " + data.id)
+        results.push({ to, success: true, emailId: data.id })
+      } catch (error) {
         console.error("[meeting-reminder] Failed to send to " + to + ":", JSON.stringify(error))
         results.push({ to, success: false, error })
-      } else {
-        console.log("[meeting-reminder] Sent to " + to + ". ID: " + data?.id)
-        results.push({ to, success: true, emailId: data?.id })
       }
-
-      // Throttle base send cadence to stay under provider limits.
-      await sleep(SEND_INTERVAL_MS)
     }
 
     try {
@@ -630,6 +582,8 @@ serve(async (req) => {
           knowledge_sharing_presenter: knowledgeSharingPresenter?.full_name || null,
           kss_roster_status: kssRosterStatus || null,
           prepared_by: meetingPreparedByName || null,
+          prepared_by_designation: meetingPreparedByDesignation || null,
+          prepared_by_department: meetingPreparedByDepartment || "Admin & HR Department",
         },
       })
     } catch (auditErr) {

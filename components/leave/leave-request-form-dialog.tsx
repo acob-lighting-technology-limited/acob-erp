@@ -10,6 +10,7 @@ import { SearchableSelect } from "@/components/ui/searchable-select"
 import { Textarea } from "@/components/ui/textarea"
 import { CalendarDays } from "lucide-react"
 import type { LeaveType, LeaveBalance } from "@/app/(app)/leave/page"
+import { getTodayLocalIsoDate } from "@/components/leave/leave-data"
 
 function prettyEligibility(status: string) {
   if (status === "eligible") return "Eligible"
@@ -137,7 +138,7 @@ export function LeaveRequestFormDialog({
                 type="date"
                 value={formData.start_date}
                 onChange={(event) => setFormData((prev) => ({ ...prev, start_date: event.target.value }))}
-                min={new Date().toISOString().slice(0, 10)}
+                min={getTodayLocalIsoDate()}
               />
             </div>
             <div className="space-y-2">

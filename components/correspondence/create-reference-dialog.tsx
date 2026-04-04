@@ -62,8 +62,8 @@ export function CreateReferenceDialog({
           Create Reference
         </Button>
       </DialogTrigger>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
+      <DialogContent className="max-w-3xl">
+        <DialogHeader>
           <div className="flex items-center gap-2">
             <DialogTitle>Create Reference</DialogTitle>
             <ItemInfoButton
@@ -89,7 +89,7 @@ export function CreateReferenceDialog({
             />
           </div>
           <DialogDescription>Fill the correspondence details and submit.</DialogDescription>
-          </DialogHeader>
+        </DialogHeader>
         <form className="grid gap-4 md:grid-cols-2" onSubmit={onSubmit}>
           <div className="space-y-2">
             <Label>Department</Label>
@@ -118,7 +118,8 @@ export function CreateReferenceDialog({
           </div>
           <div className="space-y-2">
             <Label>Sender</Label>
-            <Input value={form.sender_name} onChange={(e) => set({ sender_name: e.target.value })} />
+            <Input value={form.sender_name} readOnly />
+            <p className="text-muted-foreground text-xs">Sender is auto-filled from your profile.</p>
           </div>
 
           <div className="space-y-2">

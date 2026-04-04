@@ -86,12 +86,12 @@ export function AdminDashboard({ users, currentUserId: _currentUserId, feedbackB
   }
 
   const exportToCSV = () => {
-    const headers = ["First Name", "Last Name", "Department", "Company Role", "Email", "Phone", "Office Location"]
+    const headers = ["First Name", "Last Name", "Department", "Designation", "Email", "Phone", "Office Location"]
     const rows = filteredUsers.map((user) => [
       user.first_name,
       user.last_name,
       user.department,
-      user.company_role,
+      user.designation,
       user.company_email,
       user.phone_number,
       user.office_location,
@@ -125,7 +125,7 @@ export function AdminDashboard({ users, currentUserId: _currentUserId, feedbackB
           "First Name": user.first_name,
           "Last Name": user.last_name,
           Department: user.department,
-          "Company Role": user.company_role,
+          Designation: user.designation,
           Email: user.company_email,
           Phone: user.phone_number,
           "Office Location": user.office_location,
@@ -151,7 +151,7 @@ export function AdminDashboard({ users, currentUserId: _currentUserId, feedbackB
           user.first_name,
           user.last_name,
           user.department,
-          user.company_role,
+          user.designation,
           user.company_email,
           user.phone_number,
         ]),

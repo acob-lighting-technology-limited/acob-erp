@@ -11,6 +11,8 @@ export interface OneDriveItem {
   createdDateTime: string
   lastModifiedDateTime: string
   webUrl: string
+  createdBy?: OneDriveIdentitySet
+  lastModifiedBy?: OneDriveIdentitySet
   parentReference?: {
     driveId: string
     id: string
@@ -73,8 +75,36 @@ export interface OneDriveConfig {
   clientId: string
   clientSecret: string
   userEmail: string
+  siteId: string
+  siteHostname: string
+  sitePath: string
+  driveId: string
+  driveName: string
   paymentsFolder: string
   projectsFolder: string
+}
+
+export interface OneDriveDrive {
+  id: string
+  name: string
+  webUrl?: string
+  driveType?: string
+}
+
+export interface OneDriveDriveResponse {
+  value: OneDriveDrive[]
+}
+
+export interface OneDriveIdentityActor {
+  displayName?: string
+  email?: string
+  id?: string
+}
+
+export interface OneDriveIdentitySet {
+  user?: OneDriveIdentityActor
+  application?: OneDriveIdentityActor
+  device?: OneDriveIdentityActor
 }
 
 // Simplified file item for UI
@@ -85,7 +115,10 @@ export interface FileItem {
   size: number
   isFolder: boolean
   mimeType?: string
+  createdAt?: string
   lastModified: string
+  createdBy?: string
+  lastModifiedBy?: string
   webUrl: string
   downloadUrl?: string
   childCount?: number

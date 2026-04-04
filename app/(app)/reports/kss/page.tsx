@@ -12,16 +12,6 @@ export default async function DashboardKssPage() {
 
   if (userError || !user) redirect("/auth/login")
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role, is_department_lead")
-    .eq("id", user.id)
-    .single()
-
-  const role = String(profile?.role || "").toLowerCase()
-  const isAllowed = ["developer", "super_admin", "admin"].includes(role) || profile?.is_department_lead === true
-  if (!isAllowed) redirect("/reports")
-
   const { data: employees } = await supabase
     .from("profiles")
     .select("id, full_name, department")
@@ -36,9 +26,11 @@ export default async function DashboardKssPage() {
         full_name: e.full_name,
         department: e.department,
       }))}
-      backHref="/reports"
-      backLabel="Back to Reports"
+      backHref="/reports/general-meeting"
+      backLabel="Back to General Meeting"
       title="Knowledge Sharing Session"
+      currentUserId={user.id}
+      enableScoring
       readOnly
     />
   )

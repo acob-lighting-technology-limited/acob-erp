@@ -79,7 +79,9 @@ async function fetchProjectData(projectId: string): Promise<ProjectPageQueryData
   }
 
   const canViewProject =
-    projectResult.data.project_manager_id === user.id || projectResult.data.created_by === user.id || !!currentMemberResult.data
+    projectResult.data.project_manager_id === user.id ||
+    projectResult.data.created_by === user.id ||
+    !!currentMemberResult.data
 
   if (!canViewProject) {
     throw new Error("Forbidden")
@@ -164,8 +166,6 @@ export default function ProjectDetailPage() {
   const [newComment, setNewComment] = useState("")
   const [isSaving, setIsSaving] = useState(false)
 
-  const supabase = createClient()
-
   const { data: projectData, isLoading } = useQuery({
     queryKey: QUERY_KEYS.appProjectDetail(projectId),
     queryFn: () => fetchProjectData(projectId),
@@ -183,18 +183,13 @@ export default function ProjectDetailPage() {
     if (!newComment.trim()) return
     setIsSaving(true)
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (!user) throw new Error("Not authenticated")
-
-      const { error } = await supabase.from("project_updates").insert({
-        project_id: projectId,
-        user_id: user.id,
-        update_type: "comment",
-        content: newComment,
+      const response = await fetch(`/api/projects/${projectId}/updates`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: newComment }),
       })
-      if (error) throw error
+      const payload = (await response.json().catch(() => null)) as { error?: string } | null
+      if (!response.ok) throw new Error(payload?.error || "Failed to add comment")
 
       toast.success("Comment added successfully")
       setNewComment("")

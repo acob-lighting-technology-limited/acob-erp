@@ -27,6 +27,7 @@ export const QUERY_KEYS = {
 
   // Admin
   departments: () => ["departments"],
+  officeLocations: () => ["office-locations"],
   profiles: (filters?: Record<string, unknown>) => (filters ? ["profiles", filters] : ["profiles"]),
   profile: (id: string) => ["profile", id],
   assets: (filters?: Record<string, unknown>) => (filters ? ["assets", filters] : ["assets"]),
@@ -150,6 +151,7 @@ export const QUERY_KEYS = {
 
   // Employee onboarding form
   employeeOnboardingDepartments: () => ["employee-onboarding-departments"],
+  employeeOnboardingOfficeLocations: () => ["employee-onboarding-office-locations"],
 
   // HR change-status dialog
   hrEmployeeStatusBlockers: (employeeId: string) => ["hr-employee-status-blockers", employeeId],

@@ -1,5 +1,9 @@
 "use client"
 
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { z } from "zod"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -20,7 +24,31 @@ import { Card, CardContent } from "@/components/ui/card"
 import { EmptyState } from "@/components/ui/patterns"
 import { ItemInfoButton } from "@/components/ui/item-info-button"
 import { User, Users, Building2 } from "lucide-react"
-import type { Task, employee, Project } from "@/app/admin/tasks/management/admin-tasks-content"
+import type { Task } from "@/types/task"
+import type { employee, Project } from "@/app/admin/tasks/management/admin-tasks-content"
+
+interface KpiOption {
+  id: string
+  title: string
+}
+
+const taskFormSchema = z.object({
+  title: z.string().min(1, "Task title is required"),
+  description: z.string(),
+  priority: z.string(),
+  status: z.string(),
+  assigned_to: z.string(),
+  department: z.string(),
+  due_date: z.string(),
+  assignment_type: z.enum(["individual", "multiple", "department"]),
+  assigned_users: z.array(z.string()),
+  project_id: z.string(),
+  goal_id: z.string(),
+  task_start_date: z.string(),
+  task_end_date: z.string(),
+})
+
+type TaskFormValues = z.infer<typeof taskFormSchema>
 
 export interface TaskFormState {
   title: string
@@ -33,6 +61,7 @@ export interface TaskFormState {
   assignment_type: "individual" | "multiple" | "department"
   assigned_users: string[]
   project_id: string
+  goal_id: string // PMS: optional KPI link
   task_start_date: string
   task_end_date: string
 }
@@ -45,9 +74,10 @@ interface TaskFormDialogProps {
   setTaskForm: (form: TaskFormState) => void
   onSave: () => void
   isSaving: boolean
-  activeEmployees: employee[]
-  departments: string[]
+  scopedAssignableEmployees: employee[]
+  scopedAssignableDepartments: string[]
   projects: Project[]
+  assignmentAuthorityLabel?: string
 }
 
 export function TaskFormDialog({
@@ -58,10 +88,123 @@ export function TaskFormDialog({
   setTaskForm,
   onSave,
   isSaving,
-  activeEmployees,
-  departments,
+  scopedAssignableEmployees,
+  scopedAssignableDepartments,
   projects,
+  assignmentAuthorityLabel,
 }: TaskFormDialogProps) {
+  const [kpiOptions, setKpiOptions] = useState<KpiOption[]>([])
+
+  const form = useForm<TaskFormValues>({
+    resolver: zodResolver(taskFormSchema),
+    defaultValues: {
+      title: taskForm.title,
+      description: taskForm.description,
+      priority: taskForm.priority,
+      status: taskForm.status,
+      assigned_to: taskForm.assigned_to,
+      department: taskForm.department,
+      due_date: taskForm.due_date,
+      assignment_type: taskForm.assignment_type,
+      assigned_users: taskForm.assigned_users,
+      project_id: taskForm.project_id,
+      goal_id: taskForm.goal_id,
+      task_start_date: taskForm.task_start_date,
+      task_end_date: taskForm.task_end_date,
+    },
+  })
+
+  const {
+    register,
+    watch,
+    setValue,
+    formState: { errors },
+  } = form
+
+  // Sync form state back to parent whenever values change
+  useEffect(() => {
+    const subscription = watch((values) => {
+      setTaskForm({
+        title: values.title ?? "",
+        description: values.description ?? "",
+        priority: values.priority ?? "",
+        status: values.status ?? "",
+        assigned_to: values.assigned_to ?? "",
+        department: values.department ?? "",
+        due_date: values.due_date ?? "",
+        assignment_type: (values.assignment_type ?? "individual") as "individual" | "multiple" | "department",
+        assigned_users: (values.assigned_users ?? []).filter((value): value is string => Boolean(value)),
+        project_id: values.project_id ?? "",
+        goal_id: values.goal_id ?? "",
+        task_start_date: values.task_start_date ?? "",
+        task_end_date: values.task_end_date ?? "",
+      })
+    })
+    return () => subscription.unsubscribe()
+  }, [watch, setTaskForm])
+
+  // Reset form when dialog opens with new data
+  useEffect(() => {
+    if (isOpen) {
+      form.reset({
+        title: taskForm.title,
+        description: taskForm.description,
+        priority: taskForm.priority,
+        status: taskForm.status,
+        assigned_to: taskForm.assigned_to,
+        department: taskForm.department,
+        due_date: taskForm.due_date,
+        assignment_type: taskForm.assignment_type,
+        assigned_users: taskForm.assigned_users,
+        project_id: taskForm.project_id,
+        goal_id: taskForm.goal_id,
+        task_start_date: taskForm.task_start_date,
+        task_end_date: taskForm.task_end_date,
+      })
+    }
+  }, [isOpen]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const assignmentType = watch("assignment_type")
+  const assignedTo = watch("assigned_to")
+  const assignedUsers = watch("assigned_users")
+  const departmentValue = watch("department")
+  const titleValue = watch("title")
+  const priorityValue = watch("priority")
+  const statusValue = watch("status")
+  const projectId = watch("project_id")
+  const goalId = watch("goal_id")
+  const taskStartDate = watch("task_start_date")
+
+  // Load approved KPIs for the selected assignee or current department context
+  useEffect(() => {
+    const targetUserId =
+      assignmentType === "individual" ? assignedTo : assignmentType === "multiple" ? assignedUsers[0] || "" : ""
+    const targetDepartment = assignmentType === "department" ? departmentValue : ""
+
+    if (!targetUserId && !targetDepartment) {
+      setKpiOptions([])
+      return
+    }
+
+    const query = targetUserId ? `?user_id=${targetUserId}` : ""
+    fetch(`/api/hr/performance/goals${query}`)
+      .then((r) => r.json())
+      .then((json) => {
+        const approved = (json.data ?? json.goals ?? []).filter(
+          (g: { approval_status: string }) => g.approval_status === "approved"
+        )
+        const scopedGoals = targetDepartment
+          ? approved.filter((goal: { department?: string | null; title: string }) =>
+              goal.department
+                ? String(goal.department).toLowerCase() === targetDepartment.toLowerCase()
+                : goal.title.toLowerCase().includes(targetDepartment.toLowerCase())
+            )
+          : approved
+        setKpiOptions(scopedGoals.map((g: { id: string; title: string }) => ({ id: g.id, title: g.title })))
+      })
+      .catch(() => setKpiOptions([]))
+  }, [assignedTo, assignedUsers, assignmentType, departmentValue])
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
@@ -93,24 +236,22 @@ export function TaskFormDialog({
           <DialogDescription>
             {selectedTask ? "Update the task information below" : "Enter the details for the new task"}
           </DialogDescription>
+          {assignmentAuthorityLabel ? (
+            <p className="text-muted-foreground text-xs">{assignmentAuthorityLabel}</p>
+          ) : null}
         </DialogHeader>
         <div className="space-y-4 py-4">
           <div>
             <Label htmlFor="title">Task Title *</Label>
-            <Input
-              id="title"
-              value={taskForm.title}
-              onChange={(e) => setTaskForm({ ...taskForm, title: e.target.value })}
-              placeholder="e.g., Complete monthly report"
-            />
+            <Input id="title" {...register("title")} placeholder="e.g., Complete monthly report" />
+            {errors.title && <p className="text-destructive mt-1 text-xs">{errors.title.message}</p>}
           </div>
 
           <div>
             <Label htmlFor="description">Description</Label>
             <Textarea
               id="description"
-              value={taskForm.description}
-              onChange={(e) => setTaskForm({ ...taskForm, description: e.target.value })}
+              {...register("description")}
               placeholder="Provide detailed task information..."
               rows={4}
             />
@@ -119,10 +260,7 @@ export function TaskFormDialog({
           <div className="grid gap-4 md:grid-cols-2">
             <div>
               <Label htmlFor="priority">Priority</Label>
-              <Select
-                value={taskForm.priority}
-                onValueChange={(value) => setTaskForm({ ...taskForm, priority: value })}
-              >
+              <Select value={priorityValue} onValueChange={(value) => setValue("priority", value)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select priority" />
                 </SelectTrigger>
@@ -137,7 +275,7 @@ export function TaskFormDialog({
 
             <div>
               <Label htmlFor="status">Status</Label>
-              <Select value={taskForm.status} onValueChange={(value) => setTaskForm({ ...taskForm, status: value })}>
+              <Select value={statusValue} onValueChange={(value) => setValue("status", value)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select status" />
                 </SelectTrigger>
@@ -154,15 +292,12 @@ export function TaskFormDialog({
           <div>
             <Label htmlFor="assignment_type">Assignment Type *</Label>
             <Select
-              value={taskForm.assignment_type}
+              value={assignmentType}
               onValueChange={(value: "individual" | "multiple" | "department") => {
-                setTaskForm({
-                  ...taskForm,
-                  assignment_type: value,
-                  assigned_to: value === "individual" ? taskForm.assigned_to : "",
-                  assigned_users: value === "multiple" ? taskForm.assigned_users : [],
-                  department: value === "department" ? taskForm.department : "",
-                })
+                setValue("assignment_type", value)
+                setValue("assigned_to", value === "individual" ? assignedTo : "")
+                setValue("assigned_users", value === "multiple" ? assignedUsers : [])
+                setValue("department", value === "department" ? departmentValue : "")
               }}
             >
               <SelectTrigger>
@@ -191,23 +326,20 @@ export function TaskFormDialog({
             </Select>
           </div>
 
-          {taskForm.assignment_type === "individual" && (
+          {assignmentType === "individual" && (
             <div>
               <Label htmlFor="assigned_to">Assign To *</Label>
               <SearchableSelect
-                value={taskForm.assigned_to}
+                value={assignedTo}
                 onValueChange={(value) => {
-                  const selectedEmployee = activeEmployees.find((s) => s.id === value)
-                  setTaskForm({
-                    ...taskForm,
-                    assigned_to: value,
-                    department: selectedEmployee?.department || "",
-                  })
+                  const selectedEmployee = scopedAssignableEmployees.find((s) => s.id === value)
+                  setValue("assigned_to", value)
+                  setValue("department", selectedEmployee?.department || "")
                 }}
                 placeholder="Select employee member"
                 searchPlaceholder="Search employee..."
                 icon={<User className="h-4 w-4" />}
-                options={activeEmployees.map((member) => ({
+                options={scopedAssignableEmployees.map((member) => ({
                   value: member.id,
                   label: `${member.first_name} ${member.last_name} - ${member.department}`,
                 }))}
@@ -215,35 +347,32 @@ export function TaskFormDialog({
             </div>
           )}
 
-          {taskForm.assignment_type === "multiple" && (
+          {assignmentType === "multiple" && (
             <div>
               <Label>Assign To Multiple People *</Label>
               <Card className="mt-2 border-2">
                 <ScrollArea className="h-[200px]">
                   <CardContent className="space-y-2 p-4">
-                    {activeEmployees.length === 0 ? (
+                    {scopedAssignableEmployees.length === 0 ? (
                       <EmptyState
                         title="No employee members found"
                         description="Activate employee records to assign this task to multiple users."
                         className="p-4"
                       />
                     ) : (
-                      activeEmployees.map((member) => (
+                      scopedAssignableEmployees.map((member) => (
                         <div key={member.id} className="hover:bg-muted flex items-center space-x-2 rounded-md p-2">
                           <Checkbox
                             id={`member-${member.id}`}
-                            checked={taskForm.assigned_users.includes(member.id)}
+                            checked={assignedUsers.includes(member.id)}
                             onCheckedChange={(checked) => {
                               if (checked) {
-                                setTaskForm({
-                                  ...taskForm,
-                                  assigned_users: [...taskForm.assigned_users, member.id],
-                                })
+                                setValue("assigned_users", [...assignedUsers, member.id])
                               } else {
-                                setTaskForm({
-                                  ...taskForm,
-                                  assigned_users: taskForm.assigned_users.filter((id) => id !== member.id),
-                                })
+                                setValue(
+                                  "assigned_users",
+                                  assignedUsers.filter((id) => id !== member.id)
+                                )
                               }
                             }}
                           />
@@ -260,34 +389,30 @@ export function TaskFormDialog({
                 </ScrollArea>
               </Card>
               <p className="text-muted-foreground mt-1 text-xs">
-                {taskForm.assigned_users.length} employee member{taskForm.assigned_users.length !== 1 ? "s" : ""}{" "}
-                selected
+                {assignedUsers.length} employee member{assignedUsers.length !== 1 ? "s" : ""} selected
               </p>
             </div>
           )}
 
-          {taskForm.assignment_type === "department" && (
+          {assignmentType === "department" && (
             <div>
               <Label htmlFor="department">Department *</Label>
               <Select
-                value={taskForm.department}
+                value={departmentValue}
                 onValueChange={(value) => {
-                  setTaskForm({
-                    ...taskForm,
-                    department: value,
-                  })
+                  setValue("department", value)
                 }}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select department" />
                 </SelectTrigger>
                 <SelectContent>
-                  {departments.length === 0 ? (
+                  {scopedAssignableDepartments.length === 0 ? (
                     <SelectItem value="__none__" disabled>
                       No departments found
                     </SelectItem>
                   ) : (
-                    departments.map((dept) => (
+                    scopedAssignableDepartments.map((dept) => (
                       <SelectItem key={dept} value={dept}>
                         {dept}
                       </SelectItem>
@@ -304,10 +429,7 @@ export function TaskFormDialog({
 
           <div>
             <Label htmlFor="project_id">Project (Optional)</Label>
-            <Select
-              value={taskForm.project_id}
-              onValueChange={(value) => setTaskForm({ ...taskForm, project_id: value })}
-            >
+            <Select value={projectId} onValueChange={(value) => setValue("project_id", value)}>
               <SelectTrigger>
                 <SelectValue placeholder="Select project (optional)" />
               </SelectTrigger>
@@ -322,37 +444,45 @@ export function TaskFormDialog({
             </Select>
           </div>
 
+          {(assignmentType === "individual" || assignmentType === "multiple" || assignmentType === "department") &&
+            kpiOptions.length > 0 && (
+              <div>
+                <Label htmlFor="goal_id">Link to KPI (Optional)</Label>
+                <Select value={goalId} onValueChange={(value) => setValue("goal_id", value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a KPI this task contributes to" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">None</SelectItem>
+                    {kpiOptions.map((kpi) => (
+                      <SelectItem key={kpi.id} value={kpi.id}>
+                        {kpi.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-muted-foreground mt-1 text-xs">
+                  Leave this blank to let the system auto-link the task to the best approved KPI bucket for the
+                  assignee.
+                </p>
+              </div>
+            )}
+
           <div>
             <Label htmlFor="due_date">Due Date</Label>
-            <Input
-              id="due_date"
-              type="date"
-              value={taskForm.due_date}
-              onChange={(e) => setTaskForm({ ...taskForm, due_date: e.target.value })}
-            />
+            <Input id="due_date" type="date" {...register("due_date")} />
           </div>
 
-          {taskForm.project_id && (
+          {projectId && (
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="task_start_date">Task Start Date</Label>
-                <Input
-                  id="task_start_date"
-                  type="date"
-                  value={taskForm.task_start_date}
-                  onChange={(e) => setTaskForm({ ...taskForm, task_start_date: e.target.value })}
-                />
+                <Input id="task_start_date" type="date" {...register("task_start_date")} />
               </div>
 
               <div>
                 <Label htmlFor="task_end_date">Task End Date</Label>
-                <Input
-                  id="task_end_date"
-                  type="date"
-                  min={taskForm.task_start_date || undefined}
-                  value={taskForm.task_end_date}
-                  onChange={(e) => setTaskForm({ ...taskForm, task_end_date: e.target.value })}
-                />
+                <Input id="task_end_date" type="date" min={taskStartDate || undefined} {...register("task_end_date")} />
               </div>
             </div>
           )}
@@ -365,10 +495,10 @@ export function TaskFormDialog({
             onClick={onSave}
             loading={isSaving}
             disabled={
-              !taskForm.title ||
-              (taskForm.assignment_type === "individual" && !taskForm.assigned_to) ||
-              (taskForm.assignment_type === "multiple" && taskForm.assigned_users.length === 0) ||
-              (taskForm.assignment_type === "department" && !taskForm.department)
+              !titleValue ||
+              (assignmentType === "individual" && !assignedTo) ||
+              (assignmentType === "multiple" && assignedUsers.length === 0) ||
+              (assignmentType === "department" && !departmentValue)
             }
           >
             {selectedTask ? "Update Task" : "Create Task"}

@@ -1,15 +1,41 @@
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
+import { z } from "zod"
 import { resolveAdminScope, getDepartmentScope, normalizeDepartmentName } from "@/lib/admin/rbac"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { resolveEffectiveMeetingDateIso } from "@/lib/reports/meeting-date"
 import { logger } from "@/lib/logger"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
+import { getPaginationRange, paginatedResponse, PaginationSchema } from "@/lib/pagination"
 
 const log = logger("api-reports-kss-roster")
 
 type ReportsClient = Awaited<ReturnType<typeof createClient>>
+
+const CreateKssRosterSchema = z.object({
+  meetingWeek: z.coerce
+    .number()
+    .int()
+    .min(1, "meetingWeek must be between 1 and 53")
+    .max(53, "meetingWeek must be between 1 and 53"),
+  meetingYear: z.coerce
+    .number()
+    .int()
+    .min(2000, "meetingYear must be between 2000 and 2100")
+    .max(2100, "meetingYear must be between 2000 and 2100"),
+  department: z.string().trim().min(1, "department is required"),
+  presenterId: z.string().optional().nullable(),
+  notes: z.string().optional().nullable(),
+})
+
+const UpdateKssRosterSchema = z.object({
+  id: z.string().trim().min(1, "id is required"),
+  department: z.string().trim().optional(),
+  presenterId: z.string().optional().nullable(),
+  notes: z.string().optional().nullable(),
+  isActive: z.boolean().optional(),
+})
 
 async function createClient() {
   const cookieStore = await cookies()
@@ -94,13 +120,23 @@ export async function GET(request: Request) {
     const dataClient = getServiceRoleClientOrFallback(supabase as ReportsClient)
 
     const { searchParams } = new URL(request.url)
+    const paginationParsed = PaginationSchema.safeParse(Object.fromEntries(searchParams))
+    if (!paginationParsed.success) {
+      return NextResponse.json(
+        { error: paginationParsed.error.issues[0]?.message ?? "Invalid pagination params" },
+        { status: 400 }
+      )
+    }
+    const pagination = paginationParsed.data
+    const { from, to } = getPaginationRange(pagination)
     const week = Number(searchParams.get("week") || "")
     const year = Number(searchParams.get("year") || "")
 
     let query = dataClient
       .from("kss_weekly_roster")
       .select(
-        "id, meeting_week, meeting_year, department, presenter_id, notes, is_active, created_by, created_at, updated_at"
+        "id, meeting_week, meeting_year, department, presenter_id, notes, is_active, created_by, created_at, updated_at",
+        { count: "exact" }
       )
       .order("meeting_year", { ascending: false })
       .order("meeting_week", { ascending: false })
@@ -108,7 +144,7 @@ export async function GET(request: Request) {
     if (Number.isFinite(week) && week > 0) query = query.eq("meeting_week", week)
     if (Number.isFinite(year) && year > 0) query = query.eq("meeting_year", year)
 
-    const { data, error } = await query
+    const { data, error, count } = await query.range(from, to)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
     const rows = data || []
@@ -132,7 +168,7 @@ export async function GET(request: Request) {
       })
     )
 
-    return NextResponse.json({ data: withLockState })
+    return NextResponse.json(paginatedResponse(withLockState, count || 0, pagination))
   } catch (error) {
     log.error({ err: String(error) }, "GET /api/reports/kss-roster failed")
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })
@@ -156,21 +192,16 @@ export async function POST(request: Request) {
     const dataClient = getServiceRoleClientOrFallback(supabase as ReportsClient)
 
     const body = await request.json()
-    const meetingWeek = Number(body?.meetingWeek)
-    const meetingYear = Number(body?.meetingYear)
-    const department = normalizeDepartment(String(body?.department || ""))
-    const presenterId = body?.presenterId ? String(body.presenterId) : null
-    const notes = body?.notes ? String(body.notes) : null
+    const parsed = CreateKssRosterSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid request body" }, { status: 400 })
+    }
 
-    if (!Number.isFinite(meetingWeek) || meetingWeek < 1 || meetingWeek > 53) {
-      return NextResponse.json({ error: "meetingWeek must be between 1 and 53" }, { status: 400 })
-    }
-    if (!Number.isFinite(meetingYear) || meetingYear < 2000 || meetingYear > 2100) {
-      return NextResponse.json({ error: "meetingYear must be between 2000 and 2100" }, { status: 400 })
-    }
-    if (!department) {
-      return NextResponse.json({ error: "department is required" }, { status: 400 })
-    }
+    const meetingWeek = parsed.data.meetingWeek
+    const meetingYear = parsed.data.meetingYear
+    const department = normalizeDepartment(parsed.data.department)
+    const presenterId = parsed.data.presenterId ? String(parsed.data.presenterId) : null
+    const notes = parsed.data.notes ? String(parsed.data.notes) : null
 
     await assertWeekAllowsRosterCreate(dataClient as ReportsClient, meetingWeek, meetingYear)
 
@@ -243,8 +274,11 @@ export async function PATCH(request: Request) {
     const dataClient = getServiceRoleClientOrFallback(supabase as ReportsClient)
 
     const body = await request.json()
-    const id = String(body?.id || "")
-    if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 })
+    const parsed = UpdateKssRosterSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid request body" }, { status: 400 })
+    }
+    const id = parsed.data.id
 
     const { data: existing, error: fetchError } = await dataClient
       .from("kss_weekly_roster")
@@ -259,12 +293,13 @@ export async function PATCH(request: Request) {
     await assertWeekIsMutable(dataClient as ReportsClient, existing.meeting_week, existing.meeting_year)
 
     const patch: Record<string, unknown> = {}
-    if (typeof body?.department === "string" && body.department.trim()) {
-      patch.department = normalizeDepartment(body.department)
+    if (typeof parsed.data.department === "string" && parsed.data.department.trim()) {
+      patch.department = normalizeDepartment(parsed.data.department)
     }
-    if (body?.presenterId !== undefined) patch.presenter_id = body.presenterId ? String(body.presenterId) : null
-    if (body?.notes !== undefined) patch.notes = body.notes ? String(body.notes) : null
-    if (body?.isActive !== undefined) patch.is_active = Boolean(body.isActive)
+    if (parsed.data.presenterId !== undefined)
+      patch.presenter_id = parsed.data.presenterId ? String(parsed.data.presenterId) : null
+    if (parsed.data.notes !== undefined) patch.notes = parsed.data.notes ? String(parsed.data.notes) : null
+    if (parsed.data.isActive !== undefined) patch.is_active = Boolean(parsed.data.isActive)
 
     if (Object.keys(patch).length === 0) {
       return NextResponse.json({ error: "No patch fields provided" }, { status: 400 })

@@ -31,6 +31,10 @@ interface AssignableStatusQuery<TSelf> {
   or(filters: string): TSelf
 }
 
+type DepartmentLookupRow = {
+  id: string
+}
+
 const ASSIGNABLE_SELECT =
   "id, first_name, last_name, full_name, company_email, department, employment_status, is_department_lead, lead_departments"
 
@@ -75,7 +79,10 @@ export function applyAssignableStatusFilter<TQuery extends AssignableStatusQuery
   return query.or("employment_status.eq.active,employment_status.is.null")
 }
 
-export function buildAssignableProfilesQuery(client: SupabaseClient<Database>, options: AssignableQueryOptions = {}) {
+export async function buildAssignableProfilesQuery(
+  client: SupabaseClient<Database>,
+  options: AssignableQueryOptions = {}
+) {
   let query = client
     .from("profiles")
     .select(options.select || ASSIGNABLE_SELECT)
@@ -84,12 +91,29 @@ export function buildAssignableProfilesQuery(client: SupabaseClient<Database>, o
   query = applyAssignableStatusFilter(query, options)
 
   if (options.departmentScope) {
-    query =
-      options.departmentScope.length > 0 ? query.in("department", options.departmentScope) : query.eq("id", "__none__")
+    if (options.departmentScope.length > 0) {
+      // Look up department IDs from names for FK filter
+      const { data: depts } = await client.from("departments").select("id").in("name", options.departmentScope)
+      const departmentIds = ((depts as DepartmentLookupRow[] | null) || []).map((department) => department.id)
+
+      query =
+        departmentIds.length > 0
+          ? query.in("department_id", departmentIds)
+          : query.in("department", options.departmentScope) // fallback to text filter
+    } else {
+      query = query.eq("id", "__none__")
+    }
   }
 
   if (options.requiredDepartment) {
-    query = query.eq("department", options.requiredDepartment)
+    // Look up department ID from name for FK filter
+    const { data: dept } = await client
+      .from("departments")
+      .select("id")
+      .eq("name", options.requiredDepartment)
+      .single<DepartmentLookupRow>()
+
+    query = dept?.id ? query.eq("department_id", dept.id) : query.eq("department", options.requiredDepartment) // fallback to text filter
   }
 
   if (options.leadOnly) {
@@ -104,7 +128,8 @@ export function buildAssignableProfilesQuery(client: SupabaseClient<Database>, o
 }
 
 export async function listAssignableProfiles(client: SupabaseClient<Database>, options: AssignableQueryOptions = {}) {
-  const { data, error } = await buildAssignableProfilesQuery(client, options)
+  const query = await buildAssignableProfilesQuery(client, options)
+  const { data, error } = await query
   if (error) return { data: [] as AssignableProfileLite[], error }
   const rows = (data || []) as AssignableProfileLite[]
   return {

@@ -10,7 +10,7 @@ const log = logger("import-csv")
 type AdminImportClient = Awaited<ReturnType<typeof createClient>>
 type CsvRecord = Record<string, string>
 
-export async function POST(_request: Request) {
+export async function PATCH(_request: Request) {
   try {
     const supabase = await createClient()
 
@@ -183,7 +183,7 @@ export async function POST(_request: Request) {
         const last_name = get(record, ["Last Name"]) || ""
         const other_names = get(record, ["Other Names (Optional)"]) || ""
         const department = get(record, ["Department (if applicable)", "Department"]) || ""
-        const company_role = get(record, ["Company Role"]) || ""
+        const designation = get(record, ["Designation"]) || ""
         const phone_number = get(record, ["Phone number", "Phone Number"]) || ""
         const residential_address = get(record, ["Residential Address"]) || ""
         const office_location =
@@ -207,7 +207,7 @@ export async function POST(_request: Request) {
           maybeSet("last_name", last_name)
           maybeSet("other_names", other_names)
           maybeSet("department", department)
-          maybeSet("company_role", company_role)
+          maybeSet("designation", designation)
           maybeSet("phone_number", phone_number)
           maybeSet("residential_address", residential_address)
           maybeSet("office_location", office_location)
@@ -254,7 +254,7 @@ export async function POST(_request: Request) {
           last_name,
           other_names,
           department,
-          company_role,
+          designation,
           phone_number,
           residential_address,
           office_location,
@@ -317,4 +317,9 @@ export async function POST(_request: Request) {
       { status: 500 }
     )
   }
+}
+
+// POST kept for backwards compat — prefer PATCH
+export async function POST(_request: Request) {
+  return PATCH(_request)
 }

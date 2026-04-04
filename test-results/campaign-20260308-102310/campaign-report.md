@@ -133,7 +133,7 @@ Duration: 96s
 | /admin/purchasing/suppliers/[id] | page | unauthenticated | skip | Dynamic route skipped in anonymous crawl. |
 | /admin/purchasing/suppliers/[id]/edit | page | unauthenticated | skip | Dynamic route skipped in anonymous crawl. |
 | /admin/reports | page | unauthenticated | pass | HTTP 307 -> /auth/login?next=%2Fadmin%2Freports |
-| /admin/reports/action-tracker | page | unauthenticated | pass | HTTP 307 -> /auth/login?next=%2Fadmin%2Freports%2Faction-tracker |
+| /admin/reports/action-point | page | unauthenticated | pass | HTTP 307 -> /auth/login?next=%2Fadmin%2Freports%2Faction-point |
 | /admin/reports/mail | page | unauthenticated | pass | HTTP 307 -> /auth/login?next=%2Fadmin%2Freports%2Fmail |
 | /admin/reports/weekly-reports | page | unauthenticated | pass | HTTP 307 -> /auth/login?next=%2Fadmin%2Freports%2Fweekly-reports |
 | /admin/settings | page | unauthenticated | pass | HTTP 307 -> /auth/login?next=%2Fadmin%2Fsettings |
@@ -175,7 +175,7 @@ Duration: 96s
 | /dashboard/projects | page | unauthenticated | pass | HTTP 307 -> /auth/login?next=%2Fdashboard%2Fprojects |
 | /dashboard/projects/[id] | page | unauthenticated | skip | Dynamic route skipped in anonymous crawl. |
 | /dashboard/reports | page | unauthenticated | pass | HTTP 307 -> /auth/login?next=%2Fdashboard%2Freports |
-| /dashboard/reports/action-tracker | page | unauthenticated | pass | HTTP 307 -> /auth/login?next=%2Fdashboard%2Freports%2Faction-tracker |
+| /dashboard/reports/action-point | page | unauthenticated | pass | HTTP 307 -> /auth/login?next=%2Fdashboard%2Freports%2Faction-point |
 | /dashboard/reports/weekly-reports | page | unauthenticated | pass | HTTP 307 -> /auth/login?next=%2Fdashboard%2Freports%2Fweekly-reports |
 | /dashboard/reports/weekly-reports/new | page | unauthenticated | pass | HTTP 307 -> /auth/login?next=%2Fdashboard%2Freports%2Fweekly-reports%2Fnew |
 | /dashboard/reviews | page | unauthenticated | pass | HTTP 307 -> /auth/login?next=%2Fdashboard%2Freviews |
@@ -326,7 +326,7 @@ Duration: 96s
 | /dashboard/documentation/internal | static | system | skip | No loading.tsx in route segment directory. |
 | /dashboard/goals | static | system | skip | No loading.tsx in route segment directory. |
 | /dashboard/payments/[id] | static | system | skip | No loading.tsx in route segment directory. |
-| /dashboard/reports/action-tracker | static | system | skip | No loading.tsx in route segment directory. |
+| /dashboard/reports/action-point | static | system | skip | No loading.tsx in route segment directory. |
 | /dashboard/reports | static | system | skip | No loading.tsx in route segment directory. |
 | /dashboard/reports/weekly-reports/new | static | system | skip | No loading.tsx in route segment directory. |
 | /dashboard/reports/weekly-reports | static | system | skip | No loading.tsx in route segment directory. |
@@ -381,7 +381,7 @@ Duration: 96s
 | /admin/purchasing/suppliers/[id]/edit | static | system | skip | No loading.tsx in route segment directory. |
 | /admin/purchasing/suppliers/[id] | static | system | skip | No loading.tsx in route segment directory. |
 | /admin/purchasing/suppliers | static | system | skip | No loading.tsx in route segment directory. |
-| /admin/reports/action-tracker | static | system | skip | No loading.tsx in route segment directory. |
+| /admin/reports/action-point | static | system | skip | No loading.tsx in route segment directory. |
 | /admin/reports/mail | static | system | skip | No loading.tsx in route segment directory. |
 | /admin/reports | static | system | skip | No loading.tsx in route segment directory. |
 | /admin/reports/weekly-reports | static | system | skip | No loading.tsx in route segment directory. |

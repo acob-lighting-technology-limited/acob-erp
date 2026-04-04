@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Loader2, CheckCircle, UserPlus, ChevronRight, ShieldCheck, Hash } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
@@ -34,7 +35,7 @@ interface PendingUser {
   last_name: string
   other_names?: string
   department: string
-  company_role: string
+  designation: string
   company_email: string
   personal_email: string
   phone_number: string
@@ -46,6 +47,29 @@ interface PendingUser {
 
 interface PendingApplicationsModalProps {
   onEmployeeCreated: () => void
+}
+
+interface ApprovalEmailPreview {
+  tempPassword: string
+  portalUrl: string
+  welcome: {
+    enabled: boolean
+    subject: string
+    recipients: string[]
+    html: string
+  }
+  internal: {
+    enabled: boolean
+    subject: string
+    recipients: string[]
+    html: string
+  }
+}
+
+interface ApprovalEmailWarning {
+  audience: "employee" | "management"
+  reason: string
+  recipients: string[]
 }
 
 async function fetchPendingApplications(supabase: ReturnType<typeof createClient>): Promise<PendingUser[]> {
@@ -74,6 +98,27 @@ export function PendingApplicationsModal({ onEmployeeCreated }: PendingApplicati
     queryKey: QUERY_KEYS.pendingApplications(),
     queryFn: () => fetchPendingApplications(supabase),
     enabled: isOpen,
+  })
+
+  const { data: approvalEmailPreview, isLoading: isLoadingApprovalPreview } = useQuery<ApprovalEmailPreview>({
+    queryKey: ["pending-approval-email-preview", selectedUser?.id, employeeId],
+    queryFn: async () => {
+      if (!selectedUser?.id || !employeeId) {
+        throw new Error("Missing approval preview context")
+      }
+
+      const response = await fetch(
+        `/api/admin/pending-users/${selectedUser.id}/approval-preview?employeeId=${encodeURIComponent(employeeId)}`
+      )
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to load approval email preview")
+      }
+
+      return result as ApprovalEmailPreview
+    },
+    enabled: isOpen && !!selectedUser?.id && !!employeeId,
   })
 
   const fetchSuggestedId = useCallback(async () => {
@@ -149,7 +194,16 @@ export function PendingApplicationsModal({ onEmployeeCreated }: PendingApplicati
         throw new Error(result.error || "Failed to approve user")
       }
 
-      toast.success("User approved and account created successfully")
+      const emailWarnings = Array.isArray(result.emailWarnings) ? (result.emailWarnings as ApprovalEmailWarning[]) : []
+
+      if (emailWarnings.length > 0) {
+        toast.warning("User approved, but some emails were not sent", {
+          description: emailWarnings.map((warning) => `${warning.audience}: ${warning.reason}`).join(" | "),
+        })
+      } else {
+        toast.success("User approved and account created successfully")
+      }
+
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.pendingApplications() })
       const remaining = pendingUsers.filter((u) => u.id !== selectedUser.id)
       if (remaining.length > 0) {
@@ -326,7 +380,7 @@ export function PendingApplicationsModal({ onEmployeeCreated }: PendingApplicati
                         </div>
                         <div className="grid grid-cols-1">
                           <DetailRow label="Department" value={selectedUser.department} />
-                          <DetailRow label="Company Role" value={selectedUser.company_role} />
+                          <DetailRow label="Designation" value={selectedUser.designation} />
                           <DetailRow label="System Email" value={selectedUser.company_email} />
                           <DetailRow label="Assigned ID" value={employeeId} />
                           <DetailRow label="Office Location" value={selectedUser.office_location || "N/A"} />
@@ -357,6 +411,103 @@ export function PendingApplicationsModal({ onEmployeeCreated }: PendingApplicati
                           database and broadcast welcome emails.
                         </p>
                       </div>
+                    </div>
+
+                    <div className="mt-10 space-y-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <h3 className="text-base font-bold tracking-tight">Approval Email Preview</h3>
+                          <p className="text-muted-foreground text-xs">
+                            These are the exact recipients and rendered email bodies that will be used for approval.
+                          </p>
+                        </div>
+                        {isLoadingApprovalPreview ? <Loader2 className="text-primary h-4 w-4 animate-spin" /> : null}
+                      </div>
+
+                      {approvalEmailPreview ? (
+                        <Tabs defaultValue="welcome" className="w-full">
+                          <TabsList className="grid w-full grid-cols-2">
+                            <TabsTrigger value="welcome">Employee Welcome Mail</TabsTrigger>
+                            <TabsTrigger value="internal">Internal Notification</TabsTrigger>
+                          </TabsList>
+
+                          <TabsContent value="welcome">
+                            <div className="border-border overflow-hidden rounded-lg border">
+                              <div className="bg-muted/30 border-border border-b p-4">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <Badge variant={approvalEmailPreview.welcome.enabled ? "default" : "secondary"}>
+                                    {approvalEmailPreview.welcome.enabled ? "EMAIL ENABLED" : "EMAIL DISABLED"}
+                                  </Badge>
+                                  <span className="text-sm font-semibold">{approvalEmailPreview.welcome.subject}</span>
+                                </div>
+                                <div className="mt-3 space-y-2">
+                                  <p className="text-muted-foreground text-[11px] font-bold uppercase">Recipients</p>
+                                  <div className="flex flex-wrap gap-2">
+                                    {approvalEmailPreview.welcome.recipients.length > 0 ? (
+                                      approvalEmailPreview.welcome.recipients.map((email) => (
+                                        <Badge key={email} variant="outline" className="font-mono text-[11px]">
+                                          {email}
+                                        </Badge>
+                                      ))
+                                    ) : (
+                                      <span className="text-muted-foreground text-sm">
+                                        No recipients will receive this email.
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="bg-background p-3">
+                                <iframe
+                                  title="Employee welcome email preview"
+                                  srcDoc={approvalEmailPreview.welcome.html}
+                                  className="border-border h-[480px] w-full rounded-md border bg-white"
+                                />
+                              </div>
+                            </div>
+                          </TabsContent>
+
+                          <TabsContent value="internal">
+                            <div className="border-border overflow-hidden rounded-lg border">
+                              <div className="bg-muted/30 border-border border-b p-4">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <Badge variant={approvalEmailPreview.internal.enabled ? "default" : "secondary"}>
+                                    {approvalEmailPreview.internal.enabled ? "EMAIL ENABLED" : "EMAIL DISABLED"}
+                                  </Badge>
+                                  <span className="text-sm font-semibold">{approvalEmailPreview.internal.subject}</span>
+                                </div>
+                                <div className="mt-3 space-y-2">
+                                  <p className="text-muted-foreground text-[11px] font-bold uppercase">Recipients</p>
+                                  <div className="flex flex-wrap gap-2">
+                                    {approvalEmailPreview.internal.recipients.length > 0 ? (
+                                      approvalEmailPreview.internal.recipients.map((email) => (
+                                        <Badge key={email} variant="outline" className="font-mono text-[11px]">
+                                          {email}
+                                        </Badge>
+                                      ))
+                                    ) : (
+                                      <span className="text-muted-foreground text-sm">
+                                        No internal recipients will receive this email.
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="bg-background p-3">
+                                <iframe
+                                  title="Internal onboarding email preview"
+                                  srcDoc={approvalEmailPreview.internal.html}
+                                  className="border-border h-[420px] w-full rounded-md border bg-white"
+                                />
+                              </div>
+                            </div>
+                          </TabsContent>
+                        </Tabs>
+                      ) : (
+                        <div className="border-border text-muted-foreground rounded-lg border border-dashed p-4 text-sm">
+                          Email preview will appear once an applicant and employee ID are available.
+                        </div>
+                      )}
                     </div>
                   </div>
                 </ScrollArea>

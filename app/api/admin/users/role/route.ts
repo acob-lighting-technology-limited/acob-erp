@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import {
   ADMIN_LIKE_ROLES,
@@ -12,8 +13,26 @@ import { syncEmploymentStatusToAuth } from "@/lib/supabase/admin"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 
 const log = logger("admin-users-role")
+const ALLOWED_ADMIN_DOMAINS = ["hr", "finance", "assets", "reports", "tasks", "projects", "communications"] as const
 
-export async function POST(request: Request) {
+const UpdateUserRoleSchema = z
+  .object({
+    targetUserId: z.string().trim().min(1, "Missing targetUserId or role"),
+    role: z.enum(ASSIGNABLE_ROLES, { errorMap: () => ({ message: "Invalid role supplied" }) }),
+    admin_domains: z.array(z.enum(ALLOWED_ADMIN_DOMAINS)).optional(),
+    employment_status: z.string().trim().nullable().optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.role === "admin" && (!value.admin_domains || value.admin_domains.length === 0)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Admin role requires at least one admin domain.",
+        path: ["admin_domains"],
+      })
+    }
+  })
+
+export async function PATCH(request: Request) {
   try {
     const supabase = await createClient()
     const {
@@ -25,35 +44,15 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const targetUserId = String(body?.targetUserId || "")
-    const targetRole = String(body?.role || "")
-    const adminDomains = Array.isArray(body?.admin_domains)
-      ? body.admin_domains
-          .map((value: unknown) =>
-            String(value || "")
-              .trim()
-              .toLowerCase()
-          )
-          .filter(Boolean)
-      : []
-    const employmentStatus = body?.employment_status ? String(body.employment_status) : null
-    const allowedAdminDomains = ["hr", "finance", "assets", "reports", "tasks", "projects", "communications"]
-
-    if (!targetUserId || !targetRole) {
-      return NextResponse.json({ error: "Missing targetUserId or role" }, { status: 400 })
+    const parsed = UpdateUserRoleSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid request body" }, { status: 400 })
     }
 
-    if (!ASSIGNABLE_ROLES.includes(targetRole as (typeof ASSIGNABLE_ROLES)[number])) {
-      return NextResponse.json({ error: "Invalid role supplied" }, { status: 400 })
-    }
-    if (targetRole === "admin") {
-      if (adminDomains.length === 0) {
-        return NextResponse.json({ error: "Admin role requires at least one admin domain." }, { status: 400 })
-      }
-      if (adminDomains.some((value: string) => !allowedAdminDomains.includes(value))) {
-        return NextResponse.json({ error: "Invalid admin domain supplied." }, { status: 400 })
-      }
-    }
+    const targetUserId = parsed.data.targetUserId
+    const targetRole = parsed.data.role
+    const adminDomains = parsed.data.admin_domains ?? []
+    const employmentStatus = parsed.data.employment_status ?? null
 
     if (targetUserId === user.id) {
       return NextResponse.json({ error: "You cannot change your own role." }, { status: 400 })
@@ -149,19 +148,32 @@ export async function POST(request: Request) {
     }
 
     // Audit: role change is a critical admin action
-    await writeAuditLog(supabase, {
-      action: "update",
-      entityType: "profile",
-      entityId: targetUserId,
-      context: { actorId: user.id, source: "api" as const },
-      newValues: { role: targetRole, admin_domains: targetRole === "admin" ? adminDomains : null, ...(employmentStatus ? { employment_status: employmentStatus } : {}) },
-      oldValues: { role: targetProfile.role },
-      metadata: { source: "admin-users-role" },
-    }, { failOpen: true })
+    await writeAuditLog(
+      supabase,
+      {
+        action: "update",
+        entityType: "profile",
+        entityId: targetUserId,
+        context: { actorId: user.id, source: "api" as const },
+        newValues: {
+          role: targetRole,
+          admin_domains: targetRole === "admin" ? adminDomains : null,
+          ...(employmentStatus ? { employment_status: employmentStatus } : {}),
+        },
+        oldValues: { role: targetProfile.role },
+        metadata: { source: "admin-users-role" },
+      },
+      { failOpen: true }
+    )
 
     return NextResponse.json({ ok: true })
   } catch (error) {
     log.error({ err: String(error) }, "[admin-users-role]")
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
+}
+
+// POST kept for backwards compat — prefer PATCH
+export async function POST(request: Request) {
+  return PATCH(request)
 }

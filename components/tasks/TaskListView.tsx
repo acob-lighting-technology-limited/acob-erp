@@ -19,7 +19,7 @@ import {
   FolderKanban,
 } from "lucide-react"
 import { formatName } from "@/lib/utils"
-import type { Task } from "@/app/admin/tasks/management/admin-tasks-content"
+import type { Task } from "@/types/task"
 
 type TaskAssignee = NonNullable<Task["assigned_to_user"]>
 type MultiAssignedUser = NonNullable<Task["assigned_users"]>[number]
@@ -145,6 +145,11 @@ function buildTaskInfo(task: Task) {
   }
 }
 
+function copyWorkItemNumber(value: string | null | undefined) {
+  if (!value) return
+  void navigator.clipboard.writeText(value)
+}
+
 export function TaskListView({
   filteredTasks,
   viewMode,
@@ -197,6 +202,15 @@ export function TaskListView({
                   <TableCell>
                     <div>
                       <div className="flex items-center gap-2">
+                        {task.work_item_number && (
+                          <button
+                            type="button"
+                            onClick={() => copyWorkItemNumber(task.work_item_number)}
+                            className="font-mono text-xs font-semibold text-slate-600 hover:underline"
+                          >
+                            {task.work_item_number}
+                          </button>
+                        )}
                         <span className="text-foreground font-medium">{task.title}</span>
                         {getSourceBadge(task.source_type)}
                         <ItemInfoButton {...buildTaskInfo(task)} />
@@ -298,7 +312,18 @@ export function TaskListView({
             <div className="flex items-start justify-between">
               <div className="flex-1">
                 <div className="flex items-start gap-2">
-                  <CardTitle className="text-lg">{task.title}</CardTitle>
+                  <div className="space-y-1">
+                    {task.work_item_number && (
+                      <button
+                        type="button"
+                        onClick={() => copyWorkItemNumber(task.work_item_number)}
+                        className="font-mono text-xs font-semibold text-slate-600 hover:underline"
+                      >
+                        {task.work_item_number}
+                      </button>
+                    )}
+                    <CardTitle className="text-lg">{task.title}</CardTitle>
+                  </div>
                   <ItemInfoButton {...buildTaskInfo(task)} />
                 </div>
                 <div className="mt-2 flex items-center gap-2">

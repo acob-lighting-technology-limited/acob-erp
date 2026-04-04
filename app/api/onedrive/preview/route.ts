@@ -51,7 +51,15 @@ export async function GET(request: Request) {
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
-    const scope = await resolveOneDriveAccessScope(supabase as OneDriveClient, user.id)
+    const { searchParams } = new URL(request.url)
+    const accessMode = searchParams.get("accessMode")
+    const scope = await resolveOneDriveAccessScope(
+      supabase as OneDriveClient,
+      user.id,
+      accessMode === "admin"
+        ? { allowAdminLike: true, allowManagedDepartments: true }
+        : { allowAdminLike: false, allowManagedDepartments: false }
+    )
     if (!scope) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
@@ -62,15 +70,14 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "OneDrive integration is not configured" }, { status: 503 })
     }
 
-    const { searchParams } = new URL(request.url)
     const path = searchParams.get("path")
 
     if (!path) {
       return NextResponse.json({ error: "No path provided" }, { status: 400 })
     }
 
-    if (!isPathAllowed(path, scope) || path === "/Projects") {
-      return NextResponse.json({ error: "Forbidden: outside your allowed department folders" }, { status: 403 })
+    if (!isPathAllowed(path, scope) || path === "/") {
+      return NextResponse.json({ error: "Forbidden: outside your allowed department libraries" }, { status: 403 })
     }
 
     // Get file info first

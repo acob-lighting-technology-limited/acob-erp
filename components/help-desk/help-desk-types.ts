@@ -1,20 +1,6 @@
-export interface HelpDeskTicket {
-  id: string
-  ticket_number: string
-  title: string
-  service_department: string
-  request_type: "support" | "procurement"
-  priority: "low" | "medium" | "high" | "urgent"
-  status: string
-  assigned_to: string | null
-  requester_id: string
-  created_at: string
-  resolved_at: string | null
-  csat_rating: number | null
-  handling_mode?: string | null
-  support_mode?: string | null
-  requester_department?: string | null
-}
+export type { HelpDeskTicket, HelpDeskStatus, HelpDeskPriority } from "@/types/help-desk"
+
+import type { HelpDeskTicket } from "@/types/help-desk"
 
 export interface HelpDeskTicketDetailResponse {
   ticket: HelpDeskTicket & {

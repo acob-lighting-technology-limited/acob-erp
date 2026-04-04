@@ -1,5 +1,9 @@
 "use client"
 
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { z } from "zod"
+import { useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -15,12 +19,34 @@ import {
 import { SearchableSelect } from "@/components/ui/searchable-select"
 import { toast } from "sonner"
 import { formatName } from "@/lib/utils"
-import { OFFICE_LOCATIONS } from "@/lib/permissions"
+import { useOfficeLocations } from "@/hooks/use-office-locations"
 import { generateUniqueCodePreview } from "@/lib/asset-types"
 import { Plus, User, Building2, Building } from "lucide-react"
 import type { Asset, Employee } from "@/app/admin/assets/admin-assets-content"
 
 const currentYear = new Date().getFullYear()
+
+const assetFormSchema = z.object({
+  asset_type: z.string().min(1, "Asset type is required"),
+  acquisition_year: z
+    .number()
+    .min(2000)
+    .max(currentYear + 1),
+  asset_model: z.string(),
+  serial_number: z.string(),
+  unique_code: z.string(),
+  status: z.string(),
+  notes: z.string(),
+  assignment_type: z.enum(["individual", "department", "office"]),
+  assigned_to: z.string(),
+  assignment_department: z.string(),
+  office_location: z.string(),
+  assignment_notes: z.string(),
+  assigned_by: z.string(),
+  assigned_at: z.string(),
+})
+
+type AssetFormValues = z.infer<typeof assetFormSchema>
 
 interface AssetFormState {
   asset_type: string
@@ -77,11 +103,95 @@ export function AssetFormDialog({
   batchQuantity,
   setBatchQuantity,
 }: AssetFormDialogProps) {
+  const { officeLocations } = useOfficeLocations()
+
+  const form = useForm<AssetFormValues>({
+    resolver: zodResolver(assetFormSchema),
+    defaultValues: {
+      asset_type: assetForm.asset_type,
+      acquisition_year: assetForm.acquisition_year,
+      asset_model: assetForm.asset_model,
+      serial_number: assetForm.serial_number,
+      unique_code: assetForm.unique_code,
+      status: assetForm.status,
+      notes: assetForm.notes,
+      assignment_type: assetForm.assignment_type,
+      assigned_to: assetForm.assigned_to,
+      assignment_department: assetForm.assignment_department,
+      office_location: assetForm.office_location,
+      assignment_notes: assetForm.assignment_notes,
+      assigned_by: assetForm.assigned_by,
+      assigned_at: assetForm.assigned_at,
+    },
+  })
+
+  const {
+    register,
+    watch,
+    setValue,
+    formState: { errors },
+  } = form
+
+  // Sync form state back to parent whenever values change
+  useEffect(() => {
+    const subscription = watch((values) => {
+      setAssetForm({
+        asset_type: values.asset_type ?? "",
+        acquisition_year: values.acquisition_year ?? currentYear,
+        asset_model: values.asset_model ?? "",
+        serial_number: values.serial_number ?? "",
+        unique_code: values.unique_code ?? "",
+        status: values.status ?? "",
+        notes: values.notes ?? "",
+        assignment_type: (values.assignment_type ?? "individual") as "individual" | "department" | "office",
+        assigned_to: values.assigned_to ?? "",
+        assignment_department: values.assignment_department ?? "",
+        office_location: values.office_location ?? "",
+        assignment_notes: values.assignment_notes ?? "",
+        assigned_by: values.assigned_by ?? "",
+        assigned_at: values.assigned_at ?? "",
+      })
+    })
+    return () => subscription.unsubscribe()
+  }, [watch, setAssetForm])
+
+  // Reset form when dialog opens with new data
+  useEffect(() => {
+    if (isOpen) {
+      form.reset({
+        asset_type: assetForm.asset_type,
+        acquisition_year: assetForm.acquisition_year,
+        asset_model: assetForm.asset_model,
+        serial_number: assetForm.serial_number,
+        unique_code: assetForm.unique_code,
+        status: assetForm.status,
+        notes: assetForm.notes,
+        assignment_type: assetForm.assignment_type,
+        assigned_to: assetForm.assigned_to,
+        assignment_department: assetForm.assignment_department,
+        office_location: assetForm.office_location,
+        assignment_notes: assetForm.assignment_notes,
+        assigned_by: assetForm.assigned_by,
+        assigned_at: assetForm.assigned_at,
+      })
+    }
+  }, [isOpen]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const assetType = watch("asset_type")
+  const acquisitionYear = watch("acquisition_year")
+  const statusValue = watch("status")
+  const assignmentType = watch("assignment_type")
+  const assignedTo = watch("assigned_to")
+  const assignmentDepartment = watch("assignment_department")
+  const officeLocation = watch("office_location")
+  const uniqueCode = watch("unique_code")
+  const serialNumber = watch("serial_number")
+
   const getUniqueCodePreview = () => {
-    if (!assetForm.asset_type || !assetForm.acquisition_year) {
+    if (!assetType || !acquisitionYear) {
       return "ACOB/HQ/???/????/???"
     }
-    return generateUniqueCodePreview(assetForm.asset_type, assetForm.acquisition_year, "???")
+    return generateUniqueCodePreview(assetType, acquisitionYear, "???")
   }
 
   return (
@@ -119,8 +229,8 @@ export function AssetFormDialog({
                 )}
               </div>
               <SearchableSelect
-                value={assetForm.asset_type}
-                onValueChange={(value) => setAssetForm({ ...assetForm, asset_type: value })}
+                value={assetType}
+                onValueChange={(value) => setValue("asset_type", value)}
                 placeholder="Select asset type"
                 searchPlaceholder="Search asset types..."
                 disabled={!!selectedAsset}
@@ -129,6 +239,7 @@ export function AssetFormDialog({
                   label: type.label,
                 }))}
               />
+              {errors.asset_type && <p className="text-destructive mt-1 text-xs">{errors.asset_type.message}</p>}
               {selectedAsset && (
                 <p className="text-muted-foreground mt-1 text-xs">Asset type cannot be changed after creation</p>
               )}
@@ -140,10 +251,8 @@ export function AssetFormDialog({
                 type="number"
                 min={2000}
                 max={currentYear + 1}
-                value={assetForm.acquisition_year}
-                onChange={(e) =>
-                  setAssetForm({ ...assetForm, acquisition_year: parseInt(e.target.value) || currentYear })
-                }
+                value={acquisitionYear}
+                onChange={(e) => setValue("acquisition_year", parseInt(e.target.value) || currentYear)}
                 disabled={!!selectedAsset}
               />
               {selectedAsset && (
@@ -175,7 +284,7 @@ export function AssetFormDialog({
             <Label htmlFor="unique_code">Unique Code</Label>
             <Input
               id="unique_code"
-              value={selectedAsset ? assetForm.unique_code : getUniqueCodePreview()}
+              value={selectedAsset ? uniqueCode : getUniqueCodePreview()}
               readOnly
               className="bg-muted font-mono text-sm"
             />
@@ -190,22 +299,12 @@ export function AssetFormDialog({
           <div className="grid gap-4 md:grid-cols-2">
             <div>
               <Label htmlFor="asset_model">Asset Model (Optional)</Label>
-              <Input
-                id="asset_model"
-                value={assetForm.asset_model}
-                onChange={(e) => setAssetForm({ ...assetForm, asset_model: e.target.value })}
-                placeholder="e.g., Dell Latitude 5420"
-              />
+              <Input id="asset_model" {...register("asset_model")} placeholder="e.g., Dell Latitude 5420" />
               <p className="text-muted-foreground mt-1 text-xs">Can be added later if not available now</p>
             </div>
             <div>
               <Label htmlFor="serial_number">Serial Number (Optional)</Label>
-              <Input
-                id="serial_number"
-                value={assetForm.serial_number}
-                onChange={(e) => setAssetForm({ ...assetForm, serial_number: e.target.value })}
-                placeholder="e.g., ABC123XYZ"
-              />
+              <Input id="serial_number" {...register("serial_number")} placeholder="e.g., ABC123XYZ" />
               <p className="text-muted-foreground mt-1 text-xs">Can be added later if not available now</p>
             </div>
           </div>
@@ -213,8 +312,8 @@ export function AssetFormDialog({
           <div>
             <Label htmlFor="status">Status</Label>
             <SearchableSelect
-              value={assetForm.status}
-              onValueChange={(value) => setAssetForm({ ...assetForm, status: value })}
+              value={statusValue}
+              onValueChange={(value) => setValue("status", value)}
               placeholder="Select status"
               searchPlaceholder="Search status..."
               options={[
@@ -227,7 +326,7 @@ export function AssetFormDialog({
           </div>
 
           {/* Assignment section - show ONLY when status is 'assigned' */}
-          {assetForm.status === "assigned" && (
+          {statusValue === "assigned" && (
             <div className="space-y-4 border-t pt-4">
               <div className="mb-2 flex items-center gap-2">
                 <div className="bg-primary h-8 w-1 rounded" />
@@ -237,16 +336,13 @@ export function AssetFormDialog({
               <div>
                 <Label htmlFor="assignment_type">Assignment Type *</Label>
                 <SearchableSelect
-                  value={assetForm.assignment_type}
-                  onValueChange={(value) =>
-                    setAssetForm({
-                      ...assetForm,
-                      assignment_type: value as "individual" | "department" | "office",
-                      assigned_to: "",
-                      assignment_department: "",
-                      office_location: "",
-                    })
-                  }
+                  value={assignmentType}
+                  onValueChange={(value) => {
+                    setValue("assignment_type", value as "individual" | "department" | "office")
+                    setValue("assigned_to", "")
+                    setValue("assignment_department", "")
+                    setValue("office_location", "")
+                  }}
                   placeholder="Select assignment type"
                   searchPlaceholder="Search assignment types..."
                   options={[
@@ -257,12 +353,12 @@ export function AssetFormDialog({
                 />
               </div>
 
-              {assetForm.assignment_type === "individual" && (
+              {assignmentType === "individual" && (
                 <div>
                   <Label htmlFor="assigned_to">Assign To *</Label>
                   <SearchableSelect
-                    value={assetForm.assigned_to}
-                    onValueChange={(value) => setAssetForm({ ...assetForm, assigned_to: value })}
+                    value={assignedTo}
+                    onValueChange={(value) => setValue("assigned_to", value)}
                     placeholder="Select employees member"
                     searchPlaceholder="Search employees..."
                     icon={<User className="h-4 w-4" />}
@@ -275,12 +371,12 @@ export function AssetFormDialog({
                 </div>
               )}
 
-              {assetForm.assignment_type === "department" && (
+              {assignmentType === "department" && (
                 <div>
                   <Label htmlFor="assignment_department">Department *</Label>
                   <SearchableSelect
-                    value={assetForm.assignment_department}
-                    onValueChange={(value) => setAssetForm({ ...assetForm, assignment_department: value })}
+                    value={assignmentDepartment}
+                    onValueChange={(value) => setValue("assignment_department", value)}
                     placeholder="Select department"
                     searchPlaceholder="Search departments..."
                     icon={<Building2 className="h-4 w-4" />}
@@ -293,16 +389,16 @@ export function AssetFormDialog({
                 </div>
               )}
 
-              {assetForm.assignment_type === "office" && (
+              {assignmentType === "office" && (
                 <div>
                   <Label htmlFor="office_location">Office Location *</Label>
                   <SearchableSelect
-                    value={assetForm.office_location}
-                    onValueChange={(value) => setAssetForm({ ...assetForm, office_location: value })}
+                    value={officeLocation}
+                    onValueChange={(value) => setValue("office_location", value)}
                     placeholder="Select office location"
                     searchPlaceholder="Search office locations..."
                     icon={<Building className="h-4 w-4" />}
-                    options={OFFICE_LOCATIONS.map((location) => ({
+                    options={officeLocations.map((location) => ({
                       value: location,
                       label: location,
                       icon: <Building className="h-3 w-3" />,
@@ -316,8 +412,8 @@ export function AssetFormDialog({
                 <div>
                   <Label htmlFor="assigned_by">Assigned By (Optional Override)</Label>
                   <SearchableSelect
-                    value={assetForm.assigned_by}
-                    onValueChange={(value) => setAssetForm({ ...assetForm, assigned_by: value })}
+                    value={watch("assigned_by")}
+                    onValueChange={(value) => setValue("assigned_by", value)}
                     placeholder="Select assigner (defaults to you)"
                     searchPlaceholder="Search employees..."
                     icon={<User className="h-4 w-4" />}
@@ -331,12 +427,7 @@ export function AssetFormDialog({
                 </div>
                 <div>
                   <Label htmlFor="assigned_at">Assigned Date (Optional Override)</Label>
-                  <Input
-                    type="datetime-local"
-                    id="assigned_at"
-                    value={assetForm.assigned_at || ""}
-                    onChange={(e) => setAssetForm({ ...assetForm, assigned_at: e.target.value })}
-                  />
+                  <Input type="datetime-local" id="assigned_at" {...register("assigned_at")} />
                 </div>
               </div>
 
@@ -344,8 +435,7 @@ export function AssetFormDialog({
                 <Label htmlFor="assignment_notes">Assignment Notes (Optional)</Label>
                 <Textarea
                   id="assignment_notes"
-                  value={assetForm.assignment_notes}
-                  onChange={(e) => setAssetForm({ ...assetForm, assignment_notes: e.target.value })}
+                  {...register("assignment_notes")}
                   placeholder="Notes about this assignment..."
                   rows={2}
                 />
@@ -362,38 +452,32 @@ export function AssetFormDialog({
             loading={isSaving}
             disabled={
               // For both create and edit: asset_type is required
-              !assetForm.asset_type ||
+              !assetType ||
               // For edit: check if anything changed
               (selectedAsset
-                ? assetForm.asset_type === originalAssetForm.asset_type &&
-                  assetForm.acquisition_year === originalAssetForm.acquisition_year &&
-                  assetForm.asset_model === originalAssetForm.asset_model &&
-                  assetForm.serial_number === originalAssetForm.serial_number &&
-                  assetForm.status === originalAssetForm.status &&
+                ? assetType === originalAssetForm.asset_type &&
+                  acquisitionYear === originalAssetForm.acquisition_year &&
+                  watch("asset_model") === originalAssetForm.asset_model &&
+                  serialNumber === originalAssetForm.serial_number &&
+                  statusValue === originalAssetForm.status &&
                   // Check assignment details
-                  assetForm.assignment_type === originalAssetForm.assignment_type &&
-                  assetForm.assigned_to === originalAssetForm.assigned_to &&
-                  assetForm.assignment_department === originalAssetForm.assignment_department &&
-                  assetForm.office_location === originalAssetForm.office_location &&
-                  assetForm.assignment_notes === originalAssetForm.assignment_notes &&
-                  assetForm.assigned_by === originalAssetForm.assigned_by &&
-                  assetForm.assigned_at === originalAssetForm.assigned_at
+                  assignmentType === originalAssetForm.assignment_type &&
+                  assignedTo === originalAssetForm.assigned_to &&
+                  assignmentDepartment === originalAssetForm.assignment_department &&
+                  officeLocation === originalAssetForm.office_location &&
+                  watch("assignment_notes") === originalAssetForm.assignment_notes &&
+                  watch("assigned_by") === originalAssetForm.assigned_by &&
+                  watch("assigned_at") === originalAssetForm.assigned_at
                 : false) ||
               // For create with "assigned" status: validate assignment fields (only when creating, not editing)
               (!selectedAsset && (!Number.isInteger(batchQuantity) || batchQuantity < 1 || batchQuantity > 100)) ||
-              (!selectedAsset && batchQuantity > 1 && !!String(assetForm.serial_number || "").trim()) ||
+              (!selectedAsset && batchQuantity > 1 && !!String(serialNumber || "").trim()) ||
+              (!selectedAsset && statusValue === "assigned" && assignmentType === "individual" && !assignedTo) ||
               (!selectedAsset &&
-                assetForm.status === "assigned" &&
-                assetForm.assignment_type === "individual" &&
-                !assetForm.assigned_to) ||
-              (!selectedAsset &&
-                assetForm.status === "assigned" &&
-                assetForm.assignment_type === "department" &&
-                !assetForm.assignment_department) ||
-              (!selectedAsset &&
-                assetForm.status === "assigned" &&
-                assetForm.assignment_type === "office" &&
-                !assetForm.office_location)
+                statusValue === "assigned" &&
+                assignmentType === "department" &&
+                !assignmentDepartment) ||
+              (!selectedAsset && statusValue === "assigned" && assignmentType === "office" && !officeLocation)
             }
           >
             {selectedAsset ? "Update Asset" : batchQuantity > 1 ? `Create ${batchQuantity} Assets` : "Create Asset"}

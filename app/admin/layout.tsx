@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import { AdminLayout } from "@/components/admin-layout"
+import { ErrorBoundary } from "@/components/error-boundary"
 
 export const metadata: Metadata = {
   title: "Admin Dashboard | ACOB Lighting Technology Limited",
@@ -8,5 +9,9 @@ export const metadata: Metadata = {
 }
 
 export default function AdminLayoutPage({ children }: { children: React.ReactNode }) {
-  return <AdminLayout>{children}</AdminLayout>
+  return (
+    <AdminLayout>
+      <ErrorBoundary>{children}</ErrorBoundary>
+    </AdminLayout>
+  )
 }

@@ -15,7 +15,7 @@ interface Profile {
   last_name: string
   company_email: string
   department: string
-  company_role: string | null
+  designation: string | null
   phone_number: string | null
   role: UserRole
   job_description: string | null
@@ -62,7 +62,7 @@ export function JobDescriptionListView({ profiles, nameSortOrder, onToggleSort, 
                 </div>
               </TableHead>
               <TableHead>Department</TableHead>
-              <TableHead>Company Role</TableHead>
+              <TableHead>Designation</TableHead>
               <TableHead>Role</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Last Updated</TableHead>
@@ -77,7 +77,7 @@ export function JobDescriptionListView({ profiles, nameSortOrder, onToggleSort, 
                   {formatName(profile.last_name)}, {formatName(profile.first_name)}
                 </TableCell>
                 <TableCell>{profile.department}</TableCell>
-                <TableCell>{profile.company_role || "-"}</TableCell>
+                <TableCell>{profile.designation || "-"}</TableCell>
                 <TableCell>
                   <Badge className={getRoleBadgeColor(profile.role)}>{getRoleDisplayName(profile.role)}</Badge>
                 </TableCell>

@@ -1,0 +1,98 @@
+import { DEPT_CORPORATE_SERVICES, DEPT_EXECUTIVE_MANAGEMENT } from "@/config/constants"
+
+export interface TaskAssignmentAuthorityProfile {
+  id: string
+  department?: string | null
+  is_department_lead?: boolean | null
+  lead_departments?: string[] | null
+}
+
+export interface TaskAssignmentTargetProfile {
+  id: string
+  department?: string | null
+}
+
+function normalizeDepartment(value: string | null | undefined) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+}
+
+function uniqueDepartments(values: Array<string | null | undefined>) {
+  return Array.from(new Set(values.map((value) => String(value || "").trim()).filter(Boolean)))
+}
+
+export function getAssignableDepartments(profile: TaskAssignmentAuthorityProfile): string[] {
+  const departments = uniqueDepartments([
+    profile.department,
+    ...(Array.isArray(profile.lead_departments) ? profile.lead_departments : []),
+  ])
+
+  return profile.is_department_lead ? departments : []
+}
+
+export function profileLeadsDepartment(
+  profile: TaskAssignmentAuthorityProfile | null | undefined,
+  departmentName: string
+) {
+  if (!profile?.is_department_lead) return false
+  const target = normalizeDepartment(departmentName)
+  return getAssignableDepartments(profile).some((department) => normalizeDepartment(department) === target)
+}
+
+export function isManagingDirectorAssigner(profile: TaskAssignmentAuthorityProfile | null | undefined) {
+  return profileLeadsDepartment(profile, DEPT_EXECUTIVE_MANAGEMENT)
+}
+
+export function isHeadCorporateServicesAssigner(profile: TaskAssignmentAuthorityProfile | null | undefined) {
+  return profileLeadsDepartment(profile, DEPT_CORPORATE_SERVICES)
+}
+
+export function hasGlobalTaskAssignmentAuthority(profile: TaskAssignmentAuthorityProfile | null | undefined) {
+  return isManagingDirectorAssigner(profile) || isHeadCorporateServicesAssigner(profile)
+}
+
+export function canAssignTasks(profile: TaskAssignmentAuthorityProfile | null | undefined) {
+  return Boolean(profile?.is_department_lead)
+}
+
+export function canAssignToDepartment(
+  assigner: TaskAssignmentAuthorityProfile | null | undefined,
+  department: string | null | undefined
+) {
+  if (!assigner || !department) return false
+  if (!canAssignTasks(assigner)) return false
+  if (hasGlobalTaskAssignmentAuthority(assigner)) return true
+  return getAssignableDepartments(assigner).some(
+    (managedDepartment) => normalizeDepartment(managedDepartment) === normalizeDepartment(department)
+  )
+}
+
+export function canAssignToProfile(
+  assigner: TaskAssignmentAuthorityProfile | null | undefined,
+  assignee: TaskAssignmentTargetProfile | null | undefined
+) {
+  if (!assigner || !assignee) return false
+  if (!canAssignTasks(assigner)) return false
+  if (assigner.id === assignee.id) return true
+  if (hasGlobalTaskAssignmentAuthority(assigner)) return true
+  return canAssignToDepartment(assigner, assignee.department)
+}
+
+export function filterAssignableTaskUsers<T extends TaskAssignmentTargetProfile>(
+  assigner: TaskAssignmentAuthorityProfile | null | undefined,
+  users: T[]
+) {
+  if (!assigner) return []
+  if (hasGlobalTaskAssignmentAuthority(assigner)) return users
+  return users.filter((user) => canAssignToProfile(assigner, user))
+}
+
+export function filterAssignableTaskDepartments(
+  assigner: TaskAssignmentAuthorityProfile | null | undefined,
+  departments: string[]
+) {
+  if (!assigner) return []
+  if (hasGlobalTaskAssignmentAuthority(assigner)) return departments
+  return departments.filter((department) => canAssignToDepartment(assigner, department))
+}

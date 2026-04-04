@@ -10,6 +10,8 @@ type DocumentationDepartmentDocs = {
   initialPath: string
   rootLabel: string
   enabled: boolean
+  lockToInitialPath: boolean
+  accessMode: "self" | "admin"
 }
 
 export type DocumentationDataResult =
@@ -44,7 +46,10 @@ export async function getDocumentationData() {
     log.error("Error loading documentation:", error)
   }
 
-  const oneDriveScope = await resolveOneDriveAccessScope(supabase, user.id)
+  const oneDriveScope = await resolveOneDriveAccessScope(supabase, user.id, {
+    allowAdminLike: false,
+    allowManagedDepartments: false,
+  })
 
   return {
     docs: (data || []) as Documentation[],
@@ -54,11 +59,15 @@ export async function getDocumentationData() {
           initialPath: oneDriveScope.defaultPath,
           rootLabel: oneDriveScope.rootLabel,
           enabled: true,
+          lockToInitialPath: true,
+          accessMode: "self",
         }
       : {
-          initialPath: "/Projects",
-          rootLabel: "Projects",
+          initialPath: "/",
+          rootLabel: "Department Libraries",
           enabled: false,
+          lockToInitialPath: true,
+          accessMode: "self",
         },
   }
 }

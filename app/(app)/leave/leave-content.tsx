@@ -131,7 +131,10 @@ export function LeaveContent({
   function isRequesterEditable(request: LeaveRequest) {
     if (request.user_id !== currentUserId) return false
     const stage = request.current_stage_code || request.approval_stage
-    return ["pending", "pending_evidence"].includes(request.status) && stage === "pending_reliever"
+    return (
+      ["pending", "pending_evidence"].includes(request.status) &&
+      (stage === "pending_reliever" || stage === "reliever_pending")
+    )
   }
 
   function resetRequestForm() {

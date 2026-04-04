@@ -59,7 +59,7 @@ async function fetchDepartmentsData(): Promise<DepartmentsData> {
 
   const { data: profiles } = await supabase
     .from("profiles")
-    .select("id, first_name, last_name, company_email, additional_email, company_role, employment_status, department")
+    .select("id, first_name, last_name, company_email, additional_email, designation, employment_status, department")
 
   const employeesByDepartment: Record<string, DepartmentEmployee[]> = {}
   for (const profile of ((profiles || []) as DepartmentEmployee[]).filter((employee) =>
@@ -98,7 +98,7 @@ interface DepartmentEmployee {
   last_name: string | null
   company_email: string | null
   additional_email: string | null
-  company_role: string | null
+  designation: string | null
   employment_status: string | null
   department: string | null
 }
@@ -135,18 +135,28 @@ export default function DepartmentsPage() {
       const supabase = createClient()
 
       if (editingDepartment) {
+        const newName = formData.name.trim()
+
         // Update existing department
-        const { error } = await supabase
+        const { error, data: updatedRows } = await supabase
           .from("departments")
           .update({
-            name: formData.name,
+            name: newName,
             description: formData.description || null,
             is_active: formData.is_active,
             updated_at: new Date().toISOString(),
           })
           .eq("id", editingDepartment.id)
+          .select()
 
         if (error) throw error
+        if (!updatedRows || updatedRows.length === 0) {
+          // Supabase RLS silently blocked the update — no rows were changed
+          throw new Error(
+            "Update was blocked by a database policy. Check that your account has permission to modify departments."
+          )
+        }
+
         toast.success("Department updated successfully")
       } else {
         // Create new department
@@ -166,7 +176,11 @@ export default function DepartmentsPage() {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminDepartmentsPage() })
     } catch (error: unknown) {
       log.error("Error saving department:", error)
-      toast.error(error instanceof Error ? error.message : "Failed to save department")
+      const msg =
+        error instanceof Error
+          ? error.message
+          : ((error as { message?: string })?.message ?? "Failed to save department")
+      toast.error(msg)
     }
   }
 
@@ -227,7 +241,7 @@ export default function DepartmentsPage() {
                   <DialogTitle>{editingDepartment ? "Edit Department" : "Create Department"}</DialogTitle>
                   <DialogDescription>
                     {editingDepartment
-                      ? "Update the department details below."
+                      ? "Update the department details below. Renaming will automatically update all assigned employee records."
                       : "Add a new department to your organization."}
                   </DialogDescription>
                 </DialogHeader>
@@ -429,7 +443,7 @@ export default function DepartmentsPage() {
                                           </TableCell>
                                           <TableCell>
                                             <Badge variant="outline" className="text-xs">
-                                              {member.company_role || "Employee"}
+                                              {member.designation || "Employee"}
                                             </Badge>
                                           </TableCell>
                                           <TableCell className="text-right">

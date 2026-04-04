@@ -1,27 +1,31 @@
 import { createClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
 import crypto from "crypto"
+import { z } from "zod"
 import { rateLimit, getClientId } from "@/lib/rate-limit"
 import { logger } from "@/lib/logger"
 
 const log = logger("setup-password")
 
-export async function POST(req: Request) {
-  const rl = rateLimit(`setup-password:${getClientId(req)}`, { limit: 5, windowSec: 900 })
+const SetupPasswordSchema = z.object({
+  token: z.string().trim().min(1, "Missing token or password"),
+  password: z.string().min(12, "Password must be at least 12 characters"),
+})
+
+export async function PATCH(req: Request) {
+  const rl = await rateLimit(`setup-password:${getClientId(req)}`, { limit: 5, windowSec: 900 })
   if (!rl.allowed) {
     return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 })
   }
 
   try {
-    const { token, password } = await req.json()
-
-    if (!token || !password) {
-      return NextResponse.json({ error: "Missing token or password" }, { status: 400 })
+    const body = await req.json()
+    const parsed = SetupPasswordSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid request body" }, { status: 400 })
     }
 
-    if (password.length < 6) {
-      return NextResponse.json({ error: "Password must be at least 6 characters" }, { status: 400 })
-    }
+    const { token, password } = parsed.data
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -79,4 +83,9 @@ export async function POST(req: Request) {
     log.error({ err: String(error) }, "Setup password error")
     return NextResponse.json({ error: "An unexpected error occurred" }, { status: 500 })
   }
+}
+
+// POST kept for backwards compat — prefer PATCH
+export async function POST(req: Request) {
+  return PATCH(req)
 }

@@ -1,9 +1,6 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { logger } from "@/lib/logger"
-
-const log = logger("action-tracker-form-dialog")
 import {
   Dialog,
   DialogContent,
@@ -19,7 +16,6 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "sonner"
 import { Loader2, Plus, Save, X } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
 import { getCurrentOfficeWeek } from "@/lib/meeting-week"
 
 interface EditableAction {
@@ -133,89 +129,44 @@ export function ActionFormDialog({
 
     setIsSaving(true)
     try {
-      const supabase = createClient()
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (!user) throw new Error("Not authenticated")
-
       const finalItems = editingAction ? [singleData.title] : [...actionItems]
       if (!editingAction && newItem.trim()) {
         finalItems.push(newItem.trim())
       }
 
       if (editingAction) {
-        // Update single
-        const { error } = await supabase
-          .from("tasks")
-          .update({
+        const response = await fetch(`/api/reports/action-tracker/${editingAction.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
             title: singleData.title,
             description: singleData.description,
             department: dept,
             status: singleData.status,
             week_number: week,
-            year: year,
-          })
-          .eq("id", editingAction.id)
-        if (error) throw error
+            year,
+          }),
+        })
+        const payload = (await response.json().catch(() => null)) as { error?: string } | null
+        if (!response.ok) throw new Error(payload?.error || "Failed to update action")
         toast.success("Action updated")
       } else {
-        // Insert bulk
-        const payloads = finalItems.map((title) => ({
-          title,
-          department: dept,
-          status: "pending",
-          week_number: week,
-          year: year,
-          assigned_by: user.id,
-          source_type: "action_item",
-          category: "weekly_action",
-          assignment_type: "department",
-          priority: "medium",
-        }))
-
-        const { error } = await supabase.from("tasks").insert(payloads)
-        if (error) throw error
-        toast.success(`Created ${payloads.length} actions`)
-
-        // Notify Department Members
-        const { data: deptMembers } = await supabase
-          .from("profiles")
-          .select("id")
-          .eq("department", dept)
-          .neq("id", user.id) // Don't notify self
-
-        if (deptMembers && deptMembers.length > 0) {
-          try {
-            const { createNotification } = await import("@/lib/notifications")
-
-            // If bulk, send one summary or multiple?
-            // Sending one summary is better to avoid spam.
-            const title = payloads.length === 1 ? "New Action Item" : `${payloads.length} New Action Items`
-            const message =
-              payloads.length === 1
-                ? `New action added to ${dept}: ${payloads[0].title}`
-                : `${payloads.length} new actions added to ${dept} tracker.`
-
-            await Promise.all(
-              deptMembers.map((member) =>
-                createNotification({
-                  userId: member.id,
-                  type: "task_assigned", // Using task_assigned generic type
-                  category: "tasks",
-                  title: title,
-                  message: message,
-                  priority: "normal",
-                  linkUrl: `/reports/action-tracker?dept=${dept}`,
-                  actorId: user.id,
-                  entityType: "task_batch",
-                })
-              )
-            )
-          } catch (notifError) {
-            log.error("Failed to send action notifications:", notifError)
-          }
+        for (const title of finalItems) {
+          const response = await fetch("/api/reports/action-tracker", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              title,
+              description: null,
+              department: dept,
+              week_number: week,
+              year,
+            }),
+          })
+          const payload = (await response.json().catch(() => null)) as { error?: string } | null
+          if (!response.ok) throw new Error(payload?.error || "Failed to create action item")
         }
+        toast.success(`Created ${finalItems.length} actions`)
       }
 
       onComplete()

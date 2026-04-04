@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { SearchableMultiSelect } from "@/components/ui/searchable-multi-select"
 import { formatName } from "@/lib/utils"
-import { OFFICE_LOCATIONS } from "@/lib/permissions"
+import { useOfficeLocations } from "@/hooks/use-office-locations"
 import {
   Download,
   FileText,
@@ -82,6 +82,7 @@ export function AssetFilterBar({
   onExportClick,
   onEmployeeReportClick,
 }: AssetFilterBarProps) {
+  const { officeLocations } = useOfficeLocations()
   return (
     <>
       {/* Export Buttons */}
@@ -234,7 +235,7 @@ export function AssetFilterBar({
                 label="Office Locations"
                 icon={<Building className="h-4 w-4" />}
                 values={officeLocationFilter}
-                options={OFFICE_LOCATIONS.map((location) => ({
+                options={officeLocations.map((location) => ({
                   value: location,
                   label: location,
                   icon: <Building className="h-3 w-3" />,

@@ -16,6 +16,11 @@ export interface Goal {
   priority: string
   due_date: string
   created_at: string
+  // PMS: approval workflow
+  approval_status: "pending" | "approved" | "rejected"
+  approved_by?: string | null
+  approved_at?: string | null
+  department?: string | null
 }
 
 async function getGoalsData() {
@@ -32,7 +37,7 @@ async function getGoalsData() {
 
   // Fetch user's goals
   const { data: goals, error } = await supabase
-    .from("performance_goals")
+    .from("goals_objectives")
     .select("*")
     .eq("user_id", user.id)
     .order("created_at", { ascending: false })

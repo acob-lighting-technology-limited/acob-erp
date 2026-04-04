@@ -3,17 +3,15 @@ import { type PendingUser } from "./welcome"
 
 interface InternalNotificationEmailProps {
   pendingUser: PendingUser
-  employeeId: string
 }
 
-export function renderInternalNotificationEmail({ pendingUser, employeeId }: InternalNotificationEmailProps) {
+export function renderInternalNotificationEmail({ pendingUser }: InternalNotificationEmailProps) {
   const firstName = escapeHtml(pendingUser.first_name)
   const lastName = escapeHtml(pendingUser.last_name)
   const dept = escapeHtml(pendingUser.department)
+  const role = escapeHtml(pendingUser.designation)
   const email = escapeHtml(pendingUser.company_email)
-  const officeLoc = pendingUser.office_location ? escapeHtml(pendingUser.office_location) : "N/A"
-  const empId = escapeHtml(employeeId)
-
+  const phoneNumber = pendingUser.phone_number ? escapeHtml(pendingUser.phone_number) : "N/A"
   return `
 <!DOCTYPE html>
 <html lang="en">
@@ -50,8 +48,8 @@ export function renderInternalNotificationEmail({ pendingUser, employeeId }: Int
     </div>
     <div class="wrapper">
         <div class="title">New Employee Onboarded</div>
-        <p class="text">Hello Team,</p>
-        <p class="text">This is an automated notification that a new employee has been successfully approved and added to the system.</p>
+        <p class="text">Dear Management,</p>
+        <p class="text">This is an automated notification that a new employee has been successfully approved and added to the system for your awareness.</p>
         
         <div class="card">
             <div class="card-header">Onboarding Details</div>
@@ -59,10 +57,6 @@ export function renderInternalNotificationEmail({ pendingUser, employeeId }: Int
                 <tr>
                     <td class="label">Employee Name</td>
                     <td class="value">${firstName} ${lastName}</td>
-                </tr>
-                <tr>
-                    <td class="label">Employee ID</td>
-                    <td class="value">${empId}</td>
                 </tr>
                 <tr>
                     <td class="label">Department</td>
@@ -73,12 +67,12 @@ export function renderInternalNotificationEmail({ pendingUser, employeeId }: Int
                     <td class="value">${email}</td>
                 </tr>
                 <tr>
-                    <td class="label">Office Location</td>
-                    <td class="value">${officeLoc}</td>
+                    <td class="label">Designation</td>
+                    <td class="value">${role}</td>
                 </tr>
                 <tr>
-                    <td class="label">Approved Date</td>
-                    <td class="value">${new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</td>
+                    <td class="label">Phone Number</td>
+                    <td class="value">${phoneNumber}</td>
                 </tr>
             </table>
         </div>
@@ -86,8 +80,10 @@ export function renderInternalNotificationEmail({ pendingUser, employeeId }: Int
 
     </div>
     <div class="footer" style="background-color:#0f2d1f;">
+        <span style="color:#d1d5db;">Prepared by Admin &amp; HR</span><br>
+        Administrative Team<br>
+        Admin &amp; HR Department<br>
         <strong>ACOB Lighting Technology Limited</strong><br>
-        Admin & HR Department<br>
         <span class="footer-system">Employee Management System</span>
         <br><br>
         <i class="footer-note">This is an automated system notification. Please do not reply directly to this email.</i>

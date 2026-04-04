@@ -20,15 +20,15 @@ export default async function DashboardMinutesOfMeetingPage() {
 
   const role = String(profile?.role || "").toLowerCase()
   const isAllowed = ["developer", "super_admin", "admin"].includes(role) || profile?.is_department_lead === true
-  if (!isAllowed) redirect("/reports")
+  if (!isAllowed) redirect("/reports/general-meeting")
 
   return (
     <MeetingDocumentTypeTable
       documentType="minutes"
       title="Minutes of Meeting"
       description="Upload and manage Minutes of Meeting PDFs by week."
-      backHref="/reports"
-      backLabel="Back to Reports"
+      backHref="/reports/general-meeting"
+      backLabel="Back to General Meeting"
       readOnly
     />
   )

@@ -20,6 +20,14 @@ type AssetRow = {
   office_location?: string | null
 }
 
+type ProfileRow = {
+  id: string
+  department?: string | null
+  department_id?: string | null
+  office_location?: string | null
+  [key: string]: unknown
+}
+
 export async function GET(_: Request, { params }: { params: { id: string } }) {
   try {
     const supabase = await createClient()
@@ -47,7 +55,7 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
       .from("profiles")
       .select("*")
       .eq("id", employeeId)
-      .single()
+      .single<ProfileRow>()
 
     if (profileError || !profile) {
       return NextResponse.json({ error: "Employee not found" }, { status: 404 })
@@ -56,8 +64,12 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
     // Department-lead actors can only read people within their managed scope.
     if (!scope.isAdminLike) {
       const inDepartmentScope =
-        scope.managedDepartments.length === 0 ||
-        (profile.department && scope.managedDepartments.includes(profile.department))
+        scope.managedDepartmentIds.length === 0
+          ? scope.managedDepartments.length === 0 ||
+            (profile.department && scope.managedDepartments.includes(profile.department))
+          : profile.department_id
+            ? scope.managedDepartmentIds.includes(profile.department_id)
+            : Boolean(profile.department && scope.managedDepartments.includes(profile.department))
       const inOfficeScope =
         scope.managedOffices.length === 0 ||
         (profile.office_location && scope.managedOffices.includes(profile.office_location))
@@ -80,17 +92,21 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
         .eq("assigned_to", employeeId)
         .eq("is_current", true)
         .limit(10),
-      profile.department
-        ? dataClient
-            .from("assets")
-            .select(
-              "id, asset_name, asset_type, asset_model, serial_number, unique_code, status, assignment_type, department, created_at"
-            )
-            .eq("assignment_type", "department")
-            .eq("department", profile.department)
-            .eq("status", "assigned")
-            .is("deleted_at", null)
-            .limit(10)
+      profile.department || profile.department_id
+        ? (() => {
+            const q = dataClient
+              .from("assets")
+              .select(
+                "id, asset_name, asset_type, asset_model, serial_number, unique_code, status, assignment_type, department, created_at"
+              )
+              .eq("assignment_type", "department")
+              .eq("status", "assigned")
+              .is("deleted_at", null)
+              .limit(10)
+            return profile.department_id
+              ? q.eq("department_id", profile.department_id)
+              : q.eq("department", profile.department!)
+          })()
         : Promise.resolve({ data: [] as AssetRow[] }),
       profile.office_location
         ? dataClient

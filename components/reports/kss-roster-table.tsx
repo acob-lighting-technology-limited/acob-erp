@@ -7,11 +7,13 @@ import { toast } from "sonner"
 import { TablePage } from "@/components/admin/admin-table-page"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { SearchableMultiSelect } from "@/components/ui/searchable-multi-select"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Textarea } from "@/components/ui/textarea"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
   AlertDialog,
@@ -65,6 +67,19 @@ type KssDocument = {
   is_locked?: boolean
 }
 
+type KssResult = {
+  id: string
+  roster_id: string
+  presenter_id: string
+  evaluator_id: string
+  score: number
+  feedback: string | null
+  meeting_week: number
+  meeting_year: number
+  created_at: string
+  updated_at: string
+}
+
 const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 const PPTX_MIME = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
 type UploadPhase = "idle" | "saving" | "converting" | "uploading"
@@ -75,6 +90,8 @@ interface Props {
   backLabel: string
   title?: string
   readOnly?: boolean
+  currentUserId?: string
+  enableScoring?: boolean
 }
 
 function compareWeekYear(aWeek: number, aYear: number, bWeek: number, bYear: number): number {
@@ -110,6 +127,8 @@ export function KssRosterTable({
   backLabel,
   title = "Knowledge Sharing Session",
   readOnly = false,
+  currentUserId,
+  enableScoring = false,
 }: Props) {
   const supabase = createClient()
   const currentOfficeWeek = getCurrentOfficeWeek()
@@ -119,6 +138,7 @@ export function KssRosterTable({
   const [showCreate, setShowCreate] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [pendingDeleteRow, setPendingDeleteRow] = useState<KssRosterEntry | null>(null)
+  const [scoringRow, setScoringRow] = useState<KssRosterEntry | null>(null)
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
 
   const [weekNumber, setWeekNumber] = useState(defaultWeek)
@@ -128,7 +148,10 @@ export function KssRosterTable({
   const [notes, setNotes] = useState("")
   const [file, setFile] = useState<File | null>(null)
   const [saving, setSaving] = useState(false)
+  const [savingScore, setSavingScore] = useState(false)
   const [uploadPhase, setUploadPhase] = useState<UploadPhase>("idle")
+  const [scoreValue, setScoreValue] = useState("")
+  const [scoreFeedback, setScoreFeedback] = useState("")
 
   const [searchQuery, setSearchQuery] = useState("")
   const [departmentFilter, setDepartmentFilter] = useState("all")
@@ -180,6 +203,17 @@ export function KssRosterTable({
       )
       const payload = await res.json()
       if (!res.ok) throw new Error(payload.error || "Failed to fetch KSS documents")
+      return payload.data || []
+    },
+  })
+
+  const { data: kssResults = [], refetch: refetchKssResults } = useQuery({
+    queryKey: ["kss-results-table"],
+    enabled: enableScoring && Boolean(currentUserId),
+    queryFn: async (): Promise<KssResult[]> => {
+      const res = await fetch("/api/reports/kss-results")
+      const payload = await res.json()
+      if (!res.ok) throw new Error(payload.error || "Failed to fetch KSS scores")
       return payload.data || []
     },
   })
@@ -283,6 +317,15 @@ export function KssRosterTable({
     employeeNameById,
   ])
 
+  const myScoresByRosterId = useMemo(() => {
+    const map = new Map<string, KssResult>()
+    if (!currentUserId) return map
+    kssResults
+      .filter((result) => result.evaluator_id === currentUserId)
+      .forEach((result) => map.set(result.roster_id, result))
+    return map
+  }, [currentUserId, kssResults])
+
   const resetForm = () => {
     setWeekNumber(defaultWeek)
     setYearNumber(defaultYear)
@@ -292,6 +335,19 @@ export function KssRosterTable({
     setFile(null)
     setEditingId(null)
     setUploadPhase("idle")
+  }
+
+  const resetScoreForm = () => {
+    setScoringRow(null)
+    setScoreValue("")
+    setScoreFeedback("")
+  }
+
+  const openScoreDialog = (row: KssRosterEntry) => {
+    const existingScore = myScoresByRosterId.get(row.id)
+    setScoringRow(row)
+    setScoreValue(existingScore ? String(existingScore.score) : "")
+    setScoreFeedback(existingScore?.feedback || "")
   }
 
   const openEdit = (row: KssRosterEntry) => {
@@ -458,6 +514,39 @@ export function KssRosterTable({
     }
   }
 
+  const handleSaveScore = async () => {
+    if (!scoringRow) return
+
+    const numericScore = Number(scoreValue)
+    if (!Number.isFinite(numericScore) || numericScore < 0 || numericScore > 100) {
+      toast.error("Score must be a number between 0 and 100")
+      return
+    }
+
+    setSavingScore(true)
+    try {
+      const res = await fetch("/api/reports/kss-results", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          roster_id: scoringRow.id,
+          score: numericScore,
+          feedback: scoreFeedback.trim() || null,
+        }),
+      })
+      const payload = await res.json()
+      if (!res.ok) throw new Error(payload.error || "Failed to save KSS score")
+
+      toast.success("KSS score submitted")
+      resetScoreForm()
+      await refetchKssResults()
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Failed to save KSS score")
+    } finally {
+      setSavingScore(false)
+    }
+  }
+
   const buildDownloadName = (doc: KssDocument, row: KssRosterEntry, presenterName: string): string => {
     const ext = getFileExtension(doc.file_name, doc.mime_type)
     return buildMeetingDocumentFileName({
@@ -473,19 +562,19 @@ export function KssRosterTable({
   const handleDownload = async (doc: KssDocument, row: KssRosterEntry, presenterName: string) => {
     if (!doc.signed_url) return
     setDownloadingId(doc.id)
+    const toastId = toast.loading("Preparing download...")
     try {
-      const response = await fetch(doc.signed_url)
-      if (!response.ok) throw new Error("Failed to download document")
-      const blob = await response.blob()
-      const objectUrl = URL.createObjectURL(blob)
       const anchor = document.createElement("a")
-      anchor.href = objectUrl
+      anchor.href = doc.signed_url
       anchor.download = buildDownloadName(doc, row, presenterName)
       document.body.appendChild(anchor)
       anchor.click()
       anchor.remove()
-      URL.revokeObjectURL(objectUrl)
+      window.setTimeout(() => {
+        toast.dismiss(toastId)
+      }, 6000)
     } catch (error: unknown) {
+      toast.dismiss(toastId)
       toast.error(error instanceof Error ? error.message : "Failed to download file")
     } finally {
       setDownloadingId((current) => (current === doc.id ? null : current))
@@ -802,9 +891,86 @@ export function KssRosterTable({
               </Button>
               {readOnly ? (
                 <Button variant="secondary" asChild>
-                  <Link href="/admin/reports/kss">Open Admin KSS</Link>
+                  <Link href="/admin/reports/general-meeting/kss">Open Admin KSS</Link>
                 </Button>
               ) : null}
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog
+          open={scoringRow !== null}
+          onOpenChange={(open) => {
+            if (!open) resetScoreForm()
+          }}
+        >
+          <DialogContent className="max-h-[90vh] w-[95vw] max-w-lg overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Score Presenter</DialogTitle>
+              <DialogDescription>
+                Submit your KSS evaluation for{" "}
+                {scoringRow?.presenter_id
+                  ? employeeNameById.get(scoringRow.presenter_id) || "this presenter"
+                  : "this presenter"}
+                .
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Week</Label>
+                  <Input
+                    value={scoringRow ? `Week ${scoringRow.meeting_week}, ${scoringRow.meeting_year}` : ""}
+                    disabled
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Department</Label>
+                  <Input value={scoringRow?.department || ""} disabled />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="kss-score">Score (0 - 100)</Label>
+                <Input
+                  id="kss-score"
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={1}
+                  value={scoreValue}
+                  onChange={(e) => setScoreValue(e.target.value)}
+                  placeholder="Enter score"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="kss-feedback">Feedback</Label>
+                <Textarea
+                  id="kss-feedback"
+                  value={scoreFeedback}
+                  onChange={(e) => setScoreFeedback(e.target.value)}
+                  placeholder="Optional feedback for the presenter"
+                  maxLength={5000}
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <Button onClick={handleSaveScore} disabled={savingScore}>
+                  {savingScore ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    "Submit Score"
+                  )}
+                </Button>
+                <Button variant="outline" onClick={resetScoreForm} disabled={savingScore}>
+                  Cancel
+                </Button>
+              </div>
             </div>
           </DialogContent>
         </Dialog>
@@ -859,6 +1025,25 @@ export function KssRosterTable({
                         <TableCell>{submittedDate}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1">
+                            {enableScoring &&
+                            currentUserId &&
+                            row.presenter_id &&
+                            row.presenter_id !== currentUserId ? (
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => openScoreDialog(row)}
+                                  title="Score presenter"
+                                  className="h-8 px-2"
+                                >
+                                  {myScoresByRosterId.has(row.id) ? "Update score" : "Score"}
+                                </Button>
+                                {myScoresByRosterId.has(row.id) ? (
+                                  <Badge variant="outline">{`My score: ${myScoresByRosterId.get(row.id)?.score ?? 0}`}</Badge>
+                                ) : null}
+                              </>
+                            ) : null}
                             {!readOnly && (!isActionLocked || canUploadMissing) ? (
                               <Button variant="ghost" size="icon" onClick={() => openEdit(row)} title="Edit">
                                 <Pencil className="h-4 w-4" />

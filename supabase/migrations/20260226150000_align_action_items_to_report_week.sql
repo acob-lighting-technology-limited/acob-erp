@@ -1,4 +1,4 @@
--- Align action tracker week with weekly report week.
+-- Align action point week with weekly report week.
 -- Previously action_items linked to weekly_reports were shifted by week logic.
 
 begin;
@@ -9,7 +9,7 @@ language plpgsql
 immutable
 as $function$
 begin
-  -- Meetings now require same-week alignment between Weekly Report and Action Tracker.
+  -- Meetings now require same-week alignment between Weekly Report and Action Point.
   return query select w, y;
 end;
 $function$;

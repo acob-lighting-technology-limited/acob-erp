@@ -28,7 +28,7 @@ interface ExportDialogProps {
   departments: string[]
 }
 
-export function ActionTrackerExportDialog({ isOpen, onClose, departments }: ExportDialogProps) {
+export function ActionPointExportDialog({ isOpen, onClose, departments }: ExportDialogProps) {
   const [isExporting, setIsExporting] = useState(false)
   const [period, setPeriod] = useState("week") // week, month, quarter, year
   const [deptFilter, setDeptFilter] = useState("all")

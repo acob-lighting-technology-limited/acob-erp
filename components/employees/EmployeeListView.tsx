@@ -168,7 +168,7 @@ export function EmployeeListView({
                     </div>
                   </TableCell>
                   <TableCell>
-                    <span className="text-muted-foreground text-sm">{member.company_role || "-"}</span>
+                    <span className="text-muted-foreground text-sm">{member.designation || "-"}</span>
                   </TableCell>
                   <TableCell>
                     <EmployeeStatusBadge status={member.employment_status || "active"} size="sm" />
@@ -248,10 +248,10 @@ export function EmployeeListView({
               <span>{member.department || "-"}</span>
             </div>
 
-            {member.company_role && (
+            {member.designation && (
               <div className="text-muted-foreground flex items-center gap-2 text-sm">
                 <UserCog className="h-4 w-4" />
-                <span>{member.company_role}</span>
+                <span>{member.designation}</span>
               </div>
             )}
 

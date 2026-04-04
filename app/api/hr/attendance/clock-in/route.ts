@@ -7,7 +7,7 @@ import { writeAuditLog } from "@/lib/audit/write-audit"
 const log = logger("hr-attendance-clock-in")
 
 export async function POST(request: NextRequest) {
-  const rl = rateLimit(`clock-in:${getClientId(request)}`, { limit: 5, windowSec: 300 })
+  const rl = await rateLimit(`clock-in:${getClientId(request)}`, { limit: 5, windowSec: 300 })
   if (!rl.allowed) {
     return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 })
   }

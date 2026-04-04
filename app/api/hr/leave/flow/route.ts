@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { logger } from "@/lib/logger"
 import { writeAuditLog } from "@/lib/audit/write-audit"
@@ -31,6 +32,39 @@ type LeaveApproverAssignmentInput = {
   is_active?: boolean | null
   is_primary?: boolean | null
 }
+
+const LeaveApproverRoleSchema = z.object({
+  code: z.string(),
+  name: z.string().nullable().optional(),
+  description: z.string().nullable().optional(),
+  resolution_mode: z.string().nullable().optional(),
+  resolution_config: z.record(z.unknown()).nullable().optional(),
+  is_active: z.boolean().nullable().optional(),
+})
+
+const LeaveApprovalRouteSchema = z.object({
+  requester_kind: z.string(),
+  stage_order: z.coerce.number(),
+  approver_role_code: z.string(),
+  is_active: z.boolean().nullable().optional(),
+})
+
+const LeaveApproverAssignmentSchema = z.object({
+  approver_role_code: z.string(),
+  user_id: z.string(),
+  scope_type: z.string().nullable().optional(),
+  scope_value: z.string().nullable().optional(),
+  effective_from: z.string().nullable().optional(),
+  effective_to: z.string().nullable().optional(),
+  is_active: z.boolean().nullable().optional(),
+  is_primary: z.boolean().nullable().optional(),
+})
+
+const UpdateLeaveFlowSchema = z.object({
+  roles: z.array(LeaveApproverRoleSchema).optional(),
+  routes: z.array(LeaveApprovalRouteSchema).optional(),
+  assignments: z.array(LeaveApproverAssignmentSchema).optional(),
+})
 
 function canViewFlow(role?: string | null) {
   return ["developer", "super_admin", "admin"].includes(role || "")
@@ -85,7 +119,7 @@ export async function GET() {
   }
 }
 
-export async function POST(request: NextRequest) {
+export async function PATCH(request: NextRequest) {
   try {
     const supabase = await createClient()
     const {
@@ -100,7 +134,11 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { roles, routes, assignments } = body || {}
+    const parsed = UpdateLeaveFlowSchema.safeParse(body || {})
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid request body" }, { status: 400 })
+    }
+    const { roles, routes, assignments } = parsed.data
 
     if (Array.isArray(roles) && roles.length) {
       const payload = (roles as LeaveApproverRoleInput[]).map((row) => ({
@@ -166,4 +204,9 @@ export async function POST(request: NextRequest) {
     log.error({ err: String(error) }, "Error in POST /api/hr/leave/flow:")
     return NextResponse.json({ error: "An error occurred" }, { status: 500 })
   }
+}
+
+// POST kept for backwards compat — prefer PATCH
+export async function POST(request: NextRequest) {
+  return PATCH(request)
 }

@@ -54,22 +54,35 @@ export function DocCardView({ docs, formatDate, onView, onEdit, onDelete }: DocC
             <div className="text-muted-foreground text-xs">Last updated: {formatDate(doc.updated_at)}</div>
 
             <div className="flex gap-2 pt-2">
-              <Button size="sm" variant="outline" onClick={() => onView(doc)} className="flex-1 gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => onView(doc)}
+                className="h-9 w-9 p-0"
+                title="View document"
+                aria-label="View document"
+              >
                 <Eye className="h-4 w-4" />
-                View
               </Button>
-              <Button size="sm" variant="outline" onClick={() => onEdit(doc)} className="flex-1 gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => onEdit(doc)}
+                className="h-9 w-9 p-0"
+                title="Edit document"
+                aria-label="Edit document"
+              >
                 <Edit2 className="h-4 w-4" />
-                Edit
               </Button>
               <Button
                 size="sm"
                 variant="outline"
                 onClick={() => onDelete(doc)}
-                className="gap-2 text-red-600 hover:text-red-700"
+                className="h-9 w-9 p-0 text-red-600 hover:text-red-700"
+                title="Delete document"
+                aria-label="Delete document"
               >
                 <Trash2 className="h-4 w-4" />
-                Delete
               </Button>
             </div>
           </CardContent>

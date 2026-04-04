@@ -1,30 +1,31 @@
 import { escapeHtml } from "./utils"
 
+const ICT_SUPPORT_EMAIL = process.env.ICT_SUPPORT_EMAIL || "ict@acoblighting.com"
+
 export interface PendingUser {
   first_name: string
   last_name: string
   department: string
-  company_role: string
+  designation: string
   company_email: string
   personal_email: string
+  phone_number?: string
   office_location?: string
 }
 
 interface WelcomeEmailProps {
   pendingUser: PendingUser
-  employeeId: string
   tempPassword: string
   portalUrl: string
 }
 
-export function renderWelcomeEmail({ pendingUser, employeeId, tempPassword, portalUrl }: WelcomeEmailProps) {
+export function renderWelcomeEmail({ pendingUser, tempPassword, portalUrl }: WelcomeEmailProps) {
   const firstName = escapeHtml(pendingUser.first_name)
   const lastName = escapeHtml(pendingUser.last_name)
   const dept = escapeHtml(pendingUser.department)
-  const role = escapeHtml(pendingUser.company_role)
+  const role = escapeHtml(pendingUser.designation)
   const email = escapeHtml(pendingUser.company_email)
   const officeLoc = pendingUser.office_location ? escapeHtml(pendingUser.office_location) : "N/A"
-  const empId = escapeHtml(employeeId)
   const safeTempPassword = escapeHtml(tempPassword)
   const safePortalUrl = escapeHtml(portalUrl)
 
@@ -79,16 +80,12 @@ export function renderWelcomeEmail({ pendingUser, employeeId, tempPassword, port
                     <td class="label">Full Name</td>
                     <td class="value">${firstName} ${lastName}</td>
                 </tr>
-                 <tr>
-                    <td class="label">Employee ID</td>
-                    <td class="value">${empId}</td>
-                </tr>
                 <tr>
                     <td class="label">Department</td>
                     <td class="value">${dept}</td>
                 </tr>
                 <tr>
-                    <td class="label">Role</td>
+                    <td class="label">Designation</td>
                     <td class="value">${role}</td>
                 </tr>
                 <tr>
@@ -121,12 +118,14 @@ export function renderWelcomeEmail({ pendingUser, employeeId, tempPassword, port
         </div>
         <div class="support">
             Please log in and change your password immediately.<br>
-            If you have any questions, contact <a href="mailto:ict@acoblighting.com">ict@acoblighting.com</a>
+            If you have any questions, contact <a href="mailto:${ICT_SUPPORT_EMAIL}">${ICT_SUPPORT_EMAIL}</a>
         </div>
     </div>
     <div class="footer" style="background-color:#0f2d1f;">
+        <span style="color:#d1d5db;">Prepared by Admin &amp; HR</span><br>
+        Administrative Team<br>
+        Admin &amp; HR Department<br>
         <strong>ACOB Lighting Technology Limited</strong><br>
-        Admin & HR Department<br>
         <span class="footer-system">Employee Management System</span>
         <br><br>
         <i class="footer-note">This is an automated system notification. Please do not reply directly to this email.</i>

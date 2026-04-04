@@ -1,3 +1,8 @@
+/**
+ * @deprecated Client-side exports expose sensitive data to the browser.
+ * Use the server-side endpoint POST /api/admin/employees/export instead.
+ * This file is kept for backwards compatibility during migration.
+ */
 import { formatName } from "@/lib/utils"
 import { getRoleDisplayName } from "@/lib/permissions"
 import { logger } from "@/lib/logger"
@@ -13,7 +18,7 @@ export interface Employee {
   company_email: string
   additional_email: string | null
   department: string
-  company_role: string | null
+  designation: string | null
   role: UserRole
   admin_domains?: string[] | null
   phone_number: string | null
@@ -52,7 +57,7 @@ export function buildEmployeeExportRows(employees: Employee[], opts: ExportOptio
     if (selectedColumns["Additional Email"]) row["Additional Email"] = member.additional_email || "-"
     if (selectedColumns["Department"]) row["Department"] = member.department || "-"
     if (selectedColumns["Role"]) row["Role"] = getRoleDisplayName(member.role)
-    if (selectedColumns["Position"]) row["Position"] = member.company_role || "-"
+    if (selectedColumns["Designation"]) row["Designation"] = member.designation || "-"
     if (selectedColumns["Phone Number"]) row["Phone Number"] = member.phone_number || "-"
     if (selectedColumns["Additional Phone"]) row["Additional Phone"] = member.additional_phone || "-"
     if (selectedColumns["Residential Address"]) row["Residential Address"] = member.residential_address || "-"
@@ -167,9 +172,9 @@ export async function exportEmployeesToPDF(
         row.push(getRoleDisplayName(member.role))
         headers.push("Role")
       }
-      if (selectedColumns["Position"]) {
-        row.push(member.company_role || "-")
-        headers.push("Position")
+      if (selectedColumns["Designation"]) {
+        row.push(member.designation || "-")
+        headers.push("Designation")
       }
       if (selectedColumns["Phone Number"]) {
         row.push(member.phone_number || "-")

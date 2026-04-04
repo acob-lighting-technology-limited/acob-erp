@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { SearchableSelect } from "@/components/ui/searchable-select"
+import { Checkbox } from "@/components/ui/checkbox"
 import { ResponsiveModal } from "@/components/ui/patterns/responsive-modal"
 import { ItemInfoButton } from "@/components/ui/item-info-button"
 import { ClipboardList, Plus, User } from "lucide-react"
@@ -27,6 +28,8 @@ interface ProjectTask {
   description?: string
   priority: string
   status: string
+  assignment_type?: "individual" | "multiple" | "department"
+  department?: string | null
   progress?: number | null
   due_date?: string
   task_start_date?: string
@@ -60,7 +63,10 @@ interface ProjectTasksTabProps {
 const INITIAL_FORM = {
   title: "",
   description: "",
+  assignment_type: "individual" as "individual" | "multiple" | "department",
   assigned_to: "",
+  assigned_users: [] as string[],
+  department: "",
   priority: "medium",
   due_date: "",
   task_start_date: "",
@@ -74,14 +80,14 @@ function buildProjectTaskInfo(task: ProjectTask) {
     details: [
       {
         label: "Why this is here",
-        value: "Project tasks track work that belongs to this project while still staying visible in the assignee's personal task workflow.",
+        value:
+          "Project tasks track work that belongs to this project while still staying visible in the assignee's personal task workflow.",
       },
       {
         label: "Current expectation",
-        value:
-          task.assigned_to_user
-            ? `${task.assigned_to_user.first_name} ${task.assigned_to_user.last_name} is expected to handle this work item.`
-            : "This task should be assigned to a project member so ownership is clear.",
+        value: task.assigned_to_user
+          ? `${task.assigned_to_user.first_name} ${task.assigned_to_user.last_name} is expected to handle this work item.`
+          : "This task should be assigned to a project member so ownership is clear.",
       },
       {
         label: "What good completion looks like",
@@ -114,6 +120,10 @@ export function ProjectTasksTab({
         label: `${member.user.first_name} ${member.user.last_name} - ${member.user.department}`,
         icon: <User className="h-3 w-3" />,
       })),
+    [members]
+  )
+  const memberDepartments = useMemo(
+    () => Array.from(new Set(members.map((member) => member.user.department).filter(Boolean))),
     [members]
   )
 
@@ -203,12 +213,18 @@ export function ProjectTasksTab({
                         )}
                         <div className="flex flex-wrap items-center gap-4 text-sm">
                           <span className="text-muted-foreground">
-                            Assigned to:{" "}
-                            <span className="text-foreground font-medium">
-                              {task.assigned_to_user
-                                ? `${task.assigned_to_user.first_name} ${task.assigned_to_user.last_name}`
-                                : "Unassigned"}
-                            </span>
+                            {task.assignment_type === "department"
+                              ? `Department: ${task.department || "Unassigned"}`
+                              : "Assigned to: "}
+                            {task.assignment_type !== "department" ? (
+                              <span className="text-foreground font-medium">
+                                {task.assignment_type === "multiple"
+                                  ? "Multiple team members"
+                                  : task.assigned_to_user
+                                    ? `${task.assigned_to_user.first_name} ${task.assigned_to_user.last_name}`
+                                    : "Unassigned"}
+                              </span>
+                            ) : null}
                           </span>
                           {task.task_start_date && task.task_end_date && (
                             <span className="text-muted-foreground">
@@ -243,7 +259,7 @@ export function ProjectTasksTab({
           if (!open) resetForm()
         }}
         title="Assign Project Task"
-        description="Create a project-linked task and assign it to one active project member."
+        description="Create a project-linked task and assign it to one member, multiple members, or a department."
       >
         <div className="space-y-4">
           <div>
@@ -267,18 +283,61 @@ export function ProjectTasksTab({
             />
           </div>
 
+          <div>
+            <Label htmlFor="project-task-assignment-type">Assignment Type</Label>
+            <select
+              id="project-task-assignment-type"
+              value={form.assignment_type}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  assignment_type: event.target.value as "individual" | "multiple" | "department",
+                  assigned_to: "",
+                  assigned_users: [],
+                  department: "",
+                }))
+              }
+              className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+            >
+              <option value="individual">Individual</option>
+              <option value="multiple">Multiple People</option>
+              <option value="department">Department</option>
+            </select>
+          </div>
+
           <div className="grid gap-4 md:grid-cols-2">
-            <div>
-              <Label>Assign To</Label>
-              <SearchableSelect
-                value={form.assigned_to}
-                onValueChange={(value) => setForm((current) => ({ ...current, assigned_to: value }))}
-                placeholder="Choose project member"
-                searchPlaceholder="Search project members..."
-                icon={<User className="h-4 w-4" />}
-                options={memberOptions}
-              />
-            </div>
+            {form.assignment_type === "individual" ? (
+              <div>
+                <Label>Assign To</Label>
+                <SearchableSelect
+                  value={form.assigned_to}
+                  onValueChange={(value) => setForm((current) => ({ ...current, assigned_to: value }))}
+                  placeholder="Choose project member"
+                  searchPlaceholder="Search project members..."
+                  icon={<User className="h-4 w-4" />}
+                  options={memberOptions}
+                />
+              </div>
+            ) : null}
+
+            {form.assignment_type === "department" ? (
+              <div>
+                <Label htmlFor="project-task-department">Department</Label>
+                <select
+                  id="project-task-department"
+                  value={form.department}
+                  onChange={(event) => setForm((current) => ({ ...current, department: event.target.value }))}
+                  className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+                >
+                  <option value="">Select department</option>
+                  {memberDepartments.map((department) => (
+                    <option key={department} value={department}>
+                      {department}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
 
             <div>
               <Label htmlFor="project-task-priority">Priority</Label>
@@ -295,6 +354,32 @@ export function ProjectTasksTab({
               </select>
             </div>
           </div>
+
+          {form.assignment_type === "multiple" ? (
+            <div className="space-y-2">
+              <Label>Assign To Multiple People</Label>
+              <div className="max-h-48 space-y-2 overflow-y-auto rounded-md border p-3">
+                {members.map((member) => (
+                  <label key={member.user_id} className="flex items-center gap-3 text-sm">
+                    <Checkbox
+                      checked={form.assigned_users.includes(member.user_id)}
+                      onCheckedChange={(checked) =>
+                        setForm((current) => ({
+                          ...current,
+                          assigned_users: checked
+                            ? [...current.assigned_users, member.user_id]
+                            : current.assigned_users.filter((userId) => userId !== member.user_id),
+                        }))
+                      }
+                    />
+                    <span>
+                      {member.user.first_name} {member.user.last_name} - {member.user.department}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          ) : null}
 
           <div className="grid gap-4 md:grid-cols-3">
             <div>
@@ -333,7 +418,16 @@ export function ProjectTasksTab({
             <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleCreateTask} loading={isSaving} disabled={!form.title.trim() || !form.assigned_to}>
+            <Button
+              onClick={handleCreateTask}
+              loading={isSaving}
+              disabled={
+                !form.title.trim() ||
+                (form.assignment_type === "individual" && !form.assigned_to) ||
+                (form.assignment_type === "multiple" && form.assigned_users.length === 0) ||
+                (form.assignment_type === "department" && !form.department)
+              }
+            >
               Create Task
             </Button>
           </div>

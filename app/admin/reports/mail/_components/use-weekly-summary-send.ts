@@ -19,6 +19,8 @@ type SendTiming = "now" | "scheduled" | "recurring"
 interface DocRef {
   id: string
   file_name: string
+  display_name?: string
+  signed_url?: string | null
 }
 
 interface UseSendParams {
@@ -34,6 +36,8 @@ interface UseSendParams {
   selectedWeeks: Set<number>
   yearNumber: number
   selectedPreparedBy: string
+  selectedPreparedByDesignation: string | null
+  selectedPreparedByDepartment: string | null
   currentUser?: { id?: string; department?: string | null; full_name?: string | null }
   fetchSchedules: () => void
 }
@@ -58,30 +62,41 @@ function readFilenameFromDisposition(disposition: string | null, fallback: strin
 }
 
 async function toBase64FromBlob(blob: Blob): Promise<string> {
-  const buffer = await blob.arrayBuffer()
-  const bytes = new Uint8Array(buffer)
-  let binary = ""
-  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
-  return btoa(binary)
+  return await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+
+    reader.onerror = () => reject(reader.error ?? new Error("Failed to encode attachment"))
+    reader.onloadend = () => {
+      const result = typeof reader.result === "string" ? reader.result : ""
+      const base64 = result.includes(",") ? result.split(",", 2)[1] : ""
+
+      if (!base64) {
+        reject(new Error("Failed to encode attachment"))
+        return
+      }
+
+      resolve(base64)
+    }
+
+    reader.readAsDataURL(blob)
+  })
 }
 
 async function fetchActionPointsAttachment(params: {
-  actions: unknown[]
   week: number
   year: number
-  meetingDate?: string
 }): Promise<{ blob: Blob; filename: string }> {
-  const response = await fetch("/api/reports/action-points-export", {
+  const response = await fetch("/api/reports/weekly-report-export", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      format: "pdf",
-      actions: params.actions,
       week: params.week,
       year: params.year,
-      meetingDate: params.meetingDate,
+      type: "action_point",
+      persist: true,
+      reuseStored: true,
     }),
   })
 
@@ -95,7 +110,43 @@ async function fetchActionPointsAttachment(params: {
     blob: exportBlob,
     filename: readFilenameFromDisposition(
       response.headers.get("Content-Disposition"),
-      `ACOB Action Tracker - Week ${params.week}.pdf`
+      `ACOB Action Points - Week ${params.week}.pdf`
+    ),
+  }
+}
+
+/**
+ * Downloads a stored meeting document (KSS, Minutes, etc.) via its signed URL
+ * and converts it to base64 — client-side, so the edge function never has to
+ * do the CPU-heavy byte-by-byte conversion itself.
+ */
+async function fetchWeeklyReportAttachment(params: {
+  week: number
+  year: number
+}): Promise<{ blob: Blob; filename: string }> {
+  const response = await fetch("/api/reports/weekly-report-export", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      week: params.week,
+      year: params.year,
+      type: "weekly_report",
+      persist: true,
+      reuseStored: true,
+    }),
+  })
+
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "")
+    throw new Error(detail || "Failed to generate Weekly Report PDF")
+  }
+
+  const exportBlob = await response.blob()
+  return {
+    blob: exportBlob,
+    filename: readFilenameFromDisposition(
+      response.headers.get("Content-Disposition"),
+      `ACOB Weekly Reports - Week ${params.week}.pdf`
     ),
   }
 }
@@ -113,6 +164,8 @@ export function useWeeklySummarySend({
   selectedWeeks,
   yearNumber,
   selectedPreparedBy,
+  selectedPreparedByDesignation,
+  selectedPreparedByDepartment,
   currentUser,
   fetchSchedules,
 }: UseSendParams) {
@@ -162,43 +215,47 @@ export function useWeeklySummarySend({
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
       const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
+      // ── Pre-generate Weekly Report PDF client-side ──────────────────────────
+      // This moves the CPU-heavy pdf-lib work out of the edge function so it
+      // never hits Supabase's 2-second CPU limit mid-send.
+      let weeklyReportBase64: string | undefined
+      let weeklyReportFilename: string | undefined
+
+      if (selectedContentChoices.has("weekly_report")) {
+        const reportFile = await fetchWeeklyReportAttachment({
+          week: weekNumbers[0],
+          year: yearNumber,
+        })
+        weeklyReportBase64 = await toBase64FromBlob(reportFile.blob)
+        weeklyReportFilename = reportFile.filename
+      }
+
+      // ── KSS / Minutes: pass document IDs to the edge function ─────────────
+      // The edge function now uses a chunk-based base64 conversion that is
+      // ~100× faster than the old byte-by-byte loop, so server-side download
+      // is fast and avoids uploading large file payloads over the user's
+      // internet connection.
+
       // ── Build per-week action points attachments ────────────────────────────
-      const actionTrackerAttachments: Array<{ base64: string; filename: string; week: number }> = []
+      const actionPointAttachments: Array<{ base64: string; filename: string; week: number }> = []
 
       if (selectedContentChoices.has("action_points_autogenerated")) {
-        for (const weekNum of weekNumbers) {
-          const { data: actions, error: actionsError } = await supabase
-            .from("action_items")
-            .select("id, title, department, status, week_number, year")
-            .eq("week_number", weekNum)
-            .eq("year", yearNumber)
+        const generatedAttachments = await Promise.all(
+          weekNumbers.map(async (weekNum) => {
+            const exportFile = await fetchActionPointsAttachment({
+              week: weekNum,
+              year: yearNumber,
+            })
 
-          if (actionsError) {
-            throw new Error(actionsError.message || `Failed to load action items for Week ${weekNum}`)
-          }
-
-          const { data: meetingDate, error: meetingDateError } = await supabase.rpc(
-            "weekly_report_effective_meeting_date",
-            { p_week: weekNum, p_year: yearNumber }
-          )
-
-          if (meetingDateError) {
-            throw new Error(meetingDateError.message || `Failed to resolve meeting date for Week ${weekNum}`)
-          }
-
-          const exportFile = await fetchActionPointsAttachment({
-            actions: actions || [],
-            week: weekNum,
-            year: yearNumber,
-            meetingDate: meetingDate ? String(meetingDate) : undefined,
+            return {
+              base64: await toBase64FromBlob(exportFile.blob),
+              filename: exportFile.filename,
+              week: weekNum,
+            }
           })
+        )
 
-          actionTrackerAttachments.push({
-            base64: await toBase64FromBlob(exportFile.blob),
-            filename: exportFile.filename,
-            week: weekNum,
-          })
-        }
+        actionPointAttachments.push(...generatedAttachments)
       }
 
       // ── Build payload ───────────────────────────────────────────────────────
@@ -211,12 +268,15 @@ export function useWeeklySummarySend({
         // Legacy single-week field kept for backward-compat if only one week
         meetingWeek: weekNumbers[0],
         preparedByName: selectedPreparedBy,
+        preparedByDesignation: selectedPreparedByDesignation,
+        preparedByDepartment: selectedPreparedByDepartment || "Admin & HR",
         requestedByUserId: currentUser?.id || null,
         skipWeeklyReport: !selectedContentChoices.has("weekly_report"),
-        skipActionTracker: !selectedContentChoices.has("action_points_autogenerated"),
+        skipActionPoint: !selectedContentChoices.has("action_points_autogenerated"),
       }
 
-      // Collect IDs from ALL selected weeks' KSS and Minutes docs
+      // Collect document IDs for KSS and Minutes — edge function downloads
+      // and converts them server-side using the fast chunk-based method.
       const additionalDocumentIds: string[] = []
       if (selectedContentChoices.has("knowledge_sharing_session")) {
         allKssDocs.forEach((d) => {
@@ -232,11 +292,18 @@ export function useWeeklySummarySend({
         payload.additionalDocumentIds = additionalDocumentIds
       }
 
-      if (actionTrackerAttachments.length > 0) {
+      // Pass the pre-generated weekly report PDF so the edge function skips
+      // its own (CPU-expensive) PDF generation entirely.
+      if (weeklyReportBase64) {
+        payload.weeklyReportBase64 = weeklyReportBase64
+        payload.weeklyReportFilename = weeklyReportFilename
+      }
+
+      if (actionPointAttachments.length > 0) {
         // Multi-week: send array; single-week: keep legacy fields too
-        payload.actionTrackerAttachments = actionTrackerAttachments
-        payload.actionTrackerBase64 = actionTrackerAttachments[0].base64
-        payload.actionTrackerFilename = actionTrackerAttachments[0].filename
+        payload.actionPointAttachments = actionPointAttachments
+        payload.actionPointBase64 = actionPointAttachments[0].base64
+        payload.actionPointFilename = actionPointAttachments[0].filename
       }
 
       const res = await fetch(`${supabaseUrl}/functions/v1/send-weekly-report`, {
@@ -287,11 +354,12 @@ export function useWeeklySummarySend({
     weekNumbers,
     yearNumber,
     selectedPreparedBy,
+    selectedPreparedByDepartment,
+    selectedPreparedByDesignation,
     selectedContentChoices,
     allKssDocs,
     allMinutesDocs,
     currentUser?.id,
-    supabase,
     logMailAudit,
   ])
 
@@ -337,20 +405,20 @@ export function useWeeklySummarySend({
       }
 
       const includeWeeklyReport = selectedContentChoices.has("weekly_report")
-      const includeActionTracker = selectedContentChoices.has("action_points_autogenerated")
+      const includeActionPoint = selectedContentChoices.has("action_points_autogenerated")
 
-      if (includeActionTracker) {
+      if (includeActionPoint) {
         toast.error("Exact Action Points PDF mail send is currently available with Send Now only")
         return
       }
 
-      let scheduleContentChoice: "weekly_report" | "action_tracker" | "both"
-      if (includeWeeklyReport && includeActionTracker) {
+      let scheduleContentChoice: "weekly_report" | "action_point" | "both"
+      if (includeWeeklyReport && includeActionPoint) {
         scheduleContentChoice = "both"
       } else if (includeWeeklyReport) {
         scheduleContentChoice = "weekly_report"
-      } else if (includeActionTracker) {
-        scheduleContentChoice = "action_tracker"
+      } else if (includeActionPoint) {
+        scheduleContentChoice = "action_point"
       } else {
         toast.error("Only Weekly Report and Action Points can be scheduled")
         return
@@ -400,18 +468,18 @@ export function useWeeklySummarySend({
       nextRun.setHours(parseInt(h, 10), parseInt(m, 10), 0, 0)
 
       const includeWeeklyReport = selectedContentChoices.has("weekly_report")
-      const includeActionTracker = selectedContentChoices.has("action_points_autogenerated")
-      if (includeActionTracker) {
+      const includeActionPoint = selectedContentChoices.has("action_points_autogenerated")
+      if (includeActionPoint) {
         toast.error("Exact Action Points PDF mail send is currently available with Send Now only")
         return
       }
-      if (!includeWeeklyReport && !includeActionTracker) {
+      if (!includeWeeklyReport && !includeActionPoint) {
         toast.error("Recurring mode supports Weekly Report and Action Points only")
         return
       }
 
-      const recurringContentChoice: "weekly_report" | "action_tracker" | "both" =
-        includeWeeklyReport && includeActionTracker ? "both" : includeWeeklyReport ? "weekly_report" : "action_tracker"
+      const recurringContentChoice: "weekly_report" | "action_point" | "both" =
+        includeWeeklyReport && includeActionPoint ? "both" : includeWeeklyReport ? "weekly_report" : "action_point"
 
       const { error } = await supabase.from("weekly_report_schedules").insert({
         schedule_type: "recurring",

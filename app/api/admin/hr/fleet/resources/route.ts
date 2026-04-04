@@ -1,10 +1,25 @@
 ﻿import { NextRequest, NextResponse } from "next/server"
 import { canManageFleet } from "@/lib/fleet-booking"
+import { z } from "zod"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 
 type FleetResourcePatch = Record<string, string | boolean | null>
+
+const CreateFleetResourceSchema = z.object({
+  name: z.string().trim().min(2, "Resource name must be at least 2 characters"),
+  resource_type: z.string().trim().optional().default("general"),
+  description: z.string().optional(),
+})
+
+const UpdateFleetResourceSchema = z.object({
+  id: z.string().trim().min(1, "Resource id is required"),
+  name: z.string().optional(),
+  resource_type: z.string().optional(),
+  description: z.string().optional(),
+  is_active: z.boolean().optional(),
+})
 
 export async function GET() {
   try {
@@ -47,13 +62,14 @@ export async function POST(request: NextRequest) {
     if (!allowed) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
     const body = await request.json()
-    const name = String(body?.name || "").trim()
-    const resourceType = String(body?.resource_type || "general").trim() || "general"
-    const description = String(body?.description || "").trim() || null
-
-    if (name.length < 2) {
-      return NextResponse.json({ error: "Resource name must be at least 2 characters" }, { status: 400 })
+    const parsed = CreateFleetResourceSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid request body" }, { status: 400 })
     }
+
+    const name = parsed.data.name
+    const resourceType = parsed.data.resource_type.trim() || "general"
+    const description = String(parsed.data.description || "").trim() || null
 
     const { data, error } = await dataClient
       .from("fleet_resources")
@@ -109,27 +125,28 @@ export async function PATCH(request: NextRequest) {
     if (!allowed) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
     const body = await request.json()
-    const id = String(body?.id || "").trim()
-
-    if (!id) {
-      return NextResponse.json({ error: "Resource id is required" }, { status: 400 })
+    const parsed = UpdateFleetResourceSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid request body" }, { status: 400 })
     }
 
+    const id = parsed.data.id
+
     const patch: FleetResourcePatch = {}
-    if (body?.name !== undefined) {
-      const name = String(body.name || "").trim()
+    if (parsed.data.name !== undefined) {
+      const name = String(parsed.data.name || "").trim()
       if (name.length < 2) return NextResponse.json({ error: "Invalid resource name" }, { status: 400 })
       patch.name = name
     }
-    if (body?.resource_type !== undefined) {
-      patch.resource_type = String(body.resource_type || "general").trim() || "general"
+    if (parsed.data.resource_type !== undefined) {
+      patch.resource_type = String(parsed.data.resource_type || "general").trim() || "general"
     }
-    if (body?.description !== undefined) {
-      const desc = String(body.description || "").trim()
+    if (parsed.data.description !== undefined) {
+      const desc = String(parsed.data.description || "").trim()
       patch.description = desc || null
     }
-    if (body?.is_active !== undefined) {
-      patch.is_active = Boolean(body.is_active)
+    if (parsed.data.is_active !== undefined) {
+      patch.is_active = Boolean(parsed.data.is_active)
     }
 
     if (Object.keys(patch).length === 0) {

@@ -1,3 +1,4 @@
+import crypto from "crypto"
 import { NextResponse } from "next/server"
 
 /**
@@ -39,6 +40,10 @@ export function apiOk<T = unknown>(data: T, status = 200): NextResponse<ApiOkRes
  */
 export function apiErr(message: string, status: number): NextResponse<ApiErrResponse> {
   return NextResponse.json({ success: false, error: message }, { status })
+}
+
+export function getRequestId(req: Request): string {
+  return req.headers.get("x-request-id") ?? crypto.randomUUID()
 }
 
 // Convenience aliases for common status codes

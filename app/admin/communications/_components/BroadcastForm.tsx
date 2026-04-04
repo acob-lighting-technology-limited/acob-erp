@@ -1,16 +1,15 @@
 "use client"
 
-import { useRef, useEffect, useCallback } from "react"
+import { useRef, useEffect, useCallback, useState } from "react"
 import DOMPurify from "dompurify"
-import { logger } from "@/lib/logger"
 import { toast } from "sonner"
+import { Bold, Italic, List, ListOrdered, Link2, Paperclip, Redo2, Underline, Undo2 } from "lucide-react"
+import { logger } from "@/lib/logger"
 import { PromptDialog } from "@/components/ui/prompt-dialog"
-import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Bold, Italic, Underline, List, ListOrdered, Link2, Undo2, Redo2 } from "lucide-react"
 
 const log = logger("broadcast-form")
 
@@ -25,17 +24,22 @@ type Employee = {
 
 interface BroadcastFormProps {
   broadcastDepartment: string
+  setBroadcastDepartment: (value: string) => void
   broadcastPreparedById: string
-  setBroadcastPreparedById: (v: string) => void
+  setBroadcastPreparedById: (value: string) => void
   broadcastSubject: string
-  setBroadcastSubject: (v: string) => void
+  setBroadcastSubject: (value: string) => void
   broadcastBodyHtml: string
-  setBroadcastBodyHtml: (v: string) => void
+  setBroadcastBodyHtml: (value: string) => void
   broadcastPreparedByOptions: Employee[]
+  departmentOptions: string[]
+  attachments: File[]
+  setAttachments: (files: File[]) => void
 }
 
 export function BroadcastForm({
   broadcastDepartment,
+  setBroadcastDepartment,
   broadcastPreparedById,
   setBroadcastPreparedById,
   broadcastSubject,
@@ -43,6 +47,9 @@ export function BroadcastForm({
   broadcastBodyHtml,
   setBroadcastBodyHtml,
   broadcastPreparedByOptions,
+  departmentOptions,
+  attachments,
+  setAttachments,
 }: BroadcastFormProps) {
   const editorRef = useRef<HTMLDivElement | null>(null)
   const [linkDialogOpen, setLinkDialogOpen] = useState(false)
@@ -69,7 +76,6 @@ export function BroadcastForm({
   const handleLinkConfirm = useCallback(
     (url: string) => {
       const trimmed = url.trim()
-      // Only allow http/https URLs to prevent javascript: XSS via link injection
       if (!/^https?:\/\//i.test(trimmed)) {
         toast.error("Only https:// or http:// links are allowed.")
         return
@@ -79,7 +85,6 @@ export function BroadcastForm({
     [runEditorCommand]
   )
 
-  // Suppress unused-variable warning for log
   void log
 
   return (
@@ -100,8 +105,21 @@ export function BroadcastForm({
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="broadcast-department">Department</Label>
-            <Input id="broadcast-department" value={broadcastDepartment || "—"} readOnly className="w-full" />
-            <p className="text-muted-foreground text-xs">Locked to sender department.</p>
+            <Select value={broadcastDepartment} onValueChange={setBroadcastDepartment}>
+              <SelectTrigger id="broadcast-department" className="w-full">
+                <SelectValue placeholder="Select department" />
+              </SelectTrigger>
+              <SelectContent>
+                {departmentOptions.map((department) => (
+                  <SelectItem key={department} value={department}>
+                    {department}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-muted-foreground text-xs">
+              Select the department branding and sign-off for this broadcast.
+            </p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="broadcast-prepared-by">Prepared by</Label>
@@ -131,6 +149,28 @@ export function BroadcastForm({
               onChange={(e) => setBroadcastSubject(e.target.value)}
               placeholder="Enter broadcast subject..."
             />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="broadcast-attachments">Attachments</Label>
+            <Input
+              id="broadcast-attachments"
+              type="file"
+              multiple
+              onChange={(e) => setAttachments(Array.from(e.target.files || []))}
+            />
+            <p className="text-muted-foreground text-xs">
+              Optional. Selected files will be attached to the broadcast email.
+            </p>
+            {attachments.length > 0 && (
+              <div className="space-y-1 rounded-md border p-2 text-xs">
+                {attachments.map((file) => (
+                  <div key={`${file.name}-${file.size}`} className="flex items-center gap-2 truncate">
+                    <Paperclip className="h-3 w-3 shrink-0" />
+                    <span className="truncate">{file.name}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
           <div className="space-y-2">
             <Label>Message Body (rich text)</Label>

@@ -1,8 +1,11 @@
 "use client"
 
-import type React from "react"
 import { useState } from "react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { z } from "zod"
 import { useDepartments } from "@/hooks/use-departments"
+import { useOfficeLocations } from "@/hooks/use-office-locations"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -28,67 +31,84 @@ interface ProfileFormProps {
   onSaved?: () => void
 }
 
+const ProfileFormSchema = z
+  .object({
+    firstName: z.string().min(1, "First name is required"),
+    lastName: z.string().min(1, "Last name is required"),
+    otherNames: z.string().optional(),
+    department: z.string().optional(),
+    companyRole: z.string().optional(),
+    phoneNumber: z.string().optional(),
+    additionalPhone: z.string().optional(),
+    residentialAddress: z.string().optional(),
+    officeLocation: z.string().optional(),
+    bankName: z.string().optional(),
+    bankAccountNumber: z.string().optional(),
+    bankAccountName: z.string().optional(),
+    dateOfBirth: z.string().optional(),
+    employmentDate: z.string().optional(),
+    emailNotifications: z.boolean(),
+  })
+  .refine((data) => !data.additionalPhone || data.additionalPhone !== data.phoneNumber, {
+    path: ["additionalPhone"],
+    message: "Additional phone number must be different from main phone number",
+  })
+
+type ProfileFormValues = z.infer<typeof ProfileFormSchema>
+
 export function ProfileForm({ user, profile, hideBackButton = false, onSaved }: ProfileFormProps) {
   const { departments: DEPARTMENTS } = useDepartments()
-  const [formData, setFormData] = useState({
-    firstName: profile?.first_name || "",
-    lastName: profile?.last_name || "",
-    otherNames: profile?.other_names || "",
-    department: profile?.department || "",
-    companyRole: profile?.company_role || "",
-    phoneNumber: profile?.phone_number || "",
-    additionalPhone: profile?.additional_phone || "",
-    residentialAddress: profile?.residential_address || "",
-    officeLocation: profile?.office_location || "",
-    bankName: profile?.bank_name || "",
-    bankAccountNumber: profile?.bank_account_number || "",
-    bankAccountName: profile?.bank_account_name || "",
-    dateOfBirth: profile?.date_of_birth ? profile.date_of_birth.substring(0, 10) : "",
-    employmentDate: profile?.employment_date ? profile.employment_date.substring(0, 10) : "",
-    emailNotifications: profile?.email_notifications ?? true,
+  const { officeLocations } = useOfficeLocations()
+  const form = useForm<ProfileFormValues>({
+    resolver: zodResolver(ProfileFormSchema),
+    defaultValues: {
+      firstName: profile?.first_name || "",
+      lastName: profile?.last_name || "",
+      otherNames: profile?.other_names || "",
+      department: profile?.department || "",
+      companyRole: profile?.designation || "",
+      phoneNumber: profile?.phone_number || "",
+      additionalPhone: profile?.additional_phone || "",
+      residentialAddress: profile?.residential_address || "",
+      officeLocation: profile?.office_location || "",
+      bankName: profile?.bank_name || "",
+      bankAccountNumber: profile?.bank_account_number || "",
+      bankAccountName: profile?.bank_account_name || "",
+      dateOfBirth: profile?.date_of_birth ? profile.date_of_birth.substring(0, 10) : "",
+      employmentDate: profile?.employment_date ? profile.employment_date.substring(0, 10) : "",
+      emailNotifications: profile?.email_notifications ?? true,
+    },
   })
 
   const [isLoading, setIsLoading] = useState(false)
 
-  const handleInputChange = (field: string, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }))
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const onSubmit = form.handleSubmit(async (data) => {
     const supabase = createClient()
     setIsLoading(true)
 
     // Clean phone numbers - only digits and + allowed
-    const phoneNumber = formData.phoneNumber.replace(/[^0-9+]/g, "")
-    const additionalPhone = formData.additionalPhone.replace(/[^0-9+]/g, "")
-
-    // Validate phone numbers
-    if (additionalPhone && additionalPhone === phoneNumber) {
-      toast.error("Additional phone number must be different from main phone number")
-      setIsLoading(false)
-      return
-    }
+    const phoneNumber = (data.phoneNumber || "").replace(/[^0-9+]/g, "")
+    const additionalPhone = (data.additionalPhone || "").replace(/[^0-9+]/g, "")
 
     try {
       const { error } = await supabase
         .from("profiles")
         .update({
-          first_name: formData.firstName,
-          last_name: formData.lastName,
-          other_names: formData.otherNames,
-          department: formData.department,
-          company_role: formData.companyRole,
+          first_name: data.firstName,
+          last_name: data.lastName,
+          other_names: data.otherNames,
+          department: data.department,
+          designation: data.companyRole,
           phone_number: phoneNumber,
           additional_phone: additionalPhone,
-          residential_address: formData.residentialAddress,
-          office_location: formData.officeLocation,
-          bank_name: formData.bankName,
-          bank_account_number: formData.bankAccountNumber,
-          bank_account_name: formData.bankAccountName,
-          date_of_birth: formData.dateOfBirth || null,
-          employment_date: formData.employmentDate || null,
-          email_notifications: formData.emailNotifications,
+          residential_address: data.residentialAddress,
+          office_location: data.officeLocation,
+          bank_name: data.bankName,
+          bank_account_number: data.bankAccountNumber,
+          bank_account_name: data.bankAccountName,
+          date_of_birth: data.dateOfBirth || null,
+          employment_date: data.employmentDate || null,
+          email_notifications: data.emailNotifications,
           updated_at: new Date().toISOString(),
         })
         .eq("id", user.id)
@@ -102,7 +122,7 @@ export function ProfileForm({ user, profile, hideBackButton = false, onSaved }: 
     } finally {
       setIsLoading(false)
     }
-  }
+  })
 
   return (
     <div className="space-y-6">
@@ -112,34 +132,26 @@ export function ProfileForm({ user, profile, hideBackButton = false, onSaved }: 
           <CardDescription>Your basic personal details</CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={onSubmit} className="space-y-6">
             {/* Personal Details */}
             <div className="grid gap-4 sm:grid-cols-3">
               <div className="space-y-2">
                 <Label htmlFor="firstName">First Name *</Label>
-                <Input
-                  id="firstName"
-                  value={formData.firstName}
-                  onChange={(e) => handleInputChange("firstName", e.target.value)}
-                  required
-                />
+                <Input id="firstName" {...form.register("firstName")} />
+                {form.formState.errors.firstName && (
+                  <p className="text-destructive text-sm">{form.formState.errors.firstName.message}</p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="lastName">Last Name *</Label>
-                <Input
-                  id="lastName"
-                  value={formData.lastName}
-                  onChange={(e) => handleInputChange("lastName", e.target.value)}
-                  required
-                />
+                <Input id="lastName" {...form.register("lastName")} />
+                {form.formState.errors.lastName && (
+                  <p className="text-destructive text-sm">{form.formState.errors.lastName.message}</p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="otherNames">Other Names</Label>
-                <Input
-                  id="otherNames"
-                  value={formData.otherNames}
-                  onChange={(e) => handleInputChange("otherNames", e.target.value)}
-                />
+                <Input id="otherNames" {...form.register("otherNames")} />
               </div>
             </div>
 
@@ -149,7 +161,10 @@ export function ProfileForm({ user, profile, hideBackButton = false, onSaved }: 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="department">Department</Label>
-                  <Select value={formData.department} onValueChange={(value) => handleInputChange("department", value)}>
+                  <Select
+                    value={form.watch("department")}
+                    onValueChange={(value) => form.setValue("department", value)}
+                  >
                     <SelectTrigger id="department">
                       <SelectValue placeholder="Select department" />
                     </SelectTrigger>
@@ -163,12 +178,8 @@ export function ProfileForm({ user, profile, hideBackButton = false, onSaved }: 
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="companyRole">Company Role</Label>
-                  <Input
-                    id="companyRole"
-                    value={formData.companyRole}
-                    onChange={(e) => handleInputChange("companyRole", e.target.value)}
-                  />
+                  <Label htmlFor="companyRole">Designation</Label>
+                  <Input id="companyRole" {...form.register("companyRole")} />
                 </div>
               </div>
             </div>
@@ -182,11 +193,11 @@ export function ProfileForm({ user, profile, hideBackButton = false, onSaved }: 
                   <Input
                     id="phoneNumber"
                     type="tel"
-                    value={formData.phoneNumber}
+                    value={form.watch("phoneNumber")}
                     onChange={(e) => {
                       // Only allow numbers and + symbol
                       const value = e.target.value.replace(/[^0-9+]/g, "")
-                      handleInputChange("phoneNumber", value)
+                      form.setValue("phoneNumber", value)
                     }}
                     placeholder="e.g., +2348012345678"
                   />
@@ -196,30 +207,28 @@ export function ProfileForm({ user, profile, hideBackButton = false, onSaved }: 
                   <Input
                     id="additionalPhone"
                     type="tel"
-                    value={formData.additionalPhone}
+                    value={form.watch("additionalPhone")}
                     onChange={(e) => {
                       // Only allow numbers and + symbol
                       const value = e.target.value.replace(/[^0-9+]/g, "")
-                      handleInputChange("additionalPhone", value)
+                      form.setValue("additionalPhone", value)
                     }}
                     placeholder="Must be different from main phone"
                   />
+                  {form.formState.errors.additionalPhone && (
+                    <p className="text-destructive text-sm">{form.formState.errors.additionalPhone.message}</p>
+                  )}
                 </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="residentialAddress">Residential Address</Label>
-                <Textarea
-                  id="residentialAddress"
-                  value={formData.residentialAddress}
-                  onChange={(e) => handleInputChange("residentialAddress", e.target.value)}
-                  rows={3}
-                />
+                <Textarea id="residentialAddress" {...form.register("residentialAddress")} rows={3} />
               </div>
               <div className="flex items-center space-x-2 pt-2">
                 <Switch
                   id="emailNotifications"
-                  checked={formData.emailNotifications}
-                  onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, emailNotifications: checked }))}
+                  checked={form.watch("emailNotifications")}
+                  onCheckedChange={(checked) => form.setValue("emailNotifications", checked)}
                 />
                 <Label htmlFor="emailNotifications">Receive email notifications for updates and tasks</Label>
               </div>
@@ -231,15 +240,18 @@ export function ProfileForm({ user, profile, hideBackButton = false, onSaved }: 
               <div className="space-y-2">
                 <Label htmlFor="officeLocation">Office Location</Label>
                 <Select
-                  value={formData.officeLocation}
-                  onValueChange={(value) => handleInputChange("officeLocation", value)}
+                  value={form.watch("officeLocation")}
+                  onValueChange={(value) => form.setValue("officeLocation", value)}
                 >
                   <SelectTrigger id="officeLocation">
                     <SelectValue placeholder="Select location" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Office">Office</SelectItem>
-                    <SelectItem value="Site">Site</SelectItem>
+                    {officeLocations.map((loc) => (
+                      <SelectItem key={loc} value={loc}>
+                        {loc}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -251,23 +263,18 @@ export function ProfileForm({ user, profile, hideBackButton = false, onSaved }: 
               <div className="grid gap-4 sm:grid-cols-3">
                 <div className="space-y-2">
                   <Label htmlFor="bankName">Bank Name</Label>
-                  <Input
-                    id="bankName"
-                    value={formData.bankName}
-                    onChange={(e) => handleInputChange("bankName", e.target.value)}
-                    placeholder="e.g., First Bank"
-                  />
+                  <Input id="bankName" {...form.register("bankName")} placeholder="e.g., First Bank" />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="bankAccountNumber">Account Number</Label>
                   <Input
                     id="bankAccountNumber"
                     type="text"
-                    value={formData.bankAccountNumber}
+                    value={form.watch("bankAccountNumber")}
                     onChange={(e) => {
                       // Only allow numbers
                       const value = e.target.value.replace(/[^0-9]/g, "")
-                      handleInputChange("bankAccountNumber", value)
+                      form.setValue("bankAccountNumber", value)
                     }}
                     placeholder="e.g., 1234567890"
                     maxLength={10}
@@ -275,12 +282,7 @@ export function ProfileForm({ user, profile, hideBackButton = false, onSaved }: 
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="bankAccountName">Account Name</Label>
-                  <Input
-                    id="bankAccountName"
-                    value={formData.bankAccountName}
-                    onChange={(e) => handleInputChange("bankAccountName", e.target.value)}
-                    placeholder="e.g., John Doe"
-                  />
+                  <Input id="bankAccountName" {...form.register("bankAccountName")} placeholder="e.g., John Doe" />
                 </div>
               </div>
             </div>
@@ -291,21 +293,11 @@ export function ProfileForm({ user, profile, hideBackButton = false, onSaved }: 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="dateOfBirth">Date of Birth</Label>
-                  <Input
-                    id="dateOfBirth"
-                    type="date"
-                    value={formData.dateOfBirth}
-                    onChange={(e) => handleInputChange("dateOfBirth", e.target.value)}
-                  />
+                  <Input id="dateOfBirth" type="date" {...form.register("dateOfBirth")} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="employmentDate">Employment Date</Label>
-                  <Input
-                    id="employmentDate"
-                    type="date"
-                    value={formData.employmentDate}
-                    onChange={(e) => handleInputChange("employmentDate", e.target.value)}
-                  />
+                  <Input id="employmentDate" type="date" {...form.register("employmentDate")} />
                 </div>
               </div>
             </div>

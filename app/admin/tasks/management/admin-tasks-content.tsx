@@ -1,5 +1,4 @@
 "use client"
-/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
@@ -20,53 +19,25 @@ import { TaskWorkflowTabs } from "@/components/tasks/TaskWorkflowTabs"
 import { TaskStatsCards } from "@/components/tasks/TaskStatsCards"
 import { ResponsiveModal } from "@/components/ui/patterns/responsive-modal"
 import { ItemInfoButton } from "@/components/ui/item-info-button"
+import type { Task } from "@/types/task"
 import {
   enrichTaskWithUsers,
   filterByDepartments,
   buildDepartmentLeadMap,
   applyTaskFilters,
   validateTaskForm,
-  persistTaskUpdate,
-  persistTaskCreate,
   sendUpdateNotifications,
   sendCreateNotifications,
 } from "./tasks-content-utils"
+import {
+  filterAssignableTaskDepartments,
+  filterAssignableTaskUsers,
+  hasGlobalTaskAssignmentAuthority,
+} from "@/lib/tasks/assignment-scope"
 
 const log = logger("tasks-management-admin-tasks-content")
 
-export interface Task {
-  id: string
-  title: string
-  description?: string
-  priority: string
-  status: string
-  assigned_to: string
-  assigned_by: string
-  department?: string
-  due_date?: string
-  project_id?: string
-  task_start_date?: string
-  task_end_date?: string
-  created_at: string
-  work_item_number?: string
-  source_type?: "manual" | "help_desk" | "action_item" | "project_task"
-  assignment_type?: "individual" | "multiple" | "department"
-  assigned_to_user?: {
-    first_name: string
-    last_name: string
-    department: string
-  }
-  assigned_users?: Array<{
-    id: string
-    first_name: string
-    last_name: string
-    department: string
-    completed?: boolean
-  }>
-  project?: {
-    project_name: string
-  }
-}
+export type { Task } from "@/types/task"
 
 export interface employee {
   id: string
@@ -86,6 +57,7 @@ export interface UserProfile {
   is_department_lead?: boolean
   lead_departments?: string[]
   managed_departments?: string[]
+  is_global_task_assigner?: boolean
 }
 
 export interface Project {
@@ -112,6 +84,7 @@ const INITIAL_TASK_FORM: TaskFormState = {
   assignment_type: "individual",
   assigned_users: [],
   project_id: "",
+  goal_id: "",
   task_start_date: "",
   task_end_date: "",
 }
@@ -125,8 +98,16 @@ export function AdminTasksContent({
 }: AdminTasksContentProps) {
   const [tasks, setTasks] = useState<Task[]>(initialTasks)
   const [employee] = useState<employee[]>(initialemployee)
+  const assignerProfile = {
+    id: userProfile.id,
+    department: userProfile.department || null,
+    is_department_lead: userProfile.is_department_lead ?? false,
+    lead_departments: userProfile.lead_departments ?? [],
+  }
   const activeEmployees = employee.filter((member) => isAssignableProfile(member, { allowLegacyNullStatus: false }))
+  const scopedAssignableEmployees = filterAssignableTaskUsers(assignerProfile, activeEmployees)
   const [departments] = useState<string[]>(initialDepartments)
+  const scopedAssignableDepartments = filterAssignableTaskDepartments(assignerProfile, departments)
   const [projects] = useState<Project[]>(initialProjects)
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
@@ -146,22 +127,24 @@ export function AdminTasksContent({
   const [taskForm, setTaskForm] = useState<TaskFormState>(INITIAL_TASK_FORM)
 
   const supabase = createClient()
-  const scopedDepartments = userProfile.managed_departments ?? userProfile.lead_departments ?? []
+  const scopedDepartments = userProfile.is_global_task_assigner
+    ? []
+    : (userProfile.managed_departments ?? userProfile.lead_departments ?? [])
 
   const loadData = async () => {
     try {
-      let tasksQuery: any = supabase
+      let tasksQuery = supabase
         .from("tasks")
         .select("*")
         .neq("category", "weekly_action")
         .order("created_at", { ascending: false })
-      if (userProfile?.is_department_lead && scopedDepartments.length > 0) {
+      if (userProfile?.is_department_lead && !userProfile.is_global_task_assigner && scopedDepartments.length > 0) {
         tasksQuery = tasksQuery.in("department", scopedDepartments)
       }
       const { data: tasksData, error: tasksError } = await tasksQuery
       if (tasksError) throw tasksError
-      let result: any[] = await Promise.all((tasksData || []).map((task: any) => enrichTaskWithUsers(supabase, task)))
-      if (userProfile?.is_department_lead && scopedDepartments.length > 0) {
+      let result = await Promise.all((tasksData || []).map((task) => enrichTaskWithUsers(supabase, task)))
+      if (userProfile?.is_department_lead && !userProfile.is_global_task_assigner && scopedDepartments.length > 0) {
         result = filterByDepartments(result, scopedDepartments)
       }
       setTasks(result as Task[])
@@ -178,7 +161,7 @@ export function AdminTasksContent({
       let assignedUsers: string[] = []
       if (task.assignment_type === "multiple" && task.id) {
         const { data: assignments } = await supabase.from("task_assignments").select("user_id").eq("task_id", task.id)
-        assignedUsers = assignments?.map((a: any) => a.user_id) || []
+        assignedUsers = assignments?.map((assignment: { user_id: string }) => assignment.user_id) || []
       }
 
       setTaskForm({
@@ -192,6 +175,7 @@ export function AdminTasksContent({
         assignment_type: task.assignment_type || "individual",
         assigned_users: assignedUsers,
         project_id: task.project_id || "",
+        goal_id: task.goal_id || "",
         task_start_date: task.task_start_date || "",
         task_end_date: task.task_end_date || "",
       })
@@ -221,7 +205,7 @@ export function AdminTasksContent({
         return
       }
 
-      const taskData: any = {
+      const taskData = {
         title: taskForm.title,
         description: taskForm.description || null,
         priority: taskForm.priority,
@@ -232,26 +216,41 @@ export function AdminTasksContent({
         assigned_to: taskForm.assignment_type === "individual" ? taskForm.assigned_to : null,
         assigned_by: user.id,
         project_id: taskForm.project_id || null,
+        goal_id: taskForm.goal_id || null,
         task_start_date: taskForm.task_start_date || null,
         task_end_date: taskForm.task_end_date || null,
         source_type: taskForm.project_id ? "project_task" : "manual",
       }
 
       if (selectedTask) {
-        await persistTaskUpdate(supabase, taskForm, selectedTask.id, user.id, taskData)
+        const response = await fetch(`/api/tasks/${selectedTask.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...taskData, assigned_users: taskForm.assigned_users }),
+        })
+        const payload = (await response.json().catch(() => null)) as { error?: string } | null
+        if (!response.ok) throw new Error(payload?.error || "Failed to update task")
         await sendUpdateNotifications(taskForm, selectedTask, user.id)
-        toast.success("Task updated successfully")
+        toast.success(`${selectedTask.work_item_number || "Task"} updated`)
       } else {
-        const newTask = await persistTaskCreate(supabase, taskForm, taskData)
+        const response = await fetch("/api/tasks", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...taskData, assigned_users: taskForm.assigned_users }),
+        })
+        const payload = (await response.json().catch(() => null)) as { error?: string; data?: Task } | null
+        if (!response.ok || !payload?.data) throw new Error(payload?.error || "Failed to create task")
+        const newTask = payload.data
         await sendCreateNotifications(taskForm, newTask, user.id)
-        toast.success("Task created successfully")
+        toast.success(`${newTask.work_item_number || "Task"} created`)
       }
 
       setIsTaskDialogOpen(false)
       loadData()
     } catch (error: unknown) {
       log.error("Error saving task:", error)
-      toast.error(`Failed to save task: ${(error as any)?.message || "Unknown error"}`)
+      const message = error instanceof Error ? error.message : "Unknown error"
+      toast.error(`Failed to save task: ${message}`)
     } finally {
       setIsSaving(false)
     }
@@ -266,12 +265,11 @@ export function AdminTasksContent({
       } = await supabase.auth.getUser()
       if (!user) return
 
-      const { error } = await supabase.from("tasks").delete().eq("id", taskToDelete.id)
-      if (error) throw error
+      const response = await fetch(`/api/tasks/${taskToDelete.id}`, { method: "DELETE" })
+      const payload = (await response.json().catch(() => null)) as { error?: string } | null
+      if (!response.ok) throw new Error(payload?.error || "Failed to delete task")
 
-      // Audit logging handled by database trigger
-
-      toast.success("Task deleted successfully")
+      toast.success(`${taskToDelete.work_item_number || "Task"} deleted`)
       setIsDeleteDialogOpen(false)
       setTaskToDelete(null)
       loadData()
@@ -426,8 +424,8 @@ export function AdminTasksContent({
               />
             </div>
             <p className="text-muted-foreground max-w-3xl text-sm">
-              Keep the main list as the place where work gets done. Open the workflow guide only when you want the
-              queue breakdown or history view.
+              Keep the main list as the place where work gets done. Open the workflow guide only when you want the queue
+              breakdown or history view.
             </p>
           </div>
 
@@ -492,9 +490,14 @@ export function AdminTasksContent({
         setTaskForm={setTaskForm}
         onSave={handleSaveTask}
         isSaving={isSaving}
-        activeEmployees={activeEmployees}
-        departments={departments}
+        scopedAssignableEmployees={scopedAssignableEmployees}
+        scopedAssignableDepartments={scopedAssignableDepartments}
         projects={projects}
+        assignmentAuthorityLabel={
+          hasGlobalTaskAssignmentAuthority(assignerProfile)
+            ? "You can assign tasks across all departments."
+            : "You can assign tasks only within your department."
+        }
       />
 
       <TaskDeleteDialog

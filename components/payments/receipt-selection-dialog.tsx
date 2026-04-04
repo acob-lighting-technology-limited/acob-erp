@@ -25,7 +25,7 @@ interface ReceiptSelectionDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   payment: PaymentWithDocs | null
-  onSelectReceipt: (filePath: string) => void
+  onSelectReceipt: (receipt: NonNullable<PaymentWithDocs["documents"]>[number]) => void
 }
 
 export function ReceiptSelectionDialog({ open, onOpenChange, payment, onSelectReceipt }: ReceiptSelectionDialogProps) {
@@ -44,7 +44,7 @@ export function ReceiptSelectionDialog({ open, onOpenChange, payment, onSelectRe
                 key={receipt.id}
                 variant="outline"
                 className="w-full justify-start"
-                onClick={() => onSelectReceipt(receipt.file_path)}
+                onClick={() => onSelectReceipt(receipt)}
               >
                 <Receipt className="mr-2 h-4 w-4" />
                 <div className="flex flex-col items-start">

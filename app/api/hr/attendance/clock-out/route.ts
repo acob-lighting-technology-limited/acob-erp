@@ -5,7 +5,7 @@ import { writeAuditLog } from "@/lib/audit/write-audit"
 
 const log = logger("hr-attendance-clock-out")
 
-export async function POST(_request: NextRequest) {
+export async function PATCH(_request: NextRequest) {
   try {
     const supabase = await createClient()
 
@@ -79,4 +79,9 @@ export async function POST(_request: NextRequest) {
     log.error({ err: String(error) }, "Error in POST /api/hr/attendance/clock-out:")
     return NextResponse.json({ error: "An error occurred" }, { status: 500 })
   }
+}
+
+// POST kept for backwards compat — prefer PATCH
+export async function POST(_request: NextRequest) {
+  return PATCH(_request)
 }

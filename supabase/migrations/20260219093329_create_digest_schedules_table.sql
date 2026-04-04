@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS public.digest_schedules (
   meeting_week int,
   meeting_year int,
   recipients jsonb NOT NULL DEFAULT '[]'::jsonb,
-  content_choice text NOT NULL DEFAULT 'both' CHECK (content_choice IN ('both', 'weekly_report', 'action_tracker')),
+  content_choice text NOT NULL DEFAULT 'both' CHECK (content_choice IN ('both', 'weekly_report', 'action_point')),
   send_day text DEFAULT 'monday' CHECK (send_day IN ('monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday')),
   send_time time DEFAULT '09:00',
   timezone text DEFAULT 'Africa/Lagos',

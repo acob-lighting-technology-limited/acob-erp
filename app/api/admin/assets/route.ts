@@ -114,7 +114,7 @@ async function closeCurrentAssetAssignments(
   }
 }
 
-export async function POST(request: NextRequest) {
+export async function PATCH(request: NextRequest) {
   const supabase = await createClient()
   const {
     data: { user },
@@ -314,4 +314,9 @@ export async function POST(request: NextRequest) {
       createdCodes.length > 0 ? `Created ${createdCodes.length} asset(s) before failure. ${baseError}` : baseError
     return NextResponse.json({ error: errorMessage }, { status: 500 })
   }
+}
+
+// POST kept for backwards compat — prefer PATCH
+export async function POST(request: NextRequest) {
+  return PATCH(request)
 }

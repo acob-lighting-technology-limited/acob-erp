@@ -45,8 +45,9 @@ import {
   UserCircle,
 } from "lucide-react"
 import type { UserRole, EmploymentStatus } from "@/types/database"
-import { getRoleDisplayName, getRoleBadgeColor, OFFICE_LOCATIONS } from "@/lib/permissions"
+import { getRoleDisplayName, getRoleBadgeColor } from "@/lib/permissions"
 import { useDepartments } from "@/hooks/use-departments"
+import { useOfficeLocations } from "@/hooks/use-office-locations"
 import { createClient } from "@/lib/supabase/client"
 import type { UserProfile } from "@/app/admin/hr/employees/admin-employee-content"
 import type { EmployeeAssignedItems, EmployeeProfile, EmployeeStatusSummary, EmployeeViewData } from "./types"
@@ -57,7 +58,7 @@ interface EditForm {
   is_department_lead: boolean
   department: string
   office_location: string
-  company_role: string
+  designation: string
   lead_departments: string[]
   employee_number: string
   first_name: string
@@ -122,6 +123,7 @@ export function EmployeeViewModal({
   getAvailableRoles,
 }: EmployeeViewModalProps) {
   const { departments: DEPARTMENTS } = useDepartments()
+  const { officeLocations } = useOfficeLocations()
   const supabase = createClient()
 
   const viewEmployeeProfile = employee
@@ -251,8 +253,8 @@ export function EmployeeViewModal({
                       <div className="flex items-center gap-3">
                         <UserIcon className="text-muted-foreground h-5 w-5" />
                         <div>
-                          <p className="text-muted-foreground text-sm">Position</p>
-                          <p className="font-medium">{viewEmployeeProfile.company_role || "N/A"}</p>
+                          <p className="text-muted-foreground text-sm">Designation</p>
+                          <p className="font-medium">{viewEmployeeProfile.designation || "N/A"}</p>
                         </div>
                       </div>
 
@@ -729,7 +731,7 @@ export function EmployeeViewModal({
                     value={editForm.office_location}
                     onValueChange={(value) => setEditForm({ ...editForm, office_location: value })}
                     placeholder="Select office location"
-                    options={OFFICE_LOCATIONS.map((location) => ({
+                    options={officeLocations.map((location) => ({
                       value: location,
                       label: location,
                     }))}
@@ -737,11 +739,11 @@ export function EmployeeViewModal({
                 </div>
 
                 <div>
-                  <Label htmlFor="company_role">Position/Title</Label>
+                  <Label htmlFor="designation">Designation</Label>
                   <Input
-                    id="company_role"
-                    value={editForm.company_role}
-                    onChange={(e) => setEditForm({ ...editForm, company_role: e.target.value })}
+                    id="designation"
+                    value={editForm.designation}
+                    onChange={(e) => setEditForm({ ...editForm, designation: e.target.value })}
                     placeholder="e.g., Senior Developer"
                   />
                 </div>

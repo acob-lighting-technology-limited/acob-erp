@@ -1,10 +1,26 @@
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
+import { z } from "zod"
 import { resolveAdminScope } from "@/lib/admin/rbac"
 import { resolveCanonicalMeetingSetup, upsertCanonicalMeetingDate } from "@/lib/reports/meeting-date"
 
 type ReportsClient = Awaited<ReturnType<typeof createClient>>
+
+const SaveMeetingDateSchema = z.object({
+  meetingWeek: z.coerce
+    .number()
+    .int()
+    .min(1, "meetingWeek must be between 1 and 53")
+    .max(53, "meetingWeek must be between 1 and 53"),
+  meetingYear: z.coerce
+    .number()
+    .int()
+    .min(2000, "meetingYear must be between 2000 and 2100")
+    .max(2100, "meetingYear must be between 2000 and 2100"),
+  meetingDate: z.string().trim().min(1, "meetingDate is required"),
+  meetingTime: z.string().optional().nullable(),
+})
 
 async function createClient() {
   const cookieStore = await cookies()
@@ -81,22 +97,12 @@ export async function POST(request: Request) {
     if (!scope) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
     const body = await request.json()
-    const meetingWeek = Number(body?.meetingWeek)
-    const meetingYear = Number(body?.meetingYear)
-    const meetingDate = String(body?.meetingDate || "")
-    const meetingTime = body?.meetingTime ? String(body.meetingTime) : null
-
-    if (!Number.isFinite(meetingWeek) || meetingWeek < 1 || meetingWeek > 53) {
-      return NextResponse.json({ error: "meetingWeek must be between 1 and 53" }, { status: 400 })
+    const parsed = SaveMeetingDateSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid request body" }, { status: 400 })
     }
 
-    if (!Number.isFinite(meetingYear) || meetingYear < 2000 || meetingYear > 2100) {
-      return NextResponse.json({ error: "meetingYear must be between 2000 and 2100" }, { status: 400 })
-    }
-
-    if (!meetingDate) {
-      return NextResponse.json({ error: "meetingDate is required" }, { status: 400 })
-    }
+    const { meetingWeek, meetingYear, meetingDate, meetingTime } = parsed.data
 
     const saved = await upsertCanonicalMeetingDate(supabase, {
       meetingWeek,

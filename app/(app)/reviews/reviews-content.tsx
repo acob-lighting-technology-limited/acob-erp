@@ -3,16 +3,31 @@
 import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Star, FileText } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Textarea } from "@/components/ui/textarea"
+import { ArrowLeft, Star, FileText, Target, BookOpen, CalendarCheck, Users } from "lucide-react"
+import { Progress } from "@/components/ui/progress"
 import Link from "next/link"
 import type { Review } from "./page"
+import { toast } from "sonner"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 
 interface ReviewsContentProps {
   initialReviews: Review[]
 }
 
 export function ReviewsContent({ initialReviews }: ReviewsContentProps) {
-  const [reviews] = useState<Review[]>(initialReviews)
+  const [reviews, setReviews] = useState<Review[]>(initialReviews)
+  const [selectedReview, setSelectedReview] = useState<Review | null>(null)
+  const [employeeComments, setEmployeeComments] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   function renderStars(rating: number) {
     return (
@@ -38,6 +53,41 @@ export function ReviewsContent({ initialReviews }: ReviewsContentProps) {
 
   const averageRating =
     reviews.length > 0 ? reviews.reduce((sum, r) => sum + (r.overall_rating || 0), 0) / reviews.length : 0
+
+  async function acknowledgeReview() {
+    if (!selectedReview) return
+
+    setIsSubmitting(true)
+    try {
+      const response = await fetch("/api/hr/performance/reviews", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: selectedReview.id,
+          acknowledge: true,
+          employee_comments: employeeComments || null,
+        }),
+      })
+      const payload = (await response.json().catch(() => null)) as { error?: string; data?: Review } | null
+      if (!response.ok || !payload?.data) throw new Error(payload?.error || "Failed to acknowledge review")
+
+      setReviews((currentReviews) =>
+        currentReviews.map((review) =>
+          review.id === selectedReview.id
+            ? { ...review, ...payload.data, employee_comments: employeeComments || null }
+            : review
+        )
+      )
+      toast.success("Review acknowledged")
+      setSelectedReview(null)
+      setEmployeeComments("")
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to acknowledge review"
+      toast.error(message)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
 
   return (
     <div className="container mx-auto p-6">
@@ -118,12 +168,63 @@ export function ReviewsContent({ initialReviews }: ReviewsContentProps) {
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* Rating */}
-                <div className="flex items-center gap-4">
-                  <span className="text-sm font-medium">Overall Rating:</span>
-                  {renderStars(review.overall_rating || 0)}
-                  <span className="text-lg font-bold">{review.overall_rating || 0}/5</span>
-                </div>
+                {/* PMS 4-component score breakdown */}
+                {review.final_score != null ? (
+                  <div className="space-y-3 rounded-lg border p-4">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold">Final Score</span>
+                      <span
+                        className={`text-2xl font-bold ${(review.final_score ?? 0) >= 70 ? "text-green-600" : (review.final_score ?? 0) >= 50 ? "text-yellow-600" : "text-red-600"}`}
+                      >
+                        {review.final_score} / 100
+                      </span>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {[
+                        { label: "KPI Achievement", value: review.kpi_score, weight: 70, icon: Target },
+                        { label: "Knowledge (CBT)", value: review.cbt_score, weight: 10, icon: BookOpen },
+                        { label: "Attendance", value: review.attendance_score, weight: 10, icon: CalendarCheck },
+                        { label: "Behaviour", value: review.behaviour_score, weight: 10, icon: Users },
+                      ].map(({ label, value, weight, icon: Icon }) => (
+                        <div key={label} className="space-y-1">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="flex items-center gap-1">
+                              <Icon className="h-3.5 w-3.5" />
+                              {label} <span className="text-muted-foreground">({weight}%)</span>
+                            </span>
+                            <span className="font-medium">
+                              {value ?? "-"}
+                              {value != null ? "/100" : ""}
+                            </span>
+                          </div>
+                          <Progress value={value ?? 0} className="h-2" />
+                        </div>
+                      ))}
+                    </div>
+                    {review.behaviour_competencies && (
+                      <details className="text-sm">
+                        <summary className="cursor-pointer text-xs text-blue-600">
+                          View behavioural competency breakdown
+                        </summary>
+                        <div className="mt-2 grid grid-cols-2 gap-1">
+                          {Object.entries(review.behaviour_competencies).map(([k, v]) => (
+                            <div key={k} className="odd:bg-muted/50 flex justify-between rounded px-2 py-1">
+                              <span className="capitalize">{k.replace("_", " ")}</span>
+                              <span className="font-medium">{v}/100</span>
+                            </div>
+                          ))}
+                        </div>
+                      </details>
+                    )}
+                  </div>
+                ) : (
+                  /* Fallback: legacy star rating */
+                  <div className="flex items-center gap-4">
+                    <span className="text-sm font-medium">Overall Rating:</span>
+                    {renderStars(review.overall_rating || 0)}
+                    <span className="text-lg font-bold">{review.overall_rating || 0}/5</span>
+                  </div>
+                )}
 
                 {/* Goals Progress */}
                 {review.goals_total > 0 && (
@@ -159,6 +260,30 @@ export function ReviewsContent({ initialReviews }: ReviewsContentProps) {
                   </div>
                 )}
 
+                {review.employee_comments && (
+                  <div>
+                    <h4 className="mb-1 text-sm font-medium text-emerald-700">Employee Comments</h4>
+                    <p className="rounded-lg bg-emerald-50 p-3 text-sm">{review.employee_comments}</p>
+                  </div>
+                )}
+
+                {review.status === "completed" && !review.acknowledged_at ? (
+                  <Button
+                    onClick={() => {
+                      setSelectedReview(review)
+                      setEmployeeComments(review.employee_comments || "")
+                    }}
+                  >
+                    Acknowledge Review
+                  </Button>
+                ) : null}
+
+                {review.acknowledged_at ? (
+                  <Badge className="bg-green-100 text-green-800">
+                    Acknowledged on {new Date(review.acknowledged_at).toLocaleDateString()}
+                  </Badge>
+                ) : null}
+
                 <p className="text-muted-foreground text-xs">
                   Review Date: {new Date(review.created_at).toLocaleDateString()}
                 </p>
@@ -167,6 +292,52 @@ export function ReviewsContent({ initialReviews }: ReviewsContentProps) {
           ))}
         </div>
       )}
+
+      <Dialog open={Boolean(selectedReview)} onOpenChange={(open) => !open && setSelectedReview(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Acknowledge Review</DialogTitle>
+            <DialogDescription>Confirm that you have read this completed performance review.</DialogDescription>
+          </DialogHeader>
+          {selectedReview ? (
+            <div className="space-y-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                {[
+                  { label: "KPI Achievement", value: selectedReview.kpi_score },
+                  { label: "Knowledge (CBT)", value: selectedReview.cbt_score },
+                  { label: "Attendance", value: selectedReview.attendance_score },
+                  { label: "Behaviour", value: selectedReview.behaviour_score },
+                ].map((item) => (
+                  <div key={item.label} className="rounded-lg border p-3">
+                    <div className="text-muted-foreground text-xs">{item.label}</div>
+                    <div className="mt-1 text-lg font-semibold">
+                      {item.value ?? "-"}
+                      {item.value != null ? "/100" : ""}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="space-y-2">
+                <div className="text-sm font-medium">Employee Comments</div>
+                <Textarea
+                  value={employeeComments}
+                  onChange={(event) => setEmployeeComments(event.target.value)}
+                  placeholder="Optional comments about this review"
+                  rows={4}
+                />
+              </div>
+            </div>
+          ) : null}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSelectedReview(null)} disabled={isSubmitting}>
+              Cancel
+            </Button>
+            <Button onClick={acknowledgeReview} disabled={isSubmitting}>
+              I acknowledge this review
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

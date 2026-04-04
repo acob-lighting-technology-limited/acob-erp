@@ -1,21 +1,28 @@
 import { createClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
+import { z } from "zod"
+import { buildApprovalEmailPreview } from "@/lib/onboarding/approval-email-preview"
 import { createClient as createServerClient } from "@/lib/supabase/server"
 import { rateLimit, getClientId } from "@/lib/rate-limit"
 import { logger } from "@/lib/logger"
-import { renderWelcomeEmail } from "@/lib/email-templates/welcome"
-import { renderInternalNotificationEmail } from "@/lib/email-templates/internal-notification"
-import { resolveActiveLeadRecipients, sendNotificationEmail } from "@/lib/notifications/email-gateway"
-import { isSystemNotificationChannelEnabled, resolveChannelEligibleUserIds } from "@/lib/notifications/delivery-policy"
-import { withSubjectPrefix } from "@/lib/notifications/subject-policy"
+import {
+  sendNotificationEmailWithRetry,
+  sendNotificationEmailsIndividuallyWithRetry,
+} from "@/lib/notifications/email-gateway"
+import { isSystemNotificationChannelEnabled } from "@/lib/notifications/delivery-policy"
 import { syncEmploymentStatusToAuth } from "@/lib/supabase/admin"
 import { writeAuditLog } from "@/lib/audit/write-audit"
-import { ORG } from "@/config/constants"
 
 const log = logger("approve-user")
 
+const ApproveUserSchema = z.object({
+  pendingUserId: z.string().trim().min(1, "Missing pendingUserId"),
+  employeeId: z.string().trim().optional(),
+  hireDate: z.string().trim().nullable().optional(),
+})
+
 export async function POST(req: Request) {
-  const rl = rateLimit(`approve-user:${getClientId(req)}`, { limit: 20, windowSec: 600 })
+  const rl = await rateLimit(`approve-user:${getClientId(req)}`, { limit: 20, windowSec: 600 })
   if (!rl.allowed) {
     return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 })
   }
@@ -37,6 +44,12 @@ export async function POST(req: Request) {
 
   log.info({ callerId: caller.id }, "Starting approval process")
   try {
+    const emailWarnings: Array<{
+      audience: "employee" | "management"
+      reason: string
+      recipients: string[]
+    }> = []
+
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
@@ -50,11 +63,12 @@ export async function POST(req: Request) {
     })
 
     const body = await req.json()
-    const { pendingUserId, employeeId: manualEmployeeId, hireDate } = body
-
-    if (!pendingUserId) {
-      return NextResponse.json({ error: "Missing pendingUserId" }, { status: 400 })
+    const parsed = ApproveUserSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid request body" }, { status: 400 })
     }
+
+    const { pendingUserId, employeeId: manualEmployeeId, hireDate } = parsed.data
 
     // 1. Fetch Pending User Details
     const { data: pendingUser, error: fetchError } = await supabaseAdmin
@@ -68,7 +82,7 @@ export async function POST(req: Request) {
     }
 
     // 1b. Validate Required Fields
-    const requiredFields = ["company_email", "personal_email", "first_name", "last_name", "department", "company_role"]
+    const requiredFields = ["company_email", "personal_email", "first_name", "last_name", "department", "designation"]
     const missingFields = requiredFields.filter((field) => !pendingUser[field])
 
     if (missingFields.length > 0) {
@@ -77,7 +91,6 @@ export async function POST(req: Request) {
 
     // 2. Determine Employee ID — use DB sequence for atomic, collision-free generation
     let employeeId = manualEmployeeId
-    const currentYear = new Date().getFullYear()
 
     if (employeeId) {
       const empNumPattern = /^ACOB\/[0-9]{4}\/[0-9]{3}$/
@@ -98,8 +111,10 @@ export async function POST(req: Request) {
       employeeId = seqRow as string
     }
 
-    const tempPassword = `Welcome${currentYear}!`
-    const portalUrl = ORG.MAIL_PORTAL_URL
+    const emailPreview = await buildApprovalEmailPreview({
+      supabase: supabaseAdmin,
+      pendingUser,
+    })
 
     // 3. Create or Update Auth User
     // First check if user already exists
@@ -114,7 +129,7 @@ export async function POST(req: Request) {
     if (!authUserId) {
       const { data: newAuthUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
         email: pendingUser.company_email,
-        password: tempPassword,
+        password: emailPreview.tempPassword,
         email_confirm: true,
         user_metadata: {
           first_name: pendingUser.first_name,
@@ -129,7 +144,7 @@ export async function POST(req: Request) {
       authUserId = newAuthUser.user.id
     } else {
       const { error: updateAuthError } = await supabaseAdmin.auth.admin.updateUserById(authUserId, {
-        password: tempPassword,
+        password: emailPreview.tempPassword,
         email_confirm: true,
       })
       if (updateAuthError) {
@@ -147,7 +162,7 @@ export async function POST(req: Request) {
       p_last_name: pendingUser.last_name,
       p_other_names: pendingUser.other_names ?? null,
       p_department: pendingUser.department,
-      p_company_role: pendingUser.company_role,
+      p_designation: pendingUser.designation,
       p_company_email: pendingUser.company_email,
       p_personal_email: pendingUser.personal_email,
       p_phone_number: pendingUser.phone_number ?? null,
@@ -171,42 +186,64 @@ export async function POST(req: Request) {
     try {
       const onboardingMailEnabled = await isSystemNotificationChannelEnabled(supabaseAdmin, "onboarding", "email")
       if (onboardingMailEnabled) {
-        await sendNotificationEmail({
-          to: [pendingUser.personal_email],
-          subject: withSubjectPrefix("Onboarding", "Welcome to ACOB - Login Credentials"),
-          html: renderWelcomeEmail({ pendingUser, employeeId, tempPassword, portalUrl }),
+        const result = await sendNotificationEmailWithRetry({
+          to: emailPreview.welcome.recipients,
+          subject: emailPreview.welcome.subject,
+          html: emailPreview.welcome.html,
         })
+
+        if (!result.sent) {
+          emailWarnings.push({
+            audience: "employee",
+            reason: result.reason,
+            recipients: emailPreview.welcome.recipients,
+          })
+          log.error(
+            { reason: result.reason, recipients: emailPreview.welcome.recipients },
+            "Welcome email was not sent"
+          )
+        }
       }
     } catch (emailError) {
+      emailWarnings.push({
+        audience: "employee",
+        reason: emailError instanceof Error ? emailError.message : String(emailError),
+        recipients: emailPreview.welcome.recipients,
+      })
       log.error({ err: String(emailError) }, "Failed to send welcome email")
     }
 
     // 7. Send Internal Confirmation Email to Department Leads
     try {
       const onboardingMailEnabled = await isSystemNotificationChannelEnabled(supabaseAdmin, "onboarding", "email")
-      if (onboardingMailEnabled) {
-        const leadRecipients = await resolveActiveLeadRecipients(supabaseAdmin)
-        const leadIds = leadRecipients.map((lead) => lead.id)
-        const allowedLeadIds = await resolveChannelEligibleUserIds(supabaseAdmin, {
-          userIds: leadIds,
-          notificationKey: "onboarding",
-          channel: "email",
+      if (onboardingMailEnabled && emailPreview.internal.recipients.length > 0) {
+        const result = await sendNotificationEmailsIndividuallyWithRetry({
+          to: emailPreview.internal.recipients,
+          subject: emailPreview.internal.subject,
+          html: emailPreview.internal.html,
         })
-        const allowedIdSet = new Set(allowedLeadIds)
-        const leadEmails = leadRecipients.filter((lead) => allowedIdSet.has(lead.id)).flatMap((lead) => lead.emails)
 
-        if (leadEmails.length > 0) {
-          await sendNotificationEmail({
-            to: leadEmails,
-            subject: withSubjectPrefix(
-              "Onboarding",
-              `New Employee Onboarded - ${pendingUser.first_name.replace(/[\r\n]/g, "")} ${pendingUser.last_name.replace(/[\r\n]/g, "")}`
-            ),
-            html: renderInternalNotificationEmail({ pendingUser, employeeId }),
+        if (!result.sent) {
+          const failureSummary = result.failedRecipients
+            .map((failure) => `${failure.recipient}: ${failure.reason}`)
+            .join("; ")
+          emailWarnings.push({
+            audience: "management",
+            reason: failureSummary || "failed to send to one or more recipients",
+            recipients: result.failedRecipients.map((failure) => failure.recipient),
           })
+          log.error(
+            { failedRecipients: result.failedRecipients, deliveredRecipients: result.deliveredRecipients },
+            "Internal onboarding email failed for one or more recipients"
+          )
         }
       }
     } catch (emailError) {
+      emailWarnings.push({
+        audience: "management",
+        reason: emailError instanceof Error ? emailError.message : String(emailError),
+        recipients: emailPreview.internal.recipients,
+      })
       log.error({ err: String(emailError) }, "Failed to send stakeholder notification emails")
     }
 
@@ -229,12 +266,12 @@ export async function POST(req: Request) {
           role: "employee",
           employment_status: "active",
         },
-        metadata: { source: "approve-user", pending_user_id: pendingUserId },
+        metadata: { source: "approve-user", pending_user_id: pendingUserId, email_warnings: emailWarnings },
       },
       { failOpen: true }
     )
 
-    return NextResponse.json({ success: true, employeeId })
+    return NextResponse.json({ success: true, employeeId, emailWarnings })
   } catch (error: unknown) {
     log.error({ err: String(error) }, "Approval process failed")
     // Redact internal error details from the client

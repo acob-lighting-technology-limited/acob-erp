@@ -15,7 +15,7 @@ interface ProfileHeroProps {
     first_name?: string | null
     last_name?: string | null
     other_names?: string | null
-    company_role?: string | null
+    designation?: string | null
     department?: string | null
     role: string
     is_department_lead?: boolean | null
@@ -34,7 +34,11 @@ export function ProfileHero({ profile, onEdit }: ProfileHeroProps) {
 
   return (
     <Card className="relative overflow-hidden">
-      <Button onClick={onEdit} variant="outline" className="bg-background/80 absolute top-4 right-4 z-10 gap-2 backdrop-blur-sm">
+      <Button
+        onClick={onEdit}
+        variant="outline"
+        className="bg-background/80 absolute top-4 right-4 z-10 gap-2 backdrop-blur-sm"
+      >
         <Edit className="h-4 w-4" />
         Edit Profile
       </Button>
@@ -57,7 +61,7 @@ export function ProfileHero({ profile, onEdit }: ProfileHeroProps) {
             <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-0.5">
               <p className="text-muted-foreground flex items-center gap-1.5 text-sm md:text-base lg:text-lg">
                 <Briefcase className="h-4 w-4 lg:h-5 lg:w-5" />
-                {profile.company_role || "employee Member"}
+                {profile.designation || "employee Member"}
               </p>
               <p className="text-muted-foreground flex items-center gap-1.5 text-sm md:text-base lg:text-lg">
                 <Building2 className="h-4 w-4 lg:h-5 lg:w-5" />

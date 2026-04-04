@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { z } from "zod"
 import {
   appendAuditLog,
   appendHelpDeskEvent,
@@ -11,6 +12,10 @@ import { getUnassignableReason } from "@/lib/workforce/assignment-policy"
 import { logger } from "@/lib/logger"
 
 const log = logger("help-desk-tickets-assign")
+const AssignHelpDeskTicketSchema = z.object({
+  assigned_to: z.string().optional().nullable(),
+  action: z.string().optional(),
+})
 
 function managesDepartmentStrict(profile: HelpDeskProfile, department: string | null | undefined) {
   if (!profile?.is_department_lead || !department) return false
@@ -22,7 +27,7 @@ function managesDepartmentStrict(profile: HelpDeskProfile, department: string | 
   return managedDepartments.includes(department) || profile?.department === department
 }
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     const { supabase, user, profile } = await getAuthContext()
 
@@ -30,8 +35,14 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { assigned_to, action } = await request.json()
-    const normalizedAction = String(action || "assign_staff")
+    const body = await request.json()
+    const parsed = AssignHelpDeskTicketSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid request body" }, { status: 400 })
+    }
+
+    const assigned_to = parsed.data.assigned_to
+    const normalizedAction = String(parsed.data.action || "assign_staff")
 
     const { data: ticket, error: ticketError } = await supabase
       .from("help_desk_tickets")
@@ -190,7 +201,10 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     return NextResponse.json({ data: updated })
   } catch (error) {
-    log.error({ err: String(error) }, "Error in POST /api/help-desk/tickets/[id]/assign:")
+    log.error({ err: String(error) }, "Error in PATCH /api/help-desk/tickets/[id]/assign:")
     return NextResponse.json({ error: "Failed to assign ticket" }, { status: 500 })
   }
 }
+
+// POST kept for backwards compat — prefer PATCH
+export { PATCH as POST }

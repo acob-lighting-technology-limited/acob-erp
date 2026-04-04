@@ -26,6 +26,7 @@ import { ActionTrackerStats } from "./_components/action-tracker-stats"
 import { ActionTrackerFilters } from "./_components/action-tracker-filters"
 import { ActionTrackerTable } from "./_components/action-tracker-table"
 import { ActionTrackerExportButtons } from "./_components/action-tracker-export-buttons"
+import { Button } from "@/components/ui/button"
 
 import { logger } from "@/lib/logger"
 
@@ -53,32 +54,23 @@ interface ActionTrackerContentProps {
 }
 
 async function fetchAdminActionTrackerTasks(
-  supabase: ReturnType<typeof createClient>,
   weekFilter: number,
   yearFilter: number,
   deptFilter: string,
   scopedDepartments: string[]
 ): Promise<ActionTask[]> {
-  let query = supabase
-    .from("tasks")
-    .select("*")
-    .eq("category", "weekly_action")
-    .eq("week_number", weekFilter)
-    .eq("year", yearFilter)
-    .order("department", { ascending: true })
-    .order("created_at", { ascending: true })
-
+  const params = new URLSearchParams({
+    week: String(weekFilter),
+    year: String(yearFilter),
+    dept: deptFilter,
+  })
   if (scopedDepartments.length > 0) {
-    query = query.in("department", scopedDepartments)
+    params.set("scoped_departments", scopedDepartments.join(","))
   }
-
-  if (deptFilter !== "all") {
-    query = query.eq("department", deptFilter)
-  }
-
-  const { data, error } = await query
-  if (error) throw new Error(error.message)
-  return data || []
+  const response = await fetch(`/api/reports/action-tracker?${params.toString()}`, { cache: "no-store" })
+  const payload = (await response.json().catch(() => null)) as { data?: ActionTask[]; error?: string } | null
+  if (!response.ok) throw new Error(payload?.error || "Failed to fetch action items")
+  return payload?.data || []
 }
 
 export function ActionTrackerContent({
@@ -108,6 +100,7 @@ export function ActionTrackerContent({
   })
   const [searchQuery, setSearchQuery] = useState("")
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
+  const [isCarryForwarding, setIsCarryForwarding] = useState(false)
 
   const supabase = createClient()
   const canMutateTask = (task: ActionTask) => canGlobalEdit || editableDepartments.includes(task.department)
@@ -118,7 +111,7 @@ export function ActionTrackerContent({
     refetch: refetchTasks,
   } = useQuery({
     queryKey: QUERY_KEYS.adminActionTrackerTasks({ weekFilter, yearFilter, deptFilter, scopedDepartments }),
-    queryFn: () => fetchAdminActionTrackerTasks(supabase, weekFilter, yearFilter, deptFilter, scopedDepartments),
+    queryFn: () => fetchAdminActionTrackerTasks(weekFilter, yearFilter, deptFilter, scopedDepartments),
   })
 
   const { data: lockState } = useQuery({
@@ -142,12 +135,13 @@ export function ActionTrackerContent({
     )
 
     try {
-      const { error } = await supabase
-        .from("tasks")
-        .update({ status: newStatus, updated_at: new Date().toISOString() })
-        .eq("id", taskId)
-
-      if (error) throw error
+      const response = await fetch(`/api/reports/action-tracker/${taskId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      })
+      const payload = (await response.json().catch(() => null)) as { error?: string } | null
+      if (!response.ok) throw new Error(payload?.error || "Failed to update status")
       toast.success("Status updated")
     } catch (error) {
       log.error({ err: String(error) }, "error")
@@ -163,12 +157,14 @@ export function ActionTrackerContent({
       return
     }
     try {
-      const { error } = await supabase.from("tasks").delete().eq("id", id)
-      if (error) throw error
+      const response = await fetch(`/api/reports/action-tracker/${id}`, { method: "DELETE" })
+      const payload = (await response.json().catch(() => null)) as { error?: string } | null
+      if (!response.ok) throw new Error(payload?.error || "Failed to delete action")
       toast.success("Action deleted")
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminActionTrackerTasks() })
-    } catch {
-      toast.error("Failed to delete")
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to delete"
+      toast.error(message)
     }
   }
 
@@ -231,22 +227,46 @@ export function ActionTrackerContent({
     year: t.year,
   }))
 
+  const handleCarryForward = async () => {
+    setIsCarryForwarding(true)
+    try {
+      const response = await fetch("/api/reports/action-tracker/carry-forward", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ week_number: weekFilter, year: yearFilter }),
+      })
+      const payload = (await response.json().catch(() => null)) as { error?: string; carried_count?: number } | null
+      if (!response.ok) throw new Error(payload?.error || "Failed to carry forward items")
+      toast.success(`Carried forward ${payload?.carried_count || 0} items`)
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminActionTrackerTasks() })
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to carry forward items")
+    } finally {
+      setIsCarryForwarding(false)
+    }
+  }
+
   return (
     <AdminTablePage
       title="Action Tracker"
       description="Monitor and manage weekly departmental actions"
       icon={FileSpreadsheet}
-      backLinkHref="/admin/reports"
-      backLinkLabel="Back to Reports"
+      backLinkHref="/admin/reports/general-meeting"
+      backLinkLabel="Back to General Meeting"
       actions={
-        tasks.length > 0 ? (
-          <ActionTrackerExportButtons
-            items={actionItemsForExport}
-            weekFilter={weekFilter}
-            yearFilter={yearFilter}
-            meetingDate={lockState?.meetingDate}
-          />
-        ) : null
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={handleCarryForward} disabled={isCarryForwarding}>
+            Carry Forward
+          </Button>
+          {tasks.length > 0 ? (
+            <ActionTrackerExportButtons
+              items={actionItemsForExport}
+              weekFilter={weekFilter}
+              yearFilter={yearFilter}
+              meetingDate={lockState?.meetingDate}
+            />
+          ) : null}
+        </div>
       }
       stats={
         <ActionTrackerStats

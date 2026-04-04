@@ -1,6 +1,10 @@
 {
   "crons": [
     {
+      "path": "/api/reports/official-exports",
+      "schedule": "0 1 * * *"
+    },
+    {
       "path": "/api/hr/leave/sla/reminders",
       "schedule": "0 8 * * *"
     }

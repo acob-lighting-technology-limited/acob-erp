@@ -54,7 +54,7 @@ interface SidebarProps {
 const navigation = [
   { name: "Home", href: "/profile", icon: LayoutDashboard },
   { name: "Notifications", href: "/notifications", icon: Bell },
-  { name: "Job Description", href: "/job-description", icon: Briefcase },
+  { name: "My Work", href: "/work", icon: Briefcase },
   { name: "Projects", href: "/projects", icon: FolderKanban },
   { name: "Tasks", href: "/tasks", icon: ClipboardList },
   { name: "Help Desk", href: "/help-desk", icon: ClipboardList },

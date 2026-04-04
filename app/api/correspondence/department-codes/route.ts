@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from "next/server"
+import { z } from "zod"
 import { getAuthContext, isAdminRole } from "@/lib/correspondence/server"
 import { logger } from "@/lib/logger"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 
 const log = logger("correspondence-department-codes")
+
+const UpdateDepartmentCodeSchema = z.object({
+  department_name: z.string().trim().min(1, "department_name and department_code are required"),
+  department_code: z.string().trim().min(1, "department_name and department_code are required"),
+  is_active: z.boolean().optional().default(true),
+})
 
 export async function GET() {
   try {
@@ -40,15 +47,14 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json()
-    const departmentName = String(body?.department_name || "").trim()
-    const departmentCode = String(body?.department_code || "")
-      .trim()
-      .toUpperCase()
-    const isActive = body?.is_active === false ? false : true
-
-    if (!departmentName || !departmentCode) {
-      return NextResponse.json({ error: "department_name and department_code are required" }, { status: 400 })
+    const parsed = UpdateDepartmentCodeSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid request body" }, { status: 400 })
     }
+
+    const departmentName = parsed.data.department_name
+    const departmentCode = parsed.data.department_code.trim().toUpperCase()
+    const isActive = parsed.data.is_active
 
     const { data, error } = await supabase
       .from("correspondence_department_codes")

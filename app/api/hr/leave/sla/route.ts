@@ -25,7 +25,7 @@ export async function GET() {
   }
 }
 
-export async function POST(request: NextRequest) {
+export async function PATCH(request: NextRequest) {
   try {
     const supabase = await createClient()
     const {
@@ -49,4 +49,9 @@ export async function POST(request: NextRequest) {
   } catch {
     return NextResponse.json({ error: "An error occurred" }, { status: 500 })
   }
+}
+
+// POST kept for backwards compat — prefer PATCH
+export async function POST(request: NextRequest) {
+  return PATCH(request)
 }

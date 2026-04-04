@@ -1,6 +1,5 @@
 import type { UserRole } from "@/types/database"
 import { canAssignRole as canAssignManagedRole } from "@/lib/role-management"
-import { DEPT_EXECUTIVE_MANAGEMENT } from "@/config/constants"
 
 /**
  * Role Hierarchy (from highest to lowest):
@@ -161,43 +160,3 @@ export function getRoleBadgeColor(role: UserRole): string {
   }
   return colors[role] || "bg-gray-100 text-gray-800"
 }
-
-/**
- * @deprecated Use the `useDepartments()` hook from `@/hooks/use-departments`
- * in client components. This static list is kept ONLY as a server-side
- * fallback and will drift out of sync with the database.
- */
-export const DEPARTMENTS = [
-  "Accounts",
-  "Admin & HR",
-  "Business, Growth and Innovation",
-  DEPT_EXECUTIVE_MANAGEMENT,
-  "IT and Communications",
-  "Legal, Regulatory and Compliance",
-  "Logistics",
-  "Monitoring and Evaluation",
-  "Operations",
-  "Project",
-  "Technical",
-] as const
-
-export const OFFICE_LOCATIONS = [
-  "Accounts",
-  "Admin & HR",
-  "Assistant Executive Director",
-  "Business, Growth and Innovation",
-  "General Conference Room",
-  "IT and Communications",
-  "Kitchen",
-  "Legal, Regulatory and Compliance",
-  "MD Conference Room",
-  "MD Office",
-  "Operations",
-  "Reception",
-  "Site",
-  "Technical",
-  "Technical Extension",
-] as const
-
-export type Department = (typeof DEPARTMENTS)[number]
-export type OfficeLocation = (typeof OFFICE_LOCATIONS)[number]

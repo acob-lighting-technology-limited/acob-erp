@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useMemo, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { logger } from "@/lib/logger"
@@ -11,38 +11,11 @@ import { UserTasksHeader } from "@/components/tasks/UserTasksHeader"
 import { UserTaskTable } from "@/components/tasks/UserTaskTable"
 import { UserTaskDetailsDialog } from "@/components/tasks/UserTaskDetailsDialog"
 import { loadUserTasks } from "@/components/tasks/user-tasks-data"
+import type { Task, TaskUserProfile } from "@/types/task"
+
+export type { Task, TaskUserProfile } from "@/types/task"
 
 const log = logger("tasks-management-tasks-content")
-
-export interface Task {
-  id: string
-  title: string
-  description?: string
-  work_item_number?: string
-  priority: string
-  status: string
-  due_date?: string
-  started_at?: string
-  completed_at?: string
-  created_at: string
-  source_type?: "manual" | "help_desk" | "action_item" | "project_task"
-  source_id?: string
-  assignment_type?: "individual" | "multiple" | "department"
-  assigned_by?: string
-  assigned_by_user?: {
-    first_name: string
-    last_name: string
-  }
-  department?: string
-  assigned_users?: Array<{
-    id: string
-    first_name: string
-    last_name: string
-    completed?: boolean
-  }>
-  user_completed?: boolean
-  can_change_status?: boolean
-}
 
 export interface TaskUpdate {
   id: string
@@ -57,13 +30,6 @@ export interface TaskUpdate {
 
 type TaskUpdateRow = Omit<TaskUpdate, "user"> & {
   user?: Array<{ first_name: string; last_name: string }> | { first_name: string; last_name: string } | null
-}
-
-export interface TaskUserProfile {
-  department?: string | null
-  role?: string | null
-  is_department_lead?: boolean | null
-  lead_departments?: string[] | null
 }
 
 interface TasksContentProps {
@@ -90,7 +56,6 @@ function mapTaskStatusToHelpDeskStatus(task: Task, status: string): string {
 
 export function TasksContent({ initialTasks, userId, userProfile }: TasksContentProps) {
   const [tasks, setTasks] = useState<Task[]>(initialTasks)
-  const [filteredTasks, setFilteredTasks] = useState<Task[]>(initialTasks)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [taskUpdates, setTaskUpdates] = useState<TaskUpdate[]>([])
   const [isDetailsOpen, setIsDetailsOpen] = useState(false)
@@ -103,7 +68,7 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
   const [newStatus, setNewStatus] = useState("")
   const supabase = createClient()
 
-  useEffect(() => {
+  const filteredTasks = useMemo(() => {
     const scopedTasks = tasks.filter((task) =>
       taskView === "history" ? isFinalTaskStatus(task.status) : !isFinalTaskStatus(task.status)
     )
@@ -121,14 +86,13 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
       return matchesStatus && matchesAssignment && matchesSearch
     })
 
-    setFilteredTasks(nextFiltered)
+    return nextFiltered
   }, [assignmentFilter, filterStatus, searchQuery, taskView, tasks])
 
   const loadTasks = async () => {
     try {
       const loaded = await loadUserTasks(supabase, userId, userProfile)
       setTasks(loaded)
-      setFilteredTasks(loaded)
       return loaded
     } catch (error: unknown) {
       log.error("Error loading tasks:", error)
@@ -180,14 +144,16 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
 
     setIsSaving(true)
     try {
-      const { error } = await supabase.from("task_updates").insert({
-        task_id: selectedTask.id,
-        user_id: userId,
-        update_type: "comment",
-        content: newComment,
+      const response = await fetch(`/api/tasks/${selectedTask.id}/comments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: newComment }),
       })
 
-      if (error) throw error
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as { error?: string } | null
+        throw new Error(payload?.error || "Failed to add comment")
+      }
 
       toast.success("Comment added")
       setNewComment("")
@@ -205,33 +171,20 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
 
     setIsSaving(true)
     try {
-      const { data: existingCompletion } = await supabase
-        .from("task_user_completion")
-        .select("id")
-        .eq("task_id", selectedTask.id)
-        .eq("user_id", userId)
-        .single()
+      const response = await fetch(`/api/tasks/${selectedTask.id}/complete`, {
+        method: "POST",
+      })
+      const payload = (await response.json().catch(() => null)) as { error?: string } | null
 
-      if (existingCompletion) {
-        toast.info("You've already marked this task as done")
-        return
+      if (!response.ok) {
+        if (response.status === 409) {
+          toast.info("You've already marked this task as done")
+          return
+        }
+        throw new Error(payload?.error || "Failed to mark task as done")
       }
 
-      const { error } = await supabase.from("task_user_completion").insert({
-        task_id: selectedTask.id,
-        user_id: userId,
-      })
-
-      if (error) throw error
-
-      await supabase.from("task_updates").insert({
-        task_id: selectedTask.id,
-        user_id: userId,
-        update_type: "comment",
-        content: "Marked task as done",
-      })
-
-      toast.success("You've marked this task as done")
+      toast.success(`${selectedTask.work_item_number || "Task"} marked as done`)
       await loadTasks()
       await loadTaskUpdates(selectedTask.id)
 
@@ -287,23 +240,18 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
           throw new Error(payload?.error || "Failed to update linked help desk task")
         }
       } else {
-        const { error } = await supabase.from("tasks").update(updates).eq("id", selectedTask.id)
-
-        if (error) throw error
+        const response = await fetch(`/api/tasks/${selectedTask.id}/status`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status, comment: statusNote || undefined }),
+        })
+        if (!response.ok) {
+          const payload = (await response.json().catch(() => null)) as { error?: string } | null
+          throw new Error(payload?.error || "Failed to update task status")
+        }
       }
 
-      await supabase.from("task_updates").insert({
-        task_id: selectedTask.id,
-        user_id: userId,
-        update_type: "status_change",
-        content: statusNote
-          ? `Status changed from ${selectedTask.status} to ${status}. Note: ${statusNote}`
-          : `Status changed from ${selectedTask.status} to ${status}`,
-        old_value: selectedTask.status,
-        new_value: status,
-      })
-
-      toast.success("Status updated")
+      toast.success(`${selectedTask.work_item_number || "Task"} updated`)
       setTasks((currentTasks) =>
         currentTasks.map((task) => (task.id === selectedTask.id ? { ...task, ...updates, status } : task))
       )

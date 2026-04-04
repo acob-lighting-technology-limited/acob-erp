@@ -5,6 +5,7 @@ import { getOneDriveService } from "@/lib/onedrive"
 import { logger } from "@/lib/logger"
 import { getDepartmentScope, resolveAdminScope, normalizeDepartmentName } from "@/lib/admin/rbac"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
+import { buildPaymentDocumentFolderPathByType, buildPaymentDocumentPath } from "@/lib/payments/document-storage"
 
 const log = logger("payments-documents")
 
@@ -15,6 +16,9 @@ type DepartmentRelation = { name?: string | null } | Array<{ name?: string | nul
 type PaymentDepartmentRecord = {
   department?: DepartmentRelation
   created_by?: string | null
+  id?: string
+  title?: string | null
+  payment_type?: "one-time" | "recurring" | null
 }
 
 async function createClient() {
@@ -42,6 +46,13 @@ function normalizeDepartment(value: string | null | undefined): string {
 
 function isFinanceDepartment(value: string | null | undefined): boolean {
   return normalizeDepartment(value) === "accounts"
+}
+
+function getPaymentDepartmentName(payment: PaymentDepartmentRecord | null | undefined): string | null {
+  const relation = payment?.department
+  if (!relation) return null
+  if (Array.isArray(relation)) return relation[0]?.name ?? null
+  return relation.name ?? null
 }
 
 async function assertPaymentAccess(supabase: PaymentsClient, userId: string, paymentId: string) {
@@ -164,15 +175,54 @@ export async function POST(request: Request, { params }: { params: { id: string 
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     }
 
-    // Upload to Storage
-    const sanitizedName = file.name.replace(/[^\x00-\x7F]/g, "")
-    const filePath = `${paymentId}/${Date.now()}-${sanitizedName}`
+    const { data: payment, error: paymentError } = await dataClient
+      .from("department_payments")
+      .select("id, title, payment_type, department:departments(name)")
+      .eq("id", paymentId)
+      .single()
 
-    const { error: uploadError } = await supabase.storage.from("payment_documents").upload(filePath, file)
+    if (paymentError || !payment) {
+      return NextResponse.json({ error: "Payment not found" }, { status: 404 })
+    }
 
-    if (uploadError) {
-      log.error({ err: String(uploadError) }, "Storage upload error:")
-      return NextResponse.json({ error: "Failed to upload file to storage" }, { status: 500 })
+    const paymentDepartment = getPaymentDepartmentName(payment)
+    if (!paymentDepartment) {
+      return NextResponse.json({ error: "Payment department is missing" }, { status: 400 })
+    }
+
+    let filePath = ""
+    const onedrive = getOneDriveService()
+
+    if (onedrive.isEnabled()) {
+      try {
+        const paymentTitle = payment.title || undefined
+        const paymentType = payment.payment_type === "one-time" ? "one-time" : "recurring"
+        const folderPath = buildPaymentDocumentFolderPathByType(paymentDepartment, paymentType, paymentId, paymentTitle)
+        filePath = buildPaymentDocumentPath(
+          paymentDepartment,
+          paymentType,
+          paymentId,
+          `${Date.now()}-${file.name}`,
+          paymentTitle
+        )
+        await onedrive.createFolder(folderPath)
+        const arrayBuffer = await file.arrayBuffer()
+        await onedrive.uploadFile(filePath, arrayBuffer, file.type)
+        log.info(`Stored payment document in SharePoint: ${filePath}`)
+      } catch (onedriveError) {
+        log.error({ err: String(onedriveError) }, "SharePoint upload error:")
+        return NextResponse.json({ error: "Failed to upload file to SharePoint" }, { status: 500 })
+      }
+    } else {
+      const sanitizedName = file.name.replace(/[^\x00-\x7F]/g, "")
+      filePath = `${paymentId}/${Date.now()}-${sanitizedName}`
+
+      const { error: uploadError } = await supabase.storage.from("payment_documents").upload(filePath, file)
+
+      if (uploadError) {
+        log.error({ err: String(uploadError) }, "Storage upload error:")
+        return NextResponse.json({ error: "Failed to upload file to storage" }, { status: 500 })
+      }
     }
 
     // Insert new document record
@@ -214,38 +264,6 @@ export async function POST(request: Request, { params }: { params: { id: string 
       }
     }
 
-    // Sync to OneDrive if enabled
-    try {
-      const onedrive = getOneDriveService()
-      if (onedrive.isEnabled()) {
-        // Get payment details for folder structure
-        const { data: payment } = await dataClient
-          .from("department_payments")
-          .select("id, title, department:departments(name)")
-          .eq("id", paymentId)
-          .single()
-
-        if (payment?.department) {
-          const departmentName =
-            typeof payment.department === "object" && "name" in payment.department
-              ? (payment.department as { name: string }).name
-              : "General"
-
-          // Create folder and upload file
-          const onedrivePath = onedrive.getPaymentsPath(departmentName, paymentId, file.name)
-
-          // Convert file to Uint8Array
-          const arrayBuffer = await file.arrayBuffer()
-
-          await onedrive.uploadFile(onedrivePath, arrayBuffer, file.type)
-          log.info(`Synced document to OneDrive: ${onedrivePath}`)
-        }
-      }
-    } catch (onedriveError) {
-      // Log but don't fail the request - OneDrive sync is best effort
-      log.error({ err: String(onedriveError) }, "OneDrive sync error (non-fatal):")
-    }
-
     return NextResponse.json({ data: newDocument }, { status: 201 })
   } catch (error: unknown) {
     log.error({ err: String(error) }, "Upload handler error:")
@@ -253,3 +271,6 @@ export async function POST(request: Request, { params }: { params: { id: string 
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }
+
+// POST kept for backwards compat — prefer PATCH
+export { POST as PATCH }

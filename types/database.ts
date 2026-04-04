@@ -14,7 +14,7 @@ export type Database = {
           other_names: string | null
           department: string | null // DEPRECATED: Use department_id
           department_id: string | null // NEW: Foreign key to departments
-          company_role: string | null
+          designation: string | null
           phone_number: string | null
           additional_phone: string | null
           residential_address: string | null
@@ -55,7 +55,7 @@ export type Database = {
           other_names?: string | null
           department?: string | null
           department_id?: string | null
-          company_role?: string | null
+          designation?: string | null
           phone_number?: string | null
           additional_phone?: string | null
           residential_address?: string | null
@@ -89,7 +89,7 @@ export type Database = {
           other_names?: string | null
           department?: string | null
           department_id?: string | null
-          company_role?: string | null
+          designation?: string | null
           phone_number?: string | null
           additional_phone?: string | null
           residential_address?: string | null
@@ -290,7 +290,7 @@ export interface Profile {
   other_names?: string
   department?: string // DEPRECATED: Use department_id
   department_id?: string | null // NEW: Foreign key
-  company_role?: string
+  designation?: string
   phone_number?: string
   additional_phone?: string
   residential_address?: string
@@ -443,8 +443,79 @@ export interface Task {
   completed_at?: string
   progress: number
   project_id?: string
+  goal_id?: string | null // PMS: optional link to a KPI/goal
   task_start_date?: string
   task_end_date?: string
+  created_at: string
+  updated_at: string
+}
+
+// PMS: KPI approval states
+export type KpiApprovalStatus = "pending" | "approved" | "rejected"
+
+export interface Goal {
+  id: string
+  user_id: string
+  review_cycle_id?: string | null
+  title: string
+  description?: string | null
+  target_value?: number | null
+  achieved_value?: number | null
+  status: string
+  priority: string
+  due_date?: string | null
+  // PMS: approval workflow
+  approval_status: KpiApprovalStatus
+  approved_by?: string | null
+  approved_at?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ReviewCycle {
+  id: string
+  name: string
+  start_date: string
+  end_date: string
+  review_type: string // annual, quarterly, monthly
+  status: string // draft, active, completed
+  created_at: string
+  updated_at: string
+}
+
+// PMS: behavioural competency breakdown stored as JSON
+export interface BehaviourCompetencies {
+  collaboration?: number // 0-100
+  accountability?: number
+  communication?: number
+  teamwork?: number
+  loyalty?: number
+  professional_conduct?: number
+}
+
+export interface PerformanceReview {
+  id: string
+  user_id: string
+  review_cycle_id: string
+  reviewer_id: string
+  review_date: string
+  overall_rating?: number | null // legacy 1-5 stars (kept for backward compat)
+  status: string // draft, in_progress, completed, approved
+  self_review_completed: boolean
+  manager_review_completed: boolean
+  employee_comments?: string | null
+  manager_comments?: string | null
+  goals_achieved: number
+  goals_total: number
+  strengths?: string | null
+  areas_for_improvement?: string | null
+  // PMS 4-component scoring
+  kpi_score?: number | null // 0-100, weight 70%
+  cbt_score?: number | null // 0-100, weight 10%
+  attendance_score?: number | null // 0-100, weight 10%
+  behaviour_score?: number | null // 0-100, weight 10%
+  final_score?: number | null // auto-computed weighted total
+  behaviour_competencies?: BehaviourCompetencies | null
   created_at: string
   updated_at: string
 }

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { NOTIFICATION_KEYS, isNotificationKey } from "@/lib/notifications/delivery-policy"
 import { writeAuditLog } from "@/lib/audit/write-audit"
@@ -8,6 +9,25 @@ type ModulePreferencePayload = {
   in_app_enabled?: boolean | null
   email_enabled?: boolean | null
 }
+
+const NotificationModuleSchema = z.object({
+  notification_key: z.string(),
+  in_app_enabled: z.boolean().nullable().optional(),
+  email_enabled: z.boolean().nullable().optional(),
+})
+
+const UpdateNotificationPreferencesSchema = z.object({
+  global: z
+    .object({
+      in_app_enabled: z.boolean().optional(),
+      email_enabled: z.boolean().optional(),
+      email_frequency: z.enum(["immediate", "hourly", "daily", "weekly", "never"]).optional(),
+      quiet_hours_start: z.string().nullable().optional(),
+      quiet_hours_end: z.string().nullable().optional(),
+    })
+    .optional(),
+  modules: z.array(NotificationModuleSchema).optional().default([]),
+})
 
 export async function GET() {
   try {
@@ -125,17 +145,13 @@ export async function PUT(request: NextRequest) {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const body = await request.json()
-    const globalPrefs = body?.global as
-      | {
-          in_app_enabled?: boolean
-          email_enabled?: boolean
-          email_frequency?: "immediate" | "hourly" | "daily" | "weekly" | "never"
-          quiet_hours_start?: string | null
-          quiet_hours_end?: string | null
-        }
-      | undefined
+    const parsed = UpdateNotificationPreferencesSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid request body" }, { status: 400 })
+    }
 
-    const modules = Array.isArray(body?.modules) ? (body.modules as ModulePreferencePayload[]) : []
+    const globalPrefs = parsed.data.global
+    const modules = parsed.data.modules as ModulePreferencePayload[]
 
     if (globalPrefs) {
       const payload: Record<string, unknown> = {

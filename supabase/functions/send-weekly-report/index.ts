@@ -1,8 +1,9 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0"
-import { Resend } from "npm:resend@2.0.0"
-import { PDFDocument, PDFFont, PDFPage, rgb, StandardFonts, type RGB } from "npm:pdf-lib@1.17.1"
+import { PDFDocument, PDFFont, PDFPage, rgb, StandardFonts } from "npm:pdf-lib@1.17.1"
 import { writeEdgeAuditLog } from "../_shared/audit.ts"
+import { sendEmail } from "../_shared/email.ts"
+import { compareDepartments, normalizeDepartmentName } from "../../../shared/departments.ts"
 import {
   buildMeetingDocumentFileName,
   formatMeetingDateLabel,
@@ -11,7 +12,6 @@ import {
 } from "../_shared/meeting-date.ts"
 import { isEdgeSystemEmailEnabled } from "../_shared/notification-gateway.ts"
 
-const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")!
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
 
@@ -27,28 +27,15 @@ const SLATE = rgb(0.2, 0.255, 0.333)
 const MUTED = rgb(0.392, 0.455, 0.545)
 const BLUE = rgb(0.114, 0.416, 0.588)
 const RED = rgb(0.725, 0.11, 0.11)
-const LIGHT = rgb(0.976, 0.984, 0.992)
-const RESEND_MAX_REQ_PER_SEC = 2
-const SEND_INTERVAL_MS = Math.ceil(1000 / RESEND_MAX_REQ_PER_SEC) + 100 // ~0.6s with safety margin
-const MAX_429_RETRIES = 5
-const DEFAULT_SENDER = "ACOB Internal Systems <notifications@acoblighting.com>"
+const DEFAULT_SENDER_EMAIL = Deno.env.get("NOTIFICATION_SENDER_EMAIL") || "notifications@acoblighting.com"
+const DEFAULT_SENDER = `ACOB Internal Systems <${DEFAULT_SENDER_EMAIL}>`
 const MEETING_DOCS_BUCKET = "meeting_documents"
+const OFFICE_WEEK_ANCHOR_MONTH_INDEX = 0
+const OFFICE_WEEK_ANCHOR_DAY = 12
 
 type AttachmentPayload = {
   filename: string
   content: string
-}
-
-type RateLimitErrorLike = {
-  statusCode?: number | string
-  status?: number | string
-  name?: string
-  message?: string
-}
-
-type SendEmailResponse = {
-  data?: { id?: string | null } | null
-  error?: { message?: string | null } | null
 }
 
 type WeeklyReportRow = {
@@ -62,37 +49,64 @@ type WeeklyReportRow = {
   status: string | null
 }
 
-type ActionItemRow = {
+type MeetingDocumentRow = {
   id: string
-  title: string | null
-  department: string
-  status: string
-  week_number: number
-  year: number
+  meeting_week: number
+  meeting_year: number
+  document_type: string
+  department: string | null
+  presenter_id: string | null
+  file_path: string | null
+  file_name: string | null
+  mime_type: string | null
+}
+
+function getOfficeYearStart(year: number): Date {
+  return new Date(year, OFFICE_WEEK_ANCHOR_MONTH_INDEX, OFFICE_WEEK_ANCHOR_DAY)
+}
+
+function getWeeksInOfficeYear(year: number): number {
+  const start = getOfficeYearStart(year)
+  const nextStart = getOfficeYearStart(year + 1)
+  const diffMs = nextStart.getTime() - start.getTime()
+  return Math.ceil(diffMs / (7 * 24 * 60 * 60 * 1000))
+}
+
+function getNextOfficeWeek(week: number, year: number): { week: number; year: number } {
+  const weeksInYear = getWeeksInOfficeYear(year)
+  if (week < weeksInYear) {
+    return { week: week + 1, year }
+  }
+
+  return { week: 1, year: year + 1 }
 }
 
 type WeeklyReportRequestBody = {
   testEmail?: string
   recipients?: string[]
   weeklyReportBase64?: string
-  actionTrackerBase64?: string
+  actionPointBase64?: string
   meetingWeek?: number
   meetingYear?: number
   forceWeek?: number
   forceYear?: number
   week?: number
   year?: number
-  contentChoice?: "weekly_report" | "action_tracker" | "both"
+  contentChoice?: "weekly_report" | "action_point" | "both"
   skipWeeklyReport?: boolean
-  skipActionTracker?: boolean
+  skipActionPoint?: boolean
   weeklyReportFilename?: string
-  actionTrackerFilename?: string
+  actionPointFilename?: string
   weeklyReportDocumentId?: string
-  actionTrackerDocumentId?: string
+  actionPointDocumentId?: string
   additionalDocumentIds?: unknown[]
-  actionTrackerAttachments?: Array<{ base64: string; filename: string; week: number }>
+  /** Pre-fetched additional attachments (KSS, Minutes, etc.) — bypasses server-side download */
+  additionalDocumentAttachments?: Array<{ base64: string; filename: string }>
+  actionPointAttachments?: Array<{ base64: string; filename: string; week: number }>
   meetingWeeks?: number[]
   preparedByName?: string
+  preparedByDesignation?: string
+  preparedByDepartment?: string
   requestedByUserId?: string
 }
 
@@ -111,16 +125,6 @@ function getErrorMessage(error: unknown): string {
   }
   return "Unknown error"
 }
-
-const DEPT_ORDER = [
-  "Accounts",
-  "Business, Growth and Innovation",
-  "IT and Communications",
-  "Admin & HR",
-  "Legal, Regulatory and Compliance",
-  "Operations",
-  "Technical",
-]
 
 function autoNumber(text: string): string {
   if (!text?.trim()) return ""
@@ -150,6 +154,7 @@ function sanitizeForPdf(text: string, font: PDFFont): string {
   let out = ""
   for (const ch of text) {
     if (ch === "\r") continue
+    if (ch === "\f") continue // Ctrl+L (form feed) — drop
     if (ch === "\n") {
       out += "\n"
       continue
@@ -177,45 +182,19 @@ function escapeHtml(input: string): string {
     .replace(/'/g, "&#39;")
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms))
+function encodeBytesToBase64(bytes: Uint8Array): string {
+  const CHUNK = 8192
+  let binary = ""
+
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode(...bytes.subarray(i, Math.min(i + CHUNK, bytes.length)))
+  }
+
+  return btoa(binary)
 }
 
 function withSubjectPrefix(moduleName: string, subject: string): string {
   return String(subject || "").trim() || "Notification"
-}
-
-function isRateLimitError(error: RateLimitErrorLike | null | undefined): boolean {
-  if (!error) return false
-  const statusCode = Number(error?.statusCode || error?.status || 0)
-  const name = String(error?.name || "").toLowerCase()
-  const msg = String(error?.message || "").toLowerCase()
-  return statusCode === 429 || name.includes("rate_limit") || msg.includes("too many requests")
-}
-
-async function sendWithRetry(
-  resend: Resend,
-  payload: {
-    from: string
-    to: string
-    subject: string
-    html: string
-    attachments: AttachmentPayload[]
-  }
-): Promise<SendEmailResponse> {
-  let attempt = 0
-  while (attempt <= MAX_429_RETRIES) {
-    const { data, error } = await resend.emails.send(payload)
-    if (!error) return { data }
-    if (!isRateLimitError(error) || attempt === MAX_429_RETRIES) return { error }
-    const backoffMs = 1000 * (attempt + 1)
-    console.warn(
-      `[weekly-report] Rate limit for ${payload.to}. Retry ${attempt + 1}/${MAX_429_RETRIES} in ${backoffMs}ms`
-    )
-    await sleep(backoffMs)
-    attempt += 1
-  }
-  return { error: { message: "Unexpected retry flow termination" } }
 }
 
 const STORAGE_BASE = "https://itqegqxeqkeogwrvlzlj.supabase.co/storage/v1/object/public/assets/logos"
@@ -234,35 +213,69 @@ async function resolveStoredMeetingDocument(
   supabase: ReturnType<typeof createClient>,
   documentId: string
 ): Promise<{ base64: string; filename: string } | null> {
+  const attachments = await resolveStoredMeetingDocuments(supabase, [documentId])
+  return attachments.get(documentId) || null
+}
+
+async function resolveStoredMeetingDocuments(
+  supabase: ReturnType<typeof createClient>,
+  documentIds: string[]
+): Promise<Map<string, { base64: string; filename: string }>> {
+  const uniqueDocumentIds = Array.from(new Set(documentIds.filter(Boolean)))
+  const attachments = new Map<string, { base64: string; filename: string }>()
+
+  if (uniqueDocumentIds.length === 0) return attachments
+
   // Note: no .eq("is_current", true) filter here — we look up by specific ID so
   // is_current is irrelevant. Filtering by it caused non-current KSS docs to silently fail.
-  const { data: doc, error } = await supabase
+  const { data: docs, error } = await supabase
     .from("meeting_week_documents")
     .select("id, meeting_week, meeting_year, document_type, department, presenter_id, file_path, file_name, mime_type")
-    .eq("id", documentId)
-    .single()
+    .in("id", uniqueDocumentIds)
 
-  if (error || !doc?.file_path) return null
+  if (error || !docs?.length) return attachments
 
-  let presenterName: string | null = null
-  if (doc.document_type === "knowledge_sharing_session" && doc.presenter_id) {
-    const { data: presenter } = await supabase.from("profiles").select("full_name").eq("id", doc.presenter_id).single()
-    presenterName = presenter?.full_name || null
+  const docRows = (docs || []).filter((doc): doc is MeetingDocumentRow => Boolean(doc?.id && doc?.file_path))
+  const presenterIds = Array.from(
+    new Set(
+      docRows
+        .filter((doc) => doc.document_type === "knowledge_sharing_session" && doc.presenter_id)
+        .map((doc) => doc.presenter_id as string)
+    )
+  )
+  const presenterMap = new Map<string, string>()
+
+  if (presenterIds.length > 0) {
+    const { data: presenters } = await supabase.from("profiles").select("id, full_name").in("id", presenterIds)
+
+    for (const presenter of presenters || []) {
+      if (presenter?.id && presenter?.full_name) {
+        presenterMap.set(presenter.id, presenter.full_name)
+      }
+    }
   }
 
-  const meetingDate = await resolveEffectiveMeetingDateIso(supabase, doc.meeting_week, doc.meeting_year)
+  for (const doc of docRows) {
+    const presenterName =
+      doc.document_type === "knowledge_sharing_session" && doc.presenter_id
+        ? presenterMap.get(doc.presenter_id) || null
+        : null
 
-  const { data: blob, error: downloadError } = await supabase.storage.from(MEETING_DOCS_BUCKET).download(doc.file_path)
-  if (downloadError || !blob) return null
+    const meetingDate = await resolveEffectiveMeetingDateIso(supabase, doc.meeting_week, doc.meeting_year)
 
-  const bytes = new Uint8Array(await blob.arrayBuffer())
-  let binary = ""
-  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
+    const { data: blob, error: downloadError } = await supabase.storage
+      .from(MEETING_DOCS_BUCKET)
+      .download(doc.file_path)
+    if (downloadError || !blob) continue
 
-  return {
-    base64: btoa(binary),
-    filename: buildAttachmentFilename(doc, meetingDate, presenterName),
+    const bytes = new Uint8Array(await blob.arrayBuffer())
+    attachments.set(doc.id, {
+      base64: encodeBytesToBase64(bytes),
+      filename: buildAttachmentFilename(doc, meetingDate, presenterName),
+    })
   }
+
+  return attachments
 }
 
 function extensionFromDocument(fileName: string | null | undefined, mimeType: string | null | undefined): string {
@@ -313,8 +326,8 @@ function buildWeeklyReportAttachmentName(meetingDateLabel: string, meetingWeek: 
   return `ACOB Weekly Reports - ${meetingDateLabel} - W${meetingWeek}.pdf`
 }
 
-function buildActionTrackerAttachmentName(meetingDateLabel: string, meetingWeek: number): string {
-  return `ACOB Action Tracker - ${meetingDateLabel} - W${meetingWeek}.pdf`
+function buildActionPointAttachmentName(meetingDateLabel: string, meetingWeek: number): string {
+  return `ACOB Action Points - ${meetingDateLabel} - W${meetingWeek}.pdf`
 }
 
 async function drawLogoInHeader(
@@ -603,118 +616,6 @@ async function addWeeklyReportContentPage(
   page.drawText(pn, { x: W / 2 - pnW / 2, y: 14, size: 9, font: bold, color: WHITE })
 }
 
-async function addActionTrackerPage(
-  doc: PDFDocument,
-  bold: PDFFont,
-  regular: PDFFont,
-  department: string,
-  actions: ActionItemRow[],
-  week: number,
-  year: number,
-  headerLogoBytes: Uint8Array | null,
-  pageNumber: number
-) {
-  const page = doc.addPage([595, 842])
-  const { width: W, height: H } = page.getSize()
-  const footerH = 40
-  const headerH = 52
-
-  page.drawRectangle({ x: 0, y: H - headerH, width: W, height: headerH, color: DARK })
-  page.drawRectangle({ x: 0, y: H - headerH - 4, width: W, height: 4, color: GREEN })
-  page.drawText(sanitizeForPdf(department.toUpperCase(), bold), { x: 22, y: H - 32, size: 9, font: bold, color: WHITE })
-  await drawLogoInHeader(doc, page, headerLogoBytes, headerH, H, W)
-
-  const badgeW = 85,
-    badgeH = 20
-  page.drawRectangle({
-    x: W - 20 - badgeW,
-    y: H - headerH - 4 - badgeH - 8,
-    width: badgeW,
-    height: badgeH,
-    color: GREEN,
-  })
-  page.drawText(`Week ${week}, ${year}`, {
-    x: W - 20 - badgeW / 2 - 22,
-    y: H - headerH - 4 - badgeH - 8 + 6,
-    size: 8,
-    font: bold,
-    color: WHITE,
-  })
-
-  page.drawText("ACTION TRACKER", { x: 20, y: H - headerH - 4 - 30, size: 12, font: bold, color: DARK })
-  page.drawRectangle({ x: 20, y: H - headerH - 4 - 36, width: W - 40, height: 1.5, color: GREEN })
-
-  // Column headers: S/N | ACTION ITEM | STATUS
-  const snX = 20
-  const snW = 30
-  const actionX = snX + snW
-  const statusW = 100
-  const statusX = W - 20 - statusW
-  // Add a bit more vertical breathing room between title band and table header
-  const headerY = H - headerH - 58
-  page.drawRectangle({ x: 20, y: headerY - 4, width: W - 40, height: 20, color: GREEN })
-  page.drawText("S/N", { x: snX + 6, y: headerY + 2, size: 8, font: bold, color: WHITE })
-  page.drawText("ACTION ITEM", { x: actionX + 6, y: headerY + 2, size: 8, font: bold, color: WHITE })
-  page.drawText("STATUS", { x: statusX + 6, y: headerY + 2, size: 8, font: bold, color: WHITE })
-
-  const statusColors: Record<string, RGB> = {
-    completed: rgb(0.086, 0.396, 0.204),
-    in_progress: rgb(0.114, 0.306, 0.847),
-    not_started: rgb(0.706, 0.325, 0.035),
-    pending: rgb(0.392, 0.455, 0.545),
-  }
-  const statusLabels: Record<string, string> = {
-    completed: "Completed",
-    in_progress: "In Progress",
-    not_started: "Not Started",
-    pending: "Pending",
-  }
-
-  let rowTop = headerY - 20
-  const minRowH = 20
-  const lineH = 8
-  const maxTitleLines = 3
-
-  for (let i = 0; i < actions.length; i++) {
-    const action = actions[i]
-    const titleLinesRaw = wrapText(sanitizeForPdf(action.title || "", regular), 60)
-    const titleLines = titleLinesRaw.slice(0, maxTitleLines)
-    if (titleLinesRaw.length > maxTitleLines && titleLines.length > 0) {
-      titleLines[titleLines.length - 1] = `${titleLines[titleLines.length - 1]}...`
-    }
-    const rowH = Math.max(minRowH, titleLines.length * lineH + 8)
-    const rowBottom = rowTop - rowH
-    if (rowBottom < footerH + 10) break
-
-    if (i % 2 === 0) {
-      page.drawRectangle({ x: 20, y: rowBottom, width: W - 40, height: rowH, color: LIGHT })
-    }
-    page.drawText(`${i + 1}`, { x: snX + 10, y: rowBottom + rowH - 12, size: 8, font: bold, color: SLATE })
-    titleLines.forEach((line, lineIdx) => {
-      page.drawText(line, {
-        x: actionX + 6,
-        y: rowBottom + rowH - 12 - lineIdx * lineH,
-        size: 8,
-        font: regular,
-        color: SLATE,
-      })
-    })
-    const sc = statusColors[action.status] || statusColors.pending
-    const sl = statusLabels[action.status] || action.status
-    const badgeY = rowBottom + (rowH - 14) / 2
-    page.drawRectangle({ x: statusX + 4, y: badgeY, width: statusW - 8, height: 14, color: sc })
-    page.drawText(sl, { x: statusX + 8, y: badgeY + 5, size: 7, font: bold, color: WHITE })
-    page.drawRectangle({ x: 20, y: rowBottom, width: W - 40, height: 0.5, color: rgb(0.886, 0.906, 0.941) })
-    rowTop = rowBottom
-  }
-
-  page.drawRectangle({ x: 0, y: 0, width: W, height: footerH, color: GREEN })
-  page.drawText("Confidential \u2014 ACOB Internal Use Only", { x: 20, y: 14, size: 8, font: regular, color: WHITE })
-  const pn = String(pageNumber)
-  const pnW = bold.widthOfTextAtSize(pn, 9)
-  page.drawText(pn, { x: W / 2 - pnW / 2, y: 14, size: 9, font: bold, color: WHITE })
-}
-
 async function buildWeeklyReportPDF(
   reports: WeeklyReportRow[],
   meetingWeek: number,
@@ -727,14 +628,9 @@ async function buildWeeklyReportPDF(
   const bold = await doc.embedFont(StandardFonts.HelveticaBold)
   const regular = await doc.embedFont(StandardFonts.Helvetica)
 
-  const sorted = [...reports].sort((a, b) => {
-    const ia = DEPT_ORDER.indexOf(a.department)
-    const ib = DEPT_ORDER.indexOf(b.department)
-    if (ia !== -1 && ib !== -1) return ia - ib
-    if (ia !== -1) return -1
-    if (ib !== -1) return 1
-    return a.department.localeCompare(b.department)
-  })
+  const sorted = [...reports]
+    .map((report) => ({ ...report, department: normalizeDepartmentName(report.department) }))
+    .sort((a, b) => compareDepartments(a.department, b.department))
 
   await addCoverPage(
     doc,
@@ -763,51 +659,9 @@ async function buildWeeklyReportPDF(
   return doc.save()
 }
 
-async function buildActionTrackerPdf(
-  actions: ActionItemRow[],
-  meetingWeek: number,
-  meetingYear: number,
-  _meetingDateLabel: string,
-  _coverLogoBytes: Uint8Array | null,
-  headerLogoBytes: Uint8Array | null
-): Promise<Uint8Array> {
-  const doc = await PDFDocument.create()
-  const bold = await doc.embedFont(StandardFonts.HelveticaBold)
-  const regular = await doc.embedFont(StandardFonts.Helvetica)
-
-  const grouped: Record<string, ActionItemRow[]> = {}
-  for (const a of actions) {
-    if (!grouped[a.department]) grouped[a.department] = []
-    grouped[a.department].push(a)
-  }
-
-  const depts = DEPT_ORDER.filter((d) => grouped[d])
-  for (const d of Object.keys(grouped)) {
-    if (!depts.includes(d)) depts.push(d)
-  }
-
-  await addTOCPage(doc, bold, regular, `Action Tracker — Week ${meetingWeek}, ${meetingYear}`, depts, headerLogoBytes)
-
-  for (let i = 0; i < depts.length; i++) {
-    await addActionTrackerPage(
-      doc,
-      bold,
-      regular,
-      depts[i],
-      grouped[depts[i]],
-      meetingWeek,
-      meetingYear,
-      headerLogoBytes,
-      i + 3
-    )
-  }
-
-  return doc.save()
-}
-
 type EmailContentContext = {
   includeWeeklyReport: boolean
-  includeActionTracker: boolean
+  includeActionPoint: boolean
   includeKss: boolean
   includeMinutes: boolean
   weekLabels: string[] // e.g. ["Week 3", "Week 4"]
@@ -827,7 +681,7 @@ function oxfordWeekList(weekLabels: string[]): string {
 function buildEmailSubject(ctx: EmailContentContext): string {
   const parts: string[] = []
   if (ctx.includeMinutes) parts.push("Minutes of Meeting")
-  if (ctx.includeActionTracker) parts.push("Action Tracker")
+  if (ctx.includeActionPoint) parts.push("Action Points")
   if (ctx.includeWeeklyReport) parts.push(ctx.weekLabels.length > 1 ? "Weekly Reports" : "Weekly Report")
   if (ctx.includeKss) parts.push(ctx.weekLabels.length > 1 ? "Knowledge Sharing Sessions" : "Knowledge Sharing Session")
 
@@ -839,7 +693,7 @@ function buildEmailSubject(ctx: EmailContentContext): string {
 function buildEmailTitle(ctx: EmailContentContext): string {
   const parts: string[] = []
   if (ctx.includeMinutes) parts.push("Minutes of Meeting")
-  if (ctx.includeActionTracker) parts.push("Action Tracker")
+  if (ctx.includeActionPoint) parts.push("Action Points")
   if (ctx.includeWeeklyReport) parts.push(ctx.weekLabels.length > 1 ? "Weekly Reports" : "Weekly Report")
   if (ctx.includeKss) parts.push(ctx.weekLabels.length > 1 ? "Knowledge Sharing Sessions" : "Knowledge Sharing Session")
   if (parts.length === 0) return "General Meeting Documents"
@@ -855,7 +709,7 @@ function buildEmailBody(meetingDate: string, nextMeetingDate: string, ctx: Email
   // Build the attached-content phrase
   const attachedParts: string[] = []
   if (ctx.includeMinutes) attachedParts.push(isMultiWeek ? "the Minutes of Meeting" : "the Minutes of Meeting")
-  if (ctx.includeActionTracker) attachedParts.push("the Action Tracker")
+  if (ctx.includeActionPoint) attachedParts.push("the Action Points")
   if (ctx.includeWeeklyReport) attachedParts.push(isMultiWeek ? "the Weekly Reports" : "the Weekly Report")
   if (ctx.includeKss)
     attachedParts.push(
@@ -879,7 +733,7 @@ function buildEmailBody(meetingDate: string, nextMeetingDate: string, ctx: Email
     lines.push(`Please find attached ${attachedPhrase} for ${weekPhrase}.`)
   } else {
     // Single week
-    if (ctx.includeMinutes || ctx.includeActionTracker) {
+    if (ctx.includeMinutes || ctx.includeActionPoint) {
       // Classic formal send — include meeting date
       lines.push(
         `Please find attached ${attachedPhrase} for ${weekPhrase} of the General Meeting held on <strong>${meetingDate}</strong>.`
@@ -902,9 +756,13 @@ function buildEmailHtml(
   meetingDate: string,
   nextMeetingDate: string,
   preparedByName: string,
+  preparedByDesignation: string | null | undefined,
+  preparedByDepartment: string | null | undefined,
   ctx: EmailContentContext
 ): string {
   const safePreparedBy = escapeHtml((preparedByName || "").trim() || "Terna")
+  const safeDesignation = escapeHtml((preparedByDesignation || "").trim())
+  const safeDepartment = escapeHtml((preparedByDepartment || "").trim() || "Admin & HR Department")
   const title = buildEmailTitle(ctx)
   const weekBadge =
     ctx.weekLabels.length <= 3
@@ -945,10 +803,10 @@ function buildEmailHtml(
 ${bodyHtml}
   </div>
   <div class="footer" style="background-color:#0f2d1f;">
-    <strong>ACOB Lighting Technology Limited</strong><br>
     <span style="color:#d1d5db;">Prepared by ${safePreparedBy}</span><br>
-    Admin &amp; HR Department<br>
-    <span class="footer-system">Reports &amp; Meeting Management System</span>
+    ${safeDesignation ? `${safeDesignation}<br>` : ""}${safeDepartment}<br>
+    <strong>ACOB Lighting Technology Limited</strong><br>
+    <span class="footer-system">Reports Management System</span>
     <br><br>
     <i class="footer-note">This is an automated system notification. Please do not reply directly to this email.</i>
   </div>
@@ -966,7 +824,6 @@ serve(async (req) => {
     if (!authHeader) return new Response("Unauthorized", { status: 401 })
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
-    const resend = new Resend(RESEND_API_KEY)
     const reportsMailEnabled = await isEdgeSystemEmailEnabled(supabase, "reports")
     if (!reportsMailEnabled) {
       return new Response(JSON.stringify({ success: true, skipped: true, reason: "reports_email_disabled" }), {
@@ -985,8 +842,8 @@ serve(async (req) => {
       testEmail,
       recipients: bodyRecipients,
       weeklyReportBase64,
-      actionTrackerBase64,
-      actionTrackerAttachments: bodyActionTrackerAttachments,
+      actionPointBase64,
+      actionPointAttachments: bodyActionPointAttachments,
       // NEW: meetingWeek is the week of the meeting (what shows on cover page)
       meetingWeek: bodyMeetingWeek,
       meetingYear: bodyMeetingYear,
@@ -998,13 +855,16 @@ serve(async (req) => {
       year: bodyYear,
       contentChoice,
       skipWeeklyReport: bodySkipWeeklyReport,
-      skipActionTracker: bodySkipActionTracker,
+      skipActionPoint: bodySkipActionPoint,
       weeklyReportFilename,
-      actionTrackerFilename,
+      actionPointFilename,
       weeklyReportDocumentId,
-      actionTrackerDocumentId,
+      actionPointDocumentId,
       additionalDocumentIds,
+      additionalDocumentAttachments: bodyAdditionalDocumentAttachments,
       preparedByName,
+      preparedByDesignation,
+      preparedByDepartment,
       requestedByUserId,
     } = body
 
@@ -1033,9 +893,9 @@ serve(async (req) => {
 
     const meetingDateIso = await resolveEffectiveMeetingDateIso(supabase, meetingWeek, meetingYear)
     const meetingDateLabel = formatMeetingDateLabel(meetingDateIso)
-    const nextMeetingDate = new Date(`${meetingDateIso}T00:00:00Z`)
-    nextMeetingDate.setUTCDate(nextMeetingDate.getUTCDate() + 7)
-    const nextMeetingDateLabel = formatMeetingDateLabel(nextMeetingDate)
+    const nextOfficeWeek = getNextOfficeWeek(meetingWeek, meetingYear)
+    const nextMeetingDateIso = await resolveEffectiveMeetingDateIso(supabase, nextOfficeWeek.week, nextOfficeWeek.year)
+    const nextMeetingDateLabel = formatMeetingDateLabel(nextMeetingDateIso)
 
     // ── Data weeks ──────────────────────────────────────────────────────
     // Everything uses the same meeting week — no previous-week offset
@@ -1049,20 +909,28 @@ serve(async (req) => {
     )
 
     let includeWeeklyReport = !bodySkipWeeklyReport
-    let includeActionTracker = !bodySkipActionTracker
+    let includeActionPoint = !bodySkipActionPoint
 
-    if (contentChoice === "weekly_report") includeActionTracker = false
-    if (contentChoice === "action_tracker") includeWeeklyReport = false
+    if (contentChoice === "weekly_report") includeActionPoint = false
+    if (contentChoice === "action_point") includeWeeklyReport = false
 
     // If caller provides a specific attachment, include it by default.
     if (weeklyReportBase64) includeWeeklyReport = true
-    if (actionTrackerBase64) includeActionTracker = true
+    if (actionPointBase64) includeActionPoint = true
 
     const requestedAdditionalDocumentIds = Array.isArray(additionalDocumentIds)
       ? additionalDocumentIds.map((id: unknown) => String(id)).filter(Boolean)
       : []
 
-    if (!includeWeeklyReport && !includeActionTracker && requestedAdditionalDocumentIds.length === 0) {
+    const hasPrefetchedAttachments =
+      Array.isArray(bodyAdditionalDocumentAttachments) && bodyAdditionalDocumentAttachments.length > 0
+
+    if (
+      !includeWeeklyReport &&
+      !includeActionPoint &&
+      requestedAdditionalDocumentIds.length === 0 &&
+      !hasPrefetchedAttachments
+    ) {
       throw new Error("No attachments selected")
     }
 
@@ -1074,13 +942,13 @@ serve(async (req) => {
       reportPdfBase64 = weeklyReportBase64
     }
 
-    if (actionTrackerBase64) {
-      console.log("[weekly-report] Using client-provided action tracker PDF")
-      trackerPdfBase64 = actionTrackerBase64
+    if (actionPointBase64) {
+      console.log("[weekly-report] Using client-provided action point PDF")
+      trackerPdfBase64 = actionPointBase64
     }
 
     let resolvedWeeklyReportFilename = weeklyReportFilename
-    let resolvedActionTrackerFilename = actionTrackerFilename
+    let resolvedActionPointFilename = actionPointFilename
 
     if (!reportPdfBase64 && weeklyReportDocumentId) {
       const stored = await resolveStoredMeetingDocument(supabase, String(weeklyReportDocumentId))
@@ -1092,23 +960,32 @@ serve(async (req) => {
       }
     }
 
-    if (!trackerPdfBase64 && actionTrackerDocumentId) {
-      const stored = await resolveStoredMeetingDocument(supabase, String(actionTrackerDocumentId))
+    if (!trackerPdfBase64 && actionPointDocumentId) {
+      const stored = await resolveStoredMeetingDocument(supabase, String(actionPointDocumentId))
       if (stored) {
         trackerPdfBase64 = stored.base64
-        resolvedActionTrackerFilename = resolvedActionTrackerFilename || stored.filename
-        includeActionTracker = true
-        console.log("[weekly-report] Using stored action tracker document", actionTrackerDocumentId)
+        resolvedActionPointFilename = resolvedActionPointFilename || stored.filename
+        includeActionPoint = true
+        console.log("[weekly-report] Using stored action point document", actionPointDocumentId)
       }
     }
 
     const additionalAttachments: AttachmentPayload[] = []
-    if (requestedAdditionalDocumentIds.length > 0) {
-      const seenIds = new Set<string>()
-      for (const docId of requestedAdditionalDocumentIds) {
-        if (seenIds.has(docId)) continue
-        seenIds.add(docId)
-        const stored = await resolveStoredMeetingDocument(supabase, docId)
+
+    // Use client-pre-fetched attachments when available (avoids CPU-heavy
+    // server-side download + base64 conversion for large KSS/Minutes files).
+    if (Array.isArray(bodyAdditionalDocumentAttachments) && bodyAdditionalDocumentAttachments.length > 0) {
+      for (const att of bodyAdditionalDocumentAttachments) {
+        if (att?.base64 && att?.filename) {
+          additionalAttachments.push({ filename: att.filename, content: att.base64 })
+        }
+      }
+    } else if (requestedAdditionalDocumentIds.length > 0) {
+      // Fallback: download server-side (legacy path, used if signed_url was unavailable)
+      const uniqueDocumentIds = Array.from(new Set(requestedAdditionalDocumentIds))
+      const storedAttachments = await resolveStoredMeetingDocuments(supabase, uniqueDocumentIds)
+      for (const docId of uniqueDocumentIds) {
+        const stored = storedAttachments.get(docId)
         if (stored) {
           additionalAttachments.push({
             filename: stored.filename || `meeting-document-${docId}.pdf`,
@@ -1118,8 +995,17 @@ serve(async (req) => {
       }
     }
 
-    if ((includeWeeklyReport && !reportPdfBase64) || (includeActionTracker && !trackerPdfBase64)) {
-      console.log("[weekly-report] Generating PDFs server-side")
+    const hasPrefetchedActionPointAttachments =
+      Array.isArray(bodyActionPointAttachments) && bodyActionPointAttachments.length > 0
+
+    if (includeActionPoint && !trackerPdfBase64 && !hasPrefetchedActionPointAttachments) {
+      throw new Error(
+        "Action Points PDF must be pre-generated by the app export route or provided as a stored meeting document"
+      )
+    }
+
+    if (includeWeeklyReport && !reportPdfBase64) {
+      console.log("[weekly-report] Generating weekly report PDF server-side")
 
       // Fetch reports from the PREVIOUS week (work done data)
       const { data: reports, error: reportsError } = await supabase
@@ -1139,15 +1025,6 @@ serve(async (req) => {
         )
       }
 
-      // Fetch action items for the meeting week
-      const { data: actions, error: actionsError } = await supabase
-        .from("action_items")
-        .select("id, title, department, status, week_number, year")
-        .eq("week_number", atWeek)
-        .eq("year", atYear)
-
-      if (actionsError) throw actionsError
-
       // Fetch BOTH logos: light for cover page, dark for headers
       const [coverLogoBytes, headerLogoBytes] = await Promise.all([
         fetchLogoBytes(`${STORAGE_BASE}/acob-logo-light.png`),
@@ -1155,40 +1032,18 @@ serve(async (req) => {
       ])
 
       const reportRows = (reports || []) as WeeklyReportRow[]
-      const actionRows = (actions || []) as ActionItemRow[]
+      console.log(`[weekly-report] Generating weekly report PDF: ${reportRows.length} reports`)
 
-      console.log(`[weekly-report] Generating PDFs: ${reportRows.length} reports, ${actionRows.length} actions`)
-      const [reportPdfBytes, trackerPdfBytes] = await Promise.all([
-        includeWeeklyReport && !reportPdfBase64
-          ? buildWeeklyReportPDF(
-              reportRows,
-              meetingWeek,
-              meetingYear,
-              meetingDateLabel,
-              coverLogoBytes,
-              headerLogoBytes
-            )
-          : Promise.resolve<Uint8Array | null>(null),
-        includeActionTracker && !trackerPdfBase64
-          ? buildActionTrackerPdf(
-              actionRows,
-              meetingWeek,
-              meetingYear,
-              meetingDateLabel,
-              coverLogoBytes,
-              headerLogoBytes
-            )
-          : Promise.resolve<Uint8Array | null>(null),
-      ])
+      const reportPdfBytes = await buildWeeklyReportPDF(
+        reportRows,
+        meetingWeek,
+        meetingYear,
+        meetingDateLabel,
+        coverLogoBytes,
+        headerLogoBytes
+      )
 
-      const toBase64 = (bytes: Uint8Array): string => {
-        let binary = ""
-        for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
-        return btoa(binary)
-      }
-
-      if (reportPdfBytes) reportPdfBase64 = toBase64(reportPdfBytes)
-      if (trackerPdfBytes) trackerPdfBase64 = toBase64(trackerPdfBytes)
+      reportPdfBase64 = encodeBytesToBase64(reportPdfBytes)
     }
 
     const recipients =
@@ -1206,16 +1061,16 @@ serve(async (req) => {
       })
     }
 
-    // Support multi-week action tracker attachments (one per week)
-    if (Array.isArray(bodyActionTrackerAttachments) && bodyActionTrackerAttachments.length > 0) {
-      for (const att of bodyActionTrackerAttachments) {
+    // Support multi-week action point attachments (one per week)
+    if (Array.isArray(bodyActionPointAttachments) && bodyActionPointAttachments.length > 0) {
+      for (const att of bodyActionPointAttachments) {
         if (att?.base64 && att?.filename) {
           attachments.push({ filename: att.filename, content: att.base64 })
         }
       }
-    } else if (includeActionTracker && trackerPdfBase64) {
+    } else if (includeActionPoint && trackerPdfBase64) {
       attachments.push({
-        filename: resolvedActionTrackerFilename || buildActionTrackerAttachmentName(meetingDateLabel, meetingWeek),
+        filename: resolvedActionPointFilename || buildActionPointAttachmentName(meetingDateLabel, meetingWeek),
         content: trackerPdfBase64,
       })
     }
@@ -1235,9 +1090,8 @@ serve(async (req) => {
 
     const emailCtx: EmailContentContext = {
       includeWeeklyReport,
-      includeActionTracker:
-        includeActionTracker ||
-        (Array.isArray(bodyActionTrackerAttachments) && bodyActionTrackerAttachments.length > 0),
+      includeActionPoint:
+        includeActionPoint || (Array.isArray(bodyActionPointAttachments) && bodyActionPointAttachments.length > 0),
       includeKss: hasKss,
       includeMinutes: hasMinutes,
       weekLabels,
@@ -1249,26 +1103,27 @@ serve(async (req) => {
       meetingDateLabel,
       nextMeetingDateLabel,
       preparedByName || "Terna",
+      preparedByDesignation || null,
+      preparedByDepartment || "Admin & HR Department",
       emailCtx
     )
 
     const results: DeliveryResult[] = []
     for (const to of recipients) {
-      const { data, error } = await sendWithRetry(resend, {
-        from: DEFAULT_SENDER,
-        to,
-        subject,
-        html,
-        attachments,
-      })
-      if (error) {
+      try {
+        const data = await sendEmail({
+          from: DEFAULT_SENDER,
+          to,
+          subject,
+          html,
+          attachments,
+        })
+        console.log(`[weekly-report] Sent to ${to}. ID: ${data.id}`)
+        results.push({ to, success: true, emailId: data.id })
+      } catch (error) {
         console.error(`[weekly-report] Failed to send to ${to}:`, JSON.stringify(error))
         results.push({ to, success: false, error })
-      } else {
-        console.log(`[weekly-report] Sent to ${to}. ID: ${data?.id}`)
-        results.push({ to, success: true, emailId: data?.id })
       }
-      await sleep(SEND_INTERVAL_MS)
     }
 
     try {
@@ -1294,7 +1149,11 @@ serve(async (req) => {
           success_count: successCount,
           failure_count: failureCount,
           prepared_by: preparedByName || "Terna",
+          prepared_by_designation: preparedByDesignation || null,
+          prepared_by_department: preparedByDepartment || "Admin & HR Department",
           attachments: attachments.map((a) => a.filename),
+          failed_recipients: results.filter((r) => !r.success).map((r) => r.to),
+          delivery_results: results.map((r) => ({ to: r.to, success: r.success, emailId: r.emailId ?? null })),
         },
       })
     } catch (auditErr) {

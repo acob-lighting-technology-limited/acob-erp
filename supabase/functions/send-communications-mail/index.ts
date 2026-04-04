@@ -1,10 +1,10 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0"
-import { Resend } from "npm:resend@2.0.0"
 import { writeEdgeAuditLog } from "../_shared/audit.ts"
+import { sendEmail } from "../_shared/email.ts"
 import { isEdgeSystemEmailEnabled } from "../_shared/notification-gateway.ts"
+import { sanitizeHtml } from "../_shared/sanitize-html.ts"
 
-const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")!
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
 
@@ -13,22 +13,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 }
 
-const RESEND_MAX_REQ_PER_SEC = 2
-const SEND_INTERVAL_MS = Math.ceil(1000 / RESEND_MAX_REQ_PER_SEC) + 100
-const MAX_429_RETRIES = 5
-const DEFAULT_SENDER = "ACOB Internal Systems <notifications@acoblighting.com>"
-
-type RateLimitErrorLike = {
-  statusCode?: number | string
-  status?: number | string
-  name?: string
-  message?: string
-}
-
-type SendEmailResponse = {
-  data?: { id?: string | null } | null
-  error?: { message?: string | null } | null
-}
+const DEFAULT_SENDER_EMAIL = Deno.env.get("NOTIFICATION_SENDER_EMAIL") || "notifications@acoblighting.com"
 
 type BroadcastRequestBody = {
   recipients?: string[]
@@ -36,7 +21,13 @@ type BroadcastRequestBody = {
   broadcastBodyHtml?: string
   broadcastDepartment?: string
   broadcastPreparedByName?: string
+  broadcastPreparedByDesignation?: string
+  broadcastPreparedByDepartment?: string
   requestedByUserId?: string
+  attachments?: {
+    filename?: string
+    content?: string
+  }[]
 }
 
 type DeliveryResult = {
@@ -44,6 +35,11 @@ type DeliveryResult = {
   success: boolean
   emailId?: string | null
   error?: unknown
+}
+
+type MailAttachment = {
+  filename: string
+  content: string
 }
 
 function getErrorMessage(error: unknown): string {
@@ -55,51 +51,6 @@ function getErrorMessage(error: unknown): string {
   return "Unknown error"
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms))
-}
-
-function isRateLimitError(error: RateLimitErrorLike | null | undefined): boolean {
-  if (!error) return false
-  const statusCode = Number(error?.statusCode || error?.status || 0)
-  const name = String(error?.name || "").toLowerCase()
-  const msg = String(error?.message || "").toLowerCase()
-  return statusCode === 429 || name.includes("rate_limit") || msg.includes("too many requests")
-}
-
-async function sendWithRetry(
-  resend: Resend,
-  from: string,
-  to: string,
-  subject: string,
-  html: string
-): Promise<SendEmailResponse> {
-  let attempt = 0
-  while (attempt <= MAX_429_RETRIES) {
-    const { data, error } = await resend.emails.send({
-      from,
-      to,
-      subject,
-      html,
-    })
-
-    if (!error) return { data }
-
-    if (!isRateLimitError(error) || attempt === MAX_429_RETRIES) {
-      return { error }
-    }
-
-    const backoffMs = 1000 * (attempt + 1)
-    console.warn(
-      `[communications-mail] Rate limit for ${to}. Retry ${attempt + 1}/${MAX_429_RETRIES} in ${backoffMs}ms`
-    )
-    await sleep(backoffMs)
-    attempt += 1
-  }
-
-  return { error: { message: "Unexpected retry flow termination" } }
-}
-
 function escapeHtml(input: string): string {
   return input
     .replace(/&/g, "&amp;")
@@ -109,27 +60,32 @@ function escapeHtml(input: string): string {
     .replace(/'/g, "&#39;")
 }
 
-function sanitizeBroadcastHtml(rawHtml: string): string {
-  if (!rawHtml?.trim()) return ""
-  return rawHtml
-    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, "")
-    .replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, "")
-    .replace(/<(iframe|object|embed|form|input|button|textarea|select)[\s\S]*?>[\s\S]*?<\/\1>/gi, "")
-    .replace(/\son\w+=("|').*?\1/gi, "")
-    .replace(/\son\w+=\S+/gi, "")
-    .replace(/javascript:/gi, "")
-    .trim()
+function normalizeDepartmentLabel(input: string): string {
+  return input.replace(/^ACOB\s+/i, "").trim() || "Admin & HR"
+}
+
+function buildBroadcastSender(department: string): string {
+  const senderDepartment = normalizeDepartmentLabel(department)
+  return `ACOB ${senderDepartment} <${DEFAULT_SENDER_EMAIL}>`
 }
 
 function withSubjectPrefix(moduleName: string, subject: string): string {
   return String(subject || "").trim() || "Notification"
 }
 
-function buildAdminBroadcastHtml(title: string, bodyHtml: string, department: string, preparedByName: string): string {
-  const safeDepartment = escapeHtml(department.trim() || "Admin & HR")
-  const displayDepartment = safeDepartment.replace(/^ACOB\s+/i, "")
+function buildAdminBroadcastHtml(
+  title: string,
+  bodyHtml: string,
+  department: string,
+  preparedByName: string,
+  preparedByDesignation?: string | null,
+  preparedByDepartment?: string | null
+): string {
+  const displayDepartment = normalizeDepartmentLabel(preparedByDepartment || department)
+  const safeDepartment = escapeHtml(displayDepartment)
   const safeTitle = escapeHtml(title)
   const safePreparedBy = escapeHtml(preparedByName.trim() || "ACOB Team")
+  const safeDesignation = escapeHtml((preparedByDesignation || "").trim())
 
   return (
     "<!DOCTYPE html>" +
@@ -165,13 +121,13 @@ function buildAdminBroadcastHtml(title: string, bodyHtml: string, department: st
     "</div>" +
     '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#0f2d1f" style="background:#0f2d1f !important;background-color:#0f2d1f !important;border-top:3px solid #16a34a;">' +
     '<tr><td align="center" style="padding:20px;background:#0f2d1f !important;background-color:#0f2d1f !important;font-size:11px;color:#9ca3af;">' +
-    '<strong style="color:#fff;">ACOB Lighting Technology Limited</strong><br>' +
     '<span style="color:#d1d5db;">Prepared by ' +
     safePreparedBy +
     "</span><br>" +
-    displayDepartment +
-    " Department<br>" +
-    '<span style="color:#16a34a;font-weight:600;">Communications System</span>' +
+    (safeDesignation ? safeDesignation + "<br>" : "") +
+    safeDepartment +
+    "<br>" +
+    '<strong style="color:#fff;">ACOB Lighting Technology Limited</strong>' +
     "<br><br>" +
     '<i style="color:#9ca3af;">This is an automated system notification. Please do not reply directly to this email.</i>' +
     "</td></tr></table>" +
@@ -188,7 +144,6 @@ serve(async (req) => {
     const authHeader = req.headers.get("Authorization")
     if (!authHeader) return new Response("Unauthorized", { status: 401 })
 
-    const resend = new Resend(RESEND_API_KEY)
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
     const communicationsMailEnabled = await isEdgeSystemEmailEnabled(supabase, "communications")
     if (!communicationsMailEnabled) {
@@ -204,13 +159,23 @@ serve(async (req) => {
     const broadcastBodyHtml = body.broadcastBodyHtml as string | undefined
     const broadcastDepartment = body.broadcastDepartment as string | undefined
     const broadcastPreparedByName = body.broadcastPreparedByName as string | undefined
+    const broadcastPreparedByDesignation = body.broadcastPreparedByDesignation as string | undefined
+    const broadcastPreparedByDepartment = body.broadcastPreparedByDepartment as string | undefined
     const requestedByUserId = (body.requestedByUserId as string | undefined) || null
+    const attachments = Array.isArray(body.attachments)
+      ? body.attachments
+          .map((attachment) => ({
+            filename: String(attachment?.filename || "").trim(),
+            content: String(attachment?.content || "").trim(),
+          }))
+          .filter((attachment): attachment is MailAttachment => Boolean(attachment.filename && attachment.content))
+      : []
 
     if (!recipients || recipients.length === 0) {
       return new Response(JSON.stringify({ error: "No recipients" }), { status: 400 })
     }
 
-    const cleanBody = sanitizeBroadcastHtml(broadcastBodyHtml || "")
+    const cleanBody = sanitizeHtml(broadcastBodyHtml || "")
     if (!cleanBody) {
       return new Response(JSON.stringify({ error: "Broadcast body is required" }), { status: 400 })
     }
@@ -221,23 +186,28 @@ serve(async (req) => {
       "Communications",
       (broadcastSubject || "Administrative Notice").trim() || "Administrative Notice"
     )
-    const html = buildAdminBroadcastHtml(subject, cleanBody, department, preparedBy)
-    const from = DEFAULT_SENDER
+    const html = buildAdminBroadcastHtml(
+      subject,
+      cleanBody,
+      department,
+      preparedBy,
+      broadcastPreparedByDesignation,
+      broadcastPreparedByDepartment
+    )
+    const from = buildBroadcastSender(department)
 
     console.log("[communications-mail] Sending admin_broadcast to " + recipients.length + " recipients")
 
     const results: DeliveryResult[] = []
     for (const to of recipients) {
-      const { data, error } = await sendWithRetry(resend, from, to, subject, html)
-      if (error) {
+      try {
+        const data = await sendEmail({ from, to, subject, html, attachments })
+        console.log("[communications-mail] Sent to " + to + ". ID: " + data.id)
+        results.push({ to, success: true, emailId: data.id })
+      } catch (error) {
         console.error("[communications-mail] Failed to send to " + to + ":", JSON.stringify(error))
         results.push({ to, success: false, error })
-      } else {
-        console.log("[communications-mail] Sent to " + to + ". ID: " + data?.id)
-        results.push({ to, success: true, emailId: data?.id })
       }
-
-      await sleep(SEND_INTERVAL_MS)
     }
 
     try {
@@ -259,6 +229,9 @@ serve(async (req) => {
           failure_count: failureCount,
           subject,
           prepared_by: preparedBy,
+          prepared_by_designation: broadcastPreparedByDesignation || null,
+          prepared_by_department: broadcastPreparedByDepartment || department,
+          attachment_count: attachments.length,
         },
       })
     } catch (auditErr) {

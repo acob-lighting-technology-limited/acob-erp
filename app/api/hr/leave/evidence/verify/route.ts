@@ -1,12 +1,20 @@
 import { NextRequest, NextResponse } from "next/server"
+import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { areRequiredDocumentsVerified, getLeavePolicy, notifyUsers } from "@/lib/hr/leave-workflow"
 import { logger } from "@/lib/logger"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 
 const log = logger("hr-leave-evidence-verify")
+const VerifyLeaveEvidenceSchema = z.object({
+  evidence_id: z.string().trim().min(1, "evidence_id and valid status are required"),
+  status: z.enum(["verified", "rejected"], {
+    errorMap: () => ({ message: "evidence_id and valid status are required" }),
+  }),
+  notes: z.string().optional().nullable(),
+})
 
-export async function POST(request: NextRequest) {
+export async function PATCH(request: NextRequest) {
   try {
     const supabase = await createClient()
     const {
@@ -21,11 +29,11 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { evidence_id, status, notes } = body
-
-    if (!evidence_id || !["verified", "rejected"].includes(status)) {
-      return NextResponse.json({ error: "evidence_id and valid status are required" }, { status: 400 })
+    const parsed = VerifyLeaveEvidenceSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid request body" }, { status: 400 })
     }
+    const { evidence_id, status, notes } = parsed.data
 
     const { data, error } = await supabase
       .from("leave_evidence")
@@ -79,4 +87,9 @@ export async function POST(request: NextRequest) {
     log.error({ err: String(error) }, "Error in POST /api/hr/leave/evidence/verify:")
     return NextResponse.json({ error: error instanceof Error ? error.message : "An error occurred" }, { status: 500 })
   }
+}
+
+// POST kept for backwards compat — prefer PATCH
+export async function POST(request: NextRequest) {
+  return PATCH(request)
 }

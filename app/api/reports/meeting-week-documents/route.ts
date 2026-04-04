@@ -4,13 +4,11 @@ import { NextResponse } from "next/server"
 import { resolveAdminScope, getDepartmentScope, normalizeDepartmentName } from "@/lib/admin/rbac"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { REPORT_DOC_MAX_SIZE_BYTES, formatLimitMb } from "@/lib/reports/document-upload-limits"
-import {
-  buildMeetingDocumentFileName,
-  resolveEffectiveMeetingDateIso,
-  sanitizeStoragePathSegment,
-} from "@/lib/reports/meeting-date"
+import { buildMeetingDocumentFileName, resolveEffectiveMeetingDateIso } from "@/lib/reports/meeting-date"
 import { convertOfficeDocumentToPdf } from "@/lib/reports/office-pdf"
 import { logger } from "@/lib/logger"
+import { getOneDriveService } from "@/lib/onedrive"
+import { buildReportDocumentPath, isOneDriveReportDocumentPath } from "@/lib/reports/document-storage"
 
 const log = logger("api-reports-meeting-week-documents")
 const BUCKET = "meeting_documents"
@@ -27,6 +25,7 @@ const KSS_ALLOWED = new Set([
 
 const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 const PPTX_MIME = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+const CAN_CONVERT_OFFICE_TO_PDF = process.platform === "win32"
 
 async function createClient() {
   const cookieStore = await cookies()
@@ -100,6 +99,7 @@ async function assertWeekAllowsDocumentCreate(
     meetingYear: number
     documentType: DocumentType
     department: string | null
+    departmentId?: string | null
   }
 ) {
   const { data, error } = await supabase.rpc("weekly_report_can_mutate", {
@@ -113,15 +113,19 @@ async function assertWeekAllowsDocumentCreate(
 
   if (data) return
 
-  const { data: existingRow, error: existingError } = await supabase
+  const lockCheckQuery = supabase
     .from("meeting_week_documents")
     .select("id")
     .eq("meeting_week", params.meetingWeek)
     .eq("meeting_year", params.meetingYear)
     .eq("document_type", params.documentType)
-    .eq("department", params.department)
     .eq("is_current", true)
-    .maybeSingle()
+
+  const { data: existingRow, error: existingError } = await (
+    params.departmentId
+      ? lockCheckQuery.eq("department_id", params.departmentId)
+      : lockCheckQuery.eq("department", params.department)
+  ).maybeSingle()
 
   if (existingError) {
     throw new Error(existingError.message)
@@ -152,6 +156,31 @@ export async function GET(request: Request) {
     const currentOnly = searchParams.get("currentOnly") === "true"
     const mode = searchParams.get("mode")
 
+    if (id && mode === "download") {
+      const { data: row, error: rowError } = await supabase
+        .from("meeting_week_documents")
+        .select("id, file_name, file_path")
+        .eq("id", id)
+        .single()
+
+      if (rowError || !row) return NextResponse.json({ error: "Document not found" }, { status: 404 })
+
+      if (isOneDriveReportDocumentPath(row.file_path)) {
+        const onedrive = getOneDriveService()
+        const downloadUrl = await onedrive.getDownloadUrl(row.file_path)
+        return NextResponse.redirect(downloadUrl)
+      }
+
+      const { data: signed, error: signedError } = await supabase.storage
+        .from(BUCKET)
+        .createSignedUrl(row.file_path, 3600)
+      if (signedError || !signed?.signedUrl) {
+        return NextResponse.json({ error: signedError?.message || "Failed to create download link" }, { status: 500 })
+      }
+
+      return NextResponse.redirect(signed.signedUrl)
+    }
+
     if (id && mode === "preview") {
       const { data: row, error: rowError } = await supabase
         .from("meeting_week_documents")
@@ -162,6 +191,16 @@ export async function GET(request: Request) {
         .single()
 
       if (rowError || !row) return NextResponse.json({ error: "Document not found" }, { status: 404 })
+
+      if (isOneDriveReportDocumentPath(row.file_path)) {
+        const onedrive = getOneDriveService()
+        const previewUrl = await onedrive.getPreviewUrl(row.file_path).catch(() => null)
+        if (previewUrl) {
+          return NextResponse.redirect(previewUrl)
+        }
+        const downloadUrl = await onedrive.getDownloadUrl(row.file_path)
+        return NextResponse.redirect(downloadUrl)
+      }
 
       const { data: fileData, error: downloadError } = await supabase.storage.from(BUCKET).download(row.file_path)
       if (downloadError || !fileData) {
@@ -206,9 +245,6 @@ export async function GET(request: Request) {
     )
     const withUrls = await Promise.all(
       rows.map(async (row) => {
-        const { data: signed, error: signedError } = await supabase.storage
-          .from(BUCKET)
-          .createSignedUrl(row.file_path, 3600)
         const { data: canMutate } = await supabase.rpc("weekly_report_can_mutate", {
           p_week: row.meeting_week,
           p_year: row.meeting_year,
@@ -217,7 +253,7 @@ export async function GET(request: Request) {
           ...row,
           meeting_date: meetingDateByWeekYear.get(`${row.meeting_year}-${row.meeting_week}`) || null,
           is_locked: !Boolean(canMutate),
-          signed_url: signedError ? null : (signed?.signedUrl ?? null),
+          signed_url: `/api/reports/meeting-week-documents?id=${row.id}&mode=download`,
         }
       })
     )
@@ -269,11 +305,17 @@ export async function POST(request: Request) {
     }
     if (!documentType) return NextResponse.json({ error: "Invalid documentType" }, { status: 400 })
 
+    const { data: deptLookup } = department
+      ? await supabase.from("departments").select("id").eq("name", department).single()
+      : { data: null }
+    const departmentId: string | null = deptLookup?.id ?? null
+
     await assertWeekAllowsDocumentCreate(supabase, {
       meetingWeek,
       meetingYear,
       documentType,
       department,
+      departmentId,
     })
 
     if (documentType === "knowledge_sharing_session") {
@@ -331,6 +373,15 @@ export async function POST(request: Request) {
       presenterName,
     })
 
+    if (shouldConvertToPdf && !CAN_CONVERT_OFFICE_TO_PDF) {
+      return NextResponse.json(
+        {
+          error: "This deployment cannot convert PPTX or DOCX files to PDF automatically. Please upload a PDF instead.",
+        },
+        { status: 400 }
+      )
+    }
+
     if (shouldConvertToPdf) {
       try {
         const converted = await convertOfficeDocumentToPdf(
@@ -358,25 +409,49 @@ export async function POST(request: Request) {
       }
     }
 
-    const deptPath = department ? sanitizeName(sanitizeStoragePathSegment(department)) : "all"
-    const safeName = sanitizeName(sanitizeStoragePathSegment(normalizedFileName))
-    const filePath = `${meetingYear}/week-${meetingWeek}/${documentType}/${deptPath}/${Date.now()}-${safeName}`
-
-    const { error: uploadError } = await supabase.storage.from(BUCKET).upload(filePath, uploadBuffer, {
-      contentType: uploadMimeType,
-      upsert: false,
+    const onedriveFilePath = buildReportDocumentPath({
+      meetingYear,
+      meetingWeek,
+      documentType,
+      department,
+      fileName: normalizedFileName,
     })
-    if (uploadError) return NextResponse.json({ error: uploadError.message }, { status: 500 })
+    let filePath = onedriveFilePath
 
-    const { data: currentRows, error: currentError } = await supabase
+    const onedrive = getOneDriveService()
+    if (onedrive.isEnabled()) {
+      try {
+        const folderPath = onedriveFilePath.slice(0, onedriveFilePath.lastIndexOf("/"))
+        await onedrive.createFolder(folderPath)
+        await onedrive.uploadFile(onedriveFilePath, uploadBuffer, uploadMimeType)
+      } catch (uploadError) {
+        return NextResponse.json(
+          { error: uploadError instanceof Error ? uploadError.message : "Failed to upload file" },
+          { status: 500 }
+        )
+      }
+    } else {
+      const legacyFilePath = onedriveFilePath.replace(/^\/reports\//, "")
+      const { error: uploadError } = await supabase.storage.from(BUCKET).upload(legacyFilePath, uploadBuffer, {
+        contentType: uploadMimeType,
+        upsert: false,
+      })
+      if (uploadError) return NextResponse.json({ error: uploadError.message }, { status: 500 })
+      filePath = legacyFilePath
+    }
+
+    const currentRowsQuery = supabase
       .from("meeting_week_documents")
       .select("id, version_no")
       .eq("meeting_week", meetingWeek)
       .eq("meeting_year", meetingYear)
       .eq("document_type", documentType)
-      .eq("department", department)
       .eq("is_current", true)
       .order("version_no", { ascending: false })
+
+    const { data: currentRows, error: currentError } = await (departmentId
+      ? currentRowsQuery.eq("department_id", departmentId)
+      : currentRowsQuery.eq("department", department))
 
     if (currentError) {
       return NextResponse.json({ error: currentError.message }, { status: 500 })
@@ -482,7 +557,7 @@ export async function PATCH(request: Request) {
     const { data: doc, error: fetchError } = await supabase
       .from("meeting_week_documents")
       .select(
-        "id, meeting_week, meeting_year, document_type, department, presenter_id, notes, file_name, file_path, mime_type, file_size, version_no, is_current, replaced_by, uploaded_by, created_at, updated_at"
+        "id, meeting_week, meeting_year, document_type, department, department_id, presenter_id, notes, file_name, file_path, mime_type, file_size, version_no, is_current, replaced_by, uploaded_by, created_at, updated_at"
       )
       .eq("id", id)
       .single()
@@ -492,13 +567,16 @@ export async function PATCH(request: Request) {
     await assertWeekIsMutable(supabase, doc.meeting_week, doc.meeting_year)
 
     if (makeCurrent) {
-      const { error: clearError } = await supabase
+      const clearQuery = supabase
         .from("meeting_week_documents")
         .update({ is_current: false })
         .eq("meeting_week", doc.meeting_week)
         .eq("meeting_year", doc.meeting_year)
         .eq("document_type", doc.document_type)
-        .eq("department", doc.department)
+
+      const { error: clearError } = await (doc.department_id
+        ? clearQuery.eq("department_id", doc.department_id)
+        : clearQuery.eq("department", doc.department))
 
       if (clearError) return NextResponse.json({ error: clearError.message }, { status: 500 })
     }
@@ -579,7 +657,12 @@ export async function DELETE(request: Request) {
     await assertWeekIsMutable(supabase, doc.meeting_week, doc.meeting_year)
 
     if (doc.file_path) {
-      await supabase.storage.from(BUCKET).remove([doc.file_path])
+      if (isOneDriveReportDocumentPath(doc.file_path)) {
+        const onedrive = getOneDriveService()
+        await onedrive.deleteItem(doc.file_path)
+      } else {
+        await supabase.storage.from(BUCKET).remove([doc.file_path])
+      }
     }
 
     const { error: deleteError } = await supabase.from("meeting_week_documents").delete().eq("id", id)

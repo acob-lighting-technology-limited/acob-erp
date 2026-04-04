@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server"
 import { resolveAdminScope } from "@/lib/admin/rbac"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { BUSINESS_HOUR_START, BUSINESS_HOUR_END, HELP_DESK_SLA } from "@/lib/org-config"
+import { resolveAutoLinkedGoalId } from "@/lib/performance/goal-linking"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import type { SupabaseClient } from "@supabase/supabase-js"
 
@@ -285,7 +286,7 @@ function normalizeTaskDueDate(value: string | null | undefined): string | null {
 export function generateFallbackHelpDeskTicketNumber(): string {
   const epochMillis = Date.now().toString()
   const randomSuffix = parseInt(crypto.randomUUID().replace(/-/g, "").slice(0, 3), 16).toString().padStart(3, "0")
-  return `TSK-${epochMillis}${randomSuffix}`
+  return `HDT-${epochMillis}${randomSuffix}`
 }
 
 export async function syncHelpDeskTicketTask(params: {
@@ -331,7 +332,9 @@ export async function syncHelpDeskTicketTask(params: {
     due_date: normalizeTaskDueDate(params.ticket.sla_target_at),
     started_at: params.ticket.started_at || null,
     completed_at:
-      taskStatus === "completed" ? params.ticket.resolved_at || params.ticket.closed_at || new Date().toISOString() : null,
+      taskStatus === "completed"
+        ? params.ticket.resolved_at || params.ticket.closed_at || new Date().toISOString()
+        : null,
     source_type: "help_desk" as const,
     source_id: params.ticket.id,
     assignment_type: assignmentType,
@@ -339,7 +342,12 @@ export async function syncHelpDeskTicketTask(params: {
   }
 
   const { data: syncedTask, error } = existingTask
-    ? await dataClient.from("tasks").update(taskPayload).eq("id", existingTask.id).select("id, work_item_number").single<SyncedTaskRow>()
+    ? await dataClient
+        .from("tasks")
+        .update(taskPayload)
+        .eq("id", existingTask.id)
+        .select("id, work_item_number")
+        .single<SyncedTaskRow>()
     : await dataClient.from("tasks").insert(taskPayload).select("id, work_item_number").single<SyncedTaskRow>()
 
   if (error || !syncedTask) {
@@ -356,6 +364,21 @@ export async function syncHelpDeskTicketTask(params: {
 
   if (Object.keys(ticketUpdates).length > 0) {
     await dataClient.from("help_desk_tickets").update(ticketUpdates).eq("id", params.ticket.id)
+  }
+
+  if (params.ticket.assigned_to) {
+    const autoGoalId = await resolveAutoLinkedGoalId({
+      supabase: dataClient as unknown as SupabaseClient,
+      actorId: params.actorId,
+      assignedTo: params.ticket.assigned_to,
+      department: params.ticket.service_department || params.ticket.requester_department || null,
+      sourceType: "help_desk",
+      title: params.ticket.title,
+    })
+
+    if (autoGoalId) {
+      await dataClient.from("tasks").update({ goal_id: autoGoalId }).eq("id", syncedTask.id)
+    }
   }
 
   return {

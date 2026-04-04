@@ -2,7 +2,9 @@
 
 import { Button } from "@/components/ui/button"
 import { Plus, FileText, File as FileIcon, Presentation, FileSpreadsheet } from "lucide-react"
-import { exportAllToPDF, exportAllToDocx, exportAllToXLSX, type WeeklyReport } from "@/lib/export-utils"
+import { toast } from "sonner"
+import { exportAllToDocx, exportAllToXLSX, type WeeklyReport } from "@/lib/export-utils"
+import { downloadWeeklyReportPdf } from "@/lib/reports/export-download"
 
 interface ReportExportActionsProps {
   filteredReports: WeeklyReport[]
@@ -23,13 +25,23 @@ export function ReportExportActions({
   onOpenPptxDialog,
   onSubmitNew,
 }: ReportExportActionsProps) {
+  const handlePdfDownload = async () => {
+    const toastId = toast.loading("Preparing weekly report PDF...")
+    try {
+      await downloadWeeklyReportPdf({ week: weekFilter, year: yearFilter })
+      toast.success("Weekly report PDF ready", { id: toastId })
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to export weekly report PDF", { id: toastId })
+    }
+  }
+
   return (
     <div className="flex flex-wrap items-center gap-2">
       {filteredReports.length > 0 && (
         <>
           <Button
             variant="outline"
-            onClick={() => exportAllToPDF(filteredReports, weekFilter, yearFilter, meetingDate)}
+            onClick={handlePdfDownload}
             className="gap-2 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-900/30 dark:hover:bg-red-950/20"
           >
             <FileText className="h-4 w-4" /> <span className="hidden sm:inline">PDF</span>

@@ -64,7 +64,7 @@ export default async function DocumentationPage() {
               <CardDescription>Browse your department&apos;s confidential OneDrive files.</CardDescription>
             </CardHeader>
             <CardContent>
-              <Link href="/documentation/department-documents">
+              <Link href="/documentation/department">
                 <Button className="w-full" disabled={!docsData.departmentDocs.enabled}>
                   {docsData.departmentDocs.enabled ? "Open Department Documents" : "Unavailable"}
                 </Button>

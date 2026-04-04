@@ -1,9 +1,25 @@
 import { NextRequest, NextResponse } from "next/server"
+import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { logger } from "@/lib/logger"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 
 const log = logger("v1-hr-performance-goals")
+const CreateV1GoalSchema = z.object({
+  user_id: z.string().trim().min(1, "Missing required fields"),
+  review_cycle_id: z.string().optional().nullable(),
+  title: z.string().trim().min(1, "Missing required fields"),
+  description: z.string().optional().nullable(),
+  target_value: z.unknown().optional(),
+  priority: z.string().optional(),
+  due_date: z.string().optional().nullable(),
+})
+
+const UpdateV1GoalSchema = z
+  .object({
+    id: z.string().trim().min(1, "Goal ID is required"),
+  })
+  .and(z.record(z.unknown()))
 
 export async function GET(request: NextRequest) {
   try {
@@ -60,7 +76,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function POST(request: NextRequest) {
+export async function PATCH(request: NextRequest) {
   try {
     const supabase = await createClient()
 
@@ -73,11 +89,11 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { user_id, review_cycle_id, title, description, target_value, priority, due_date } = body
-
-    if (!user_id || !title) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
+    const parsed = CreateV1GoalSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid request body" }, { status: 400 })
     }
+    const { user_id, review_cycle_id, title, description, target_value, priority, due_date } = parsed.data
 
     // Create goal
     const { data: goal, error } = await supabase
@@ -132,6 +148,11 @@ export async function POST(request: NextRequest) {
   }
 }
 
+// POST kept for backwards compat — prefer PATCH
+export async function POST(request: NextRequest) {
+  return PATCH(request)
+}
+
 export async function PUT(request: NextRequest) {
   try {
     const supabase = await createClient()
@@ -145,11 +166,11 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { id, ...updates } = body
-
-    if (!id) {
-      return NextResponse.json({ error: "Goal ID is required" }, { status: 400 })
+    const parsed = UpdateV1GoalSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid request body" }, { status: 400 })
     }
+    const { id, ...updates } = parsed.data
 
     // Update goal
     const { data: goal, error } = await supabase.from("goals_objectives").update(updates).eq("id", id).select().single()

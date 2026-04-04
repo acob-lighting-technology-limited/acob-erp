@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
-import { AdminCorrespondenceContent } from "../../correspondence/admin-correspondence-content"
+import { AdminReferenceGeneratorContent } from "./admin-reference-generator-content"
 import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
 import type { CorrespondenceRecord } from "@/types/correspondence"
 
@@ -88,7 +88,7 @@ export default async function AdminReferenceGeneratorPage() {
   }
 
   return (
-    <AdminCorrespondenceContent
+    <AdminReferenceGeneratorContent
       initialRecords={data.records}
       employees={data.employees}
       departmentCodes={data.departmentCodes}

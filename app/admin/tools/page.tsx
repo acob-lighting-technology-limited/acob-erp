@@ -21,6 +21,14 @@ const tools = [
     bgColor: "bg-blue-50 dark:bg-blue-950/30",
   },
   {
+    name: "10th Anniversary Signature",
+    description: "Generate the temporary anniversary version of the employee email signature",
+    href: "/tools/signature-anniversary",
+    icon: FileSignature,
+    color: "text-amber-600",
+    bgColor: "bg-amber-50 dark:bg-amber-950/30",
+  },
+  {
     name: "Watermark Studio",
     description: "Apply branded watermarks to uploaded media",
     href: "/tools/watermark",

@@ -5,7 +5,6 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { createClient } from "@/lib/supabase/client"
 import { PageWrapper, PageHeader } from "@/components/layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -35,6 +34,7 @@ import {
   isValid,
 } from "date-fns"
 import { PageLoader } from "@/components/ui/query-states"
+import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { ScheduleList } from "@/components/payments/schedule-list"
 import { PaymentEditDialog } from "@/components/payments/payment-edit-dialog"
 import { PaymentUploadDialog } from "@/components/payments/payment-upload-dialog"
@@ -42,7 +42,6 @@ import { PrintReceiptDialog } from "@/components/payments/print-receipt-dialog"
 import { PaymentInfoCard } from "@/components/payments/payment-info-card"
 import { PaymentMetaCard } from "@/components/payments/payment-meta-card"
 import { usePaymentSchedule } from "@/components/payments/use-payment-schedule"
-import { logger } from "@/lib/logger"
 import type {
   Payment,
   Department,
@@ -50,8 +49,6 @@ import type {
   PaymentDocument,
   PaymentEditFormData,
 } from "@/components/payments/payment-types"
-
-const log = logger("finance-payments")
 
 interface AdminPaymentPageData {
   payment: Payment
@@ -123,49 +120,22 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
 
   const schedule = usePaymentSchedule(payment)
 
-  const downloadFile = async (url: string, filename: string) => {
-    try {
-      const response = await fetch(url)
-      if (!response.ok) throw new Error("Failed to fetch file")
-
-      const blob = await response.blob()
-      const blobUrl = window.URL.createObjectURL(blob)
-      const link = document.createElement("a")
-      link.href = blobUrl
-      link.download = filename
-      link.style.display = "none"
-      document.body.appendChild(link)
-      link.click()
-
-      setTimeout(() => {
-        document.body.removeChild(link)
-        window.URL.revokeObjectURL(blobUrl)
-      }, 100)
-    } catch (error) {
-      log.error("Error downloading file:", error)
-      throw error
-    }
-  }
-
-  const handleViewDocument = async (e: React.MouseEvent, doc?: PaymentDocument) => {
-    e.preventDefault()
-    if (!doc) return
-
-    try {
-      const supabase = createClient()
-      const { data, error } = await supabase.storage.from("payment_documents").createSignedUrl(doc.file_path, 3600)
-      if (data?.signedUrl) {
-        const filename = doc.file_name || doc.file_path.split("/").pop() || "document.pdf"
-        await downloadFile(data.signedUrl, filename)
-        toast.success("Document downloaded successfully")
-      } else {
-        toast.error("Could not get secure document URL")
-        if (error) log.error("Error signing URL:", error)
-      }
-    } catch (error) {
-      log.error("Error downloading document:", error)
-      toast.error("Error downloading document")
-    }
+  const downloadPaymentDocument = (doc: PaymentDocument) => {
+    const filename = doc.file_name || doc.file_path.split("/").pop() || "document.pdf"
+    const toastId = toast.loading("Preparing download...")
+    const link = document.createElement("a")
+    link.href = `/api/payments/${params.id}/documents/${doc.id}/download`
+    link.download = filename
+    link.style.display = "none"
+    link.rel = "noopener noreferrer"
+    document.body.appendChild(link)
+    link.click()
+    window.setTimeout(() => {
+      document.body.removeChild(link)
+    }, 100)
+    window.setTimeout(() => {
+      toast.dismiss(toastId)
+    }, 6000)
   }
 
   const handleEditClick = () => {
@@ -441,160 +411,171 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
   })()
 
   return (
-    <PageWrapper maxWidth="full" background="gradient">
-      <PageHeader
-        title={payment.title}
-        description={
-          payment.payment_type === "recurring"
-            ? `Repeats ${payment.recurrence_period}`
-            : `One-time payment on ${payment.payment_date ? format(parseISO(payment.payment_date), "PPP") : "N/A"}`
-        }
-        icon={CreditCard}
-        backLink={{ href: "/admin/finance/payments", label: "Back to Payments" }}
-        actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge className={getStatusColor(realStatus)}>{realStatus}</Badge>
-            {payment.payment_type === "recurring" && payment.next_payment_due && (
-              <Badge
-                variant="outline"
-                className="border-primary/20 text-primary bg-primary/5 border-2 px-2 py-0.5 text-sm font-medium"
-              >
-                Next Due: {format(parseISO(payment.next_payment_due), "MMM d, yyyy")}
-              </Badge>
-            )}
-            {(realStatus === "due" || realStatus === "overdue") && hasReceiptForMark && (
-              <Button onClick={() => markAsPaid()}>
-                <CheckCircle className="mr-2 h-4 w-4" />
-                {payment.payment_type === "recurring" ? "Mark Current Due as Paid" : "Mark as Paid"}
-              </Button>
-            )}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon">
-                  <MoreVertical className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={handleEditClick}>
-                  <Edit className="mr-2 h-4 w-4" />
-                  Edit Payment
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setPrintDialogOpen(true)}>
-                  <Printer className="mr-2 h-4 w-4" />
-                  Print Receipt
-                </DropdownMenuItem>
-                <DropdownMenuItem className="text-red-600 focus:text-red-600" onClick={() => setDeleteDialogOpen(true)}>
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Delete Payment
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        }
-      />
-
-      <div className="mx-auto max-w-5xl space-y-6">
-        <div className="grid gap-6 md:grid-cols-3">
-          <div className="space-y-6 md:col-span-2">
-            {payment.payment_type === "recurring" && (
-              <>
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Calendar className="h-5 w-5" />
-                      Upcoming Schedule
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <ScheduleList
-                      items={schedule.filter((i) => i.status !== "paid")}
-                      onUpload={handleUploadClick}
-                      onView={handleViewDocument}
-                      onMarkPaid={markAsPaid}
-                      onReplace={handleReplaceClick}
-                    />
-                  </CardContent>
-                </Card>
-
-                {schedule.some((i) => i.status === "paid") && (
-                  <Card className="mt-6">
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <FileText className="h-5 w-5" />
-                        Payment History
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <ScheduleList
-                        items={schedule.filter((i) => i.status === "paid")}
-                        onUpload={handleUploadClick}
-                        onView={handleViewDocument}
-                        onReplace={handleReplaceClick}
-                      />
-                    </CardContent>
-                  </Card>
+    <Dialog defaultOpen onOpenChange={(open) => !open && router.push("/admin/finance/payments")}>
+      <DialogContent className="max-h-[92vh] w-[96vw] max-w-6xl overflow-y-auto p-0">
+        <PageWrapper maxWidth="full" background="gradient">
+          <PageHeader
+            title={payment.title}
+            description={
+              payment.payment_type === "recurring"
+                ? `Repeats ${payment.recurrence_period}`
+                : `One-time payment on ${payment.payment_date ? format(parseISO(payment.payment_date), "PPP") : "N/A"}`
+            }
+            icon={CreditCard}
+            backLink={{ href: "/admin/finance/payments", label: "Back to Payments" }}
+            actions={
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge className={getStatusColor(realStatus)}>{realStatus}</Badge>
+                {payment.payment_type === "recurring" && payment.next_payment_due && (
+                  <Badge
+                    variant="outline"
+                    className="border-primary/20 text-primary bg-primary/5 border-2 px-2 py-0.5 text-sm font-medium"
+                  >
+                    Next Due: {format(parseISO(payment.next_payment_due), "MMM d, yyyy")}
+                  </Badge>
                 )}
-              </>
-            )}
+                {(realStatus === "due" || realStatus === "overdue") && hasReceiptForMark && (
+                  <Button onClick={() => markAsPaid()}>
+                    <CheckCircle className="mr-2 h-4 w-4" />
+                    {payment.payment_type === "recurring" ? "Mark Current Due as Paid" : "Mark as Paid"}
+                  </Button>
+                )}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="icon">
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={handleEditClick}>
+                      <Edit className="mr-2 h-4 w-4" />
+                      Edit Payment
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setPrintDialogOpen(true)}>
+                      <Printer className="mr-2 h-4 w-4" />
+                      Download Receipt
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="text-red-600 focus:text-red-600"
+                      onClick={() => setDeleteDialogOpen(true)}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete Payment
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            }
+          />
 
-            <PaymentInfoCard payment={payment} formatCurrency={formatCurrency} />
+          <div className="mx-auto max-w-5xl space-y-6">
+            <div className="grid gap-6 md:grid-cols-3">
+              <div className="space-y-6 md:col-span-2">
+                {payment.payment_type === "recurring" && (
+                  <>
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <Calendar className="h-5 w-5" />
+                          Upcoming Schedule
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <ScheduleList
+                          items={schedule.filter((i) => i.status !== "paid")}
+                          onUpload={handleUploadClick}
+                          onView={(_, doc) => downloadPaymentDocument(doc)}
+                          onMarkPaid={markAsPaid}
+                          onReplace={handleReplaceClick}
+                        />
+                      </CardContent>
+                    </Card>
+
+                    {schedule.some((i) => i.status === "paid") && (
+                      <Card className="mt-6">
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2">
+                            <FileText className="h-5 w-5" />
+                            Payment History
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <ScheduleList
+                            items={schedule.filter((i) => i.status === "paid")}
+                            onUpload={handleUploadClick}
+                            onView={(_, doc) => downloadPaymentDocument(doc)}
+                            onReplace={handleReplaceClick}
+                          />
+                        </CardContent>
+                      </Card>
+                    )}
+                  </>
+                )}
+
+                <PaymentInfoCard payment={payment} formatCurrency={formatCurrency} />
+              </div>
+
+              <div className="space-y-6">
+                <PaymentMetaCard payment={payment} />
+              </div>
+            </div>
           </div>
 
-          <div className="space-y-6">
-            <PaymentMetaCard payment={payment} />
-          </div>
-        </div>
-      </div>
+          <PaymentEditDialog
+            open={editDialogOpen}
+            onOpenChange={setEditDialogOpen}
+            formData={editFormData}
+            onFormDataChange={setEditFormData}
+            onSubmit={handleUpdate}
+            updating={updating}
+            departments={departments}
+            categories={categories}
+            showPaymentTypeField={false}
+          />
 
-      <PaymentEditDialog
-        open={editDialogOpen}
-        onOpenChange={setEditDialogOpen}
-        formData={editFormData}
-        onFormDataChange={setEditFormData}
-        onSubmit={handleUpdate}
-        updating={updating}
-        departments={departments}
-        categories={categories}
-        showPaymentTypeField={false}
-      />
+          <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This action cannot be undone. This will permanently delete the payment record and remove it from our
+                  servers.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-red-600 hover:bg-red-700"
+                  onClick={handleDelete}
+                  disabled={deleteLoading}
+                >
+                  {deleteLoading ? "Deleting..." : "Delete"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
 
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the payment record and remove it from our
-              servers.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction className="bg-red-600 hover:bg-red-700" onClick={handleDelete} disabled={deleteLoading}>
-              {deleteLoading ? "Deleting..." : "Delete"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+          <PaymentUploadDialog
+            open={uploadDialogOpen}
+            onOpenChange={(open) => {
+              setUploadDialogOpen(open)
+              if (!open) setReplaceDocumentId(null)
+            }}
+            uploadDate={uploadDate}
+            uploadType={uploadType}
+            uploading={uploading}
+            replaceDocumentId={replaceDocumentId}
+            onSubmit={handleFileUpload}
+          />
 
-      <PaymentUploadDialog
-        open={uploadDialogOpen}
-        onOpenChange={(open) => {
-          setUploadDialogOpen(open)
-          if (!open) setReplaceDocumentId(null)
-        }}
-        uploadDate={uploadDate}
-        uploadType={uploadType}
-        uploading={uploading}
-        replaceDocumentId={replaceDocumentId}
-        onSubmit={handleFileUpload}
-      />
-
-      <PrintReceiptDialog
-        open={printDialogOpen}
-        onOpenChange={setPrintDialogOpen}
-        schedule={schedule}
-        onViewDocument={handleViewDocument}
-      />
-    </PageWrapper>
+          <PrintReceiptDialog
+            open={printDialogOpen}
+            onOpenChange={setPrintDialogOpen}
+            schedule={schedule}
+            onDownloadDocument={downloadPaymentDocument}
+          />
+        </PageWrapper>
+      </DialogContent>
+    </Dialog>
   )
 }

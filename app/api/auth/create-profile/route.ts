@@ -30,7 +30,7 @@ export async function POST(_request: Request) {
       last_name: "",
       other_names: "",
       department: "",
-      company_role: "",
+      designation: "",
       phone_number: "",
       additional_phone: "",
       residential_address: "",

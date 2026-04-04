@@ -1,5 +1,9 @@
 "use client"
 
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { z } from "zod"
+import { useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -27,6 +31,12 @@ interface AssetIssue {
   created_by: string
 }
 
+const issueSchema = z.object({
+  newIssueDescription: z.string(),
+})
+
+type IssueFormValues = z.infer<typeof issueSchema>
+
 interface AssetIssuesDialogProps {
   isOpen: boolean
   onOpenChange: (open: boolean) => void
@@ -52,6 +62,32 @@ export function AssetIssuesDialog({
   onDeleteIssue,
   isAddingIssue,
 }: AssetIssuesDialogProps) {
+  const form = useForm<IssueFormValues>({
+    resolver: zodResolver(issueSchema),
+    defaultValues: {
+      newIssueDescription: newIssueDescription,
+    },
+  })
+
+  const { register, watch } = form
+
+  // Sync form state back to parent whenever values change
+  useEffect(() => {
+    const subscription = watch((values) => {
+      setNewIssueDescription(values.newIssueDescription ?? "")
+    })
+    return () => subscription.unsubscribe()
+  }, [watch, setNewIssueDescription])
+
+  // Reset form when dialog opens
+  useEffect(() => {
+    if (isOpen) {
+      form.reset({ newIssueDescription })
+    }
+  }, [isOpen]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const descriptionValue = watch("newIssueDescription")
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
@@ -91,8 +127,7 @@ export function AssetIssuesDialog({
             <div className="flex gap-2">
               <Input
                 placeholder="Describe issue (e.g., RAM not working, screen cracked)..."
-                value={newIssueDescription}
-                onChange={(e) => setNewIssueDescription(e.target.value)}
+                {...register("newIssueDescription")}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault()
@@ -100,7 +135,7 @@ export function AssetIssuesDialog({
                   }
                 }}
               />
-              <Button onClick={onAddIssue} loading={isAddingIssue} disabled={!newIssueDescription.trim()} size="sm">
+              <Button onClick={onAddIssue} loading={isAddingIssue} disabled={!descriptionValue.trim()} size="sm">
                 <Plus className="mr-1 h-4 w-4" />
                 Add
               </Button>

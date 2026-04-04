@@ -19,7 +19,7 @@ import {
   HeadphonesIcon,
 } from "lucide-react"
 import { formatName } from "@/lib/utils"
-import type { Task } from "@/app/(app)/tasks/management/tasks-content"
+import type { Task } from "@/types/task"
 
 interface TaskUpdate {
   id: string

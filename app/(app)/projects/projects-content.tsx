@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useMemo, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -16,16 +16,20 @@ interface ProjectsContentProps {
 
 export function ProjectsContent({ initialProjects }: ProjectsContentProps) {
   const [projects] = useState<Project[]>(initialProjects)
-  const [filteredProjects, setFilteredProjects] = useState<Project[]>(initialProjects)
   const [filterStatus, setFilterStatus] = useState("all")
+  const [searchQuery, setSearchQuery] = useState("")
 
-  useEffect(() => {
-    if (filterStatus === "all") {
-      setFilteredProjects(projects)
-    } else {
-      setFilteredProjects(projects.filter((p) => p.status === filterStatus))
-    }
-  }, [filterStatus, projects])
+  const filteredProjects = useMemo(() => {
+    const normalizedSearch = searchQuery.trim().toLowerCase()
+    return projects.filter((project) => {
+      const matchesStatus = filterStatus === "all" || project.status === filterStatus
+      const matchesSearch =
+        normalizedSearch.length === 0 ||
+        project.project_name.toLowerCase().includes(normalizedSearch) ||
+        project.location.toLowerCase().includes(normalizedSearch)
+      return matchesStatus && matchesSearch
+    })
+  }, [filterStatus, projects, searchQuery])
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -108,47 +112,55 @@ export function ProjectsContent({ initialProjects }: ProjectsContentProps) {
         </div>
       }
       filters={
-        <div className="flex gap-2 border-b">
-          <button
-            onClick={() => setFilterStatus("all")}
-            className={`border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
-              filterStatus === "all"
-                ? "border-primary text-primary"
-                : "text-muted-foreground hover:text-foreground border-transparent"
-            }`}
-          >
-            All ({stats.total})
-          </button>
-          <button
-            onClick={() => setFilterStatus("planning")}
-            className={`border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
-              filterStatus === "planning"
-                ? "border-primary text-primary"
-                : "text-muted-foreground hover:text-foreground border-transparent"
-            }`}
-          >
-            Planning ({stats.planning})
-          </button>
-          <button
-            onClick={() => setFilterStatus("active")}
-            className={`border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
-              filterStatus === "active"
-                ? "border-primary text-primary"
-                : "text-muted-foreground hover:text-foreground border-transparent"
-            }`}
-          >
-            Active ({stats.active})
-          </button>
-          <button
-            onClick={() => setFilterStatus("completed")}
-            className={`border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
-              filterStatus === "completed"
-                ? "border-primary text-primary"
-                : "text-muted-foreground hover:text-foreground border-transparent"
-            }`}
-          >
-            Completed ({stats.completed})
-          </button>
+        <div className="space-y-3">
+          <input
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="Search projects by name or location"
+            className="border-input bg-background ring-offset-background placeholder:text-muted-foreground flex h-10 w-full rounded-md border px-3 py-2 text-sm"
+          />
+          <div className="flex gap-2 border-b">
+            <button
+              onClick={() => setFilterStatus("all")}
+              className={`border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
+                filterStatus === "all"
+                  ? "border-primary text-primary"
+                  : "text-muted-foreground hover:text-foreground border-transparent"
+              }`}
+            >
+              All ({stats.total})
+            </button>
+            <button
+              onClick={() => setFilterStatus("planning")}
+              className={`border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
+                filterStatus === "planning"
+                  ? "border-primary text-primary"
+                  : "text-muted-foreground hover:text-foreground border-transparent"
+              }`}
+            >
+              Planning ({stats.planning})
+            </button>
+            <button
+              onClick={() => setFilterStatus("active")}
+              className={`border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
+                filterStatus === "active"
+                  ? "border-primary text-primary"
+                  : "text-muted-foreground hover:text-foreground border-transparent"
+              }`}
+            >
+              Active ({stats.active})
+            </button>
+            <button
+              onClick={() => setFilterStatus("completed")}
+              className={`border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
+                filterStatus === "completed"
+                  ? "border-primary text-primary"
+                  : "text-muted-foreground hover:text-foreground border-transparent"
+              }`}
+            >
+              Completed ({stats.completed})
+            </button>
+          </div>
         </div>
       }
       filtersInCard={false}

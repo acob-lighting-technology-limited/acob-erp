@@ -1,7 +1,9 @@
 "use client"
 
+import { useState } from "react"
 import { useParams } from "next/navigation"
 import { useQuery } from "@tanstack/react-query"
+import { useQueryClient } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -13,6 +15,7 @@ import Link from "next/link"
 import { PageHeader } from "@/components/layout/page-header"
 import { EmptyState } from "@/components/ui/patterns"
 import { PageLoader } from "@/components/ui/query-states"
+import { SupplierFormDialog } from "../_components/supplier-form-dialog"
 
 interface Supplier {
   id: string
@@ -67,6 +70,8 @@ function formatDate(date: string) {
 export default function SupplierDetailPage() {
   const params = useParams()
   const id = params.id as string
+  const queryClient = useQueryClient()
+  const [isEditOpen, setIsEditOpen] = useState(false)
 
   const { data, isLoading } = useQuery({
     queryKey: QUERY_KEYS.adminSupplierDetail(id),
@@ -90,14 +95,27 @@ export default function SupplierDetailPage() {
             <Badge variant={supplier.is_active ? "default" : "secondary"}>
               {supplier.is_active ? "Active" : "Inactive"}
             </Badge>
-            <Link href={`/admin/purchasing/suppliers/${supplier.id}/edit`}>
-              <Button>
-                <Pencil className="mr-2 h-4 w-4" />
-                Edit Supplier
-              </Button>
-            </Link>
+            <Button onClick={() => setIsEditOpen(true)}>
+              <Pencil className="mr-2 h-4 w-4" />
+              Edit Supplier
+            </Button>
           </>
         }
+      />
+      <SupplierFormDialog
+        open={isEditOpen}
+        onOpenChange={setIsEditOpen}
+        queryClient={queryClient}
+        supplier={{
+          id: supplier.id,
+          name: supplier.name,
+          code: supplier.code,
+          email: supplier.email || "",
+          phone: supplier.phone || "",
+          address: supplier.address || "",
+          contact_person: supplier.contact_person || "",
+          is_active: supplier.is_active,
+        }}
       />
 
       <div className="grid gap-6 lg:grid-cols-3">

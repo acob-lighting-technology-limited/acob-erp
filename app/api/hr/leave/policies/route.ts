@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
+import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { writeAuditLog } from "@/lib/audit/write-audit"
+
+const SaveLeavePolicySchema = z.record(z.unknown())
 
 async function assertHR(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
   const { data } = await supabase.from("profiles").select("role").eq("id", userId).single()
@@ -27,7 +30,7 @@ export async function GET() {
   }
 }
 
-export async function POST(request: NextRequest) {
+export async function PATCH(request: NextRequest) {
   try {
     const supabase = await createClient()
     const {
@@ -39,7 +42,11 @@ export async function POST(request: NextRequest) {
     if (!isHR) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
     const body = await request.json()
-    const { data, error } = await supabase.from("leave_policies").upsert(body).select().single()
+    const parsed = SaveLeavePolicySchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid request body" }, { status: 400 })
+    }
+    const { data, error } = await supabase.from("leave_policies").upsert(parsed.data).select().single()
 
     if (error) return NextResponse.json({ error: "Failed to save leave policy" }, { status: 500 })
 
@@ -49,7 +56,7 @@ export async function POST(request: NextRequest) {
         action: "update",
         entityType: "leave_policy",
         entityId: data.id,
-        newValues: body,
+        newValues: parsed.data,
         context: { actorId: user.id, source: "api", route: "/api/hr/leave/policies" },
       },
       { failOpen: true }
@@ -59,4 +66,9 @@ export async function POST(request: NextRequest) {
   } catch {
     return NextResponse.json({ error: "An error occurred" }, { status: 500 })
   }
+}
+
+// POST kept for backwards compat — prefer PATCH
+export async function POST(request: NextRequest) {
+  return PATCH(request)
 }

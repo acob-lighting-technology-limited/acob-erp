@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
+import { useQueryClient } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
@@ -16,6 +17,8 @@ import Link from "next/link"
 import { StatCard } from "@/components/ui/stat-card"
 import { EmptyState } from "@/components/ui/empty-state"
 import { TableSkeleton } from "@/components/ui/query-states"
+import { useSearchParams } from "next/navigation"
+import { InvoiceFormDialog } from "./_components/invoice-form-dialog"
 
 import { logger } from "@/lib/logger"
 
@@ -60,8 +63,11 @@ const statusColors: Record<Invoice["status"], InvoiceStatusVariant> = {
 }
 
 export default function InvoicesPage() {
+  const queryClient = useQueryClient()
+  const searchParams = useSearchParams()
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
+  const [isCreateOpen, setIsCreateOpen] = useState(searchParams.get("openCreate") === "1")
 
   const { data: invoices = [], isLoading: loading } = useQuery({
     queryKey: QUERY_KEYS.adminInvoices(),
@@ -111,12 +117,10 @@ export default function InvoicesPage() {
       backLinkHref="/admin"
       backLinkLabel="Back to Admin"
       actions={
-        <Link href="/admin/finance/invoices/new">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Create Invoice
-          </Button>
-        </Link>
+        <Button onClick={() => setIsCreateOpen(true)}>
+          <Plus className="mr-2 h-4 w-4" />
+          Create Invoice
+        </Button>
       }
     >
       {/* Stats */}
@@ -188,7 +192,7 @@ export default function InvoicesPage() {
               icon={FileText}
               title="No invoices yet"
               description="Create your first invoice to start tracking revenue."
-              action={{ label: "Create Invoice", href: "/admin/finance/invoices/new", icon: Plus }}
+              action={{ label: "Create Invoice", href: "/admin/finance/invoices?openCreate=1", icon: Plus }}
             />
           ) : (
             <Table>
@@ -256,6 +260,7 @@ export default function InvoicesPage() {
           )}
         </CardContent>
       </Card>
+      <InvoiceFormDialog open={isCreateOpen} onOpenChange={setIsCreateOpen} queryClient={queryClient} />
     </AdminTablePage>
   )
 }

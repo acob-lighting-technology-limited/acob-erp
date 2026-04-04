@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { z } from "zod"
 import {
   appendAuditLog,
   appendHelpDeskEvent,
@@ -12,6 +13,12 @@ import { sendHelpDeskMail } from "@/lib/help-desk/mailer"
 import { logger } from "@/lib/logger"
 
 const log = logger("help-desk-tickets-approvals")
+const ProcessHelpDeskApprovalSchema = z.object({
+  decision: z.enum(["approved", "rejected"], {
+    errorMap: () => ({ message: 'decision must be "approved" or "rejected"' }),
+  }),
+  comments: z.string().optional().nullable(),
+})
 
 const STAGE_ORDER = [
   "requester_department_lead",
@@ -68,7 +75,7 @@ function stageRank(stage: string) {
   return rank >= 0 ? rank : Number.MAX_SAFE_INTEGER
 }
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     const { supabase, user, profile } = await getAuthContext()
 
@@ -76,12 +83,14 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { decision, comments } = await request.json()
-    const normalizedDecision = String(decision || "").toLowerCase()
-
-    if (!["approved", "rejected"].includes(normalizedDecision)) {
-      return NextResponse.json({ error: 'decision must be "approved" or "rejected"' }, { status: 400 })
+    const body = await request.json()
+    const parsed = ProcessHelpDeskApprovalSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid request body" }, { status: 400 })
     }
+
+    const normalizedDecision = parsed.data.decision
+    const comments = parsed.data.comments
 
     const { data: ticket, error: ticketError } = await supabase
       .from("help_desk_tickets")
@@ -350,7 +359,10 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       },
     })
   } catch (error) {
-    log.error({ err: String(error) }, "Error in POST /api/help-desk/tickets/[id]/approvals:")
+    log.error({ err: String(error) }, "Error in PATCH /api/help-desk/tickets/[id]/approvals:")
     return NextResponse.json({ error: "Failed to process approval decision" }, { status: 500 })
   }
 }
+
+// POST kept for backwards compat — prefer PATCH
+export { PATCH as POST }

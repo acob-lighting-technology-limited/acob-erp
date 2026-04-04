@@ -478,7 +478,11 @@ async function testTask(admin: SupabaseClient, body: TestFlowBody): Promise<{ ok
   }
 }
 
-export async function POST(request: NextRequest) {
+export async function PATCH(request: NextRequest) {
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json({ error: "Not available in production" }, { status: 404 })
+  }
+
   const supabase = await createClient()
   const {
     data: { user },
@@ -507,4 +511,9 @@ export async function POST(request: NextRequest) {
   }
 
   return NextResponse.json({ error: "kind must be 'help_desk' or 'task'" }, { status: 400 })
+}
+
+// POST kept for backwards compat — prefer PATCH
+export async function POST(request: NextRequest) {
+  return PATCH(request)
 }

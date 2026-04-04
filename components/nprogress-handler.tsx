@@ -3,36 +3,6 @@
 import { useEffect } from "react"
 import NProgress from "nprogress"
 
-// Helper to check if navigating between dashboard and admin
-function isAdminDashboardNavigation(fromHref: string, toHref: string): boolean {
-  const fromPath = new URL(fromHref).pathname
-  const toPath = new URL(toHref).pathname
-
-  const adminPaths = ["/admin"]
-  const dashboardPaths = [
-    "/profile",
-    "/projects",
-    "/assets",
-    "/payments",
-    "/feedback",
-    "/notifications",
-    "/tools",
-    "/tools/signature",
-    "/tools/watermark",
-    "/documentation",
-    "/job-description",
-  ]
-
-  const isFromAdmin = adminPaths.some((p) => fromPath.startsWith(p))
-  const isFromDashboard = dashboardPaths.some((p) => fromPath.startsWith(p)) || fromPath === "/"
-
-  const isToAdmin = adminPaths.some((p) => toPath.startsWith(p))
-  const isToDashboard = dashboardPaths.some((p) => toPath.startsWith(p)) || toPath === "/"
-
-  // Return true if navigating between admin and dashboard (in either direction)
-  return (isFromAdmin && isToDashboard) || (isFromDashboard && isToAdmin)
-}
-
 export function NProgressHandler() {
   useEffect(() => {
     // Start progress on link clicks
@@ -43,11 +13,6 @@ export function NProgressHandler() {
 
       // Only show progress for internal navigation
       if (href && href !== currentUrl && href.startsWith(window.location.origin)) {
-        // Don't start NProgress if this is an admin<->dashboard navigation
-        // Those use the custom staircase transition instead
-        if (isAdminDashboardNavigation(currentUrl, href)) {
-          return
-        }
         NProgress.start()
       }
     }

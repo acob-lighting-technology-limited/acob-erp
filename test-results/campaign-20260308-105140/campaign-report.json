@@ -698,11 +698,11 @@
       "reason": "HTTP 307 -> /auth/login?next=%2Fadmin%2Freports"
     },
     {
-      "target": "/admin/reports/action-tracker",
+      "target": "/admin/reports/action-point",
       "type": "page",
       "role": "unauthenticated",
       "status": "pass",
-      "reason": "HTTP 307 -> /auth/login?next=%2Fadmin%2Freports%2Faction-tracker"
+      "reason": "HTTP 307 -> /auth/login?next=%2Fadmin%2Freports%2Faction-point"
     },
     {
       "target": "/admin/reports/mail",
@@ -992,11 +992,11 @@
       "reason": "HTTP 307 -> /auth/login?next=%2Fdashboard%2Freports"
     },
     {
-      "target": "/dashboard/reports/action-tracker",
+      "target": "/dashboard/reports/action-point",
       "type": "page",
       "role": "unauthenticated",
       "status": "pass",
-      "reason": "HTTP 307 -> /auth/login?next=%2Fdashboard%2Freports%2Faction-tracker"
+      "reason": "HTTP 307 -> /auth/login?next=%2Fdashboard%2Freports%2Faction-point"
     },
     {
       "target": "/dashboard/reports/weekly-reports",
@@ -3123,8 +3123,8 @@
       "classification": "admin"
     },
     {
-      "file": "app/admin/reports/action-tracker/page.tsx",
-      "route": "/admin/reports/action-tracker",
+      "file": "app/admin/reports/action-point/page.tsx",
+      "route": "/admin/reports/action-point",
       "kind": "page",
       "classification": "admin"
     },
@@ -3375,8 +3375,8 @@
       "classification": "employee_app"
     },
     {
-      "file": "app/(app)/dashboard/reports/action-tracker/page.tsx",
-      "route": "/dashboard/reports/action-tracker",
+      "file": "app/(app)/dashboard/reports/action-point/page.tsx",
+      "route": "/dashboard/reports/action-point",
       "kind": "page",
       "classification": "employee_app"
     },

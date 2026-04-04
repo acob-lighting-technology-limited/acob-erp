@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { createClient as createAdminClient } from "@supabase/supabase-js"
 import { DEFAULT_MAINTENANCE_MESSAGE, canManageMaintenanceMode, parseMaintenanceMode } from "@/lib/maintenance"
@@ -7,8 +8,16 @@ import { writeAuditLog } from "@/lib/audit/write-audit"
 
 const log = logger("dev-maintenance")
 export const dynamic = "force-dynamic"
+const UpdateMaintenanceModeSchema = z.object({
+  enabled: z.boolean().optional(),
+  message: z.string().optional(),
+})
 
 export async function GET() {
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json({ error: "Not available in production" }, { status: 404 })
+  }
+
   try {
     const supabase = await createClient()
     const {
@@ -57,6 +66,10 @@ export async function GET() {
 }
 
 export async function PUT(request: NextRequest) {
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json({ error: "Not available in production" }, { status: 404 })
+  }
+
   try {
     const supabase = await createClient()
     const {
@@ -82,8 +95,12 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json().catch(() => ({}))
-    const enabled = Boolean(body?.enabled)
-    const message = body?.message ? String(body.message) : DEFAULT_MAINTENANCE_MESSAGE
+    const parsed = UpdateMaintenanceModeSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid request body" }, { status: 400 })
+    }
+    const enabled = Boolean(parsed.data.enabled)
+    const message = parsed.data.message ? String(parsed.data.message) : DEFAULT_MAINTENANCE_MESSAGE
 
     if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
       return NextResponse.json({ error: "Server is missing Supabase service credentials" }, { status: 500 })

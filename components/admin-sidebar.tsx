@@ -76,8 +76,7 @@ function normalizeAdminDomains(domains: string[] | null | undefined): AdminDomai
 
 function getDomainForAdminPath(path: string): AdminDomain | null {
   if (path.startsWith("/admin/hr")) return "hr"
-  if (path.startsWith("/admin/finance") || path.startsWith("/admin/purchasing") || path.startsWith("/admin/payments"))
-    return "finance"
+  if (path.startsWith("/admin/finance") || path.startsWith("/admin/purchasing")) return "finance"
   if (path.startsWith("/admin/assets") || path.startsWith("/admin/inventory")) return "assets"
   if (path.startsWith("/admin/reports") || path.startsWith("/admin/audit-logs")) return "reports"
   if (path.startsWith("/admin/tasks")) return "tasks"
@@ -240,13 +239,11 @@ const adminSections = [
 
 const ADMIN_ROUTE_ALIASES: Record<string, string[]> = {
   // Finance — purchasing and payments have their own top-level prefixes
-  "/admin/finance": ["/admin/payments", "/admin/purchasing"],
+  "/admin/finance": ["/admin/purchasing"],
   // Assets — inventory lives at a separate prefix
   "/admin/assets": ["/admin/inventory"],
   // HR — employees are sometimes accessed at /admin/employees (flat) in addition to /admin/hr/employees
-  "/admin/hr": ["/admin/employees"],
   // Communications — correspondence is logically part of communications
-  "/admin/communications": ["/admin/correspondence"],
 }
 
 export function AdminSidebar({ user, profile }: AdminSidebarProps) {

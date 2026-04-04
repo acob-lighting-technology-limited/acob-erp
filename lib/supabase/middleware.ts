@@ -13,6 +13,21 @@ interface MaintenanceCache {
 }
 let _maintenanceCache: MaintenanceCache | null = null
 
+function randomHex(bytes: number): string {
+  const buffer = new Uint8Array(bytes)
+  globalThis.crypto.getRandomValues(buffer)
+  return Array.from(buffer, (value) => value.toString(16).padStart(2, "0")).join("")
+}
+
+function timingSafeEqualText(left: string, right: string): boolean {
+  if (left.length !== right.length) return false
+  let mismatch = 0
+  for (let index = 0; index < left.length; index += 1) {
+    mismatch |= left.charCodeAt(index) ^ right.charCodeAt(index)
+  }
+  return mismatch === 0
+}
+
 async function getMaintenanceMode(supabase: ReturnType<typeof createServerClient>): Promise<boolean> {
   const now = Date.now()
   if (_maintenanceCache && now < _maintenanceCache.expiresAt) {
@@ -31,9 +46,13 @@ async function getMaintenanceMode(supabase: ReturnType<typeof createServerClient
 }
 
 export async function updateSession(request: NextRequest) {
+  const requestId = globalThis.crypto.randomUUID()
+  request.headers.set("x-request-id", requestId)
+
   let supabaseResponse = NextResponse.next({
     request,
   })
+  supabaseResponse.headers.set("x-request-id", requestId)
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -48,6 +67,7 @@ export async function updateSession(request: NextRequest) {
           supabaseResponse = NextResponse.next({
             request,
           })
+          supabaseResponse.headers.set("x-request-id", requestId)
           cookiesToSet.forEach(({ name, value, options }) => supabaseResponse.cookies.set(name, value, options))
         },
       },
@@ -144,7 +164,14 @@ export async function updateSession(request: NextRequest) {
   // Allow unauthenticated access to auth pages, public routes, and the form
   // Maintenance mode check must run before this block so non-authenticated users
   // are redirected to /maintenance when maintenance is enabled.
-  if (pathname !== "/" && !user && !pathname.startsWith("/auth") && !pathname.startsWith("/employee/new")) {
+  if (
+    pathname !== "/" &&
+    !user &&
+    !pathname.startsWith("/auth") &&
+    !pathname.startsWith("/employee/new") &&
+    !pathname.startsWith("/api/public") &&
+    !pathname.startsWith("/kss")
+  ) {
     const url = request.nextUrl.clone()
     url.pathname = "/auth/login"
     url.searchParams.set("next", intendedPath || "/profile")
@@ -200,6 +227,36 @@ export async function updateSession(request: NextRequest) {
 
     if (origin && !allowedOrigins.some((o) => origin.startsWith(o!))) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
+  }
+
+  if (!["GET", "HEAD", "OPTIONS"].includes(method)) {
+    const isApiRoute = pathname.startsWith("/api/")
+    const hasBearerAuth = request.headers.get("authorization")?.startsWith("Bearer ")
+
+    if (isApiRoute && !hasBearerAuth) {
+      const cookieToken = request.cookies.get("csrf_token")?.value
+      const headerToken = request.headers.get("x-csrf-token")
+
+      if (cookieToken && headerToken) {
+        if (headerToken.length !== cookieToken.length || !timingSafeEqualText(headerToken, cookieToken)) {
+          return NextResponse.json({ error: "Invalid CSRF token" }, { status: 403 })
+        }
+      }
+    }
+  }
+
+  if (method === "GET" && !pathname.startsWith("/api/") && !pathname.startsWith("/_next/")) {
+    const existingToken = request.cookies.get("csrf_token")?.value
+    if (!existingToken) {
+      const token = randomHex(32)
+      supabaseResponse.cookies.set("csrf_token", token, {
+        httpOnly: false,
+        sameSite: "strict",
+        secure: process.env.NODE_ENV === "production",
+        path: "/",
+        maxAge: 60 * 60,
+      })
     }
   }
 

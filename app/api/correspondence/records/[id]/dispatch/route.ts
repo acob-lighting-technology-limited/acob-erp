@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { z } from "zod"
 import {
   appendCorrespondenceAuditLog,
   appendCorrespondenceEvent,
@@ -10,10 +11,18 @@ import { logger } from "@/lib/logger"
 
 const log = logger("correspondence-records-dispatch")
 
-const FINAL_STATUSES = ["sent", "filed"]
-const DISPATCH_METHODS = ["email", "courier", "hand_delivery", "regulatory_portal"]
+const DispatchCorrespondenceSchema = z.object({
+  final_status: z.enum(["sent", "filed"], {
+    errorMap: () => ({ message: "final_status must be sent or filed" }),
+  }),
+  dispatch_method: z.enum(["email", "courier", "hand_delivery", "regulatory_portal"], {
+    errorMap: () => ({ message: "Invalid dispatch_method" }),
+  }),
+  proof_of_delivery_path: z.string().optional().nullable(),
+  recipient_name: z.string().optional().nullable(),
+})
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     const { supabase, user, profile } = await getAuthContext()
 
@@ -40,24 +49,23 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     }
 
     const body = await request.json()
-    const finalStatus = String(body?.final_status || "").toLowerCase()
-    const dispatchMethod = String(body?.dispatch_method || "").toLowerCase()
-
-    if (!FINAL_STATUSES.includes(finalStatus)) {
-      return NextResponse.json({ error: "final_status must be sent or filed" }, { status: 400 })
+    const parsed = DispatchCorrespondenceSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid request body" }, { status: 400 })
     }
 
-    if (!DISPATCH_METHODS.includes(dispatchMethod)) {
-      return NextResponse.json({ error: "Invalid dispatch_method" }, { status: 400 })
-    }
+    const finalStatus = parsed.data.final_status
+    const dispatchMethod = parsed.data.dispatch_method
 
     const { data: updatedRecord, error: updateError } = await supabase
       .from("correspondence_records")
       .update({
         status: finalStatus,
         dispatch_method: dispatchMethod,
-        proof_of_delivery_path: body?.proof_of_delivery_path ? String(body.proof_of_delivery_path).trim() : null,
-        recipient_name: body?.recipient_name ? String(body.recipient_name).trim() : record.recipient_name,
+        proof_of_delivery_path: parsed.data.proof_of_delivery_path
+          ? String(parsed.data.proof_of_delivery_path).trim()
+          : null,
+        recipient_name: parsed.data.recipient_name ? String(parsed.data.recipient_name).trim() : record.recipient_name,
         sent_at: new Date().toISOString(),
         is_locked: true,
       })
@@ -75,7 +83,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       newStatus: finalStatus,
       details: {
         dispatch_method: dispatchMethod,
-        proof_of_delivery_path: body?.proof_of_delivery_path || null,
+        proof_of_delivery_path: parsed.data.proof_of_delivery_path || null,
       },
     })
 
@@ -99,7 +107,10 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     return NextResponse.json({ data: updatedRecord })
   } catch (error) {
-    log.error({ err: String(error) }, "Error in POST /api/correspondence/records/[id]/dispatch:")
+    log.error({ err: String(error) }, "Error in PATCH /api/correspondence/records/[id]/dispatch:")
     return NextResponse.json({ error: "Failed to finalize dispatch" }, { status: 500 })
   }
 }
+
+// POST kept for backwards compat — prefer PATCH
+export { PATCH as POST }

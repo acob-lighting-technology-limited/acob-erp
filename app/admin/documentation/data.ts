@@ -14,6 +14,7 @@ type AdminDepartmentDocs = {
   rootLabel: string
   enabled: boolean
   lockToInitialPath: boolean
+  accessMode: "self" | "admin"
 }
 
 export type AdminDocumentationDataResult =
@@ -71,7 +72,13 @@ export async function getAdminDocumentationData() {
         documentation: [],
         employee: [],
         userProfile,
-        departmentDocs: { initialPath: "/Projects", rootLabel: "Projects", enabled: false, lockToInitialPath: false },
+        departmentDocs: {
+          initialPath: "/",
+          rootLabel: "Department Libraries",
+          enabled: false,
+          lockToInitialPath: false,
+          accessMode: "admin",
+        },
       }
     }
   }
@@ -84,7 +91,13 @@ export async function getAdminDocumentationData() {
       documentation: [],
       employee: [],
       userProfile,
-      departmentDocs: { initialPath: "/Projects", rootLabel: "Projects", enabled: false, lockToInitialPath: false },
+      departmentDocs: {
+        initialPath: "/",
+        rootLabel: "Department Libraries",
+        enabled: false,
+        lockToInitialPath: false,
+        accessMode: "admin",
+      },
     }
   }
 
@@ -128,12 +141,14 @@ export async function getAdminDocumentationData() {
           rootLabel: oneDriveScope.rootLabel,
           enabled: true,
           lockToInitialPath: !oneDriveScope.isAdminLike,
+          accessMode: "admin",
         }
       : {
-          initialPath: "/Projects",
-          rootLabel: "Projects",
+          initialPath: "/",
+          rootLabel: "Department Libraries",
           enabled: false,
           lockToInitialPath: false,
+          accessMode: "admin",
         },
   }
 }

@@ -1,5 +1,9 @@
 "use client"
 
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { z } from "zod"
+import { useEffect } from "react"
 import {
   Dialog,
   DialogContent,
@@ -19,6 +23,21 @@ import type { UserRole } from "@/types/database"
 import { getRoleDisplayName } from "@/lib/permissions"
 import { getAssignableRolesForActor } from "@/lib/role-management"
 import type { UserProfile } from "@/app/admin/hr/employees/admin-employee-content"
+
+const createUserSchema = z.object({
+  firstName: z.string().min(1, "First name is required"),
+  lastName: z.string().min(1, "Last name is required"),
+  otherNames: z.string(),
+  email: z.string().min(1, "Email is required").email("Invalid email address"),
+  department: z.string().min(1, "Department is required"),
+  companyRole: z.string(),
+  phoneNumber: z.string(),
+  role: z.string(),
+  admin_domains: z.array(z.string()),
+  employeeNumber: z.string(),
+})
+
+type CreateUserFormValues = z.infer<typeof createUserSchema>
 
 interface CreateUserForm {
   firstName: string
@@ -47,8 +66,8 @@ interface CreateUserDialogProps {
 export function CreateUserDialog({
   isOpen,
   onOpenChange,
-  form,
-  setForm,
+  form: parentForm,
+  setForm: setParentForm,
   onCreate,
   isCreating,
   canManageUsers: _canManageUsers,
@@ -56,10 +75,76 @@ export function CreateUserDialog({
 }: CreateUserDialogProps) {
   const { departments: DEPARTMENTS } = useDepartments()
 
+  const rhf = useForm<CreateUserFormValues>({
+    resolver: zodResolver(createUserSchema),
+    defaultValues: {
+      firstName: parentForm.firstName,
+      lastName: parentForm.lastName,
+      otherNames: parentForm.otherNames,
+      email: parentForm.email,
+      department: parentForm.department,
+      companyRole: parentForm.companyRole,
+      phoneNumber: parentForm.phoneNumber,
+      role: parentForm.role,
+      admin_domains: parentForm.admin_domains,
+      employeeNumber: parentForm.employeeNumber,
+    },
+  })
+
+  const {
+    register,
+    watch,
+    setValue,
+    formState: { errors },
+  } = rhf
+
+  // Sync form state back to parent whenever values change
+  useEffect(() => {
+    const subscription = watch((values) => {
+      setParentForm({
+        firstName: values.firstName ?? "",
+        lastName: values.lastName ?? "",
+        otherNames: values.otherNames ?? "",
+        email: values.email ?? "",
+        department: values.department ?? "",
+        companyRole: values.companyRole ?? "",
+        phoneNumber: values.phoneNumber ?? "",
+        role: (values.role ?? "employee") as UserRole,
+        admin_domains: (values.admin_domains ?? []).filter((value): value is string => Boolean(value)),
+        employeeNumber: values.employeeNumber ?? "",
+      })
+    })
+    return () => subscription.unsubscribe()
+  }, [watch, setParentForm])
+
+  // Reset form when dialog opens with new data
+  useEffect(() => {
+    if (isOpen) {
+      rhf.reset({
+        firstName: parentForm.firstName,
+        lastName: parentForm.lastName,
+        otherNames: parentForm.otherNames,
+        email: parentForm.email,
+        department: parentForm.department,
+        companyRole: parentForm.companyRole,
+        phoneNumber: parentForm.phoneNumber,
+        role: parentForm.role,
+        admin_domains: parentForm.admin_domains,
+        employeeNumber: parentForm.employeeNumber,
+      })
+    }
+  }, [isOpen]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const getAvailableRoles = (): UserRole[] => {
     if (!userProfile) return []
     return getAssignableRolesForActor(userProfile.role) as UserRole[]
   }
+
+  const roleValue = watch("role")
+  const firstNameValue = watch("firstName")
+  const lastNameValue = watch("lastName")
+  const emailValue = watch("email")
+  const departmentValue = watch("department")
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -83,25 +168,15 @@ export function CreateUserDialog({
               <Label htmlFor="create_first_name">
                 First Name * <span className="text-destructive">*</span>
               </Label>
-              <Input
-                id="create_first_name"
-                value={form.firstName}
-                onChange={(e) => setForm({ ...form, firstName: e.target.value })}
-                placeholder="John"
-                className="mt-1.5"
-              />
+              <Input id="create_first_name" {...register("firstName")} placeholder="John" className="mt-1.5" />
+              {errors.firstName && <p className="text-destructive mt-1 text-xs">{errors.firstName.message}</p>}
             </div>
             <div>
               <Label htmlFor="create_last_name">
                 Last Name * <span className="text-destructive">*</span>
               </Label>
-              <Input
-                id="create_last_name"
-                value={form.lastName}
-                onChange={(e) => setForm({ ...form, lastName: e.target.value })}
-                placeholder="Doe"
-                className="mt-1.5"
-              />
+              <Input id="create_last_name" {...register("lastName")} placeholder="Doe" className="mt-1.5" />
+              {errors.lastName && <p className="text-destructive mt-1 text-xs">{errors.lastName.message}</p>}
             </div>
           </div>
 
@@ -109,8 +184,7 @@ export function CreateUserDialog({
             <Label htmlFor="create_other_names">Other Names</Label>
             <Input
               id="create_other_names"
-              value={form.otherNames}
-              onChange={(e) => setForm({ ...form, otherNames: e.target.value })}
+              {...register("otherNames")}
               placeholder="Middle name or other names (optional)"
               className="mt-1.5"
             />
@@ -122,8 +196,8 @@ export function CreateUserDialog({
             </Label>
             <Input
               id="create_employee_number"
-              value={form.employeeNumber}
-              onChange={(e) => setForm({ ...form, employeeNumber: e.target.value.toUpperCase() })}
+              value={watch("employeeNumber")}
+              onChange={(e) => setValue("employeeNumber", e.target.value.toUpperCase())}
               placeholder="e.g., ACOB/2026/058"
               className="mt-1.5 font-mono"
               required
@@ -139,19 +213,18 @@ export function CreateUserDialog({
               <Input
                 id="create_email"
                 type="email"
-                value={form.email}
-                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                {...register("email")}
                 placeholder="john.doe@company.com"
                 className="mt-1.5"
               />
+              {errors.email && <p className="text-destructive mt-1 text-xs">{errors.email.message}</p>}
             </div>
             <div>
               <Label htmlFor="create_phone">Phone Number</Label>
               <Input
                 id="create_phone"
                 type="tel"
-                value={form.phoneNumber}
-                onChange={(e) => setForm({ ...form, phoneNumber: e.target.value })}
+                {...register("phoneNumber")}
                 placeholder="+234 800 000 0000"
                 className="mt-1.5"
               />
@@ -163,7 +236,7 @@ export function CreateUserDialog({
               <Label htmlFor="create_department">
                 Department * <span className="text-destructive">*</span>
               </Label>
-              <Select value={form.department} onValueChange={(value) => setForm({ ...form, department: value })}>
+              <Select value={departmentValue} onValueChange={(value) => setValue("department", value)}>
                 <SelectTrigger className="mt-1.5">
                   <SelectValue placeholder="Select department" />
                 </SelectTrigger>
@@ -175,18 +248,18 @@ export function CreateUserDialog({
                   ))}
                 </SelectContent>
               </Select>
+              {errors.department && <p className="text-destructive mt-1 text-xs">{errors.department.message}</p>}
             </div>
             <div>
               <Label htmlFor="create_role">Role</Label>
               <Select
-                value={form.role}
-                onValueChange={(value: UserRole) =>
-                  setForm({
-                    ...form,
-                    role: value,
-                    admin_domains: value === "admin" ? form.admin_domains : [],
-                  })
-                }
+                value={roleValue}
+                onValueChange={(value: string) => {
+                  setValue("role", value)
+                  if (value !== "admin") {
+                    setValue("admin_domains", [])
+                  }
+                }}
               >
                 <SelectTrigger className="mt-1.5">
                   <SelectValue />
@@ -201,13 +274,13 @@ export function CreateUserDialog({
               </Select>
             </div>
           </div>
-          {form.role === "admin" && (
+          {roleValue === "admin" && (
             <div>
               <Label>Admin Domains *</Label>
               <SearchableMultiSelect
                 label="Admin Domains"
-                values={form.admin_domains}
-                onChange={(values) => setForm({ ...form, admin_domains: values })}
+                values={watch("admin_domains")}
+                onChange={(values) => setValue("admin_domains", values)}
                 options={[
                   { value: "hr", label: "HR" },
                   { value: "finance", label: "Finance" },
@@ -224,11 +297,10 @@ export function CreateUserDialog({
           )}
 
           <div>
-            <Label htmlFor="create_company_role">Position/Title</Label>
+            <Label htmlFor="create_designation">Designation</Label>
             <Input
-              id="create_company_role"
-              value={form.companyRole}
-              onChange={(e) => setForm({ ...form, companyRole: e.target.value })}
+              id="create_designation"
+              {...register("companyRole")}
               placeholder="e.g., Senior Developer, Manager"
               className="mt-1.5"
             />
@@ -241,7 +313,7 @@ export function CreateUserDialog({
           <Button
             onClick={onCreate}
             disabled={
-              isCreating || !form.firstName.trim() || !form.lastName.trim() || !form.email.trim() || !form.department
+              isCreating || !firstNameValue.trim() || !lastNameValue.trim() || !emailValue.trim() || !departmentValue
             }
             className="gap-2"
           >

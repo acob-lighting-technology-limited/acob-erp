@@ -112,7 +112,7 @@ export function WeeklyReportTableRow({
         </TableCell>
         <TableCell className="text-center">
           <Link
-            href={`/admin/reports/action-tracker?week=${report.week_number}&year=${report.year}&dept=${report.department}`}
+            href={`/admin/reports/general-meeting/action-tracker?week=${report.week_number}&year=${report.year}&dept=${report.department}`}
             className="group flex flex-col items-center gap-1 transition-all"
             onClick={(e) => e.stopPropagation()}
           >

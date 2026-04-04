@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
+import { z } from "zod"
 import { resolveAdminScope } from "@/lib/admin/rbac"
 import { logger } from "@/lib/logger"
 import { writeAuditLog } from "@/lib/audit/write-audit"
@@ -10,6 +11,10 @@ const log = logger("payments-categories")
 export const dynamic = "force-dynamic"
 
 type PaymentsClient = Awaited<ReturnType<typeof createClient>>
+
+const UpdatePaymentCategorySchema = z.object({
+  name: z.string().trim().min(1, "Category name is required"),
+})
 
 // Helper function to create Supabase client
 async function createClient() {
@@ -52,11 +57,12 @@ export async function PUT(request: Request, { params }: { params: { id: string }
     }
 
     const body = await request.json()
-    const { name } = body
-
-    if (!name) {
-      return NextResponse.json({ error: "Category name is required" }, { status: 400 })
+    const parsed = UpdatePaymentCategorySchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid request body" }, { status: 400 })
     }
+
+    const { name } = parsed.data
 
     const { data: category, error } = await supabase
       .from("payment_categories")

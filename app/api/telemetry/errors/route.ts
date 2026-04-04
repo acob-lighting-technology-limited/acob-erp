@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { rateLimit, getClientId } from "@/lib/rate-limit"
@@ -19,6 +20,17 @@ interface ErrorPayload {
   timestamp?: string
 }
 
+const TelemetryErrorSchema = z.object({
+  source: z.string().optional(),
+  message: z.string().trim().min(1, "message is required"),
+  stack: z.string().nullable().optional(),
+  route: z.string().optional(),
+  href: z.string().optional(),
+  userAgent: z.string().optional(),
+  context: z.record(z.unknown()).optional(),
+  timestamp: z.string().optional(),
+})
+
 function truncate(value: string | null | undefined, max = 1000): string | null {
   if (!value) return null
   return value.length > max ? `${value.slice(0, max)}...` : value
@@ -36,17 +48,20 @@ function getFirstIp(request: NextRequest): string | null {
 }
 
 export async function POST(request: NextRequest) {
-  const rl = rateLimit(`telemetry:${getClientId(request)}`, { limit: 20, windowSec: 60 })
+  const rl = await rateLimit(`telemetry:${getClientId(request)}`, { limit: 20, windowSec: 60 })
   if (!rl.allowed) {
     return NextResponse.json({ error: "Too many requests." }, { status: 429 })
   }
 
   try {
-    const payload = (await request.json()) as ErrorPayload
-    const message = truncate(String(payload?.message || "").trim(), 600)
-    if (!message) {
-      return NextResponse.json({ error: "message is required" }, { status: 400 })
+    const body = (await request.json()) as ErrorPayload
+    const parsed = TelemetryErrorSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "invalid_payload" }, { status: 400 })
     }
+
+    const payload = parsed.data
+    const message = truncate(payload.message, 600)
 
     const supabase = await createClient()
     const dataClient = getServiceRoleClientOrFallback(supabase)

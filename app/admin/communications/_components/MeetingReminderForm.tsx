@@ -57,7 +57,7 @@ export function MeetingReminderForm({
             Managed from Admin Reports meeting window. This value is read-only here.
           </p>
           <Button variant="outline" size="sm" asChild className="h-7 px-2 text-[11px]">
-            <Link href="/admin/reports/weekly-reports">Manage Meeting Date</Link>
+            <Link href="/admin/reports/general-meeting/weekly-reports">Manage Meeting Date</Link>
           </Button>
         </div>
         <div className="space-y-2">

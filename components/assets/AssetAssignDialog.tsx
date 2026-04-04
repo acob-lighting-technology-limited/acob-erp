@@ -1,5 +1,9 @@
 "use client"
 
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { z } from "zod"
+import { useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -15,7 +19,7 @@ import {
 import { SearchableSelect } from "@/components/ui/searchable-select"
 import { formatName } from "@/lib/utils"
 import { ASSET_TYPE_MAP } from "@/lib/asset-types"
-import { OFFICE_LOCATIONS } from "@/lib/permissions"
+import { useOfficeLocations } from "@/hooks/use-office-locations"
 import { User, Building2, Building } from "lucide-react"
 import type { Asset, Employee } from "@/app/admin/assets/admin-assets-content"
 
@@ -32,6 +36,18 @@ interface AssetAssignment {
     last_name: string
   }
 }
+
+const assignFormSchema = z.object({
+  assignment_type: z.enum(["individual", "department", "office"]),
+  assigned_to: z.string(),
+  department: z.string(),
+  office_location: z.string(),
+  assignment_notes: z.string(),
+  assigned_by: z.string(),
+  assigned_at: z.string(),
+})
+
+type AssignFormValues = z.infer<typeof assignFormSchema>
 
 interface AssignFormState {
   assignment_type: "individual" | "department" | "office"
@@ -70,6 +86,59 @@ export function AssetAssignDialog({
   departments,
   isAssigning,
 }: AssetAssignDialogProps) {
+  const { officeLocations } = useOfficeLocations()
+
+  const form = useForm<AssignFormValues>({
+    resolver: zodResolver(assignFormSchema),
+    defaultValues: {
+      assignment_type: assignForm.assignment_type,
+      assigned_to: assignForm.assigned_to,
+      department: assignForm.department,
+      office_location: assignForm.office_location,
+      assignment_notes: assignForm.assignment_notes,
+      assigned_by: assignForm.assigned_by,
+      assigned_at: assignForm.assigned_at,
+    },
+  })
+
+  const { register, watch, setValue } = form
+
+  // Sync form state back to parent whenever values change
+  useEffect(() => {
+    const subscription = watch((values) => {
+      setAssignForm({
+        assignment_type: (values.assignment_type ?? "individual") as "individual" | "department" | "office",
+        assigned_to: values.assigned_to ?? "",
+        department: values.department ?? "",
+        office_location: values.office_location ?? "",
+        assignment_notes: values.assignment_notes ?? "",
+        assigned_by: values.assigned_by ?? "",
+        assigned_at: values.assigned_at ?? "",
+      })
+    })
+    return () => subscription.unsubscribe()
+  }, [watch, setAssignForm])
+
+  // Reset form when dialog opens with new data
+  useEffect(() => {
+    if (isOpen) {
+      form.reset({
+        assignment_type: assignForm.assignment_type,
+        assigned_to: assignForm.assigned_to,
+        department: assignForm.department,
+        office_location: assignForm.office_location,
+        assignment_notes: assignForm.assignment_notes,
+        assigned_by: assignForm.assigned_by,
+        assigned_at: assignForm.assigned_at,
+      })
+    }
+  }, [isOpen]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const assignmentType = watch("assignment_type")
+  const assignedTo = watch("assigned_to")
+  const departmentValue = watch("department")
+  const officeLocation = watch("office_location")
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] w-[95vw] max-w-2xl overflow-y-auto">
@@ -114,16 +183,13 @@ export function AssetAssignDialog({
           <div>
             <Label htmlFor="assignment_type">Assignment Type *</Label>
             <SearchableSelect
-              value={assignForm.assignment_type}
-              onValueChange={(value) =>
-                setAssignForm({
-                  ...assignForm,
-                  assignment_type: value as "individual" | "department" | "office",
-                  assigned_to: "",
-                  department: "",
-                  office_location: "",
-                })
-              }
+              value={assignmentType}
+              onValueChange={(value) => {
+                setValue("assignment_type", value as "individual" | "department" | "office")
+                setValue("assigned_to", "")
+                setValue("department", "")
+                setValue("office_location", "")
+              }}
               placeholder="Select assignment type"
               searchPlaceholder="Search assignment types..."
               options={[
@@ -134,12 +200,12 @@ export function AssetAssignDialog({
             />
           </div>
 
-          {assignForm.assignment_type === "individual" && (
+          {assignmentType === "individual" && (
             <div>
               <Label htmlFor="assigned_to">Assign To *</Label>
               <SearchableSelect
-                value={assignForm.assigned_to}
-                onValueChange={(value) => setAssignForm({ ...assignForm, assigned_to: value })}
+                value={assignedTo}
+                onValueChange={(value) => setValue("assigned_to", value)}
                 placeholder="Select employees member"
                 searchPlaceholder="Search employees..."
                 icon={<User className="h-4 w-4" />}
@@ -153,12 +219,12 @@ export function AssetAssignDialog({
             </div>
           )}
 
-          {assignForm.assignment_type === "department" && (
+          {assignmentType === "department" && (
             <div>
               <Label htmlFor="department">Department *</Label>
               <SearchableSelect
-                value={assignForm.department}
-                onValueChange={(value) => setAssignForm({ ...assignForm, department: value })}
+                value={departmentValue}
+                onValueChange={(value) => setValue("department", value)}
                 placeholder="Select department"
                 searchPlaceholder="Search departments..."
                 icon={<Building2 className="h-4 w-4" />}
@@ -172,22 +238,22 @@ export function AssetAssignDialog({
             </div>
           )}
 
-          {assignForm.assignment_type === "office" && (
+          {assignmentType === "office" && (
             <div>
               <Label htmlFor="office_location">Office Location *</Label>
               <SearchableSelect
-                value={assignForm.office_location}
-                onValueChange={(value) => setAssignForm({ ...assignForm, office_location: value })}
+                value={officeLocation}
+                onValueChange={(value) => setValue("office_location", value)}
                 placeholder="Select office location"
                 searchPlaceholder="Search office locations..."
                 icon={<Building className="h-4 w-4" />}
-                options={OFFICE_LOCATIONS.map((location) => ({
+                options={officeLocations.map((location) => ({
                   value: location,
                   label: location,
                   icon: <Building className="h-3 w-3" />,
                 }))}
               />
-              <p className="text-muted-foreground mt-1 text-xs">{OFFICE_LOCATIONS.length} office locations available</p>
+              <p className="text-muted-foreground mt-1 text-xs">{officeLocations.length} office locations available</p>
             </div>
           )}
 
@@ -196,8 +262,8 @@ export function AssetAssignDialog({
             <div>
               <Label htmlFor="assigned_by">Assigned By (Optional Override)</Label>
               <SearchableSelect
-                value={assignForm.assigned_by}
-                onValueChange={(value) => setAssignForm({ ...assignForm, assigned_by: value })}
+                value={watch("assigned_by")}
+                onValueChange={(value) => setValue("assigned_by", value)}
                 placeholder="Select assigner (defaults to you)"
                 searchPlaceholder="Search employees..."
                 icon={<User className="h-4 w-4" />}
@@ -211,12 +277,7 @@ export function AssetAssignDialog({
             </div>
             <div>
               <Label htmlFor="assigned_at">Assigned Date (Optional Override)</Label>
-              <Input
-                type="datetime-local"
-                id="assigned_at"
-                value={assignForm.assigned_at || ""}
-                onChange={(e) => setAssignForm({ ...assignForm, assigned_at: e.target.value })}
-              />
+              <Input type="datetime-local" id="assigned_at" {...register("assigned_at")} />
             </div>
           </div>
 
@@ -224,8 +285,7 @@ export function AssetAssignDialog({
             <Label htmlFor="assignment_notes">Assignment Notes</Label>
             <Textarea
               id="assignment_notes"
-              value={assignForm.assignment_notes}
-              onChange={(e) => setAssignForm({ ...assignForm, assignment_notes: e.target.value })}
+              {...register("assignment_notes")}
               placeholder="Any notes about this assignment (e.g., faults, accessories included)..."
               rows={3}
             />
@@ -239,9 +299,9 @@ export function AssetAssignDialog({
             onClick={onAssign}
             loading={isAssigning}
             disabled={
-              (assignForm.assignment_type === "individual" && !assignForm.assigned_to) ||
-              (assignForm.assignment_type === "department" && !assignForm.department) ||
-              (assignForm.assignment_type === "office" && !assignForm.office_location)
+              (assignmentType === "individual" && !assignedTo) ||
+              (assignmentType === "department" && !departmentValue) ||
+              (assignmentType === "office" && !officeLocation)
             }
           >
             {currentAssignment ? "Reassign Asset" : "Assign Asset"}

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { z } from "zod"
 import {
   HELP_DESK_STATUSES,
   appendAuditLog,
@@ -13,6 +14,32 @@ import { logger } from "@/lib/logger"
 
 const log = logger("help-desk-ticket")
 export const dynamic = "force-dynamic"
+const VALID_HD_TRANSITIONS: Record<string, string[]> = {
+  new: ["assigned", "department_queue", "cancelled"],
+  department_queue: ["department_assigned", "assigned", "cancelled"],
+  department_assigned: ["assigned", "in_progress", "cancelled"],
+  assigned: ["in_progress", "cancelled"],
+  in_progress: ["resolved", "returned", "cancelled", "paused"],
+  paused: ["in_progress", "cancelled"],
+  resolved: ["closed", "in_progress"],
+  returned: ["in_progress"],
+  closed: [],
+  cancelled: [],
+  pending_approval: ["approved_for_procurement", "rejected"],
+  approved_for_procurement: ["assigned", "cancelled"],
+  rejected: ["new"],
+  pending_lead_review: ["department_queue", "assigned", "cancelled"],
+}
+const UpdateHelpDeskTicketSchema = z.object({
+  status: z.enum(HELP_DESK_STATUSES).optional(),
+  status_note: z.string().optional().nullable(),
+  csat_rating: z
+    .number()
+    .min(1, "CSAT rating must be between 1 and 5")
+    .max(5, "CSAT rating must be between 1 and 5")
+    .optional(),
+  csat_feedback: z.string().optional().nullable(),
+})
 
 export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -86,27 +113,37 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     }
 
     const body = await request.json()
-    const nextStatus = body?.status ? String(body.status) : null
-    const statusNote = body?.status_note ? String(body.status_note).trim() : null
-    const csatRating = body?.csat_rating
-    const csatFeedback = body?.csat_feedback ? String(body.csat_feedback) : null
+    const parsed = UpdateHelpDeskTicketSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid request body" }, { status: 400 })
+    }
+    const nextStatus = parsed.data.status ? String(parsed.data.status) : null
+    const statusNote = parsed.data.status_note ? String(parsed.data.status_note).trim() : null
+    const csatRating = parsed.data.csat_rating
+    const csatFeedback = parsed.data.csat_feedback ? String(parsed.data.csat_feedback) : null
 
-    const canManage =
+    const canManageWorkflow =
       isAdminRole(profile.role) ||
       canLeadDepartment(profile, ticket.service_department) ||
       canLeadDepartment(profile, ticket.requester_department) ||
-      ticket.assigned_to === user.id ||
-      ticket.requester_id === user.id
+      ticket.assigned_to === user.id
 
-    if (!canManage) {
+    const canRateTicket = ticket.requester_id === user.id
+
+    if (nextStatus && !canManageWorkflow) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
     const updates: Record<string, unknown> = {}
 
     if (nextStatus) {
-      if (!HELP_DESK_STATUSES.includes(nextStatus as (typeof HELP_DESK_STATUSES)[number])) {
-        return NextResponse.json({ error: "Invalid status" }, { status: 400 })
+      const currentStatus = String(ticket.status)
+      const allowed = VALID_HD_TRANSITIONS[currentStatus] || []
+      if (!allowed.includes(nextStatus)) {
+        return NextResponse.json(
+          { error: `Cannot transition from "${currentStatus}" to "${nextStatus}"` },
+          { status: 400 }
+        )
       }
 
       updates.status = nextStatus
@@ -122,14 +159,21 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     }
 
     if (typeof csatRating === "number") {
-      if (ticket.requester_id !== user.id) {
+      if (!canRateTicket) {
         return NextResponse.json({ error: "Only requester can rate a ticket" }, { status: 403 })
+      }
+      if (!["resolved", "closed"].includes(String(ticket.status || "").toLowerCase())) {
+        return NextResponse.json({ error: "Ticket can only be rated after it is resolved or closed" }, { status: 400 })
       }
       if (csatRating < 1 || csatRating > 5) {
         return NextResponse.json({ error: "CSAT rating must be between 1 and 5" }, { status: 400 })
       }
       updates.csat_rating = csatRating
       updates.csat_feedback = csatFeedback
+    }
+
+    if (!nextStatus && typeof csatRating !== "number") {
+      return NextResponse.json({ error: "No valid update provided" }, { status: 400 })
     }
 
     const { data: updated, error: updateError } = await supabase

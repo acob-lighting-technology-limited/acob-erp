@@ -1,16 +1,18 @@
 "use client"
 
+import { useState } from "react"
 import { useParams } from "next/navigation"
 import { useQuery } from "@tanstack/react-query"
+import { useQueryClient } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Pencil, Package } from "lucide-react"
-import Link from "next/link"
 import { PageHeader } from "@/components/layout/page-header"
 import { PageLoader } from "@/components/ui/query-states"
+import { ProductFormDialog } from "../_components/product-form-dialog"
 
 interface Product {
   id: string
@@ -48,6 +50,8 @@ async function fetchProduct(id: string): Promise<Product> {
 export default function ProductDetailPage() {
   const params = useParams()
   const id = params.id as string
+  const queryClient = useQueryClient()
+  const [isEditOpen, setIsEditOpen] = useState(false)
 
   const { data: product, isLoading } = useQuery({
     queryKey: QUERY_KEYS.adminProductDetail(id),
@@ -73,13 +77,28 @@ export default function ProductDetailPage() {
         description={product.sku}
         backLink={{ href: "/admin/inventory/products", label: "Back to Products" }}
         actions={
-          <Link href={`/admin/inventory/products/${product.id}/edit`}>
-            <Button>
-              <Pencil className="mr-2 h-4 w-4" />
-              Edit Product
-            </Button>
-          </Link>
+          <Button onClick={() => setIsEditOpen(true)}>
+            <Pencil className="mr-2 h-4 w-4" />
+            Edit Product
+          </Button>
         }
+      />
+      <ProductFormDialog
+        open={isEditOpen}
+        onOpenChange={setIsEditOpen}
+        queryClient={queryClient}
+        product={{
+          id: product.id,
+          sku: product.sku,
+          name: product.name,
+          description: product.description || "",
+          category_id: product.category_id || "",
+          unit_cost: product.unit_cost,
+          selling_price: product.selling_price,
+          quantity_on_hand: product.quantity_on_hand,
+          reorder_level: product.reorder_level,
+          status: product.status,
+        }}
       />
 
       <div className="grid gap-6 lg:grid-cols-3">

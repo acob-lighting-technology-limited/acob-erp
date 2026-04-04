@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import { PortalCorrespondenceContent } from "../../correspondence/portal-correspondence-content"
+import { PortalReferenceGeneratorContent } from "./portal-reference-generator-content"
 import type { CorrespondenceRecord } from "@/types/correspondence"
 
 interface DepartmentCodeOption {
@@ -45,6 +45,7 @@ async function getData() {
     .select("*")
     .returns<CorrespondenceRecord[]>()
     .order("created_at", { ascending: false })
+    .limit(50)
 
   const role = profile?.role || ""
   const isDeptLead = Boolean(profile?.is_department_lead)
@@ -75,7 +76,6 @@ async function getData() {
     .returns<DepartmentCodeOption[]>()
 
   return {
-    userId: user.id,
     currentViewerRole: role,
     isDepartmentLead: isDeptLead,
     currentViewerName,
@@ -93,8 +93,7 @@ export default async function ToolsReferenceGeneratorPage() {
   }
 
   return (
-    <PortalCorrespondenceContent
-      userId={data.userId}
+    <PortalReferenceGeneratorContent
       currentViewerRole={data.currentViewerRole}
       isDepartmentLead={data.isDepartmentLead}
       currentViewerName={data.currentViewerName}

@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Users, Search, Filter, Shield, UserPlus } from "lucide-react"
-import Link from "next/link"
 import { toast } from "sonner"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { StatCard } from "@/components/ui/stat-card"
@@ -19,6 +18,8 @@ import { fetchUsersSettingsData, fetchAllUsersForPicker, formatDate, type User }
 import { EditUserDialog } from "./_components/edit-user-dialog"
 import { AddUserToRoleDialog } from "./_components/add-user-to-role-dialog"
 import { UsersTable } from "./_components/users-table"
+import { InviteUserDialog } from "./_components/invite-user-dialog"
+import { getAssignableRolesForActor } from "@/lib/role-management"
 
 const log = logger("settings-users")
 
@@ -30,6 +31,7 @@ export default function UsersPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [formData, setFormData] = useState({ role: "", employment_status: "active", admin_domains: [] as string[] })
+  const [isInviteOpen, setIsInviteOpen] = useState(searchParams.get("invite") === "1")
 
   const { data: settingsData, isLoading: loading } = useQuery({
     queryKey: QUERY_KEYS.adminUsersSettings(),
@@ -95,6 +97,7 @@ export default function UsersPage() {
   }
 
   const roles = Array.from(new Set(users.map((u) => u.role)))
+  const roleOptions = getAssignableRolesForActor(currentUserRole)
 
   const [isAddUserDialogOpen, setIsAddUserDialogOpen] = useState(false)
   const [userToAdd, setUserToAdd] = useState<string>("")
@@ -153,12 +156,10 @@ export default function UsersPage() {
               Add User to {roleFilter.replace("_", " ")}
             </Button>
           )}
-          <Link href="/admin/settings/users/invite">
-            <Button>
-              <UserPlus className="mr-2 h-4 w-4" />
-              Invite User
-            </Button>
-          </Link>
+          <Button onClick={() => setIsInviteOpen(true)}>
+            <UserPlus className="mr-2 h-4 w-4" />
+            Invite User
+          </Button>
         </div>
       }
       stats={
@@ -221,6 +222,13 @@ export default function UsersPage() {
         availableUsers={availableUsers}
         addUserWarning={addUserWarning}
         onConfirm={handleAddUserToRole}
+      />
+
+      <InviteUserDialog
+        open={isInviteOpen}
+        onOpenChange={setIsInviteOpen}
+        roleOptions={roleOptions}
+        queryClient={queryClient}
       />
     </AdminTablePage>
   )

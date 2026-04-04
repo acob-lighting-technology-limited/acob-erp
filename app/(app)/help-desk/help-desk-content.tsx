@@ -1,6 +1,7 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { toast } from "sonner"
@@ -12,12 +13,7 @@ import { Headset } from "lucide-react"
 import { HelpDeskStats } from "@/components/help-desk/help-desk-stats"
 import { PendingApprovalsCard } from "@/components/help-desk/pending-approvals-card"
 import { CreateTicketDialog, type CreateTicketForm } from "@/components/help-desk/create-ticket-dialog"
-import { ViewTicketDialog } from "@/components/help-desk/view-ticket-dialog"
-import type {
-  HelpDeskTicket,
-  HelpDeskTicketDetailResponse,
-  HelpDeskContentProps,
-} from "@/components/help-desk/help-desk-types"
+import type { HelpDeskTicket, HelpDeskContentProps } from "@/components/help-desk/help-desk-types"
 
 type ErrorPayload = {
   error?: string
@@ -42,18 +38,14 @@ export function HelpDeskContent({
   initialTickets,
   initialError,
 }: HelpDeskContentProps) {
+  const router = useRouter()
   const queryClient = useQueryClient()
   const [tickets, setTickets] = useState<HelpDeskTicket[]>(initialTickets)
   const [isSaving, setIsSaving] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
   const [availableDepartments] = useState<string[]>(initialDepartments || [])
-  const [viewTicketId, setViewTicketId] = useState<string | null>(null)
-  const [viewTicketOpen, setViewTicketOpen] = useState(false)
-  const [viewTicketLoading, setViewTicketLoading] = useState(false)
-  const [viewTicketSaving, setViewTicketSaving] = useState(false)
-  const [viewTicketData, setViewTicketData] = useState<HelpDeskTicketDetailResponse | null>(null)
-  const [viewTicketStatus, setViewTicketStatus] = useState<string>("")
   const [pendingApprovalsOpen, setPendingApprovalsOpen] = useState(false)
+  const [processingApprovalId, setProcessingApprovalId] = useState<string | null>(null)
   const [form, setForm] = useState<CreateTicketForm>({
     title: "",
     description: "",
@@ -62,9 +54,11 @@ export function HelpDeskContent({
     request_type: "support",
   })
 
-  if (initialError) {
-    toast.error(initialError)
-  }
+  useEffect(() => {
+    if (initialError) {
+      toast.error(initialError)
+    }
+  }, [initialError])
 
   const pendingApprovalsPath = canReviewPendingApprovals
     ? "/api/help-desk/tickets?scope=department&status=pending_approval"
@@ -207,53 +201,25 @@ export function HelpDeskContent({
   }
 
   async function openTicketDetails(ticketId: string) {
-    setViewTicketId(ticketId)
-    setViewTicketOpen(true)
-    setViewTicketLoading(true)
-
-    try {
-      const res = await fetch(`/api/help-desk/tickets/${ticketId}`, { cache: "no-store" })
-      const json = await res.json()
-
-      if (!res.ok) {
-        throw new Error(json?.error || "Failed to load ticket details")
-      }
-
-      setViewTicketData(json.data || null)
-      setViewTicketStatus(json.data?.ticket?.status || "")
-    } catch (error: unknown) {
-      toast.error(getErrorMessage(error, "Failed to load ticket details"))
-      setViewTicketData(null)
-      setViewTicketStatus("")
-    } finally {
-      setViewTicketLoading(false)
-    }
+    router.push(`/help-desk/${ticketId}`)
   }
 
-  async function saveTicketStatusFromModal() {
-    if (!viewTicketId || !viewTicketStatus) return
-
-    setViewTicketSaving(true)
+  async function decideApproval(ticketId: string, decision: "approved" | "rejected") {
+    setProcessingApprovalId(ticketId)
     try {
-      const res = await fetch(`/api/help-desk/tickets/${viewTicketId}`, {
+      const response = await fetch(`/api/help-desk/tickets/${ticketId}/approvals`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: viewTicketStatus }),
+        body: JSON.stringify({ decision }),
       })
-      const json = await res.json().catch(() => ({}))
-
-      if (!res.ok) {
-        throw new Error(json?.error || "Failed to update ticket")
-      }
-
-      toast.success("Ticket status updated")
+      const payload = (await response.json().catch(() => null)) as { error?: string } | null
+      if (!response.ok) throw new Error(payload?.error || "Failed to process approval")
+      toast.success(`Ticket ${decision === "approved" ? "approved" : "rejected"}`)
       await refreshTickets()
-      await openTicketDetails(viewTicketId)
     } catch (error: unknown) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      toast.error((error as any).message || "Failed to update ticket")
+      toast.error(getErrorMessage(error, "Failed to process approval"))
     } finally {
-      setViewTicketSaving(false)
+      setProcessingApprovalId(null)
     }
   }
 
@@ -296,6 +262,8 @@ export function HelpDeskContent({
           open={pendingApprovalsOpen}
           onOpenChange={setPendingApprovalsOpen}
           tickets={pendingApprovals}
+          processingId={processingApprovalId}
+          onDecision={decideApproval}
         />
       )}
 
@@ -313,18 +281,6 @@ export function HelpDeskContent({
           />
         </CardContent>
       </Card>
-
-      <ViewTicketDialog
-        open={viewTicketOpen}
-        onOpenChange={setViewTicketOpen}
-        loading={viewTicketLoading}
-        ticket={viewTicketData?.ticket ?? null}
-        events={viewTicketData?.events ?? []}
-        currentStatus={viewTicketStatus}
-        onStatusChange={setViewTicketStatus}
-        onSave={saveTicketStatusFromModal}
-        isSaving={viewTicketSaving}
-      />
     </PageWrapper>
   )
 }

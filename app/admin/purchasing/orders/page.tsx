@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
+import { useQueryClient } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -16,6 +17,8 @@ import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { StatCard } from "@/components/ui/stat-card"
 import { EmptyState } from "@/components/ui/empty-state"
 import { TableSkeleton } from "@/components/ui/query-states"
+import { PurchaseOrderFormDialog } from "./_components/purchase-order-form-dialog"
+import { useSearchParams } from "next/navigation"
 
 interface PurchaseOrder {
   id: string
@@ -65,8 +68,11 @@ async function fetchPurchaseOrdersList(): Promise<PurchaseOrder[]> {
 }
 
 export default function PurchaseOrdersPage() {
+  const queryClient = useQueryClient()
+  const searchParams = useSearchParams()
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
+  const [isCreateOpen, setIsCreateOpen] = useState(searchParams.get("openCreate") === "1")
 
   const { data: orders = [], isLoading: loading } = useQuery({
     queryKey: QUERY_KEYS.adminPurchaseOrders(),
@@ -104,12 +110,10 @@ export default function PurchaseOrdersPage() {
       backLinkHref="/admin"
       backLinkLabel="Back to Admin"
       actions={
-        <Link href="/admin/purchasing/orders/new">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Create PO
-          </Button>
-        </Link>
+        <Button onClick={() => setIsCreateOpen(true)}>
+          <Plus className="mr-2 h-4 w-4" />
+          Create PO
+        </Button>
       }
     >
       {/* Stats */}
@@ -176,7 +180,7 @@ export default function PurchaseOrdersPage() {
               icon={ShoppingCart}
               title="No purchase orders yet"
               description="Create your first purchase order."
-              action={{ label: "Create PO", href: "/admin/purchasing/orders/new", icon: Plus }}
+              action={{ label: "Create PO", href: "/admin/purchasing/orders?openCreate=1", icon: Plus }}
             />
           ) : (
             <Table>
@@ -218,6 +222,7 @@ export default function PurchaseOrdersPage() {
           )}
         </CardContent>
       </Card>
+      <PurchaseOrderFormDialog open={isCreateOpen} onOpenChange={setIsCreateOpen} queryClient={queryClient} />
     </AdminTablePage>
   )
 }

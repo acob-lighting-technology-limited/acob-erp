@@ -33,6 +33,8 @@ interface DocumentationContentProps {
     initialPath: string
     rootLabel: string
     enabled: boolean
+    lockToInitialPath: boolean
+    accessMode: "self" | "admin"
   }
   defaultTab?: "knowledge-docs" | "department-documents"
   hideTabList?: boolean
@@ -363,7 +365,12 @@ export function DocumentationContent({
 
       <TabsContent value="department-documents" className="space-y-4">
         {departmentDocs.enabled ? (
-          <DepartmentDocumentsBrowser initialPath={departmentDocs.initialPath} rootLabel={departmentDocs.rootLabel} />
+          <DepartmentDocumentsBrowser
+            initialPath={departmentDocs.initialPath}
+            rootLabel={departmentDocs.rootLabel}
+            lockToInitialPath={departmentDocs.lockToInitialPath}
+            accessMode={departmentDocs.accessMode}
+          />
         ) : (
           <Card className="border-2">
             <CardContent className="p-12 text-center">

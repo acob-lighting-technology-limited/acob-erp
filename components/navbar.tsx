@@ -25,8 +25,8 @@ import {
   FileSignature,
   ShieldCheck,
   Droplet,
-  ChevronLeft,
-  ChevronRight,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react"
 import { NotificationBell } from "@/components/notification-bell"
 import { UniversalSearch } from "@/components/universal-search"
@@ -116,11 +116,11 @@ export function Navbar({ user, canAccessAdmin = false, isAdminMode = false }: Na
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-10 w-10 rounded-full p-0 lg:h-11 lg:w-11">
-            <Avatar className="h-10 w-10 lg:h-11 lg:w-11">
-              <AvatarFallback className="bg-primary text-primary-foreground text-sm font-semibold lg:text-base">
+          <Avatar className="h-10 w-10 lg:h-11 lg:w-11">
+            <AvatarFallback className="bg-primary text-primary-foreground text-sm font-semibold lg:text-base">
               {getInitials(user?.email, user?.user_metadata?.first_name, user?.user_metadata?.last_name)}
-              </AvatarFallback>
-            </Avatar>
+            </AvatarFallback>
+          </Avatar>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56" align="end" forceMount>
@@ -218,8 +218,9 @@ export function Navbar({ user, canAccessAdmin = false, isAdminMode = false }: Na
               )}
               onClick={() => setIsCollapsed(!isCollapsed)}
               title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+              aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
             >
-              {isCollapsed ? <ChevronRight className="h-5 w-5" /> : <ChevronLeft className="h-5 w-5" />}
+              {isCollapsed ? <PanelLeftOpen className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
             </Button>
             <Link href={dashboardHref} className="flex h-full items-center px-4">
               <Image
