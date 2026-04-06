@@ -17,7 +17,7 @@ interface SignatureCreatorProps {
     phone_number?: string | null
     company_email?: string | null
   } | null
-  variant?: "default" | "anniversary"
+  variant?: "default" | "anniversary" | "selectable"
 }
 
 interface FormData {
@@ -74,11 +74,12 @@ export function SignatureCreator({ profile, variant = "default" }: SignatureCrea
   const [emailError, setEmailError] = useState("")
   const [phoneError, setPhoneError] = useState("")
   const [selectedAnniversaryFont, setSelectedAnniversaryFont] = useState<(typeof ANNIVERSARY_FONT_OPTIONS)[number]["value"]>(
-    ANNIVERSARY_FONT_OPTIONS[0].value
+    ANNIVERSARY_FONT_OPTIONS[1].value
   )
   const [selectedAnniversaryTemplate, setSelectedAnniversaryTemplate] = useState<
     (typeof ANNIVERSARY_TEMPLATE_OPTIONS)[number]["id"]
-  >(ANNIVERSARY_TEMPLATE_OPTIONS[0].id)
+  >("minimal")
+  const [selectedSignatureMode, setSelectedSignatureMode] = useState<"default" | "anniversary">("default")
 
   useEffect(() => {
     if (formData.firstName && formData.lastName) {
@@ -456,7 +457,9 @@ export function SignatureCreator({ profile, variant = "default" }: SignatureCrea
     } ${formattedLastName}`.trim()
     const formattedPhone = formatPhoneNumber(formData.phoneNumber)
 
-    if (variant === "anniversary") {
+    const activeVariant = variant === "selectable" ? selectedSignatureMode : variant
+
+    if (activeVariant === "anniversary") {
       return generateAnniversarySignature(fullName, formattedPhone)
     }
 
@@ -511,17 +514,21 @@ export function SignatureCreator({ profile, variant = "default" }: SignatureCrea
     !emailError &&
     !phoneError
 
-  const pageTitle = variant === "anniversary" ? "10th Anniversary Signature" : "Personal Information"
+  const activeVariant = variant === "selectable" ? selectedSignatureMode : variant
+
+  const pageTitle = activeVariant === "anniversary" ? "10th Anniversary Signature" : "Personal Information"
   const pageDescription =
-    variant === "anniversary"
+    activeVariant === "anniversary"
       ? "Generate the temporary 10th anniversary email signature"
-      : "Fill in your details to generate your signature"
-  const previewTitle = variant === "anniversary" ? "Anniversary Preview" : "Signature Preview"
+      : variant === "selectable"
+        ? "Choose between the standard and anniversary employee signature"
+        : "Fill in your details to generate your signature"
+  const previewTitle = activeVariant === "anniversary" ? "Anniversary Preview" : "Signature Preview"
   const previewDescription =
-    variant === "anniversary"
+    activeVariant === "anniversary"
       ? "This is how your temporary anniversary signature will look"
       : "This is how your signature will look"
-  const copyButtonLabel = variant === "anniversary" ? "Copy Anniversary Signature" : "Copy Signature"
+  const copyButtonLabel = activeVariant === "anniversary" ? "Copy Anniversary Signature" : "Copy Signature"
 
   return (
     <div className="grid gap-8 lg:grid-cols-2">
@@ -532,6 +539,21 @@ export function SignatureCreator({ profile, variant = "default" }: SignatureCrea
           <CardDescription>{pageDescription}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {variant === "selectable" && (
+            <div className="space-y-2">
+              <Label>Signature Type</Label>
+              <Tabs value={selectedSignatureMode} onValueChange={(value) => setSelectedSignatureMode(value as "default" | "anniversary")}>
+                <TabsList className="h-auto w-full justify-start">
+                  <TabsTrigger value="default">Standard</TabsTrigger>
+                  <TabsTrigger value="anniversary">10th Anniversary</TabsTrigger>
+                </TabsList>
+              </Tabs>
+              <p className="text-muted-foreground text-xs">
+                Use the anniversary option when the employee should use the 2026 commemorative signature.
+              </p>
+            </div>
+          )}
+
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="firstName">First Name *</Label>
@@ -596,7 +618,7 @@ export function SignatureCreator({ profile, variant = "default" }: SignatureCrea
             {emailError && <p className="text-destructive text-sm">{emailError}</p>}
           </div>
 
-          {variant === "anniversary" && (
+          {activeVariant === "anniversary" && (
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label>Signature Font</Label>
@@ -629,7 +651,7 @@ export function SignatureCreator({ profile, variant = "default" }: SignatureCrea
                   </TabsList>
                 </Tabs>
                 <p className="text-muted-foreground text-xs">
-                  We now have 11 anniversary directions here so you can compare fresh options based on the standard signature style.
+                  Template 7 with Trebuchet is the default starting point for the anniversary option.
                 </p>
               </div>
             </div>
