@@ -196,7 +196,7 @@ function buildMeetingReminderHtml(
     '<div class="cta">' +
     '<a href="' +
     teamsLink +
-    '" class="button" style="color: #fff;">Join via Microsoft Teams</a>' +
+    '" class="button" style="color: #fff;"><strong>🔗 Click to Join via Microsoft Teams</strong></a>' +
     "</div>" +
     '<div class="card">' +
     '<div class="card-header">Agenda</div>' +

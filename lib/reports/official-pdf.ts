@@ -7,10 +7,10 @@ import { getOneDriveService } from "@/lib/onedrive"
 import { buildGeneratedReportExportPath } from "@/lib/reports/document-storage"
 import { formatMeetingDateLabel, resolveEffectiveMeetingDateIso } from "@/lib/reports/meeting-date"
 import { generateActionPointsPdfFromDocxBuffer } from "@/lib/reports/action-points-word-pdf"
+import { fetchActionTrackerItems } from "@/lib/reports/action-tracker-data"
 import {
   buildWeeklyReportPDF,
   fetchLogoPair,
-  type ActionItemRow,
   type WeeklyReportRow,
 } from "@/lib/reports/weekly-report-pdf"
 
@@ -19,53 +19,15 @@ const log = logger("reports-official-pdf")
 export type OfficialReportExportType = "weekly_report" | "action_point"
 type ReportsPdfClient = Pick<SupabaseClient, "from" | "rpc">
 
-type ActionPointRouteRow = {
-  id: string
-  title: string | null
-  department: string
-  status: string
-  week_number: number
-  year: number
-}
-
 export async function fetchActionPointRows(supabase: ReportsPdfClient, week: number, year: number) {
-  const { data: taskRows, error: taskError } = await supabase
-    .from("tasks")
-    .select("id, title, department, status, week_number, year")
-    .eq("category", "weekly_action")
-    .eq("week_number", week)
-    .eq("year", year)
-
-  if (taskError) throw new Error(taskError.message)
-
-  const normalizedTaskRows: ActionItemRow[] = Array.isArray(taskRows)
-    ? taskRows.map((row) => ({
-        id: String(row.id),
-        title: typeof row.title === "string" ? row.title : null,
-        department: String(row.department || ""),
-        status: String(row.status || ""),
-        week_number: Number(row.week_number || week),
-        year: Number(row.year || year),
-      }))
-    : []
-
-  if (normalizedTaskRows.length > 0) return normalizedTaskRows
-
-  const { data: legacyRows, error: legacyError } = await supabase
-    .from("action_items")
-    .select("id, title, department, status, week_number, year")
-    .eq("week_number", week)
-    .eq("year", year)
-
-  if (legacyError) throw new Error(legacyError.message)
-
-  return (Array.isArray(legacyRows) ? legacyRows : []).map((row: ActionPointRouteRow) => ({
-    id: String(row.id),
-    title: typeof row.title === "string" ? row.title : null,
-    department: String(row.department || ""),
-    status: String(row.status || ""),
-    week_number: Number(row.week_number || week),
-    year: Number(row.year || year),
+  const actions = await fetchActionTrackerItems(supabase, { week, year })
+  return actions.map((action) => ({
+    id: action.id,
+    title: action.title || null,
+    department: action.department,
+    status: action.status,
+    week_number: action.week_number,
+    year: action.year,
   }))
 }
 

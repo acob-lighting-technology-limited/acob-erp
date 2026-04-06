@@ -3,6 +3,7 @@ import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { logger } from "@/lib/logger"
+import { fetchActionTrackerItems } from "@/lib/reports/action-tracker-data"
 
 const log = logger("action-tracker-carry-forward-route")
 
@@ -52,24 +53,21 @@ export async function POST(request: NextRequest) {
 
     const scopedDepartments = isAdmin
       ? null
-      : Array.from(new Set([profile?.department, ...(profile?.lead_departments || [])].filter(Boolean)))
+      : Array.from(
+          new Set(
+            [profile?.department, ...(profile?.lead_departments || [])].filter(
+              (value): value is string => typeof value === "string" && value.length > 0
+            )
+          )
+        )
 
     const previous = getPreviousWeek(parsed.data.week_number, parsed.data.year)
-    let query = supabase
-      .from("action_items")
-      .select("*")
-      .eq("week_number", previous.week)
-      .eq("year", previous.year)
-      .neq("status", "completed")
-
-    if (scopedDepartments && scopedDepartments.length > 0) {
-      query = query.in("department", scopedDepartments)
-    }
-
-    const { data: sourceItems, error } = await query
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
-    const itemsToCarry = sourceItems || []
+    const sourceItems = await fetchActionTrackerItems(supabase, {
+      week: previous.week,
+      year: previous.year,
+      scopedDepartments: scopedDepartments || undefined,
+    })
+    const itemsToCarry = sourceItems.filter((item) => item.status !== "completed")
     if (itemsToCarry.length === 0) {
       return NextResponse.json({ carried_count: 0, items: [] })
     }
@@ -77,17 +75,18 @@ export async function POST(request: NextRequest) {
     const insertPayload = itemsToCarry.map((item) => ({
       title: item.title,
       department: item.department,
-      description: item.description,
+      description: item.description || null,
+      priority: item.priority || "medium",
       status: "not_started",
+      assignment_type: "department",
+      category: "weekly_action",
+      source_type: "action_item",
       week_number: parsed.data.week_number,
       year: parsed.data.year,
-      original_week: item.week_number,
-      original_year: item.year,
-      carried_from_item_id: item.id,
       assigned_by: user.id,
     }))
 
-    const { data: newItems, error: insertError } = await supabase.from("action_items").insert(insertPayload).select("*")
+    const { data: newItems, error: insertError } = await supabase.from("tasks").insert(insertPayload).select("*")
 
     if (insertError) {
       return NextResponse.json({ error: insertError.message }, { status: 500 })
@@ -96,8 +95,8 @@ export async function POST(request: NextRequest) {
     await writeAuditLog(
       supabase,
       {
-        action: "action_item.carry_forward",
-        entityType: "action_item",
+        action: "task.carry_forward",
+        entityType: "task",
         entityId: String(parsed.data.week_number),
         newValues: { count: newItems?.length || 0, week_number: parsed.data.week_number, year: parsed.data.year },
         context: { actorId: user.id, source: "api", route: "/api/reports/action-tracker/carry-forward" },

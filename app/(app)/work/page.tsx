@@ -7,6 +7,7 @@ type WorkItem = {
   title: string
   work_item_number?: string | null
   source_type?: string | null
+  category?: string | null
   status: string
   priority?: string | null
   department?: string | null
@@ -30,6 +31,7 @@ export default async function WorkPage() {
       .from("unified_work")
       .select("*")
       .eq("assigned_to", user.id)
+      .neq("category", "weekly_action")
       .order("created_at", { ascending: false })
       .limit(100),
     supabase.from("task_assignments").select("task_id").eq("user_id", user.id),
@@ -38,7 +40,12 @@ export default async function WorkPage() {
   const extraTaskIds = (multiTaskAssignments || []).map((row) => row.task_id)
   const { data: extraTasks } =
     extraTaskIds.length > 0
-      ? await supabase.from("tasks").select("*").in("id", extraTaskIds).order("created_at", { ascending: false })
+      ? await supabase
+          .from("tasks")
+          .select("*")
+          .in("id", extraTaskIds)
+          .neq("category", "weekly_action")
+          .order("created_at", { ascending: false })
       : { data: [] }
 
   const merged = [...((workRows as WorkItem[] | null) || []), ...((extraTasks as WorkItem[] | null) || [])]

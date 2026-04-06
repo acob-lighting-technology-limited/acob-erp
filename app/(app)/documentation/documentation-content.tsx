@@ -5,7 +5,6 @@ import { useSearchParams } from "next/navigation"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
-import { writeAuditLogClient } from "@/lib/audit/client"
 import { toast } from "sonner"
 import { FileText, Plus } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -73,6 +72,7 @@ export function DocumentationContent({
     category: "",
     tags: "",
     is_draft: false,
+    attachments: [],
   })
   const supabase = createClient()
 
@@ -124,7 +124,7 @@ export function DocumentationContent({
 
   const openCreateDialog = () => {
     setSelectedDoc(null)
-    setFormData({ title: "", content: "", category: "", tags: "", is_draft: false })
+    setFormData({ title: "", content: "", category: "", tags: "", is_draft: false, attachments: [] })
     setIsDialogOpen(true)
   }
 
@@ -136,77 +136,61 @@ export function DocumentationContent({
       category: doc.category || "",
       tags: doc.tags?.join(", ") || "",
       is_draft: doc.is_draft,
+      attachments: [],
     })
     setIsDialogOpen(true)
   }
 
   const handleSave = async (isDraft: boolean) => {
-    if (!formData.title.trim() || !formData.content.trim()) {
-      toast.error("Title and content are required")
+    if (!formData.title.trim() || !formData.category.trim() || !formData.content.trim()) {
+      toast.error("Title, category, and content are required")
       return
     }
 
     setIsSaving(true)
+    const attachmentCount = formData.attachments.length
+    const uploadToastId =
+      attachmentCount > 0
+        ? toast.loading(`Uploading ${attachmentCount} file${attachmentCount === 1 ? "" : "s"} to SharePoint`, {
+            description: "Please keep this dialog open until the save completes.",
+          })
+        : null
+
     try {
-      const tags = formData.tags
-        ? formData.tags
-            .split(",")
-            .map((tag) => tag.trim())
-            .filter(Boolean)
-        : []
-
-      const docData = {
-        user_id: userId,
-        title: formData.title,
-        content: formData.content,
-        category: formData.category || null,
-        tags,
-        is_draft: isDraft,
-        updated_at: new Date().toISOString(),
+      const payload = new FormData()
+      payload.append("title", formData.title)
+      payload.append("content", formData.content)
+      payload.append("category", formData.category)
+      payload.append("tags", formData.tags)
+      payload.append("is_draft", String(isDraft))
+      for (const file of formData.attachments) {
+        payload.append("attachments", file)
       }
 
-      const auditCtx = { source: "ui" as const, route: "/documentation", actorId: userId }
-      if (selectedDoc) {
-        const { error } = await supabase.from("user_documentation").update(docData).eq("id", selectedDoc.id)
-        if (error) throw error
-        await writeAuditLogClient(
-          supabase,
-          {
-            action: "update",
-            entityType: "documentation",
-            entityId: selectedDoc.id,
-            newValues: docData,
-            context: auditCtx,
-          },
-          { failOpen: true }
-        )
-        toast.success("Documentation updated")
-      } else {
-        const { data: createdDoc, error } = await supabase
-          .from("user_documentation")
-          .insert({ ...docData, created_at: new Date().toISOString() })
-          .select("id")
-          .single()
-        if (error) throw error
-        await writeAuditLogClient(
-          supabase,
-          {
-            action: "create",
-            entityType: "documentation",
-            entityId: createdDoc.id,
-            newValues: docData,
-            context: auditCtx,
-          },
-          { failOpen: true }
-        )
-        toast.success("Documentation created")
+      const response = await fetch(
+        selectedDoc ? `/api/documentation/internal/${selectedDoc.id}` : "/api/documentation/internal",
+        {
+          method: selectedDoc ? "PUT" : "POST",
+          body: payload,
+        }
+      )
+
+      const result = await response.json()
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to save documentation")
       }
+
+      toast.success(selectedDoc ? "Documentation updated" : "Documentation created", {
+        id: uploadToastId || undefined,
+      })
 
       setIsDialogOpen(false)
       await loadDocumentation()
     } catch (error) {
       log.error("Error saving documentation:", error)
-      toast.error("Failed to save documentation")
+      toast.error("Failed to save documentation", {
+        id: uploadToastId || undefined,
+      })
     } finally {
       setIsSaving(false)
     }
@@ -217,19 +201,11 @@ export function DocumentationContent({
 
     setIsSaving(true)
     try {
-      const { error } = await supabase.from("user_documentation").delete().eq("id", selectedDoc.id)
-      if (error) throw error
-      await writeAuditLogClient(
-        supabase,
-        {
-          action: "delete",
-          entityType: "documentation",
-          entityId: selectedDoc.id,
-          oldValues: { title: selectedDoc.title, category: selectedDoc.category },
-          context: { source: "ui", route: "/documentation", actorId: userId },
-        },
-        { failOpen: true }
-      )
+      const response = await fetch(`/api/documentation/internal/${selectedDoc.id}`, { method: "DELETE" })
+      const result = await response.json()
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to delete documentation")
+      }
 
       toast.success("Documentation deleted")
       setIsDeleteDialogOpen(false)
@@ -349,6 +325,7 @@ export function DocumentationContent({
             isEditing={!!selectedDoc}
             formData={formData}
             onFormChange={setFormData}
+            existingAttachments={selectedDoc?.sharepoint_attachments || []}
             onSave={handleSave}
             isSaving={isSaving}
           />

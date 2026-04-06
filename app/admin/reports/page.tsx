@@ -1,7 +1,7 @@
 "use client"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { ShieldCheck, Send, Users, ChevronRight } from "lucide-react"
+import { ShieldCheck, Users, ChevronRight } from "lucide-react"
 import Link from "next/link"
 import { PageWrapper, PageHeader } from "@/components/layout"
 import { PageSection } from "@/components/ui/patterns"
@@ -15,14 +15,6 @@ export default function AdminReportsPage() {
       icon: Users,
       color: "text-indigo-600 dark:text-indigo-400",
       bgColor: "bg-indigo-100 dark:bg-indigo-900/30",
-    },
-    {
-      title: "Meeting Mail",
-      description: "Prepare and send the weekly meeting summary mail with the stored report documents.",
-      href: "/admin/communications/meetings/mail",
-      icon: Send,
-      color: "text-emerald-600 dark:text-emerald-400",
-      bgColor: "bg-emerald-100 dark:bg-emerald-900/30",
     },
   ]
 

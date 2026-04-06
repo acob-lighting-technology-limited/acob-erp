@@ -110,7 +110,7 @@ export function RoleUsersDialog({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-14">S/N</TableHead>
+                  <TableHead className="text-foreground w-14 font-bold">#</TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Department</TableHead>

@@ -44,6 +44,7 @@ interface DeptActionRowsProps {
   onStatusChange: (taskId: string, newStatus: string) => void
   getDeptStatus: (dept: string) => DeptStatus
   statusColor: (status: string) => string
+  allowStatusEdit?: boolean
 }
 
 export function DeptActionRows({
@@ -58,6 +59,7 @@ export function DeptActionRows({
   onStatusChange,
   getDeptStatus,
   statusColor,
+  allowStatusEdit = true,
 }: DeptActionRowsProps) {
   return (
     <>
@@ -66,7 +68,7 @@ export function DeptActionRows({
         const completed = deptActions.filter((a) => a.status === "completed").length
         const total = deptActions.length
         const status = getDeptStatus(dept)
-        const isMyDept = profile?.department === dept
+        const isMyDept = allowStatusEdit && profile?.department === dept
         const deptActionItemsForExport: ActionItem[] = deptActions.map((item) => ({
           id: item.id,
           title: item.title,
@@ -147,13 +149,13 @@ export function DeptActionRows({
                       <Table>
                         <TableHeader className="bg-muted/30">
                           <TableRow>
-                            <TableHead className="w-[70px] text-[10px] font-black tracking-widest uppercase">
-                              S/N
+                            <TableHead className="text-foreground w-[70px] text-[10px] font-black tracking-widest uppercase">
+                              #
                             </TableHead>
-                            <TableHead className="text-[10px] font-black tracking-widest uppercase">
+                            <TableHead className="text-foreground text-[10px] font-black tracking-widest uppercase">
                               Action Description
                             </TableHead>
-                            <TableHead className="w-[180px] text-[10px] font-black tracking-widest uppercase">
+                            <TableHead className="text-foreground w-[180px] text-[10px] font-black tracking-widest uppercase">
                               Status
                             </TableHead>
                           </TableRow>

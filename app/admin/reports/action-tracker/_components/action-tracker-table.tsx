@@ -252,16 +252,16 @@ export function ActionTrackerTable({
                             <Table>
                               <TableHeader className="bg-muted/30">
                                 <TableRow>
-                                  <TableHead className="text-muted-foreground w-[70px] text-[10px] font-black tracking-widest uppercase">
-                                    S/N
+                                  <TableHead className="text-foreground w-[70px] text-[10px] font-black tracking-widest uppercase">
+                                    #
                                   </TableHead>
-                                  <TableHead className="text-muted-foreground text-[10px] font-black tracking-widest uppercase">
+                                  <TableHead className="text-foreground text-[10px] font-black tracking-widest uppercase">
                                     Action Item (Task)
                                   </TableHead>
-                                  <TableHead className="text-muted-foreground w-[150px] text-[10px] font-black tracking-widest uppercase">
+                                  <TableHead className="text-foreground w-[150px] text-[10px] font-black tracking-widest uppercase">
                                     Status
                                   </TableHead>
-                                  <TableHead className="text-muted-foreground w-[170px] text-[10px] font-black tracking-widest uppercase">
+                                  <TableHead className="text-foreground w-[170px] text-[10px] font-black tracking-widest uppercase">
                                     Due Date
                                   </TableHead>
                                   <TableHead className="w-[80px] text-right"></TableHead>

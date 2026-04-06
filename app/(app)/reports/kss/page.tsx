@@ -30,7 +30,6 @@ export default async function DashboardKssPage() {
       backLabel="Back to General Meeting"
       title="Knowledge Sharing Session"
       currentUserId={user.id}
-      enableScoring
       readOnly
     />
   )

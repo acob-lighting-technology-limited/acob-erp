@@ -12,6 +12,7 @@ export interface TablePageProps {
   backLinkHref?: string | null
   backLinkLabel?: string
   stats?: ReactNode
+  exportBar?: ReactNode
   filters?: ReactNode
   filtersInCard?: boolean
   children: ReactNode
@@ -26,6 +27,7 @@ export function TablePage({
   backLinkHref,
   backLinkLabel,
   stats,
+  exportBar,
   filters,
   filtersInCard = true,
   children,
@@ -43,6 +45,7 @@ export function TablePage({
         actionsPlacement={actionsPlacement}
       />
       {stats}
+      {exportBar}
       {filters ? (
         filtersInCard ? (
           <Card>

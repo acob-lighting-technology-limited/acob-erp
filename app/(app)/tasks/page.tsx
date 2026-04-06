@@ -44,13 +44,19 @@ async function getTasksData() {
     .select("*")
     .eq("assigned_to", user.id)
     .eq("assignment_type", "individual")
+    .neq("category", "weekly_action")
 
   const { data: assignments } = await supabase.from("task_assignments").select("task_id").eq("user_id", user.id)
 
   const multipleTaskIds = ((assignments as TaskAssignmentRow[] | null) || []).map((a) => a.task_id)
   const { data: multipleTasks } =
     multipleTaskIds.length > 0
-      ? await supabase.from("tasks").select("*").in("id", multipleTaskIds).eq("assignment_type", "multiple")
+      ? await supabase
+          .from("tasks")
+          .select("*")
+          .in("id", multipleTaskIds)
+          .eq("assignment_type", "multiple")
+          .neq("category", "weekly_action")
       : { data: [] }
 
   const { data: departmentTasks } = userProfile?.department

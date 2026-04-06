@@ -9,7 +9,7 @@ import { toast } from "sonner"
 import { fetchWeeklyReportLockState, getDefaultMeetingDateIso } from "@/lib/weekly-report-lock"
 import { getDepartmentAliases, normalizeDepartmentName } from "@/shared/departments"
 
-import { FileBarChart } from "lucide-react"
+import { FileBarChart, Plus, Download } from "lucide-react"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
 import {
   exportAllToPPTX,
@@ -24,9 +24,12 @@ import { WeeklyReportAdminDialog } from "@/components/admin/reports/weekly-repor
 import { WeeklyReportFiltersBar } from "./_components/weekly-report-filters-bar"
 import { PptxModeDialog } from "./_components/pptx-mode-dialog"
 import { DeleteReportDialog } from "./_components/delete-report-dialog"
-import { WeeklyReportExportActions } from "./_components/weekly-report-export-actions"
 import { WeeklyReportTable } from "./_components/weekly-report-table"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { WeeklyReportCardGrid } from "./_components/weekly-report-card-grid"
+import { Button } from "@/components/ui/button"
+import { TableViewToggle } from "@/components/admin/table-view-toggle"
+import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
+import { downloadWeeklyReportPdf } from "@/lib/reports/export-download"
 
 interface AdminWeeklyReportsData {
   reports: WeeklyReport[]
@@ -103,13 +106,6 @@ interface TrackerStatus {
   status: string
 }
 
-interface MeetingDocumentHelper {
-  id: string
-  file_name: string
-  signed_url: string | null
-  document_type?: "knowledge_sharing_session" | "minutes"
-}
-
 interface WeeklyReportsContentProps {
   initialDepartments: string[]
   employees: Array<{
@@ -127,15 +123,6 @@ interface WeeklyReportsContentProps {
     lead_departments?: string[]
     admin_domains?: string[] | null
   }
-}
-
-type OfficialBackfillStatus = {
-  state: "idle" | "running" | "success" | "error"
-  processed?: number
-  created?: number
-  existing?: number
-  skipped?: number
-  error?: string
 }
 
 export function WeeklyReportsContent({
@@ -166,7 +153,8 @@ export function WeeklyReportsContent({
   const [kssPresenterIdInput, setKssPresenterIdInput] = useState("none")
   const [savingMeetingWindow, setSavingMeetingWindow] = useState(false)
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
-  const [officialBackfillStatus, setOfficialBackfillStatus] = useState<OfficialBackfillStatus>({ state: "idle" })
+  const [viewMode, setViewMode] = useState<"list" | "card">("list")
+  const [exportOptionsOpen, setExportOptionsOpen] = useState(false)
 
   const supabase = createClient()
   const queryClient = useQueryClient()
@@ -242,26 +230,6 @@ export function WeeklyReportsContent({
     },
   })
 
-  const { data: selectedWeekDocuments = [] } = useQuery({
-    queryKey: ["admin-weekly-report-helper-documents", weekFilter, yearFilter],
-    queryFn: async (): Promise<MeetingDocumentHelper[]> => {
-      const [kssRes, minutesRes] = await Promise.all([
-        fetch(
-          `/api/reports/meeting-week-documents?documentType=knowledge_sharing_session&currentOnly=true&week=${weekFilter}&year=${yearFilter}`
-        ),
-        fetch(
-          `/api/reports/meeting-week-documents?documentType=minutes&currentOnly=true&week=${weekFilter}&year=${yearFilter}`
-        ),
-      ])
-
-      const [kssPayload, minutesPayload] = await Promise.all([kssRes.json(), minutesRes.json()])
-      if (!kssRes.ok) throw new Error(kssPayload.error || "Failed to fetch KSS document")
-      if (!minutesRes.ok) throw new Error(minutesPayload.error || "Failed to fetch minutes document")
-
-      return [...(kssPayload.data || []), ...(minutesPayload.data || [])]
-    },
-  })
-
   const isFilteredWeekLocked = lockState?.isLocked ?? false
 
   useEffect(() => {
@@ -278,74 +246,9 @@ export function WeeklyReportsContent({
     setKssPresenterIdInput(weekSetupData.kssPresenterId || "none")
   }, [isAdminRole, weekSetupData])
 
-  useEffect(() => {
-    if (!isAdminRole) return
-
-    setOfficialBackfillStatus({ state: "running" })
-    void fetch("/api/reports/official-exports", {
-      method: "POST",
-    })
-      .then(async (response) => {
-        const payload = (await response.json().catch(() => null)) as {
-          success?: boolean
-          processed?: number
-          results?: Array<{ status?: string }>
-          error?: string
-        } | null
-
-        if (!response.ok) {
-          throw new Error(payload?.error || "Failed to backfill official PDFs")
-        }
-
-        const results = payload?.results || []
-        const created = results.filter((item) => item.status === "created").length
-        const existing = results.filter((item) => item.status === "existing").length
-        const skipped = results.filter((item) => item.status === "skipped").length
-
-        setOfficialBackfillStatus({
-          state: "success",
-          processed: payload?.processed || 0,
-          created,
-          existing,
-          skipped,
-        })
-      })
-      .catch((error: unknown) => {
-        setOfficialBackfillStatus({
-          state: "error",
-          error: error instanceof Error ? error.message : "Failed to backfill official PDFs",
-        })
-      })
-  }, [isAdminRole])
-
   const presenterOptions = employees
     .filter((employee) => normalizeDepartmentName(employee.department) === normalizeDepartmentName(kssDepartmentInput))
     .sort((a, b) => a.full_name.localeCompare(b.full_name))
-
-  const kssDocument = selectedWeekDocuments.find((doc) => doc.document_type === "knowledge_sharing_session") || null
-  const minutesDocument = selectedWeekDocuments.find((doc) => doc.document_type === "minutes") || null
-
-  const handleDownloadMeetingDocument = async (meetingDocument: MeetingDocumentHelper) => {
-    if (!meetingDocument.signed_url) {
-      toast.error("No file available to download yet")
-      return
-    }
-
-    try {
-      const toastId = toast.loading("Preparing download...")
-      const anchor = document.createElement("a")
-      anchor.href = meetingDocument.signed_url
-      anchor.download = meetingDocument.file_name
-      document.body.appendChild(anchor)
-      anchor.click()
-      anchor.remove()
-      window.setTimeout(() => {
-        toast.dismiss(toastId)
-      }, 6000)
-    } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : "Failed to download document")
-    }
-  }
 
   const toggleRow = (id: string) => {
     const newExpanded = new Set(expandedRows)
@@ -486,22 +389,25 @@ export function WeeklyReportsContent({
       icon={FileBarChart}
       backLinkHref="/admin/reports/general-meeting"
       backLinkLabel="Back to General Meeting"
-      actionsPlacement="below"
       actions={
-        <WeeklyReportExportActions
-          filteredReports={filteredReports}
-          weekFilter={weekFilter}
-          yearFilter={yearFilter}
-          meetingDate={lockState?.meetingDate || meetingDateInput}
-          kssDocument={kssDocument}
-          minutesDocument={minutesDocument}
-          onDownloadDocument={handleDownloadMeetingDocument}
-          onOpenAllPptx={openAllPptxModeDialog}
-          onAddReport={() => {
-            setEditingReport(null)
-            setIsAdminDialogOpen(true)
-          }}
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <TableViewToggle viewMode={viewMode} onChange={setViewMode} />
+          <Button variant="outline" size="sm" className="h-8 gap-2" onClick={() => setExportOptionsOpen(true)}>
+            <Download className="h-4 w-4" />
+            Export
+          </Button>
+          <Button
+            onClick={() => {
+              setEditingReport(null)
+              setIsAdminDialogOpen(true)
+            }}
+            className="h-8 gap-2"
+            size="sm"
+          >
+            <Plus className="h-4 w-4" />
+            Add Report
+          </Button>
+        </div>
       }
       filters={
         <WeeklyReportFiltersBar
@@ -534,49 +440,38 @@ export function WeeklyReportsContent({
         />
       }
     >
-      {officialBackfillStatus.state !== "idle" ? (
-        <Alert
-          className={
-            officialBackfillStatus.state === "error"
-              ? "mb-4 border-red-200 bg-red-50 text-red-900"
-              : officialBackfillStatus.state === "running"
-                ? "mb-4 border-blue-200 bg-blue-50 text-blue-900"
-                : "mb-4 border-emerald-200 bg-emerald-50 text-emerald-900"
-          }
-        >
-          <AlertTitle>
-            {officialBackfillStatus.state === "running"
-              ? "Official PDFs backfilling"
-              : officialBackfillStatus.state === "error"
-                ? "Official PDF backfill failed"
-                : "Official PDFs synced"}
-          </AlertTitle>
-          <AlertDescription>
-            {officialBackfillStatus.state === "running"
-              ? "Locked weeks are being checked and stored in SharePoint in the background."
-              : officialBackfillStatus.state === "error"
-                ? officialBackfillStatus.error || "The backfill could not complete."
-                : `Processed ${officialBackfillStatus.processed || 0} export checks: ${officialBackfillStatus.created || 0} created, ${officialBackfillStatus.existing || 0} already present, ${officialBackfillStatus.skipped || 0} skipped.`}
-          </AlertDescription>
-        </Alert>
-      ) : null}
-
-      <WeeklyReportTable
-        loading={loading}
-        filteredReports={filteredReports}
-        meetingDate={lockState?.meetingDate || meetingDateInput}
-        expandedRows={expandedRows}
-        trackingData={trackingData}
-        isFilteredWeekLocked={isFilteredWeekLocked}
-        canMutateReport={canMutateReport}
-        onToggleRow={toggleRow}
-        onEdit={(r) => {
-          setEditingReport(r)
-          setIsAdminDialogOpen(true)
-        }}
-        onDelete={(id) => setPendingDeleteId(id)}
-        onExportPptx={openSinglePptxModeDialog}
-      />
+      {viewMode === "list" ? (
+        <WeeklyReportTable
+          loading={loading}
+          filteredReports={filteredReports}
+          meetingDate={lockState?.meetingDate || meetingDateInput}
+          expandedRows={expandedRows}
+          trackingData={trackingData}
+          isFilteredWeekLocked={isFilteredWeekLocked}
+          canMutateReport={canMutateReport}
+          onToggleRow={toggleRow}
+          onEdit={(r) => {
+            setEditingReport(r)
+            setIsAdminDialogOpen(true)
+          }}
+          onDelete={(id) => setPendingDeleteId(id)}
+          onExportPptx={openSinglePptxModeDialog}
+        />
+      ) : (
+        <WeeklyReportCardGrid
+          reports={filteredReports}
+          meetingDate={lockState?.meetingDate || meetingDateInput}
+          trackingData={trackingData}
+          isFilteredWeekLocked={isFilteredWeekLocked}
+          canMutateReport={canMutateReport}
+          onEdit={(r) => {
+            setEditingReport(r)
+            setIsAdminDialogOpen(true)
+          }}
+          onDelete={(id) => setPendingDeleteId(id)}
+          onExportPptx={openSinglePptxModeDialog}
+        />
+      )}
 
       <WeeklyReportAdminDialog
         isOpen={isAdminDialogOpen}
@@ -603,6 +498,37 @@ export function WeeklyReportsContent({
         }}
         onSelect={runPptxExport}
         showOrderStep={pendingPptxExport?.kind === "all"}
+      />
+
+      <ExportOptionsDialog
+        open={exportOptionsOpen}
+        onOpenChange={setExportOptionsOpen}
+        title="Export Weekly Reports"
+        options={[
+          { id: "pdf", label: "PDF", icon: "pdf" },
+          { id: "word", label: "Word (.docx)", icon: "word" },
+          { id: "pptx", label: "PowerPoint (.pptx)", icon: "pptx" },
+          { id: "excel", label: "Excel (.xlsx)", icon: "excel" },
+        ]}
+        onSelect={(id) => {
+          if (id === "pdf") {
+            void downloadWeeklyReportPdf({ week: weekFilter, year: yearFilter })
+            return
+          }
+          if (id === "word") {
+            void import("@/lib/export-utils").then(({ exportAllToDocx }) =>
+              exportAllToDocx(filteredReports, weekFilter, yearFilter, lockState?.meetingDate || meetingDateInput)
+            )
+            return
+          }
+          if (id === "excel") {
+            void import("@/lib/export-utils").then(({ exportAllToXLSX }) =>
+              exportAllToXLSX(filteredReports, weekFilter, yearFilter, lockState?.meetingDate || meetingDateInput)
+            )
+            return
+          }
+          openAllPptxModeDialog()
+        }}
       />
     </AdminTablePage>
   )

@@ -135,22 +135,27 @@ function buildTaskInfo(task: Task) {
 interface UserTaskTableProps {
   filteredTasks: Task[]
   filterStatus: string
+  assignmentFilter: "individual" | "department" | "multiple"
   onViewTask: (task: Task) => void
 }
 
-export function UserTaskTable({ filteredTasks, filterStatus, onViewTask }: UserTaskTableProps) {
+export function UserTaskTable({ filteredTasks, filterStatus, assignmentFilter, onViewTask }: UserTaskTableProps) {
   if (filteredTasks.length === 0) {
+    const assignmentLabel =
+      assignmentFilter === "department" ? "Dept" : assignmentFilter === "multiple" ? "Group" : "Individual"
     return (
       <Card className="border-2">
         <CardContent className="p-12 text-center">
           <ClipboardList className="text-muted-foreground mx-auto mb-4 h-16 w-16" />
           <h3 className="text-foreground mb-2 text-xl font-semibold">
-            {filterStatus === "all" ? "No Tasks Assigned" : `No ${filterStatus.replace("_", " ")} Tasks`}
+            {filterStatus === "all"
+              ? `No ${assignmentLabel} Tasks`
+              : `No ${assignmentLabel} ${filterStatus.replace("_", " ")} Tasks`}
           </h3>
           <p className="text-muted-foreground">
             {filterStatus === "all"
-              ? "You don't have any tasks assigned to you at the moment."
-              : "Try selecting a different filter to view other tasks."}
+              ? `You don't have any ${assignmentLabel.toLowerCase()} tasks at the moment.`
+              : "Try selecting a different status to view other tasks."}
           </p>
         </CardContent>
       </Card>
@@ -190,6 +195,11 @@ export function UserTaskTable({ filteredTasks, filterStatus, onViewTask }: UserT
                           <Badge variant="outline" className="gap-1 text-[10px]">
                             <HeadphonesIcon className="h-2.5 w-2.5" />
                             Help Desk
+                          </Badge>
+                        )}
+                        {task.source_type === "action_item" && (
+                          <Badge variant="outline" className="gap-1 text-[10px]">
+                            Action Point
                           </Badge>
                         )}
                       </div>

@@ -1,0 +1,32 @@
+{
+  "tasks": [
+    {
+      "title": "Prepare branch-reset checklist",
+      "description": "Use this after the reset to verify task creation from scratch.",
+      "priority": "high",
+      "status": "pending",
+      "category": "manual"
+    }
+  ],
+  "help_desk": [
+    {
+      "title": "Laptop battery replacement request",
+      "description": "Battery drains within 30 minutes of use.",
+      "priority": "medium"
+    }
+  ],
+  "projects": [
+    {
+      "name": "Workflow reset sandbox",
+      "description": "Test project to confirm clean project creation after the reset."
+    }
+  ],
+  "leave": [
+    {
+      "leave_type": "Annual Leave",
+      "reason": "Regression test request after workflow reset",
+      "start_date": "2026-04-13",
+      "end_date": "2026-04-15"
+    }
+  ]
+}

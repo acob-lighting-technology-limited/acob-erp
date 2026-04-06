@@ -109,11 +109,11 @@ export function AssetListView({
       <Card className="border-2">
         <div className="table-responsive">
           <Table>
-            <TableHeader>
+            <TableHeader className="bg-muted/50">
               <TableRow>
-                <TableHead className="w-12">#</TableHead>
+                <TableHead className="text-foreground w-12 font-bold">#</TableHead>
                 <TableHead
-                  className="hover:bg-muted/50 cursor-pointer select-none"
+                  className="text-foreground hover:bg-muted/50 cursor-pointer select-none font-bold"
                   onClick={() => onSort("unique_code")}
                 >
                   <div className="flex items-center gap-2">
@@ -122,7 +122,7 @@ export function AssetListView({
                   </div>
                 </TableHead>
                 <TableHead
-                  className="hover:bg-muted/50 cursor-pointer select-none"
+                  className="text-foreground hover:bg-muted/50 cursor-pointer select-none font-bold"
                   onClick={() => onSort("asset_type")}
                 >
                   <div className="flex items-center gap-2">
@@ -130,26 +130,35 @@ export function AssetListView({
                     <SortIcon columnKey="asset_type" sortConfig={sortConfig} />
                   </div>
                 </TableHead>
-                <TableHead className="hover:bg-muted/50 cursor-pointer select-none" onClick={() => onSort("model")}>
+                <TableHead
+                  className="text-foreground hover:bg-muted/50 cursor-pointer select-none font-bold"
+                  onClick={() => onSort("model")}
+                >
                   <div className="flex items-center gap-2">
                     Model / Serial
                     <SortIcon columnKey="model" sortConfig={sortConfig} />
                   </div>
                 </TableHead>
-                <TableHead className="hover:bg-muted/50 cursor-pointer select-none" onClick={() => onSort("year")}>
+                <TableHead
+                  className="text-foreground hover:bg-muted/50 cursor-pointer select-none font-bold"
+                  onClick={() => onSort("year")}
+                >
                   <div className="flex items-center gap-2">
                     Year
                     <SortIcon columnKey="year" sortConfig={sortConfig} />
                   </div>
                 </TableHead>
-                <TableHead className="hover:bg-muted/50 cursor-pointer select-none" onClick={() => onSort("status")}>
+                <TableHead
+                  className="text-foreground hover:bg-muted/50 cursor-pointer select-none font-bold"
+                  onClick={() => onSort("status")}
+                >
                   <div className="flex items-center gap-2">
                     Status
                     <SortIcon columnKey="status" sortConfig={sortConfig} />
                   </div>
                 </TableHead>
                 <TableHead
-                  className="hover:bg-muted/50 cursor-pointer select-none"
+                  className="text-foreground hover:bg-muted/50 cursor-pointer select-none font-bold"
                   onClick={() => onSort("assigned_to")}
                 >
                   <div className="flex items-center gap-2">
@@ -157,7 +166,7 @@ export function AssetListView({
                     <SortIcon columnKey="assigned_to" sortConfig={sortConfig} />
                   </div>
                 </TableHead>
-                <TableHead className="w-[100px] text-right">Actions</TableHead>
+                <TableHead className="text-foreground w-[120px] text-right font-bold">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

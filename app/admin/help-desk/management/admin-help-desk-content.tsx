@@ -2,7 +2,6 @@
 
 import { useCallback, useMemo, useState } from "react"
 import { toast } from "sonner"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { StatCard } from "@/components/ui/stat-card"
@@ -261,48 +260,39 @@ export function AdminHelpDeskContent({ initialTickets, employees, leadDirectory,
         </TabsList>
 
         <TabsContent value="pending" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>All Pending Help Desk Workflow</CardTitle>
-            </CardHeader>
-            <CardContent className="overflow-x-auto">
-              {allPendingTickets.length === 0 ? (
-                <EmptyState title="No pending tickets" description="New pending workflow tickets will appear here." />
-              ) : (
+          <div className="space-y-2">
+            <h3 className="text-lg font-semibold">All Pending Help Desk Workflow</h3>
+            {allPendingTickets.length === 0 ? (
+              <EmptyState title="No pending tickets" description="New pending workflow tickets will appear here." />
+            ) : (
+              <div className="overflow-x-auto rounded-lg border bg-white">
                 <TicketQueueTable rows={allPendingTickets} includeActions={false} {...sharedTableProps} />
-              )}
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>My Action Queue</CardTitle>
-            </CardHeader>
-            <CardContent className="overflow-x-auto">
-              {myActionQueue.length === 0 ? (
-                <EmptyState
-                  title="No tickets assigned to you"
-                  description="Your actionable queue is currently empty."
-                />
-              ) : (
+              </div>
+            )}
+          </div>
+          <div className="space-y-2">
+            <h3 className="text-lg font-semibold">My Action Queue</h3>
+            {myActionQueue.length === 0 ? (
+              <EmptyState title="No tickets assigned to you" description="Your actionable queue is currently empty." />
+            ) : (
+              <div className="overflow-x-auto rounded-lg border bg-white">
                 <TicketQueueTable rows={myActionQueue} includeActions={true} {...sharedTableProps} />
-              )}
-            </CardContent>
-          </Card>
+              </div>
+            )}
+          </div>
         </TabsContent>
 
         <TabsContent value="history">
-          <Card>
-            <CardHeader>
-              <CardTitle>Help Desk History</CardTitle>
-            </CardHeader>
-            <CardContent className="overflow-x-auto">
-              {historyTickets.length === 0 ? (
-                <EmptyState title="No history tickets" description="Resolved and closed tickets will appear here." />
-              ) : (
+          <div className="space-y-2">
+            <h3 className="text-lg font-semibold">Help Desk History</h3>
+            {historyTickets.length === 0 ? (
+              <EmptyState title="No history tickets" description="Resolved and closed tickets will appear here." />
+            ) : (
+              <div className="overflow-x-auto rounded-lg border bg-white">
                 <TicketQueueTable rows={historyTickets} includeActions={false} {...sharedTableProps} />
-              )}
-            </CardContent>
-          </Card>
+              </div>
+            )}
+          </div>
         </TabsContent>
       </Tabs>
 

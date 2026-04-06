@@ -315,16 +315,21 @@ export default function LoginPage() {
                               required
                               value={password}
                               onChange={(e) => setPassword(e.target.value)}
-                              className="h-11 pr-10 text-base"
+                              className="h-11 pr-12 text-base"
                               autoComplete="current-password"
                             />
-                            <button
-                              type="button"
-                              onClick={() => setShowPassword(!showPassword)}
-                              className="text-muted-foreground hover:text-foreground absolute top-1/2 right-3 -translate-y-1/2"
-                            >
-                              {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                            </button>
+                            <div className="absolute inset-y-0 right-0 flex items-center pr-2">
+                              <button
+                                type="button"
+                                aria-label={showPassword ? "Hide password" : "Show password"}
+                                aria-pressed={showPassword}
+                                onMouseDown={(event) => event.preventDefault()}
+                                onClick={() => setShowPassword((current) => !current)}
+                                className="text-muted-foreground hover:text-foreground inline-flex h-8 w-8 items-center justify-center rounded-md transition-colors"
+                              >
+                                {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                              </button>
+                            </div>
                           </div>
                         </div>
                         {error && (

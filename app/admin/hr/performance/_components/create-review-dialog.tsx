@@ -20,6 +20,7 @@ interface User {
   first_name: string
   last_name: string
   department_id: string
+  department?: string | null
 }
 
 interface ReviewCycle {
@@ -46,6 +47,7 @@ interface CreateReviewDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   queryClient?: QueryClient
+  mode?: "individual" | "department"
 }
 
 async function fetchPerformanceCreateData(supabase: ReturnType<typeof createClient>): Promise<PerformanceCreateData> {
@@ -59,7 +61,10 @@ async function fetchPerformanceCreateData(supabase: ReturnType<typeof createClie
     .select("role, is_department_lead, department_id")
     .eq("id", user.id)
     .single()
-  let usersQuery = supabase.from("profiles").select("id, first_name, last_name, department_id").neq("id", user.id)
+  let usersQuery = supabase
+    .from("profiles")
+    .select("id, first_name, last_name, department_id, department")
+    .neq("id", user.id)
   if (profile?.is_department_lead && !["developer", "admin", "super_admin"].includes(profile.role)) {
     usersQuery = usersQuery.eq("department_id", profile.department_id)
   }
@@ -70,11 +75,17 @@ async function fetchPerformanceCreateData(supabase: ReturnType<typeof createClie
   return { users: usersData || [], cycles: cyclesData.cycles || [] }
 }
 
-export function CreateReviewDialog({ open, onOpenChange, queryClient }: CreateReviewDialogProps) {
+export function CreateReviewDialog({
+  open,
+  onOpenChange,
+  queryClient,
+  mode = "individual",
+}: CreateReviewDialogProps) {
   const supabase = createClient()
   const [saving, setSaving] = useState(false)
   const [loadingScore, setLoadingScore] = useState(false)
   const [formData, setFormData] = useState({
+    department: "",
     user_id: "",
     review_cycle_id: "",
     strengths: "",
@@ -101,6 +112,13 @@ export function CreateReviewDialog({ open, onOpenChange, queryClient }: CreateRe
 
   const users = data?.users ?? []
   const cycles = data?.cycles ?? []
+  const departments = Array.from(new Set(users.map((user) => user.department).filter(Boolean) as string[])).sort((a, b) =>
+    a.localeCompare(b)
+  )
+  const visibleUsers =
+    mode === "department" && formData.department
+      ? users.filter((user) => user.department === formData.department)
+      : users
   const behaviourAvg = Math.round(
     Object.values(competencies).reduce((sum, value) => sum + value, 0) / Object.keys(competencies).length
   )
@@ -124,7 +142,7 @@ export function CreateReviewDialog({ open, onOpenChange, queryClient }: CreateRe
         cbt_score: scoreData.cbt_score ?? 0,
         attendance_score: scoreData.attendance_score ?? 0,
       }))
-      toast.success("KPI, KSS, and attendance scores auto-filled from ERP data")
+      toast.success("KPI, CBT, and attendance scores auto-filled from ERP data")
     } catch {
       toast.error("Failed to auto-fill scores")
     } finally {
@@ -151,6 +169,17 @@ export function CreateReviewDialog({ open, onOpenChange, queryClient }: CreateRe
 
       toast.success("Performance review created successfully")
       await queryClient?.invalidateQueries({ queryKey: QUERY_KEYS.performanceCreateData() })
+      setFormData({
+        department: "",
+        user_id: "",
+        review_cycle_id: "",
+        strengths: "",
+        areas_for_improvement: "",
+        manager_comments: "",
+        kpi_score: 0,
+        cbt_score: 0,
+        attendance_score: 0,
+      })
       onOpenChange(false)
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : "Failed to create review")
@@ -165,9 +194,13 @@ export function CreateReviewDialog({ open, onOpenChange, queryClient }: CreateRe
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
-            Create Performance Review
+            {mode === "department" ? "Create Department Review" : "Create Individual Review"}
           </DialogTitle>
-          <DialogDescription>Evaluate an employee&apos;s performance without leaving the dashboard.</DialogDescription>
+          <DialogDescription>
+            {mode === "department"
+              ? "Choose a department first, then complete the full review form for the selected employee."
+              : "Evaluate an employee&apos;s performance without leaving the dashboard."}
+          </DialogDescription>
         </DialogHeader>
 
         {isLoading ? null : (
@@ -178,16 +211,39 @@ export function CreateReviewDialog({ open, onOpenChange, queryClient }: CreateRe
                 <CardDescription>Complete review details and submit for records.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
+                {mode === "department" ? (
+                  <FormFieldGroup label="Department">
+                    <Select
+                      value={formData.department}
+                      onValueChange={(value) => setFormData({ ...formData, department: value, user_id: "" })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select department" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {departments.map((department) => (
+                          <SelectItem key={department} value={department}>
+                            {department}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FormFieldGroup>
+                ) : null}
+
                 <FormFieldGroup label="Employee">
                   <Select
                     value={formData.user_id}
                     onValueChange={(value) => setFormData({ ...formData, user_id: value })}
+                    disabled={mode === "department" && !formData.department}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select employee" />
+                      <SelectValue
+                        placeholder={mode === "department" && !formData.department ? "Select department first" : "Select employee"}
+                      />
                     </SelectTrigger>
                     <SelectContent>
-                      {users.map((user) => (
+                      {visibleUsers.map((user) => (
                         <SelectItem key={user.id} value={user.id}>
                           {user.first_name} {user.last_name}
                         </SelectItem>

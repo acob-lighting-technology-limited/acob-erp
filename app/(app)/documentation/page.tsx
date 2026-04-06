@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { PageHeader, PageWrapper, Section } from "@/components/layout"
 import { FileText, FolderOpen } from "lucide-react"
 import { getDocumentationData } from "./data"
+import type { DocumentationAttachment } from "@/lib/documentation/sharepoint"
 
 export interface Documentation {
   id: string
@@ -13,6 +14,9 @@ export interface Documentation {
   category?: string
   tags?: string[]
   is_draft: boolean
+  sharepoint_folder_path?: string | null
+  sharepoint_text_file_path?: string | null
+  sharepoint_attachments?: DocumentationAttachment[]
   created_at: string
   updated_at: string
 }

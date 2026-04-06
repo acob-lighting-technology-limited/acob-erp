@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { logger } from "@/lib/logger"
 import { getCurrentOfficeWeek } from "@/lib/meeting-week"
+import { fetchActionTrackerItems } from "@/lib/reports/action-tracker-data"
 
 const log = logger("action-tracker-route")
 
@@ -20,64 +21,6 @@ type ScopeProfile = {
   department?: string | null
   is_department_lead?: boolean | null
   lead_departments?: string[] | null
-}
-
-type ActionItemRow = {
-  id: string
-  title: string | null
-  description: string | null
-  status: string | null
-  department: string | null
-  week_number: number | null
-  year: number | null
-  original_week?: number | null
-  created_at?: string | null
-}
-
-type WeeklyActionTaskRow = {
-  id: string
-  title: string | null
-  description: string | null
-  status: string | null
-  priority: string | null
-  department: string | null
-  due_date: string | null
-  week_number: number | null
-  year: number | null
-  work_item_number: string | null
-  created_at?: string | null
-}
-
-function normalizeActionItemRow(row: ActionItemRow) {
-  return {
-    id: String(row.id),
-    title: String(row.title || ""),
-    description: row.description || undefined,
-    status: String(row.status || "pending"),
-    priority: "medium",
-    department: String(row.department || ""),
-    due_date: undefined,
-    week_number: Number(row.week_number || 0),
-    year: Number(row.year || 0),
-    original_week: row.original_week ?? undefined,
-    work_item_number: undefined,
-  }
-}
-
-function normalizeWeeklyActionTaskRow(row: WeeklyActionTaskRow) {
-  return {
-    id: String(row.id),
-    title: String(row.title || ""),
-    description: row.description || undefined,
-    status: String(row.status || "pending"),
-    priority: String(row.priority || "medium"),
-    department: String(row.department || ""),
-    due_date: row.due_date || undefined,
-    week_number: Number(row.week_number || 0),
-    year: Number(row.year || 0),
-    original_week: undefined,
-    work_item_number: row.work_item_number || undefined,
-  }
 }
 
 function canManageDepartment(profile: ScopeProfile | null, department: string) {
@@ -114,12 +57,16 @@ export async function POST(request: NextRequest) {
 
     const officeWeek = getCurrentOfficeWeek()
     const { data: item, error } = await supabase
-      .from("action_items")
+      .from("tasks")
       .insert({
         title: parsed.data.title,
         description: parsed.data.description || null,
         department: parsed.data.department,
         status: "not_started",
+        priority: "medium",
+        assignment_type: "department",
+        category: "weekly_action",
+        source_type: "action_item",
         week_number: parsed.data.week_number ?? officeWeek.week,
         year: parsed.data.year ?? officeWeek.year,
         assigned_by: user.id,
@@ -133,8 +80,8 @@ export async function POST(request: NextRequest) {
     await writeAuditLog(
       supabase,
       {
-        action: "action_item.create",
-        entityType: "action_item",
+        action: "task.create",
+        entityType: "task",
         entityId: item.id,
         newValues: { title: item.title, department: item.department },
         context: { actorId: user.id, source: "api", route: "/api/reports/action-tracker" },
@@ -167,47 +114,11 @@ export async function GET(request: NextRequest) {
       .map((value) => value.trim())
       .filter(Boolean)
 
-    let actionItemsQuery = supabase
-      .from("action_items")
-      .select("id, title, department, description, status, week_number, year, original_week, created_at")
-      .eq("week_number", week)
-      .eq("year", year)
-      .order("department", { ascending: true })
-      .order("created_at", { ascending: true })
-
-    let tasksQuery = supabase
-      .from("tasks")
-      .select(
-        "id, title, description, status, priority, department, due_date, week_number, year, work_item_number, created_at"
-      )
-      .eq("category", "weekly_action")
-      .eq("week_number", week)
-      .eq("year", year)
-      .order("department", { ascending: true })
-      .order("created_at", { ascending: true })
-
-    if (scopedDepartments.length > 0) {
-      actionItemsQuery = actionItemsQuery.in("department", scopedDepartments)
-      tasksQuery = tasksQuery.in("department", scopedDepartments)
-    }
-    if (dept !== "all") {
-      actionItemsQuery = actionItemsQuery.eq("department", dept)
-      tasksQuery = tasksQuery.eq("department", dept)
-    }
-
-    const [{ data: actionItems, error: actionItemsError }, { data: weeklyActionTasks, error: weeklyActionTasksError }] =
-      await Promise.all([actionItemsQuery.returns<ActionItemRow[]>(), tasksQuery.returns<WeeklyActionTaskRow[]>()])
-
-    if (actionItemsError) return NextResponse.json({ error: actionItemsError.message }, { status: 500 })
-    if (weeklyActionTasksError) return NextResponse.json({ error: weeklyActionTasksError.message }, { status: 500 })
-
-    const data = [
-      ...(actionItems || []).map(normalizeActionItemRow),
-      ...(weeklyActionTasks || []).map(normalizeWeeklyActionTaskRow),
-    ].sort((a, b) => {
-      const departmentCompare = a.department.localeCompare(b.department)
-      if (departmentCompare !== 0) return departmentCompare
-      return a.title.localeCompare(b.title)
+    const data = await fetchActionTrackerItems(supabase, {
+      week,
+      year,
+      department: dept,
+      scopedDepartments,
     })
 
     return NextResponse.json({ data })

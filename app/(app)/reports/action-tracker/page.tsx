@@ -20,8 +20,6 @@ import { ActionTrackerFilters } from "./_components/action-tracker-filters"
 import { ActionTrackerExportButtons } from "./_components/action-tracker-export-buttons"
 import { DeptActionRows } from "./_components/dept-action-rows"
 import { fetchActionTrackerMetadata, fetchActionTrackerTasks, getDeptStatus, getStatusColor } from "./_lib/queries"
-import { ActionFormDialog } from "@/components/admin/action-tracker/action-form-dialog"
-import { Button } from "@/components/ui/button"
 
 const log = logger("dashboard-reports-action-tracker")
 
@@ -43,7 +41,6 @@ export default function ActionTrackerPortal() {
   const [deptFilter, setDeptFilter] = useState("all")
   const [searchQuery, setSearchQuery] = useState("")
   const [meetingDate, setMeetingDate] = useState<string | undefined>(undefined)
-  const [isFormOpen, setIsFormOpen] = useState(false)
 
   const { data: metaData } = useQuery({
     queryKey: QUERY_KEYS.actionTrackerMetadata(),
@@ -137,19 +134,9 @@ export default function ActionTrackerPortal() {
       backLinkHref="/reports/general-meeting"
       backLinkLabel="Back to General Meeting"
       actions={
-        <div className="flex items-center gap-2">
-          {profile?.is_department_lead && profile.department ? (
-            <Button onClick={() => setIsFormOpen(true)}>Create Action Item</Button>
-          ) : null}
-          {tasks.length > 0 ? (
-            <ActionTrackerExportButtons
-              actionItems={actionItemsForExport}
-              week={week}
-              year={year}
-              meetingDate={meetingDate}
-            />
-          ) : null}
-        </div>
+        tasks.length > 0 ? (
+          <ActionTrackerExportButtons actionItems={actionItemsForExport} week={week} year={year} meetingDate={meetingDate} />
+        ) : null
       }
       stats={
         <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-5 md:gap-4">
@@ -218,23 +205,12 @@ export default function ActionTrackerPortal() {
                 onStatusChange={handleStatusChange}
                 getDeptStatus={(dept) => getDeptStatus(tasks, dept)}
                 statusColor={getStatusColor}
+                allowStatusEdit={false}
               />
             )}
           </TableBody>
         </Table>
       </div>
-
-      <ActionFormDialog
-        isOpen={isFormOpen}
-        onClose={() => setIsFormOpen(false)}
-        onComplete={() =>
-          queryClient.invalidateQueries({ queryKey: QUERY_KEYS.actionTrackerTasks({ week, year, deptFilter }) })
-        }
-        departments={profile?.department ? [profile.department] : allDepartments}
-        defaultDept={profile?.department || undefined}
-        defaultWeek={week}
-        defaultYear={year}
-      />
     </AdminTablePage>
   )
 }

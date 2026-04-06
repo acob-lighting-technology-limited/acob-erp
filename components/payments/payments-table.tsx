@@ -13,8 +13,6 @@ import {
   Download,
   CreditCard,
   Eye,
-  FileSpreadsheet,
-  FileIcon,
   Printer,
   ArrowUpDown,
   Upload,
@@ -49,6 +47,8 @@ import { ExportColumnsDialog } from "./export-columns-dialog"
 import { ReceiptSelectionDialog } from "./receipt-selection-dialog"
 import { PaymentStatsCards } from "./payment-stats-cards"
 import { usePaymentExport } from "./use-payment-export"
+import { TableViewToggle } from "@/components/admin/table-view-toggle"
+import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
 import type { CreatePaymentFormData } from "./create-payment-dialog"
 
 // Types
@@ -167,6 +167,7 @@ export function PaymentsTable({
   const [departmentFilter, setDepartmentFilter] = useState("all")
   const [categoryFilter, setCategoryFilter] = useState("all")
   const [statusFilter, setStatusFilter] = useState("all")
+  const [viewMode, setViewMode] = useState<"list" | "card">("list")
 
   // Sorting
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" }>({
@@ -189,6 +190,7 @@ export function PaymentsTable({
 
   // Export dialog state
   const [exportDialogOpen, setExportDialogOpen] = useState(false)
+  const [exportOptionsOpen, setExportOptionsOpen] = useState(false)
   const [exportType, setExportType] = useState<"excel" | "pdf" | null>(null)
   const [selectedColumns, setSelectedColumns] = useState<Record<string, boolean>>({
     "#": true,
@@ -628,39 +630,15 @@ export function PaymentsTable({
       backLinkHref={backLinkHref}
       backLinkLabel={backLinkLabel}
       actions={
-        <div className="flex gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="flex-1 sm:flex-none" size="sm">
-                <Download className="mr-2 h-4 w-4" />
-                <span className="text-xs sm:text-sm">Export</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              <DropdownMenuLabel>Export Options</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => {
-                  setExportType("excel")
-                  setExportDialogOpen(true)
-                }}
-              >
-                <FileSpreadsheet className="mr-2 h-4 w-4" /> Excel (XLSX)
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => {
-                  setExportType("pdf")
-                  setExportDialogOpen(true)
-                }}
-              >
-                <FileIcon className="mr-2 h-4 w-4" /> PDF
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          <Button onClick={() => setIsModalOpen(true)} className="flex-1 sm:flex-none" size="sm">
-            <Plus className="mr-2 h-4 w-4" />
-            <span className="text-xs sm:text-sm">New Payment</span>
+        <div className="flex flex-wrap items-center gap-2">
+          <TableViewToggle viewMode={viewMode} onChange={setViewMode} />
+          <Button variant="outline" className="h-8 gap-2" size="sm" onClick={() => setExportOptionsOpen(true)}>
+            <Download className="h-4 w-4" />
+            Export
+          </Button>
+          <Button onClick={() => setIsModalOpen(true)} className="h-8 gap-2" size="sm">
+            <Plus className="h-4 w-4" />
+            Add Payment
           </Button>
         </div>
       }
@@ -733,31 +711,37 @@ export function PaymentsTable({
             Add Payment
           </Button>
         </div>
-      ) : (
+      ) : viewMode === "list" ? (
         <div className="overflow-x-auto rounded-md border">
           <Table className="[&_td]:py-2 [&_th]:py-2">
-            <TableHeader>
+            <TableHeader className="bg-muted/50">
               <TableRow>
-                <TableHead className="w-[50px]">S/N</TableHead>
-                <TableHead className="hover:bg-muted/50 cursor-pointer" onClick={() => handleSort("category")}>
+                <TableHead className="text-foreground w-[50px] font-bold">#</TableHead>
+                <TableHead
+                  className="text-foreground hover:bg-muted/50 cursor-pointer font-bold"
+                  onClick={() => handleSort("category")}
+                >
                   <div className="flex items-center gap-1">
                     Category
                     <ArrowUpDown className="h-4 w-4" />
                   </div>
                 </TableHead>
-                <TableHead>Title</TableHead>
-                <TableHead>Issuer</TableHead>
-                <TableHead>Department</TableHead>
-                <TableHead>Amount</TableHead>
-                <TableHead>Amount Due</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="hover:bg-muted/50 cursor-pointer" onClick={() => handleSort("date")}>
+                <TableHead className="text-foreground font-bold">Title</TableHead>
+                <TableHead className="text-foreground font-bold">Issuer</TableHead>
+                <TableHead className="text-foreground font-bold">Department</TableHead>
+                <TableHead className="text-foreground font-bold">Amount</TableHead>
+                <TableHead className="text-foreground font-bold">Amount Due</TableHead>
+                <TableHead className="text-foreground font-bold">Status</TableHead>
+                <TableHead
+                  className="text-foreground hover:bg-muted/50 cursor-pointer font-bold"
+                  onClick={() => handleSort("date")}
+                >
                   <div className="flex items-center gap-1">
                     Date / Next Due
                     <ArrowUpDown className="h-4 w-4" />
                   </div>
                 </TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead className="text-foreground text-right font-bold">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -886,6 +870,54 @@ export function PaymentsTable({
             </TableBody>
           </Table>
         </div>
+      ) : (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {sortedPayments.map((payment) => (
+            <div
+              key={payment.id}
+              className="bg-card rounded-lg border-2 p-5 shadow-sm transition-shadow hover:shadow-md"
+              onClick={() => router.push(`${basePath}/${payment.id}`)}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-foreground font-semibold">{payment.title}</h3>
+                  <p className="text-muted-foreground mt-1 text-sm">{payment.department?.name || "Unknown"}</p>
+                </div>
+                <Badge className={getStatusColor(payment.status)} variant="outline">
+                  {payment.status}
+                </Badge>
+              </div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <div>
+                  <p className="text-muted-foreground text-xs font-semibold uppercase">Type</p>
+                  <p className="text-foreground font-medium">
+                    {payment.payment_type === "recurring" ? "Recurring" : "One-time"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground text-xs font-semibold uppercase">Amount</p>
+                  <p className="text-foreground font-medium">{formatCurrency(payment.amount, payment.currency)}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground text-xs font-semibold uppercase">Amount Due</p>
+                  <p className="text-foreground font-medium">{formatCurrency(payment.amountDue, payment.currency)}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground text-xs font-semibold uppercase">Date / Next Due</p>
+                  <p className="text-foreground font-medium">
+                    {payment.payment_type === "recurring"
+                      ? payment.next_payment_due
+                        ? format(parseISO(payment.next_payment_due), "MMM d, yyyy")
+                        : "N/A"
+                      : payment.payment_date
+                        ? format(parseISO(payment.payment_date), "MMM d, yyyy")
+                        : "N/A"}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
       )}
 
       <CreatePaymentDialog
@@ -959,6 +991,20 @@ export function PaymentsTable({
         selectedColumns={selectedColumns}
         onColumnChange={setSelectedColumns}
         onConfirm={() => exportType && handleExportConfirm(exportType)}
+      />
+
+      <ExportOptionsDialog
+        open={exportOptionsOpen}
+        onOpenChange={setExportOptionsOpen}
+        title="Export Payments"
+        options={[
+          { id: "excel", label: "Excel (.xlsx)", icon: "excel" },
+          { id: "pdf", label: "PDF", icon: "pdf" },
+        ]}
+        onSelect={(id) => {
+          setExportType(id === "excel" ? "excel" : "pdf")
+          setExportDialogOpen(true)
+        }}
       />
     </AdminTablePage>
   )

@@ -539,6 +539,16 @@ export interface UserDocumentation {
   category?: string
   tags?: string[]
   is_draft: boolean
+  sharepoint_folder_path?: string | null
+  sharepoint_text_file_path?: string | null
+  sharepoint_attachments?: {
+    id: string
+    name: string
+    file_path: string
+    mime_type?: string | null
+    size?: number | null
+    uploaded_at: string
+  }[]
   created_at: string
   updated_at: string
 }

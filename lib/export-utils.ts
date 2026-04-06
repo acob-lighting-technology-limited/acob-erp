@@ -23,6 +23,7 @@ import {
   getDepartmentAliases,
   normalizeDepartmentName,
 } from "@/shared/departments"
+import { getSeasonalLogoPaths } from "@/lib/seasonal-branding"
 
 // Load pptxgenjs from the installed npm package via dynamic import.
 // Dynamic import keeps it out of the SSR bundle (it requires browser APIs).
@@ -70,6 +71,7 @@ export interface WeeklyReport {
 }
 
 const INVALID_FILENAME_CHARS = /[<>:"/\\|?*\u0000-\u001F]+/g
+const inFlightActionPointFileExports = new Set<string>()
 
 const sanitizeFilenameSegment = (value: string) =>
   value.replace(INVALID_FILENAME_CHARS, " ").replace(/\s+/g, " ").trim()
@@ -625,8 +627,8 @@ export const exportToPDF = async (report: WeeklyReport, meetingDate?: string) =>
   const mondayDate = getWeekMonday(currentWeek, currentYear)
 
   const [logoFull, logoDark] = await Promise.all([
-    fetchImageAsBase64("/images/acob-logo-light.webp"),
-    fetchImageAsBase64("/images/acob-logo-dark.webp"),
+    fetchImageAsBase64(getSeasonalLogoPaths("light").full),
+    fetchImageAsBase64(getSeasonalLogoPaths("light").icon),
   ])
 
   // Page 1 — Cover (shows current week / meeting date)
@@ -657,8 +659,8 @@ export const exportAllToPDF = async (reports: WeeklyReport[], week: number, year
   const departments = sortedReports.map((r) => r.department)
 
   const [logoFull, logoDark] = await Promise.all([
-    fetchImageAsBase64("/images/acob-logo-light.webp"),
-    fetchImageAsBase64("/images/acob-logo-dark.webp"),
+    fetchImageAsBase64(getSeasonalLogoPaths("light").full),
+    fetchImageAsBase64(getSeasonalLogoPaths("light").icon),
   ])
 
   // Page 1 — Cover (current week / meeting date)
@@ -698,8 +700,8 @@ export const exportAllToPDFBase64 = async (reports: WeeklyReport[], week: number
   const departments = sortedReports.map((r) => r.department)
 
   const [logoFull, logoDark] = await Promise.all([
-    fetchImageAsBase64("/images/acob-logo-light.webp"),
-    fetchImageAsBase64("/images/acob-logo-dark.webp"),
+    fetchImageAsBase64(getSeasonalLogoPaths("light").full),
+    fetchImageAsBase64(getSeasonalLogoPaths("light").icon),
   ])
 
   pdfCoverPage(doc, currentWeek, currentYear, mondayDate, logoFull)
@@ -1040,6 +1042,11 @@ export const exportActionPointToPPTX = async (
   meetingDate?: string,
   department?: string
 ): Promise<void> => {
+  const exportKey = ["pptx", week, year, meetingDate || "", department || "all", actions.length].join(":")
+  if (inFlightActionPointFileExports.has(exportKey)) return
+  inFlightActionPointFileExports.add(exportKey)
+
+  try {
   const PptxConstructor = await loadPptxGenJS()
   const pres = new PptxConstructor()
   pres.layout = "LAYOUT_WIDE"
@@ -1234,6 +1241,9 @@ export const exportActionPointToPPTX = async (
   await pres.writeFile({
     fileName: buildActionPointFilename({ week, year, meetingDate, extension: "pptx", department }),
   })
+  } finally {
+    inFlightActionPointFileExports.delete(exportKey)
+  }
 }
 
 // ─── DOCX helpers ─────────────────────────────────────────────────────────────
@@ -1512,6 +1522,11 @@ export const exportActionPointToXLSX = async (
   department?: string,
   meetingDate?: string
 ) => {
+  const exportKey = ["xlsx", week, year, meetingDate || "", department || "all", actions.length].join(":")
+  if (inFlightActionPointFileExports.has(exportKey)) return
+  inFlightActionPointFileExports.add(exportKey)
+
+  try {
   const XLSX = await import("xlsx")
   const filteredActions = department
     ? actions.filter((item) => getDepartmentAliases(department).includes(normalizeDepartmentName(item.department)))
@@ -1544,6 +1559,9 @@ export const exportActionPointToXLSX = async (
       department: department || "All Departments",
     })
   )
+  } finally {
+    inFlightActionPointFileExports.delete(exportKey)
+  }
 }
 
 export const exportAllToDocx = async (reports: WeeklyReport[], week: number, year: number, meetingDate?: string) => {
@@ -1774,8 +1792,8 @@ const ACOB_OFFWHITE = "F8FAF9"
 // Logo URLs
 // acob-logo-light.webp = full colour logo (dark text + green) — use on light/white backgrounds
 // acob-logo-dark.webp  = green-only minimal logo — use on dark/green backgrounds
-const LOGO_FULL = "/images/acob-logo-light.webp" // full ACOB LIGHTING logo
-const LOGO_ICON = "/images/acob-logo-dark.webp" // green-only icon variant
+const LOGO_FULL = getSeasonalLogoPaths("light").full // full ACOB LIGHTING logo
+const LOGO_ICON = getSeasonalLogoPaths("light").icon // green-only icon variant
 
 export type WeeklyPptxTheme = "light" | "dark"
 export type WeeklyDeptOrder = "default" | "alpha" | "random"

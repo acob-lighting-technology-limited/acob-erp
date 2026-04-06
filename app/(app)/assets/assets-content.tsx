@@ -3,18 +3,18 @@
 import { useEffect, useMemo, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { formatName } from "@/lib/utils"
-import { Package, Calendar, User, FileText, Building2, LayoutGrid, List, Hash, Search, Filter } from "lucide-react"
+import { Package, Calendar, User, FileText, Building2, Hash, Search, Filter } from "lucide-react"
 import { ASSET_TYPE_MAP } from "@/lib/asset-types"
 import type { AssetAssignment } from "./page"
 import { AppTablePage } from "@/components/app/app-table-page"
 import { toast } from "sonner"
 import { StatCard } from "@/components/ui/stat-card"
 import { EmptyState } from "@/components/ui/patterns"
+import { TableViewToggle } from "@/components/admin/table-view-toggle"
 
 interface AssetsContentProps {
   initialAssignments: AssetAssignment[]
@@ -116,26 +116,7 @@ export function AssetsContent({ initialAssignments, initialError }: AssetsConten
       description="View your currently assigned assets and equipment"
       icon={Package}
       actions={
-        <div className="flex items-center gap-2">
-          <Button
-            variant={viewMode === "list" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setViewMode("list")}
-            className="gap-2"
-          >
-            <List className="h-4 w-4" />
-            List
-          </Button>
-          <Button
-            variant={viewMode === "card" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setViewMode("card")}
-            className="gap-2"
-          >
-            <LayoutGrid className="h-4 w-4" />
-            Card
-          </Button>
-        </div>
+        <TableViewToggle viewMode={viewMode} onChange={setViewMode} />
       }
       stats={
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -221,17 +202,17 @@ export function AssetsContent({ initialAssignments, initialError }: AssetsConten
           <Card className="border-2">
             <div className="overflow-x-auto">
               <Table>
-                <TableHeader>
+                <TableHeader className="bg-muted/50">
                   <TableRow>
-                    <TableHead className="w-[50px]">S/N</TableHead>
-                    <TableHead>Asset Name</TableHead>
-                    <TableHead>Unique Code</TableHead>
-                    <TableHead>Model</TableHead>
-                    <TableHead>Serial Number</TableHead>
-                    <TableHead>Year</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Assignment Type</TableHead>
-                    <TableHead>Assigned</TableHead>
+                    <TableHead className="text-foreground w-[50px] font-bold">#</TableHead>
+                    <TableHead className="text-foreground font-bold">Asset Name</TableHead>
+                    <TableHead className="text-foreground font-bold">Unique Code</TableHead>
+                    <TableHead className="text-foreground font-bold">Model</TableHead>
+                    <TableHead className="text-foreground font-bold">Serial Number</TableHead>
+                    <TableHead className="text-foreground font-bold">Year</TableHead>
+                    <TableHead className="text-foreground font-bold">Status</TableHead>
+                    <TableHead className="text-foreground font-bold">Assignment Type</TableHead>
+                    <TableHead className="text-foreground font-bold">Assigned</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

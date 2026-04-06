@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { getCurrentOfficeWeek } from "@/lib/meeting-week"
 import { toast } from "sonner"
-import { FileSpreadsheet } from "lucide-react"
+import { FileSpreadsheet, Download } from "lucide-react"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
 import {
   AlertDialog,
@@ -25,8 +25,10 @@ import { fetchWeeklyReportLockState } from "@/lib/weekly-report-lock"
 import { ActionTrackerStats } from "./_components/action-tracker-stats"
 import { ActionTrackerFilters } from "./_components/action-tracker-filters"
 import { ActionTrackerTable } from "./_components/action-tracker-table"
-import { ActionTrackerExportButtons } from "./_components/action-tracker-export-buttons"
 import { Button } from "@/components/ui/button"
+import { TableViewToggle } from "@/components/admin/table-view-toggle"
+import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
+import { ActionTrackerCardGrid } from "./_components/action-tracker-card-grid"
 
 import { logger } from "@/lib/logger"
 
@@ -101,6 +103,8 @@ export function ActionTrackerContent({
   const [searchQuery, setSearchQuery] = useState("")
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
   const [isCarryForwarding, setIsCarryForwarding] = useState(false)
+  const [viewMode, setViewMode] = useState<"list" | "card">("list")
+  const [exportOptionsOpen, setExportOptionsOpen] = useState(false)
 
   const supabase = createClient()
   const canMutateTask = (task: ActionTask) => canGlobalEdit || editableDepartments.includes(task.department)
@@ -254,18 +258,17 @@ export function ActionTrackerContent({
       backLinkHref="/admin/reports/general-meeting"
       backLinkLabel="Back to General Meeting"
       actions={
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={handleCarryForward} disabled={isCarryForwarding}>
+        <div className="flex flex-wrap items-center gap-2">
+          <TableViewToggle viewMode={viewMode} onChange={setViewMode} />
+          {tasks.length > 0 ? (
+            <Button variant="outline" size="sm" className="h-8 gap-2" onClick={() => setExportOptionsOpen(true)}>
+              <Download className="h-4 w-4" />
+              Export
+            </Button>
+          ) : null}
+          <Button variant="outline" onClick={handleCarryForward} disabled={isCarryForwarding} className="h-8">
             Carry Forward
           </Button>
-          {tasks.length > 0 ? (
-            <ActionTrackerExportButtons
-              items={actionItemsForExport}
-              weekFilter={weekFilter}
-              yearFilter={yearFilter}
-              meetingDate={lockState?.meetingDate}
-            />
-          ) : null}
         </div>
       }
       stats={
@@ -293,21 +296,33 @@ export function ActionTrackerContent({
         />
       }
     >
-      <ActionTrackerTable
-        tasks={filteredTasks}
-        loading={loading}
-        expandedDepts={expandedDepts}
-        onToggleDept={toggleDept}
-        weekFilter={weekFilter}
-        yearFilter={yearFilter}
-        meetingDate={lockState?.meetingDate}
-        canMutateTask={canMutateTask}
-        onStatusChange={handleStatusChange}
-        onEdit={handleEdit}
-        onDeleteRequest={setPendingDeleteId}
-        getDeptStatus={getDeptStatus}
-        statusColor={statusColor}
-      />
+      {viewMode === "list" ? (
+        <ActionTrackerTable
+          tasks={filteredTasks}
+          loading={loading}
+          expandedDepts={expandedDepts}
+          onToggleDept={toggleDept}
+          weekFilter={weekFilter}
+          yearFilter={yearFilter}
+          meetingDate={lockState?.meetingDate}
+          canMutateTask={canMutateTask}
+          onStatusChange={handleStatusChange}
+          onEdit={handleEdit}
+          onDeleteRequest={setPendingDeleteId}
+          getDeptStatus={getDeptStatus}
+          statusColor={statusColor}
+        />
+      ) : (
+        <ActionTrackerCardGrid
+          tasks={filteredTasks}
+          canMutateTask={canMutateTask}
+          onStatusChange={handleStatusChange}
+          onEdit={handleEdit}
+          onDeleteRequest={setPendingDeleteId}
+          getDeptStatus={getDeptStatus}
+          statusColor={statusColor}
+        />
+      )}
 
       <ActionFormDialog
         isOpen={isFormOpen}
@@ -341,6 +356,41 @@ export function ActionTrackerContent({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <ExportOptionsDialog
+        open={exportOptionsOpen}
+        onOpenChange={setExportOptionsOpen}
+        title="Export Action Tracker"
+        options={[
+          { id: "pdf", label: "PDF", icon: "pdf" },
+          { id: "pptx", label: "PowerPoint (.pptx)", icon: "pptx" },
+          { id: "word", label: "Word (.docx)", icon: "word" },
+          { id: "excel", label: "Excel (.xlsx)", icon: "excel" },
+        ]}
+        onSelect={(id) => {
+          if (id === "pdf") {
+            void import("@/lib/action-points-export").then(({ exportActionPointsPdf }) =>
+              exportActionPointsPdf(actionItemsForExport, weekFilter, yearFilter, lockState?.meetingDate)
+            )
+            return
+          }
+          if (id === "pptx") {
+            void import("@/lib/export-utils").then(({ exportActionPointToPPTX }) =>
+              exportActionPointToPPTX(actionItemsForExport, weekFilter, yearFilter, lockState?.meetingDate)
+            )
+            return
+          }
+          if (id === "word") {
+            void import("@/lib/action-points-export").then(({ exportActionPointsDocx }) =>
+              exportActionPointsDocx(actionItemsForExport, weekFilter, yearFilter, lockState?.meetingDate)
+            )
+            return
+          }
+          void import("@/lib/export-utils").then(({ exportActionPointToXLSX }) =>
+            exportActionPointToXLSX(actionItemsForExport, weekFilter, yearFilter, undefined, lockState?.meetingDate)
+          )
+        }}
+      />
     </AdminTablePage>
   )
 }

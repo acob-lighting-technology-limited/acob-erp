@@ -10,6 +10,7 @@ const ActionStatusSchema = z.object({
   status: z.enum(["not_started", "pending", "in_progress", "completed"]).optional(),
   title: z.string().trim().min(1).optional(),
   description: z.string().optional().nullable(),
+  priority: z.string().trim().min(1).optional(),
   department: z.string().trim().min(1).optional(),
   week_number: z.number().int().min(1).max(53).optional(),
   year: z.number().int().min(2000).max(9999).optional(),
@@ -46,15 +47,6 @@ async function findActionEntity(
   supabase: Awaited<ReturnType<typeof createClient>>,
   id: string
 ): Promise<ActionEntity | null> {
-  const { data: actionItem } = await supabase.from("action_items").select("*").eq("id", id).maybeSingle()
-  if (actionItem) {
-    return {
-      table: "action_items",
-      entityType: "action_item",
-      item: actionItem as Record<string, unknown> & { id: string; department?: string | null },
-    }
-  }
-
   const { data: task } = await supabase
     .from("tasks")
     .select("*")
@@ -66,6 +58,15 @@ async function findActionEntity(
       table: "tasks",
       entityType: "task",
       item: task as Record<string, unknown> & { id: string; department?: string | null },
+    }
+  }
+
+  const { data: actionItem } = await supabase.from("action_items").select("*").eq("id", id).maybeSingle()
+  if (actionItem) {
+    return {
+      table: "action_items",
+      entityType: "action_item",
+      item: actionItem as Record<string, unknown> & { id: string; department?: string | null },
     }
   }
 
@@ -108,6 +109,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     }
     if (parsed.data.title) updates.title = parsed.data.title
     if (typeof parsed.data.description !== "undefined") updates.description = parsed.data.description
+    if (parsed.data.priority && entity.table === "tasks") updates.priority = parsed.data.priority
     if (parsed.data.department) updates.department = parsed.data.department
     if (parsed.data.week_number) updates.week_number = parsed.data.week_number
     if (parsed.data.year) updates.year = parsed.data.year

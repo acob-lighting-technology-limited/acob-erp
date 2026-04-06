@@ -20,6 +20,23 @@ let cachedToken: { token: string; expiresAt: number } | null = null
 let cachedResolvedSiteId: string | null = null
 let cachedSiteDrives: OneDriveDrive[] | null = null
 const cachedDriveBaseUrls = new Map<string, string>()
+const RETRYABLE_GRAPH_STATUSES = new Set([500, 502, 503, 504])
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function shouldRetryGraphError(status: number, errorText: string): boolean {
+  if (!RETRYABLE_GRAPH_STATUSES.has(status)) return false
+
+  const normalizedErrorText = errorText.toLowerCase()
+  return (
+    normalizedErrorText.includes("generalexception") ||
+    normalizedErrorText.includes("timeout") ||
+    normalizedErrorText.includes("temporar") ||
+    normalizedErrorText.includes("try again")
+  )
+}
 
 function normalizeGraphPath(path: string): string {
   const normalized = `/${path || ""}`.replace(/\/+/g, "/")
@@ -147,48 +164,66 @@ export class OneDriveService {
 
   private async graphApiRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const token = await this.getAccessToken()
-    const response = await fetch(`https://graph.microsoft.com/v1.0${endpoint}`, {
-      ...options,
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-        ...options.headers,
-      },
-    })
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const response = await fetch(`https://graph.microsoft.com/v1.0${endpoint}`, {
+        ...options,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          ...options.headers,
+        },
+      })
 
-    if (!response.ok) {
+      if (response.ok) {
+        if (response.status === 204) {
+          return {} as T
+        }
+
+        return response.json()
+      }
+
       const error = await response.text()
+      if (attempt === 0 && shouldRetryGraphError(response.status, error)) {
+        await sleep(500)
+        continue
+      }
+
       throw new Error(`Graph API error (${response.status}): ${error}`)
     }
 
-    if (response.status === 204) {
-      return {} as T
-    }
-
-    return response.json()
+    throw new Error("Graph API request failed after retry")
   }
 
   private async driveRequest<T>(baseUrl: string, endpoint: string, options: RequestInit = {}): Promise<T> {
     const token = await this.getAccessToken()
-    const response = await fetch(`${baseUrl}${endpoint}`, {
-      ...options,
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-        ...options.headers,
-      },
-    })
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const response = await fetch(`${baseUrl}${endpoint}`, {
+        ...options,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          ...options.headers,
+        },
+      })
 
-    if (!response.ok) {
+      if (response.ok) {
+        if (response.status === 204) {
+          return {} as T
+        }
+
+        return response.json()
+      }
+
       const error = await response.text()
+      if (attempt === 0 && shouldRetryGraphError(response.status, error)) {
+        await sleep(500)
+        continue
+      }
+
       throw new Error(`Graph API error (${response.status}): ${error}`)
     }
 
-    if (response.status === 204) {
-      return {} as T
-    }
-
-    return response.json()
+    throw new Error("Graph API request failed after retry")
   }
 
   private async resolveSiteId(): Promise<string> {

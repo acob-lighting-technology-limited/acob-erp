@@ -5,13 +5,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ClipboardList, Search } from "lucide-react"
 
+type TaskAssignmentTab = "individual" | "department" | "multiple"
+
 interface UserTasksHeaderProps {
   searchQuery: string
   setSearchQuery: (value: string) => void
   filterStatus: string
   setFilterStatus: (value: string) => void
-  assignmentFilter: string
-  setAssignmentFilter: (value: string) => void
+  assignmentFilter: TaskAssignmentTab
+  setAssignmentFilter: (value: TaskAssignmentTab) => void
   taskView: "ongoing" | "history"
   setTaskView: (value: "ongoing" | "history") => void
 }
@@ -43,6 +45,14 @@ export function UserTasksHeader({
         </TabsList>
       </Tabs>
 
+      <Tabs value={assignmentFilter} onValueChange={(value) => setAssignmentFilter(value as TaskAssignmentTab)}>
+        <TabsList className="grid w-full max-w-md grid-cols-3">
+          <TabsTrigger value="individual">Individual</TabsTrigger>
+          <TabsTrigger value="department">Dept</TabsTrigger>
+          <TabsTrigger value="multiple">Group</TabsTrigger>
+        </TabsList>
+      </Tabs>
+
       <div className="flex flex-col gap-3 xl:flex-row">
         <div className="relative flex-1">
           <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
@@ -65,18 +75,6 @@ export function UserTasksHeader({
               <SelectItem value="in_progress">In Progress</SelectItem>
               <SelectItem value="completed">Completed</SelectItem>
               <SelectItem value="cancelled">Cancelled</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select value={assignmentFilter} onValueChange={setAssignmentFilter}>
-            <SelectTrigger className="w-full sm:w-[200px]">
-              <SelectValue placeholder="Filter by type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Types</SelectItem>
-              <SelectItem value="individual">Individual</SelectItem>
-              <SelectItem value="department">Dept</SelectItem>
-              <SelectItem value="multiple">Group</SelectItem>
             </SelectContent>
           </Select>
         </div>

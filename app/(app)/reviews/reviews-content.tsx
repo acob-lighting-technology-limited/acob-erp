@@ -182,7 +182,7 @@ export function ReviewsContent({ initialReviews }: ReviewsContentProps) {
                     <div className="grid gap-3 sm:grid-cols-2">
                       {[
                         { label: "KPI Achievement", value: review.kpi_score, weight: 70, icon: Target },
-                        { label: "Knowledge (CBT)", value: review.cbt_score, weight: 10, icon: BookOpen },
+                        { label: "CBT", value: review.cbt_score, weight: 10, icon: BookOpen },
                         { label: "Attendance", value: review.attendance_score, weight: 10, icon: CalendarCheck },
                         { label: "Behaviour", value: review.behaviour_score, weight: 10, icon: Users },
                       ].map(({ label, value, weight, icon: Icon }) => (
@@ -304,7 +304,7 @@ export function ReviewsContent({ initialReviews }: ReviewsContentProps) {
               <div className="grid gap-3 sm:grid-cols-2">
                 {[
                   { label: "KPI Achievement", value: selectedReview.kpi_score },
-                  { label: "Knowledge (CBT)", value: selectedReview.cbt_score },
+                  { label: "CBT", value: selectedReview.cbt_score },
                   { label: "Attendance", value: selectedReview.attendance_score },
                   { label: "Behaviour", value: selectedReview.behaviour_score },
                 ].map((item) => (

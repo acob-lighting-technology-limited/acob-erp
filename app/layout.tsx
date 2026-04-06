@@ -14,6 +14,7 @@ import { NProgressProvider } from "@/components/nprogress-provider"
 import { NProgressHandler } from "@/components/nprogress-handler"
 import { ClientErrorMonitor } from "@/components/telemetry/client-error-monitor"
 import { QueryProvider } from "@/providers/query-provider"
+import { SeasonalFaviconSwitcher } from "@/components/seasonal-favicon-switcher"
 import "./globals.css"
 
 export const metadata: Metadata = {
@@ -60,6 +61,7 @@ export default function RootLayout({
           {/* Theme follows system preference automatically (light/dark mode) */}
           <ThemeProvider attribute="class" defaultTheme="system" enableSystem enableColorScheme storageKey="acob-theme">
             <QueryProvider>
+              <SeasonalFaviconSwitcher />
               <SidebarProvider>
                 <NProgressProvider />
                 <NProgressHandler />

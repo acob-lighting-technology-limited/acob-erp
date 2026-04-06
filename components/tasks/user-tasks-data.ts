@@ -57,7 +57,9 @@ export async function loadUserTasks(
 
   const multipleTaskIds = ((assignments as TaskAssignmentRow[] | null) || []).map((a) => a.task_id)
   const { data: multipleTasks } =
-    multipleTaskIds.length > 0 ? await supabase.from("tasks").select("*").in("id", multipleTaskIds) : { data: [] }
+    multipleTaskIds.length > 0
+      ? await supabase.from("tasks").select("*").in("id", multipleTaskIds).neq("category", "weekly_action")
+      : { data: [] }
 
   const { data: departmentTasks } =
     userProfile?.department && userProfile?.is_department_lead

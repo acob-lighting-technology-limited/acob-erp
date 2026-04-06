@@ -599,7 +599,7 @@ export function EmployeeViewModal({
           {viewEmployeeProfile && modalViewMode === "signature" && (
             <ScrollArea className="h-full pr-4">
               <div className="mt-4">
-                <SignatureCreator profile={viewEmployeeProfile} />
+                <SignatureCreator profile={viewEmployeeProfile} variant="selectable" />
               </div>
             </ScrollArea>
           )}
