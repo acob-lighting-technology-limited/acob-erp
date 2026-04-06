@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
+import { Buffer } from "node:buffer"
 import { getOneDriveService } from "@/lib/onedrive"
 import { getDepartmentScope, normalizeDepartmentName, resolveAdminScope } from "@/lib/admin/rbac"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
@@ -88,6 +89,11 @@ async function assertPaymentAccess(supabase: PaymentsClient, userId: string, pay
   return { allowed: true as const }
 }
 
+function dedupePdfExtension(fileName: string): string {
+  const trimmed = fileName.trim()
+  return trimmed.toLowerCase().endsWith(".pdf.pdf") ? trimmed.slice(0, -4) : trimmed
+}
+
 export async function GET(_request: Request, { params }: { params: { id: string; documentId: string } }) {
   try {
     const supabase = await createClient()
@@ -108,7 +114,7 @@ export async function GET(_request: Request, { params }: { params: { id: string;
 
     const { data: document, error } = await dataClient
       .from("payment_documents")
-      .select("id, payment_id, file_path")
+      .select("id, payment_id, file_path, file_name, mime_type")
       .eq("id", params.documentId)
       .eq("payment_id", params.id)
       .maybeSingle()
@@ -117,6 +123,9 @@ export async function GET(_request: Request, { params }: { params: { id: string;
       return NextResponse.json({ error: "Document not found" }, { status: 404 })
     }
 
+    const fileName = dedupePdfExtension(String(document.file_name || "payment-document.pdf"))
+    const mimeType = String(document.mime_type || "application/pdf")
+
     if (isOneDrivePaymentDocumentPath(document.file_path)) {
       const onedrive = getOneDriveService()
       if (!onedrive.isEnabled()) {
@@ -124,7 +133,17 @@ export async function GET(_request: Request, { params }: { params: { id: string;
       }
 
       const downloadUrl = await onedrive.getDownloadUrl(document.file_path)
-      return NextResponse.redirect(downloadUrl)
+      const upstream = await fetch(downloadUrl)
+      if (!upstream.ok) {
+        return NextResponse.json({ error: "Failed to download document" }, { status: 502 })
+      }
+
+      return new NextResponse(Buffer.from(await upstream.arrayBuffer()), {
+        headers: {
+          "Content-Type": mimeType,
+          "Content-Disposition": `attachment; filename="${fileName}"`,
+        },
+      })
     }
 
     const { data: signed, error: signedError } = await dataClient.storage
@@ -138,7 +157,17 @@ export async function GET(_request: Request, { params }: { params: { id: string;
       )
     }
 
-    return NextResponse.redirect(signed.signedUrl)
+    const upstream = await fetch(signed.signedUrl)
+    if (!upstream.ok) {
+      return NextResponse.json({ error: "Failed to download document" }, { status: 502 })
+    }
+
+    return new NextResponse(Buffer.from(await upstream.arrayBuffer()), {
+      headers: {
+        "Content-Type": mimeType,
+        "Content-Disposition": `attachment; filename="${fileName}"`,
+      },
+    })
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Internal Server Error"
     return NextResponse.json({ error: message }, { status: 500 })

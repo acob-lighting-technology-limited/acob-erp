@@ -81,9 +81,8 @@ async function fetchReports(
     .eq("year", yearFilter)
     .order("department", { ascending: true })
 
-  const effectiveDept = profile?.is_department_lead ? profile.department || "all" : deptFilter
-  if (effectiveDept !== "all") {
-    query = query.eq("department", effectiveDept)
+  if (deptFilter !== "all") {
+    query = query.eq("department", deptFilter)
   }
 
   const { data, error } = await query
@@ -118,12 +117,6 @@ export default function WeeklyReportsPortal() {
 
   const profile = profileData?.profile ?? null
   const allDepartments = profileData?.allDepartments ?? []
-
-  useEffect(() => {
-    if (profile?.is_department_lead && profile.department) {
-      setDeptFilter(profile.department || "all")
-    }
-  }, [profile?.department, profile?.is_department_lead])
 
   const {
     data: reports = [],
@@ -253,7 +246,7 @@ export default function WeeklyReportsPortal() {
         onToggleRow={toggleRow}
         meetingDate={meetingDate}
         isFilteredWeekLocked={isFilteredWeekLocked}
-        currentUserDepartment={profile?.department}
+        currentUserDepartment={null}
         onEdit={(report) => {
           setSelectedReportParams({
             week: report.week_number,

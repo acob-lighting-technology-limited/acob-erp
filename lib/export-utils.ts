@@ -70,6 +70,7 @@ export interface WeeklyReport {
 }
 
 const INVALID_FILENAME_CHARS = /[<>:"/\\|?*\u0000-\u001F]+/g
+const inFlightActionPointFileExports = new Set<string>()
 
 const sanitizeFilenameSegment = (value: string) =>
   value.replace(INVALID_FILENAME_CHARS, " ").replace(/\s+/g, " ").trim()
@@ -1040,6 +1041,11 @@ export const exportActionPointToPPTX = async (
   meetingDate?: string,
   department?: string
 ): Promise<void> => {
+  const exportKey = ["pptx", week, year, meetingDate || "", department || "all", actions.length].join(":")
+  if (inFlightActionPointFileExports.has(exportKey)) return
+  inFlightActionPointFileExports.add(exportKey)
+
+  try {
   const PptxConstructor = await loadPptxGenJS()
   const pres = new PptxConstructor()
   pres.layout = "LAYOUT_WIDE"
@@ -1234,6 +1240,9 @@ export const exportActionPointToPPTX = async (
   await pres.writeFile({
     fileName: buildActionPointFilename({ week, year, meetingDate, extension: "pptx", department }),
   })
+  } finally {
+    inFlightActionPointFileExports.delete(exportKey)
+  }
 }
 
 // ─── DOCX helpers ─────────────────────────────────────────────────────────────
@@ -1512,6 +1521,11 @@ export const exportActionPointToXLSX = async (
   department?: string,
   meetingDate?: string
 ) => {
+  const exportKey = ["xlsx", week, year, meetingDate || "", department || "all", actions.length].join(":")
+  if (inFlightActionPointFileExports.has(exportKey)) return
+  inFlightActionPointFileExports.add(exportKey)
+
+  try {
   const XLSX = await import("xlsx")
   const filteredActions = department
     ? actions.filter((item) => getDepartmentAliases(department).includes(normalizeDepartmentName(item.department)))
@@ -1544,6 +1558,9 @@ export const exportActionPointToXLSX = async (
       department: department || "All Departments",
     })
   )
+  } finally {
+    inFlightActionPointFileExports.delete(exportKey)
+  }
 }
 
 export const exportAllToDocx = async (reports: WeeklyReport[], week: number, year: number, meetingDate?: string) => {

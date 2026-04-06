@@ -32,6 +32,12 @@ interface GoalsContentProps {
   userId: string
 }
 
+type GoalsApiResponse = {
+  data?: Goal | Goal[]
+  goals?: Goal[]
+  error?: string
+}
+
 export function GoalsContent({ initialGoals, userId }: GoalsContentProps) {
   const [goals, setGoals] = useState<Goal[]>(initialGoals)
   const [linkedTasks, setLinkedTasks] = useState<
@@ -59,10 +65,11 @@ export function GoalsContent({ initialGoals, userId }: GoalsContentProps) {
 
   async function fetchGoals() {
     try {
-      const response = await fetch("/api/hr/performance/goals")
-      const data = await response.json()
-      if (data.goals) {
-        setGoals(data.goals)
+      const response = await fetch("/api/hr/performance/goals", { cache: "no-store" })
+      const data = (await response.json().catch(() => null)) as GoalsApiResponse | null
+      const nextGoals = Array.isArray(data?.data) ? data.data : Array.isArray(data?.goals) ? data.goals : []
+      if (Array.isArray(nextGoals)) {
+        setGoals(nextGoals)
       }
     } catch (error) {
       log.error("Error fetching goals:", error)
@@ -104,16 +111,22 @@ export function GoalsContent({ initialGoals, userId }: GoalsContentProps) {
         }),
       })
 
+      const payload = (await response.json().catch(() => null)) as GoalsApiResponse | null
+
       if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || "Failed to create goal")
+        throw new Error(payload?.error || "Failed to create goal")
+      }
+
+      const createdGoal = payload?.data && !Array.isArray(payload.data) ? payload.data : null
+      if (createdGoal) {
+        setGoals((current) => [createdGoal, ...current.filter((goal) => goal.id !== createdGoal.id)])
+      } else {
+        await fetchGoals()
       }
 
       toast.success("Goal created successfully")
-
       setShowAddDialog(false)
       setNewGoal({ title: "", description: "", target_value: 100, priority: "medium", due_date: "" })
-      fetchGoals()
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : "Failed to create goal")
     } finally {

@@ -38,6 +38,8 @@ interface TasksContentProps {
   userProfile: TaskUserProfile | null
 }
 
+type TaskAssignmentTab = "individual" | "department" | "multiple"
+
 const FINAL_TASK_STATUSES = new Set(["completed", "cancelled", "archived", "closed"])
 
 function isFinalTaskStatus(status: string | undefined) {
@@ -63,7 +65,7 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
   const [isSaving, setIsSaving] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [filterStatus, setFilterStatus] = useState("all")
-  const [assignmentFilter, setAssignmentFilter] = useState("all")
+  const [assignmentFilter, setAssignmentFilter] = useState<TaskAssignmentTab>("individual")
   const [taskView, setTaskView] = useState<"ongoing" | "history">("ongoing")
   const [newStatus, setNewStatus] = useState("")
   const supabase = createClient()
@@ -76,7 +78,7 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
 
     const nextFiltered = scopedTasks.filter((task) => {
       const matchesStatus = filterStatus === "all" || task.status === filterStatus
-      const matchesAssignment = assignmentFilter === "all" || task.assignment_type === assignmentFilter
+      const matchesAssignment = task.assignment_type === assignmentFilter
       const matchesSearch =
         normalizedSearch.length === 0 ||
         task.title.toLowerCase().includes(normalizedSearch) ||
@@ -321,7 +323,12 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
           />
         </div>
 
-        <UserTaskTable filteredTasks={filteredTasks} filterStatus={filterStatus} onViewTask={openTaskDetails} />
+        <UserTaskTable
+          filteredTasks={filteredTasks}
+          filterStatus={filterStatus}
+          assignmentFilter={assignmentFilter}
+          onViewTask={openTaskDetails}
+        />
       </div>
 
       <UserTaskDetailsDialog

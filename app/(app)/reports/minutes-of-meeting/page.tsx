@@ -12,16 +12,6 @@ export default async function DashboardMinutesOfMeetingPage() {
 
   if (userError || !user) redirect("/auth/login")
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role, is_department_lead")
-    .eq("id", user.id)
-    .single()
-
-  const role = String(profile?.role || "").toLowerCase()
-  const isAllowed = ["developer", "super_admin", "admin"].includes(role) || profile?.is_department_lead === true
-  if (!isAllowed) redirect("/reports/general-meeting")
-
   return (
     <MeetingDocumentTypeTable
       documentType="minutes"

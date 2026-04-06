@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Eye, Edit2, Trash2 } from "lucide-react"
+import { Eye, Edit2, Trash2, Paperclip } from "lucide-react"
 import type { Documentation } from "@/app/(app)/documentation/page"
 
 interface DocListViewProps {
@@ -27,6 +27,7 @@ export function DocListView({ docs, getStatusColor, formatDate, onView, onEdit, 
                 <TableHead className="w-12">#</TableHead>
                 <TableHead>Title</TableHead>
                 <TableHead>Category</TableHead>
+                <TableHead>Files</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Updated</TableHead>
                 <TableHead>Actions</TableHead>
@@ -45,6 +46,12 @@ export function DocListView({ docs, getStatusColor, formatDate, onView, onEdit, 
                     ) : (
                       "-"
                     )}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1 text-sm">
+                      <Paperclip className="h-3.5 w-3.5 text-muted-foreground" />
+                      <span>{doc.sharepoint_attachments?.length || 0}</span>
+                    </div>
                   </TableCell>
                   <TableCell>
                     <Badge className={getStatusColor(doc.is_draft)}>{doc.is_draft ? "Draft" : "Published"}</Badge>

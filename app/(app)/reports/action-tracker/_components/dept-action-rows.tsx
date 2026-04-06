@@ -44,6 +44,7 @@ interface DeptActionRowsProps {
   onStatusChange: (taskId: string, newStatus: string) => void
   getDeptStatus: (dept: string) => DeptStatus
   statusColor: (status: string) => string
+  allowStatusEdit?: boolean
 }
 
 export function DeptActionRows({
@@ -58,6 +59,7 @@ export function DeptActionRows({
   onStatusChange,
   getDeptStatus,
   statusColor,
+  allowStatusEdit = true,
 }: DeptActionRowsProps) {
   return (
     <>
@@ -66,7 +68,7 @@ export function DeptActionRows({
         const completed = deptActions.filter((a) => a.status === "completed").length
         const total = deptActions.length
         const status = getDeptStatus(dept)
-        const isMyDept = profile?.department === dept
+        const isMyDept = allowStatusEdit && profile?.department === dept
         const deptActionItemsForExport: ActionItem[] = deptActions.map((item) => ({
           id: item.id,
           title: item.title,

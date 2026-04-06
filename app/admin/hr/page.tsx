@@ -15,6 +15,7 @@ import { QUERY_KEYS } from "@/lib/query-keys"
 import type { Database } from "@/types/database"
 import { useSearchParams } from "next/navigation"
 import { CreateReviewDialog } from "./performance/_components/create-review-dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
 interface DashboardStats {
   pendingLeaveRequests: number
@@ -129,7 +130,9 @@ async function fetchHrDashboardStats(): Promise<DashboardStats> {
 export default function HRAdminDashboard() {
   const queryClient = useQueryClient()
   const searchParams = useSearchParams()
-  const [isCreateReviewOpen, setIsCreateReviewOpen] = useState(searchParams.get("openReview") === "1")
+  const [isReviewTypeDialogOpen, setIsReviewTypeDialogOpen] = useState(searchParams.get("openReview") === "1")
+  const [isCreateReviewOpen, setIsCreateReviewOpen] = useState(false)
+  const [reviewMode, setReviewMode] = useState<"individual" | "department">("individual")
   const {
     data: stats = {
       pendingLeaveRequests: 0,
@@ -302,7 +305,7 @@ export default function HRAdminDashboard() {
               <CardDescription>Create and manage employee reviews</CardDescription>
             </CardHeader>
             <CardContent>
-              <Button className="w-full" onClick={() => setIsCreateReviewOpen(true)}>
+              <Button className="w-full" onClick={() => setIsReviewTypeDialogOpen(true)}>
                 Create Review
               </Button>
             </CardContent>
@@ -361,7 +364,43 @@ export default function HRAdminDashboard() {
           </CardContent>
         </Card>
       </Section>
-      <CreateReviewDialog open={isCreateReviewOpen} onOpenChange={setIsCreateReviewOpen} queryClient={queryClient} />
+      <Dialog open={isReviewTypeDialogOpen} onOpenChange={setIsReviewTypeDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Choose Review Type</DialogTitle>
+            <DialogDescription>Select how you want to start the performance review workflow.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3">
+            <Button
+              className="justify-start"
+              onClick={() => {
+                setReviewMode("individual")
+                setIsReviewTypeDialogOpen(false)
+                setIsCreateReviewOpen(true)
+              }}
+            >
+              Individual Review
+            </Button>
+            <Button
+              variant="outline"
+              className="justify-start"
+              onClick={() => {
+                setReviewMode("department")
+                setIsReviewTypeDialogOpen(false)
+                setIsCreateReviewOpen(true)
+              }}
+            >
+              Department Review
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <CreateReviewDialog
+        open={isCreateReviewOpen}
+        onOpenChange={setIsCreateReviewOpen}
+        queryClient={queryClient}
+        mode={reviewMode}
+      />
     </PageWrapper>
   )
 }

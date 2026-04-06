@@ -141,6 +141,7 @@ export function ActionFormDialog({
           body: JSON.stringify({
             title: singleData.title,
             description: singleData.description,
+            priority: singleData.priority,
             department: dept,
             status: singleData.status,
             week_number: week,

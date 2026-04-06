@@ -304,19 +304,11 @@ export async function getLeavePolicy(supabase: LeaveWorkflowClient, leaveTypeId:
     .eq("leave_type_id", leaveTypeId)
     .maybeSingle()
 
-  // Backward compatibility: some environments may still run an older leave_policies schema.
-  // If the governance columns are not present yet, re-query the legacy column set.
+  // Backward compatibility: some environments may still run an older leave_policies schema
+  // or a partially upgraded one. If the enriched policy query fails, retry a smaller legacy
+  // shape before falling all the way back to leave type defaults.
   if (error) {
-    const missingGovernanceColumn =
-      typeof error.message === "string" &&
-      (error.message.includes("eligibility_conditions") ||
-        error.message.includes("required_documents") ||
-        error.message.includes("frequency_rules") ||
-        error.message.includes("override_allowed"))
-
-    if (!missingGovernanceColumn) {
-      throw new Error("Failed to load leave policy")
-    }
+    log.warn({ leaveTypeId, err: error }, "Failed to load enriched leave policy, retrying legacy shape")
 
     const { data: legacyData, error: legacyError } = await supabase
       .from("leave_policies")
@@ -324,9 +316,11 @@ export async function getLeavePolicy(supabase: LeaveWorkflowClient, leaveTypeId:
       .eq("leave_type_id", leaveTypeId)
       .maybeSingle()
 
-    if (legacyError) throw new Error("Failed to load leave policy")
+    if (legacyError) {
+      log.warn({ leaveTypeId, err: legacyError }, "Failed to load legacy leave policy, using leave type defaults")
+    }
 
-    if (legacyData?.is_active) {
+    if (!legacyError && legacyData?.is_active) {
       return {
         ...(legacyData as LeavePolicyRecord),
         eligibility_conditions: {},

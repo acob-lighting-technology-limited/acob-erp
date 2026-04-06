@@ -135,6 +135,7 @@ type OfficialBackfillStatus = {
   created?: number
   existing?: number
   skipped?: number
+  skippedDetails?: string[]
   error?: string
 }
 
@@ -289,7 +290,7 @@ export function WeeklyReportsContent({
         const payload = (await response.json().catch(() => null)) as {
           success?: boolean
           processed?: number
-          results?: Array<{ status?: string }>
+          results?: Array<{ status?: string; week?: number; year?: number; type?: string; error?: string }>
           error?: string
         } | null
 
@@ -300,7 +301,14 @@ export function WeeklyReportsContent({
         const results = payload?.results || []
         const created = results.filter((item) => item.status === "created").length
         const existing = results.filter((item) => item.status === "existing").length
-        const skipped = results.filter((item) => item.status === "skipped").length
+        const skippedEntries = results.filter((item) => item.status === "skipped")
+        const skipped = skippedEntries.length
+        const skippedDetails = skippedEntries.slice(0, 3).map((item) => {
+          const typeLabel = item.type === "action_point" ? "action points" : "weekly report"
+          const periodLabel =
+            item.week && item.year ? `W${item.week}/${item.year}` : "an unknown week"
+          return `${periodLabel} ${typeLabel}: ${item.error || "Skipped"}`
+        })
 
         setOfficialBackfillStatus({
           state: "success",
@@ -308,6 +316,7 @@ export function WeeklyReportsContent({
           created,
           existing,
           skipped,
+          skippedDetails,
         })
       })
       .catch((error: unknown) => {
@@ -556,7 +565,7 @@ export function WeeklyReportsContent({
               ? "Locked weeks are being checked and stored in SharePoint in the background."
               : officialBackfillStatus.state === "error"
                 ? officialBackfillStatus.error || "The backfill could not complete."
-                : `Processed ${officialBackfillStatus.processed || 0} export checks: ${officialBackfillStatus.created || 0} created, ${officialBackfillStatus.existing || 0} already present, ${officialBackfillStatus.skipped || 0} skipped.`}
+                : `Processed ${officialBackfillStatus.processed || 0} export checks: ${officialBackfillStatus.created || 0} created, ${officialBackfillStatus.existing || 0} already present, ${officialBackfillStatus.skipped || 0} skipped.${officialBackfillStatus.skippedDetails?.length ? ` Skipped details: ${officialBackfillStatus.skippedDetails.join(" | ")}` : ""}`}
           </AlertDescription>
         </Alert>
       ) : null}

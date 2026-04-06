@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { FileText, LayoutGrid, List, ScrollText, Download } from "lucide-react"
@@ -64,6 +64,14 @@ export function AdminAuditLogsContent({
   const employee = initialemployee
   const departments = initialDepartments
   const supabase = createClient()
+
+  useEffect(() => {
+    if (initialLogs.length === 0 && initialTotalCount === 0) {
+      void loadLogs()
+    }
+    // Only perform the fallback when SSR provided no data.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   function handleFilterChange<K extends keyof AuditLogFiltersState>(key: K, value: AuditLogFiltersState[K]) {
     setFilters((prev) => ({ ...prev, [key]: value }))

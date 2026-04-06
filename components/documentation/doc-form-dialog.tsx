@@ -12,7 +12,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Save, EyeOff } from "lucide-react"
+import { EyeOff, Loader2, Paperclip, Save, Upload } from "lucide-react"
+import { toast } from "sonner"
+import type { DocumentationAttachment } from "@/lib/documentation/sharepoint"
 
 const CATEGORIES = [
   "Project Documentation",
@@ -30,6 +32,7 @@ export interface DocFormData {
   category: string
   tags: string
   is_draft: boolean
+  attachments: File[]
 }
 
 interface DocFormDialogProps {
@@ -38,6 +41,7 @@ interface DocFormDialogProps {
   isEditing: boolean
   formData: DocFormData
   onFormChange: (data: DocFormData) => void
+  existingAttachments: DocumentationAttachment[]
   onSave: (isDraft: boolean) => void
   isSaving: boolean
 }
@@ -48,9 +52,16 @@ export function DocFormDialog({
   isEditing,
   formData,
   onFormChange,
+  existingAttachments,
   onSave,
   isSaving,
 }: DocFormDialogProps) {
+  const formatFileSize = (size: number) => {
+    if (size < 1024) return `${size} B`
+    if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
+    return `${(size / (1024 * 1024)).toFixed(1)} MB`
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
@@ -73,7 +84,7 @@ export function DocFormDialog({
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Category</label>
+              <label className="text-sm font-medium">Category *</label>
               <Select
                 value={formData.category}
                 onValueChange={(value) => onFormChange({ ...formData, category: value })}
@@ -110,6 +121,74 @@ export function DocFormDialog({
               className="min-h-[300px] text-base"
             />
           </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Attachments</label>
+            <div className="space-y-3">
+              <label className="block cursor-pointer rounded-lg border border-dashed border-border bg-muted/20 p-4 transition-colors hover:bg-muted/40">
+                <input
+                  type="file"
+                  multiple
+                  disabled={isSaving}
+                  className="hidden"
+                  onChange={(e) => {
+                    const attachments = e.target.files ? Array.from(e.target.files) : []
+                    onFormChange({
+                      ...formData,
+                      attachments,
+                    })
+
+                    if (attachments.length > 0) {
+                      const totalSize = attachments.reduce((total, file) => total + file.size, 0)
+                      toast.info(
+                        `${attachments.length} file${attachments.length === 1 ? "" : "s"} selected`,
+                        {
+                          description: `Total size: ${formatFileSize(totalSize)}`,
+                        }
+                      )
+                    }
+                  }}
+                />
+                <div className="flex items-start gap-3">
+                  <div className="rounded-md bg-primary/10 p-2 text-primary">
+                    <Upload className="h-4 w-4" />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">
+                      {formData.attachments.length > 0
+                        ? `${formData.attachments.length} file${formData.attachments.length === 1 ? "" : "s"} attached`
+                        : "Choose files to attach"}
+                    </p>
+                    <p className="text-muted-foreground text-xs">
+                      {formData.attachments.length > 0
+                        ? "Click here if you want to replace the current file selection before saving."
+                        : "Files are uploaded to SharePoint when you save this document."}
+                    </p>
+                    <p className="text-muted-foreground text-xs">
+                      Supabase keeps the document record and attachment metadata only.
+                    </p>
+                  </div>
+                </div>
+              </label>
+            </div>
+
+            {existingAttachments.length > 0 && (
+              <div className="rounded-md border p-3">
+                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Existing Attachments
+                </p>
+                <div className="space-y-1">
+                  {existingAttachments.map((attachment) => (
+                    <div key={attachment.id} className="flex items-center gap-2 text-sm">
+                      <Paperclip className="h-3.5 w-3.5 text-muted-foreground" />
+                      <span>{attachment.name}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+          </div>
         </div>
 
         <DialogFooter className="gap-2">
@@ -117,12 +196,12 @@ export function DocFormDialog({
             Cancel
           </Button>
           <Button variant="outline" onClick={() => onSave(true)} disabled={isSaving} className="gap-2">
-            <EyeOff className="h-4 w-4" />
-            Save as Draft
+            {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <EyeOff className="h-4 w-4" />}
+            {isSaving ? "Saving..." : "Save as Draft"}
           </Button>
           <Button onClick={() => onSave(false)} disabled={isSaving} className="gap-2">
-            <Save className="h-4 w-4" />
-            Publish
+            {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            {isSaving ? "Uploading..." : "Publish"}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -3,7 +3,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Eye, Edit2, Trash2, Tag } from "lucide-react"
+import { Eye, Edit2, Trash2, Tag, Paperclip } from "lucide-react"
 import { MarkdownContent } from "@/components/ui/markdown-content"
 import type { Documentation } from "@/app/(app)/documentation/page"
 
@@ -52,6 +52,11 @@ export function DocCardView({ docs, formatDate, onView, onEdit, onDelete }: DocC
             )}
 
             <div className="text-muted-foreground text-xs">Last updated: {formatDate(doc.updated_at)}</div>
+
+            <div className="text-muted-foreground flex items-center gap-1 text-xs">
+              <Paperclip className="h-3.5 w-3.5" />
+              <span>{doc.sharepoint_attachments?.length || 0} attachment(s)</span>
+            </div>
 
             <div className="flex gap-2 pt-2">
               <Button

@@ -634,10 +634,12 @@ export function DepartmentDocumentsBrowser({
   const formatDate = (dateString: string): string =>
     Number.isNaN(Date.parse(dateString))
       ? "-"
-      : new Date(dateString).toLocaleDateString(undefined, {
+      : new Date(dateString).toLocaleString(undefined, {
           year: "numeric",
           month: "short",
           day: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
         })
 
   const getFileExtension = (fileName: string): string => {
