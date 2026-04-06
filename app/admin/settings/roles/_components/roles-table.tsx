@@ -31,7 +31,7 @@ export function RolesTable({ roles, loading, onEdit, onDelete, onViewUsers }: Ro
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-14">S/N</TableHead>
+                <TableHead className="text-foreground w-14 font-bold">#</TableHead>
                 <TableHead>Role</TableHead>
                 <TableHead>Description</TableHead>
                 <TableHead>Permissions</TableHead>

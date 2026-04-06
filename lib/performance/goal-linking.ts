@@ -152,6 +152,7 @@ export async function resolveAutoLinkedGoalId(params: GoalLinkParams): Promise<s
       approval_status: "approved",
       approved_by: params.actorId,
       approved_at: now,
+      is_system_generated: true,
     })
     .select("id")
     .single<{ id: string }>()

@@ -248,7 +248,7 @@ export function WorkContent({ initialItems }: { initialItems: WorkItem[] }) {
           <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-16">S/N</TableHead>
+              <TableHead className="text-foreground w-16 font-bold">#</TableHead>
               <TableHead>Item</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Priority</TableHead>

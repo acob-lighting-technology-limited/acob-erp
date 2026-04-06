@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { FileText, LayoutGrid, List, ScrollText, Download } from "lucide-react"
+import { ScrollText, Download } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
@@ -15,6 +15,8 @@ import { AuditLogDetailPanel } from "@/components/audit/AuditLogDetailPanel"
 import { exportAuditLogsToExcel, exportAuditLogsToPDF, exportAuditLogsToWord } from "@/lib/audit/audit-log-export"
 import { HIDDEN_ACTIONS } from "@/lib/audit/audit-log-display"
 import { logger } from "@/lib/logger"
+import { TableViewToggle } from "@/components/admin/table-view-toggle"
+import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
 import type { AuditLog, AuditLogFiltersState, EmployeeMember, UserProfile } from "./types"
 
 // Re-export types consumed by page.tsx
@@ -55,11 +57,11 @@ export function AdminAuditLogsContent({
 
   const [logs, setLogs] = useState<AuditLog[]>(initialLogs)
   const [totalCount, setTotalCount] = useState<number>(initialTotalCount)
-  const [isLoading, setIsLoading] = useState(false)
   const [filters, setFilters] = useState<AuditLogFiltersState>(DEFAULT_FILTERS)
   const [viewMode, setViewMode] = useState<"list" | "card">("list")
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null)
   const [isDetailsOpen, setIsDetailsOpen] = useState(false)
+  const [exportOptionsOpen, setExportOptionsOpen] = useState(false)
 
   const employee = initialemployee
   const departments = initialDepartments
@@ -81,7 +83,6 @@ export function AdminAuditLogsContent({
   // Client-side refresh (manual only — initial data comes from server props)
   // -------------------------------------------------------------------------
   const loadLogs = async () => {
-    setIsLoading(true)
     try {
       const { count } = await supabase
         .from("audit_logs")
@@ -147,7 +148,6 @@ export function AdminAuditLogsContent({
       log.error("Error loading audit logs:", error)
       toast.error("Failed to refresh audit logs")
     } finally {
-      setIsLoading(false)
     }
   }
 
@@ -247,24 +247,11 @@ export function AdminAuditLogsContent({
       description="Complete audit trail of all system activities"
       icon={ScrollText}
       actions={
-        <div className="flex items-center rounded-lg border p-1">
-          <Button
-            variant={viewMode === "list" ? "default" : "ghost"}
-            size="sm"
-            onClick={() => setViewMode("list")}
-            className="gap-1 sm:gap-2"
-          >
-            <List className="h-4 w-4" />
-            <span className="hidden sm:inline">List</span>
-          </Button>
-          <Button
-            variant={viewMode === "card" ? "default" : "ghost"}
-            size="sm"
-            onClick={() => setViewMode("card")}
-            className="gap-1 sm:gap-2"
-          >
-            <LayoutGrid className="h-4 w-4" />
-            <span className="hidden sm:inline">Card</span>
+        <div className="flex flex-wrap items-center gap-2">
+          <TableViewToggle viewMode={viewMode} onChange={setViewMode} />
+          <Button variant="outline" size="sm" className="h-8 gap-2" onClick={() => setExportOptionsOpen(true)}>
+            <Download className="h-4 w-4" />
+            Export
           </Button>
         </div>
       }
@@ -304,51 +291,6 @@ export function AdminAuditLogsContent({
       }
       filtersInCard={false}
     >
-      {/* Export bar */}
-      <Card className="border-2">
-        <CardContent className="p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <Download className="text-muted-foreground h-4 w-4" />
-              <span className="text-foreground text-sm font-medium">Export Filtered Data:</span>
-            </div>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => exportAuditLogsToExcel(filteredLogs)}
-                className="gap-2"
-                disabled={filteredLogs.length === 0 || isLoading}
-              >
-                <FileText className="h-4 w-4" />
-                Excel (.xlsx)
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => exportAuditLogsToPDF(filteredLogs)}
-                className="gap-2"
-                disabled={filteredLogs.length === 0 || isLoading}
-              >
-                <FileText className="h-4 w-4" />
-                PDF
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => exportAuditLogsToWord(filteredLogs)}
-                className="gap-2"
-                disabled={filteredLogs.length === 0 || isLoading}
-              >
-                <FileText className="h-4 w-4" />
-                Word (.docx)
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Log list or cards */}
       {filteredLogs.length > 0 ? (
         viewMode === "list" ? (
           <AuditLogTable
@@ -398,6 +340,28 @@ export function AdminAuditLogsContent({
 
       {/* Detail dialog */}
       <AuditLogDetailPanel log={selectedLog} open={isDetailsOpen} onClose={() => setIsDetailsOpen(false)} />
+
+      <ExportOptionsDialog
+        open={exportOptionsOpen}
+        onOpenChange={setExportOptionsOpen}
+        title="Export Audit Logs"
+        options={[
+          { id: "excel", label: "Excel (.xlsx)", icon: "excel" },
+          { id: "pdf", label: "PDF", icon: "pdf" },
+          { id: "word", label: "Word (.docx)", icon: "word" },
+        ]}
+        onSelect={(id) => {
+          if (id === "excel") {
+            exportAuditLogsToExcel(filteredLogs)
+            return
+          }
+          if (id === "pdf") {
+            exportAuditLogsToPDF(filteredLogs)
+            return
+          }
+          exportAuditLogsToWord(filteredLogs)
+        }}
+      />
     </AdminTablePage>
   )
 

@@ -1,6 +1,6 @@
 "use client"
 
-import { Fragment } from "react"
+import { Fragment, useState } from "react"
 import { TableCell, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -15,19 +15,17 @@ import {
   ChevronDown,
   ChevronRight,
   MoreVertical,
-  FileText,
-  File as FileIcon,
-  Presentation,
   Edit2,
   Trash2,
   ExternalLink,
-  FileSpreadsheet,
+  Download,
 } from "lucide-react"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
 import { toast } from "sonner"
 import { autoNumberLines, exportToPDF, exportToDocx, exportToXLSX, type WeeklyReport } from "@/lib/export-utils"
+import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
 
 interface TrackerStatus {
   id: string
@@ -81,6 +79,7 @@ export function WeeklyReportTableRow({
   onDelete,
   onExportPptx,
 }: WeeklyReportTableRowProps) {
+  const [exportOptionsOpen, setExportOptionsOpen] = useState(false)
   const trackerStatus = getActionTrackerStatus(report.department, trackingData)
   const submitterProfile = Array.isArray(report.profiles) ? report.profiles[0] : report.profiles
   const submitterName = submitterProfile ? `${submitterProfile.first_name} ${submitterProfile.last_name}` : "Unknown"
@@ -133,44 +132,9 @@ export function WeeklyReportTableRow({
         </TableCell>
         <TableCell className="text-right">
           <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
-            <div className="bg-background flex items-center gap-1 rounded-md border p-0.5 shadow-sm">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-red-600 hover:text-red-700"
-                onClick={() => exportToPDF(report, meetingDate)}
-                title="PDF"
-              >
-                <FileIcon className="h-3.5 w-3.5" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-indigo-600 hover:text-indigo-700"
-                onClick={() => exportToDocx(report, meetingDate)}
-                title="Word"
-              >
-                <FileText className="h-3.5 w-3.5" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-amber-600 hover:text-amber-700"
-                onClick={() => onExportPptx(report)}
-                title="Deck"
-              >
-                <Presentation className="h-3.5 w-3.5" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-emerald-600 hover:text-emerald-700"
-                onClick={() => exportToXLSX(report, meetingDate)}
-                title="XLSX"
-              >
-                <FileSpreadsheet className="h-3.5 w-3.5" />
-              </Button>
-            </div>
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setExportOptionsOpen(true)}>
+              <Download className="h-4 w-4" />
+            </Button>
             {!isFilteredWeekLocked && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -252,6 +216,23 @@ export function WeeklyReportTableRow({
           </TableCell>
         </TableRow>
       )}
+      <ExportOptionsDialog
+        open={exportOptionsOpen}
+        onOpenChange={setExportOptionsOpen}
+        title={`Export ${report.department} Report`}
+        options={[
+          { id: "pdf", label: "PDF", icon: "pdf" },
+          { id: "word", label: "Word (.docx)", icon: "word" },
+          { id: "pptx", label: "PowerPoint (.pptx)", icon: "pptx" },
+          { id: "excel", label: "Excel (.xlsx)", icon: "excel" },
+        ]}
+        onSelect={(id) => {
+          if (id === "pdf") return exportToPDF(report, meetingDate)
+          if (id === "word") return exportToDocx(report, meetingDate)
+          if (id === "pptx") return onExportPptx(report)
+          exportToXLSX(report, meetingDate)
+        }}
+      />
     </Fragment>
   )
 }

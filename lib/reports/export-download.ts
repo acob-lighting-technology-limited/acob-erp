@@ -54,7 +54,7 @@ export async function downloadWeeklyReportPdf(params: { week: number; year: numb
       week: params.week,
       year: params.year,
       type: "weekly_report",
-      persist: true,
+      persist: false,
     }
   )
 }
@@ -77,7 +77,7 @@ export async function downloadStoredActionPointsPdf(params: {
       year: params.year,
       meetingDate: params.meetingDate,
       department: params.department,
-      persist: true,
+      persist: false,
     }
   )
 }

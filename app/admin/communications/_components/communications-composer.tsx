@@ -19,7 +19,7 @@ import { SchedulingOptions } from "./SchedulingOptions"
 import { SendSummary } from "./SendSummary"
 import { ReminderTypeSelector } from "./ReminderTypeSelector"
 import { getCurrentOfficeWeek, getOfficeWeekFromDate } from "@/lib/meeting-week"
-import { getDefaultMeetingDateIso } from "@/lib/weekly-report-lock"
+import { fetchWeeklyReportLockState, getDefaultMeetingDateIso } from "@/lib/weekly-report-lock"
 
 const log = logger("communications-composer")
 
@@ -53,13 +53,13 @@ interface Props {
 }
 
 export function CommunicationsComposer({ employees, mode = "meetings", currentUser }: Props) {
-  const nextOfficeMeetingBaseDate = useMemo(() => {
+  const currentOfficeWeek = getCurrentOfficeWeek()
+  const nextOfficeWeek = useMemo(() => {
     const next = new Date()
     next.setDate(next.getDate() + 7)
-    return next
+    return getCurrentOfficeWeek(next)
   }, [])
-  const nextOfficeWeek = getCurrentOfficeWeek(nextOfficeMeetingBaseDate)
-  const defaultMeetingDate = getDefaultMeetingDateIso(nextOfficeWeek.week, nextOfficeWeek.year)
+  const defaultMeetingDate = getDefaultMeetingDateIso(currentOfficeWeek.week, currentOfficeWeek.year)
 
   // ── State ──────────────────────────────────────────────────────────────────
   const [reminderType, setReminderType] = useState<ReminderType>(
@@ -76,6 +76,8 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
   const [meetingTime, setMeetingTime] = useState("08:30")
   const [teamsLink, setTeamsLink] = useState(DEFAULT_TEAMS_LINK)
   const [agendaText, setAgendaText] = useState(DEFAULT_AGENDA.join("\n"))
+  const [activeMeetingWeek, setActiveMeetingWeek] = useState(currentOfficeWeek)
+  const [savingMeetingDraft, setSavingMeetingDraft] = useState(false)
 
   // Knowledge sharing fields
   const [sessionDate, setSessionDate] = useState(defaultMeetingDate)
@@ -113,10 +115,10 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
     currentUserDept.toLowerCase().includes("admin") && currentUserDept.toLowerCase().includes("hr")
 
   const { data: canonicalMeetingSetup } = useQuery({
-    queryKey: ["canonical-meeting-date", nextOfficeWeek.week, nextOfficeWeek.year],
+    queryKey: ["canonical-meeting-date", activeMeetingWeek.week, activeMeetingWeek.year],
     enabled: mode !== "communications",
     queryFn: async (): Promise<{ meetingDate: string; meetingTime: string }> => {
-      const res = await fetch(`/api/reports/meeting-date?week=${nextOfficeWeek.week}&year=${nextOfficeWeek.year}`)
+      const res = await fetch(`/api/reports/meeting-date?week=${activeMeetingWeek.week}&year=${activeMeetingWeek.year}`)
       const payload = await res.json()
       if (!res.ok) throw new Error(payload.error || "Failed to resolve meeting date")
       return {
@@ -179,6 +181,27 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
 
   // ── Effects ────────────────────────────────────────────────────────────────
   useEffect(() => {
+    if (mode === "communications") return
+
+    let cancelled = false
+    const resolveActiveMeetingWeek = async () => {
+      try {
+        const currentLock = await fetchWeeklyReportLockState(supabase, currentOfficeWeek.week, currentOfficeWeek.year)
+        if (!cancelled) {
+          setActiveMeetingWeek(currentLock.isLocked ? nextOfficeWeek : currentOfficeWeek)
+        }
+      } catch {
+        if (!cancelled) setActiveMeetingWeek(currentOfficeWeek)
+      }
+    }
+
+    void resolveActiveMeetingWeek()
+    return () => {
+      cancelled = true
+    }
+  }, [currentOfficeWeek, mode, nextOfficeWeek, supabase])
+
+  useEffect(() => {
     if (mode === "communications" && reminderType !== "admin_broadcast") setReminderType("admin_broadcast")
   }, [mode, reminderType])
 
@@ -215,6 +238,30 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
     }
     setMeetingTime(canonicalMeetingSetup.meetingTime || "08:30")
   }, [canonicalMeetingSetup, defaultMeetingDate, meetingDate, reminderType])
+
+  const meetingDraftStorageKey = useMemo(() => {
+    return `meeting-reminder-draft:${activeMeetingWeek.year}:${activeMeetingWeek.week}`
+  }, [activeMeetingWeek.week, activeMeetingWeek.year])
+
+  useEffect(() => {
+    if (reminderType !== "meeting") return
+    if (typeof window === "undefined") return
+
+    const savedDraftRaw = window.localStorage.getItem(meetingDraftStorageKey)
+    if (!savedDraftRaw) return
+
+    try {
+      const savedDraft = JSON.parse(savedDraftRaw) as { teamsLink?: string; agendaText?: string }
+      if (typeof savedDraft.teamsLink === "string" && savedDraft.teamsLink.trim()) {
+        setTeamsLink(savedDraft.teamsLink)
+      }
+      if (typeof savedDraft.agendaText === "string" && savedDraft.agendaText.trim()) {
+        setAgendaText(savedDraft.agendaText)
+      }
+    } catch {
+      // Ignore invalid local draft payloads.
+    }
+  }, [meetingDraftStorageKey, reminderType])
 
   useEffect(() => {
     if (reminderType !== "meeting") return
@@ -675,6 +722,20 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
     }
   }
 
+  const handleSaveMeetingDraft = useCallback(() => {
+    if (typeof window === "undefined") return
+    setSavingMeetingDraft(true)
+    window.localStorage.setItem(
+      meetingDraftStorageKey,
+      JSON.stringify({
+        teamsLink,
+        agendaText,
+      })
+    )
+    toast.success("Agenda changes saved")
+    window.setTimeout(() => setSavingMeetingDraft(false), 300)
+  }, [agendaText, meetingDraftStorageKey, teamsLink])
+
   const deactivateSchedule = async (id: string) => {
     const { error } = await supabase.from("reminder_schedules").update({ is_active: false }).eq("id", id)
     if (error) {
@@ -734,6 +795,8 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
                   setTeamsLink={setTeamsLink}
                   agendaText={agendaText}
                   setAgendaText={setAgendaText}
+                  onSaveDraft={handleSaveMeetingDraft}
+                  savingDraft={savingMeetingDraft}
                   knowledgeDepartment={knowledgeDepartment}
                   knowledgePresenterId={knowledgePresenterId}
                   meetingPreparedById={meetingPreparedById}

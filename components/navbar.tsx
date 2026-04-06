@@ -35,6 +35,7 @@ import { useSidebarSafe } from "@/components/sidebar-context"
 import { useTheme } from "next-themes"
 import { ThemeToggle } from "@/components/ui/theme-toggle"
 import { cn } from "@/lib/utils"
+import { getSeasonalLogoPaths } from "@/lib/seasonal-branding"
 
 interface NavbarProps {
   user?: {
@@ -65,10 +66,8 @@ export function Navbar({ user, canAccessAdmin = false, isAdminMode = false }: Na
 
   // Default to light logo for SSR to prevent hydration mismatch
   const logoSrc = !mounted
-    ? "/images/acob-logo-light.webp"
-    : resolvedTheme === "dark"
-      ? "/images/acob-logo-dark.webp"
-      : "/images/acob-logo-light.webp"
+    ? getSeasonalLogoPaths("light").navbar
+    : getSeasonalLogoPaths(resolvedTheme === "dark" ? "dark" : "light").navbar
 
   useEffect(() => {
     setMounted(true)

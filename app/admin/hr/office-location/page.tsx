@@ -470,7 +470,7 @@ export default function OfficeLocationsPage() {
                                     <TableHeader className="bg-muted/30">
                                       <TableRow>
                                         <TableHead className="text-muted-foreground w-[70px] text-[10px] font-black tracking-widest uppercase">
-                                          S/N
+                                          #
                                         </TableHead>
                                         <TableHead className="text-muted-foreground text-[10px] font-black tracking-widest uppercase">
                                           Employee

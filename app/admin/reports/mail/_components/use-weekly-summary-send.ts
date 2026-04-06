@@ -109,8 +109,8 @@ async function fetchActionPointsAttachment(params: {
       week: params.week,
       year: params.year,
       type: "action_point",
-      persist: true,
-      reuseStored: true,
+      persist: false,
+      reuseStored: false,
     }),
   })
 
@@ -145,8 +145,8 @@ async function fetchWeeklyReportAttachment(params: {
       week: params.week,
       year: params.year,
       type: "weekly_report",
-      persist: true,
-      reuseStored: true,
+      persist: false,
+      reuseStored: false,
     }),
   })
 

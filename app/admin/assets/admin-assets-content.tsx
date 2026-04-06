@@ -20,7 +20,7 @@ import { isAssignableProfile } from "@/lib/workforce/assignment-policy"
 import { ASSET_TYPES, ASSET_TYPE_MAP } from "@/lib/asset-types"
 import { getDepartmentForOffice } from "@/lib/office-locations"
 import { assignmentValidation } from "@/lib/validation"
-import { Package, LayoutGrid, List, AlertCircle, Loader2, Plus } from "lucide-react"
+import { Package, AlertCircle, Loader2, Plus, Download } from "lucide-react"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { StatCard } from "@/components/ui/stat-card"
 
@@ -37,6 +37,8 @@ import { AssetTypeDialog } from "@/components/assets/AssetTypeDialog"
 import { AssetExportDialog } from "@/components/assets/AssetExportDialog"
 import { EmployeeAssetsReportDialog } from "@/components/assets/EmployeeAssetsReportDialog"
 import { AssetFilterBar } from "@/components/assets/AssetFilterBar"
+import { TableViewToggle } from "@/components/admin/table-view-toggle"
+import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
 import {
   buildAssetExportRows,
   exportAssetsToExcel,
@@ -260,6 +262,7 @@ export function AdminAssetsContent({
   const [employeeReportDialogOpen, setEmployeeReportDialogOpen] = useState(false)
   const [employeeReportExportType, setEmployeeReportExportType] = useState<"excel" | "pdf" | "word" | null>(null)
   const [employeeReportSelectedTypes, setEmployeeReportSelectedTypes] = useState<Record<string, boolean>>({})
+  const [exportOptionsOpen, setExportOptionsOpen] = useState(false)
 
   // Dialog states
   const [isAssetDialogOpen, setIsAssetDialogOpen] = useState(false)
@@ -1304,31 +1307,20 @@ export function AdminAssetsContent({
       icon={Package}
       actions={
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center rounded-lg border p-1">
-            <Button
-              variant={viewMode === "list" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setViewMode("list")}
-              className="gap-1 sm:gap-2"
-            >
-              <List className="h-4 w-4" />
-              <span className="hidden sm:inline">List</span>
-            </Button>
-            <Button
-              variant={viewMode === "card" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setViewMode("card")}
-              className="gap-1 sm:gap-2"
-            >
-              <LayoutGrid className="h-4 w-4" />
-              <span className="hidden sm:inline">Card</span>
-            </Button>
-          </div>
+          <TableViewToggle viewMode={viewMode} onChange={setViewMode} />
+          <Button
+            variant="outline"
+            onClick={() => setExportOptionsOpen(true)}
+            className="h-8 gap-2"
+            size="sm"
+          >
+            <Download className="h-4 w-4" />
+            Export
+          </Button>
           {!userProfile?.is_department_lead && (
-            <Button onClick={() => handleOpenAssetDialog()} className="gap-2" size="sm">
+            <Button onClick={() => handleOpenAssetDialog()} className="h-8 gap-2" size="sm">
               <Plus className="h-4 w-4" />
-              <span className="hidden sm:inline">Add Asset</span>
-              <span className="sm:hidden">Add</span>
+              Add Asset
             </Button>
           )}
         </div>
@@ -1407,13 +1399,9 @@ export function AdminAssetsContent({
           setIssueStatusFilter={setIssueStatusFilter}
           assetTypes={assetTypes}
           departments={departments}
-          employees={employees}
           activeEmployees={activeEmployees}
           acquisitionYears={Array.from(new Set(assets.map((a) => a.acquisition_year)))}
-          filteredAssetsCount={getSortedAssets(filteredAssets).length}
           isDepartmentLead={!!userProfile?.is_department_lead}
-          onExportClick={handleExportClick}
-          onEmployeeReportClick={handleEmployeeReportClick}
         />
       }
       filtersInCard={false}
@@ -1556,6 +1544,28 @@ export function AdminAssetsContent({
         assetTypes={assetTypes}
         employeesCount={employees.length}
         onConfirm={handleEmployeeReportConfirm}
+      />
+
+      <ExportOptionsDialog
+        open={exportOptionsOpen}
+        onOpenChange={setExportOptionsOpen}
+        title="Export Assets"
+        options={[
+          { id: "asset_excel", label: "Assets: Excel (.xlsx)", icon: "excel" },
+          { id: "asset_pdf", label: "Assets: PDF", icon: "pdf" },
+          { id: "asset_word", label: "Assets: Word (.docx)", icon: "word" },
+          { id: "employee_excel", label: "Employee Report: Excel (.xlsx)", icon: "excel" },
+          { id: "employee_pdf", label: "Employee Report: PDF", icon: "pdf" },
+          { id: "employee_word", label: "Employee Report: Word (.docx)", icon: "word" },
+        ]}
+        onSelect={(id) => {
+          if (id === "asset_excel") return handleExportClick("excel")
+          if (id === "asset_pdf") return handleExportClick("pdf")
+          if (id === "asset_word") return handleExportClick("word")
+          if (id === "employee_excel") return handleEmployeeReportClick("excel")
+          if (id === "employee_pdf") return handleEmployeeReportClick("pdf")
+          handleEmployeeReportClick("word")
+        }}
       />
     </AdminTablePage>
   )

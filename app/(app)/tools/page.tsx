@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { FileSignature, Droplet, ArrowRight, Wrench, Hash, Briefcase } from "lucide-react"
+import { FileSignature, Droplet, ArrowRight, Wrench, Hash, Briefcase, Sparkles } from "lucide-react"
 import { PageHeader, PageWrapper } from "@/components/layout"
 
 const tools = [
@@ -21,6 +21,14 @@ const tools = [
     icon: FileSignature,
     color: "text-amber-600",
     bgColor: "bg-amber-50 dark:bg-amber-950/30",
+  },
+  {
+    name: "10th Anniversary Signature V2",
+    description: "Generate the premium anniversary email signature with an elevated, bold design",
+    href: "/tools/signature-anniversary-2",
+    icon: Sparkles,
+    color: "text-emerald-500",
+    bgColor: "bg-emerald-50 dark:bg-emerald-950/30",
   },
   {
     name: "Watermark Studio",

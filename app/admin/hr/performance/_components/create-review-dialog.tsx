@@ -142,7 +142,7 @@ export function CreateReviewDialog({
         cbt_score: scoreData.cbt_score ?? 0,
         attendance_score: scoreData.attendance_score ?? 0,
       }))
-      toast.success("KPI, KSS, and attendance scores auto-filled from ERP data")
+      toast.success("KPI, CBT, and attendance scores auto-filled from ERP data")
     } catch {
       toast.error("Failed to auto-fill scores")
     } finally {
@@ -289,7 +289,7 @@ export function CreateReviewDialog({
                         onChange={(e) => setFormData({ ...formData, kpi_score: parseInt(e.target.value, 10) || 0 })}
                       />
                     </FormFieldGroup>
-                    <FormFieldGroup label="KSS Score">
+                    <FormFieldGroup label="CBT Score">
                       <Input
                         type="number"
                         min="0"

@@ -23,6 +23,8 @@ interface MeetingReminderFormProps {
   setTeamsLink: (v: string) => void
   agendaText: string
   setAgendaText: (v: string) => void
+  onSaveDraft: () => void
+  savingDraft: boolean
   knowledgeDepartment: string
   knowledgePresenterId: string
   meetingPreparedById: string
@@ -39,6 +41,8 @@ export function MeetingReminderForm({
   setTeamsLink,
   agendaText,
   setAgendaText,
+  onSaveDraft,
+  savingDraft,
   knowledgeDepartment,
   knowledgePresenterId,
   meetingPreparedById,
@@ -87,6 +91,9 @@ export function MeetingReminderForm({
           placeholder={"1. Opening Prayer\n2. Departmental updates\n..."}
         />
         <p className="text-muted-foreground text-xs">Each line becomes one agenda item. Numbering is automatic.</p>
+        <Button variant="outline" size="sm" className="h-8" onClick={onSaveDraft} disabled={savingDraft}>
+          {savingDraft ? "Saving..." : "Save Agenda"}
+        </Button>
       </div>
       <div className="space-y-3 rounded-lg border border-dashed p-3">
         <div>

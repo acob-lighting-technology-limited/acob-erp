@@ -275,7 +275,7 @@ export default function LeaveApprovePage() {
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead className="w-[64px]">S/N</TableHead>
+                            <TableHead className="text-foreground w-[64px] font-bold">#</TableHead>
                             <TableHead>Employee</TableHead>
                             <TableHead>Leave Type</TableHead>
                             <TableHead>Period</TableHead>
@@ -406,7 +406,7 @@ export default function LeaveApprovePage() {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="w-[64px]">S/N</TableHead>
+                          <TableHead className="text-foreground w-[64px] font-bold">#</TableHead>
                           <TableHead>Employee</TableHead>
                           <TableHead>Leave Type</TableHead>
                           <TableHead>Period</TableHead>
