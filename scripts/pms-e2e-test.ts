@@ -38,6 +38,17 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
 }
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
+type HelpDeskTicketCheckRow = {
+  status?: string | null
+  assigned_to?: string | null
+}
+
+type LeaveRequestCheckRow = {
+  current_stage_code?: string | null
+  current_approver_user_id?: string | null
+  status?: string | null
+}
+
 // ─── User IDs ─────────────────────────────────────────────────────────────
 const USERS = {
   chibuikem:    "1aeae0c5-ef2f-4790-be14-d0e696be01af", // IT developer, NOT lead (FOCAL POINT)
@@ -525,18 +536,34 @@ async function testHelpDesk() {
   if (supportTicket?.id) {
     // new → department_queue (lead reviews and puts in queue)
     await supabase.from("help_desk_tickets").update({ status: "department_queue" }).eq("id", supportTicket.id)
-    let { data: t } = await supabase.from("help_desk_tickets").select("status").eq("id", supportTicket.id).single()
+    let { data: t }: { data: HelpDeskTicketCheckRow | null } = await supabase
+      .from("help_desk_tickets")
+      .select("status")
+      .eq("id", supportTicket.id)
+      .single()
     assert("D1.3 new → department_queue", t?.status, "department_queue")
 
     // department_queue → assigned (Abdulsamad picks it up from the pool)
     await supabase.from("help_desk_tickets").update({ status: "assigned", assigned_to: USERS.abdulsamad }).eq("id", supportTicket.id)
-    ;({ data: t } = await supabase.from("help_desk_tickets").select("status, assigned_to").eq("id", supportTicket.id).single())
+    ;({
+      data: t,
+    } = await supabase
+      .from("help_desk_tickets")
+      .select("status, assigned_to")
+      .eq("id", supportTicket.id)
+      .single())
     assert("D1.4 department_queue → assigned (Abdulsamad picks up)", t?.status, "assigned")
     assert("D1.5 Assigned to Abdulsamad", t?.assigned_to, USERS.abdulsamad)
 
     // assigned → in_progress
     await supabase.from("help_desk_tickets").update({ status: "in_progress" }).eq("id", supportTicket.id)
-    ;({ data: t } = await supabase.from("help_desk_tickets").select("status").eq("id", supportTicket.id).single())
+    ;({
+      data: t,
+    } = await supabase
+      .from("help_desk_tickets")
+      .select("status")
+      .eq("id", supportTicket.id)
+      .single())
     assert("D1.6 assigned → in_progress", t?.status, "in_progress")
 
     // in_progress → resolved
@@ -1042,7 +1069,11 @@ async function testOnyekachukwuAsHRLead() {
         current_stage_order: 2, current_stage_code: "pending_supervisor",
         approval_stage: "pending_supervisor", current_approver_user_id: USERS.abdulsamad,
       }).eq("id", testLeave.id)
-      let { data: s } = await supabase.from("leave_requests").select("current_stage_code").eq("id", testLeave.id).single()
+      let { data: s }: { data: LeaveRequestCheckRow | null } = await supabase
+        .from("leave_requests")
+        .select("current_stage_code")
+        .eq("id", testLeave.id)
+        .single()
       assert("I5.3 Stage 1 done → pending dept lead", s?.current_stage_code, "pending_supervisor")
 
       // Stage 2: Dept lead approval (Abdulsamad as IT lead)
@@ -1055,7 +1086,13 @@ async function testOnyekachukwuAsHRLead() {
         current_stage_order: 3, current_stage_code: "pending_hr",
         approval_stage: "pending_hr", current_approver_user_id: USERS.onyekachukwu,
       }).eq("id", testLeave.id)
-      ;({ data: s } = await supabase.from("leave_requests").select("current_stage_code, current_approver_user_id").eq("id", testLeave.id).single())
+      ;({
+        data: s,
+      } = await supabase
+        .from("leave_requests")
+        .select("current_stage_code, current_approver_user_id")
+        .eq("id", testLeave.id)
+        .single())
       assert("I5.4 Stage 2 done → pending HR", s?.current_stage_code, "pending_hr")
       assert("I5.5 HR approver is Onyekachukwu", s?.current_approver_user_id, USERS.onyekachukwu)
 
@@ -1068,7 +1105,13 @@ async function testOnyekachukwuAsHRLead() {
       await supabase.from("leave_requests").update({
         status: "approved", approval_stage: "completed", current_stage_code: "completed",
       }).eq("id", testLeave.id)
-      ;({ data: s } = await supabase.from("leave_requests").select("status").eq("id", testLeave.id).single())
+      ;({
+        data: s,
+      } = await supabase
+        .from("leave_requests")
+        .select("status")
+        .eq("id", testLeave.id)
+        .single())
       assert("I5.6 Leave FULLY APPROVED", s?.status, "approved")
 
       // Show chain
