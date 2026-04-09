@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { FileText, Zap } from "lucide-react"
+import { FileText, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { FormFieldGroup } from "@/components/ui/patterns"
 import { QUERY_KEYS } from "@/lib/query-keys"
@@ -43,11 +43,37 @@ interface BehaviourCompetencies {
   professional_conduct: number
 }
 
+type ExistingReview = {
+  kpi_score?: number | null
+  cbt_score?: number | null
+  attendance_score?: number | null
+  behaviour_score?: number | null
+  behaviour_competencies?: Record<string, unknown> | null
+  strengths?: string | null
+  areas_for_improvement?: string | null
+  manager_comments?: string | null
+}
+
+type ScoreResponse = {
+  data?: {
+    kpi_score?: number | null
+    cbt_score?: number | null
+    attendance_score?: number | null
+    behaviour_score?: number | null
+    existing_review?: ExistingReview | null
+  }
+  error?: string
+}
+
 interface CreateReviewDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   queryClient?: QueryClient
   mode?: "individual" | "department"
+  onSaved?: () => void
+  initialUserId?: string
+  initialCycleId?: string
+  initialDepartment?: string
 }
 
 async function fetchPerformanceCreateData(supabase: ReturnType<typeof createClient>): Promise<PerformanceCreateData> {
@@ -61,18 +87,46 @@ async function fetchPerformanceCreateData(supabase: ReturnType<typeof createClie
     .select("role, is_department_lead, department_id")
     .eq("id", user.id)
     .single()
-  let usersQuery = supabase
-    .from("profiles")
-    .select("id, first_name, last_name, department_id, department")
-    .neq("id", user.id)
+
+  let usersQuery = supabase.from("profiles").select("id, first_name, last_name, department_id, department")
   if (profile?.is_department_lead && !["developer", "admin", "super_admin"].includes(profile.role)) {
     usersQuery = usersQuery.eq("department_id", profile.department_id)
   }
 
   const { data: usersData } = await usersQuery
-  const cyclesResponse = await fetch("/api/hr/performance/cycles")
-  const cyclesData = await cyclesResponse.json()
-  return { users: usersData || [], cycles: cyclesData.cycles || [] }
+  const cyclesResponse = await fetch("/api/hr/performance/cycles", { cache: "no-store" })
+  const cyclesData = (await cyclesResponse.json()) as { data?: ReviewCycle[]; cycles?: ReviewCycle[] }
+  const cycles = Array.isArray(cyclesData.data)
+    ? cyclesData.data
+    : Array.isArray(cyclesData.cycles)
+      ? cyclesData.cycles
+      : []
+  return { users: usersData || [], cycles }
+}
+
+function clampScore(value: number) {
+  if (!Number.isFinite(value)) return 0
+  return Math.max(0, Math.min(100, Math.round(value)))
+}
+
+function buildCompetencies(
+  payload: Record<string, unknown> | null | undefined,
+  fallback: number
+): BehaviourCompetencies {
+  const read = (key: keyof BehaviourCompetencies) => {
+    const raw = payload?.[key]
+    const parsed = typeof raw === "number" ? raw : Number(raw)
+    return clampScore(Number.isFinite(parsed) ? parsed : fallback)
+  }
+
+  return {
+    collaboration: read("collaboration"),
+    accountability: read("accountability"),
+    communication: read("communication"),
+    teamwork: read("teamwork"),
+    loyalty: read("loyalty"),
+    professional_conduct: read("professional_conduct"),
+  }
 }
 
 export function CreateReviewDialog({
@@ -80,10 +134,15 @@ export function CreateReviewDialog({
   onOpenChange,
   queryClient,
   mode = "individual",
+  onSaved,
+  initialUserId = "",
+  initialCycleId = "",
+  initialDepartment = "",
 }: CreateReviewDialogProps) {
   const supabase = createClient()
   const [saving, setSaving] = useState(false)
   const [loadingScore, setLoadingScore] = useState(false)
+  const [loadedSelectionKey, setLoadedSelectionKey] = useState("")
   const [formData, setFormData] = useState({
     department: "",
     user_id: "",
@@ -110,15 +169,25 @@ export function CreateReviewDialog({
     enabled: open,
   })
 
-  const users = data?.users ?? []
-  const cycles = data?.cycles ?? []
-  const departments = Array.from(new Set(users.map((user) => user.department).filter(Boolean) as string[])).sort((a, b) =>
-    a.localeCompare(b)
+  const users = useMemo(() => data?.users ?? [], [data?.users])
+  const cycles = useMemo(() => data?.cycles ?? [], [data?.cycles])
+  const departments = useMemo(
+    () =>
+      Array.from(new Set(users.map((user) => user.department).filter(Boolean) as string[])).sort((a, b) =>
+        a.localeCompare(b)
+      ),
+    [users]
   )
+
   const visibleUsers =
     mode === "department" && formData.department
       ? users.filter((user) => user.department === formData.department)
       : users
+
+  const isSelectionComplete = Boolean(formData.user_id && formData.review_cycle_id)
+  const selectedKey = isSelectionComplete ? `${formData.user_id}:${formData.review_cycle_id}` : ""
+  const isSelectionDataReady = isSelectionComplete && loadedSelectionKey === selectedKey && !loadingScore
+
   const behaviourAvg = Math.round(
     Object.values(competencies).reduce((sum, value) => sum + value, 0) / Object.keys(competencies).length
   )
@@ -126,29 +195,73 @@ export function CreateReviewDialog({
     formData.kpi_score * 0.7 + formData.cbt_score * 0.1 + formData.attendance_score * 0.1 + behaviourAvg * 0.1
   )
 
-  async function autoFillScores() {
-    if (!formData.user_id || !formData.review_cycle_id) return toast.error("Select employee and review cycle first")
+  const loadScoresForSelection = useCallback(async (userId: string, cycleId: string) => {
+    if (!userId || !cycleId) return
     setLoadingScore(true)
+    setLoadedSelectionKey("")
+    const requestKey = `${userId}:${cycleId}`
     try {
-      const res = await fetch(
-        `/api/hr/performance/score?user_id=${formData.user_id}&cycle_id=${formData.review_cycle_id}`
-      )
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error)
+      const res = await fetch(`/api/hr/performance/score?user_id=${userId}&cycle_id=${cycleId}`, { cache: "no-store" })
+      const json = (await res.json()) as ScoreResponse
+      if (!res.ok) throw new Error(json.error || "Failed to load performance data")
       const scoreData = json.data
+      const existingReview = scoreData?.existing_review
+
+      const fallbackBehaviour = clampScore(Number(scoreData?.behaviour_score ?? existingReview?.behaviour_score ?? 0))
+
       setFormData((prev) => ({
         ...prev,
-        kpi_score: scoreData.kpi_score ?? 0,
-        cbt_score: scoreData.cbt_score ?? 0,
-        attendance_score: scoreData.attendance_score ?? 0,
+        kpi_score: clampScore(Number(scoreData?.kpi_score ?? 0)),
+        cbt_score: clampScore(Number(scoreData?.cbt_score ?? 0)),
+        attendance_score: clampScore(Number(scoreData?.attendance_score ?? 0)),
+        strengths: String(existingReview?.strengths || ""),
+        areas_for_improvement: String(existingReview?.areas_for_improvement || ""),
+        manager_comments: String(existingReview?.manager_comments || ""),
       }))
-      toast.success("KPI, CBT, and attendance scores auto-filled from ERP data")
+
+      setCompetencies(buildCompetencies(existingReview?.behaviour_competencies, fallbackBehaviour))
     } catch {
-      toast.error("Failed to auto-fill scores")
+      toast.error("Failed to load selected employee data for this quarter")
     } finally {
+      setLoadedSelectionKey(requestKey)
       setLoadingScore(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    if (!open) return
+    setLoadedSelectionKey("")
+    setFormData({
+      department: initialDepartment,
+      user_id: initialUserId,
+      review_cycle_id: initialCycleId,
+      strengths: "",
+      areas_for_improvement: "",
+      manager_comments: "",
+      kpi_score: 0,
+      cbt_score: 0,
+      attendance_score: 0,
+    })
+    setCompetencies({
+      collaboration: 0,
+      accountability: 0,
+      communication: 0,
+      teamwork: 0,
+      loyalty: 0,
+      professional_conduct: 0,
+    })
+  }, [open, initialDepartment, initialUserId, initialCycleId])
+
+  useEffect(() => {
+    if (!open || !formData.user_id || !formData.review_cycle_id) return
+    void loadScoresForSelection(formData.user_id, formData.review_cycle_id)
+  }, [open, formData.user_id, formData.review_cycle_id, loadScoresForSelection])
+
+  useEffect(() => {
+    if (!open || formData.review_cycle_id || cycles.length === 0) return
+    if (initialCycleId) return
+    setFormData((prev) => ({ ...prev, review_cycle_id: cycles[0]?.id || "" }))
+  }, [open, formData.review_cycle_id, cycles, initialCycleId])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -164,25 +277,15 @@ export function CreateReviewDialog({
           behaviour_competencies: competencies,
         }),
       })
-      const responseData = await response.json()
-      if (!response.ok) throw new Error(responseData.error || "Failed to create review")
+      const responseData = (await response.json().catch(() => null)) as { error?: string } | null
+      if (!response.ok) throw new Error(responseData?.error || "Failed to create review")
 
-      toast.success("Performance review created successfully")
+      toast.success("Performance review saved successfully")
       await queryClient?.invalidateQueries({ queryKey: QUERY_KEYS.performanceCreateData() })
-      setFormData({
-        department: "",
-        user_id: "",
-        review_cycle_id: "",
-        strengths: "",
-        areas_for_improvement: "",
-        manager_comments: "",
-        kpi_score: 0,
-        cbt_score: 0,
-        attendance_score: 0,
-      })
+      onSaved?.()
       onOpenChange(false)
     } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : "Failed to create review")
+      toast.error(error instanceof Error ? error.message : "Failed to save review")
     } finally {
       setSaving(false)
     }
@@ -198,24 +301,32 @@ export function CreateReviewDialog({
           </DialogTitle>
           <DialogDescription>
             {mode === "department"
-              ? "Choose a department first, then complete the full review form for the selected employee."
-              : "Evaluate an employee&apos;s performance without leaving the dashboard."}
+              ? "Choose department, employee, and quarter before entering scores."
+              : "Choose employee and quarter first. Existing data will populate automatically."}
           </DialogDescription>
         </DialogHeader>
 
-        {isLoading ? null : (
+        {isLoading ? (
+          <div className="text-muted-foreground flex items-center justify-center gap-2 py-10 text-sm">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Loading employees and review cycles...
+          </div>
+        ) : (
           <form onSubmit={handleSubmit} className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Review Form</CardTitle>
-                <CardDescription>Complete review details and submit for records.</CardDescription>
+                <CardTitle>Review Setup</CardTitle>
+                <CardDescription>Select employee and review cycle to load existing quarter data.</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-6">
+              <CardContent className="space-y-4">
                 {mode === "department" ? (
                   <FormFieldGroup label="Department">
                     <Select
                       value={formData.department}
-                      onValueChange={(value) => setFormData({ ...formData, department: value, user_id: "" })}
+                      onValueChange={(value) => {
+                        setLoadedSelectionKey("")
+                        setFormData((prev) => ({ ...prev, department: value, user_id: "" }))
+                      }}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Select department" />
@@ -234,12 +345,17 @@ export function CreateReviewDialog({
                 <FormFieldGroup label="Employee">
                   <Select
                     value={formData.user_id}
-                    onValueChange={(value) => setFormData({ ...formData, user_id: value })}
+                    onValueChange={(value) => {
+                      setLoadedSelectionKey("")
+                      setFormData((prev) => ({ ...prev, user_id: value }))
+                    }}
                     disabled={mode === "department" && !formData.department}
                   >
                     <SelectTrigger>
                       <SelectValue
-                        placeholder={mode === "department" && !formData.department ? "Select department first" : "Select employee"}
+                        placeholder={
+                          mode === "department" && !formData.department ? "Select department first" : "Select employee"
+                        }
                       />
                     </SelectTrigger>
                     <SelectContent>
@@ -255,7 +371,10 @@ export function CreateReviewDialog({
                 <FormFieldGroup label="Review Cycle">
                   <Select
                     value={formData.review_cycle_id}
-                    onValueChange={(value) => setFormData({ ...formData, review_cycle_id: value })}
+                    onValueChange={(value) => {
+                      setLoadedSelectionKey("")
+                      setFormData((prev) => ({ ...prev, review_cycle_id: value }))
+                    }}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select review cycle" />
@@ -268,104 +387,143 @@ export function CreateReviewDialog({
                       ))}
                     </SelectContent>
                   </Select>
+                  {cycles.length === 0 ? (
+                    <p className="text-muted-foreground text-xs">No review cycle is configured yet.</p>
+                  ) : null}
                 </FormFieldGroup>
-
-                <div className="space-y-4 rounded-lg border p-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-semibold">Performance Score Components</h3>
-                    <Button type="button" variant="outline" size="sm" onClick={autoFillScores} disabled={loadingScore}>
-                      <Zap className="mr-1 h-3 w-3" />
-                      Auto-fill from ERP
-                    </Button>
-                  </div>
-
-                  <div className="grid gap-4 sm:grid-cols-3">
-                    <FormFieldGroup label="KPI Score">
-                      <Input
-                        type="number"
-                        min="0"
-                        max="100"
-                        value={formData.kpi_score}
-                        onChange={(e) => setFormData({ ...formData, kpi_score: parseInt(e.target.value, 10) || 0 })}
-                      />
-                    </FormFieldGroup>
-                    <FormFieldGroup label="CBT Score">
-                      <Input
-                        type="number"
-                        min="0"
-                        max="100"
-                        value={formData.cbt_score}
-                        onChange={(e) => setFormData({ ...formData, cbt_score: parseInt(e.target.value, 10) || 0 })}
-                      />
-                    </FormFieldGroup>
-                    <FormFieldGroup label="Attendance Score">
-                      <Input
-                        type="number"
-                        min="0"
-                        max="100"
-                        value={formData.attendance_score}
-                        onChange={(e) =>
-                          setFormData({ ...formData, attendance_score: parseInt(e.target.value, 10) || 0 })
-                        }
-                      />
-                    </FormFieldGroup>
-                  </div>
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {Object.entries(competencies).map(([key, value]) => (
-                    <FormFieldGroup key={key} label={key.replace("_", " ")}>
-                      <Input
-                        type="number"
-                        min="0"
-                        max="100"
-                        value={value}
-                        onChange={(e) =>
-                          setCompetencies((prev) => ({ ...prev, [key]: parseInt(e.target.value, 10) || 0 }))
-                        }
-                      />
-                    </FormFieldGroup>
-                  ))}
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <FormFieldGroup label="Strengths">
-                    <Textarea
-                      value={formData.strengths}
-                      onChange={(e) => setFormData({ ...formData, strengths: e.target.value })}
-                      rows={3}
-                    />
-                  </FormFieldGroup>
-                  <FormFieldGroup label="Areas for Improvement">
-                    <Textarea
-                      value={formData.areas_for_improvement}
-                      onChange={(e) => setFormData({ ...formData, areas_for_improvement: e.target.value })}
-                      rows={3}
-                    />
-                  </FormFieldGroup>
-                </div>
-
-                <FormFieldGroup label="Manager Comments">
-                  <Textarea
-                    value={formData.manager_comments}
-                    onChange={(e) => setFormData({ ...formData, manager_comments: e.target.value })}
-                    rows={4}
-                  />
-                </FormFieldGroup>
-
-                <div className="rounded-lg border p-4">
-                  <p className="text-sm font-medium">Final Score</p>
-                  <p className="text-3xl font-bold">{finalScore}%</p>
-                </div>
               </CardContent>
             </Card>
+
+            {!isSelectionComplete ? (
+              <Card>
+                <CardContent className="text-muted-foreground py-6 text-sm">
+                  Select employee and quarter to load KPI, CBT, attendance, behaviour competencies, strengths, areas for
+                  improvement, and manager comments.
+                </CardContent>
+              </Card>
+            ) : !isSelectionDataReady ? (
+              <Card>
+                <CardContent className="text-muted-foreground flex items-center gap-2 py-6 text-sm">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading selected employee quarter data...
+                </CardContent>
+              </Card>
+            ) : (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    Review Form
+                    {loadingScore ? <Loader2 className="text-muted-foreground h-4 w-4 animate-spin" /> : null}
+                  </CardTitle>
+                  <CardDescription>
+                    Complete the review details. Existing values are pre-filled when available for this quarter.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="space-y-4 rounded-lg border p-4">
+                    <h3 className="font-semibold">Performance Score Components</h3>
+                    <div className="grid gap-4 sm:grid-cols-3">
+                      <FormFieldGroup label="KPI Score">
+                        <Input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={formData.kpi_score}
+                          onChange={(e) =>
+                            setFormData((prev) => ({ ...prev, kpi_score: clampScore(Number(e.target.value)) }))
+                          }
+                        />
+                      </FormFieldGroup>
+                      <FormFieldGroup label="CBT Score">
+                        <Input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={formData.cbt_score}
+                          onChange={(e) =>
+                            setFormData((prev) => ({ ...prev, cbt_score: clampScore(Number(e.target.value)) }))
+                          }
+                        />
+                      </FormFieldGroup>
+                      <FormFieldGroup label="Attendance Score">
+                        <Input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={formData.attendance_score}
+                          onChange={(e) =>
+                            setFormData((prev) => ({ ...prev, attendance_score: clampScore(Number(e.target.value)) }))
+                          }
+                        />
+                      </FormFieldGroup>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4 rounded-lg border p-4">
+                    <h3 className="font-semibold">Behaviour</h3>
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                      {Object.entries(competencies).map(([key, value]) => (
+                        <FormFieldGroup
+                          key={key}
+                          label={key
+                            .replace("_", " ")
+                            .split(" ")
+                            .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+                            .join(" ")}
+                        >
+                          <Input
+                            type="number"
+                            min="0"
+                            max="100"
+                            value={value}
+                            onChange={(e) =>
+                              setCompetencies((prev) => ({ ...prev, [key]: clampScore(Number(e.target.value)) }))
+                            }
+                          />
+                        </FormFieldGroup>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <FormFieldGroup label="Strengths">
+                      <Textarea
+                        value={formData.strengths}
+                        onChange={(e) => setFormData((prev) => ({ ...prev, strengths: e.target.value }))}
+                        rows={3}
+                      />
+                    </FormFieldGroup>
+                    <FormFieldGroup label="Areas for Improvement">
+                      <Textarea
+                        value={formData.areas_for_improvement}
+                        onChange={(e) => setFormData((prev) => ({ ...prev, areas_for_improvement: e.target.value }))}
+                        rows={3}
+                      />
+                    </FormFieldGroup>
+                  </div>
+
+                  <FormFieldGroup label="Manager Comments">
+                    <Textarea
+                      value={formData.manager_comments}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, manager_comments: e.target.value }))}
+                      rows={4}
+                    />
+                  </FormFieldGroup>
+
+                  <div className="rounded-lg border p-4">
+                    <p className="text-sm font-medium">Final Score</p>
+                    <p className="text-3xl font-bold">{finalScore}%</p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             <div className="flex justify-end gap-4">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={saving}>
-                Create Review
+              <Button type="submit" disabled={saving || !isSelectionComplete}>
+                Save Review
               </Button>
             </div>
           </form>

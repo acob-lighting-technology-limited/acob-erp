@@ -35,7 +35,7 @@ import { useSidebarSafe } from "@/components/sidebar-context"
 import { useTheme } from "next-themes"
 import { ThemeToggle } from "@/components/ui/theme-toggle"
 import { cn } from "@/lib/utils"
-import { getSeasonalLogoPaths } from "@/lib/seasonal-branding"
+import { getSeasonalLogoPaths, isTemporary2026LogoPeriod } from "@/lib/seasonal-branding"
 
 interface NavbarProps {
   user?: {
@@ -59,6 +59,10 @@ export function Navbar({ user, canAccessAdmin = false, isAdminMode = false }: Na
   const { resolvedTheme } = useTheme()
   const dashboardHref = isAdminMode ? "/admin" : "/profile"
   const dashboardLabel = isAdminMode ? "Admin Dashboard" : "Home"
+  const use2026Logo = isTemporary2026LogoPeriod()
+  const logoWidth = use2026Logo ? 220 : 150
+  const logoHeight = use2026Logo ? 56 : 150
+  const logoClassName = use2026Logo ? "h-12 w-auto" : "h-8 w-auto"
 
   // Get sidebar context safely (returns null if not available)
   const sidebarContext = useSidebarSafe()
@@ -226,10 +230,10 @@ export function Navbar({ user, canAccessAdmin = false, isAdminMode = false }: Na
                 key={logoSrc}
                 src={logoSrc}
                 alt="ACOB Lighting"
-                width={150}
-                height={150}
+                width={logoWidth}
+                height={logoHeight}
                 priority
-                className="h-8 w-auto"
+                className={logoClassName}
               />
             </Link>
           </div>
@@ -242,10 +246,10 @@ export function Navbar({ user, canAccessAdmin = false, isAdminMode = false }: Na
               key={logoSrc}
               src={logoSrc}
               alt="ACOB Lighting"
-              width={150}
-              height={150}
+              width={logoWidth}
+              height={logoHeight}
               priority
-              className="h-8 w-auto"
+              className={logoClassName}
             />
           </Link>
         </div>

@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
+  Award,
   Bell,
   Briefcase,
   Calendar,
@@ -20,7 +21,6 @@ import {
   MessageSquare,
   Package,
   ShieldCheck,
-  Target,
   Wrench,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -70,7 +70,7 @@ const hrNavigation = [
   { name: "Leave", href: "/leave", icon: Calendar },
   { name: "Attendance", href: "/attendance", icon: Clock },
   { name: "Fleet", href: "/fleet", icon: Car },
-  { name: "Goals", href: "/goals", icon: Target },
+  { name: "PMS", href: "/pms", icon: Award },
 ]
 
 export function Sidebar({ user, profile, canAccessAdmin }: SidebarProps) {

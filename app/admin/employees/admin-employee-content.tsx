@@ -27,6 +27,7 @@ import {
 } from "@/lib/employees/employee-export"
 import { EmployeeListView } from "@/components/employees/EmployeeListView"
 import { getAssignableRolesForActor } from "@/lib/role-management"
+import { formValidation } from "@/lib/validation"
 
 const log = logger("employees-admin-employee-content")
 
@@ -423,6 +424,27 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         return
       }
 
+      const companyEmail = editForm.company_email.trim().toLowerCase()
+      const additionalEmail = editForm.additional_email.trim().toLowerCase()
+
+      if (!companyEmail) {
+        toast.error("Company email is required")
+        setIsSaving(false)
+        return
+      }
+
+      if (!formValidation.isCompanyEmail(companyEmail)) {
+        toast.error("Only @acoblighting.com and @org.acoblighting.com emails are allowed")
+        setIsSaving(false)
+        return
+      }
+
+      if (additionalEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(additionalEmail)) {
+        toast.error("Additional email must be a valid email address")
+        setIsSaving(false)
+        return
+      }
+
       const isLead = editForm.is_department_lead
 
       if (isLead) {
@@ -461,7 +483,8 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         first_name: editForm.first_name || null,
         last_name: editForm.last_name || null,
         other_names: editForm.other_names || null,
-        additional_email: editForm.additional_email || null,
+        company_email: companyEmail,
+        additional_email: additionalEmail || null,
         phone_number: editForm.phone_number || null,
         additional_phone: editForm.additional_phone || null,
         residential_address: editForm.residential_address || null,
@@ -471,6 +494,16 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         date_of_birth: editForm.date_of_birth || null,
         employment_date: editForm.employment_date || null,
         job_description: editForm.job_description || null,
+      }
+
+      const emailSyncResponse = await fetch(`/api/admin/hr/employees/${selectedEmployee.id}/email`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ companyEmail, additionalEmail: additionalEmail || null }),
+      })
+      const emailSyncResult = (await emailSyncResponse.json().catch(() => ({}))) as { error?: string }
+      if (!emailSyncResponse.ok) {
+        throw new Error(emailSyncResult.error || "Failed to sync employee login email")
       }
 
       const { error } = await supabase.from("profiles").update(updateData).eq("id", selectedEmployee.id)

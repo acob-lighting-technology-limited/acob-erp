@@ -118,17 +118,42 @@ export async function PATCH(request: Request) {
       .eq("week_number", weekNumber)
       .eq("year", yearNumber)
 
-    const { data: existingByKey, error: existingByKeyError } = await (
-      deptRow?.id ? weeklyReportQuery.eq("department_id", deptRow.id) : weeklyReportQuery.eq("department", department)
-    ).maybeSingle()
+    const [existingByIdResult, existingByKeyResult] = await Promise.all([
+      reportId
+        ? dataClient
+            .from("weekly_reports")
+            .select("id, user_id, department, week_number, year")
+            .eq("id", reportId)
+            .maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
+      (deptRow?.id
+        ? weeklyReportQuery.eq("department_id", deptRow.id)
+        : weeklyReportQuery.eq("department", department)
+      ).maybeSingle(),
+    ])
+
+    const existingById = existingByIdResult.data
+    const existingByIdError = existingByIdResult.error
+    const existingByKey = existingByKeyResult.data
+    const existingByKeyError = existingByKeyResult.error
+
+    if (existingByIdError) {
+      log.error({ err: existingByIdError, reportId }, "Failed to look up existing report by id")
+      return NextResponse.json({ error: existingByIdError.message }, { status: 500 })
+    }
 
     if (existingByKeyError) {
       log.error({ err: existingByKeyError, department, weekNumber, yearNumber }, "Failed to look up existing report")
       return NextResponse.json({ error: existingByKeyError.message }, { status: 500 })
     }
 
-    const targetExisting =
-      reportId && existingByKey?.id && existingByKey.id !== reportId ? existingByKey : existingByKey
+    if (reportId && !existingById) {
+      return NextResponse.json({ error: "Weekly report not found" }, { status: 404 })
+    }
+
+    const conflictingReport =
+      existingByKey && (!existingById || existingByKey.id !== existingById.id) ? existingByKey : null
+    const targetExisting = existingById || existingByKey
     const isWeekMutable = await canMutateWeek(dataClient as ReportsClient, weekNumber, yearNumber)
     log.info(
       {
@@ -145,6 +170,26 @@ export async function PATCH(request: Request) {
       },
       "Weekly report save pre-write state"
     )
+
+    if (conflictingReport?.id) {
+      log.warn(
+        {
+          reportId,
+          conflictingId: conflictingReport.id,
+          userId: user.id,
+          department,
+          weekNumber,
+          yearNumber,
+        },
+        "Weekly report save blocked by unique week/department conflict"
+      )
+      return NextResponse.json(
+        {
+          error: "A weekly report already exists for this department, week, and year. Please edit the existing report.",
+        },
+        { status: 409 }
+      )
+    }
 
     if (!isWeekMutable && targetExisting?.id) {
       log.warn(
@@ -186,6 +231,15 @@ export async function PATCH(request: Request) {
 
     const { data: saved, error: saveError } = await writeQuery.select("id").single()
     if (saveError) {
+      if (saveError.code === "23505") {
+        return NextResponse.json(
+          {
+            error:
+              "A weekly report already exists for this department, week, and year. Please edit the existing report.",
+          },
+          { status: 409 }
+        )
+      }
       log.error(
         {
           err: saveError,

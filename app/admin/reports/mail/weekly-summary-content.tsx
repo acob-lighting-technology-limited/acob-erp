@@ -298,6 +298,25 @@ export function WeeklySummaryContent({ employees, presenterDirectory = [], curre
     [currentDocByType.knowledgeSharingSession, currentDocByType.minutesOfMeeting]
   )
 
+  useEffect(() => {
+    setSelectedContentChoices((prev) => {
+      let changed = false
+      const next = new Set(prev)
+
+      if (!currentDocByType.knowledgeSharingSession && next.has("knowledge_sharing_session")) {
+        next.delete("knowledge_sharing_session")
+        changed = true
+      }
+
+      if (!currentDocByType.minutesOfMeeting && next.has("minutes_of_meeting")) {
+        next.delete("minutes_of_meeting")
+        changed = true
+      }
+
+      return changed ? next : prev
+    })
+  }, [currentDocByType.knowledgeSharingSession, currentDocByType.minutesOfMeeting])
+
   // ── Computed ────────────────────────────────────────────────────────────────
   const filteredEmployees = useMemo(() => {
     if (!searchQuery.trim()) return employees

@@ -1,0 +1,288 @@
+.birthday-route {
+  min-height: 100vh;
+}
+
+.birthday-page {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 12% 18%, color-mix(in oklab, var(--primary) 26%, transparent), transparent 28%),
+    radial-gradient(circle at 88% 22%, color-mix(in oklab, var(--chart-2) 24%, transparent), transparent 26%),
+    linear-gradient(180deg, color-mix(in oklab, var(--background) 90%, white 10%), var(--background));
+  color: var(--foreground);
+}
+
+.birthday-page__ambient {
+  position: absolute;
+  inset: auto auto -12rem -9rem;
+  width: 26rem;
+  height: 26rem;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--chart-1) 18%, transparent);
+  filter: blur(50px);
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.birthday-page__ambient--secondary {
+  inset: 4rem -8rem auto auto;
+  background: color-mix(in oklab, var(--chart-2) 18%, transparent);
+}
+
+.birthday-hero {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  min-height: 100vh;
+  grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr);
+  align-items: center;
+  gap: 2rem;
+  padding: 2rem;
+}
+
+.birthday-hero__copy {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 1rem 0;
+}
+
+.birthday-back-link,
+.birthday-kicker,
+.birthday-photo__badge,
+.birthday-meta-card {
+  backdrop-filter: blur(18px);
+}
+
+.birthday-back-link {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 0.625rem;
+  border: 1px solid color-mix(in oklab, var(--border) 78%, var(--primary) 22%);
+  border-radius: 999px;
+  padding: 0.8rem 1.15rem;
+  background: color-mix(in oklab, var(--card) 82%, transparent);
+  color: var(--foreground);
+  text-decoration: none;
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    background-color 180ms ease;
+}
+
+.birthday-back-link:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in oklab, var(--primary) 45%, var(--border) 55%);
+  background: color-mix(in oklab, var(--card) 92%, transparent);
+}
+
+.birthday-kicker {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 0.625rem;
+  border-radius: 999px;
+  padding: 0.7rem 1rem;
+  background: color-mix(in oklab, var(--primary) 18%, transparent);
+  color: color-mix(in oklab, var(--foreground) 88%, var(--primary) 12%);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.birthday-copy-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-width: 42rem;
+}
+
+.birthday-overline {
+  margin: 0;
+  color: color-mix(in oklab, var(--muted-foreground) 78%, var(--primary) 22%);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+.birthday-title {
+  margin: 0;
+  font-size: clamp(2.25rem, 4.8vw, 4.4rem);
+  line-height: 0.95;
+  letter-spacing: -0.05em;
+  text-wrap: balance;
+}
+
+.birthday-subtitle {
+  margin: 0;
+  max-width: 40rem;
+  color: var(--muted-foreground);
+  font-size: clamp(1rem, 1.5vw, 1.2rem);
+  line-height: 1.8;
+}
+
+.birthday-meta-grid {
+  display: grid;
+  max-width: 44rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.birthday-meta-card {
+  display: flex;
+  min-height: 7.5rem;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border: 1px solid color-mix(in oklab, var(--border) 82%, var(--primary) 18%);
+  border-radius: 1.5rem;
+  padding: 1.25rem;
+  background: color-mix(in oklab, var(--card) 82%, transparent);
+  box-shadow: 0 24px 60px -40px color-mix(in oklab, var(--foreground) 18%, transparent);
+}
+
+.birthday-meta-label {
+  color: color-mix(in oklab, var(--muted-foreground) 84%, var(--primary) 16%);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.birthday-meta-card strong {
+  font-size: 1.28rem;
+  line-height: 1.45;
+}
+
+.birthday-week-range {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  font-size: 1.55rem !important;
+  line-height: 1.15 !important;
+}
+
+.birthday-hero__visual {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100%;
+}
+
+.birthday-grid {
+  display: grid;
+  width: 100%;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.birthday-photo-shell {
+  position: relative;
+  width: 100%;
+  min-height: 32rem;
+  overflow: hidden;
+  border: 1px solid color-mix(in oklab, var(--border) 72%, var(--primary) 28%);
+  border-radius: 2rem;
+  background: color-mix(in oklab, var(--muted) 90%, black 10%);
+  box-shadow: 0 36px 100px -42px color-mix(in oklab, var(--foreground) 28%, transparent);
+}
+
+.birthday-photo {
+  object-fit: cover;
+  object-position: center top;
+}
+
+.birthday-photo__veil {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, color-mix(in oklab, transparent 70%, var(--background) 30%), transparent 35%),
+    linear-gradient(180deg, transparent 46%, color-mix(in oklab, var(--foreground) 26%, transparent) 100%);
+}
+
+.birthday-photo__badge {
+  display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
+  align-items: center;
+  gap: 0.625rem;
+  border: 1px solid color-mix(in oklab, white 55%, transparent);
+  border-radius: 999px;
+  padding: 0.8rem 1rem;
+  background: color-mix(in oklab, var(--background) 18%, transparent);
+  color: white;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.birthday-photo__content {
+  position: absolute;
+  inset: auto 1.25rem 1.25rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.birthday-photo__badge svg {
+  color: white;
+}
+
+@media (max-width: 1100px) {
+  .birthday-hero {
+    grid-template-columns: 1fr;
+    padding: 1.5rem;
+  }
+
+  .birthday-hero__copy {
+    order: 2;
+  }
+
+  .birthday-hero__visual {
+    order: 1;
+  }
+
+  .birthday-grid {
+    max-width: 58rem;
+  }
+}
+
+@media (max-width: 720px) {
+  .birthday-page,
+  .birthday-hero {
+    min-height: 100vh;
+  }
+
+  .birthday-hero {
+    gap: 1.5rem;
+    padding: 1rem;
+  }
+
+  .birthday-copy-stack {
+    gap: 0.85rem;
+  }
+
+  .birthday-meta-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .birthday-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .birthday-photo-shell {
+    min-height: 26rem;
+    border-radius: 1.5rem;
+  }
+
+  .birthday-photo__badge {
+    width: auto;
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+  }
+}

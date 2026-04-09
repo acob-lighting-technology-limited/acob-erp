@@ -8,16 +8,31 @@ import { buildGeneratedReportExportPath } from "@/lib/reports/document-storage"
 import { formatMeetingDateLabel, resolveEffectiveMeetingDateIso } from "@/lib/reports/meeting-date"
 import { generateActionPointsPdfFromDocxBuffer } from "@/lib/reports/action-points-word-pdf"
 import { fetchActionTrackerItems } from "@/lib/reports/action-tracker-data"
-import {
-  buildWeeklyReportPDF,
-  fetchLogoPair,
-  type WeeklyReportRow,
-} from "@/lib/reports/weekly-report-pdf"
+import { buildWeeklyReportPDF, fetchLogoPair, type WeeklyReportRow } from "@/lib/reports/weekly-report-pdf"
 
 const log = logger("reports-official-pdf")
 
 export type OfficialReportExportType = "weekly_report" | "action_point"
 type ReportsPdfClient = Pick<SupabaseClient, "from" | "rpc">
+type TimestampedRow = { updated_at?: string | null; created_at?: string | null }
+
+function getNewestIsoTimestamp(rows: TimestampedRow[]): string | null {
+  let newestTime = Number.NEGATIVE_INFINITY
+  let newestIso: string | null = null
+
+  for (const row of rows) {
+    const candidate = row.updated_at || row.created_at || null
+    if (!candidate) continue
+
+    const time = Date.parse(candidate)
+    if (Number.isNaN(time) || time <= newestTime) continue
+
+    newestTime = time
+    newestIso = candidate
+  }
+
+  return newestIso
+}
 
 export async function fetchActionPointRows(supabase: ReportsPdfClient, week: number, year: number) {
   const actions = await fetchActionTrackerItems(supabase, { week, year })
@@ -55,6 +70,49 @@ export async function resolveOfficialReportExportMeta(
     meetingDateIso,
     meetingDateLabel,
   }
+}
+
+export async function resolveOfficialReportSourceUpdatedAt(
+  supabase: ReportsPdfClient,
+  params: { week: number; year: number; type: OfficialReportExportType }
+): Promise<string | null> {
+  const { week, year, type } = params
+
+  if (type === "weekly_report") {
+    const reportsResult = await supabase
+      .from("weekly_reports")
+      .select("updated_at, created_at")
+      .eq("week_number", week)
+      .eq("year", year)
+      .eq("status", "submitted")
+      .returns<TimestampedRow[]>()
+
+    if (reportsResult.error) throw new Error(reportsResult.error.message)
+    return getNewestIsoTimestamp(reportsResult.data ?? [])
+  }
+
+  const tasksResult = await supabase
+    .from("tasks")
+    .select("updated_at, created_at")
+    .eq("category", "weekly_action")
+    .eq("week_number", week)
+    .eq("year", year)
+    .returns<TimestampedRow[]>()
+
+  if (tasksResult.error) throw new Error(tasksResult.error.message)
+
+  const taskTimestamp = getNewestIsoTimestamp(tasksResult.data ?? [])
+  if (taskTimestamp) return taskTimestamp
+
+  const legacyResult = await supabase
+    .from("action_items")
+    .select("updated_at, created_at")
+    .eq("week_number", week)
+    .eq("year", year)
+    .returns<TimestampedRow[]>()
+
+  if (legacyResult.error) throw new Error(legacyResult.error.message)
+  return getNewestIsoTimestamp(legacyResult.data ?? [])
 }
 
 export async function buildOfficialReportPdf(
@@ -123,6 +181,41 @@ export async function tryReadStoredOfficialPdf(filePath: string): Promise<Uint8A
     return new Uint8Array(await response.arrayBuffer())
   } catch (error) {
     log.warn({ err: String(error), filePath }, "Stored official PDF lookup failed")
+    return null
+  }
+}
+
+export async function tryReadCurrentStoredOfficialPdf(
+  supabase: ReportsPdfClient,
+  params: { week: number; year: number; type: OfficialReportExportType }
+): Promise<{ bytes: Uint8Array; filename: string } | null> {
+  const onedrive = getOneDriveService()
+  if (!onedrive.isEnabled()) return null
+
+  const storedMeta = await resolveOfficialReportExportMeta(supabase, params)
+  const sourceUpdatedAt = await resolveOfficialReportSourceUpdatedAt(supabase, params)
+
+  try {
+    const storedItem = await onedrive.getItem(storedMeta.storagePath)
+
+    if (sourceUpdatedAt) {
+      const sourceTime = Date.parse(sourceUpdatedAt)
+      const storedTime = Date.parse(storedItem.lastModified || "")
+
+      if (!Number.isNaN(sourceTime) && !Number.isNaN(storedTime) && storedTime < sourceTime) {
+        return null
+      }
+    }
+
+    const storedBytes = await tryReadStoredOfficialPdf(storedMeta.storagePath)
+    if (!storedBytes) return null
+
+    return {
+      bytes: storedBytes,
+      filename: storedMeta.filename,
+    }
+  } catch (error) {
+    log.warn({ err: String(error), filePath: storedMeta.storagePath }, "Stored official PDF freshness check failed")
     return null
   }
 }

@@ -225,25 +225,5 @@ export async function generateActionPointsPdfFromDocxBuffer(
   year: number,
   meetingDate?: string
 ) {
-  const docxBuffer = await generateActionPointsDocxBuffer(actions, week, year, meetingDate)
-
-  if (process.platform !== "win32") {
-    return await generateHostedSafePdf(actions, week, year, meetingDate)
-  }
-
-  const workingDir = await mkdtemp(join(tmpdir(), "acob-action-points-"))
-  const docxPath = join(workingDir, `action-points-w${week}-${year}.docx`)
-  const pdfPath = join(workingDir, `action-points-w${week}-${year}.pdf`)
-
-  try {
-    await writeFile(docxPath, Buffer.from(docxBuffer))
-    try {
-      await convertDocxFileToPdf(docxPath, pdfPath)
-    } catch {
-      return await generateHostedSafePdf(actions, week, year, meetingDate)
-    }
-    return new Uint8Array(await readFile(pdfPath))
-  } finally {
-    await rm(workingDir, { recursive: true, force: true })
-  }
+  return await generateHostedSafePdf(actions, week, year, meetingDate)
 }

@@ -1,4 +1,5 @@
 import { escapeHtml } from "./utils"
+import { EMAIL_HEADER_LOGO_SRC } from "./email-logo"
 import { type PendingUser } from "./welcome"
 
 interface InternalNotificationEmailProps {
@@ -44,7 +45,7 @@ export function renderInternalNotificationEmail({ pendingUser }: InternalNotific
 <body>
     <div class="email-shell">
     <div class="outer-header" style="background-color:#0f2d1f;">
-        <img src="https://erp.acoblighting.com/images/acob-logo-dark.png" alt="ACOB Lighting" height="35">
+        <img src="${EMAIL_HEADER_LOGO_SRC}" alt="ACOB Lighting" height="58">
     </div>
     <div class="wrapper">
         <div class="title">New Employee Onboarded</div>

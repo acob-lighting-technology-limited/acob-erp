@@ -1,9 +1,10 @@
 "use client"
 
+import type { ClipboardEvent } from "react"
 import { useRef, useEffect, useCallback, useState } from "react"
 import DOMPurify from "dompurify"
 import { toast } from "sonner"
-import { Bold, Italic, List, ListOrdered, Link2, Paperclip, Redo2, Underline, Undo2 } from "lucide-react"
+import { Bold, Italic, Link2, List, ListOrdered, Mail, Paperclip, Redo2, Underline, Undo2 } from "lucide-react"
 import { logger } from "@/lib/logger"
 import { PromptDialog } from "@/components/ui/prompt-dialog"
 import { Button } from "@/components/ui/button"
@@ -37,6 +38,35 @@ interface BroadcastFormProps {
   setAttachments: (files: File[]) => void
 }
 
+function escapeHtml(text: string) {
+  return text
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;")
+}
+
+function convertPlainTextToEditorHtml(text: string) {
+  const normalized = text.replace(/\r\n/g, "\n").trim()
+  if (!normalized) return "<p><br></p>"
+
+  const paragraphs = normalized
+    .split(/\n\s*\n/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean)
+
+  if (paragraphs.length === 0) return "<p><br></p>"
+
+  return paragraphs.map((paragraph) => `<p>${escapeHtml(paragraph).replace(/\n/g, "<br>")}</p>`).join("")
+}
+
+function buildPreparedByMailto(email: string, subject: string) {
+  const trimmedSubject = subject.trim()
+  const replySubject = trimmedSubject ? `Re: ${trimmedSubject}` : "Re:"
+  return `mailto:${email}?subject=${encodeURIComponent(replySubject)}`
+}
+
 export function BroadcastForm({
   broadcastDepartment,
   setBroadcastDepartment,
@@ -52,7 +82,34 @@ export function BroadcastForm({
   setAttachments,
 }: BroadcastFormProps) {
   const editorRef = useRef<HTMLDivElement | null>(null)
+  const savedRangeRef = useRef<Range | null>(null)
   const [linkDialogOpen, setLinkDialogOpen] = useState(false)
+
+  const selectedPreparedBy =
+    broadcastPreparedById === "none"
+      ? null
+      : broadcastPreparedByOptions.find((employee) => employee.id === broadcastPreparedById) || null
+
+  const selectedPreparedByEmail = selectedPreparedBy?.company_email || selectedPreparedBy?.additional_email || null
+
+  useEffect(() => {
+    const el = editorRef.current
+    if (!el || !selectedPreparedByEmail) return
+
+    const nextHref = buildPreparedByMailto(selectedPreparedByEmail, broadcastSubject)
+    let hasChanges = false
+
+    el.querySelectorAll<HTMLAnchorElement>('a[data-link-type="prepared-by-mail"]').forEach((anchor) => {
+      if (anchor.getAttribute("href") !== nextHref) {
+        anchor.setAttribute("href", nextHref)
+        hasChanges = true
+      }
+    })
+
+    if (hasChanges) {
+      setBroadcastBodyHtml(DOMPurify.sanitize(el.innerHTML))
+    }
+  }, [broadcastSubject, selectedPreparedByEmail, setBroadcastBodyHtml])
 
   useEffect(() => {
     const el = editorRef.current
@@ -67,11 +124,28 @@ export function BroadcastForm({
     (command: string, value?: string) => {
       if (!editorRef.current) return
       editorRef.current.focus()
+
+      const selection = window.getSelection()
+      if (selection && savedRangeRef.current) {
+        selection.removeAllRanges()
+        selection.addRange(savedRangeRef.current)
+      }
+
       document.execCommand(command, false, value)
       setBroadcastBodyHtml(DOMPurify.sanitize(editorRef.current.innerHTML))
     },
     [setBroadcastBodyHtml]
   )
+
+  const saveCurrentSelection = useCallback(() => {
+    const selection = window.getSelection()
+    if (!selection || selection.rangeCount === 0) return
+
+    const range = selection.getRangeAt(0)
+    if (!editorRef.current?.contains(range.commonAncestorContainer)) return
+
+    savedRangeRef.current = range.cloneRange()
+  }, [])
 
   const handleLinkConfirm = useCallback(
     (url: string) => {
@@ -81,6 +155,47 @@ export function BroadcastForm({
         return
       }
       runEditorCommand("createLink", trimmed)
+      toast.success("Web link inserted")
+    },
+    [runEditorCommand]
+  )
+
+  const handlePreparedByMailLink = useCallback(() => {
+    if (!selectedPreparedBy) {
+      toast.error("Select a Prepared by person first.")
+      return
+    }
+
+    if (!selectedPreparedByEmail) {
+      toast.error("The selected Prepared by person does not have an email address.")
+      return
+    }
+
+    const selection = window.getSelection()
+    const selectedText = selection?.toString().trim() || ""
+    if (!selectedText) {
+      toast.error("Highlight the text you want to turn into an email link first.")
+      return
+    }
+
+    const mailtoUrl = buildPreparedByMailto(selectedPreparedByEmail, broadcastSubject)
+
+    runEditorCommand("createLink", mailtoUrl)
+    const selectionAnchor = window.getSelection()?.anchorNode?.parentElement?.closest("a")
+    if (selectionAnchor instanceof HTMLAnchorElement) {
+      selectionAnchor.setAttribute("data-link-type", "prepared-by-mail")
+      setBroadcastBodyHtml(DOMPurify.sanitize(editorRef.current?.innerHTML || ""))
+    }
+    toast.success(`Linked selected text to ${selectedPreparedByEmail}`)
+  }, [broadcastSubject, runEditorCommand, selectedPreparedBy, selectedPreparedByEmail, setBroadcastBodyHtml])
+
+  const handlePaste = useCallback(
+    (event: ClipboardEvent<HTMLDivElement>) => {
+      const pastedText = event.clipboardData.getData("text/plain")
+      if (!pastedText) return
+
+      event.preventDefault()
+      runEditorCommand("insertHTML", convertPlainTextToEditorHtml(pastedText))
     },
     [runEditorCommand]
   )
@@ -225,9 +340,23 @@ export function BroadcastForm({
                 size="icon"
                 variant="ghost"
                 className="h-8 w-8"
-                onClick={() => setLinkDialogOpen(true)}
+                onClick={() => {
+                  saveCurrentSelection()
+                  setLinkDialogOpen(true)
+                }}
+                title="Insert web link"
               >
                 <Link2 className="h-4 w-4" />
+              </Button>
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                className="h-8 w-8"
+                onClick={handlePreparedByMailLink}
+                title="Link selected text to the Prepared by email"
+              >
+                <Mail className="h-4 w-4" />
               </Button>
               <div className="bg-border mx-1 h-5 w-px" />
               <Button
@@ -253,11 +382,15 @@ export function BroadcastForm({
               ref={editorRef}
               contentEditable
               suppressContentEditableWarning
-              className="bg-background min-h-[220px] rounded-b-lg border p-3 text-sm leading-6 outline-none focus:ring-2 focus:ring-orange-500"
+              className="bg-background text-foreground min-h-[220px] rounded-b-lg border p-4 text-[15px] leading-7 break-words outline-none focus:ring-2 focus:ring-orange-500 [&_a]:font-medium [&_a]:text-blue-600 [&_a]:underline [&_a]:underline-offset-2 hover:[&_a]:text-blue-700 [&_br]:content-[''] [&_div]:my-0 [&_div+div]:mt-4 [&_ol]:list-decimal [&_ol]:pl-6 [&_p]:my-0 [&_p+*]:mt-4 [&_strong]:font-semibold [&_ul]:list-disc [&_ul]:pl-6"
               onInput={(e) => setBroadcastBodyHtml(DOMPurify.sanitize((e.currentTarget as HTMLDivElement).innerHTML))}
+              onPaste={handlePaste}
+              onKeyUp={saveCurrentSelection}
+              onMouseUp={saveCurrentSelection}
             />
             <p className="text-muted-foreground text-xs">
-              Paste text from Word or type directly. This message is placed between the ACOB header and footer.
+              Paste text from Word or type directly. Use the chain icon for web links and the mail icon for reply links
+              to the selected Prepared by person.
             </p>
           </div>
         </div>

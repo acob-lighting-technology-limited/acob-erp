@@ -145,8 +145,8 @@ async function fetchWeeklyReportAttachment(params: {
       week: params.week,
       year: params.year,
       type: "weekly_report",
-      persist: false,
-      reuseStored: false,
+      persist: true,
+      reuseStored: true,
     }),
   })
 
@@ -317,6 +317,9 @@ export function useWeeklySummarySend({
       // and converts them server-side using the fast chunk-based method.
       if (additionalDocumentAttachments.length > 0) {
         payload.additionalDocumentAttachments = additionalDocumentAttachments
+      }
+      if (selectedAdditionalDocs.length > 0) {
+        payload.expectedAdditionalDocumentCount = selectedAdditionalDocs.length
       }
       if (fallbackAdditionalDocumentIds.length > 0) {
         payload.additionalDocumentIds = fallbackAdditionalDocumentIds

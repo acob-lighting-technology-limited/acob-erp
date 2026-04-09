@@ -5,8 +5,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Copy } from "lucide-react"
+import { Copy, Moon, Sun } from "lucide-react"
+import { Switch } from "@/components/ui/switch"
 import { toast } from "sonner"
+import {
+  PHONE_ICON,
+  MAIL_ICON,
+  WEB_ICON,
+  ACOB_LOGO,
+  LINKEDIN_ICON,
+  X_ICON,
+  FACEBOOK_ICON,
+  INSTAGRAM_ICON,
+  ANNIVERSARY_LOGO,
+} from "@/lib/signature-assets"
 
 interface SignatureCreatorProps {
   profile: {
@@ -59,8 +71,6 @@ const ANNIVERSARY_TEMPLATE_OPTIONS = [
   { id: "minimal-confidential", label: "Template 9" },
 ] as const
 
-const DEFAULT_ASSET_BASE_URL = "https://erp.acoblighting.com"
-
 export function SignatureCreator({ profile, variant = "default" }: SignatureCreatorProps) {
   const [formData, setFormData] = useState<FormData>({
     firstName: profile?.first_name || "",
@@ -73,13 +83,13 @@ export function SignatureCreator({ profile, variant = "default" }: SignatureCrea
 
   const [emailError, setEmailError] = useState("")
   const [phoneError, setPhoneError] = useState("")
-  const [selectedAnniversaryFont, setSelectedAnniversaryFont] = useState<(typeof ANNIVERSARY_FONT_OPTIONS)[number]["value"]>(
-    ANNIVERSARY_FONT_OPTIONS[1].value
-  )
-  const [selectedAnniversaryTemplate, setSelectedAnniversaryTemplate] = useState<
-    (typeof ANNIVERSARY_TEMPLATE_OPTIONS)[number]["id"]
-  >("minimal")
+  const [selectedAnniversaryFont, setSelectedAnniversaryFont] = useState<
+    (typeof ANNIVERSARY_FONT_OPTIONS)[number]["value"]
+  >(ANNIVERSARY_FONT_OPTIONS[1].value)
+  const [selectedAnniversaryTemplate, setSelectedAnniversaryTemplate] =
+    useState<(typeof ANNIVERSARY_TEMPLATE_OPTIONS)[number]["id"]>("minimal")
   const [selectedSignatureMode, setSelectedSignatureMode] = useState<"default" | "anniversary">("default")
+  const [darkPreview, setDarkPreview] = useState(false)
 
   useEffect(() => {
     if (formData.firstName && formData.lastName) {
@@ -138,11 +148,6 @@ export function SignatureCreator({ profile, variant = "default" }: SignatureCrea
       .join(" ")
   }
 
-  const getAssetUrl = (path: string) => {
-    const baseUrl = typeof window !== "undefined" ? window.location.origin : DEFAULT_ASSET_BASE_URL
-    return `${baseUrl}${path}`
-  }
-
   const generateDefaultSignature = (fullName: string, formattedPhone: string) => {
     return `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; max-width: 1000px; margin: 0; padding: 12px 0; line-height: 1.5;">
   <!-- Thin green line -->
@@ -159,31 +164,31 @@ export function SignatureCreator({ profile, variant = "default" }: SignatureCrea
     <!-- Contact details -->
     <div style="font-size: 14px; color: #374151; line-height: 1.3;">
       <div style="margin: 0 0 1px 0;">
-        <img src="${getAssetUrl("/images/signature/phone.png")}" width="18" height="18" style="vertical-align: middle; opacity: 0.8; margin-right: 6px; display: inline-block;" alt="Phone" /><a href="tel:${formData.phoneNumber.replace(
+        <img src="${PHONE_ICON}" width="18" height="18" style="vertical-align: middle; opacity: 0.8; margin-right: 6px; display: inline-block;" alt="Phone" /><a href="tel:${formData.phoneNumber.replace(
           /\s+/g,
           ""
         )}" style="color: #1f2937; text-decoration: none; vertical-align: middle;">${formattedPhone}</a>
       </div>
       <div style="margin: 0 0 1px 0;">
-        <img src="${getAssetUrl("/images/signature/mail.png")}" width="18" height="18" style="vertical-align: middle; opacity: 0.8; margin-right: 6px; display: inline-block;" alt="Email" /><a href="mailto:${
+        <img src="${MAIL_ICON}" width="18" height="18" style="vertical-align: middle; opacity: 0.8; margin-right: 6px; display: inline-block;" alt="Email" /><a href="mailto:${
           formData.companyEmail
         }" style="color: #1f2937; text-decoration: none; vertical-align: middle;">${formData.companyEmail}</a>
       </div>
       <div>
-        <img src="${getAssetUrl("/images/signature/web.png")}" width="18" height="18" style="vertical-align: middle; opacity: 0.8; margin-right: 6px; display: inline-block;" alt="Website" /><a href="https://www.acoblighting.com" style="color: #1f2937; text-decoration: none; vertical-align: middle;">www.acoblighting.com</a>
+        <img src="${WEB_ICON}" width="18" height="18" style="vertical-align: middle; opacity: 0.8; margin-right: 6px; display: inline-block;" alt="Website" /><a href="https://www.acoblighting.com" style="color: #1f2937; text-decoration: none; vertical-align: middle;">www.acoblighting.com</a>
       </div>
     </div>
   </div>
   
   <!-- Logo + Socials (stacked vertically) -->
   <div style="margin-bottom: 8px;">
-    <img src="${getAssetUrl("/images/signature/acob-logo.png")}" width="200" height="47" alt="ACOB Lighting Technology Limited" style="display: block; margin-bottom: 8px;" />
+    <img src="${ACOB_LOGO}" width="200" height="47" alt="ACOB Lighting Technology Limited" style="display: block; margin-bottom: 8px;" />
     
    <div style="display: inline-block;">
-  <a href="https://www.linkedin.com/company/acob-lighting-technology-limited" style="text-decoration: none; display: inline-block;"><img src="${getAssetUrl("/images/signature/linkedin.png")}" width="22" height="22" alt="LinkedIn" style="border-radius: 4px; display: inline-block;" /></a>
-  <a href="https://twitter.com/AcobLimited" style="text-decoration: none; display: inline-block; margin-left: 4px;"><img src="${getAssetUrl("/images/signature/x.png")}" width="22" height="22" alt="X (Twitter)" style="border-radius: 4px; display: inline-block;" /></a>
-  <a href="https://www.facebook.com/acoblightingtechltd" style="text-decoration: none; display: inline-block; margin-left: 4px;"><img src="${getAssetUrl("/images/signature/facebook.png")}" width="22" height="22" alt="Facebook" style="border-radius: 4px; display: inline-block;" /></a>
-  <a href="https://www.instagram.com/acob_lighting/" style="text-decoration: none; display: inline-block; margin-left: 4px;"><img src="${getAssetUrl("/images/signature/instagram.png")}" width="22" height="22" alt="Instagram" style="border-radius: 4px; display: inline-block;" /></a>
+  <a href="https://www.linkedin.com/company/acob-lighting-technology-limited" style="text-decoration: none; display: inline-block;"><img src="${LINKEDIN_ICON}" width="22" height="22" alt="LinkedIn" style="border-radius: 4px; display: inline-block;" /></a>
+  <a href="https://twitter.com/AcobLimited" style="text-decoration: none; display: inline-block; margin-left: 4px;"><img src="${X_ICON}" width="22" height="22" alt="X (Twitter)" style="border-radius: 4px; display: inline-block;" /></a>
+  <a href="https://www.facebook.com/acoblightingtechltd" style="text-decoration: none; display: inline-block; margin-left: 4px;"><img src="${FACEBOOK_ICON}" width="22" height="22" alt="Facebook" style="border-radius: 4px; display: inline-block;" /></a>
+  <a href="https://www.instagram.com/acob_lighting/" style="text-decoration: none; display: inline-block; margin-left: 4px;"><img src="${INSTAGRAM_ICON}" width="22" height="22" alt="Instagram" style="border-radius: 4px; display: inline-block;" /></a>
 </div>
   </div>
   
@@ -200,18 +205,18 @@ export function SignatureCreator({ profile, variant = "default" }: SignatureCrea
   const generateAnniversarySignature = (fullName: string, formattedPhone: string) => {
     const contactBlock = `<div style="font-size: 14px; color: #374151; line-height: 1.35;">
   <div style="margin: 0 0 1px 0;">
-    <img src="${getAssetUrl("/images/signature/phone.png")}" width="18" height="18" style="vertical-align: middle; opacity: 0.8; margin-right: 6px; display: inline-block;" alt="Phone" /><a href="tel:${formData.phoneNumber.replace(
+    <img src="${PHONE_ICON}" width="18" height="18" style="vertical-align: middle; opacity: 0.8; margin-right: 6px; display: inline-block;" alt="Phone" /><a href="tel:${formData.phoneNumber.replace(
       /\s+/g,
       ""
     )}" style="color: #1f2937; text-decoration: none; vertical-align: middle;">${formattedPhone}</a>
   </div>
   <div style="margin: 0 0 1px 0;">
-    <img src="${getAssetUrl("/images/signature/mail.png")}" width="18" height="18" style="vertical-align: middle; opacity: 0.8; margin-right: 6px; display: inline-block;" alt="Email" /><a href="mailto:${
+    <img src="${MAIL_ICON}" width="18" height="18" style="vertical-align: middle; opacity: 0.8; margin-right: 6px; display: inline-block;" alt="Email" /><a href="mailto:${
       formData.companyEmail
     }" style="color: #1f2937; text-decoration: none; vertical-align: middle;">${formData.companyEmail}</a>
   </div>
   <div>
-    <img src="${getAssetUrl("/images/signature/web.png")}" width="18" height="18" style="vertical-align: middle; opacity: 0.8; margin-right: 6px; display: inline-block;" alt="Website" /><a href="https://www.acoblighting.com" style="color: #1f2937; text-decoration: none; vertical-align: middle;">www.acoblighting.com</a>
+    <img src="${WEB_ICON}" width="18" height="18" style="vertical-align: middle; opacity: 0.8; margin-right: 6px; display: inline-block;" alt="Website" /><a href="https://www.acoblighting.com" style="color: #1f2937; text-decoration: none; vertical-align: middle;">www.acoblighting.com</a>
   </div>
 </div>`
 
@@ -219,13 +224,13 @@ export function SignatureCreator({ profile, variant = "default" }: SignatureCrea
       "border-radius: 4px; display: inline-block; filter: brightness(0.9) saturate(0.92); opacity: 0.92;"
 
     const socialBlock = `<div style="display: inline-block;">
-  <a href="https://www.linkedin.com/company/acob-lighting-technology-limited" style="text-decoration: none; display: inline-block;"><img src="${getAssetUrl("/images/signature/linkedin.png")}" width="22" height="22" alt="LinkedIn" style="${mutedSocialIconStyle}" /></a>
-  <a href="https://twitter.com/AcobLimited" style="text-decoration: none; display: inline-block; margin-left: 4px;"><img src="${getAssetUrl("/images/signature/x.png")}" width="22" height="22" alt="X (Twitter)" style="${mutedSocialIconStyle}" /></a>
-  <a href="https://www.facebook.com/acoblightingtechltd" style="text-decoration: none; display: inline-block; margin-left: 4px;"><img src="${getAssetUrl("/images/signature/facebook.png")}" width="22" height="22" alt="Facebook" style="${mutedSocialIconStyle}" /></a>
-  <a href="https://www.instagram.com/acob_lighting/" style="text-decoration: none; display: inline-block; margin-left: 4px;"><img src="${getAssetUrl("/images/signature/instagram.png")}" width="22" height="22" alt="Instagram" style="${mutedSocialIconStyle}" /></a>
+  <a href="https://www.linkedin.com/company/acob-lighting-technology-limited" style="text-decoration: none; display: inline-block;"><img src="${LINKEDIN_ICON}" width="22" height="22" alt="LinkedIn" style="${mutedSocialIconStyle}" /></a>
+  <a href="https://twitter.com/AcobLimited" style="text-decoration: none; display: inline-block; margin-left: 4px;"><img src="${X_ICON}" width="22" height="22" alt="X (Twitter)" style="${mutedSocialIconStyle}" /></a>
+  <a href="https://www.facebook.com/acoblightingtechltd" style="text-decoration: none; display: inline-block; margin-left: 4px;"><img src="${FACEBOOK_ICON}" width="22" height="22" alt="Facebook" style="${mutedSocialIconStyle}" /></a>
+  <a href="https://www.instagram.com/acob_lighting/" style="text-decoration: none; display: inline-block; margin-left: 4px;"><img src="${INSTAGRAM_ICON}" width="22" height="22" alt="Instagram" style="${mutedSocialIconStyle}" /></a>
 </div>`
 
-    const anniversaryLogo = `<img src="${getAssetUrl("/images/acob-logo-light-2026.webp")}" width="250" height="auto" alt="ACOB Lighting Technology Limited 2026 Anniversary Logo" style="display: block;" />`
+    const anniversaryLogo = `<img src="${ANNIVERSARY_LOGO}" width="250" height="auto" alt="ACOB Lighting Technology Limited 2026 Anniversary Logo" style="display: block;" />`
 
     const anniversaryNarrative = `<p style="margin: 0 0 5px 0; font-size: 13px; font-weight: 700; color: #0f5c4d;">A decade of purpose, progress, and power.</p>
 <p style="margin: 0 0 5px 0; font-size: 12px; color: #374151;">For 10 remarkable years, ACOB Lighting Technology Limited has remained committed to lighting up communities, driving innovation, and creating lasting impact across Nigeria.</p>
@@ -233,15 +238,13 @@ export function SignatureCreator({ profile, variant = "default" }: SignatureCrea
 <p style="margin: 0; font-size: 11.5px; color: #4b5563;">We celebrate 10 years of impact and look forward to many more years of lighting up lives and shaping a brighter future.</p>`
 
     const compactNarrative = `<p style="margin: 0 0 5px 0; font-size: 13px; font-weight: 700; color: #0f5c4d;">A decade of purpose, progress, and power.</p>
-<p style="margin: 0 0 5px 0; font-size: 12px; color: #374151;">From 2016 to 2026, ACOB Lighting Technology Limited has remained committed to lighting up communities, driving innovation, and creating lasting impact across Nigeria.</p>
-<p style="margin: 0; font-size: 11.5px; color: #4b5563;">We celebrate 10 years of impact and look forward to many more years of lighting up lives and shaping a brighter future.</p>`
+<p style="margin: 0; font-size: 12px; color: #374151;">From 2016 to 2026, ACOB Lighting Technology Limited has remained committed to lighting up communities, driving innovation, and creating lasting impact across Nigeria.</p>`
 
-    const legalCopyBlock = `<div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #e7dec2;">
-  <p style="margin: 0 0 5px 0; font-size: 11px; font-weight: 600; color: #7a828e;">ACOB Lighting Technology Limited is a renewable energy company registered under the Laws of the Federal Republic of Nigeria.</p>
-  <p style="margin: 0; font-size: 10.5px; color: #7a828e; font-style: italic;">This email, including any attachments, contains confidential information intended solely for the recipient(s) named above. If you have received this email in error, please notify the sender immediately and delete the email from your system. Any unauthorized use, disclosure, distribution, or copying of this email is strictly prohibited and may be unlawful.</p>
+    const legalCopyBlock = `<div style="margin-top: 8px; padding-top: 8px; border-top: 0.5px solid #e7dec2;">
+  <p style="margin: 0; font-size: 11px; font-weight: 600; color: #7a828e;">ACOB Lighting Technology Limited is a renewable energy company registered under the Laws of the Federal Republic of Nigeria.</p>
 </div>`
 
-    const anniversaryFooter = `<div style="border-top: 1px solid #e7dec2; padding-top: 8px; font-size: 11px; color: #6b7280; line-height: 1.4;">
+    const anniversaryFooter = `<div style="border-top: 0.5px solid #e7dec2; padding-top: 8px; font-size: 11px; color: #6b7280; line-height: 1.4;">
   <table role="presentation" style="width: 100%; border-collapse: collapse;">
     <tr>
       <td style="padding: 0; font-weight: 600; font-style: italic; color: #6b7280; text-align: left;">
@@ -252,11 +255,12 @@ export function SignatureCreator({ profile, variant = "default" }: SignatureCrea
       </td>
     </tr>
   </table>
+  <div style="margin-top: 8px; border-top: 0.5px solid #e7dec2;"></div>
+  <p style="margin: 8px 0 0 0; font-size: 10.5px; color: #7a828e; font-style: italic;">This email, including any attachments, contains confidential information intended solely for the recipient(s) named above. If you have received this email in error, please notify the sender immediately and delete the email from your system. Any unauthorized use, disclosure, distribution, or copying of this email is strictly prohibited and may be unlawful.</p>
 </div>`
 
-    const executiveAnniversaryFooter = `<div style="border-top: 1px solid #e7dec2; padding-top: 8px; font-size: 11px; color: #6b7280; line-height: 1.4;">
+    const executiveAnniversaryFooter = `<div style="border-top: 0.5px solid #e7dec2; padding-top: 8px; font-size: 11px; color: #6b7280; line-height: 1.4;">
   <p style="margin: 0 0 5px 0; font-size: 10.75px; color: #7a828e;">ACOB Lighting Technology Limited is a renewable energy company registered under the Laws of the Federal Republic of Nigeria.</p>
-  <p style="margin: 0 0 8px 0; font-size: 10.25px; color: #7a828e; font-style: italic;">This email, including any attachments, contains confidential information intended solely for the recipient(s) named above. If you have received this email in error, please notify the sender immediately and delete the email from your system. Any unauthorized use, disclosure, distribution, or copying of this email is strictly prohibited and may be unlawful.</p>
   <table role="presentation" style="width: 100%; border-collapse: collapse;">
     <tr>
       <td style="padding: 0; font-weight: 600; font-style: italic; color: #6b7280; text-align: left;">
@@ -267,14 +271,18 @@ export function SignatureCreator({ profile, variant = "default" }: SignatureCrea
       </td>
     </tr>
   </table>
+  <div style="margin-top: 8px; border-top: 0.5px solid #e7dec2;"></div>
+  <p style="margin: 8px 0 0 0; font-size: 10.25px; color: #7a828e; font-style: italic;">This email, including any attachments, contains confidential information intended solely for the recipient(s) named above. If you have received this email in error, please notify the sender immediately and delete the email from your system. Any unauthorized use, disclosure, distribution, or copying of this email is strictly prohibited and may be unlawful.</p>
 </div>`
 
-    const renderAnniversaryLayout = (body: string) => `<div style="font-family: ${selectedAnniversaryFont}; max-width: 1000px; margin: 0; padding: 12px 0; line-height: 1.5; color: #1f2937;">
+    const renderAnniversaryLayout = (
+      body: string
+    ) => `<div style="font-family: ${selectedAnniversaryFont}; max-width: 1000px; margin: 0; padding: 12px 0; line-height: 1.5; color: #1f2937;">
   ${body}
 </div>`
 
     const templates: Record<(typeof ANNIVERSARY_TEMPLATE_OPTIONS)[number]["id"], string> = {
-      classic: renderAnniversaryLayout(`<div style="color: #0f5c4d;">&mdash;&mdash;</div>
+      classic: renderAnniversaryLayout(`<div style="color: #d4af37;">&mdash;&mdash;</div>
   <p style="margin: 0 0 4px 0; font-size: 14px; color: #4b5563; font-style: italic;">Best Regards,</p>
   <table cellpadding="0" cellspacing="0" border="0" style="border-collapse: collapse; margin-bottom: 8px;">
     <tr>
@@ -287,33 +295,38 @@ export function SignatureCreator({ profile, variant = "default" }: SignatureCrea
   </table>
   <div style="margin-bottom: 8px;">${contactBlock}</div>
   <div style="margin: 14px 0 16px 0; border-top: 1px solid #d4af37;"></div>
-  <div style="margin-bottom: 10px;">${anniversaryLogo}</div>
-  <div style="margin-bottom: 10px;">${anniversaryNarrative}${legalCopyBlock}</div>
-  <div style="margin-bottom: 8px;">${socialBlock}</div>
-  ${anniversaryFooter}`),
-      timeline: renderAnniversaryLayout(`<div style="color: #0f5c4d;">&mdash;&mdash;</div>
+  <div style="padding: 8px 0 14px 0; border-top: 2px solid #e7dec2; border-bottom: 2px solid #e7dec2;">
+    <div style="margin-bottom: 8px;">${anniversaryLogo}</div>
+    ${anniversaryNarrative}${legalCopyBlock}
+    <div style="margin-top: 8px; margin-bottom: 8px;">${socialBlock}</div>
+    ${anniversaryFooter}
+  </div>`),
+      timeline: renderAnniversaryLayout(`<div style="color: #d4af37;">&mdash;&mdash;</div>
   <p style="margin: 0 0 4px 0; font-size: 14px; color: #4b5563; font-style: italic;">Best Regards,</p>
   <p style="margin: 0; line-height: 1; font-size: 20px; font-weight: 700; color: #0f172a;">${fullName}</p>
   <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #0f5c4d;">${formData.companyRole}</p>
   <div style="margin-bottom: 8px;">${contactBlock}</div>
-  <div style="margin-bottom: 10px;">${anniversaryLogo}</div>
-  <table cellpadding="0" cellspacing="0" border="0" style="border-collapse: collapse; width: 100%; margin-bottom: 10px;">
-    <tr>
-      <td style="width: 56px; text-align: center; vertical-align: top;">
-        <p style="margin: 0; font-size: 13px; font-weight: 700; color: #8a6b08;">2016</p>
-      </td>
-      <td style="vertical-align: top; padding: 0 10px;">
-        <div style="margin-top: 7px; border-top: 2px solid #d4af37;"></div>
-      </td>
-      <td style="width: 56px; text-align: center; vertical-align: top;">
-        <p style="margin: 0; font-size: 13px; font-weight: 700; color: #8a6b08;">2026</p>
-      </td>
-    </tr>
-  </table>
-  <div style="margin-bottom: 10px;">${compactNarrative}${legalCopyBlock}</div>
-  <div style="margin-bottom: 8px;">${socialBlock}</div>
-  ${anniversaryFooter}`),
-      heritage: renderAnniversaryLayout(`<div style="color: #0f5c4d;">&mdash;&mdash;</div>
+  <div style="padding: 8px 0 14px 0; border-top: 2px solid #e7dec2; border-bottom: 2px solid #e7dec2;">
+    <div style="margin-bottom: 8px;">${anniversaryLogo}</div>
+    ${compactNarrative}
+    <table cellpadding="0" cellspacing="0" border="0" style="border-collapse: collapse; width: 100%; margin-bottom: 10px;">
+      <tr>
+        <td style="width: 56px; text-align: center; vertical-align: top;">
+          <p style="margin: 0; font-size: 13px; font-weight: 700; color: #8a6b08;">2016</p>
+        </td>
+        <td style="vertical-align: top; padding: 0 10px;">
+          <div style="margin-top: 7px; border-top: 2px solid #d4af37;"></div>
+        </td>
+        <td style="width: 56px; text-align: center; vertical-align: top;">
+          <p style="margin: 0; font-size: 13px; font-weight: 700; color: #8a6b08;">2026</p>
+        </td>
+      </tr>
+    </table>
+    ${legalCopyBlock}
+    <div style="margin-top: 8px; margin-bottom: 8px;">${socialBlock}</div>
+    ${anniversaryFooter}
+  </div>`),
+      heritage: renderAnniversaryLayout(`<div style="color: #d4af37;">&mdash;&mdash;</div>
   <p style="margin: 0 0 4px 0; font-size: 14px; color: #4b5563; font-style: italic;">Best Regards,</p>
   <div style="margin-bottom: 10px;">
     <div style="padding-left: 12px; border-left: 3px solid #d4af37;">
@@ -322,27 +335,25 @@ export function SignatureCreator({ profile, variant = "default" }: SignatureCrea
     </div>
     ${contactBlock}
   </div>
-  <div style="margin-bottom: 10px; padding: 10px 12px; background: #fbf8ec; border-left: 3px solid #d4af37;">
+  <div style="padding: 8px 0 14px 0; border-top: 2px solid #e7dec2; border-bottom: 2px solid #e7dec2;">
     <div style="margin-bottom: 8px;">${anniversaryLogo}</div>
     ${anniversaryNarrative}
     ${legalCopyBlock}
-  </div>
-  <div style="margin-bottom: 8px;">${socialBlock}</div>
-  ${anniversaryFooter}`),
-      renewal: renderAnniversaryLayout(`<div style="color: #0f5c4d;">&mdash;&mdash;</div>
+    <div style="margin-top: 8px; margin-bottom: 8px;">${socialBlock}</div>
+    ${anniversaryFooter}
+  </div>`),
+      renewal: renderAnniversaryLayout(`<div style="color: #d4af37;">&mdash;&mdash;</div>
   <p style="margin: 0 0 4px 0; font-size: 14px; color: #4b5563; font-style: italic;">Best Regards,</p>
   <p style="margin: 0; line-height: 1; font-size: 20px; font-weight: 700; color: #0f172a;">${fullName}</p>
   <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #0f5c4d;">${formData.companyRole}</p>
   <div style="margin-bottom: 10px;">${contactBlock}</div>
-  <div style="margin-bottom: 10px; padding: 14px 16px; border: 1px solid #e7dec2; background: linear-gradient(180deg, #ffffff, #fcf9ef);">
+  <div style="padding: 8px 0 14px 0; border-top: 2px solid #e7dec2; border-bottom: 2px solid #e7dec2;">
     <div style="margin-bottom: 8px;">${anniversaryLogo}</div>
-    <p style="margin: 0 0 5px 0; font-size: 12px; text-transform: uppercase; letter-spacing: 0.24em; color: #8a6b08;">Celebrating 10 Years of Impact</p>
-    ${compactNarrative}
-  </div>
-  <div style="margin-bottom: 10px;">${legalCopyBlock}</div>
-  <div style="margin-bottom: 8px;">${socialBlock}</div>
-  ${anniversaryFooter}`),
-      "renewal-accent": renderAnniversaryLayout(`<div style="color: #0f5c4d;">&mdash;&mdash;</div>
+    ${compactNarrative}${legalCopyBlock}
+    <div style="margin-top: 8px; margin-bottom: 8px;">${socialBlock}</div>
+    ${anniversaryFooter}
+  </div>`),
+      "renewal-accent": renderAnniversaryLayout(`<div style="color: #d4af37;">&mdash;&mdash;</div>
   <p style="margin: 0 0 4px 0; font-size: 14px; color: #4b5563; font-style: italic;">Best Regards,</p>
   <table cellpadding="0" cellspacing="0" border="0" style="border-collapse: collapse; margin-bottom: 10px;">
     <tr>
@@ -354,15 +365,13 @@ export function SignatureCreator({ profile, variant = "default" }: SignatureCrea
     </tr>
   </table>
   <div style="margin-bottom: 10px;">${contactBlock}</div>
-  <div style="margin-bottom: 10px; padding: 14px 16px; border: 1px solid #e7dec2; background: linear-gradient(180deg, #ffffff, #fcf9ef);">
+  <div style="padding: 8px 0 14px 0; border-top: 2px solid #e7dec2; border-bottom: 2px solid #e7dec2;">
     <div style="margin-bottom: 8px;">${anniversaryLogo}</div>
-    <p style="margin: 0 0 5px 0; font-size: 12px; text-transform: uppercase; letter-spacing: 0.24em; color: #8a6b08;">Celebrating 10 Years of Impact</p>
-    ${compactNarrative}
-  </div>
-  <div style="margin-bottom: 10px;">${legalCopyBlock}</div>
-  <div style="margin-bottom: 8px;">${socialBlock}</div>
-  ${anniversaryFooter}`),
-      "renewal-executive": renderAnniversaryLayout(`<div style="color: #0f5c4d;">&mdash;&mdash;</div>
+    ${compactNarrative}${legalCopyBlock}
+    <div style="margin-top: 8px; margin-bottom: 8px;">${socialBlock}</div>
+    ${anniversaryFooter}
+  </div>`),
+      "renewal-executive": renderAnniversaryLayout(`<div style="color: #d4af37;">&mdash;&mdash;</div>
   <p style="margin: 0 0 4px 0; font-size: 14px; color: #4b5563; font-style: italic;">Best Regards,</p>
   <table cellpadding="0" cellspacing="0" border="0" style="border-collapse: collapse; margin-bottom: 10px;">
     <tr>
@@ -374,74 +383,45 @@ export function SignatureCreator({ profile, variant = "default" }: SignatureCrea
     </tr>
   </table>
   <div style="margin-bottom: 10px;">${contactBlock}</div>
-  <div style="margin-bottom: 10px; padding: 14px 16px; border: 1px solid #e7dec2; background: linear-gradient(180deg, #ffffff, #fcf9ef);">
+  <div style="padding: 8px 0 14px 0; border-top: 2px solid #e7dec2; border-bottom: 2px solid #e7dec2;">
     <div style="margin-bottom: 8px;">${anniversaryLogo}</div>
-    <p style="margin: 0 0 5px 0; font-size: 12px; text-transform: uppercase; letter-spacing: 0.24em; color: #8a6b08;">Celebrating 10 Years of Impact</p>
     ${compactNarrative}
-  </div>
-  <div style="margin-bottom: 8px;">${socialBlock}</div>
-  ${executiveAnniversaryFooter}`),
-      minimal: renderAnniversaryLayout(`<div style="color: #0f5c4d;">&mdash;&mdash;</div>
-  <p style="margin: 0 0 4px 0; font-size: 14px; color: #4b5563; font-style: italic;">Best Regards,</p>
-  <p style="margin: 0; line-height: 1; font-size: 20px; font-weight: 700; color: #0f172a;">${fullName}</p>
-  <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #0f5c4d;">${formData.companyRole}</p>
-  <div style="margin-bottom: 10px;">${contactBlock}</div>
-  <div style="padding: 14px 16px; border: 1px solid #e7dec2; background: linear-gradient(180deg, #ffffff, #fcf9ef); border-radius: 8px;">
-    <div style="margin-bottom: 8px;">${anniversaryLogo}</div>
-    <p style="margin: 0 0 8px 0; font-size: 13px; font-weight: 700; color: #0f5c4d;">A decade of purpose, progress, and power.</p>
-    <p style="margin: 0 0 12px 0; font-size: 12px; color: #374151;">From 2016 to 2026, ACOB Lighting Technology Limited has remained committed to lighting up communities, driving innovation, and creating lasting impact across Nigeria.</p>
-    <p style="margin: 0 0 12px 0; font-size: 10.5px; color: #7a828e; font-style: italic;">This email, including any attachments, contains confidential information intended solely for the recipient(s) named above. If you have received this email in error, please notify the sender immediately and delete the email from your system. Any unauthorized use, disclosure, distribution, or copying of this email is strictly prohibited and may be unlawful.</p>
-    <div style="margin-bottom: 12px;">${socialBlock}</div>
-    <div style="border-top: 1px solid #e7dec2; padding-top: 8px; font-size: 11px; color: #6b7280; line-height: 1.4;">
-      <table role="presentation" style="width: 100%; border-collapse: collapse;">
-        <tr>
-          <td style="padding: 0; font-weight: 600; font-style: italic; color: #6b7280; text-align: left;">
-            Celebrating 10 Years of Impact &bull; Lighting up Nigeria!
-          </td>
-          <td style="padding: 0; font-weight: 600; color: #6b7280; text-align: right; white-space: nowrap; vertical-align: top;">
-            2016 &ndash; 2026
-          </td>
-        </tr>
-      </table>
-    </div>
+    <div style="margin-top: 8px; margin-bottom: 8px;">${socialBlock}</div>
+    ${executiveAnniversaryFooter}
   </div>`),
-      "minimal-clean": renderAnniversaryLayout(`<div style="color: #0f5c4d;">&mdash;&mdash;</div>
+      minimal: renderAnniversaryLayout(`<div style="color: #d4af37;">&mdash;&mdash;</div>
   <p style="margin: 0 0 4px 0; font-size: 14px; color: #4b5563; font-style: italic;">Best Regards,</p>
   <p style="margin: 0; line-height: 1; font-size: 20px; font-weight: 700; color: #0f172a;">${fullName}</p>
   <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #0f5c4d;">${formData.companyRole}</p>
   <div style="margin-bottom: 10px;">${contactBlock}</div>
-  <div style="padding: 14px 16px; border: 1px solid #e7dec2; background: linear-gradient(180deg, #ffffff, #fcf9ef); border-radius: 8px;">
+  <div style="padding: 8px 0 14px 0; border-top: 2px solid #e7dec2; border-bottom: 2px solid #e7dec2;">
     <div style="margin-bottom: 8px;">${anniversaryLogo}</div>
-    <p style="margin: 0 0 8px 0; font-size: 13px; font-weight: 700; color: #0f5c4d;">A decade of purpose, progress, and power.</p>
-    <p style="margin: 0 0 12px 0; font-size: 12px; color: #374151;">From 2016 to 2026, ACOB Lighting Technology Limited has remained committed to lighting up communities, driving innovation, and creating lasting impact across Nigeria.</p>
-    <div style="margin-bottom: 12px;">${socialBlock}</div>
-    <div style="border-top: 1px solid #e7dec2; padding-top: 8px; font-size: 11px; color: #6b7280; line-height: 1.4; margin-bottom: 12px;">
-      <table role="presentation" style="width: 100%; border-collapse: collapse;">
-        <tr>
-          <td style="padding: 0; font-weight: 600; font-style: italic; color: #6b7280; text-align: left;">
-            Celebrating 10 Years of Impact &bull; Lighting up Nigeria!
-          </td>
-          <td style="padding: 0; font-weight: 600; color: #6b7280; text-align: right; white-space: nowrap; vertical-align: top;">
-            2016 &ndash; 2026
-          </td>
-        </tr>
-      </table>
-    </div>
-    <p style="margin: 0; font-size: 10.5px; color: #7a828e; font-style: italic;">This email, including any attachments, contains confidential information intended solely for the recipient(s) named above. If you have received this email in error, please notify the sender immediately and delete the email from your system. Any unauthorized use, disclosure, distribution, or copying of this email is strictly prohibited and may be unlawful.</p>
+    ${compactNarrative}
+    <div style="margin-top: 8px; margin-bottom: 12px;">${socialBlock}</div>
+    ${anniversaryFooter}
   </div>`),
-      "minimal-confidential": renderAnniversaryLayout(`<div style="color: #0f5c4d;">&mdash;&mdash;</div>
+      "minimal-clean": renderAnniversaryLayout(`<div style="color: #d4af37;">&mdash;&mdash;</div>
   <p style="margin: 0 0 4px 0; font-size: 14px; color: #4b5563; font-style: italic;">Best Regards,</p>
   <p style="margin: 0; line-height: 1; font-size: 20px; font-weight: 700; color: #0f172a;">${fullName}</p>
   <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #0f5c4d;">${formData.companyRole}</p>
   <div style="margin-bottom: 10px;">${contactBlock}</div>
-  <div style="margin-bottom: 10px; padding: 14px 16px; border: 1px solid #e7dec2; background: linear-gradient(180deg, #ffffff, #fcf9ef);">
+  <div style="padding: 8px 0 14px 0; border-top: 2px solid #e7dec2; border-bottom: 2px solid #e7dec2;">
     <div style="margin-bottom: 8px;">${anniversaryLogo}</div>
-    <p style="margin: 0 0 8px 0; font-size: 13px; font-weight: 700; color: #0f5c4d;">A decade of purpose, progress, and power.</p>
-    <p style="margin: 0 0 8px 0; font-size: 12px; color: #374151;">From 2016 to 2026, ACOB Lighting Technology Limited has remained committed to lighting up communities, driving innovation, and creating lasting impact across Nigeria.</p>
-    <p style="margin: 0; font-size: 10.5px; color: #7a828e; font-style: italic;">This email, including any attachments, contains confidential information intended solely for the recipient(s) named above. If you have received this email in error, please notify the sender immediately and delete the email from your system. Any unauthorized use, disclosure, distribution, or copying of this email is strictly prohibited and may be unlawful.</p>
-  </div>
-  <div style="margin-bottom: 8px;">${socialBlock}</div>
-  ${anniversaryFooter}`),
+    ${compactNarrative}
+    <div style="margin-top: 8px; margin-bottom: 12px;">${socialBlock}</div>
+    ${anniversaryFooter}
+  </div>`),
+      "minimal-confidential": renderAnniversaryLayout(`<div style="color: #d4af37;">&mdash;&mdash;</div>
+  <p style="margin: 0 0 4px 0; font-size: 14px; color: #4b5563; font-style: italic;">Best Regards,</p>
+  <p style="margin: 0; line-height: 1; font-size: 20px; font-weight: 700; color: #0f172a;">${fullName}</p>
+  <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #0f5c4d;">${formData.companyRole}</p>
+  <div style="margin-bottom: 10px;">${contactBlock}</div>
+  <div style="padding: 8px 0 14px 0; border-top: 2px solid #e7dec2; border-bottom: 2px solid #e7dec2;">
+    <div style="margin-bottom: 8px;">${anniversaryLogo}</div>
+    ${compactNarrative}
+    <div style="margin-top: 8px; margin-bottom: 8px;">${socialBlock}</div>
+    ${anniversaryFooter}
+  </div>`),
     }
 
     return templates[selectedAnniversaryTemplate]
@@ -542,7 +522,10 @@ export function SignatureCreator({ profile, variant = "default" }: SignatureCrea
           {variant === "selectable" && (
             <div className="space-y-2">
               <Label>Signature Type</Label>
-              <Tabs value={selectedSignatureMode} onValueChange={(value) => setSelectedSignatureMode(value as "default" | "anniversary")}>
+              <Tabs
+                value={selectedSignatureMode}
+                onValueChange={(value) => setSelectedSignatureMode(value as "default" | "anniversary")}
+              >
                 <TabsList className="h-auto w-full justify-start">
                   <TabsTrigger value="default">Standard</TabsTrigger>
                   <TabsTrigger value="anniversary">10th Anniversary</TabsTrigger>
@@ -641,7 +624,12 @@ export function SignatureCreator({ profile, variant = "default" }: SignatureCrea
 
               <div className="space-y-2">
                 <Label>Anniversary Template</Label>
-                <Tabs value={selectedAnniversaryTemplate} onValueChange={(value) => setSelectedAnniversaryTemplate(value as (typeof ANNIVERSARY_TEMPLATE_OPTIONS)[number]["id"])}>
+                <Tabs
+                  value={selectedAnniversaryTemplate}
+                  onValueChange={(value) =>
+                    setSelectedAnniversaryTemplate(value as (typeof ANNIVERSARY_TEMPLATE_OPTIONS)[number]["id"])
+                  }
+                >
                   <TabsList className="h-auto w-full flex-wrap justify-start">
                     {ANNIVERSARY_TEMPLATE_OPTIONS.map((template) => (
                       <TabsTrigger key={template.id} value={template.id} className="min-w-[96px]">
@@ -669,13 +657,22 @@ export function SignatureCreator({ profile, variant = "default" }: SignatureCrea
       {/* Preview */}
       <Card>
         <CardHeader>
-          <CardTitle>{previewTitle}</CardTitle>
-          <CardDescription>{previewDescription}</CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>{previewTitle}</CardTitle>
+              <CardDescription>{previewDescription}</CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <Sun className="text-muted-foreground h-4 w-4" />
+              <Switch checked={darkPreview} onCheckedChange={setDarkPreview} />
+              <Moon className="text-muted-foreground h-4 w-4" />
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {isFormValid ? (
             <div
-              className="rounded-lg border bg-white p-4 text-sm"
+              className={`rounded-lg border p-4 text-sm ${darkPreview ? "bg-[#1a1a1a]" : "bg-white"}`}
               dangerouslySetInnerHTML={{ __html: generateSignature() }}
             />
           ) : (

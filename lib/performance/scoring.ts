@@ -153,59 +153,67 @@ export async function computeIndividualPerformanceScore(
     absent: 0,
   }
 
+  let leaveRequestQuery = supabase
+    .from("leave_requests")
+    .select("start_date, end_date")
+    .eq("user_id", params.userId)
+    .eq("status", "approved")
+
+  let attendanceQuery = supabase.from("attendance_records").select("status, date").eq("user_id", params.userId)
+
   if (cycle) {
-    // ── Fix 2: Exclude approved leave days from attendance denominator ──
-    // Fetch approved leave requests within the cycle window so those dates
-    // don't penalise the employee's attendance score.
-    const { data: approvedLeaves } = await supabase
-      .from("leave_requests")
-      .select("start_date, end_date")
-      .eq("user_id", params.userId)
-      .eq("status", "approved")
-      .gte("end_date", cycle.start_date)
-      .lte("start_date", cycle.end_date)
+    leaveRequestQuery = leaveRequestQuery.gte("end_date", cycle.start_date).lte("start_date", cycle.end_date)
+    attendanceQuery = attendanceQuery.gte("date", cycle.start_date).lte("date", cycle.end_date)
+  }
 
-    // Build a Set of leave date strings (YYYY-MM-DD) for fast lookup
-    const leaveDateSet = new Set<string>()
-    if (approvedLeaves) {
-      for (const leave of approvedLeaves) {
-        const leaveStart = new Date(Math.max(new Date(leave.start_date).getTime(), new Date(cycle.start_date).getTime()))
-        const leaveEnd = new Date(Math.min(new Date(leave.end_date).getTime(), new Date(cycle.end_date).getTime()))
-        for (let d = new Date(leaveStart); d <= leaveEnd; d.setDate(d.getDate() + 1)) {
-          leaveDateSet.add(d.toISOString().slice(0, 10))
-        }
+  const [{ data: approvedLeaves }, { data: attendance }] = await Promise.all([leaveRequestQuery, attendanceQuery])
+
+  const leaveDateSet = new Set<string>()
+  if (approvedLeaves) {
+    for (const leave of approvedLeaves) {
+      const effectiveStart = cycle ? cycle.start_date : leave.start_date
+      const effectiveEnd = cycle ? cycle.end_date : leave.end_date
+      const leaveStart = new Date(Math.max(new Date(leave.start_date).getTime(), new Date(effectiveStart).getTime()))
+      const leaveEnd = new Date(Math.min(new Date(leave.end_date).getTime(), new Date(effectiveEnd).getTime()))
+      for (let d = new Date(leaveStart); d <= leaveEnd; d.setDate(d.getDate() + 1)) {
+        leaveDateSet.add(d.toISOString().slice(0, 10))
       }
-    }
-
-    const { data: attendance } = await supabase
-      .from("attendance_records")
-      .select("status, date")
-      .eq("user_id", params.userId)
-      .gte("date", cycle.start_date)
-      .lte("date", cycle.end_date)
-
-    if (attendance && attendance.length > 0) {
-      // Filter out days where the employee was on approved leave
-      const scorableRecords = attendance.filter(
-        (row) => !leaveDateSet.has(String(row.date || "").slice(0, 10))
-      )
-
-      let creditSum = 0
-      for (const row of scorableRecords) {
-        const status = String(row.status || "absent").toLowerCase()
-        creditSum += ATTENDANCE_CREDIT[status] ?? 0
-      }
-      attendanceBreakdown.present = scorableRecords.filter((row) =>
-        ["present", "wfh", "remote"].includes(String(row.status || "").toLowerCase())
-      ).length
-      attendanceBreakdown.total = scorableRecords.length
-      attendanceScore = scorableRecords.length > 0 ? roundScore((creditSum / scorableRecords.length) * 100) : 100
-      attendanceBreakdown.score = attendanceScore
     }
   }
 
-  // CBT score: placeholder until dedicated CBT test system is built.
-  const cbtScore = 0
+  if (attendance && attendance.length > 0) {
+    const scorableRecords = attendance.filter((row) => !leaveDateSet.has(String(row.date || "").slice(0, 10)))
+
+    let creditSum = 0
+    for (const row of scorableRecords) {
+      const status = String(row.status || "absent").toLowerCase()
+      creditSum += ATTENDANCE_CREDIT[status] ?? 0
+    }
+    attendanceBreakdown.present = scorableRecords.filter((row) =>
+      ["present", "wfh", "remote"].includes(String(row.status || "").toLowerCase())
+    ).length
+    attendanceBreakdown.total = scorableRecords.length
+    attendanceScore = scorableRecords.length > 0 ? roundScore((creditSum / scorableRecords.length) * 100) : 100
+    attendanceBreakdown.score = attendanceScore
+  }
+
+  let cbtScore = 0
+  let cbtQuery = supabase
+    .from("performance_reviews")
+    .select("cbt_score")
+    .eq("user_id", params.userId)
+    .not("cbt_score", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(1)
+
+  if (params.cycleId) {
+    cbtQuery = cbtQuery.eq("review_cycle_id", params.cycleId)
+  }
+
+  const { data: cbtRows } = await cbtQuery
+  if (cbtRows && cbtRows.length > 0) {
+    cbtScore = roundScore(Number(cbtRows[0]?.cbt_score) || 0)
+  }
 
   // ── Fix 2: 360° feedback — blend peer + manager for behaviour ──
   // Query manager behaviour score from performance_reviews
@@ -239,15 +247,12 @@ export async function computeIndividualPerformanceScore(
 
   if (peerRows && peerRows.length > 0) {
     peerFeedbackCount = peerRows.length
-    peerBehaviourScore = roundScore(
-      peerRows.reduce((sum, row) => sum + (Number(row.score) || 0), 0) / peerRows.length
-    )
+    peerBehaviourScore = roundScore(peerRows.reduce((sum, row) => sum + (Number(row.score) || 0), 0) / peerRows.length)
   }
 
   // Blend: if peer feedback exists, 60% manager + 40% peer. Otherwise 100% manager.
-  const behaviourScore = peerFeedbackCount > 0
-    ? roundScore(managerBehaviourScore * 0.6 + peerBehaviourScore * 0.4)
-    : managerBehaviourScore
+  const behaviourScore =
+    peerFeedbackCount > 0 ? roundScore(managerBehaviourScore * 0.6 + peerBehaviourScore * 0.4) : managerBehaviourScore
 
   // ── Fix 1: CBT dead weight redistribution ──
   // When CBT = 0 (system not built yet), redistribute its 10% proportionally
@@ -261,7 +266,12 @@ export async function computeIndividualPerformanceScore(
     // New: KPI=77.78%, Attendance=11.11%, Behaviour=11.11%
     const w = { kpi: 70 / 90, cbt: 0, attendance: 10 / 90, behaviour: 10 / 90 }
     finalScore = roundScore(kpiScore * w.kpi + attendanceScore * w.attendance + behaviourScore * w.behaviour)
-    appliedWeights = { kpi: roundScore(w.kpi * 100), cbt: 0, attendance: roundScore(w.attendance * 100), behaviour: roundScore(w.behaviour * 100) }
+    appliedWeights = {
+      kpi: roundScore(w.kpi * 100),
+      cbt: 0,
+      attendance: roundScore(w.attendance * 100),
+      behaviour: roundScore(w.behaviour * 100),
+    }
   } else {
     finalScore = roundScore(kpiScore * 0.7 + cbtScore * 0.1 + attendanceScore * 0.1 + behaviourScore * 0.1)
     appliedWeights = { kpi: 70, cbt: 10, attendance: 10, behaviour: 10 }
@@ -316,10 +326,7 @@ export async function computeDepartmentPerformanceScore(
   }
 
   // Source 2: Users with goals linked to this department's review cycle
-  let goalUsersQuery = supabase
-    .from("goals_objectives")
-    .select("user_id")
-    .eq("approval_status", "approved")
+  let goalUsersQuery = supabase.from("goals_objectives").select("user_id").eq("approval_status", "approved")
   if (params.cycleId) {
     goalUsersQuery = goalUsersQuery.eq("review_cycle_id", params.cycleId)
   }
@@ -468,13 +475,15 @@ export async function computeDepartmentPerformanceScore(
     .map((s) => ({ user_id: s.user_id, final_score: s.final_score }))
     .sort((a, b) => b.final_score - a.final_score)
 
-  const mean = individualScores.length > 0
-    ? roundScore(individualScores.reduce((sum, s) => sum + s.final_score, 0) / individualScores.length)
-    : 0
+  const mean =
+    individualScores.length > 0
+      ? roundScore(individualScores.reduce((sum, s) => sum + s.final_score, 0) / individualScores.length)
+      : 0
 
-  const variance = individualScores.length > 1
-    ? individualScores.reduce((sum, s) => sum + Math.pow(s.final_score - mean, 2), 0) / (individualScores.length - 1)
-    : 0
+  const variance =
+    individualScores.length > 1
+      ? individualScores.reduce((sum, s) => sum + Math.pow(s.final_score - mean, 2), 0) / (individualScores.length - 1)
+      : 0
   const stddev = roundScore(Math.sqrt(variance))
 
   // Percentile: rank / total * 100 (higher = better)
