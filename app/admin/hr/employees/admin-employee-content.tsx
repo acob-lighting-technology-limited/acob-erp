@@ -10,19 +10,7 @@ import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { formatName } from "@/lib/utils"
-import {
-  ArrowLeft,
-  Users,
-  Shield,
-  UserCog,
-  LayoutGrid,
-  List,
-  Download,
-  FileText,
-  Plus,
-  Loader2,
-  AlertTriangle,
-} from "lucide-react"
+import { ArrowLeft, Users, Shield, UserCog, LayoutGrid, List, Download, Plus, Loader2 } from "lucide-react"
 import type { UserRole, EmploymentStatus } from "@/types/database"
 import { getRoleDisplayName, getRoleBadgeColor, canAssignRoles } from "@/lib/permissions"
 import { PendingApplicationsModal } from "./pending-applications-modal"
@@ -47,6 +35,7 @@ import {
 import { EmployeeListView } from "@/components/employees/EmployeeListView"
 import type { Database } from "@/types/database"
 import type { EmployeeAssignedItems, EmployeeProfile, EmployeeViewData } from "@/components/employees/types"
+import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
 
 const log = logger("hr-employees-admin-employee-content")
 
@@ -130,6 +119,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
   )
 
   // Export dialog state
+  const [exportOptionsOpen, setExportOptionsOpen] = useState(false)
   const [exportEmployeeDialogOpen, setExportEmployeeDialogOpen] = useState(false)
   const [exportType, setExportType] = useState<"excel" | "pdf" | "word" | null>(null)
   const [selectedColumns, setSelectedColumns] = useState<Record<string, boolean>>({
@@ -474,6 +464,27 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         return
       }
 
+      const companyEmail = editForm.company_email.trim().toLowerCase()
+      const additionalEmail = editForm.additional_email.trim().toLowerCase()
+
+      if (!companyEmail) {
+        toast.error("Company email is required")
+        setIsSaving(false)
+        return
+      }
+
+      if (!formValidation.isCompanyEmail(companyEmail)) {
+        toast.error("Only @acoblighting.com and @org.acoblighting.com emails are allowed")
+        setIsSaving(false)
+        return
+      }
+
+      if (additionalEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(additionalEmail)) {
+        toast.error("Additional email must be a valid email address")
+        setIsSaving(false)
+        return
+      }
+
       const isLead = editForm.is_department_lead
 
       // Build update object with all fields
@@ -490,6 +501,8 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         first_name: editForm.first_name || "",
         last_name: editForm.last_name || "",
         other_names: editForm.other_names || null,
+        company_email: companyEmail,
+        additional_email: additionalEmail || null,
         phone_number: editForm.phone_number || null,
         additional_phone: editForm.additional_phone || null,
         residential_address: editForm.residential_address || null,
@@ -499,6 +512,16 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         date_of_birth: editForm.date_of_birth || null,
         employment_date: editForm.employment_date || null,
         job_description: editForm.job_description || null,
+      }
+
+      const emailSyncResponse = await fetch(`/api/admin/hr/employees/${selectedEmployee.id}/email`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ companyEmail, additionalEmail: additionalEmail || null }),
+      })
+      const emailSyncResult = (await emailSyncResponse.json().catch(() => ({}))) as { error?: string }
+      if (!emailSyncResponse.ok) {
+        throw new Error(emailSyncResult.error || "Failed to sync employee login email")
       }
 
       const { error } = await supabase.from("profiles").update(updateData).eq("id", selectedEmployee.id)
@@ -695,8 +718,15 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
     <div className="from-background via-background to-muted/20 min-h-screen w-full overflow-x-hidden bg-gradient-to-br">
       <div className="mx-auto max-w-7xl space-y-6 p-4 md:p-8">
         {/* Header */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
+            <Link
+              href="/admin/hr"
+              className="text-muted-foreground hover:text-foreground mb-3 inline-flex items-center gap-2 text-sm font-medium transition-colors"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to HR
+            </Link>
             <h1 className="text-foreground flex items-center gap-2 text-2xl font-bold sm:gap-3 sm:text-3xl">
               <Users className="text-primary h-6 w-6 sm:h-8 sm:w-8" />
               Employee Management
@@ -706,12 +736,6 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Link href="/admin/hr">
-              <Button variant="outline" className="gap-2" size="sm">
-                <ArrowLeft className="h-4 w-4" />
-                Back to HR
-              </Button>
-            </Link>
             {canManageUsers && <PendingApplicationsModal onEmployeeCreated={loadData} />}
             {canManageUsers && (
               <Button onClick={() => setIsCreateUserDialogOpen(true)} className="gap-2" size="sm">
@@ -719,6 +743,16 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                 <span className="hidden sm:inline">Create User</span>
               </Button>
             )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setExportOptionsOpen(true)}
+              className="gap-2"
+              disabled={filteredEmployees.length === 0}
+            >
+              <Download className="h-4 w-4" />
+              <span className="hidden sm:inline">Export</span>
+            </Button>
             <div className="flex items-center rounded-lg border p-1">
               <Button
                 variant={viewMode === "list" ? "default" : "ghost"}
@@ -800,56 +834,6 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
             </CardContent>
           </Card>
         </div>
-
-        {/* Export Buttons */}
-        <Card className="border-2">
-          <CardContent className="p-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-center gap-2">
-                <Download className="text-muted-foreground h-4 w-4" />
-                <span className="text-foreground text-sm font-medium">Export Filtered Employee:</span>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Link href="/admin/hr/employees/offboarding-conflicts">
-                  <Button variant="secondary" size="sm" className="gap-2">
-                    <AlertTriangle className="h-4 w-4" />
-                    Offboarding Conflicts
-                  </Button>
-                </Link>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleExportClick("excel")}
-                  className="flex-1 gap-2 sm:flex-none"
-                  disabled={filteredEmployees.length === 0}
-                >
-                  <FileText className="h-4 w-4" />
-                  <span className="text-xs sm:text-sm">Excel (.xlsx)</span>
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleExportClick("pdf")}
-                  className="flex-1 gap-2 sm:flex-none"
-                  disabled={filteredEmployees.length === 0}
-                >
-                  <FileText className="h-4 w-4" />
-                  <span className="text-xs sm:text-sm">PDF</span>
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleExportClick("word")}
-                  className="flex-1 gap-2 sm:flex-none"
-                  disabled={filteredEmployees.length === 0}
-                >
-                  <FileText className="h-4 w-4" />
-                  <span className="text-xs sm:text-sm">Word (.docx)</span>
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
 
         {/* Filters */}
         <EmployeeFilterBar
@@ -942,6 +926,20 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
           else if (exportType === "pdf") await exportEmployeesToPDF(filteredEmployees, { selectedColumns }, filename)
           else if (exportType === "word") await exportEmployeesToWord(rows, filename)
           setExportEmployeeDialogOpen(false)
+        }}
+      />
+
+      <ExportOptionsDialog
+        open={exportOptionsOpen}
+        onOpenChange={setExportOptionsOpen}
+        title="Export Employees"
+        options={[
+          { id: "excel", label: "Excel (.xlsx)", icon: "excel" },
+          { id: "pdf", label: "PDF", icon: "pdf" },
+          { id: "word", label: "Word (.docx)", icon: "word" },
+        ]}
+        onSelect={(id) => {
+          handleExportClick(id as "excel" | "pdf" | "word")
         }}
       />
     </div>

@@ -159,7 +159,7 @@ export async function GET(request: Request) {
     if (id && mode === "download") {
       const { data: row, error: rowError } = await supabase
         .from("meeting_week_documents")
-        .select("id, file_name, file_path")
+        .select("id, file_name, file_path, mime_type")
         .eq("id", id)
         .single()
 
@@ -168,7 +168,20 @@ export async function GET(request: Request) {
       if (isOneDriveReportDocumentPath(row.file_path)) {
         const onedrive = getOneDriveService()
         const downloadUrl = await onedrive.getDownloadUrl(row.file_path)
-        return NextResponse.redirect(downloadUrl)
+        const downloadResponse = await fetch(downloadUrl)
+
+        if (!downloadResponse.ok) {
+          return NextResponse.json({ error: "Failed to download document" }, { status: 502 })
+        }
+
+        const bytes = new Uint8Array(await downloadResponse.arrayBuffer())
+        return new NextResponse(bytes, {
+          headers: {
+            "Content-Type": row.mime_type || downloadResponse.headers.get("Content-Type") || "application/octet-stream",
+            "Content-Disposition": `attachment; filename="${sanitizeName(row.file_name || "document.pdf")}"`,
+            "Cache-Control": "private, max-age=60",
+          },
+        })
       }
 
       const { data: signed, error: signedError } = await supabase.storage
@@ -364,25 +377,18 @@ export async function POST(request: Request) {
       presenterName = presenter.full_name
     }
 
+    // On Vercel (Linux), LibreOffice isn't available — upload the original file as-is
+    const willConvert = shouldConvertToPdf && CAN_CONVERT_OFFICE_TO_PDF
     normalizedFileName = buildMeetingDocumentFileName({
       documentType,
       meetingDate,
       meetingWeek,
-      extension: shouldConvertToPdf ? "pdf" : originalExtension,
+      extension: willConvert ? "pdf" : originalExtension,
       department,
       presenterName,
     })
 
-    if (shouldConvertToPdf && !CAN_CONVERT_OFFICE_TO_PDF) {
-      return NextResponse.json(
-        {
-          error: "This deployment cannot convert PPTX or DOCX files to PDF automatically. Please upload a PDF instead.",
-        },
-        { status: 400 }
-      )
-    }
-
-    if (shouldConvertToPdf) {
+    if (willConvert) {
       try {
         const converted = await convertOfficeDocumentToPdf(
           uploadBuffer,

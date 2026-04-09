@@ -101,6 +101,14 @@ const formatActionPointsDate = (week: number, year: number, meetingDate?: string
     year: "numeric",
   }).format(resolveExportMeetingDate(week, year, meetingDate))
 
+const formatMeetingDateWithWeekday = (date: Date): string => {
+  const weekday = date.toLocaleDateString("en-GB", { weekday: "long" })
+  return `${weekday}, ${formatOfficeDateWithOrdinal(date)}`
+}
+
+const formatExportMeetingDateLabel = (week: number, year: number, meetingDate?: string) =>
+  formatMeetingDateWithWeekday(resolveExportMeetingDate(week, year, meetingDate))
+
 const buildWeeklyReportFilename = ({
   week,
   year: _year,
@@ -223,10 +231,10 @@ export const autoNumberLines = (text: string): string => {
   return lines.map((l, i) => `${i + 1}. ${sanitizeLine(l)}`).join("\n")
 }
 
-/** Returns the Monday date of a given ISO week as a formatted string e.g. "Monday, 17th February 2026" */
+/** Returns the office-week start date as a formatted string e.g. "Monday, 17th February, 2026" */
 const getWeekMonday = (week: number, year: number): string => {
   const monday = getOfficeWeekMonday(week, year)
-  return `Monday, ${formatOfficeDateWithOrdinal(monday)}`
+  return formatMeetingDateWithWeekday(monday)
 }
 
 /**
@@ -624,7 +632,7 @@ export const exportToPDF = async (report: WeeklyReport, meetingDate?: string) =>
   // Cover shows the CURRENT week (week being reported IN = report week + 1)
   const currentWeek = normalizedReport.week_number + 1
   const currentYear = currentWeek > 52 ? normalizedReport.year + 1 : normalizedReport.year
-  const mondayDate = getWeekMonday(currentWeek, currentYear)
+  const meetingDateLabel = formatExportMeetingDateLabel(currentWeek, currentYear, meetingDate)
 
   const [logoFull, logoDark] = await Promise.all([
     fetchImageAsBase64(getSeasonalLogoPaths("light").full),
@@ -632,7 +640,7 @@ export const exportToPDF = async (report: WeeklyReport, meetingDate?: string) =>
   ])
 
   // Page 1 — Cover (shows current week / meeting date)
-  pdfCoverPage(doc, currentWeek, currentYear, mondayDate, logoFull, normalizedReport.department)
+  pdfCoverPage(doc, currentWeek, currentYear, meetingDateLabel, logoFull, normalizedReport.department)
 
   // Page 2 — Content (no separate dept header page)
   doc.addPage()
@@ -655,7 +663,7 @@ export const exportAllToPDF = async (reports: WeeklyReport[], week: number, year
   // Cover shows the CURRENT week (week being reported IN = report week + 1)
   const currentWeek = week + 1
   const currentYear = currentWeek > 52 ? year + 1 : year
-  const mondayDate = getWeekMonday(currentWeek, currentYear)
+  const meetingDateLabel = formatExportMeetingDateLabel(currentWeek, currentYear, meetingDate)
   const departments = sortedReports.map((r) => r.department)
 
   const [logoFull, logoDark] = await Promise.all([
@@ -664,7 +672,7 @@ export const exportAllToPDF = async (reports: WeeklyReport[], week: number, year
   ])
 
   // Page 1 — Cover (current week / meeting date)
-  pdfCoverPage(doc, currentWeek, currentYear, mondayDate, logoFull)
+  pdfCoverPage(doc, currentWeek, currentYear, meetingDateLabel, logoFull)
 
   // Page 2 — Dept index
   doc.addPage()
@@ -908,19 +916,19 @@ export const exportActionPointToPDFBase64 = async (
   actions: ActionItem[],
   week: number,
   year: number,
-  _meetingDate?: string
+  meetingDate?: string
 ): Promise<string> => {
   const doc = new jsPDF()
   // Action Point week IS the current week (no +1 needed)
-  const mondayDate = getWeekMonday(week, year)
+  const meetingDateLabel = formatExportMeetingDateLabel(week, year, meetingDate)
 
   const [logoFull, logoDark] = await Promise.all([
-    fetchImageAsBase64("/images/acob-logo-light.webp"),
-    fetchImageAsBase64("/images/acob-logo-dark.webp"),
+    fetchImageAsBase64(getSeasonalLogoPaths("light").full),
+    fetchImageAsBase64(getSeasonalLogoPaths("light").icon),
   ])
 
   // Cover page — shows current week with "Action Points" subtitle
-  pdfCoverPage(doc, week, year, mondayDate, logoFull, "Action Points")
+  pdfCoverPage(doc, week, year, meetingDateLabel, logoFull, "Action Points")
 
   // Group actions by department (in DEPARTMENT_ORDER)
   const { grouped, departments } = groupActionItemsByDepartment(actions)
@@ -1047,200 +1055,200 @@ export const exportActionPointToPPTX = async (
   inFlightActionPointFileExports.add(exportKey)
 
   try {
-  const PptxConstructor = await loadPptxGenJS()
-  const pres = new PptxConstructor()
-  pres.layout = "LAYOUT_WIDE"
+    const PptxConstructor = await loadPptxGenJS()
+    const pres = new PptxConstructor()
+    pres.layout = "LAYOUT_WIDE"
 
-  // Cover slide
-  addCoverSlide(pres, week, year, "Action Points")
+    // Cover slide
+    addCoverSlide(pres, week, year, "Action Points")
 
-  // Group by department
-  const { grouped, departments } = groupActionItemsByDepartment(actions)
+    // Group by department
+    const { grouped, departments } = groupActionItemsByDepartment(actions)
 
-  // TOC slide
-  addDeptIndexSlide(pres, departments, week, year)
+    // TOC slide
+    addDeptIndexSlide(pres, departments, week, year)
 
-  departments.forEach((dept, idx) => {
-    const deptActions = grouped[dept] || []
-    const slide = pres.addSlide()
-    slide.background = { color: ACOB_OFFWHITE }
+    departments.forEach((dept, idx) => {
+      const deptActions = grouped[dept] || []
+      const slide = pres.addSlide()
+      slide.background = { color: ACOB_OFFWHITE }
 
-    // Header
-    slide.addShape(pres.ShapeType?.rect ?? "rect", {
-      x: 0,
-      y: 0,
-      w: "100%",
-      h: 0.65,
-      fill: { color: ACOB_DARK },
-      line: { color: ACOB_DARK },
-    })
-    slide.addText(dept.toUpperCase(), {
-      x: 0.3,
-      y: 0,
-      w: 9,
-      h: 0.65,
-      fontSize: 14,
-      bold: true,
-      color: ACOB_WHITE,
-      valign: "middle",
-      fontFace: "Calibri",
-    })
-    try {
-      slide.addImage({ path: LOGO_ICON, x: 11.45, y: 0.14, w: 1.7, h: 0.37 })
-    } catch {
-      /* skip */
-    }
-
-    // Week badge
-    slide.addText(`Week ${week}, ${year}`, {
-      x: 9.5,
-      y: 0.7,
-      w: 3.5,
-      h: 0.35,
-      fontSize: 10,
-      bold: true,
-      color: ACOB_WHITE,
-      fill: { color: ACOB_GREEN },
-      align: "center",
-      valign: "middle",
-      fontFace: "Calibri",
-    })
-
-    // Table header: S/N | ACTION ITEM | STATUS
-    const tableY = 1.2
-    const colWidths = [0.8, 9.2, 2.8]
-    const headers = ["S/N", "ACTION ITEM", "STATUS"]
-    const colX = [0.25, 1.05, 10.25]
-
-    slide.addShape(pres.ShapeType?.rect ?? "rect", {
-      x: 0.25,
-      y: tableY,
-      w: 12.83,
-      h: 0.38,
-      fill: { color: ACOB_GREEN },
-      line: { color: ACOB_GREEN },
-    })
-    headers.forEach((h, i) => {
-      slide.addText(h, {
-        x: colX[i] + 0.1,
-        y: tableY,
-        w: colWidths[i] - 0.1,
-        h: 0.38,
-        fontSize: 9,
-        bold: true,
-        color: ACOB_WHITE,
-        valign: "middle",
-        fontFace: "Calibri",
-      })
-    })
-
-    const statusColors: Record<string, string> = {
-      completed: "166534",
-      in_progress: "1D4ED8",
-      not_started: "C2410C",
-      pending: "64748B",
-    }
-    const statusLabels: Record<string, string> = {
-      completed: "Completed",
-      in_progress: "In Progress",
-      not_started: "Not Started",
-      pending: "Pending",
-    }
-
-    let rowY = tableY + 0.38
-    const rowH = 0.38
-    deptActions.slice(0, 14).forEach((action, i) => {
-      const bg = i % 2 === 0 ? "F8FAFB" : ACOB_WHITE
+      // Header
       slide.addShape(pres.ShapeType?.rect ?? "rect", {
-        x: 0.25,
-        y: rowY,
-        w: 12.83,
-        h: rowH,
-        fill: { color: bg },
-        line: { color: "E2E8F0", width: 0.5 },
+        x: 0,
+        y: 0,
+        w: "100%",
+        h: 0.65,
+        fill: { color: ACOB_DARK },
+        line: { color: ACOB_DARK },
       })
-      // S/N
-      slide.addText(`${i + 1}`, {
-        x: colX[0] + 0.1,
-        y: rowY,
-        w: colWidths[0] - 0.1,
-        h: rowH,
-        fontSize: 10,
-        bold: true,
-        color: ACOB_SLATE,
-        valign: "middle",
-        fontFace: "Calibri",
-      })
-      // Action item — full width, no truncation
-      slide.addText(action.title, {
-        x: colX[1] + 0.1,
-        y: rowY,
-        w: colWidths[1] - 0.1,
-        h: rowH,
-        fontSize: 10,
-        color: ACOB_SLATE,
-        valign: "middle",
-        fontFace: "Calibri",
-      })
-      const sc = statusColors[action.status] || statusColors.pending
-      const sl = statusLabels[action.status] || action.status
-      slide.addText(sl, {
-        x: colX[2] + 0.1,
-        y: rowY + 0.05,
-        w: colWidths[2] - 0.2,
-        h: rowH - 0.1,
-        fontSize: 9,
+      slide.addText(dept.toUpperCase(), {
+        x: 0.3,
+        y: 0,
+        w: 9,
+        h: 0.65,
+        fontSize: 14,
         bold: true,
         color: ACOB_WHITE,
-        fill: { color: sc },
+        valign: "middle",
+        fontFace: "Calibri",
+      })
+      try {
+        slide.addImage({ path: LOGO_ICON, x: 11.45, y: 0.14, w: 1.7, h: 0.37 })
+      } catch {
+        /* skip */
+      }
+
+      // Week badge
+      slide.addText(`Week ${week}, ${year}`, {
+        x: 9.5,
+        y: 0.7,
+        w: 3.5,
+        h: 0.35,
+        fontSize: 10,
+        bold: true,
+        color: ACOB_WHITE,
+        fill: { color: ACOB_GREEN },
         align: "center",
         valign: "middle",
         fontFace: "Calibri",
       })
-      rowY += rowH
-    })
 
-    // Footer
-    slide.addShape(pres.ShapeType?.rect ?? "rect", {
-      x: 0,
-      y: 6.9,
-      w: "100%",
-      h: 0.6,
-      fill: { color: ACOB_GREEN },
-      line: { color: ACOB_GREEN },
-    })
-    const nextDept = departments[idx + 1]
-    if (nextDept) {
-      slide.addText(`NEXT: ${nextDept}`, {
-        x: 7,
+      // Table header: S/N | ACTION ITEM | STATUS
+      const tableY = 1.2
+      const colWidths = [0.8, 9.2, 2.8]
+      const headers = ["S/N", "ACTION ITEM", "STATUS"]
+      const colX = [0.25, 1.05, 10.25]
+
+      slide.addShape(pres.ShapeType?.rect ?? "rect", {
+        x: 0.25,
+        y: tableY,
+        w: 12.83,
+        h: 0.38,
+        fill: { color: ACOB_GREEN },
+        line: { color: ACOB_GREEN },
+      })
+      headers.forEach((h, i) => {
+        slide.addText(h, {
+          x: colX[i] + 0.1,
+          y: tableY,
+          w: colWidths[i] - 0.1,
+          h: 0.38,
+          fontSize: 9,
+          bold: true,
+          color: ACOB_WHITE,
+          valign: "middle",
+          fontFace: "Calibri",
+        })
+      })
+
+      const statusColors: Record<string, string> = {
+        completed: "166534",
+        in_progress: "1D4ED8",
+        not_started: "C2410C",
+        pending: "64748B",
+      }
+      const statusLabels: Record<string, string> = {
+        completed: "Completed",
+        in_progress: "In Progress",
+        not_started: "Not Started",
+        pending: "Pending",
+      }
+
+      let rowY = tableY + 0.38
+      const rowH = 0.38
+      deptActions.slice(0, 14).forEach((action, i) => {
+        const bg = i % 2 === 0 ? "F8FAFB" : ACOB_WHITE
+        slide.addShape(pres.ShapeType?.rect ?? "rect", {
+          x: 0.25,
+          y: rowY,
+          w: 12.83,
+          h: rowH,
+          fill: { color: bg },
+          line: { color: "E2E8F0", width: 0.5 },
+        })
+        // S/N
+        slide.addText(`${i + 1}`, {
+          x: colX[0] + 0.1,
+          y: rowY,
+          w: colWidths[0] - 0.1,
+          h: rowH,
+          fontSize: 10,
+          bold: true,
+          color: ACOB_SLATE,
+          valign: "middle",
+          fontFace: "Calibri",
+        })
+        // Action item — full width, no truncation
+        slide.addText(action.title, {
+          x: colX[1] + 0.1,
+          y: rowY,
+          w: colWidths[1] - 0.1,
+          h: rowH,
+          fontSize: 10,
+          color: ACOB_SLATE,
+          valign: "middle",
+          fontFace: "Calibri",
+        })
+        const sc = statusColors[action.status] || statusColors.pending
+        const sl = statusLabels[action.status] || action.status
+        slide.addText(sl, {
+          x: colX[2] + 0.1,
+          y: rowY + 0.05,
+          w: colWidths[2] - 0.2,
+          h: rowH - 0.1,
+          fontSize: 9,
+          bold: true,
+          color: ACOB_WHITE,
+          fill: { color: sc },
+          align: "center",
+          valign: "middle",
+          fontFace: "Calibri",
+        })
+        rowY += rowH
+      })
+
+      // Footer
+      slide.addShape(pres.ShapeType?.rect ?? "rect", {
+        x: 0,
         y: 6.9,
-        w: 6.1,
+        w: "100%",
+        h: 0.6,
+        fill: { color: ACOB_GREEN },
+        line: { color: ACOB_GREEN },
+      })
+      const nextDept = departments[idx + 1]
+      if (nextDept) {
+        slide.addText(`NEXT: ${nextDept}`, {
+          x: 7,
+          y: 6.9,
+          w: 6.1,
+          h: 0.6,
+          fontSize: 10,
+          color: ACOB_WHITE,
+          align: "right",
+          valign: "middle",
+          fontFace: "Calibri",
+          bold: true,
+        })
+      }
+      slide.addText(String(idx + 3), {
+        x: 0,
+        y: 6.9,
+        w: "100%",
         h: 0.6,
         fontSize: 10,
         color: ACOB_WHITE,
-        align: "right",
+        align: "center",
         valign: "middle",
         fontFace: "Calibri",
         bold: true,
       })
-    }
-    slide.addText(String(idx + 3), {
-      x: 0,
-      y: 6.9,
-      w: "100%",
-      h: 0.6,
-      fontSize: 10,
-      color: ACOB_WHITE,
-      align: "center",
-      valign: "middle",
-      fontFace: "Calibri",
-      bold: true,
     })
-  })
 
-  await pres.writeFile({
-    fileName: buildActionPointFilename({ week, year, meetingDate, extension: "pptx", department }),
-  })
+    await pres.writeFile({
+      fileName: buildActionPointFilename({ week, year, meetingDate, extension: "pptx", department }),
+    })
   } finally {
     inFlightActionPointFileExports.delete(exportKey)
   }
@@ -1281,7 +1289,11 @@ export const exportToDocx = async (report: WeeklyReport, meetingDate?: string) =
   const normalizedReport = { ...report, department: normalizeDepartmentName(report.department) }
   const p = Array.isArray(normalizedReport.profiles) ? normalizedReport.profiles[0] : normalizedReport.profiles
   const name = p ? `${p.first_name} ${p.last_name}` : "Employee"
-  const mondayDate = getWeekMonday(normalizedReport.week_number, normalizedReport.year)
+  const meetingDateLabel = formatExportMeetingDateLabel(
+    normalizedReport.week_number,
+    normalizedReport.year,
+    meetingDate
+  )
 
   const doc = new Document({
     sections: [
@@ -1313,7 +1325,7 @@ export const exportToDocx = async (report: WeeklyReport, meetingDate?: string) =
             spacing: { after: 60 },
           }),
           new Paragraph({
-            children: [new TextRun({ text: mondayDate, size: 20, color: "64748B" })],
+            children: [new TextRun({ text: meetingDateLabel, size: 20, color: "64748B" })],
             alignment: AlignmentType.CENTER,
             spacing: { after: 60 },
           }),
@@ -1391,7 +1403,7 @@ export const exportActionPointToDocx = async (
   meetingDate?: string,
   department?: string
 ) => {
-  const mondayDate = getWeekMonday(week, year)
+  const meetingDateLabel = formatExportMeetingDateLabel(week, year, meetingDate)
 
   const { grouped, departments } = groupActionItemsByDepartment(actions)
 
@@ -1489,7 +1501,7 @@ export const exportActionPointToDocx = async (
             spacing: { after: 60 },
           }),
           new Paragraph({
-            children: [new TextRun({ text: mondayDate, size: 20, color: "64748B" })],
+            children: [new TextRun({ text: meetingDateLabel, size: 20, color: "64748B" })],
             alignment: AlignmentType.CENTER,
             spacing: { after: 120 },
           }),
@@ -1527,38 +1539,38 @@ export const exportActionPointToXLSX = async (
   inFlightActionPointFileExports.add(exportKey)
 
   try {
-  const XLSX = await import("xlsx")
-  const filteredActions = department
-    ? actions.filter((item) => getDepartmentAliases(department).includes(normalizeDepartmentName(item.department)))
-    : actions
+    const XLSX = await import("xlsx")
+    const filteredActions = department
+      ? actions.filter((item) => getDepartmentAliases(department).includes(normalizeDepartmentName(item.department)))
+      : actions
 
-  const rows = filteredActions.map((item, index) => ({
-    "S/N": index + 1,
-    Department: normalizeDepartmentName(item.department),
-    "Action Item": item.title,
-    Description: item.description || "",
-    Status: formatStatusLabel(item.status),
-    Week: item.week_number || week,
-    Year: item.year || year,
-  }))
+    const rows = filteredActions.map((item, index) => ({
+      "S/N": index + 1,
+      Department: normalizeDepartmentName(item.department),
+      "Action Item": item.title,
+      Description: item.description || "",
+      Status: formatStatusLabel(item.status),
+      Week: item.week_number || week,
+      Year: item.year || year,
+    }))
 
-  const worksheet = XLSX.utils.json_to_sheet(rows.length > 0 ? rows : [{ Message: "No action items to export." }])
-  const workbook = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Action Points")
+    const worksheet = XLSX.utils.json_to_sheet(rows.length > 0 ? rows : [{ Message: "No action items to export." }])
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Action Points")
 
-  const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" })
-  saveAs(
-    new Blob([excelBuffer], {
-      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    }),
-    buildActionPointFilename({
-      week,
-      year,
-      meetingDate,
-      extension: "xlsx",
-      department: department || "All Departments",
-    })
-  )
+    const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" })
+    saveAs(
+      new Blob([excelBuffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      }),
+      buildActionPointFilename({
+        week,
+        year,
+        meetingDate,
+        extension: "xlsx",
+        department: department || "All Departments",
+      })
+    )
   } finally {
     inFlightActionPointFileExports.delete(exportKey)
   }
@@ -1566,7 +1578,7 @@ export const exportActionPointToXLSX = async (
 
 export const exportAllToDocx = async (reports: WeeklyReport[], week: number, year: number, meetingDate?: string) => {
   const sortedReports = sortReportsByDepartment(reports)
-  const mondayDate = getWeekMonday(week, year)
+  const meetingDateLabel = formatExportMeetingDateLabel(week, year, meetingDate)
 
   const tocChildren: Array<Paragraph | Table> = [
     new Paragraph({
@@ -1585,7 +1597,7 @@ export const exportAllToDocx = async (reports: WeeklyReport[], week: number, yea
       spacing: { after: 60 },
     }),
     new Paragraph({
-      children: [new TextRun({ text: mondayDate, size: 20, color: "64748B" })],
+      children: [new TextRun({ text: meetingDateLabel, size: 20, color: "64748B" })],
       alignment: AlignmentType.CENTER,
       spacing: { after: 300 },
     }),
@@ -1838,7 +1850,8 @@ const addCoverSlide = (
   week: number,
   year: number,
   subtitle?: string,
-  theme: WeeklyPptxTheme = "light"
+  theme: WeeklyPptxTheme = "light",
+  meetingDate?: string
 ) => {
   const colors = getWeeklyPptxThemeColors(theme)
   const slide = pres.addSlide()
@@ -1874,7 +1887,7 @@ const addCoverSlide = (
   // Block start = bodyCentre - blockH/2 = (0.61 + 6.29/2) - 4.07/2 = 3.755 - 2.035 = 1.72
   const blockStart = 1.72
   const logoW = 4.6
-  const logoH = 1.0
+  const logoH = 1.15
   const logoX = (13.33 - logoW) / 2
   try {
     slide.addImage({
@@ -1952,9 +1965,8 @@ const addCoverSlide = (
     fontFace: "Calibri",
   })
 
-  // Monday date
-  const mondayDate = getWeekMonday(week, year)
-  slide.addText(mondayDate, {
+  const meetingDateLabel = formatExportMeetingDateLabel(week, year, meetingDate)
+  slide.addText(meetingDateLabel, {
     x: 0.5,
     y: titleStart + 2.15,
     w: 12.33,
@@ -2475,7 +2487,7 @@ const addWeeklyHeaderAndFooter = (
       x: 11.45,
       y: 0.14,
       w: 1.7,
-      h: 0.37,
+      h: 0.45,
     })
   } catch {
     /* skip */
@@ -2896,7 +2908,7 @@ export const exportToPPTX = async (
   pres.layout = "LAYOUT_WIDE"
 
   // Slide 1 — Cover
-  const coverSlide = addCoverSlide(pres, report.week_number, report.year, report.department, theme)
+  const coverSlide = addCoverSlide(pres, report.week_number, report.year, report.department, theme, meetingDate)
   applyWeeklySlideTransition(coverSlide)
 
   if (mode === "compact") {
@@ -2945,7 +2957,7 @@ export const exportAllToPPTX = async (
   const departments = sortedReports.map((entry) => entry.department)
 
   // Slide 1 — Cover
-  const coverSlide = addCoverSlide(pres, week, year, undefined, theme)
+  const coverSlide = addCoverSlide(pres, week, year, undefined, theme, meetingDate)
   applyWeeklySlideTransition(coverSlide)
 
   let pageCursor = 3

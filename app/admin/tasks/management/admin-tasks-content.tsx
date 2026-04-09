@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { formatName } from "@/lib/utils"
@@ -18,7 +17,6 @@ import { TaskFilterBar } from "@/components/tasks/TaskFilterBar"
 import { TaskWorkflowTabs } from "@/components/tasks/TaskWorkflowTabs"
 import { TaskStatsCards } from "@/components/tasks/TaskStatsCards"
 import { ResponsiveModal } from "@/components/ui/patterns/responsive-modal"
-import { ItemInfoButton } from "@/components/ui/item-info-button"
 import type { Task } from "@/types/task"
 import {
   enrichTaskWithUsers,
@@ -396,56 +394,6 @@ export function AdminTasksContent({
       }
       filtersInCard={false}
     >
-      <Card className="border-dashed">
-        <CardContent className="flex flex-col gap-4 p-5 lg:flex-row lg:items-center lg:justify-between">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <div className="text-sm font-semibold">Task workflow at a glance</div>
-              <ItemInfoButton
-                title="Task workflow guide"
-                summary="Tasks can come from help desk, meetings, projects, or direct assignment, but they should still feel like one flow."
-                details={[
-                  {
-                    label: "How to read this page",
-                    value:
-                      "The main list below is the working source of truth. Use it to search, edit, assign, and complete tasks.",
-                  },
-                  {
-                    label: "Where the other queues went",
-                    value:
-                      "Pending queue, your action queue, and history are still available, but they now live under Workflow Guide so the page stays easier to understand.",
-                  },
-                  {
-                    label: "What the info icon means",
-                    value:
-                      "Use the info icon on any task, help desk ticket, reference, project task, or leave item when you need a quick explanation of what it is and what should happen next.",
-                  },
-                ]}
-              />
-            </div>
-            <p className="text-muted-foreground max-w-3xl text-sm">
-              Keep the main list as the place where work gets done. Open the workflow guide only when you want the queue
-              breakdown or history view.
-            </p>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-3">
-            <div className="rounded-lg border px-4 py-3">
-              <div className="text-muted-foreground text-xs uppercase">Pending Queue</div>
-              <div className="mt-1 text-2xl font-semibold">{allPendingWorkflowTasks.length}</div>
-            </div>
-            <div className="rounded-lg border px-4 py-3">
-              <div className="text-muted-foreground text-xs uppercase">My Action Queue</div>
-              <div className="mt-1 text-2xl font-semibold">{myTaskActionQueue.length}</div>
-            </div>
-            <div className="rounded-lg border px-4 py-3">
-              <div className="text-muted-foreground text-xs uppercase">History</div>
-              <div className="mt-1 text-2xl font-semibold">{taskHistory.length}</div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Tasks List */}
       <TaskListView
         filteredTasks={filteredTasks}
@@ -458,6 +406,7 @@ export function AdminTasksContent({
         searchQuery={searchQuery}
         statusFilter={statusFilter}
         priorityFilter={priorityFilter}
+        showSerialNumber
       />
 
       <ResponsiveModal

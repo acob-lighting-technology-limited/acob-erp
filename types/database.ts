@@ -8,6 +8,7 @@ export type Database = {
           id: string
           employee_number: string | null // Unique employee identifier: ACOB/YEAR/NUMBER
           company_email: string
+          additional_email: string | null
           first_name: string
           last_name: string
           full_name: string | null // NEW: Computed column
@@ -50,6 +51,7 @@ export type Database = {
           id: string
           employee_number?: string | null
           company_email: string
+          additional_email?: string | null
           first_name: string
           last_name: string
           other_names?: string | null
@@ -84,6 +86,7 @@ export type Database = {
         Update: {
           employee_number?: string | null
           company_email?: string
+          additional_email?: string | null
           first_name?: string
           last_name?: string
           other_names?: string | null

@@ -265,7 +265,7 @@ export function AdminHelpDeskContent({ initialTickets, employees, leadDirectory,
             {allPendingTickets.length === 0 ? (
               <EmptyState title="No pending tickets" description="New pending workflow tickets will appear here." />
             ) : (
-              <div className="overflow-x-auto rounded-lg border bg-white">
+              <div className="bg-card overflow-x-auto rounded-lg border">
                 <TicketQueueTable rows={allPendingTickets} includeActions={false} {...sharedTableProps} />
               </div>
             )}
@@ -275,7 +275,7 @@ export function AdminHelpDeskContent({ initialTickets, employees, leadDirectory,
             {myActionQueue.length === 0 ? (
               <EmptyState title="No tickets assigned to you" description="Your actionable queue is currently empty." />
             ) : (
-              <div className="overflow-x-auto rounded-lg border bg-white">
+              <div className="bg-card overflow-x-auto rounded-lg border">
                 <TicketQueueTable rows={myActionQueue} includeActions={true} {...sharedTableProps} />
               </div>
             )}
@@ -288,7 +288,7 @@ export function AdminHelpDeskContent({ initialTickets, employees, leadDirectory,
             {historyTickets.length === 0 ? (
               <EmptyState title="No history tickets" description="Resolved and closed tickets will appear here." />
             ) : (
-              <div className="overflow-x-auto rounded-lg border bg-white">
+              <div className="bg-card overflow-x-auto rounded-lg border">
                 <TicketQueueTable rows={historyTickets} includeActions={false} {...sharedTableProps} />
               </div>
             )}

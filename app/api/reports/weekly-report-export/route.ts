@@ -5,8 +5,7 @@ import {
   buildOfficialReportPdf,
   buildPdfDownloadResponse,
   persistOfficialPdf,
-  resolveOfficialReportExportMeta,
-  tryReadStoredOfficialPdf,
+  tryReadCurrentStoredOfficialPdf,
 } from "@/lib/reports/official-pdf"
 
 const log = logger("api-reports-weekly-report-export")
@@ -31,10 +30,9 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient()
 
     if (persist && reuseStored) {
-      const storedMeta = await resolveOfficialReportExportMeta(supabase, { week, year, type })
-      const storedBytes = await tryReadStoredOfficialPdf(storedMeta.storagePath)
-      if (storedBytes) {
-        return buildPdfDownloadResponse(storedBytes, storedMeta.filename)
+      const storedPdf = await tryReadCurrentStoredOfficialPdf(supabase, { week, year, type })
+      if (storedPdf) {
+        return buildPdfDownloadResponse(storedPdf.bytes, storedPdf.filename)
       }
     }
 

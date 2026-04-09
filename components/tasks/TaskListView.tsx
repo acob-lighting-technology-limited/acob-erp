@@ -32,6 +32,7 @@ interface TaskListViewProps {
   searchQuery: string
   statusFilter: string
   priorityFilter: string
+  showSerialNumber?: boolean
 }
 
 function getStatusColor(status: string) {
@@ -158,6 +159,7 @@ export function TaskListView({
   searchQuery,
   statusFilter,
   priorityFilter,
+  showSerialNumber = false,
 }: TaskListViewProps) {
   if (filteredTasks.length === 0) {
     return (
@@ -184,6 +186,7 @@ export function TaskListView({
           <Table>
             <TableHeader>
               <TableRow>
+                {showSerialNumber ? <TableHead className="w-12">S/N</TableHead> : null}
                 <TableHead className="w-12">#</TableHead>
                 <TableHead>Task</TableHead>
                 <TableHead>Assigned To</TableHead>
@@ -196,6 +199,9 @@ export function TaskListView({
             <TableBody>
               {filteredTasks.map((task, index) => (
                 <TableRow key={task.id}>
+                  {showSerialNumber ? (
+                    <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
+                  ) : null}
                   <TableCell className="text-muted-foreground font-medium">
                     {task.work_item_number || index + 1}
                   </TableCell>

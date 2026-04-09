@@ -144,6 +144,7 @@ export function TicketQueueTable({
       <TableHeader>
         <TableRow>
           <TableHead className="w-12">S/N</TableHead>
+          <TableHead>#</TableHead>
           <TableHead>Ticket</TableHead>
           <TableHead>Department</TableHead>
           <TableHead>Priority</TableHead>
@@ -158,9 +159,9 @@ export function TicketQueueTable({
         {rows.map((ticket, index) => (
           <TableRow key={ticket.id}>
             <TableCell>{index + 1}</TableCell>
+            <TableCell className="text-muted-foreground font-medium">{ticket.ticket_number}</TableCell>
             <TableCell>
-              <div className="font-medium">{ticket.ticket_number}</div>
-              <div className="text-muted-foreground text-xs">{ticket.title}</div>
+              <div className="font-medium">{ticket.title}</div>
               <div className="text-muted-foreground mt-1 text-[11px]">
                 {ticket.request_type} | requester: {ticket.requester_department || "-"} | service:{" "}
                 {ticket.service_department}

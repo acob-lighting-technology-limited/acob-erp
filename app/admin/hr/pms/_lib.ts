@@ -1,0 +1,123 @@
+import { redirect } from "next/navigation"
+import { createClient } from "@/lib/supabase/server"
+import { computeDepartmentPerformanceScore } from "@/lib/performance/scoring"
+
+type AdminProfileRow = {
+  role: string | null
+  department: string | null
+  is_department_lead: boolean | null
+  lead_departments: string[] | null
+}
+
+type DepartmentRow = {
+  name: string
+}
+
+type ScopedProfileRow = {
+  id: string
+  department: string | null
+}
+
+type GoalRow = {
+  user_id: string
+  approval_status: string | null
+  status: string | null
+}
+
+type DepartmentScore = Awaited<ReturnType<typeof computeDepartmentPerformanceScore>>
+
+function round(value: number) {
+  return Math.round(value * 100) / 100
+}
+
+function average(values: number[]) {
+  if (values.length === 0) return 0
+  return round(values.reduce((sum, value) => sum + value, 0) / values.length)
+}
+
+export async function getAdminPmsData() {
+  const supabase = await createClient()
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser()
+
+  if (userError || !user) {
+    redirect("/auth/login")
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role, department, is_department_lead, lead_departments")
+    .eq("id", user.id)
+    .maybeSingle<AdminProfileRow>()
+
+  const role = String(profile?.role || "").toLowerCase()
+  const isAdminLike = ["developer", "admin", "super_admin"].includes(role)
+
+  let departments: string[] = []
+
+  if (isAdminLike) {
+    const { data: allDepartments } = await supabase
+      .from("departments")
+      .select("name")
+      .order("name", { ascending: true })
+      .returns<DepartmentRow[]>()
+    departments = (allDepartments || []).map((row) => row.name).filter(Boolean)
+  } else {
+    departments = Array.from(
+      new Set([profile?.department, ...(profile?.lead_departments || [])].filter(Boolean) as string[])
+    )
+  }
+
+  const { data: scopedProfiles } =
+    departments.length > 0
+      ? await supabase
+          .from("profiles")
+          .select("id, department")
+          .in("department", departments)
+          .returns<ScopedProfileRow[]>()
+      : { data: [] as ScopedProfileRow[] }
+
+  const scopedUsers = scopedProfiles || []
+  const scopedUserIds = scopedUsers.map((row) => row.id)
+  const departmentByUserId = new Map(scopedUsers.map((row) => [row.id, row.department || "Unassigned"]))
+
+  const { data: goalRows } =
+    scopedUserIds.length > 0
+      ? await supabase
+          .from("goals_objectives")
+          .select("user_id, approval_status, status")
+          .in("user_id", scopedUserIds)
+          .returns<GoalRow[]>()
+      : { data: [] as GoalRow[] }
+
+  const departmentScores: DepartmentScore[] = await Promise.all(
+    departments.map((department) => computeDepartmentPerformanceScore(supabase, { department }))
+  )
+
+  const goalBreakdown = departments.map((department) => {
+    const rows = (goalRows || []).filter((row) => departmentByUserId.get(row.user_id) === department)
+    return {
+      department,
+      total: rows.length,
+      approved: rows.filter((row) => row.approval_status === "approved").length,
+      completed: rows.filter((row) => row.status === "completed").length,
+    }
+  })
+
+  return {
+    departments,
+    scopedUserCount: scopedUserIds.length,
+    departmentScores,
+    goalBreakdown,
+    summary: {
+      overallPms: average(departmentScores.map((entry) => entry.department_pms)),
+      overallKpi: average(departmentScores.map((entry) => entry.department_kpi)),
+      attendance: average(departmentScores.map((entry) => entry.breakdown.attendance_compliance_score)),
+      cbt: average(departmentScores.map((entry) => entry.breakdown.learning_capability_score)),
+      behaviour: average(departmentScores.map((entry) => entry.breakdown.behaviour_leadership_score)),
+      approvedGoals: goalBreakdown.reduce((sum, item) => sum + item.approved, 0),
+    },
+  }
+}

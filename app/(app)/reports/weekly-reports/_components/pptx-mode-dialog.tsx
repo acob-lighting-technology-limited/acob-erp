@@ -36,13 +36,11 @@ export function PptxModeDialog({ isOpen, onOpenChange, onExport, showOrderStep =
       setStep(3)
     } else {
       onExport(mode, t, "default")
-      setStep(1)
     }
   }
 
   const handleOrderSelect = (order: WeeklyDeptOrder) => {
     onExport(mode, theme, order)
-    setStep(1)
   }
 
   const totalSteps = showOrderStep ? 3 : 2

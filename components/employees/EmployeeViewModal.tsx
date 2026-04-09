@@ -854,8 +854,8 @@ export function EmployeeViewModal({
                               id="edit_company_email"
                               type="email"
                               value={editForm.company_email}
-                              readOnly
-                              disabled
+                              onChange={(e) => setEditForm({ ...editForm, company_email: e.target.value })}
+                              disabled={!canManageUsers}
                               placeholder="email@company.com"
                             />
                           </div>

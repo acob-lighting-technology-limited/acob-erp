@@ -35,7 +35,26 @@ export async function GET(request: NextRequest) {
 
     const score = await computeIndividualPerformanceScore(supabase, { userId: targetUserId, cycleId })
 
-    return NextResponse.json({ data: score })
+    let latestReviewQuery = supabase
+      .from("performance_reviews")
+      .select("id, behaviour_score, behaviour_competencies, strengths, areas_for_improvement, manager_comments")
+      .eq("user_id", targetUserId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+
+    if (cycleId) {
+      latestReviewQuery = latestReviewQuery.eq("review_cycle_id", cycleId)
+    }
+
+    const { data: latestReviewRows } = await latestReviewQuery
+    const latestReview = latestReviewRows?.[0] ?? null
+
+    return NextResponse.json({
+      data: {
+        ...score,
+        existing_review: latestReview,
+      },
+    })
   } catch (error) {
     log.error({ err: String(error) }, "Unhandled error in GET /api/hr/performance/score")
     return NextResponse.json({ error: "An error occurred" }, { status: 500 })

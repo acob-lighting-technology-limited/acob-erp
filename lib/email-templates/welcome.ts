@@ -1,4 +1,5 @@
 import { escapeHtml } from "./utils"
+import { EMAIL_HEADER_LOGO_SRC } from "./email-logo"
 
 const ICT_SUPPORT_EMAIL = process.env.ICT_SUPPORT_EMAIL || "ict@acoblighting.com"
 
@@ -65,7 +66,7 @@ export function renderWelcomeEmail({ pendingUser, tempPassword, portalUrl }: Wel
 <body>
     <div class="email-shell">
     <div class="outer-header" style="background-color:#0f2d1f;">
-        <img src="https://erp.acoblighting.com/images/acob-logo-dark.png" alt="ACOB Lighting" height="40">
+        <img src="${EMAIL_HEADER_LOGO_SRC}" alt="ACOB Lighting" height="65">
     </div>
     <div class="wrapper">
         <div class="title">Welcome to the Team</div>
