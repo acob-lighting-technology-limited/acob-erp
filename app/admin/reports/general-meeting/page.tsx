@@ -5,6 +5,7 @@ import { ClipboardList, FileText, ChevronRight, Presentation, Users } from "luci
 import { PageWrapper, PageHeader } from "@/components/layout"
 import { PageSection } from "@/components/ui/patterns"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { WeekSetupCard } from "./_components/week-setup-card"
 
 export default function AdminGeneralMeetingReportsPage() {
   const reportCards = [
@@ -52,6 +53,8 @@ export default function AdminGeneralMeetingReportsPage() {
       />
 
       <PageSection title="General Meeting" className="space-y-4">
+        <WeekSetupCard />
+
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {reportCards.map((card) => (
             <Link key={card.title} href={card.href} className="group">

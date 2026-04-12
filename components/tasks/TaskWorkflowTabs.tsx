@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Ticket, HeadphonesIcon, FolderKanban } from "lucide-react"
+import { Ticket, HeadphonesIcon } from "lucide-react"
 import type { Task } from "@/types/task"
 
 function getStatusColor(status: string) {
@@ -61,15 +61,6 @@ function getSourceBadge(sourceType?: string) {
           className="gap-1 border-amber-200 text-[10px] text-amber-600 dark:border-amber-800 dark:text-amber-400"
         >
           <Ticket className="h-2.5 w-2.5" /> Action
-        </Badge>
-      )
-    case "project_task":
-      return (
-        <Badge
-          variant="outline"
-          className="gap-1 border-cyan-200 text-[10px] text-cyan-600 dark:border-cyan-800 dark:text-cyan-400"
-        >
-          <FolderKanban className="h-2.5 w-2.5" /> Project
         </Badge>
       )
     default:

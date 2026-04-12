@@ -2,7 +2,7 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
-import { AdminTasksContent, type employee, type Project, type UserProfile } from "./management/admin-tasks-content"
+import { AdminTasksContent, type employee, type UserProfile } from "./management/admin-tasks-content"
 import type { Task } from "@/types/task"
 import { listAssignableProfiles } from "@/lib/workforce/assignment-policy"
 import { hasGlobalTaskAssignmentAuthority } from "@/lib/tasks/assignment-scope"
@@ -11,16 +11,16 @@ import { logger } from "@/lib/logger"
 
 const log = logger("tasks")
 
-type TaskAssignmentRow = {
-  task_id: string
-  user_id: string
-}
-
 type ProfileDepartmentRow = {
   id: string
   first_name: string
   last_name: string
   department: string | null
+}
+
+type GoalFilterOption = {
+  id: string
+  title: string
 }
 
 async function getAdminTasksData() {
@@ -66,7 +66,7 @@ async function getAdminTasksData() {
     .order("created_at", { ascending: false })
 
   // Fetch employee - leads can only see employee in their departments
-  const [tasksResult, employeeResult, projectsResult] = await Promise.all([
+  const [tasksResult, employeeResult] = await Promise.all([
     tasksQuery,
     listAssignableProfiles(dataClient, {
       select:
@@ -74,16 +74,13 @@ async function getAdminTasksData() {
       departmentScope,
       allowLegacyNullStatus: false,
     }),
-    dataClient.from("projects").select("id, project_name").order("project_name", { ascending: true }),
   ])
 
-  if (tasksResult.error || employeeResult.error || projectsResult.error) {
-    log.error("Error loading data:", tasksResult.error || employeeResult.error || projectsResult.error)
-    return { tasks: [], employee: [], projects: [], departments: [], userProfile }
+  if (tasksResult.error || employeeResult.error) {
+    log.error("Error loading data:", tasksResult.error || employeeResult.error)
+    return { tasks: [], employee: [], departments: [], userProfile }
   }
 
-  // 1. Collect all IDs for batch queries
-  const allTaskIds = ((tasksResult.data as Task[] | null) || []).map((t) => t.id)
   const allIndivUserIds = Array.from(
     new Set(
       ((tasksResult.data as Task[] | null) || [])
@@ -99,46 +96,6 @@ async function getAdminTasksData() {
       : { data: [] }
   const indivProfileMap = new Map(((indivProfiles as ProfileDepartmentRow[] | null) || []).map((p) => [p.id, p]))
 
-  // 3. Fetch task assignments for multiple tasks
-  const multTaskIds =
-    ((tasksResult.data as Task[] | null) || []).filter((t) => t.assignment_type === "multiple").map((t) => t.id) || []
-  const { data: allTaskAssignments } =
-    multTaskIds.length > 0
-      ? await dataClient.from("task_assignments").select("task_id, user_id").in("task_id", multTaskIds)
-      : { data: [] }
-
-  // 4. Fetch profiles for multiple assigned users
-  const multUserIds = Array.from(
-    new Set(((allTaskAssignments as TaskAssignmentRow[] | null) || []).map((a) => a.user_id))
-  )
-  const { data: multProfiles } =
-    multUserIds.length > 0
-      ? await dataClient.from("profiles").select("id, first_name, last_name, department").in("id", multUserIds)
-      : { data: [] }
-  const multProfileMap = new Map(((multProfiles as ProfileDepartmentRow[] | null) || []).map((p) => [p.id, p]))
-
-  // 5. Fetch all completions
-  const { data: allCompletions } =
-    allTaskIds.length > 0
-      ? await dataClient.from("task_user_completion").select("task_id, user_id").in("task_id", allTaskIds)
-      : { data: [] }
-
-  // Grouping logic
-  const assignmentsByTask = new Map<string, string[]>()
-  allTaskAssignments?.forEach((a) => {
-    const existingAssignments = assignmentsByTask.get(a.task_id) || []
-    existingAssignments.push(a.user_id)
-    assignmentsByTask.set(a.task_id, existingAssignments)
-  })
-
-  const completionsByTask = new Map<string, Set<string>>()
-  allCompletions?.forEach((c) => {
-    const existingCompletions = completionsByTask.get(c.task_id) || new Set<string>()
-    existingCompletions.add(c.user_id)
-    completionsByTask.set(c.task_id, existingCompletions)
-  })
-
-  // 6. Reconstruct tasksWithUsers
   const tasksWithUsers = ((tasksResult.data as Task[] | null) || []).map((task) => {
     const taskData: Task = { ...task }
 
@@ -152,21 +109,6 @@ async function getAdminTasksData() {
         : undefined
     }
 
-    if (task.assignment_type === "multiple") {
-      const userIds = assignmentsByTask.get(task.id) || []
-      const taskComps = completionsByTask.get(task.id) || new Set()
-      const assignedUsers: NonNullable<Task["assigned_users"]> = []
-      for (const uid of userIds) {
-        const prof = multProfileMap.get(uid)
-        if (!prof) continue
-        assignedUsers.push({
-          ...prof,
-          department: prof.department || "",
-          completed: taskComps.has(uid),
-        })
-      }
-      taskData.assigned_users = assignedUsers
-    }
     return taskData
   }) as Task[]
 
@@ -179,9 +121,6 @@ async function getAdminTasksData() {
       }
       if (task.assigned_to_user?.department && departmentScope.includes(task.assigned_to_user.department)) {
         return true
-      }
-      if (task.assigned_users && task.assigned_users.length > 0) {
-        return task.assigned_users.some((u) => u.department && departmentScope.includes(u.department))
       }
       return false
     })
@@ -198,16 +137,26 @@ async function getAdminTasksData() {
     departments.sort()
   }
 
+  const goalIds = Array.from(new Set(filteredTasks.map((task) => task.goal_id).filter(Boolean))) as string[]
+  const { data: goalRows } =
+    goalIds.length > 0
+      ? await dataClient
+          .from("goals_objectives")
+          .select("id, title")
+          .in("id", goalIds)
+          .order("title", { ascending: true })
+      : { data: [] as GoalFilterOption[] }
+
   return {
     tasks: filteredTasks as Task[],
     employee: (employeeResult.data || []) as employee[],
-    projects: (projectsResult.data || []) as Project[],
     departments,
+    goals: (goalRows || []) as GoalFilterOption[],
     userProfile,
   }
 }
 
-export default async function AdminTasksPage() {
+export default async function AdminTasksPage({ searchParams }: { searchParams?: { goal_id?: string } }) {
   const data = await getAdminTasksData()
 
   if ("redirect" in data && data.redirect) {
@@ -217,8 +166,8 @@ export default async function AdminTasksPage() {
   const pageData = data as {
     tasks: Task[]
     employee: employee[]
-    projects: Project[]
     departments: string[]
+    goals: GoalFilterOption[]
     userProfile: UserProfile
   }
 
@@ -226,9 +175,10 @@ export default async function AdminTasksPage() {
     <AdminTasksContent
       initialTasks={pageData.tasks}
       initialemployee={pageData.employee}
-      initialProjects={pageData.projects}
       initialDepartments={pageData.departments}
+      initialGoals={pageData.goals}
       userProfile={pageData.userProfile}
+      initialGoalId={searchParams?.goal_id || ""}
     />
   )
 }

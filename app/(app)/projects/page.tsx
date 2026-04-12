@@ -1,10 +1,29 @@
-import { redirect } from "next/navigation"
-import { createClient } from "@/lib/supabase/server"
-import { ProjectsContent } from "./projects-content"
+import Link from "next/link"
+import { FolderKanban, Goal, Headset, ClipboardList } from "lucide-react"
+import { PageHeader, PageWrapper, Section } from "@/components/layout"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 
-import { logger } from "@/lib/logger"
-
-const log = logger("projects")
+const nextSteps = [
+  {
+    title: "Department Goals",
+    href: "/goals",
+    icon: Goal,
+    description: "Goals are now the planning layer for each department. Leads create yearly goals there.",
+  },
+  {
+    title: "Tasks",
+    href: "/tasks",
+    icon: ClipboardList,
+    description: "Tasks now sit directly under approved goals and are assigned to one person or the department queue.",
+  },
+  {
+    title: "Help Desk",
+    href: "/help-desk",
+    icon: Headset,
+    description: "Help desk work now links back into goals before execution so KPI tracking stays aligned.",
+  },
+]
 
 export interface Project {
   id: string
@@ -27,94 +46,54 @@ export interface Project {
   }
 }
 
-async function getProjectsData() {
-  const supabase = await createClient()
+export default function ProjectsPage() {
+  return (
+    <PageWrapper maxWidth="full" background="gradient">
+      <PageHeader
+        title="Projects Deprecated"
+        description="Project workflows have been retired from the active PMS flow. Use goals, tasks, and help desk instead."
+        icon={FolderKanban}
+        backLink={{ href: "/profile", label: "Back to Dashboard" }}
+      />
 
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser()
+      <Section
+        title="What Changed"
+        description="The new workflow starts with department goals, then moves into individual or department tasks."
+      >
+        <Card>
+          <CardContent className="space-y-3 pt-6 text-sm">
+            <p>
+              Department leads now create yearly goals for their departments. Personal standalone goals and
+              project-driven work planning are no longer the main workflow.
+            </p>
+            <p>
+              Tasks are created under those goals and assigned either to one person or to the department queue. Help
+              desk items must also link to a goal before work starts.
+            </p>
+          </CardContent>
+        </Card>
+      </Section>
 
-  if (userError || !user) {
-    return { redirect: "/auth/login" as const }
-  }
-
-  const { data: memberProjects, error: memberError } = await supabase
-    .from("project_members")
-    .select("project_id")
-    .eq("user_id", user.id)
-    .eq("is_active", true)
-
-  if (memberError) {
-    log.error("Error loading member projects:", memberError)
-  }
-
-  const memberProjectIds = memberProjects?.map((member) => member.project_id) || []
-
-  const { data: ownedProjects, error: ownedProjectsError } = await supabase
-    .from("projects")
-    .select("id")
-    .or(`project_manager_id.eq.${user.id},created_by.eq.${user.id}`)
-
-  if (ownedProjectsError) {
-    log.error("Error loading owned projects:", ownedProjectsError)
-  }
-
-  const accessibleProjectIds = Array.from(
-    new Set([...(memberProjectIds || []), ...((ownedProjects || []).map((project) => project.id) || [])])
+      <Section title="Use These Instead" description="These routes replace the old project flow.">
+        <div className="grid gap-3 md:grid-cols-3">
+          {nextSteps.map((item) => (
+            <Card key={item.href}>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <item.icon className="text-primary h-5 w-5" />
+                  {item.title}
+                </CardTitle>
+                <CardDescription>{item.description}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Link href={item.href}>
+                  <Button className="w-full">Open {item.title}</Button>
+                </Link>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </Section>
+    </PageWrapper>
   )
-
-  if (accessibleProjectIds.length === 0) {
-    return {
-      projects: [],
-    }
-  }
-
-  const { data, error } = await supabase
-    .from("projects")
-    .select(
-      `
-      id,
-      project_name,
-      location,
-      deployment_start_date,
-      deployment_end_date,
-      capacity_w,
-      technology_type,
-      description,
-      status,
-      created_at,
-      project_manager:profiles!projects_project_manager_id_fkey (
-        first_name,
-        last_name
-      ),
-      created_by_user:profiles!projects_created_by_fkey (
-        first_name,
-        last_name
-      )
-    `
-    )
-    .in("id", accessibleProjectIds)
-    .order("created_at", { ascending: false })
-    .returns<Project[]>()
-
-  if (error) {
-    log.error("Error loading projects:", error)
-  }
-
-  return {
-    projects: data || [],
-  }
-}
-
-export default async function ProjectsPage() {
-  const data = await getProjectsData()
-
-  if ("redirect" in data && data.redirect) {
-    redirect(data.redirect)
-  }
-
-  const projectsData = data as Exclude<Awaited<ReturnType<typeof getProjectsData>>, { redirect: "/auth/login" }>
-
-  return <ProjectsContent initialProjects={projectsData.projects} />
 }

@@ -33,7 +33,7 @@ export default async function SignaturePage({ searchParams }: { searchParams: { 
         icon={FileSignature}
         backLink={{ href: "/tools", label: "Back to Tools" }}
       />
-      <SignatureCreator profile={profile} />
+      <SignatureCreator profile={profile} authEmail={data.user.email} />
     </PageWrapper>
   )
 }

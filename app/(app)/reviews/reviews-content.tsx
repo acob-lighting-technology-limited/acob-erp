@@ -29,6 +29,7 @@ export function ReviewsContent({ initialReviews, currentUserId }: ReviewsContent
   const [employeeComments, setEmployeeComments] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [expandedQuarters, setExpandedQuarters] = useState<Record<string, boolean>>({})
+  const [cycleFilter, setCycleFilter] = useState("all")
 
   function renderStars(rating: number) {
     return (
@@ -115,13 +116,20 @@ export function ReviewsContent({ initialReviews, currentUserId }: ReviewsContent
       existing.push(review)
       grouped.set(label, existing)
     }
-    return Array.from(grouped.entries()).map(([quarter, quarterReviews]) => ({
-      quarter,
-      reviews: quarterReviews.sort(
-        (left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime()
-      ),
-    }))
-  }, [visibleReviews])
+    return Array.from(grouped.entries())
+      .map(([quarter, quarterReviews]) => ({
+        quarter,
+        reviews: quarterReviews.sort(
+          (left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime()
+        ),
+      }))
+      .filter((group) => cycleFilter === "all" || group.quarter === cycleFilter)
+  }, [cycleFilter, visibleReviews])
+
+  const cycleOptions = useMemo(
+    () => Array.from(new Set(visibleReviews.map((review) => getQuarterLabel(review)))).sort(),
+    [visibleReviews]
+  )
 
   function toggleQuarter(quarter: string) {
     setExpandedQuarters((current) => ({
@@ -181,6 +189,28 @@ export function ReviewsContent({ initialReviews, currentUserId }: ReviewsContent
         </div>
       </div>
 
+      <Card className="mb-6 border-2">
+        <CardContent className="p-3 sm:p-6">
+          <div className="flex flex-col gap-4 md:flex-row">
+            <div className="flex-1" />
+            <div className="w-full md:w-64">
+              <select
+                value={cycleFilter}
+                onChange={(event) => setCycleFilter(event.target.value)}
+                className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex h-10 w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+              >
+                <option value="all">All Cycles</option>
+                {cycleOptions.map((cycle) => (
+                  <option key={cycle} value={cycle}>
+                    {cycle}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Summary */}
       <div className="mb-6 grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 md:gap-4">
         <Card>
@@ -234,7 +264,7 @@ export function ReviewsContent({ initialReviews, currentUserId }: ReviewsContent
           <CardContent>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[900px] text-sm">
-                <thead>
+                <thead className="bg-emerald-50 dark:bg-emerald-950/30">
                   <tr className="border-b text-left">
                     <th className="px-3 py-2 font-medium">Quarter</th>
                     <th className="px-3 py-2 font-medium">Reviewed By</th>

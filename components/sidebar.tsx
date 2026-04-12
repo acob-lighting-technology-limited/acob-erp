@@ -15,7 +15,6 @@ import {
   CreditCard,
   FileBarChart,
   FileText,
-  FolderKanban,
   LayoutDashboard,
   LogOut,
   MessageSquare,
@@ -46,6 +45,7 @@ interface SidebarProps {
     last_name?: string
     department?: string
     role?: UserRole
+    is_department_lead?: boolean
     lead_departments?: string[]
   }
   canAccessAdmin?: boolean
@@ -55,7 +55,6 @@ const navigation = [
   { name: "Home", href: "/profile", icon: LayoutDashboard },
   { name: "Notifications", href: "/notifications", icon: Bell },
   { name: "My Work", href: "/work", icon: Briefcase },
-  { name: "Projects", href: "/projects", icon: FolderKanban },
   { name: "Tasks", href: "/tasks", icon: ClipboardList },
   { name: "Help Desk", href: "/help-desk", icon: ClipboardList },
   { name: "Reports", href: "/reports", icon: FileBarChart },
@@ -128,7 +127,9 @@ export function Sidebar({ user, profile, canAccessAdmin }: SidebarProps) {
     return pathname === href || pathname.startsWith(`${href}/`)
   }
 
-  const isLead = Boolean(profile?.lead_departments && profile.lead_departments.length > 0)
+  const isLead = Boolean(
+    profile?.is_department_lead || (profile?.lead_departments && profile.lead_departments.length > 0)
+  )
 
   const sidebarJSX = (
     <>

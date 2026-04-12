@@ -42,10 +42,6 @@ const OFFICE_TYPE_OPTIONS = [
   { value: "common_area", label: "Common Area" },
 ]
 
-function getOfficeTypeLabel(type: string): string {
-  return OFFICE_TYPE_OPTIONS.find((o) => o.value === type)?.label ?? type
-}
-
 interface OfficeLocation {
   id: string
   name: string
@@ -383,12 +379,12 @@ export default function OfficeLocationsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-12">#</TableHead>
                   <TableHead className="w-14"></TableHead>
+                  <TableHead className="w-12">#</TableHead>
                   <TableHead>Name</TableHead>
-                  <TableHead>Type</TableHead>
+                  <TableHead>Linked Dept</TableHead>
+                  <TableHead>Employee Count</TableHead>
                   <TableHead>Description</TableHead>
-                  <TableHead>Employees</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -407,7 +403,6 @@ export default function OfficeLocationsPage() {
                         )}
                         onClick={() => toggleLocationRow(loc.id)}
                       >
-                        <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
                         <TableCell>
                           <Button
                             variant="ghost"
@@ -422,17 +417,24 @@ export default function OfficeLocationsPage() {
                             {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                           </Button>
                         </TableCell>
-                        <TableCell className="font-medium">{loc.name}</TableCell>
+                        <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
                         <TableCell>
-                          <Badge variant="outline" className="text-xs">
-                            {getOfficeTypeLabel(loc.type)}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground max-w-xs truncate">
-                          {loc.description || "—"}
+                          <div className="font-medium">{loc.name}</div>
                         </TableCell>
                         <TableCell>
-                          <Badge variant="secondary">{loc.employee_count} employees</Badge>
+                          <div className="flex flex-wrap gap-1">
+                            {loc.department ? (
+                              <Badge variant="secondary">{loc.department}</Badge>
+                            ) : (
+                              <span className="text-muted-foreground text-sm">-</span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary">{loc.employee_count || 0} employees</Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground max-w-xs truncate text-sm">
+                          {loc.description || "No description added"}
                         </TableCell>
                         <TableCell>
                           <Badge variant={loc.is_active ? "default" : "secondary"}>
@@ -458,13 +460,13 @@ export default function OfficeLocationsPage() {
 
                       {isExpanded && (
                         <TableRow className="bg-muted/10 hover:bg-muted/10 border-t-0">
-                          <TableCell colSpan={8} className="p-0">
-                            {members.length === 0 ? (
-                              <p className="text-muted-foreground px-6 py-3 text-sm">
-                                No employees assigned to this location.
-                              </p>
-                            ) : (
-                              <div className="animate-in slide-in-from-top-2 p-6 pt-2 duration-200">
+                          <TableCell colSpan={6} className="p-0">
+                            <div className="animate-in slide-in-from-top-2 p-6 pt-2 duration-200">
+                              {members.length === 0 ? (
+                                <p className="text-muted-foreground px-1 py-1 text-sm">
+                                  No employees assigned to this location.
+                                </p>
+                              ) : (
                                 <div className="bg-background overflow-hidden rounded-lg border shadow-sm">
                                   <Table>
                                     <TableHeader className="bg-muted/30">
@@ -527,8 +529,8 @@ export default function OfficeLocationsPage() {
                                     </TableBody>
                                   </Table>
                                 </div>
-                              </div>
-                            )}
+                              )}
+                            </div>
                           </TableCell>
                         </TableRow>
                       )}

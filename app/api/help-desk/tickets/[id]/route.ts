@@ -146,6 +146,29 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
         )
       }
 
+      if (["in_progress", "resolved", "closed"].includes(nextStatus)) {
+        const taskId = String(ticket.task_id || "")
+        if (!taskId) {
+          return NextResponse.json(
+            { error: "This help desk item must be linked to a task before work can continue" },
+            { status: 400 }
+          )
+        }
+
+        const { data: linkedTask } = await supabase
+          .from("tasks")
+          .select("id, goal_id")
+          .eq("id", taskId)
+          .maybeSingle<{ id: string; goal_id?: string | null }>()
+
+        if (!linkedTask?.goal_id) {
+          return NextResponse.json(
+            { error: "Link this help desk task to a department goal before starting or resolving it" },
+            { status: 400 }
+          )
+        }
+      }
+
       updates.status = nextStatus
       if (nextStatus === "in_progress" && !ticket.started_at) {
         updates.started_at = new Date().toISOString()

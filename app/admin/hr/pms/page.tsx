@@ -1,5 +1,18 @@
 import Link from "next/link"
-import { Award, Brain, CheckCircle2, Clock3, FileText, ShieldCheck, Target, Users } from "lucide-react"
+import {
+  Award,
+  BookOpen,
+  Brain,
+  CheckCircle2,
+  Clock3,
+  FileText,
+  MessageSquare,
+  RefreshCw,
+  Settings,
+  ShieldCheck,
+  Target,
+  Users,
+} from "lucide-react"
 import { PageHeader, PageWrapper, Section } from "@/components/layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -43,7 +56,41 @@ const adminPmsLinks = [
     icon: FileText,
     description: "Create and manage reviews from the PMS area.",
   },
+  {
+    title: "Peer Feedback",
+    href: "/admin/hr/pms/peer-feedback",
+    icon: MessageSquare,
+    description: "View all peer feedback submissions across departments.",
+  },
+  {
+    title: "Review Cycles",
+    href: "/admin/hr/pms/cycles",
+    icon: RefreshCw,
+    description: "Create and manage performance review cycles.",
+  },
+  {
+    title: "Analytics",
+    href: "/admin/hr/pms/analytics",
+    icon: Settings,
+    description: "Performance distribution, trends, and calibration data.",
+  },
+  {
+    title: "Development Plans",
+    href: "/admin/hr/pms/development-plans",
+    icon: BookOpen,
+    description: "Create and track employee development plans linked to reviews.",
+  },
+  {
+    title: "Competencies",
+    href: "/admin/hr/pms/competencies",
+    icon: ShieldCheck,
+    description: "Manage behaviour competency keys used in performance reviews.",
+  },
 ]
+
+function formatPercent(value: number | null | undefined) {
+  return typeof value === "number" && Number.isFinite(value) ? `${value}%` : "-"
+}
 
 export default async function AdminPmsPage() {
   const { departments, scopedUserCount, summary } = await getAdminPmsData()
@@ -65,11 +112,21 @@ export default async function AdminPmsPage() {
           icon={Users}
           description="People covered by this PMS view"
         />
-        <StatCard title="Avg PMS" value={`${summary.overallPms}%`} icon={Award} description="Average department PMS" />
-        <StatCard title="Avg KPI" value={`${summary.overallKpi}%`} icon={Target} description="Average department KPI" />
+        <StatCard
+          title="Avg PMS"
+          value={formatPercent(summary.overallPms)}
+          icon={Award}
+          description="Average department PMS"
+        />
+        <StatCard
+          title="Avg KPI"
+          value={formatPercent(summary.overallKpi)}
+          icon={Target}
+          description="Average department KPI"
+        />
         <StatCard
           title="Avg Attendance"
-          value={`${summary.attendance}%`}
+          value={formatPercent(summary.attendance)}
           icon={Clock3}
           description="Attendance compliance"
         />

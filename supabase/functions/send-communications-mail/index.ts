@@ -107,9 +107,9 @@ function buildAdminBroadcastHtml(
     "</head>" +
     "<body>" +
     '<div class="email-shell">' +
-    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#0f2d1f" style="background:#0f2d1f !important;background-color:#0f2d1f !important;border-bottom:3px solid #16a34a;">' +
-    '<tr><td align="center" style="padding:20px 0;background:#0f2d1f !important;background-color:#0f2d1f !important;">' +
-    '<img src="https://erp.acoblighting.com/images/acob-logo-dark.png" height="40" alt="ACOB Lighting">' +
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#000000" style="background:#000000 !important;background-color:#000000 !important;border-top:3px solid #16a34a;border-bottom:3px solid #16a34a;">' +
+    '<tr><td align="center" style="padding:20px 0;background:#000000 !important;background-color:#000000 !important;">' +
+    '<img src="https://erp.acoblighting.com/images/acob-logo-dark.png" height="65" alt="ACOB Lighting">' +
     "</td></tr></table>" +
     '<div class="wrapper">' +
     '<div class="title">' +
@@ -119,9 +119,9 @@ function buildAdminBroadcastHtml(
     bodyHtml +
     "</div>" +
     "</div>" +
-    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#0f2d1f" style="background:#0f2d1f !important;background-color:#0f2d1f !important;border-top:3px solid #16a34a;">' +
-    '<tr><td align="center" style="padding:20px;background:#0f2d1f !important;background-color:#0f2d1f !important;font-size:11px;color:#9ca3af;">' +
-    '<span style="color:#d1d5db;">Prepared by ' +
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#000000" style="background:#000000 !important;background-color:#000000 !important;border-top:3px solid #16a34a;border-bottom:3px solid #16a34a;">' +
+    '<tr><td align="center" style="padding:20px;background:#000000 !important;background-color:#000000 !important;font-size:11px;color:#d1d5db;">' +
+    '<span style="color:#f3f4f6;">Prepared by ' +
     safePreparedBy +
     "</span><br>" +
     (safeDesignation ? safeDesignation + "<br>" : "") +

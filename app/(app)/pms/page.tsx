@@ -1,5 +1,15 @@
 import Link from "next/link"
-import { Award, Brain, CheckCircle2, Clock3, ShieldCheck, Target, TrendingUp } from "lucide-react"
+import {
+  Award,
+  BookOpen,
+  Brain,
+  CheckCircle2,
+  Clock3,
+  MessageSquare,
+  ShieldCheck,
+  Target,
+  TrendingUp,
+} from "lucide-react"
 import { PageHeader, PageWrapper, Section } from "@/components/layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -27,7 +37,7 @@ const pmsLinks = [
   },
   {
     title: "CBT",
-    description: "Check CBT scoring as learning records start flowing into PMS.",
+    description: "View your CBT scores by quarter from PMS.",
     href: "/pms/cbt",
     icon: Brain,
   },
@@ -43,7 +53,23 @@ const pmsLinks = [
     href: "/pms/reviews",
     icon: TrendingUp,
   },
+  {
+    title: "Peer Feedback",
+    description: "Submit peer feedback for colleagues and view scores you've received.",
+    href: "/pms/peer-feedback",
+    icon: MessageSquare,
+  },
+  {
+    title: "Development Plans",
+    description: "View and track your personal development goals and action steps.",
+    href: "/pms/development-plans",
+    icon: BookOpen,
+  },
 ]
+
+function formatPercent(value: number | null | undefined) {
+  return typeof value === "number" && Number.isFinite(value) ? `${value}%` : "-"
+}
 
 export default async function PmsPage() {
   const { profile, score, goalSummary, attendance, latestReview } = await getCurrentUserPmsData()
@@ -59,23 +85,28 @@ export default async function PmsPage() {
       />
 
       <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-6">
-        <StatCard title="Overall PMS" value={`${score.final_score}%`} icon={Award} description="Live overall score" />
+        <StatCard
+          title="Overall PMS"
+          value={formatPercent(score.final_score)}
+          icon={Award}
+          description="Live overall score"
+        />
         <StatCard
           title="KPI"
-          value={`${score.kpi_score}%`}
+          value={formatPercent(score.kpi_score)}
           icon={Target}
           description={`${goalSummary.approved} approved goals`}
         />
         <StatCard
           title="Attendance"
-          value={`${score.attendance_score}%`}
+          value={formatPercent(score.attendance_score)}
           icon={Clock3}
           description={`${attendance.presentDays}/${attendance.trackedDays || 0} recent days positive`}
         />
-        <StatCard title="CBT" value={`${score.cbt_score}%`} icon={Brain} description="Learning score in PMS" />
+        <StatCard title="CBT" value={formatPercent(score.cbt_score)} icon={Brain} description="Learning score in PMS" />
         <StatCard
           title="Behaviour"
-          value={`${score.behaviour_score}%`}
+          value={formatPercent(score.behaviour_score)}
           icon={ShieldCheck}
           description="Manager and peer feedback blend"
         />
@@ -125,7 +156,8 @@ export default async function PmsPage() {
               workdays, while behaviour comes from review feedback already in the ERP.
             </p>
             <p>
-              CBT is already wired into PMS, and it will become more meaningful as dedicated learning records are added.
+              CBT scores appear here inside PMS, while the live objective test itself runs separately on the standalone
+              /cbt page.
             </p>
           </CardContent>
         </Card>

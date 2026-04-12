@@ -7,7 +7,9 @@ import { compareDepartments, normalizeDepartmentName } from "../../../shared/dep
 import {
   buildMeetingDocumentFileName,
   formatMeetingDateLabel,
+  getAnchorDay,
   getCurrentOfficeWeek,
+  initOfficeYearAnchors,
   resolveEffectiveMeetingDateIso,
 } from "../_shared/meeting-date.ts"
 import { isEdgeSystemEmailEnabled } from "../_shared/notification-gateway.ts"
@@ -30,8 +32,7 @@ const RED = rgb(0.725, 0.11, 0.11)
 const DEFAULT_SENDER_EMAIL = Deno.env.get("NOTIFICATION_SENDER_EMAIL") || "notifications@acoblighting.com"
 const DEFAULT_SENDER = `ACOB Internal Systems <${DEFAULT_SENDER_EMAIL}>`
 const MEETING_DOCS_BUCKET = "meeting_documents"
-const OFFICE_WEEK_ANCHOR_MONTH_INDEX = 0
-const OFFICE_WEEK_ANCHOR_DAY = 12
+// Anchor day is read from _shared/meeting-date.ts (populated by initOfficeYearAnchors).
 
 type AttachmentPayload = {
   filename: string
@@ -62,7 +63,7 @@ type MeetingDocumentRow = {
 }
 
 function getOfficeYearStart(year: number): Date {
-  return new Date(year, OFFICE_WEEK_ANCHOR_MONTH_INDEX, OFFICE_WEEK_ANCHOR_DAY)
+  return new Date(year, 0, getAnchorDay(year))
 }
 
 function getWeeksInOfficeYear(year: number): number {
@@ -780,12 +781,12 @@ function buildEmailHtml(
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { margin: 0; padding: 0; background: #fff; font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif; }
     .email-shell { max-width: 600px; margin: 0 auto; overflow: hidden; }
-    .outer-header { background: #0f2d1f; padding: 20px 0; text-align: center; border-bottom: 3px solid #16a34a; }
+    .outer-header { background: #000; padding: 20px 0; text-align: center; border-top: 3px solid #16a34a; border-bottom: 3px solid #16a34a; }
     .wrapper { max-width: 600px; margin: 0 auto; background: #fff; padding: 32px 28px; }
     .week-badge { display: inline-block; background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; padding: 4px 12px; border-radius: 20px; text-transform: uppercase; margin-bottom: 16px; }
     .title { font-size: 24px; font-weight: 700; color: #111827; margin-bottom: 14px; }
     .text { font-size: 15px; color: #374151; line-height: 1.6; margin: 0 0 18px 0; }
-    .footer { background: #0f2d1f; padding: 20px; text-align: center; font-size: 11px; color: #9ca3af; border-top: 3px solid #16a34a; }
+    .footer { background: #000; padding: 20px; text-align: center; font-size: 11px; color: #d1d5db; border-top: 3px solid #16a34a; border-bottom: 3px solid #16a34a; }
     .footer strong { color: #fff; }
     .footer-system { color: #16a34a; font-weight: 600; }
     .footer-note { color: #9ca3af; font-style: italic; }
@@ -793,8 +794,8 @@ function buildEmailHtml(
 </head>
 <body>
   <div class="email-shell">
-  <div class="outer-header" style="background-color:#0f2d1f;">
-    <img src="https://erp.acoblighting.com/images/acob-logo-dark.png" height="40" alt="ACOB Lighting">
+  <div class="outer-header" style="background-color:#000;">
+    <img src="https://erp.acoblighting.com/images/acob-logo-dark.png" height="65" alt="ACOB Lighting">
   </div>
   <div class="wrapper">
     <span class="week-badge">${weekBadge}</span>
@@ -802,8 +803,8 @@ function buildEmailHtml(
     <p class="text">Dear All,</p>
 ${bodyHtml}
   </div>
-  <div class="footer" style="background-color:#0f2d1f;">
-    <span style="color:#d1d5db;">Prepared by ${safePreparedBy}</span><br>
+  <div class="footer" style="background-color:#000;">
+    <span style="color:#f3f4f6;">Prepared by ${safePreparedBy}</span><br>
     ${safeDesignation ? `${safeDesignation}<br>` : ""}${safeDepartment}<br>
     <strong>ACOB Lighting Technology Limited</strong><br>
     <span class="footer-system">Reports Management System</span>
@@ -824,6 +825,7 @@ serve(async (req) => {
     if (!authHeader) return new Response("Unauthorized", { status: 401 })
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+    await initOfficeYearAnchors(supabase)
     const reportsMailEnabled = await isEdgeSystemEmailEnabled(supabase, "reports")
     if (!reportsMailEnabled) {
       return new Response(JSON.stringify({ success: true, skipped: true, reason: "reports_email_disabled" }), {

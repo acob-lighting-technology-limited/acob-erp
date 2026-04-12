@@ -1,21 +1,15 @@
 import "server-only"
 
-import { execFile } from "node:child_process"
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
-import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { promisify } from "node:util"
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib"
 import type { ActionItem } from "@/lib/export-utils"
-import { generateActionPointsDocxBuffer } from "@/lib/reports/action-points-template"
 import {
   getActionPointsDepartmentHeading,
   getCanonicalDepartmentOrder,
   normalizeDepartmentName,
 } from "@/shared/departments"
+import { readFile } from "node:fs/promises"
 
-const execFileAsync = promisify(execFile)
-const WORD_PDF_FORMAT = 17
 const PAGE_SIZE: [number, number] = [595, 842]
 const PAGE_MARGIN_X = 54
 const PAGE_MARGIN_TOP = 70
@@ -28,10 +22,6 @@ const DATE_FONT_SIZE = 12
 const TEXT_COLOR = rgb(0.16, 0.16, 0.16)
 const LOGO_FILE = join(process.cwd(), "public", "images", "acob-logo-light.png")
 const DEPARTMENT_ORDER = getCanonicalDepartmentOrder().filter((department) => department !== "Executive Management")
-
-const encodePowerShell = (script: string) => Buffer.from(script, "utf16le").toString("base64")
-
-const escapePowerShellPath = (value: string) => value.replace(/'/g, "''")
 
 const wrapText = (text: string, maxWidth: number, font: PDFFontLike, fontSize: number) => {
   const words = String(text || "")
@@ -188,35 +178,6 @@ async function generateHostedSafePdf(actions: ActionItem[], week: number, year: 
   }
 
   return await pdf.save()
-}
-
-async function convertDocxFileToPdf(docxPath: string, pdfPath: string) {
-  if (process.platform !== "win32") {
-    throw new Error("Action Points PDF export requires Windows with Microsoft Word installed")
-  }
-
-  const psScript = `
-$ErrorActionPreference = 'Stop'
-$word = $null
-$document = $null
-try {
-  $word = New-Object -ComObject Word.Application
-  $word.Visible = $false
-  $word.DisplayAlerts = 0
-  $document = $word.Documents.Open('${escapePowerShellPath(docxPath)}')
-  $document.SaveAs('${escapePowerShellPath(pdfPath)}', ${WORD_PDF_FORMAT})
-}
-finally {
-  if ($document -ne $null) { $document.Close([ref]$false) }
-  if ($word -ne $null) { $word.Quit() }
-}
-`.trim()
-
-  await execFileAsync(
-    "powershell.exe",
-    ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand", encodePowerShell(psScript)],
-    { timeout: 120000, windowsHide: true }
-  )
 }
 
 export async function generateActionPointsPdfFromDocxBuffer(

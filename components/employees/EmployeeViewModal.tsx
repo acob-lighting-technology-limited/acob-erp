@@ -20,7 +20,6 @@ import { SearchableMultiSelect } from "@/components/ui/searchable-multi-select"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Checkbox } from "@/components/ui/checkbox"
 import { Textarea } from "@/components/ui/textarea"
 import { EmployeeStatusBadge } from "@/components/hr/employee-status-badge"
 import { ChangeStatusContent } from "@/components/hr/change-status-dialog"
@@ -127,6 +126,10 @@ export function EmployeeViewModal({
   const supabase = createClient()
 
   const viewEmployeeProfile = employee
+  const displayedLeadDepartments =
+    viewEmployeeProfile?.is_department_lead && viewEmployeeProfile.department
+      ? [viewEmployeeProfile.department]
+      : viewEmployeeProfile?.lead_departments || []
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -238,14 +241,12 @@ export function EmployeeViewModal({
                             <Badge className={getRoleBadgeColor(viewEmployeeProfile.role as UserRole)}>
                               {getRoleDisplayName(viewEmployeeProfile.role as UserRole)}
                             </Badge>
-                            {viewEmployeeProfile.is_department_lead &&
-                              viewEmployeeProfile.lead_departments &&
-                              viewEmployeeProfile.lead_departments.length > 0 && (
-                                <Badge variant="outline">
-                                  Leading {viewEmployeeProfile.lead_departments.length} Dept
-                                  {viewEmployeeProfile.lead_departments.length > 1 ? "s" : ""}
-                                </Badge>
-                              )}
+                            {viewEmployeeProfile.is_department_lead && displayedLeadDepartments.length > 0 && (
+                              <Badge variant="outline">
+                                Leading {displayedLeadDepartments.length} Dept
+                                {displayedLeadDepartments.length > 1 ? "s" : ""}
+                              </Badge>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -291,13 +292,13 @@ export function EmployeeViewModal({
                         </div>
                       )}
 
-                      {viewEmployeeProfile.lead_departments && viewEmployeeProfile.lead_departments.length > 0 && (
+                      {displayedLeadDepartments.length > 0 && (
                         <div className="flex items-center gap-3">
                           <Building2 className="text-muted-foreground h-5 w-5" />
                           <div>
                             <p className="text-muted-foreground text-sm">Leading Departments</p>
                             <div className="mt-1 flex flex-wrap gap-1">
-                              {viewEmployeeProfile.lead_departments.map((dept: string) => (
+                              {displayedLeadDepartments.map((dept: string) => (
                                 <Badge key={dept} variant="outline">
                                   {dept}
                                 </Badge>
@@ -663,20 +664,6 @@ export function EmployeeViewModal({
                       ? "As Admin, you can assign: Visitor and Employee roles"
                       : "As Super Admin, you can assign any role"}
                   </p>
-                  <div className="mt-3 flex items-center gap-2">
-                    <Checkbox
-                      id="is_department_lead"
-                      checked={editForm.is_department_lead}
-                      onCheckedChange={(checked) =>
-                        setEditForm((prev) => ({
-                          ...prev,
-                          is_department_lead: checked === true,
-                          lead_departments: checked === true ? [prev.department].filter(Boolean) : [],
-                        }))
-                      }
-                    />
-                    <Label htmlFor="is_department_lead">Department Lead</Label>
-                  </div>
                   {editForm.role === "admin" && (
                     <div className="mt-3 space-y-2">
                       <Label>Admin Domains *</Label>
@@ -723,6 +710,30 @@ export function EmployeeViewModal({
                       ))}
                     </SelectContent>
                   </Select>
+                  {editForm.is_department_lead && editForm.department && (
+                    <p className="text-muted-foreground mt-1 text-xs">
+                      Lead department will be set to {editForm.department}.
+                    </p>
+                  )}
+                  <div className="mt-3 flex items-center gap-2">
+                    <input
+                      id="is_department_lead"
+                      type="checkbox"
+                      checked={editForm.is_department_lead}
+                      onChange={(e) =>
+                        setEditForm((prev) => ({
+                          ...prev,
+                          is_department_lead: e.target.checked,
+                          lead_departments: e.target.checked && prev.department ? [prev.department] : [],
+                        }))
+                      }
+                      className="rounded"
+                    />
+                    <Label htmlFor="is_department_lead">Department Lead</Label>
+                  </div>
+                  <p className="text-muted-foreground mt-1 text-xs">
+                    When enabled, the selected department is used automatically as the lead department.
+                  </p>
                 </div>
 
                 <div>
@@ -747,45 +758,6 @@ export function EmployeeViewModal({
                     placeholder="e.g., Senior Developer"
                   />
                 </div>
-
-                {editForm.is_department_lead && (
-                  <div className="space-y-2">
-                    <p className="text-xs text-amber-600 dark:text-amber-400">
-                      A person can belong to only one department, so the lead department must match the selected
-                      department.
-                    </p>
-                    <Label>Lead Department *</Label>
-                    <div className="mt-2 grid grid-cols-2 gap-2">
-                      {DEPARTMENTS.map((dept) => (
-                        <div key={dept} className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            id={`dept-edit-${dept}`}
-                            checked={editForm.lead_departments.includes(dept)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setEditForm({
-                                  ...editForm,
-                                  lead_departments: [dept],
-                                })
-                              } else {
-                                setEditForm({
-                                  ...editForm,
-                                  lead_departments: editForm.lead_departments.filter((d) => d !== dept),
-                                })
-                              }
-                            }}
-                            className="rounded"
-                            disabled={dept !== editForm.department}
-                          />
-                          <Label htmlFor={`dept-edit-${dept}`} className="text-sm">
-                            {dept}
-                          </Label>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
 
                 {/* More Options */}
                 <div className="border-t pt-4">

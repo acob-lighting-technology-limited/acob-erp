@@ -1,51 +1,63 @@
-import { ShieldCheck } from "lucide-react"
-import { PageHeader, PageWrapper, Section } from "@/components/layout"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { StatCard } from "@/components/ui/stat-card"
+import { createClient } from "@/lib/supabase/server"
+import { BehaviourContent } from "./page-content"
 import { getCurrentUserPmsData } from "../_lib"
 
+type ReviewDetailRow = {
+  behaviour_score: number | null
+  behaviour_competencies: Record<string, unknown> | null
+  strengths: string | null
+  areas_for_improvement: string | null
+  manager_comments: string | null
+  review_cycles?: { name?: string } | { name?: string }[] | null
+}
+
+function normalizeValue(value: unknown) {
+  if (value === null || value === undefined || value === "") return null
+  const parsed = typeof value === "number" ? value : Number(value)
+  return Number.isFinite(parsed) ? Math.max(0, Math.min(100, parsed)) : null
+}
+
 export default async function PmsBehaviourPage() {
-  const { score } = await getCurrentUserPmsData()
+  const supabase = await createClient()
+  const { profile, score } = await getCurrentUserPmsData()
+
+  const { data: latestReview } = await supabase
+    .from("performance_reviews")
+    .select(
+      "behaviour_score, behaviour_competencies, strengths, areas_for_improvement, manager_comments, review_cycles(name)"
+    )
+    .eq("user_id", profile?.id || "")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle<ReviewDetailRow>()
+
+  const competenciesSource = latestReview?.behaviour_competencies || {}
+  const rows = [
+    { competency: "Collaboration", value: normalizeValue(competenciesSource.collaboration) },
+    { competency: "Accountability", value: normalizeValue(competenciesSource.accountability) },
+    { competency: "Communication", value: normalizeValue(competenciesSource.communication) },
+    { competency: "Teamwork", value: normalizeValue(competenciesSource.teamwork) },
+    { competency: "Loyalty", value: normalizeValue(competenciesSource.loyalty) },
+    { competency: "Professional Conduct", value: normalizeValue(competenciesSource.professional_conduct) },
+  ].filter((row): row is { competency: string; value: number } => row.value !== null)
+
+  const average =
+    rows.length > 0
+      ? Math.round((rows.reduce((sum, row) => sum + row.value, 0) / rows.length) * 100) / 100
+      : score.behaviour_score
 
   return (
-    <PageWrapper maxWidth="content" background="gradient">
-      <PageHeader
-        title="PMS Behaviour"
-        description="See the behaviour component contributing to your overall PMS."
-        icon={ShieldCheck}
-        backLink={{ href: "/pms", label: "Back to PMS" }}
-      />
-
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        <StatCard title="Behaviour Score" value={`${score.behaviour_score}%`} icon={ShieldCheck} />
-        <StatCard
-          title="Manager Score"
-          value={`${score.manager_behaviour_score}%`}
-          description="Latest recorded manager behaviour score"
-        />
-        <StatCard
-          title="Peer Feedback"
-          value={score.peer_feedback_count}
-          description={`Peer average: ${score.peer_behaviour_score}%`}
-        />
-      </div>
-
-      <Section title="How It Is Calculated">
-        <Card>
-          <CardHeader>
-            <CardTitle>Behaviour Blend</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm">
-            <p>
-              Where peer feedback exists, PMS blends manager behaviour scoring with peer submissions. If no peer
-              feedback exists yet, the manager score carries the behaviour section.
-            </p>
-            <p>
-              That keeps behaviour visible in real time while still letting new feedback raise or lower the score later.
-            </p>
-          </CardContent>
-        </Card>
-      </Section>
-    </PageWrapper>
+    <BehaviourContent
+      rows={rows}
+      average={average}
+      cycle={
+        Array.isArray(latestReview?.review_cycles)
+          ? latestReview?.review_cycles[0]?.name || "-"
+          : latestReview?.review_cycles?.name || "-"
+      }
+      strengths={latestReview?.strengths || ""}
+      areasForImprovement={latestReview?.areas_for_improvement || ""}
+      managerComments={latestReview?.manager_comments || ""}
+    />
   )
 }

@@ -354,7 +354,7 @@ serve(async (req) => {
     <style>
         body { margin: 0; padding: 0; background: #fff; font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif; }
         .email-shell { max-width: 600px; margin: 0 auto; overflow: hidden; }
-        .outer-header { background: #0f2d1f; padding: 20px 0; text-align: center; border-bottom: 3px solid #16a34a; }
+        .outer-header { background: #000; padding: 20px 0; text-align: center; border-top: 3px solid #16a34a; border-bottom: 3px solid #16a34a; }
         .wrapper { max-width: 600px; margin: 0 auto; background: #fff; padding: 32px 28px; }
         .title { font-size: 24px; font-weight: 700; color: #111827; margin-bottom: 14px; }
         .text { font-size: 15px; color: #374151; line-height: 1.6; margin: 0 0 18px 0; }
@@ -373,7 +373,7 @@ serve(async (req) => {
         .button { display: inline-block; background: #000; color: #fff; text-decoration: none; padding: 14px 32px; border-radius: 6px; font-weight: 600; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; }
         .support { text-align: center; font-size: 14px; color: #4b5563; margin-top: 24px; line-height: 1.5; }
         .support a { color: #16a34a; font-weight: 600; text-decoration: none; }
-        .footer { background: #0f2d1f; padding: 20px; text-align: center; font-size: 11px; color: #9ca3af; border-top: 3px solid #16a34a; }
+        .footer { background: #000; padding: 20px; text-align: center; font-size: 11px; color: #d1d5db; border-top: 3px solid #16a34a; border-bottom: 3px solid #16a34a; }
         .footer strong { color: #fff; }
         .footer-system { color: #16a34a; font-weight: 600; }
         .footer-note { color: #9ca3af; font-style: italic; }
@@ -381,7 +381,7 @@ serve(async (req) => {
 </head>
 <body>
     <div class="email-shell">
-    <div class="outer-header" style="background-color:#0f2d1f;">
+    <div class="outer-header" style="background-color:#000;">
         <img src="${EMAIL_HEADER_LOGO_SRC}" height="65" alt="ACOB Lighting">
     </div>
     <div class="wrapper">
@@ -399,8 +399,8 @@ serve(async (req) => {
 
         <div class="support">${supportText}</div>
     </div>
-    <div class="footer" style="background-color:#0f2d1f;">
-        <span style="color:#d1d5db;">Prepared by IT &amp; Communications</span><br>
+    <div class="footer" style="background-color:#000;">
+        <span style="color:#f3f4f6;">Prepared by IT &amp; Communications</span><br>
         ICT Support Team<br>
         IT &amp; Communications Department<br>
         <strong>ACOB Lighting Technology Limited</strong><br>

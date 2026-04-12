@@ -326,11 +326,11 @@ export default function DepartmentsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-12">#</TableHead>
                   <TableHead className="w-14"></TableHead>
+                  <TableHead className="w-12">#</TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>Description</TableHead>
-                  <TableHead>Employees</TableHead>
+                  <TableHead>Employee Count</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -350,7 +350,6 @@ export default function DepartmentsPage() {
                         )}
                         onClick={() => toggleDepartmentRow(dept.id)}
                       >
-                        <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
                         <TableCell>
                           <Button
                             variant="ghost"
@@ -365,12 +364,15 @@ export default function DepartmentsPage() {
                             {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                           </Button>
                         </TableCell>
-                        <TableCell className="font-medium">{dept.name}</TableCell>
-                        <TableCell className="text-muted-foreground max-w-xs truncate">
-                          {dept.description || "—"}
+                        <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
+                        <TableCell>
+                          <div className="font-medium">{dept.name}</div>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground max-w-xs truncate text-sm">
+                          {dept.description || "No description added"}
                         </TableCell>
                         <TableCell>
-                          <Badge variant="secondary">{dept.employee_count} employees</Badge>
+                          <Badge variant="secondary">{dept.employee_count || 0} employees</Badge>
                         </TableCell>
                         <TableCell>
                           <Badge variant={dept.is_active ? "default" : "secondary"}>
@@ -395,13 +397,13 @@ export default function DepartmentsPage() {
                       </TableRow>
                       {isExpanded && (
                         <TableRow key={`${dept.id}-members`} className="bg-muted/10 hover:bg-muted/10 border-t-0">
-                          <TableCell colSpan={7} className="p-0">
-                            {members.length === 0 ? (
-                              <p className="text-muted-foreground px-6 py-3 text-sm">
-                                No employees in this department.
-                              </p>
-                            ) : (
-                              <div className="animate-in slide-in-from-top-2 p-6 pt-2 duration-200">
+                          <TableCell colSpan={6} className="p-0">
+                            <div className="animate-in slide-in-from-top-2 p-6 pt-2 duration-200">
+                              {members.length === 0 ? (
+                                <p className="text-muted-foreground px-1 py-1 text-sm">
+                                  No employees in this department.
+                                </p>
+                              ) : (
                                 <div className="bg-background overflow-hidden rounded-lg border shadow-sm">
                                   <Table>
                                     <TableHeader className="bg-muted/30">
@@ -464,8 +466,8 @@ export default function DepartmentsPage() {
                                     </TableBody>
                                   </Table>
                                 </div>
-                              </div>
-                            )}
+                              )}
+                            </div>
                           </TableCell>
                         </TableRow>
                       )}

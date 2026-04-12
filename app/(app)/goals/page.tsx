@@ -16,11 +16,15 @@ export interface Goal {
   priority: string
   due_date: string
   created_at: string
+  review_cycle_id?: string | null
   // PMS: approval workflow
   approval_status: "pending" | "approved" | "rejected"
   approved_by?: string | null
   approved_at?: string | null
   department?: string | null
+  cycle?: {
+    name: string
+  } | null
 }
 
 async function getGoalsData() {
@@ -35,20 +39,38 @@ async function getGoalsData() {
     return { redirect: "/auth/login" as const }
   }
 
-  // Fetch user's goals
-  const { data: goals, error } = await supabase
-    .from("goals_objectives")
-    .select("*")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: false })
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("department")
+    .eq("id", user.id)
+    .maybeSingle<{ department?: string | null }>()
+
+  const { data: cycles } = await supabase
+    .from("review_cycles")
+    .select("id, name")
+    .order("start_date", { ascending: false })
+    .returns<Array<{ id: string; name: string }>>()
+
+  const cyclesById = new Map((cycles || []).map((cycle) => [cycle.id, cycle]))
+
+  const { data: goals, error } = profile?.department
+    ? await supabase
+        .from("goals_objectives")
+        .select("*")
+        .eq("department", profile.department)
+        .order("created_at", { ascending: false })
+    : { data: [], error: null }
 
   if (error) {
     log.error("Error loading goals:", error)
   }
 
   return {
-    goals: (goals || []) as Goal[],
-    userId: user.id,
+    goals: ((goals || []) as Goal[]).map((goal) => ({
+      ...goal,
+      cycle: goal.review_cycle_id ? cyclesById.get(goal.review_cycle_id) || null : null,
+    })),
+    department: profile?.department || null,
   }
 }
 
@@ -59,7 +81,28 @@ export default async function GoalsPage() {
     redirect(data.redirect)
   }
 
-  const goalsData = data as { goals: Goal[]; userId: string }
+  const goalsData = data as { goals: Goal[]; department: string | null }
 
-  return <GoalsContent initialGoals={goalsData.goals} userId={goalsData.userId} />
+  return (
+    <GoalsContent
+      initialGoals={goalsData.goals}
+      canCreateGoal={false}
+      summaryCards={[
+        { label: "Department", value: goalsData.department || "-" },
+        { label: "Total Goals", value: goalsData.goals.length },
+        {
+          label: "Approved Goals",
+          value: goalsData.goals.filter((goal) => goal.approval_status === "approved").length,
+        },
+      ]}
+      pageTitle="Department Goals"
+      pageDescription={
+        goalsData.department
+          ? `Goals for ${goalsData.department}. Department leads create goals from the admin PMS side.`
+          : "Department leads create goals from the admin PMS side."
+      }
+      backHref="/pms"
+      backLabel="Back to PMS"
+    />
+  )
 }

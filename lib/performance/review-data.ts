@@ -58,13 +58,22 @@ function normalizeCycleKey(cycleId: string | null | undefined) {
 type ReviewFilter = {
   userId?: string | null
   cycleId?: string | null
+  limit?: number
+  offset?: number
 }
 
 export async function getUnifiedPerformanceReviews(
   supabase: SupabaseClient,
   filters: ReviewFilter = {}
-): Promise<UnifiedReviewRow[]> {
-  let query = supabase.from("performance_reviews").select("*").order("created_at", { ascending: false })
+): Promise<{ reviews: UnifiedReviewRow[]; total: number }> {
+  const limit = filters.limit ?? 50
+  const offset = filters.offset ?? 0
+
+  let query = supabase
+    .from("performance_reviews")
+    .select("*", { count: "exact" })
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1)
 
   if (filters.userId) {
     query = query.eq("user_id", filters.userId)
@@ -73,11 +82,11 @@ export async function getUnifiedPerformanceReviews(
     query = query.eq("review_cycle_id", filters.cycleId)
   }
 
-  const { data: reviews, error } = await query.returns<BaseReviewRow[]>()
+  const { data: reviews, error, count } = await query.returns<BaseReviewRow[]>()
   if (error || !reviews) {
     throw new Error(error?.message || "Failed to load performance reviews")
   }
-  if (reviews.length === 0) return []
+  if (reviews.length === 0) return { reviews: [], total: count ?? 0 }
 
   const userIds = Array.from(new Set(reviews.map((row) => row.user_id).filter(Boolean)))
   const reviewerIds = Array.from(new Set(reviews.map((row) => row.reviewer_id).filter(Boolean))) as string[]
@@ -125,20 +134,22 @@ export async function getUnifiedPerformanceReviews(
     )
   )
 
-  return reviews.map((row) => {
+  const unified = reviews.map((row) => {
     const scoreKey = `${row.user_id}:${normalizeCycleKey(row.review_cycle_id)}`
     const score = scoreByKey.get(scoreKey)
 
     return {
       ...row,
-      kpi_score: score?.kpi_score ?? row.kpi_score,
-      cbt_score: score?.cbt_score ?? row.cbt_score,
-      attendance_score: score?.attendance_score ?? row.attendance_score,
-      behaviour_score: score?.behaviour_score ?? row.behaviour_score,
-      final_score: score?.final_score ?? row.final_score,
+      kpi_score: score ? score.kpi_score : row.kpi_score,
+      cbt_score: score ? score.cbt_score : row.cbt_score,
+      attendance_score: score ? score.attendance_score : row.attendance_score,
+      behaviour_score: score ? score.behaviour_score : row.behaviour_score,
+      final_score: score ? score.final_score : row.final_score,
       user: userById.get(row.user_id) || null,
       reviewer: row.reviewer_id ? reviewerById.get(row.reviewer_id) || null : null,
       cycle: row.review_cycle_id ? cycleById.get(row.review_cycle_id) || null : null,
     }
   })
+
+  return { reviews: unified, total: count ?? unified.length }
 }

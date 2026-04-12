@@ -1,439 +1,446 @@
 "use client"
 
-import { startTransition, useCallback, useEffect, useState } from "react"
-import { Brain, Download, Plus, RefreshCw, Save, Search } from "lucide-react"
+import Link from "next/link"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { Brain, Eye, Loader2, RefreshCw, Search } from "lucide-react"
 import { toast } from "sonner"
-import { PageHeader, PageWrapper, Section } from "@/components/layout"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { PageHeader, PageWrapper } from "@/components/layout"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { StatCard } from "@/components/ui/stat-card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Input } from "@/components/ui/input"
+
+type TabKey = "individual" | "department" | "cycle"
 
 type ReviewCycle = {
   id: string
   name: string
   review_type: string | null
-  start_date: string | null
-  end_date: string | null
 }
 
-type ScopedUser = {
+type CbtUser = {
   id: string
   first_name: string | null
   last_name: string | null
   department: string | null
 }
 
-type CbtScoreRow = {
-  id: string
+type CbtScore = {
   user_id: string
   review_cycle_id: string
-  reviewer_id?: string | null
   cbt_score: number | null
-  created_at?: string
-}
-
-type ReviewerRow = {
-  id: string
-  first_name: string | null
-  last_name: string | null
 }
 
 type CbtPayload = {
-  users: ScopedUser[]
+  users: CbtUser[]
   cycles: ReviewCycle[]
-  scores: CbtScoreRow[]
-  reviewers: ReviewerRow[]
-}
-
-function formatEmployeeName(user: ScopedUser) {
-  return [user.first_name, user.last_name].filter(Boolean).join(" ") || "Unnamed employee"
-}
-
-function formatCycleLabel(cycle: ReviewCycle) {
-  const typeSuffix = cycle.review_type ? ` (${cycle.review_type})` : ""
-  return `${cycle.name}${typeSuffix}`
-}
-
-function formatReviewerName(reviewer?: ReviewerRow) {
-  if (!reviewer) return "System"
-  return [reviewer.first_name, reviewer.last_name].filter(Boolean).join(" ") || "System"
+  scores: CbtScore[]
 }
 
 export default function AdminPmsCbtPage() {
-  const [data, setData] = useState<CbtPayload>({ users: [], cycles: [], scores: [], reviewers: [] })
-  const [selectedCycleId, setSelectedCycleId] = useState("")
-  const [loading, setLoading] = useState(true)
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [scoreInputs, setScoreInputs] = useState<Record<string, string>>({})
-  const [savingUserIds, setSavingUserIds] = useState<string[]>([])
+  const [tab, setTab] = useState<TabKey>("individual")
+  const [selectedCycleId, setSelectedCycleId] = useState("all")
+  const [data, setData] = useState<CbtPayload>({ users: [], cycles: [], scores: [] })
+  const [questionCounts, setQuestionCounts] = useState<Record<string, number>>({})
+  const [isInitialLoading, setIsInitialLoading] = useState(true)
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [departmentFilter, setDepartmentFilter] = useState("all")
+  const [userFilter, setUserFilter] = useState("all")
+  const hasLoadedSnapshotRef = useRef(false)
 
-  const loadData = useCallback(
-    async (cycleId?: string) => {
-      setLoading(true)
-      try {
-        const query = cycleId ? `?cycle_id=${encodeURIComponent(cycleId)}` : ""
-        const response = await fetch(`/api/hr/performance/cbt${query}`, { cache: "no-store" })
-        const result = await response.json()
+  const loadCbtSnapshot = useCallback(async () => {
+    if (hasLoadedSnapshotRef.current) {
+      setIsRefreshing(true)
+    } else {
+      setIsInitialLoading(true)
+    }
+    try {
+      const response = await fetch("/api/hr/performance/cbt", { cache: "no-store" })
+      const payload = (await response.json().catch(() => null)) as { data?: CbtPayload; error?: string } | null
+      if (!response.ok || !payload?.data) throw new Error(payload?.error || "Failed to load CBT data")
+      const snapshot = payload.data
+      setData(snapshot)
+      hasLoadedSnapshotRef.current = true
+      setSelectedCycleId((current) => current || "all")
 
-        if (!response.ok) {
-          throw new Error(result.error || "Failed to load CBT data")
-        }
+      const counts = await Promise.all(
+        snapshot.cycles.map(async (cycle) => {
+          const questionsResponse = await fetch(
+            `/api/hr/performance/cbt/questions?cycle_id=${encodeURIComponent(cycle.id)}`,
+            {
+              cache: "no-store",
+            }
+          )
+          const questionsPayload = (await questionsResponse.json().catch(() => null)) as {
+            data?: Array<{ id: string }>
+          } | null
+          return [cycle.id, questionsPayload?.data?.length || 0] as const
+        })
+      )
+      setQuestionCounts(Object.fromEntries(counts))
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to load CBT data")
+    } finally {
+      setIsInitialLoading(false)
+      setIsRefreshing(false)
+    }
+  }, [])
 
-        const payload = result.data as CbtPayload
-        setData(payload)
+  useEffect(() => {
+    void loadCbtSnapshot()
+  }, [loadCbtSnapshot])
 
-        const nextScoreInputs: Record<string, string> = {}
-        for (const score of payload.scores) {
-          nextScoreInputs[score.user_id] =
-            score.cbt_score !== null && score.cbt_score !== undefined ? String(score.cbt_score) : ""
-        }
-        setScoreInputs((current) => ({ ...current, ...nextScoreInputs }))
+  const usersById = useMemo(() => new Map(data.users.map((user) => [user.id, user])), [data.users])
 
-        const nextCycleId = cycleId || selectedCycleId || payload.cycles[0]?.id || ""
-        if (!cycleId && !selectedCycleId && nextCycleId) {
-          setSelectedCycleId(nextCycleId)
-        }
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Failed to load CBT data")
-      } finally {
-        setLoading(false)
-      }
-    },
-    [selectedCycleId]
+  const scoresForSelectedCycle = useMemo(
+    () => data.scores.filter((score) => selectedCycleId === "all" || score.review_cycle_id === selectedCycleId),
+    [data.scores, selectedCycleId]
   )
 
-  useEffect(() => {
-    void loadData()
-  }, [loadData])
+  const individualRows = useMemo(
+    () =>
+      data.scores.map((score, index) => {
+        const user = usersById.get(score.user_id)
+        return {
+          id: `${score.user_id}-${index}`,
+          user_id: score.user_id,
+          review_cycle_id: score.review_cycle_id,
+          employee: [user?.first_name, user?.last_name].filter(Boolean).join(" ") || "Employee",
+          department: user?.department || "-",
+          cycle: data.cycles.find((cycle) => cycle.id === score.review_cycle_id)?.name || "-",
+          cbt_score: score.cbt_score !== null ? `${score.cbt_score}%` : "-",
+        }
+      }),
+    [data.cycles, data.scores, usersById]
+  )
 
-  useEffect(() => {
-    if (!selectedCycleId) return
-    void loadData(selectedCycleId)
-  }, [loadData, selectedCycleId])
-
-  const enteredCount = data.scores.length
-  const averageScore =
-    data.scores.length > 0
-      ? Math.round(
-          (data.scores.reduce((sum, item) => sum + (Number(item.cbt_score) || 0), 0) /
-            Math.max(data.scores.length, 1)) *
-            100
-        ) / 100
-      : 0
-
-  const tableRows = data.scores.map((score) => {
-    const user = data.users.find((entry) => entry.id === score.user_id)
-    const reviewer = data.reviewers.find((entry) => entry.id === score.reviewer_id)
-    const cycle = data.cycles.find((entry) => entry.id === score.review_cycle_id)
-    return {
-      id: score.id,
-      staff: user ? formatEmployeeName(user) : "Employee",
-      department: user?.department || "No department",
-      cbt_score: `${score.cbt_score ?? 0}%`,
-      reviewed_by: formatReviewerName(reviewer),
-      cycle: cycle ? formatCycleLabel(cycle) : "Q2 2026",
-      last_updated: score.created_at ? new Date(score.created_at).toLocaleDateString() : "-",
+  const departmentRows = useMemo(() => {
+    const grouped = new Map<string, number[]>()
+    for (const score of scoresForSelectedCycle) {
+      const department = usersById.get(score.user_id)?.department || "Unassigned"
+      const current = grouped.get(department) || []
+      if (typeof score.cbt_score === "number") current.push(score.cbt_score)
+      grouped.set(department, current)
     }
-  })
+    return Array.from(grouped.entries()).map(([department, values]) => ({
+      department,
+      cycle: data.cycles.find((cycle) => cycle.id === selectedCycleId)?.name || "-",
+      scores_recorded: values.length,
+      average_score:
+        values.length > 0
+          ? `${(values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(2).replace(/\.00$/, "")}%`
+          : "-",
+    }))
+  }, [data.cycles, scoresForSelectedCycle, selectedCycleId, usersById])
 
-  const departmentOptions = Array.from(
-    new Set(tableRows.map((row) => row.department).filter((department) => department !== "No department"))
-  ).sort((a, b) => a.localeCompare(b))
+  const cycleRows = useMemo(
+    () =>
+      data.cycles.map((cycle) => ({
+        id: cycle.id,
+        cycle: cycle.name,
+        review_type: cycle.review_type || "-",
+        scores_recorded: data.scores.filter((score) => score.review_cycle_id === cycle.id).length,
+        questions: questionCounts[cycle.id] || 0,
+      })),
+    [data.cycles, data.scores, questionCounts]
+  )
 
-  const filteredRows = tableRows.filter((row) => {
+  const filteredIndividualRows = useMemo(() => {
     const query = searchQuery.trim().toLowerCase()
-    const matchesQuery =
-      query.length === 0 ||
-      row.staff.toLowerCase().includes(query) ||
-      row.department.toLowerCase().includes(query) ||
-      row.reviewed_by.toLowerCase().includes(query) ||
-      row.cycle.toLowerCase().includes(query)
-    const matchesDepartment = departmentFilter === "all" || row.department === departmentFilter
-    return matchesQuery && matchesDepartment
-  })
+    return individualRows.filter((row) => {
+      const matchesQuery =
+        query.length === 0 ||
+        [row.employee, row.department, row.cycle, row.cbt_score].some((value) => value.toLowerCase().includes(query))
+      const matchesDepartment = departmentFilter === "all" || row.department === departmentFilter
+      const matchesUser = userFilter === "all" || row.user_id === userFilter
+      const matchesCycle = selectedCycleId === "all" || row.review_cycle_id === selectedCycleId
+      return matchesQuery && matchesDepartment && matchesUser && matchesCycle
+    })
+  }, [departmentFilter, individualRows, searchQuery, selectedCycleId, userFilter])
 
-  function handleExport() {
-    if (filteredRows.length === 0) return
-    const header = "S/N,Staff,Department,CBT Score,Reviewed By,Cycle,Last Updated"
-    const body = filteredRows
-      .map((row, index) =>
-        [index + 1, row.staff, row.department, row.cbt_score, row.reviewed_by, row.cycle, row.last_updated]
-          .map((value) => `"${String(value).replace(/"/g, '""')}"`)
-          .join(",")
-      )
-      .join("\n")
-    const csv = `${header}\n${body}`
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
-    const url = window.URL.createObjectURL(blob)
-    const link = document.createElement("a")
-    link.href = url
-    link.download = `pms-cbt-${new Date().toISOString().split("T")[0]}.csv`
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    window.URL.revokeObjectURL(url)
-  }
+  const filteredDepartmentRows = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase()
+    return departmentRows.filter((row) => {
+      const matchesQuery =
+        query.length === 0 ||
+        [row.department, row.cycle, row.average_score].some((value) => value.toLowerCase().includes(query))
+      const matchesDepartment = departmentFilter === "all" || row.department === departmentFilter
+      return matchesQuery && matchesDepartment
+    })
+  }, [departmentFilter, departmentRows, searchQuery])
 
-  async function saveScore(userId: string) {
-    if (!selectedCycleId) {
-      toast.error("Select a review cycle first")
-      return
-    }
-
-    if (savingUserIds.includes(userId)) {
-      return
-    }
-
-    const rawValue = scoreInputs[userId] ?? ""
-    const parsedValue = Number(rawValue)
-    if (rawValue.trim() === "" || Number.isNaN(parsedValue)) {
-      return
-    }
-
-    setSavingUserIds((current) => (current.includes(userId) ? current : [...current, userId]))
-    try {
-      const response = await fetch("/api/hr/performance/cbt", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          user_id: userId,
-          review_cycle_id: selectedCycleId,
-          cbt_score: parsedValue,
-        }),
-      })
-
-      const result = await response.json()
-      if (!response.ok) {
-        throw new Error(result.error || "Failed to save CBT score")
-      }
-
-      const user = data.users.find((entry) => entry.id === userId)
-      toast.success(`${user ? formatEmployeeName(user) : "Employee"} CBT score saved`)
-
-      startTransition(() => {
-        void loadData(selectedCycleId)
-      })
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to save CBT score")
-    } finally {
-      setSavingUserIds((current) => current.filter((entry) => entry !== userId))
-    }
-  }
+  const filteredCycleRows = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase()
+    return cycleRows.filter((row) => {
+      const matchesQuery =
+        query.length === 0 || [row.cycle, row.review_type].some((value) => value.toLowerCase().includes(query))
+      const matchesCycle = selectedCycleId === "all" || row.id === selectedCycleId
+      return matchesQuery && matchesCycle
+    })
+  }, [cycleRows, searchQuery, selectedCycleId])
 
   return (
     <PageWrapper maxWidth="full" background="gradient">
       <PageHeader
         title="PMS CBT"
-        description="Input CBT scores manually from HR for now, using one modal that lists all staff in scope."
+        description="Review CBT results by employee, department, or cycle. Open a cycle to manage its question bank."
         icon={Brain}
         backLink={{ href: "/admin/hr/pms", label: "Back to PMS" }}
         actions={
-          <>
-            <Button
-              variant="outline"
-              onClick={handleExport}
-              disabled={filteredRows.length === 0}
-              className="h-8 gap-2"
-              size="sm"
-            >
-              <Download className="h-4 w-4" />
-              Export
-            </Button>
-            <Button variant="outline" onClick={() => void loadData(selectedCycleId)} disabled={loading}>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => void loadCbtSnapshot()} disabled={isRefreshing}>
               <RefreshCw className="mr-2 h-4 w-4" />
               Refresh
             </Button>
-            <Button onClick={() => setIsModalOpen(true)} disabled={!selectedCycleId}>
-              <Plus className="mr-2 h-4 w-4" />
-              Open CBT Modal
-            </Button>
-          </>
+            <Link href="/cbt">
+              <Button size="sm">Start Test</Button>
+            </Link>
+          </div>
         }
       />
 
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        <StatCard
-          title="Employees In Scope"
-          value={data.users.length}
-          icon={Brain}
-          description="Available for manual CBT entry"
-        />
-        <StatCard title="Scores Entered" value={enteredCount} description="Saved for the selected review cycle" />
-        <StatCard
-          title="Average CBT"
-          value={`${averageScore}%`}
-          description="Current manual CBT average for this cycle"
-        />
+      <Tabs value={tab} onValueChange={(value) => setTab(value as TabKey)} className="mb-4">
+        <TabsList>
+          <TabsTrigger value="individual">Individual</TabsTrigger>
+          <TabsTrigger value="department">Department</TabsTrigger>
+          <TabsTrigger value="cycle">Cycle</TabsTrigger>
+        </TabsList>
+      </Tabs>
+
+      <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-muted-foreground text-sm">Rows</p>
+            <p className="text-2xl font-semibold">
+              {tab === "individual"
+                ? filteredIndividualRows.length
+                : tab === "department"
+                  ? filteredDepartmentRows.length
+                  : filteredCycleRows.length}
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-muted-foreground text-sm">Scores Recorded</p>
+            <p className="text-2xl font-semibold">
+              {tab === "individual"
+                ? filteredIndividualRows.length
+                : tab === "department"
+                  ? filteredDepartmentRows.reduce((sum, row) => sum + row.scores_recorded, 0)
+                  : filteredCycleRows.reduce((sum, row) => sum + row.scores_recorded, 0)}
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-muted-foreground text-sm">Cycle</p>
+            <p className="text-lg font-semibold">
+              {selectedCycleId === "all"
+                ? "All Cycles"
+                : data.cycles.find((cycle) => cycle.id === selectedCycleId)?.name || "Current"}
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
-      <Section
-        title="Entered Scores"
-        description="A quick view of the CBT scores already saved for the selected cycle."
-      >
-        <Card className="mb-4 border-2">
-          <CardContent className="p-3 sm:p-6">
-            <div className="flex flex-col gap-4 md:flex-row md:items-end">
-              <div className="relative flex-1">
-                <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform" />
-                <Input
-                  placeholder="Search staff, department, reviewer, or cycle..."
-                  value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                  className="pl-10"
-                />
-              </div>
+      <Card className="mb-4 border-2">
+        <CardContent className="p-3 sm:p-6">
+          <div className="flex flex-col gap-4 md:flex-row md:items-end">
+            <div className="relative flex-1">
+              <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform" />
+              <Input
+                placeholder="Search current view..."
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                className="pl-10"
+              />
+            </div>
+            {tab === "individual" ? (
+              <Select value={userFilter} onValueChange={setUserFilter}>
+                <SelectTrigger className="w-full md:w-64">
+                  <SelectValue placeholder="Employee" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Employees</SelectItem>
+                  {data.users.map((user) => (
+                    <SelectItem key={user.id} value={user.id}>
+                      {[user.first_name, user.last_name].filter(Boolean).join(" ") || "Employee"}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : null}
+            {tab === "individual" || tab === "department" ? (
               <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
                 <SelectTrigger className="w-full md:w-56">
                   <SelectValue placeholder="Department" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Departments</SelectItem>
-                  {departmentOptions.map((department) => (
-                    <SelectItem key={department} value={department}>
-                      {department}
-                    </SelectItem>
-                  ))}
+                  {Array.from(new Set(data.users.map((user) => user.department).filter(Boolean) as string[])).map(
+                    (department) => (
+                      <SelectItem key={department} value={department}>
+                        {department}
+                      </SelectItem>
+                    )
+                  )}
                 </SelectContent>
               </Select>
-              <Select value={selectedCycleId} onValueChange={setSelectedCycleId}>
-                <SelectTrigger id="cbt-cycle" className="w-full md:w-80">
-                  <SelectValue placeholder="Review cycle" />
-                </SelectTrigger>
-                <SelectContent>
-                  {data.cycles.map((cycle) => (
-                    <SelectItem key={cycle.id} value={cycle.id}>
-                      {formatCycleLabel(cycle)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Saved CBT Entries</CardTitle>
-            <CardDescription>The modal now lists all staff with score inputs beside their names.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {filteredRows.length > 0 ? (
-              <div className="space-y-4">
-                <p className="text-muted-foreground text-sm">
-                  Showing {filteredRows.length} of {tableRows.length} record(s).
-                </p>
-                <Table className="min-w-[1050px]">
-                  <TableHeader className="bg-muted/50">
-                    <TableRow>
-                      <TableHead className="w-16">S/N</TableHead>
-                      <TableHead>Staff</TableHead>
-                      <TableHead>Department</TableHead>
-                      <TableHead>CBT Score</TableHead>
-                      <TableHead>Reviewed By</TableHead>
-                      <TableHead>Cycle</TableHead>
-                      <TableHead>Last Updated</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredRows.map((row, index) => (
-                      <TableRow key={row.id}>
-                        <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
-                        <TableCell className="font-medium">{row.staff}</TableCell>
-                        <TableCell>{row.department}</TableCell>
-                        <TableCell className="font-semibold">{row.cbt_score}</TableCell>
-                        <TableCell>{row.reviewed_by}</TableCell>
-                        <TableCell>{row.cycle}</TableCell>
-                        <TableCell className="text-muted-foreground">{row.last_updated}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            ) : (
-              <p className="text-muted-foreground text-sm">No CBT scores saved for this review cycle yet.</p>
-            )}
-          </CardContent>
-        </Card>
-      </Section>
-
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>Enter CBT Scores</DialogTitle>
-            <DialogDescription>
-              Each staff member is listed here. Enter a score in the second column and press `Enter` or click the save
-              icon to save that row.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div className="grid grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] gap-3 border-b pb-2 text-sm font-medium">
-              <p>Staff</p>
-              <p>CBT Score</p>
-            </div>
-
-            <div className="max-h-[55vh] space-y-3 overflow-y-auto pr-1">
-              {data.users.map((user) => {
-                const isSaving = savingUserIds.includes(user.id)
-                return (
-                  <div
-                    key={user.id}
-                    className="grid grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] items-center gap-3 rounded-lg border p-3"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate font-medium">{formatEmployeeName(user)}</p>
-                      <p className="text-muted-foreground truncate text-sm">{user.department || "No department"}</p>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <Input
-                        type="number"
-                        min="0"
-                        max="100"
-                        value={scoreInputs[user.id] ?? ""}
-                        onChange={(event) =>
-                          setScoreInputs((current) => ({
-                            ...current,
-                            [user.id]: event.target.value,
-                          }))
-                        }
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter") {
-                            event.preventDefault()
-                            void saveScore(user.id)
-                          }
-                        }}
-                        placeholder="0 - 100"
-                      />
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => void saveScore(user.id)}
-                        disabled={isSaving}
-                      >
-                        <Save className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-
-            <div className="flex justify-end">
-              <Button variant="outline" onClick={() => setIsModalOpen(false)}>
-                Close
-              </Button>
-            </div>
+            ) : null}
+            <Select value={selectedCycleId} onValueChange={setSelectedCycleId}>
+              <SelectTrigger className="w-full md:w-80">
+                <SelectValue placeholder="Select cycle" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Cycles</SelectItem>
+                {data.cycles.map((cycle) => (
+                  <SelectItem key={cycle.id} value={cycle.id}>
+                    {cycle.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-        </DialogContent>
-      </Dialog>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <CardTitle>{tab[0].toUpperCase() + tab.slice(1)} View</CardTitle>
+            {isRefreshing ? (
+              <div className="text-muted-foreground flex items-center gap-2 text-sm">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Refreshing...
+              </div>
+            ) : null}
+          </div>
+          <CardDescription>
+            {tab === "individual"
+              ? "Scores recorded per employee."
+              : tab === "department"
+                ? "Department CBT averages for the selected cycle."
+                : "Open a cycle to manage that cycle question bank."}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isInitialLoading &&
+          filteredIndividualRows.length === 0 &&
+          filteredDepartmentRows.length === 0 &&
+          filteredCycleRows.length === 0 ? (
+            <div className="text-muted-foreground py-8 text-sm">Loading CBT data...</div>
+          ) : tab === "individual" ? (
+            <div className="overflow-x-auto">
+              <Table key="individual" className="min-w-[980px]">
+                <TableHeader className="bg-emerald-50 dark:bg-emerald-950/30">
+                  <TableRow>
+                    <TableHead className="w-16">S/N</TableHead>
+                    <TableHead>Employee</TableHead>
+                    <TableHead>Department</TableHead>
+                    <TableHead>Cycle</TableHead>
+                    <TableHead>CBT Score</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredIndividualRows.map((row, index) => (
+                    <TableRow key={row.id}>
+                      <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
+                      <TableCell>{row.employee}</TableCell>
+                      <TableCell>{row.department}</TableCell>
+                      <TableCell>{row.cycle}</TableCell>
+                      <TableCell>{row.cbt_score}</TableCell>
+                    </TableRow>
+                  ))}
+                  {filteredIndividualRows.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-muted-foreground py-8 text-center text-sm">
+                        No records found.
+                      </TableCell>
+                    </TableRow>
+                  ) : null}
+                </TableBody>
+              </Table>
+            </div>
+          ) : tab === "department" ? (
+            <div className="overflow-x-auto">
+              <Table key="department" className="min-w-[980px]">
+                <TableHeader className="bg-emerald-50 dark:bg-emerald-950/30">
+                  <TableRow>
+                    <TableHead className="w-16">S/N</TableHead>
+                    <TableHead>Department</TableHead>
+                    <TableHead>Cycle</TableHead>
+                    <TableHead>Scores Recorded</TableHead>
+                    <TableHead>Average Score</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredDepartmentRows.map((row, index) => (
+                    <TableRow key={`${row.department}-${row.cycle}`}>
+                      <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
+                      <TableCell>{row.department}</TableCell>
+                      <TableCell>{row.cycle}</TableCell>
+                      <TableCell>{row.scores_recorded}</TableCell>
+                      <TableCell>{row.average_score}</TableCell>
+                    </TableRow>
+                  ))}
+                  {filteredDepartmentRows.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-muted-foreground py-8 text-center text-sm">
+                        No records found.
+                      </TableCell>
+                    </TableRow>
+                  ) : null}
+                </TableBody>
+              </Table>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table key="cycle" className="min-w-[980px]">
+                <TableHeader className="bg-emerald-50 dark:bg-emerald-950/30">
+                  <TableRow>
+                    <TableHead className="w-16">S/N</TableHead>
+                    <TableHead>Cycle</TableHead>
+                    <TableHead>Review Type</TableHead>
+                    <TableHead>Scores Recorded</TableHead>
+                    <TableHead>Questions</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredCycleRows.map((row, index) => (
+                    <TableRow key={row.id}>
+                      <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
+                      <TableCell>{row.cycle}</TableCell>
+                      <TableCell>{row.review_type}</TableCell>
+                      <TableCell>{row.scores_recorded}</TableCell>
+                      <TableCell>{row.questions}</TableCell>
+                      <TableCell className="text-right">
+                        <Link href={`/admin/hr/pms/cbt/${encodeURIComponent(row.id)}`}>
+                          <Button size="sm" variant="outline">
+                            <Eye className="mr-2 h-4 w-4" />
+                            View
+                          </Button>
+                        </Link>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {filteredCycleRows.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-muted-foreground py-8 text-center text-sm">
+                        No records found.
+                      </TableCell>
+                    </TableRow>
+                  ) : null}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </PageWrapper>
   )
 }

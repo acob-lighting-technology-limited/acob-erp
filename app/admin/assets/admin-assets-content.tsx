@@ -1095,6 +1095,14 @@ export function AdminAssetsContent({
     return `Assigned${statusSuffix}`
   }
 
+  const getCreatedByLabel = (createdBy: string) => {
+    const creator = employees.find((employee) => employee.id === createdBy)
+    if (!creator) return "Unknown user"
+
+    const fullName = `${formatName(creator.first_name)} ${formatName(creator.last_name)}`.trim()
+    return fullName || creator.company_email || "Unknown user"
+  }
+
   const getSortedAssets = (assetsToSort: Asset[]) => {
     if (!sortConfig) return assetsToSort
 
@@ -1308,12 +1316,7 @@ export function AdminAssetsContent({
       actions={
         <div className="flex flex-wrap items-center gap-2">
           <TableViewToggle viewMode={viewMode} onChange={setViewMode} />
-          <Button
-            variant="outline"
-            onClick={() => setExportOptionsOpen(true)}
-            className="h-8 gap-2"
-            size="sm"
-          >
+          <Button variant="outline" onClick={() => setExportOptionsOpen(true)} className="h-8 gap-2" size="sm">
             <Download className="h-4 w-4" />
             Export
           </Button>
@@ -1422,6 +1425,7 @@ export function AdminAssetsContent({
         getStatusColor={getStatusColor}
         getEffectiveAssignmentType={getEffectiveAssignmentType}
         getAssignedPersonName={getAssignedPersonName}
+        getCreatedByLabel={getCreatedByLabel}
         sortConfig={sortConfig}
         onSort={handleSort}
         hasActiveFilters={

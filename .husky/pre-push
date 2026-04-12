@@ -5,8 +5,8 @@ protected_branch='main'
 current_branch=$(git symbolic-ref HEAD | sed -e 's,.*/\(.*\),\1,')
 
 if [ "$protected_branch" = "$current_branch" ]; then
-  echo "❌ Direct pushes to '$protected_branch' branch are not allowed!"
-  echo "📝 Please create a feature branch and use a Pull Request instead."
+  echo "Direct pushes to '$protected_branch' branch are not allowed!"
+  echo "Please create a feature branch and use a Pull Request instead."
   echo ""
   echo "   Example:"
   echo "   git checkout -b feature/your-feature-name"
@@ -15,13 +15,28 @@ if [ "$protected_branch" = "$current_branch" ]; then
   exit 1
 fi
 
-echo "🔨 Running build before push..."
-
-npm run build
+echo "Running strict lint before push..."
+npm run lint:strict
 
 if [ $? -ne 0 ]; then
-  echo "❌ Build failed! Push aborted."
+  echo "Strict lint failed! Push aborted."
   exit 1
 fi
 
-echo "✅ Build successful! Proceeding with push..."
+echo "Running type-check before push..."
+npm run type-check
+
+if [ $? -ne 0 ]; then
+  echo "Type-check failed! Push aborted."
+  exit 1
+fi
+
+echo "Running build before push..."
+npm run build
+
+if [ $? -ne 0 ]; then
+  echo "Build failed! Push aborted."
+  exit 1
+fi
+
+echo "Checks passed. Proceeding with push..."

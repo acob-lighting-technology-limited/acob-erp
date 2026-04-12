@@ -29,6 +29,7 @@ interface SignatureCreatorProps {
     phone_number?: string | null
     company_email?: string | null
   } | null
+  authEmail?: string | null
   variant?: "default" | "anniversary" | "selectable"
 }
 
@@ -71,14 +72,38 @@ const ANNIVERSARY_TEMPLATE_OPTIONS = [
   { id: "minimal-confidential", label: "Template 9" },
 ] as const
 
-export function SignatureCreator({ profile, variant = "default" }: SignatureCreatorProps) {
+const isAllowedCompanyEmailDomain = (email: string) =>
+  email.endsWith("@org.acoblighting.com") || email.endsWith("@acoblighting.com")
+
+const normalizePreferredCompanyEmail = (email?: string | null) => {
+  const normalizedEmail = email?.trim().toLowerCase() || ""
+  return normalizedEmail && isAllowedCompanyEmailDomain(normalizedEmail) ? normalizedEmail : ""
+}
+
+const buildCompanyEmailFallback = (firstName: string, lastName: string) => {
+  const normalizedFirstName = firstName.trim().toLowerCase().replace(/\s+/g, "")
+  const normalizedLastName = lastName.trim().toLowerCase()
+
+  if (!normalizedFirstName || !normalizedLastName) {
+    return ""
+  }
+
+  return `${normalizedLastName.charAt(0)}.${normalizedFirstName}@org.acoblighting.com`
+}
+
+export function SignatureCreator({ profile, authEmail, variant = "default" }: SignatureCreatorProps) {
+  const preferredCompanyEmail =
+    normalizePreferredCompanyEmail(authEmail) ||
+    normalizePreferredCompanyEmail(profile?.company_email) ||
+    buildCompanyEmailFallback(profile?.first_name || "", profile?.last_name || "")
+
   const [formData, setFormData] = useState<FormData>({
     firstName: profile?.first_name || "",
     middleName: profile?.other_names || "",
     lastName: profile?.last_name || "",
     companyRole: profile?.designation || "",
     phoneNumber: profile?.phone_number || "",
-    companyEmail: profile?.company_email || "",
+    companyEmail: preferredCompanyEmail,
   })
 
   const [emailError, setEmailError] = useState("")
@@ -92,17 +117,11 @@ export function SignatureCreator({ profile, variant = "default" }: SignatureCrea
   const [darkPreview, setDarkPreview] = useState(false)
 
   useEffect(() => {
-    if (formData.firstName && formData.lastName) {
-      const firstLetter = formData.lastName.charAt(0).toLowerCase()
-      const firstName = formData.firstName.toLowerCase().replace(/\s+/g, "")
-      const autoEmail = `${firstLetter}.${firstName}@org.acoblighting.com`
+    if (!formData.companyEmail.trim()) {
+      const fallbackEmail = buildCompanyEmailFallback(formData.firstName, formData.lastName)
 
-      if (
-        !formData.companyEmail ||
-        formData.companyEmail.endsWith("@org.acoblighting.com") ||
-        formData.companyEmail.endsWith("@acoblighting.com")
-      ) {
-        setFormData((prev) => ({ ...prev, companyEmail: autoEmail }))
+      if (fallbackEmail) {
+        setFormData((prev) => ({ ...prev, companyEmail: fallbackEmail }))
       }
     }
   }, [formData.companyEmail, formData.firstName, formData.lastName])
@@ -124,8 +143,7 @@ export function SignatureCreator({ profile, variant = "default" }: SignatureCrea
   const validateEmail = (email: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     const isValidFormat = emailRegex.test(email)
-    const isAllowedDomain = email.endsWith("@org.acoblighting.com") || email.endsWith("@acoblighting.com")
-    return isValidFormat && isAllowedDomain
+    return isValidFormat && isAllowedCompanyEmailDomain(email)
   }
 
   const validatePhone = (phone: string) => {

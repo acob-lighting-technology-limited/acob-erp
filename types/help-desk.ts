@@ -30,6 +30,7 @@ export interface HelpDeskTicket {
   created_by: string
   assigned_to: string | null
   assigned_by: string | null
+  task_id?: string | null
   requester_department?: string | null
   handling_mode?: string | null
   support_mode?: string | null

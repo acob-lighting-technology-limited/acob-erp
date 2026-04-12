@@ -2,9 +2,14 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools"
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { initOfficeYearAnchors } from "@/lib/meeting-week"
 
 export function QueryProvider({ children }: { children: React.ReactNode }) {
+  useEffect(() => {
+    void initOfficeYearAnchors()
+  }, [])
+
   const [queryClient] = useState(
     () =>
       new QueryClient({

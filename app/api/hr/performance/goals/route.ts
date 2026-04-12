@@ -6,13 +6,14 @@ import { writeAuditLog } from "@/lib/audit/write-audit"
 
 const log = logger("performance-goals")
 const CreateGoalSchema = z.object({
-  user_id: z.string().trim().min(1, "Missing required fields"),
+  department: z.string().trim().min(1, "Department is required"),
   review_cycle_id: z.string().optional().nullable(),
-  title: z.string().trim().min(1, "Missing required fields"),
-  description: z.string().optional().nullable(),
-  target_value: z.coerce.number().optional(),
-  priority: z.string().optional(),
+  title: z.string().trim().min(1, "Goal title is required").max(500),
+  description: z.string().max(5000).optional().nullable(),
+  target_value: z.coerce.number().min(0).optional(),
+  priority: z.enum(["low", "medium", "high"]).optional(),
   due_date: z.string().optional().nullable(),
+  weight_pct: z.number().min(0).max(100).optional().nullable(),
 })
 
 const UpdateGoalApprovalSchema = z.object({
@@ -24,13 +25,14 @@ const UpdateGoalApprovalSchema = z.object({
 
 const UpdateGoalSchema = z.object({
   id: z.string().trim().min(1, "Goal ID is required"),
-  title: z.string().trim().min(1).optional(),
-  description: z.string().optional().nullable(),
-  target_value: z.number().optional().nullable(),
-  achieved_value: z.number().optional().nullable(),
+  title: z.string().trim().min(1).max(500).optional(),
+  description: z.string().max(5000).optional().nullable(),
+  target_value: z.number().min(0).optional().nullable(),
+  achieved_value: z.number().min(0).optional().nullable(),
   status: z.string().optional(),
-  priority: z.string().optional(),
+  priority: z.enum(["low", "medium", "high"]).optional(),
   due_date: z.string().optional().nullable(),
+  weight_pct: z.number().min(0).max(100).optional().nullable(),
   approval_status: z.enum(["pending"]).optional(),
 })
 
@@ -56,6 +58,7 @@ type GoalCycleRecord = {
 type GoalRow = {
   id: string
   user_id: string
+  department?: string | null
   review_cycle_id?: string | null
   title: string
   description?: string | null
@@ -68,10 +71,7 @@ type GoalRow = {
   updated_at?: string | null
 }
 
-async function attachGoalCycles(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  goals: GoalRow[]
-) {
+async function attachGoalCycles(supabase: Awaited<ReturnType<typeof createClient>>, goals: GoalRow[]) {
   const cycleIds = Array.from(new Set(goals.map((goal) => goal.review_cycle_id).filter(Boolean)))
   if (cycleIds.length === 0) {
     return goals.map((goal) => ({ ...goal, cycle: null }))
@@ -115,26 +115,43 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url)
-    const userId = searchParams.get("user_id") || user.id
+    const userId = searchParams.get("user_id")
+    const department = searchParams.get("department")
     const cycleId = searchParams.get("cycle_id")
-    if (userId !== user.id) {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role, department, is_department_lead, lead_departments")
-        .eq("id", user.id)
-        .single<GoalProfileRecord>()
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role, department, is_department_lead, lead_departments")
+      .eq("id", user.id)
+      .single<GoalProfileRecord>()
+
+    let targetDepartment = department || profile?.department || null
+
+    if (userId) {
       const { data: goalOwnerProfile } = await supabase
         .from("profiles")
         .select("department")
         .eq("id", userId)
         .single<{ department?: string | null }>()
-
-      if (!isAdminProfile(profile) && !canManageGoalOwner(profile, goalOwnerProfile?.department)) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 })
-      }
+      targetDepartment = goalOwnerProfile?.department || targetDepartment
     }
 
-    let query = supabase.from("goals_objectives").select("*").eq("user_id", userId).order("created_at", { ascending: false })
+    if (!targetDepartment) {
+      return NextResponse.json({ data: [] })
+    }
+
+    if (
+      targetDepartment !== profile?.department &&
+      !isAdminProfile(profile) &&
+      !canManageGoalOwner(profile, targetDepartment)
+    ) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
+
+    let query = supabase
+      .from("goals_objectives")
+      .select("*")
+      .eq("department", targetDepartment)
+      .order("created_at", { ascending: false })
 
     if (cycleId) {
       query = query.eq("review_cycle_id", cycleId)
@@ -171,20 +188,45 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid request body" }, { status: 400 })
     }
-    const { user_id, review_cycle_id, title, description, target_value, priority, due_date } = parsed.data
+    const { department, review_cycle_id, title, description, target_value, priority, due_date, weight_pct } =
+      parsed.data
+    const { data: actorProfile } = await supabase
+      .from("profiles")
+      .select("role, department, is_department_lead, lead_departments")
+      .eq("id", user.id)
+      .single<GoalProfileRecord>()
 
-    if (user_id !== user.id) {
-      const [{ data: actorProfile }, { data: targetProfile }] = await Promise.all([
-        supabase
-          .from("profiles")
-          .select("role, department, is_department_lead, lead_departments")
-          .eq("id", user.id)
-          .single<GoalProfileRecord>(),
-        supabase.from("profiles").select("department").eq("id", user_id).single<{ department?: string | null }>(),
-      ])
+    const canCreateForDepartment = isAdminProfile(actorProfile) || canManageGoalOwner(actorProfile, department)
 
-      if (!isAdminProfile(actorProfile) && !canManageGoalOwner(actorProfile, targetProfile?.department)) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    if (!canCreateForDepartment) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
+
+    // Weight validation: if weight_pct is set, check existing goals don't exceed 100%
+    let weightWarning: string | null = null
+    if (typeof weight_pct === "number" && review_cycle_id) {
+      const { data: existingGoals } = await supabase
+        .from("goals_objectives")
+        .select("weight_pct")
+        .eq("department", department)
+        .eq("review_cycle_id", review_cycle_id)
+        .eq("approval_status", "approved")
+        .not("weight_pct", "is", null)
+
+      const existingTotal = (existingGoals || []).reduce(
+        (sum, goal) => sum + (typeof goal.weight_pct === "number" ? goal.weight_pct : 0),
+        0
+      )
+      if (existingTotal + weight_pct > 100) {
+        return NextResponse.json(
+          {
+            error: `Adding this weight (${weight_pct}%) would bring total approved goal weights to ${existingTotal + weight_pct}%, exceeding 100%. Current total: ${existingTotal}%.`,
+          },
+          { status: 400 }
+        )
+      }
+      if (existingTotal + weight_pct < 100) {
+        weightWarning = `Current total goal weight will be ${existingTotal + weight_pct}% (${100 - existingTotal - weight_pct}% unallocated).`
       }
     }
 
@@ -192,13 +234,15 @@ export async function POST(request: NextRequest) {
     const { data: goal, error } = await supabase
       .from("goals_objectives")
       .insert({
-        user_id,
+        user_id: user.id,
+        department,
         review_cycle_id,
         title,
         description,
         target_value,
         priority: priority || "medium",
         due_date,
+        weight_pct: weight_pct ?? null,
         status: "in_progress",
       })
       .select("*")
@@ -216,7 +260,7 @@ export async function POST(request: NextRequest) {
         action: "create",
         entityType: "goal",
         entityId: goal.id,
-        newValues: { user_id, review_cycle_id, title, priority: priority || "medium" },
+        newValues: { user_id: user.id, department, review_cycle_id, title, priority: priority || "medium" },
         context: { actorId: user.id, source: "api", route: "/api/hr/performance/goals" },
       },
       { failOpen: true }
@@ -225,6 +269,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       data: (await attachGoalCycles(supabase, [goal]))[0],
       message: "Goal created successfully",
+      ...(weightWarning ? { warning: weightWarning } : {}),
     })
   } catch (error) {
     log.error({ err: String(error) }, "Unhandled error in POST")
@@ -329,12 +374,13 @@ export async function PUT(request: NextRequest) {
     if (!isOwner && !managerCanUpdate) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
-    if (!isOwner && updates.approval_status === "pending") {
-      return NextResponse.json({ error: "Only the goal owner can request approval" }, { status: 403 })
-    }
-
     // Update goal
-    const { data: goal, error } = await supabase.from("goals_objectives").update(updates).eq("id", id).select().single()
+    const { data: goal, error } = await supabase
+      .from("goals_objectives")
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .eq("id", id)
+      .select()
+      .single()
 
     if (error) {
       log.error({ err: error }, "Error updating goal")

@@ -17,6 +17,12 @@ type Employee = {
 }
 
 interface MeetingReminderFormProps {
+  meetingWeek: number
+  meetingYear: number
+  weekOptions: number[]
+  yearOptions: number[]
+  setMeetingWeek: (value: number) => void
+  setMeetingYear: (value: number) => void
   meetingDate: string
   meetingTime: string
   teamsLink: string
@@ -35,6 +41,12 @@ interface MeetingReminderFormProps {
 }
 
 export function MeetingReminderForm({
+  meetingWeek,
+  meetingYear,
+  weekOptions,
+  yearOptions,
+  setMeetingWeek,
+  setMeetingYear,
   meetingDate,
   meetingTime,
   teamsLink,
@@ -55,10 +67,41 @@ export function MeetingReminderForm({
     <>
       <div className="flex flex-wrap gap-4">
         <div className="space-y-2">
+          <Label htmlFor="meeting-week">Week</Label>
+          <Select value={String(meetingWeek)} onValueChange={(value) => setMeetingWeek(Number(value))}>
+            <SelectTrigger id="meeting-week" className="w-[140px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {weekOptions.map((week) => (
+                <SelectItem key={week} value={String(week)}>
+                  Week {week}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="meeting-year">Year</Label>
+          <Select value={String(meetingYear)} onValueChange={(value) => setMeetingYear(Number(value))}>
+            <SelectTrigger id="meeting-year" className="w-[140px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {yearOptions.map((year) => (
+                <SelectItem key={year} value={String(year)}>
+                  {year}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
           <Label htmlFor="meet-date">Meeting Date</Label>
           <Input id="meet-date" type="date" value={meetingDate} className="w-[180px]" disabled readOnly />
           <p className="text-muted-foreground text-xs">
-            Managed from Admin Reports meeting window. This value is read-only here.
+            The date updates automatically from the selected week&apos;s Admin Reports setup. This value is read-only
+            here.
           </p>
           <Button variant="outline" size="sm" asChild className="h-7 px-2 text-[11px]">
             <Link href="/admin/reports/general-meeting/weekly-reports">Manage Meeting Date</Link>

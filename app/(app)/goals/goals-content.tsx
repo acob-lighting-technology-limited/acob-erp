@@ -1,464 +1,331 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import Link from "next/link"
+import { useMemo, useState } from "react"
+import { Plus, Search, Target } from "lucide-react"
+import { toast } from "sonner"
+import { PageHeader, PageWrapper } from "@/components/layout"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Target, Plus, CheckCircle, Clock, XCircle } from "lucide-react"
-import { PageHeader, PageWrapper } from "@/components/layout"
-import { toast } from "sonner"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import type { Goal } from "./page"
-import { ChevronDown } from "lucide-react"
 
-import { logger } from "@/lib/logger"
-
-const log = logger("dashboard-goals-goals-content")
-
-interface GoalsContentProps {
+type GoalsContentProps = {
   initialGoals: Goal[]
-  userId: string
+  canCreateGoal?: boolean
+  managedDepartments?: string[]
+  pageTitle?: string
+  pageDescription?: string
+  backHref?: string
+  backLabel?: string
+  showCreateTaskAction?: boolean
+  summaryCards?: Array<{ label: string; value: string | number }>
 }
 
-type GoalsApiResponse = {
-  data?: Goal | Goal[]
-  goals?: Goal[]
-  error?: string
+const INITIAL_FORM = {
+  department: "",
+  title: "",
+  description: "",
+  priority: "medium",
+  due_date: "",
 }
 
-export function GoalsContent({ initialGoals, userId }: GoalsContentProps) {
+function getApprovalLabel(status: Goal["approval_status"]) {
+  if (status === "approved") return "Approved"
+  if (status === "rejected") return "Rejected"
+  return "Pending"
+}
+
+function getApprovalClass(status: Goal["approval_status"]) {
+  if (status === "approved") return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+  if (status === "rejected") return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
+  return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
+}
+
+export function GoalsContent({
+  initialGoals,
+  canCreateGoal = false,
+  managedDepartments = [],
+  pageTitle = "Department Goals",
+  pageDescription = "View the department goals already set by your lead.",
+  backHref = "/pms",
+  backLabel = "Back to PMS",
+  showCreateTaskAction = false,
+  summaryCards = [],
+}: GoalsContentProps) {
   const [goals, setGoals] = useState<Goal[]>(initialGoals)
-  const [linkedTasks, setLinkedTasks] = useState<
-    Record<
-      string,
-      Array<{
-        id: string
-        title: string
-        status: string
-        work_item_number?: string | null
-        source_type?: string | null
-      }>
-    >
-  >({})
-  const [expandedGoals, setExpandedGoals] = useState<Record<string, boolean>>({})
-  const [showAddDialog, setShowAddDialog] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [cycleFilter, setCycleFilter] = useState("all")
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [newGoal, setNewGoal] = useState({
-    title: "",
-    description: "",
-    target_value: 100,
-    priority: "medium",
-    due_date: "",
-  })
+  const [form, setForm] = useState(INITIAL_FORM)
 
-  async function fetchGoals() {
-    try {
-      const response = await fetch("/api/hr/performance/goals", { cache: "no-store" })
-      const data = (await response.json().catch(() => null)) as GoalsApiResponse | null
-      const nextGoals = Array.isArray(data?.data) ? data.data : Array.isArray(data?.goals) ? data.goals : []
-      if (Array.isArray(nextGoals)) {
-        setGoals(nextGoals)
-      }
-    } catch (error) {
-      log.error("Error fetching goals:", error)
+  const availableDepartments = useMemo(
+    () =>
+      (managedDepartments.length > 0
+        ? managedDepartments
+        : Array.from(new Set(goals.map((goal) => goal.department).filter(Boolean) as string[]))
+      ).sort((left, right) => left.localeCompare(right)),
+    [goals, managedDepartments]
+  )
+
+  const filteredGoals = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase()
+    return goals.filter((goal) => {
+      const matchesQuery =
+        !query ||
+        [goal.title, goal.description, goal.department, goal.priority, goal.status, goal.cycle?.name]
+          .filter(Boolean)
+          .some((value) => String(value).toLowerCase().includes(query))
+      const matchesCycle = cycleFilter === "all" || (goal.cycle?.name || "-") === cycleFilter
+      return matchesQuery && matchesCycle
+    })
+  }, [cycleFilter, goals, searchQuery])
+
+  const cycleOptions = useMemo(
+    () => Array.from(new Set(goals.map((goal) => goal.cycle?.name).filter(Boolean) as string[])).sort(),
+    [goals]
+  )
+
+  async function handleCreateGoal() {
+    if (!form.department || !form.title) {
+      toast.error("Department and goal title are required")
+      return
     }
-  }
 
-  useEffect(() => {
-    async function loadLinkedTasks() {
-      const approvedGoals = goals.filter((goal) => goal.approval_status === "approved")
-      const entries = await Promise.all(
-        approvedGoals.map(async (goal) => {
-          const response = await fetch(`/api/hr/performance/goals/${goal.id}/tasks`, { cache: "no-store" })
-          const payload = (await response.json().catch(() => null)) as {
-            data?: Array<{
-              id: string
-              title: string
-              status: string
-              work_item_number?: string | null
-              source_type?: string | null
-            }>
-          } | null
-          return [goal.id, payload?.data || []] as const
-        })
-      )
-      setLinkedTasks(Object.fromEntries(entries))
-    }
-    void loadLinkedTasks()
-  }, [goals])
-
-  async function handleAddGoal() {
     setSaving(true)
     try {
       const response = await fetch("/api/hr/performance/goals", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...newGoal,
-          user_id: userId,
-        }),
+        body: JSON.stringify(form),
       })
-
-      const payload = (await response.json().catch(() => null)) as GoalsApiResponse | null
-
-      if (!response.ok) {
+      const payload = (await response.json().catch(() => null)) as { data?: Goal; error?: string } | null
+      if (!response.ok || !payload?.data) {
         throw new Error(payload?.error || "Failed to create goal")
       }
 
-      const createdGoal = payload?.data && !Array.isArray(payload.data) ? payload.data : null
-      if (createdGoal) {
-        setGoals((current) => [createdGoal, ...current.filter((goal) => goal.id !== createdGoal.id)])
-      } else {
-        await fetchGoals()
-      }
-
-      toast.success("Goal created successfully")
-      setShowAddDialog(false)
-      setNewGoal({ title: "", description: "", target_value: 100, priority: "medium", due_date: "" })
-    } catch (error: unknown) {
+      setGoals((current) => [payload.data as Goal, ...current])
+      setForm(INITIAL_FORM)
+      setIsDialogOpen(false)
+      toast.success("Department goal created")
+    } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to create goal")
     } finally {
       setSaving(false)
     }
   }
 
-  async function updateGoalProgress(goalId: string, achievedValue: number) {
-    try {
-      const response = await fetch("/api/hr/performance/goals", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: goalId,
-          achieved_value: achievedValue,
-          status: achievedValue >= 100 ? "completed" : "in_progress",
-        }),
-      })
-
-      if (!response.ok) throw new Error("Failed to update goal")
-
-      toast.success("Goal progress updated")
-      fetchGoals()
-    } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : "Failed to update goal")
-    }
-  }
-
-  async function handleRequestApproval(goalId: string) {
-    try {
-      const response = await fetch("/api/hr/performance/goals", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: goalId, approval_status: "pending" }),
-      })
-      if (!response.ok) throw new Error("Failed to request approval")
-      toast.success("Approval request sent to your line manager")
-      fetchGoals()
-    } catch {
-      toast.error("Failed to request approval")
-    }
-  }
-
-  function getApprovalBadge(approval_status: string) {
-    if (approval_status === "approved")
-      return (
-        <Badge className="flex items-center gap-1 bg-green-100 text-green-800">
-          <CheckCircle className="h-3 w-3" /> KPI Approved
-        </Badge>
-      )
-    if (approval_status === "rejected")
-      return (
-        <Badge className="flex items-center gap-1 bg-red-100 text-red-800">
-          <XCircle className="h-3 w-3" /> KPI Rejected
-        </Badge>
-      )
-    return (
-      <Badge className="flex items-center gap-1 bg-yellow-100 text-yellow-800">
-        <Clock className="h-3 w-3" /> Pending Approval
-      </Badge>
-    )
-  }
-
-  function getStatusBadge(status: string) {
-    const colors: { [key: string]: string } = {
-      not_started: "bg-gray-100 text-gray-800",
-      in_progress: "bg-blue-100 text-blue-800",
-      completed: "bg-green-100 text-green-800",
-      cancelled: "bg-red-100 text-red-800",
-    }
-    return colors[status] || "bg-gray-100 text-gray-800"
-  }
-
-  function getPriorityBadge(priority: string) {
-    const colors: { [key: string]: string } = {
-      low: "bg-gray-100 text-gray-800",
-      medium: "bg-yellow-100 text-yellow-800",
-      high: "bg-red-100 text-red-800",
-    }
-    return colors[priority] || "bg-gray-100 text-gray-800"
-  }
-
-  const inProgress = goals.filter((g) => g.status === "in_progress").length
-  const completed = goals.filter((g) => g.status === "completed").length
-
-  function toggleGoalTasks(goalId: string) {
-    setExpandedGoals((current) => ({
-      ...current,
-      [goalId]: !current[goalId],
-    }))
-  }
-
   return (
     <PageWrapper maxWidth="full" background="gradient">
       <PageHeader
-        title="My Goals"
-        description="Track and manage your performance goals"
+        title={pageTitle}
+        description={pageDescription}
         icon={Target}
-        backLink={{ href: "/profile", label: "Back to Dashboard" }}
+        backLink={{ href: backHref, label: backLabel }}
         actions={
-          <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="mr-2 h-4 w-4" />
-                Add Goal
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-h-[90vh] w-[95vw] max-w-lg overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Create New Goal</DialogTitle>
-                <DialogDescription>Set a new performance goal to track</DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 pt-4">
-                <div className="space-y-2">
-                  <Label>Title</Label>
-                  <Input
-                    value={newGoal.title}
-                    onChange={(e) => setNewGoal({ ...newGoal, title: e.target.value })}
-                    placeholder="e.g., Complete React certification"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Description</Label>
-                  <Textarea
-                    value={newGoal.description}
-                    onChange={(e) => setNewGoal({ ...newGoal, description: e.target.value })}
-                    placeholder="Describe your goal..."
-                    rows={3}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Priority</Label>
-                    <Select
-                      value={newGoal.priority}
-                      onValueChange={(value) => setNewGoal({ ...newGoal, priority: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="low">Low</SelectItem>
-                        <SelectItem value="medium">Medium</SelectItem>
-                        <SelectItem value="high">High</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Due Date</Label>
-                    <Input
-                      type="date"
-                      value={newGoal.due_date}
-                      onChange={(e) => setNewGoal({ ...newGoal, due_date: e.target.value })}
-                    />
-                  </div>
-                </div>
-                <Button onClick={handleAddGoal} disabled={saving || !newGoal.title} className="w-full">
-                  {saving ? "Creating..." : "Create Goal"}
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
+          canCreateGoal ? (
+            <Button size="sm" className="h-8 gap-2" onClick={() => setIsDialogOpen(true)}>
+              <Plus className="h-4 w-4" />
+              Add Goal
+            </Button>
+          ) : undefined
         }
       />
 
-      {/* Summary */}
-      <div className="mb-6 grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 md:gap-4">
-        <Card>
-          <CardHeader className="px-3 pt-3 pb-1 sm:px-6 sm:pt-6 sm:pb-2">
-            <CardTitle className="text-sm font-medium">Total Goals</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-lg font-bold sm:text-2xl">{goals.length}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="px-3 pt-3 pb-1 sm:px-6 sm:pt-6 sm:pb-2">
-            <CardTitle className="text-sm font-medium">In Progress</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-lg font-bold text-blue-600 sm:text-2xl">{inProgress}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="px-3 pt-3 pb-1 sm:px-6 sm:pt-6 sm:pb-2">
-            <CardTitle className="text-sm font-medium">Completed</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-lg font-bold text-green-600 sm:text-2xl">{completed}</div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Goals List */}
-      {goals.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <Target className="text-muted-foreground mx-auto mb-4 h-12 w-12" />
-            <h3 className="text-lg font-semibold">No goals yet</h3>
-            <p className="text-muted-foreground mb-4">Create your first performance goal to get started</p>
-            <Button onClick={() => setShowAddDialog(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Goal
-            </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-4">
-          {goals.map((goal) => (
-            <Card key={goal.id}>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2">
-                    {goal.status === "completed" ? (
-                      <CheckCircle className="h-5 w-5 text-green-500" />
-                    ) : (
-                      <Target className="h-5 w-5" />
-                    )}
-                    {goal.title}
-                  </CardTitle>
-                  <div className="flex flex-wrap gap-2">
-                    <Badge className={getPriorityBadge(goal.priority)}>{goal.priority}</Badge>
-                    <Badge className={getStatusBadge(goal.status)}>{goal.status.replace("_", " ")}</Badge>
-                    {getApprovalBadge(goal.approval_status ?? "pending")}
-                  </div>
-                </div>
-                {goal.description && <CardDescription>{goal.description}</CardDescription>}
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {(() => {
-                    const goalTasks = linkedTasks[goal.id] || []
-                    const completedTasks = goalTasks.filter((task) => task.status === "completed").length
-                    const taskProgress =
-                      goalTasks.length > 0 ? Math.round((completedTasks / goalTasks.length) * 100) : null
-                    const progressValue = taskProgress ?? (goal.achieved_value || 0)
-                    const isExpanded = Boolean(expandedGoals[goal.id])
-                    return (
-                      <>
-                        <div>
-                          <div className="mb-2 flex justify-between text-sm">
-                            <span>Progress</span>
-                            <span>{progressValue}%</span>
-                          </div>
-                          <Progress value={progressValue} />
-                        </div>
-                        {goalTasks.length === 0 && goal.status !== "completed" && (
-                          <div className="flex gap-2">
-                            <Input
-                              type="number"
-                              min="0"
-                              max="100"
-                              placeholder="Update progress %"
-                              className="w-32"
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                  updateGoalProgress(goal.id, parseInt((e.target as HTMLInputElement).value))
-                                }
-                              }}
-                            />
-                            <Button variant="outline" size="sm" onClick={() => updateGoalProgress(goal.id, 100)}>
-                              Mark Complete
-                            </Button>
-                          </div>
-                        )}
-                        {goalTasks.length === 0 ? (
-                          <p className="text-sm text-amber-700">No linked tasks - progress is self-reported</p>
-                        ) : (
-                          <div className="space-y-3">
-                            <button
-                              type="button"
-                              className="flex w-full items-center justify-between rounded-lg border px-3 py-2 text-left"
-                              onClick={() => toggleGoalTasks(goal.id)}
-                            >
-                              <div>
-                                <div className="font-medium">Linked Tasks</div>
-                                <div className="text-sm text-slate-500">
-                                  {completedTasks} of {goalTasks.length} tasks completed ({taskProgress}%)
-                                </div>
-                              </div>
-                              <ChevronDown
-                                className={`h-4 w-4 transition-transform ${isExpanded ? "rotate-180" : ""}`}
-                              />
-                            </button>
-                            {isExpanded ? (
-                              <div className="space-y-2 pt-1">
-                                {goalTasks.map((task) => (
-                                  <div
-                                    key={task.id}
-                                    className="flex items-center justify-between rounded-lg border p-3"
-                                  >
-                                    <div>
-                                      <div className="font-mono text-xs text-slate-500">
-                                        {task.work_item_number || "Task"}
-                                      </div>
-                                      <div className="font-medium">{task.title}</div>
-                                    </div>
-                                    <div className="flex gap-2">
-                                      <Badge variant="outline">{task.status.replace("_", " ")}</Badge>
-                                      {task.source_type ? (
-                                        <Badge variant="outline">{task.source_type.replace("_", " ")}</Badge>
-                                      ) : null}
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            ) : null}
-                          </div>
-                        )}
-                      </>
-                    )
-                  })()}
-                  {goal.due_date && (
-                    <p className="text-muted-foreground text-sm">Due: {new Date(goal.due_date).toLocaleDateString()}</p>
-                  )}
-                  {/* Approval action — only show for pending goals not yet completed */}
-                  {(goal.approval_status ?? "pending") === "pending" && goal.status !== "completed" && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="mt-1 w-full sm:w-auto"
-                      onClick={() => handleRequestApproval(goal.id)}
-                    >
-                      Request KPI Approval
-                    </Button>
-                  )}
-                </div>
+      {summaryCards.length > 0 ? (
+        <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+          {summaryCards.map((card) => (
+            <Card key={card.label}>
+              <CardContent className="pt-6">
+                <p className="text-muted-foreground text-sm">{card.label}</p>
+                <p className="text-2xl font-semibold">{card.value}</p>
               </CardContent>
             </Card>
           ))}
         </div>
-      )}
+      ) : null}
+
+      <Card className="mb-4 border-2">
+        <CardContent className="p-3 sm:p-6">
+          <div className="flex flex-col gap-4 md:flex-row">
+            <div className="relative flex-1">
+              <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+              <Input
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Search goal, department, or status..."
+                className="pl-10"
+              />
+            </div>
+            <Select value={cycleFilter} onValueChange={setCycleFilter}>
+              <SelectTrigger className="w-full md:w-64">
+                <SelectValue placeholder="Cycle" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Cycles</SelectItem>
+                {cycleOptions.map((cycle) => (
+                  <SelectItem key={cycle} value={cycle}>
+                    {cycle}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Goal Table</CardTitle>
+          <CardDescription>
+            {canCreateGoal
+              ? "Department goals are created here, then tasks are created under each goal."
+              : "Goals are created from the admin side by your department lead."}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {filteredGoals.length === 0 ? (
+            <p className="text-muted-foreground py-4 text-sm">No department goals found.</p>
+          ) : (
+            <Table className="min-w-[980px]">
+              <TableHeader className="bg-emerald-50 dark:bg-emerald-950/30">
+                <TableRow>
+                  <TableHead className="w-16">S/N</TableHead>
+                  <TableHead>Goal</TableHead>
+                  <TableHead>Department</TableHead>
+                  <TableHead>Cycle</TableHead>
+                  <TableHead>Priority</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Approval</TableHead>
+                  <TableHead>Due Date</TableHead>
+                  {showCreateTaskAction ? <TableHead className="text-right">Action</TableHead> : null}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredGoals.map((goal, index) => (
+                  <TableRow key={goal.id}>
+                    <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
+                    <TableCell>
+                      <div className="space-y-1">
+                        <p className="font-medium">{goal.title}</p>
+                        {goal.description ? <p className="text-muted-foreground text-xs">{goal.description}</p> : null}
+                      </div>
+                    </TableCell>
+                    <TableCell>{goal.department || "-"}</TableCell>
+                    <TableCell>{goal.cycle?.name || "-"}</TableCell>
+                    <TableCell className="capitalize">{goal.priority}</TableCell>
+                    <TableCell className="capitalize">{String(goal.status || "").replace("_", " ")}</TableCell>
+                    <TableCell>
+                      <span
+                        className={`rounded-full px-2 py-1 text-xs font-medium ${getApprovalClass(goal.approval_status)}`}
+                      >
+                        {getApprovalLabel(goal.approval_status)}
+                      </span>
+                    </TableCell>
+                    <TableCell>{goal.due_date ? new Date(goal.due_date).toLocaleDateString() : "-"}</TableCell>
+                    {showCreateTaskAction ? (
+                      <TableCell className="text-right">
+                        <Link href={`/admin/tasks?goal_id=${encodeURIComponent(goal.id)}`}>
+                          <Button size="sm" variant="outline">
+                            Create Task
+                          </Button>
+                        </Link>
+                      </TableCell>
+                    ) : null}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Create Department Goal</DialogTitle>
+            <DialogDescription>
+              Goals are now departmental. After saving the goal, create tasks under it and assign them from the task
+              manager.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Department</Label>
+              <Select
+                value={form.department}
+                onValueChange={(value) => setForm((current) => ({ ...current, department: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select department" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableDepartments.map((department) => (
+                    <SelectItem key={department} value={department}>
+                      {department}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Goal Title</Label>
+              <Input
+                value={form.title}
+                onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Description</Label>
+              <Textarea
+                rows={4}
+                value={form.description}
+                onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
+              />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Priority</Label>
+                <Select
+                  value={form.priority}
+                  onValueChange={(value) => setForm((current) => ({ ...current, priority: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="low">Low</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Due Date</Label>
+                <Input
+                  type="date"
+                  value={form.due_date}
+                  onChange={(event) => setForm((current) => ({ ...current, due_date: event.target.value }))}
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={saving}>
+                Cancel
+              </Button>
+              <Button onClick={() => void handleCreateGoal()} loading={saving}>
+                Save Goal
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </PageWrapper>
   )
 }

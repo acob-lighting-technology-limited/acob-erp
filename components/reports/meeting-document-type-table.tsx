@@ -236,10 +236,7 @@ export function MeetingDocumentTypeTable({
       return
     }
     const target = rows.find((row) => row.id === id)
-    const isPastRow = target
-      ? compareWeekYear(target.meeting_week, target.meeting_year, officeWeek.week, officeWeek.year) < 0
-      : false
-    if (target?.is_locked || isPastRow) {
+    if (target?.is_locked) {
       toast.error(
         `Week ${target?.meeting_week ?? weekNumber}, ${target?.meeting_year ?? yearNumber} is locked and can no longer be changed`
       )
@@ -282,8 +279,7 @@ export function MeetingDocumentTypeTable({
   }
 
   const openEdit = (row: MeetingDocument) => {
-    const isPastRow = compareWeekYear(row.meeting_week, row.meeting_year, officeWeek.week, officeWeek.year) < 0
-    if (row.is_locked || isPastRow) {
+    if (row.is_locked) {
       toast.error(`Week ${row.meeting_week}, ${row.meeting_year} is locked and can no longer be edited`)
       return
     }
@@ -539,9 +535,7 @@ export function MeetingDocumentTypeTable({
                 </TableRow>
               ) : (
                 filteredRows.map((row, index) => {
-                  const isPastRow =
-                    compareWeekYear(row.meeting_week, row.meeting_year, officeWeek.week, officeWeek.year) < 0
-                  const isActionLocked = isPastRow || Boolean(row.is_locked)
+                  const isActionLocked = Boolean(row.is_locked)
                   const submittedDate = row.created_at
                     ? new Date(row.created_at).toLocaleString("en-GB", {
                         day: "2-digit",

@@ -3,7 +3,6 @@ import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { logger } from "@/lib/logger"
-import { resolveAutoLinkedGoalId } from "@/lib/performance/goal-linking"
 import {
   canAssignTasks,
   canAssignToDepartment,
@@ -21,14 +20,12 @@ const TaskBodySchema = z.object({
   status: z.enum(["pending", "in_progress", "completed", "cancelled"]).default("pending"),
   due_date: z.string().optional().nullable(),
   department: z.string().optional().nullable(),
-  assignment_type: z.enum(["individual", "multiple", "department"]),
+  assignment_type: z.enum(["individual", "department"]),
   assigned_to: z.string().uuid().optional().nullable(),
-  assigned_users: z.array(z.string().uuid()).optional().default([]),
-  project_id: z.string().uuid().optional().nullable(),
-  goal_id: z.string().uuid().optional().nullable(),
+  goal_id: z.string().uuid("Goal is required"),
   task_start_date: z.string().optional().nullable(),
   task_end_date: z.string().optional().nullable(),
-  source_type: z.enum(["manual", "project_task"]).default("manual"),
+  source_type: z.enum(["manual"]).default("manual"),
 })
 
 export async function POST(request: NextRequest) {
@@ -80,30 +77,6 @@ export async function POST(request: NextRequest) {
       resolvedDepartment = assignee.department || resolvedDepartment
     }
 
-    if (payload.assignment_type === "multiple") {
-      if (payload.assigned_users.length === 0) {
-        return NextResponse.json({ error: "At least one assignee is required for group tasks" }, { status: 400 })
-      }
-
-      const { data: assignees } = await supabase
-        .from("profiles")
-        .select("id, department")
-        .in("id", payload.assigned_users)
-
-      const typedAssignees = (assignees || []) as TaskAssignmentTargetProfile[]
-      if (typedAssignees.length !== payload.assigned_users.length) {
-        return NextResponse.json({ error: "One or more selected assignees were not found" }, { status: 400 })
-      }
-
-      const invalidAssignee = typedAssignees.find((assignee) => !canAssignToProfile(profile, assignee))
-      if (invalidAssignee) {
-        return NextResponse.json({ error: "You can only assign tasks within your approved scope" }, { status: 403 })
-      }
-
-      const departments = Array.from(new Set(typedAssignees.map((assignee) => assignee.department).filter(Boolean)))
-      resolvedDepartment = departments.length === 1 ? departments[0] || null : resolvedDepartment
-    }
-
     if (payload.assignment_type === "department") {
       if (!payload.department) {
         return NextResponse.json({ error: "Department is required for department tasks" }, { status: 400 })
@@ -124,8 +97,7 @@ export async function POST(request: NextRequest) {
       assignment_type: payload.assignment_type,
       assigned_to: payload.assignment_type === "individual" ? payload.assigned_to || null : null,
       assigned_by: user.id,
-      project_id: payload.project_id || null,
-      goal_id: payload.goal_id || null,
+      goal_id: payload.goal_id,
       task_start_date: payload.task_start_date || null,
       task_end_date: payload.task_end_date || null,
       source_type: payload.source_type,
@@ -136,49 +108,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error?.message || "Failed to create task" }, { status: 500 })
     }
 
-    if (payload.assignment_type === "multiple" && payload.assigned_users.length > 0) {
-      const assignments = payload.assigned_users.map((userId) => ({ task_id: task.id, user_id: userId }))
-      await supabase.from("task_assignments").insert(assignments)
-    }
-
-    const autoGoalId =
-      payload.assignment_type === "individual"
-        ? await resolveAutoLinkedGoalId({
-            supabase,
-            actorId: user.id,
-            assignedTo: payload.assigned_to || null,
-            department: payload.department || null,
-            sourceType: payload.source_type,
-            title: payload.title,
-            explicitGoalId: payload.goal_id || null,
-          })
-        : payload.goal_id || null
-
-    const finalTask =
-      autoGoalId && autoGoalId !== task.goal_id
-        ? (
-            await supabase
-              .from("tasks")
-              .update({ goal_id: autoGoalId, updated_at: new Date().toISOString() })
-              .eq("id", task.id)
-              .select("*")
-              .single()
-          ).data || task
-        : task
-
     await writeAuditLog(
       supabase,
       {
         action: "task.create",
         entityType: "task",
         entityId: task.id,
-        newValues: { title: finalTask.title, status: finalTask.status, goal_id: finalTask.goal_id },
+        newValues: { title: task.title, status: task.status, goal_id: task.goal_id },
         context: { actorId: user.id, source: "api", route: "/api/tasks" },
       },
       { failOpen: true }
     )
 
-    return NextResponse.json({ data: finalTask }, { status: 201 })
+    return NextResponse.json({ data: task }, { status: 201 })
   } catch (error) {
     log.error({ err: String(error) }, "Unhandled error in tasks POST")
     return NextResponse.json({ error: "Failed to create task" }, { status: 500 })

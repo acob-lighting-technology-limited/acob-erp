@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
@@ -58,17 +58,18 @@ export interface UserProfile {
   is_global_task_assigner?: boolean
 }
 
-export interface Project {
+interface GoalFilterOption {
   id: string
-  project_name: string
+  title: string
 }
 
 interface AdminTasksContentProps {
   initialTasks: Task[]
   initialemployee: employee[]
-  initialProjects: Project[]
   initialDepartments: string[]
+  initialGoals: GoalFilterOption[]
   userProfile: UserProfile
+  initialGoalId?: string
 }
 
 const INITIAL_TASK_FORM: TaskFormState = {
@@ -90,9 +91,10 @@ const INITIAL_TASK_FORM: TaskFormState = {
 export function AdminTasksContent({
   initialTasks,
   initialemployee,
-  initialProjects,
   initialDepartments,
+  initialGoals,
   userProfile,
+  initialGoalId = "",
 }: AdminTasksContentProps) {
   const [tasks, setTasks] = useState<Task[]>(initialTasks)
   const [employee] = useState<employee[]>(initialemployee)
@@ -106,12 +108,12 @@ export function AdminTasksContent({
   const scopedAssignableEmployees = filterAssignableTaskUsers(assignerProfile, activeEmployees)
   const [departments] = useState<string[]>(initialDepartments)
   const scopedAssignableDepartments = filterAssignableTaskDepartments(assignerProfile, departments)
-  const [projects] = useState<Project[]>(initialProjects)
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [priorityFilter, setPriorityFilter] = useState("all")
   const [departmentFilter, setDepartmentFilter] = useState("all")
   const [employeeFilter, setemployeeFilter] = useState("all")
+  const [goalFilter, setGoalFilter] = useState(initialGoalId || "all")
   const [viewMode, setViewMode] = useState<"list" | "card">("list")
 
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false)
@@ -123,6 +125,15 @@ export function AdminTasksContent({
   const [isWorkflowOpen, setIsWorkflowOpen] = useState(false)
 
   const [taskForm, setTaskForm] = useState<TaskFormState>(INITIAL_TASK_FORM)
+  const consumedInitialGoalIdRef = useRef("")
+
+  useEffect(() => {
+    if (!initialGoalId || consumedInitialGoalIdRef.current === initialGoalId) return
+    consumedInitialGoalIdRef.current = initialGoalId
+    setSelectedTask(null)
+    setTaskForm({ ...INITIAL_TASK_FORM, goal_id: initialGoalId })
+    setIsTaskDialogOpen(true)
+  }, [initialGoalId])
 
   const supabase = createClient()
   const scopedDepartments = userProfile.is_global_task_assigner
@@ -156,12 +167,6 @@ export function AdminTasksContent({
     if (task) {
       setSelectedTask(task)
 
-      let assignedUsers: string[] = []
-      if (task.assignment_type === "multiple" && task.id) {
-        const { data: assignments } = await supabase.from("task_assignments").select("user_id").eq("task_id", task.id)
-        assignedUsers = assignments?.map((assignment: { user_id: string }) => assignment.user_id) || []
-      }
-
       setTaskForm({
         title: task.title,
         description: task.description || "",
@@ -171,8 +176,8 @@ export function AdminTasksContent({
         department: task.department || "",
         due_date: task.due_date ? task.due_date.split("T")[0] : "",
         assignment_type: task.assignment_type || "individual",
-        assigned_users: assignedUsers,
-        project_id: task.project_id || "",
+        assigned_users: [],
+        project_id: "",
         goal_id: task.goal_id || "",
         task_start_date: task.task_start_date || "",
         task_end_date: task.task_end_date || "",
@@ -184,7 +189,7 @@ export function AdminTasksContent({
     setIsTaskDialogOpen(true)
   }
 
-  const handleSaveTask = async () => {
+  const handleSaveTask = async (nextTaskForm?: TaskFormState) => {
     if (isSaving) return
     setIsSaving(true)
     try {
@@ -196,7 +201,9 @@ export function AdminTasksContent({
         return
       }
 
-      const validationError = validateTaskForm(taskForm)
+      const activeTaskForm = nextTaskForm ?? taskForm
+
+      const validationError = validateTaskForm(activeTaskForm)
       if (validationError) {
         toast.error(validationError)
         setIsSaving(false)
@@ -204,46 +211,49 @@ export function AdminTasksContent({
       }
 
       const taskData = {
-        title: taskForm.title,
-        description: taskForm.description || null,
-        priority: taskForm.priority,
-        status: taskForm.status,
-        due_date: taskForm.due_date || null,
-        department: taskForm.assignment_type === "department" ? taskForm.department : taskForm.department || null,
-        assignment_type: taskForm.assignment_type,
-        assigned_to: taskForm.assignment_type === "individual" ? taskForm.assigned_to : null,
+        title: activeTaskForm.title,
+        description: activeTaskForm.description || null,
+        priority: activeTaskForm.priority,
+        status: activeTaskForm.status,
+        due_date: activeTaskForm.due_date || null,
+        department:
+          activeTaskForm.assignment_type === "department"
+            ? activeTaskForm.department
+            : activeTaskForm.department || null,
+        assignment_type: activeTaskForm.assignment_type,
+        assigned_to: activeTaskForm.assignment_type === "individual" ? activeTaskForm.assigned_to : null,
         assigned_by: user.id,
-        project_id: taskForm.project_id || null,
-        goal_id: taskForm.goal_id || null,
-        task_start_date: taskForm.task_start_date || null,
-        task_end_date: taskForm.task_end_date || null,
-        source_type: taskForm.project_id ? "project_task" : "manual",
+        goal_id: activeTaskForm.goal_id,
+        task_start_date: null,
+        task_end_date: null,
+        source_type: "manual",
       }
 
       if (selectedTask) {
         const response = await fetch(`/api/tasks/${selectedTask.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...taskData, assigned_users: taskForm.assigned_users }),
+          body: JSON.stringify(taskData),
         })
         const payload = (await response.json().catch(() => null)) as { error?: string } | null
         if (!response.ok) throw new Error(payload?.error || "Failed to update task")
-        await sendUpdateNotifications(taskForm, selectedTask, user.id)
+        await sendUpdateNotifications(activeTaskForm, selectedTask, user.id)
         toast.success(`${selectedTask.work_item_number || "Task"} updated`)
       } else {
         const response = await fetch("/api/tasks", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...taskData, assigned_users: taskForm.assigned_users }),
+          body: JSON.stringify(taskData),
         })
         const payload = (await response.json().catch(() => null)) as { error?: string; data?: Task } | null
         if (!response.ok || !payload?.data) throw new Error(payload?.error || "Failed to create task")
         const newTask = payload.data
-        await sendCreateNotifications(taskForm, newTask, user.id)
+        await sendCreateNotifications(activeTaskForm, newTask, user.id)
         toast.success(`${newTask.work_item_number || "Task"} created`)
       }
 
       setIsTaskDialogOpen(false)
+      setTaskForm(INITIAL_TASK_FORM)
       loadData()
     } catch (error: unknown) {
       log.error("Error saving task:", error)
@@ -285,6 +295,7 @@ export function AdminTasksContent({
     priorityFilter,
     departmentFilter,
     employeeFilter,
+    goalFilter,
     userProfile,
     scopedDepartments,
     employee,
@@ -307,9 +318,6 @@ export function AdminTasksContent({
   const departmentLeadMap = buildDepartmentLeadMap(activeEmployees)
 
   const myTaskActionQueue = allPendingWorkflowTasks.filter((task) => {
-    if (task.assignment_type === "multiple" && task.assigned_users) {
-      return task.assigned_users.some((member) => member.id === userProfile.id && !member.completed)
-    }
     if (task.assignment_type === "department") {
       if (!task.department) return false
       if (managedDeptSet.size > 0) return managedDeptSet.has(task.department)
@@ -319,12 +327,6 @@ export function AdminTasksContent({
   })
 
   const workflowOwnerLabel = (task: Task) => {
-    if (task.assignment_type === "multiple" && task.assigned_users) {
-      const names = task.assigned_users
-        .map((member) => `${formatName(member.first_name)} ${formatName(member.last_name)}`.trim())
-        .filter(Boolean)
-      return names.length > 0 ? names.join(", ") : "Unassigned"
-    }
     if (task.assignment_type === "department") {
       const dept = task.department || ""
       if (!dept) return "Department"
@@ -387,7 +389,10 @@ export function AdminTasksContent({
           setDepartmentFilter={setDepartmentFilter}
           employeeFilter={employeeFilter}
           setEmployeeFilter={setemployeeFilter}
+          goalFilter={goalFilter}
+          setGoalFilter={setGoalFilter}
           departments={departments}
+          goals={initialGoals}
           activeEmployees={activeEmployees}
           userProfile={userProfile}
         />
@@ -441,7 +446,6 @@ export function AdminTasksContent({
         isSaving={isSaving}
         scopedAssignableEmployees={scopedAssignableEmployees}
         scopedAssignableDepartments={scopedAssignableDepartments}
-        projects={projects}
         assignmentAuthorityLabel={
           hasGlobalTaskAssignmentAuthority(assignerProfile)
             ? "You can assign tasks across all departments."
