@@ -1,18 +1,14 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo } from "react"
 import { useQuery } from "@tanstack/react-query"
+import { ArrowDown, ArrowUp, ArrowUpDown, Boxes, ClipboardList, Package2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { QUERY_KEYS } from "@/lib/query-keys"
-import { AdminTablePage } from "@/components/admin/admin-table-page"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { StatCard } from "@/components/ui/stat-card"
-import { EmptyState } from "@/components/ui/patterns"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { ArrowUpDown, ArrowUp, ArrowDown, Filter, Boxes } from "lucide-react"
-import { TableSkeleton } from "@/components/ui/query-states"
+import { StatCard } from "@/components/ui/stat-card"
+import { DataTable, DataTablePage } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 
 interface StockMovement {
   id: string
@@ -32,15 +28,15 @@ const typeColors: Record<StockMovement["movement_type"], BadgeVariant> = {
   in: "default",
   out: "destructive",
   adjustment: "secondary",
-  transfer: "secondary",
+  transfer: "outline",
 }
 
-const typeIcons: Record<StockMovement["movement_type"], typeof ArrowUpDown> = {
+const typeIcons = {
   in: ArrowDown,
   out: ArrowUp,
   adjustment: ArrowUpDown,
-  transfer: ArrowUpDown,
-}
+  transfer: ClipboardList,
+} satisfies Record<StockMovement["movement_type"], typeof ArrowUpDown>
 
 type StockMovementRow = StockMovement & {
   product?: { name?: string | null } | null
@@ -62,138 +58,314 @@ async function fetchMovementsList(): Promise<StockMovement[]> {
     throw new Error(error.message)
   }
 
-  return ((data || []) as StockMovementRow[]).map((m) => ({
-    ...m,
-    product_name: m.product?.name || undefined,
-    created_by_name: m.created_by
-      ? `${m.created_by.first_name || ""} ${m.created_by.last_name || ""}`.trim() || undefined
+  return ((data || []) as StockMovementRow[]).map((movement) => ({
+    ...movement,
+    product_name: movement.product?.name || undefined,
+    created_by_name: movement.created_by
+      ? `${movement.created_by.first_name || ""} ${movement.created_by.last_name || ""}`.trim() || undefined
       : undefined,
   }))
 }
 
-export default function MovementsPage() {
-  const [typeFilter, setTypeFilter] = useState<string>("all")
+function formatDate(date: string) {
+  return new Date(date).toLocaleDateString("en-NG", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  })
+}
 
-  const { data: movements = [], isLoading: loading } = useQuery({
+function getQuantityLabel(movement: StockMovement) {
+  if (movement.movement_type === "in") return `+${movement.quantity}`
+  if (movement.movement_type === "out") return `-${movement.quantity}`
+  return `${movement.quantity}`
+}
+
+export default function MovementsPage() {
+  const {
+    data: movements = [],
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
     queryKey: QUERY_KEYS.adminInventoryMovements(),
     queryFn: fetchMovementsList,
   })
 
-  function formatDate(date: string) {
-    return new Date(date).toLocaleDateString("en-NG", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    })
-  }
+  const stats = useMemo(() => {
+    const total = movements.length
+    const stockIn = movements
+      .filter((movement) => movement.movement_type === "in")
+      .reduce((sum, movement) => sum + movement.quantity, 0)
+    const stockOut = movements
+      .filter((movement) => movement.movement_type === "out")
+      .reduce((sum, movement) => sum + movement.quantity, 0)
+    const transfers = movements.filter((movement) => movement.movement_type === "transfer").length
 
-  const filteredMovements = movements.filter((m) => typeFilter === "all" || m.movement_type === typeFilter)
+    return { total, stockIn, stockOut, transfers }
+  }, [movements])
 
-  const stats = {
-    total: movements.length,
-    in: movements.filter((m) => m.movement_type === "in").reduce((sum, m) => sum + m.quantity, 0),
-    out: movements.filter((m) => m.movement_type === "out").reduce((sum, m) => sum + m.quantity, 0),
-  }
+  const productOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          movements.map((movement) => movement.product_name).filter((product): product is string => Boolean(product))
+        )
+      )
+        .sort()
+        .map((product) => ({
+          value: product,
+          label: product,
+        })),
+    [movements]
+  )
+
+  const movementTypeOptions = useMemo(
+    () =>
+      ["in", "out", "adjustment", "transfer"].map((type) => ({
+        value: type,
+        label: type.charAt(0).toUpperCase() + type.slice(1),
+      })),
+    []
+  )
+
+  const quantityBandOptions = useMemo(
+    () => [
+      { value: "1-10", label: "1-10" },
+      { value: "11-50", label: "11-50" },
+      { value: "51+", label: "51+" },
+    ],
+    []
+  )
+
+  const columns = useMemo<DataTableColumn<StockMovement>[]>(
+    () => [
+      {
+        key: "created_at",
+        label: "Date",
+        sortable: true,
+        accessor: (movement) => movement.created_at,
+        resizable: true,
+        initialWidth: 210,
+        render: (movement) => formatDate(movement.created_at),
+      },
+      {
+        key: "product_name",
+        label: "Product",
+        sortable: true,
+        accessor: (movement) => movement.product_name || "",
+        resizable: true,
+        initialWidth: 220,
+        render: (movement) => <span className="font-medium">{movement.product_name || "Unknown product"}</span>,
+      },
+      {
+        key: "movement_type",
+        label: "Type",
+        sortable: true,
+        accessor: (movement) => movement.movement_type,
+        render: (movement) => {
+          const Icon = typeIcons[movement.movement_type]
+          return (
+            <Badge variant={typeColors[movement.movement_type]} className="capitalize">
+              <Icon className="mr-1 h-3 w-3" />
+              {movement.movement_type}
+            </Badge>
+          )
+        },
+      },
+      {
+        key: "quantity",
+        label: "Quantity",
+        sortable: true,
+        accessor: (movement) => movement.quantity,
+        align: "right",
+        render: (movement) => (
+          <span
+            className={
+              movement.movement_type === "in"
+                ? "font-medium text-emerald-600"
+                : movement.movement_type === "out"
+                  ? "font-medium text-red-600"
+                  : "font-medium"
+            }
+          >
+            {getQuantityLabel(movement)}
+          </span>
+        ),
+      },
+      {
+        key: "reference_number",
+        label: "Reference",
+        accessor: (movement) => movement.reference_number || "",
+        render: (movement) => (
+          <span className="text-muted-foreground text-sm">{movement.reference_number || "None"}</span>
+        ),
+      },
+      {
+        key: "created_by_name",
+        label: "By",
+        accessor: (movement) => movement.created_by_name || "",
+        hideOnMobile: true,
+        render: (movement) => (
+          <span className="text-muted-foreground text-sm">{movement.created_by_name || "System"}</span>
+        ),
+      },
+    ],
+    []
+  )
+
+  const filters = useMemo<DataTableFilter<StockMovement>[]>(
+    () => [
+      {
+        key: "movement_type",
+        label: "Movement Type",
+        options: movementTypeOptions,
+      },
+      {
+        key: "product_name",
+        label: "Product",
+        options: productOptions,
+      },
+      {
+        key: "quantity_band",
+        label: "Quantity Range",
+        mode: "custom",
+        options: quantityBandOptions,
+        filterFn: (movement, value) => {
+          const quantity = movement.quantity
+          const resolve = (entry: string) => {
+            if (entry === "1-10") return quantity >= 1 && quantity <= 10
+            if (entry === "11-50") return quantity >= 11 && quantity <= 50
+            if (entry === "51+") return quantity >= 51
+            return false
+          }
+          if (Array.isArray(value)) {
+            return value.some(resolve)
+          }
+          return resolve(value)
+        },
+      },
+    ],
+    [movementTypeOptions, productOptions, quantityBandOptions]
+  )
 
   return (
-    <AdminTablePage
+    <DataTablePage
       title="Stock Movements"
-      description="Track stock in and out"
+      description="Review stock inflows, outflows, adjustments, and transfer activity."
       icon={Boxes}
-      backLinkHref="/admin/inventory"
-      backLinkLabel="Back to Inventory"
+      backLink={{ href: "/admin/inventory", label: "Back to Inventory" }}
       stats={
-        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 md:gap-4">
-          <StatCard title="Total Movements" value={stats.total} icon={ArrowUpDown} />
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard
+            title="Total Movements"
+            value={stats.total}
+            icon={ArrowUpDown}
+            iconBgColor="bg-blue-500/10"
+            iconColor="text-blue-500"
+          />
           <StatCard
             title="Stock In"
-            value={`+${stats.in}`}
+            value={`+${stats.stockIn}`}
             icon={ArrowDown}
-            iconBgColor="bg-green-100 dark:bg-green-900/30"
-            iconColor="text-green-600 dark:text-green-400"
+            iconBgColor="bg-emerald-500/10"
+            iconColor="text-emerald-500"
           />
           <StatCard
             title="Stock Out"
-            value={`-${stats.out}`}
+            value={`-${stats.stockOut}`}
             icon={ArrowUp}
-            iconBgColor="bg-red-100 dark:bg-red-900/30"
-            iconColor="text-red-600 dark:text-red-400"
+            iconBgColor="bg-red-500/10"
+            iconColor="text-red-500"
+          />
+          <StatCard
+            title="Transfers"
+            value={stats.transfers}
+            icon={ClipboardList}
+            iconBgColor="bg-amber-500/10"
+            iconColor="text-amber-500"
           />
         </div>
       }
-      filters={
-        <div className="flex items-center gap-4">
-          <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger className="w-[180px]">
-              <Filter className="mr-2 h-4 w-4" />
-              <SelectValue placeholder="Filter by type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Types</SelectItem>
-              <SelectItem value="in">Stock In</SelectItem>
-              <SelectItem value="out">Stock Out</SelectItem>
-              <SelectItem value="adjustment">Adjustment</SelectItem>
-              <SelectItem value="transfer">Transfer</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      }
     >
-      <Card>
-        <CardHeader>
-          <CardTitle>Movement History</CardTitle>
-          <CardDescription>{filteredMovements.length} movements</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <TableSkeleton rows={5} cols={5} />
-          ) : filteredMovements.length === 0 ? (
-            <EmptyState title="No movements yet" description="Stock movements will appear here." icon={ArrowUpDown} />
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Product</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead className="text-right">Quantity</TableHead>
-                    <TableHead>Reference</TableHead>
-                    <TableHead>By</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredMovements.map((m) => {
-                    const Icon = typeIcons[m.movement_type]
-                    return (
-                      <TableRow key={m.id}>
-                        <TableCell className="text-sm">{formatDate(m.created_at)}</TableCell>
-                        <TableCell className="font-medium">{m.product_name || "—"}</TableCell>
-                        <TableCell>
-                          <Badge variant={typeColors[m.movement_type]} className="capitalize">
-                            <Icon className="mr-1 h-3 w-3" />
-                            {m.movement_type}
-                          </Badge>
-                        </TableCell>
-                        <TableCell
-                          className={`text-right font-medium ${m.movement_type === "in" ? "text-green-600" : m.movement_type === "out" ? "text-red-600" : ""}`}
-                        >
-                          {m.movement_type === "in" ? "+" : m.movement_type === "out" ? "-" : ""}
-                          {m.quantity}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">{m.reference_number || "—"}</TableCell>
-                        <TableCell className="text-muted-foreground">{m.created_by_name || "—"}</TableCell>
-                      </TableRow>
-                    )
-                  })}
-                </TableBody>
-              </Table>
+      <DataTable<StockMovement>
+        data={movements}
+        columns={columns}
+        filters={filters}
+        getRowId={(movement) => movement.id}
+        searchPlaceholder="Search product, reference, note, or operator..."
+        searchFn={(movement, query) => {
+          const normalizedQuery = query.toLowerCase()
+          return (
+            (movement.product_name || "").toLowerCase().includes(normalizedQuery) ||
+            (movement.reference_number || "").toLowerCase().includes(normalizedQuery) ||
+            (movement.notes || "").toLowerCase().includes(normalizedQuery) ||
+            (movement.created_by_name || "").toLowerCase().includes(normalizedQuery)
+          )
+        }}
+        isLoading={isLoading}
+        error={error instanceof Error ? error.message : null}
+        onRetry={() => {
+          void refetch()
+        }}
+        expandable={{
+          render: (movement) => (
+            <div className="grid gap-4 md:grid-cols-4">
+              <div className="rounded-lg border p-4">
+                <p className="text-muted-foreground text-xs tracking-wide uppercase">Product</p>
+                <p className="mt-2 text-sm font-medium">{movement.product_name || "Unknown product"}</p>
+              </div>
+              <div className="rounded-lg border p-4">
+                <p className="text-muted-foreground text-xs tracking-wide uppercase">Operator</p>
+                <p className="mt-2 text-sm">{movement.created_by_name || "System"}</p>
+              </div>
+              <div className="rounded-lg border p-4">
+                <p className="text-muted-foreground text-xs tracking-wide uppercase">Reference</p>
+                <p className="mt-2 text-sm">{movement.reference_number || "No reference number"}</p>
+              </div>
+              <div className="rounded-lg border p-4">
+                <p className="text-muted-foreground text-xs tracking-wide uppercase">Notes</p>
+                <p className="mt-2 text-sm">{movement.notes || "No notes added"}</p>
+              </div>
             </div>
-          )}
-        </CardContent>
-      </Card>
-    </AdminTablePage>
+          ),
+        }}
+        viewToggle
+        cardRenderer={(movement) => {
+          const Icon = typeIcons[movement.movement_type]
+          return (
+            <div className="space-y-3 rounded-xl border p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-medium">{movement.product_name || "Unknown product"}</p>
+                  <p className="text-muted-foreground text-sm">{formatDate(movement.created_at)}</p>
+                </div>
+                <Badge variant={typeColors[movement.movement_type]} className="capitalize">
+                  <Icon className="mr-1 h-3 w-3" />
+                  {movement.movement_type}
+                </Badge>
+              </div>
+              <div className="grid gap-1 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Quantity</span>
+                  <span>{getQuantityLabel(movement)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Reference</span>
+                  <span>{movement.reference_number || "None"}</span>
+                </div>
+              </div>
+            </div>
+          )
+        }}
+        emptyTitle="No movements yet"
+        emptyDescription="Stock movements will appear here as inventory changes happen."
+        emptyIcon={Package2}
+        skeletonRows={5}
+        urlSync
+      />
+    </DataTablePage>
   )
 }

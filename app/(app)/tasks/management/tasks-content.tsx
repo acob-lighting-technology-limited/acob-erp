@@ -38,7 +38,7 @@ interface TasksContentProps {
   userProfile: TaskUserProfile | null
 }
 
-type TaskAssignmentTab = "individual" | "department" | "multiple"
+type TaskAssignmentTab = "individual" | "department"
 
 const FINAL_TASK_STATUSES = new Set(["completed", "cancelled", "archived", "closed"])
 
@@ -168,50 +168,11 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
     }
   }
 
-  const handleMarkAsDone = async () => {
-    if (!selectedTask || selectedTask.assignment_type !== "multiple") return
-
-    setIsSaving(true)
-    try {
-      const response = await fetch(`/api/tasks/${selectedTask.id}/complete`, {
-        method: "POST",
-      })
-      const payload = (await response.json().catch(() => null)) as { error?: string } | null
-
-      if (!response.ok) {
-        if (response.status === 409) {
-          toast.info("You've already marked this task as done")
-          return
-        }
-        throw new Error(payload?.error || "Failed to mark task as done")
-      }
-
-      toast.success(`${selectedTask.work_item_number || "Task"} marked as done`)
-      await loadTasks()
-      await loadTaskUpdates(selectedTask.id)
-
-      const updatedTask = tasks.find((t) => t.id === selectedTask.id)
-      if (updatedTask) {
-        setSelectedTask({ ...updatedTask, user_completed: true })
-      }
-    } catch (error) {
-      log.error("Error marking task as done:", error)
-      toast.error("Failed to mark task as done")
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
   const handleUpdateStatus = async (status: string) => {
     if (!selectedTask) return
 
     if (selectedTask.assignment_type === "department" && !selectedTask.can_change_status) {
       toast.error("Only department leads, admins, and super admins can change the status of department tasks")
-      return
-    }
-
-    if (selectedTask.assignment_type === "multiple") {
-      toast.error("For group tasks, please mark yourself as done instead of changing the status")
       return
     }
 
@@ -341,7 +302,6 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
         newStatus={newStatus}
         isSaving={isSaving}
         onAddComment={handleAddComment}
-        onMarkAsDone={handleMarkAsDone}
         onUpdateStatus={handleUpdateStatus}
       />
     </div>

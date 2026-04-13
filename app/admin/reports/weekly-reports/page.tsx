@@ -1,18 +1,10 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { WeeklyReportsContent } from "./weekly-reports-content"
 import { resolveAdminScope } from "@/lib/admin/rbac"
 
-type EmployeeRow = {
-  id: string
-  full_name: string | null
-  department: string | null
-}
-
 export default async function WeeklyReportsPage() {
   const supabase = await createClient()
-  const dataClient = getServiceRoleClientOrFallback(supabase)
 
   const {
     data: { user },
@@ -28,29 +20,14 @@ export default async function WeeklyReportsPage() {
     redirect("/profile")
   }
 
-  // Fetch departments for filtering and presenter options for week setup.
-  const { data: employeeData } = await dataClient
-    .from("profiles")
-    .select("id, full_name, department")
-    .not("department", "is", null)
-    .returns<EmployeeRow[]>()
+  const { data: employeeData } = await supabase.from("profiles").select("department").not("department", "is", null)
 
   const departments = Array.from(new Set((employeeData || []).map((row) => row.department).filter(Boolean))) as string[]
   departments.sort()
 
-  const employees = (employeeData || [])
-    .filter((row) => row?.id && row?.full_name && row?.department)
-    .map((row) => ({
-      id: String(row.id),
-      full_name: String(row.full_name),
-      department: String(row.department),
-    }))
-    .sort((a, b) => a.full_name.localeCompare(b.full_name))
-
   return (
     <WeeklyReportsContent
       initialDepartments={departments}
-      employees={employees}
       scopedDepartments={[]}
       editableDepartments={scope.isAdminLike ? [] : scope.managedDepartments || []}
       currentUser={{

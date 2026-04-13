@@ -54,12 +54,16 @@ interface Props {
 
 export function CommunicationsComposer({ employees, mode = "meetings", currentUser }: Props) {
   const currentOfficeWeek = getCurrentOfficeWeek()
+  const currentOfficeWeekWeek = currentOfficeWeek.week
+  const currentOfficeWeekYear = currentOfficeWeek.year
   const nextOfficeWeek = useMemo(() => {
     const next = new Date()
     next.setDate(next.getDate() + 7)
     return getCurrentOfficeWeek(next)
   }, [])
-  const defaultMeetingDate = getDefaultMeetingDateIso(currentOfficeWeek.week, currentOfficeWeek.year)
+  const nextOfficeWeekWeek = nextOfficeWeek.week
+  const nextOfficeWeekYear = nextOfficeWeek.year
+  const defaultMeetingDate = getDefaultMeetingDateIso(currentOfficeWeekWeek, currentOfficeWeekYear)
 
   // ── State ──────────────────────────────────────────────────────────────────
   const [reminderType, setReminderType] = useState<ReminderType>(
@@ -72,11 +76,16 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
   const [searchQuery, setSearchQuery] = useState("")
 
   // Meeting fields
-  const [meetingDate, setMeetingDate] = useState(defaultMeetingDate)
+  const [meetingDate, setMeetingDate] = useState("")
   const [meetingTime, setMeetingTime] = useState("08:30")
   const [teamsLink, setTeamsLink] = useState(DEFAULT_TEAMS_LINK)
   const [agendaText, setAgendaText] = useState(DEFAULT_AGENDA.join("\n"))
-  const [activeMeetingWeek, setActiveMeetingWeek] = useState(currentOfficeWeek)
+  // On Sunday (last day of office week), default to next week since the user
+  // is preparing for the upcoming meeting — avoids a visible flash from W13→W14.
+  const [activeMeetingWeek, setActiveMeetingWeek] = useState(() =>
+    new Date().getDay() === 0 ? nextOfficeWeek : currentOfficeWeek
+  )
+  const [hasManualMeetingWeekOverride, setHasManualMeetingWeekOverride] = useState(false)
   const [savingMeetingDraft, setSavingMeetingDraft] = useState(false)
 
   // Knowledge sharing fields
@@ -106,8 +115,13 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
   const [sendResult, setSendResult] = useState<any>(null)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [activeSchedules, setActiveSchedules] = useState<any[]>([])
+  const meetingWeekOptions = useMemo(() => Array.from({ length: 53 }, (_, index) => index + 1), [])
+  const meetingYearOptions = useMemo(
+    () => [currentOfficeWeekYear - 1, currentOfficeWeekYear, currentOfficeWeekYear + 1, currentOfficeWeekYear + 2],
+    [currentOfficeWeekYear]
+  )
 
-  const supabase = createClient()
+  const [supabase] = useState(() => createClient())
   const queryClient = useQueryClient()
   const currentUserDept = (currentUser?.department || "").trim()
   const currentUserName = (currentUser?.full_name || "").trim()
@@ -122,7 +136,9 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
       const payload = await res.json()
       if (!res.ok) throw new Error(payload.error || "Failed to resolve meeting date")
       return {
-        meetingDate: String(payload?.data?.meetingDate || defaultMeetingDate),
+        meetingDate: String(
+          payload?.data?.meetingDate || getDefaultMeetingDateIso(activeMeetingWeek.week, activeMeetingWeek.year)
+        ),
         meetingTime: String(payload?.data?.meetingTime || "08:30"),
       }
     },
@@ -182,16 +198,33 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
   // ── Effects ────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (mode === "communications") return
+    if (hasManualMeetingWeekOverride) return
 
     let cancelled = false
     const resolveActiveMeetingWeek = async () => {
       try {
-        const currentLock = await fetchWeeklyReportLockState(supabase, currentOfficeWeek.week, currentOfficeWeek.year)
-        if (!cancelled) {
-          setActiveMeetingWeek(currentLock.isLocked ? nextOfficeWeek : currentOfficeWeek)
+        const currentLock = await fetchWeeklyReportLockState(supabase, currentOfficeWeekWeek, currentOfficeWeekYear)
+        if (cancelled) return
+
+        // Advance to next week if:
+        // 1. The current week's report is already locked, OR
+        // 2. The current week's meeting date has already passed (e.g. meeting was
+        //    Mon/Tue and today is later in the week — the user wants to prepare
+        //    next week's reminder, not re-send for a meeting that already happened).
+        let shouldAdvance = currentLock.isLocked
+        if (!shouldAdvance && currentLock.meetingDate) {
+          const today = new Date()
+          const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`
+          shouldAdvance = todayIso > currentLock.meetingDate
         }
+
+        setActiveMeetingWeek(
+          shouldAdvance
+            ? { week: nextOfficeWeekWeek, year: nextOfficeWeekYear }
+            : { week: currentOfficeWeekWeek, year: currentOfficeWeekYear }
+        )
       } catch {
-        if (!cancelled) setActiveMeetingWeek(currentOfficeWeek)
+        if (!cancelled) setActiveMeetingWeek({ week: currentOfficeWeekWeek, year: currentOfficeWeekYear })
       }
     }
 
@@ -199,7 +232,15 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
     return () => {
       cancelled = true
     }
-  }, [currentOfficeWeek, mode, nextOfficeWeek, supabase])
+  }, [
+    currentOfficeWeekWeek,
+    currentOfficeWeekYear,
+    hasManualMeetingWeekOverride,
+    mode,
+    nextOfficeWeekWeek,
+    nextOfficeWeekYear,
+    supabase,
+  ])
 
   useEffect(() => {
     if (mode === "communications" && reminderType !== "admin_broadcast") setReminderType("admin_broadcast")
@@ -233,30 +274,32 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
   useEffect(() => {
     if (reminderType !== "meeting") return
     if (!canonicalMeetingSetup) return
-    if (!meetingDate || meetingDate === defaultMeetingDate) {
-      setMeetingDate(canonicalMeetingSetup.meetingDate)
-    }
+    setMeetingDate(canonicalMeetingSetup.meetingDate)
     setMeetingTime(canonicalMeetingSetup.meetingTime || "08:30")
-  }, [canonicalMeetingSetup, defaultMeetingDate, meetingDate, reminderType])
+  }, [canonicalMeetingSetup, reminderType])
 
+  // Teams link is per-week (can change each meeting); agenda is global (rarely changes week to week).
   const meetingDraftStorageKey = useMemo(() => {
     return `meeting-reminder-draft:${activeMeetingWeek.year}:${activeMeetingWeek.week}`
   }, [activeMeetingWeek.week, activeMeetingWeek.year])
+  const AGENDA_STORAGE_KEY = "meeting-reminder-agenda"
 
   useEffect(() => {
     if (reminderType !== "meeting") return
     if (typeof window === "undefined") return
 
+    // Restore agenda globally — it doesn't reset when the week changes
+    const savedAgenda = window.localStorage.getItem(AGENDA_STORAGE_KEY)
+    if (savedAgenda?.trim()) setAgendaText(savedAgenda)
+
+    // Restore teams link per-week
     const savedDraftRaw = window.localStorage.getItem(meetingDraftStorageKey)
     if (!savedDraftRaw) return
 
     try {
-      const savedDraft = JSON.parse(savedDraftRaw) as { teamsLink?: string; agendaText?: string }
+      const savedDraft = JSON.parse(savedDraftRaw) as { teamsLink?: string }
       if (typeof savedDraft.teamsLink === "string" && savedDraft.teamsLink.trim()) {
         setTeamsLink(savedDraft.teamsLink)
-      }
-      if (typeof savedDraft.agendaText === "string" && savedDraft.agendaText.trim()) {
-        setAgendaText(savedDraft.agendaText)
       }
     } catch {
       // Ignore invalid local draft payloads.
@@ -428,7 +471,7 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
     [currentUser?.id, supabase]
   )
 
-  const resolveMeetingContext = useCallback((dateValue: string) => {
+  const resolveMeetingContext = useCallback((dateValue: string, meetingWeek: number, meetingYear: number) => {
     const [year, month, day] = String(dateValue || "")
       .split("-")
       .map((part) => Number(part))
@@ -438,11 +481,10 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
     const date = new Date(year, month - 1, day)
     if (Number.isNaN(date.getTime())) return null
 
-    const officeWeek = getOfficeWeekFromDate(date)
     return {
       meetingDate: `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`,
-      meetingWeek: officeWeek.week,
-      meetingYear: officeWeek.year,
+      meetingWeek,
+      meetingYear,
     }
   }, [])
 
@@ -514,7 +556,7 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
     } | null = null
 
     if (reminderType === "meeting") {
-      meetingContext = resolveMeetingContext(meetingDate)
+      meetingContext = resolveMeetingContext(meetingDate, activeMeetingWeek.week, activeMeetingWeek.year)
       if (!meetingContext) {
         toast.error("Meeting date is unavailable. Update it from Admin Reports first.")
         return
@@ -537,6 +579,8 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
             type: reminderType,
             requestedByUserId: currentUser?.id || null,
             meetingDate: reminderType === "meeting" ? meetingContext?.meetingDate : undefined,
+            meetingWeek: reminderType === "meeting" ? meetingContext?.meetingWeek : undefined,
+            meetingYear: reminderType === "meeting" ? meetingContext?.meetingYear : undefined,
             meetingTime: reminderType === "meeting" ? meetingTime : undefined,
             teamsLink: reminderType === "meeting" ? teamsLink : undefined,
             agenda: reminderType === "meeting" ? agendaText : undefined,
@@ -725,13 +769,10 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
   const handleSaveMeetingDraft = useCallback(() => {
     if (typeof window === "undefined") return
     setSavingMeetingDraft(true)
-    window.localStorage.setItem(
-      meetingDraftStorageKey,
-      JSON.stringify({
-        teamsLink,
-        agendaText,
-      })
-    )
+    // Agenda is global — persists across week changes
+    window.localStorage.setItem(AGENDA_STORAGE_KEY, agendaText)
+    // Teams link is per-week
+    window.localStorage.setItem(meetingDraftStorageKey, JSON.stringify({ teamsLink }))
     toast.success("Agenda changes saved")
     window.setTimeout(() => setSavingMeetingDraft(false), 300)
   }, [agendaText, meetingDraftStorageKey, teamsLink])
@@ -789,6 +830,24 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
             <CardContent className="space-y-4">
               {reminderType === "meeting" ? (
                 <MeetingReminderForm
+                  meetingWeek={activeMeetingWeek.week}
+                  meetingYear={activeMeetingWeek.year}
+                  weekOptions={meetingWeekOptions}
+                  yearOptions={meetingYearOptions}
+                  setMeetingWeek={(value) => {
+                    setHasManualMeetingWeekOverride(true)
+                    setActiveMeetingWeek((prev) => ({
+                      ...prev,
+                      week: value,
+                    }))
+                  }}
+                  setMeetingYear={(value) => {
+                    setHasManualMeetingWeekOverride(true)
+                    setActiveMeetingWeek((prev) => ({
+                      ...prev,
+                      year: value,
+                    }))
+                  }}
                   meetingDate={meetingDate}
                   meetingTime={meetingTime}
                   teamsLink={teamsLink}

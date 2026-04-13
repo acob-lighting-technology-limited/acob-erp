@@ -19,7 +19,7 @@ type ScopedProfileRow = {
 }
 
 type GoalRow = {
-  user_id: string
+  department?: string | null
   approval_status: string | null
   status: string | null
 }
@@ -30,9 +30,10 @@ function round(value: number) {
   return Math.round(value * 100) / 100
 }
 
-function average(values: number[]) {
-  if (values.length === 0) return 0
-  return round(values.reduce((sum, value) => sum + value, 0) / values.length)
+function average(values: Array<number | null | undefined>) {
+  const valid = values.filter((value): value is number => typeof value === "number" && Number.isFinite(value))
+  if (valid.length === 0) return null
+  return round(valid.reduce((sum, value) => sum + value, 0) / valid.length)
 }
 
 export async function getAdminPmsData() {
@@ -81,14 +82,13 @@ export async function getAdminPmsData() {
 
   const scopedUsers = scopedProfiles || []
   const scopedUserIds = scopedUsers.map((row) => row.id)
-  const departmentByUserId = new Map(scopedUsers.map((row) => [row.id, row.department || "Unassigned"]))
 
   const { data: goalRows } =
-    scopedUserIds.length > 0
+    departments.length > 0
       ? await supabase
           .from("goals_objectives")
-          .select("user_id, approval_status, status")
-          .in("user_id", scopedUserIds)
+          .select("department, approval_status, status")
+          .in("department", departments)
           .returns<GoalRow[]>()
       : { data: [] as GoalRow[] }
 
@@ -97,7 +97,7 @@ export async function getAdminPmsData() {
   )
 
   const goalBreakdown = departments.map((department) => {
-    const rows = (goalRows || []).filter((row) => departmentByUserId.get(row.user_id) === department)
+    const rows = (goalRows || []).filter((row) => (row.department || "Unassigned") === department)
     return {
       department,
       total: rows.length,

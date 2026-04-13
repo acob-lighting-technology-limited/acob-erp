@@ -85,6 +85,10 @@ interface AdminEmployeeContentProps {
   userProfile: UserProfile
 }
 
+function deriveLeadDepartments(department: string, isDepartmentLead: boolean): string[] {
+  return isDepartmentLead && department ? [department] : []
+}
+
 export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmployeeContentProps) {
   const searchParams = useSearchParams()
   const [employees, setEmployees] = useState<Employee[]>(initialEmployees)
@@ -222,14 +226,16 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         const { data: fullProfile } = await supabase.from("profiles").select("*").eq("id", employee.id).single()
 
         if (fullProfile) {
+          const isDepartmentLead = Boolean(fullProfile.is_department_lead)
+          const normalizedDepartment = fullProfile.department || ""
           setEditForm({
             role: fullProfile.role || "employee",
             admin_domains: Array.isArray(fullProfile.admin_domains) ? fullProfile.admin_domains : [],
-            is_department_lead: Boolean(fullProfile.is_department_lead),
-            department: fullProfile.department || "",
+            is_department_lead: isDepartmentLead,
+            department: normalizedDepartment,
             office_location: fullProfile.office_location || "",
             designation: fullProfile.designation || "",
-            lead_departments: fullProfile.lead_departments || [],
+            lead_departments: deriveLeadDepartments(normalizedDepartment, isDepartmentLead),
             // Expanded fields
             employee_number: fullProfile.employee_number || "",
             first_name: fullProfile.first_name || "",
@@ -249,14 +255,16 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
           })
         } else {
           // Fallback to basic fields if full profile not found
+          const isDepartmentLead = Boolean(employee.is_department_lead)
+          const normalizedDepartment = employee.department || ""
           setEditForm({
             role: employee.role,
             admin_domains: Array.isArray(employee.admin_domains) ? employee.admin_domains : [],
-            is_department_lead: Boolean(employee.is_department_lead),
-            department: employee.department,
+            is_department_lead: isDepartmentLead,
+            department: normalizedDepartment,
             office_location: employee.office_location || "",
             designation: employee.designation || "",
-            lead_departments: employee.lead_departments || [],
+            lead_departments: deriveLeadDepartments(normalizedDepartment, isDepartmentLead),
             employee_number: employee.employee_number || "",
             first_name: employee.first_name || "",
             last_name: employee.last_name || "",
@@ -447,14 +455,8 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         }
       }
 
-      if (editForm.is_department_lead && editForm.lead_departments.length !== 1) {
-        toast.error("A department lead must have exactly one lead department")
-        setIsSaving(false)
-        return
-      }
-
-      if (editForm.is_department_lead && editForm.lead_departments[0] !== editForm.department) {
-        toast.error("A department lead can only lead their own department")
+      if (editForm.is_department_lead && !editForm.department) {
+        toast.error("A department lead must belong to a department")
         setIsSaving(false)
         return
       }
@@ -486,6 +488,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
       }
 
       const isLead = editForm.is_department_lead
+      const leadDepartments = deriveLeadDepartments(editForm.department, isLead)
 
       // Build update object with all fields
       const updateData: Database["public"]["Tables"]["profiles"]["Update"] = {
@@ -495,7 +498,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         office_location: editForm.office_location || null,
         designation: editForm.designation || null,
         is_department_lead: isLead,
-        lead_departments: isLead ? editForm.lead_departments : [],
+        lead_departments: leadDepartments,
         updated_at: new Date().toISOString(),
         // Always include expanded fields if they exist in form state
         first_name: editForm.first_name || "",

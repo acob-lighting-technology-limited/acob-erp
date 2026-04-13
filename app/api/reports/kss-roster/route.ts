@@ -148,6 +148,7 @@ export async function GET(request: Request) {
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
     const rows = data || []
+    const now = new Date()
     const withLockState = await Promise.all(
       rows.map(async (row) => {
         const meetingDate = await resolveEffectiveMeetingDateIso(
@@ -155,15 +156,23 @@ export async function GET(request: Request) {
           row.meeting_week,
           row.meeting_year
         )
-        const { data: canMutate } = await dataClient.rpc("weekly_report_can_mutate", {
+        const { data: canMutate } = await supabase.rpc("weekly_report_can_mutate", {
           p_week: row.meeting_week,
           p_year: row.meeting_year,
         })
+        const { data: lockState } = await supabase.rpc("weekly_report_lock_state", {
+          p_week: row.meeting_week,
+          p_year: row.meeting_year,
+        })
+        const lockRow = Array.isArray(lockState) && lockState[0] ? lockState[0] : null
+        const lockDeadline = typeof lockRow?.lock_deadline === "string" ? lockRow.lock_deadline : null
+        const isOutsideGraceWindow = lockDeadline ? now >= new Date(lockDeadline) : false
 
         return {
           ...row,
           meeting_date: meetingDate,
           is_locked: !Boolean(canMutate),
+          is_outside_grace_window: isOutsideGraceWindow,
         }
       })
     )
@@ -203,7 +212,7 @@ export async function POST(request: Request) {
     const presenterId = parsed.data.presenterId ? String(parsed.data.presenterId) : null
     const notes = parsed.data.notes ? String(parsed.data.notes) : null
 
-    await assertWeekAllowsRosterCreate(dataClient as ReportsClient, meetingWeek, meetingYear)
+    await assertWeekAllowsRosterCreate(supabase as ReportsClient, meetingWeek, meetingYear)
 
     const { data: saved, error } = await dataClient
       .from("kss_weekly_roster")
@@ -290,7 +299,7 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Roster entry not found" }, { status: 404 })
     }
 
-    await assertWeekIsMutable(dataClient as ReportsClient, existing.meeting_week, existing.meeting_year)
+    await assertWeekIsMutable(supabase as ReportsClient, existing.meeting_week, existing.meeting_year)
 
     const patch: Record<string, unknown> = {}
     if (typeof parsed.data.department === "string" && parsed.data.department.trim()) {
@@ -373,7 +382,7 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "Roster entry not found" }, { status: 404 })
     }
 
-    await assertWeekIsMutable(dataClient as ReportsClient, existing.meeting_week, existing.meeting_year)
+    await assertWeekIsMutable(supabase as ReportsClient, existing.meeting_week, existing.meeting_year)
     const { error } = await dataClient.from("kss_weekly_roster").delete().eq("id", id)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 

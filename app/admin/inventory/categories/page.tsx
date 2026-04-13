@@ -1,16 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { Boxes, FolderOpen, Layers3, Pencil, Plus, Tag, Trash2 } from "lucide-react"
+import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
 import { QUERY_KEYS } from "@/lib/query-keys"
-import { AdminTablePage } from "@/components/admin/admin-table-page"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import { StatCard } from "@/components/ui/stat-card"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import {
   AlertDialog,
@@ -22,12 +18,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Plus, Pencil, Trash2, Boxes } from "lucide-react"
-import { toast } from "sonner"
-import { EmptyState } from "@/components/ui/patterns"
-import { TableSkeleton } from "@/components/ui/query-states"
+import { Badge } from "@/components/ui/badge"
+import { StatCard } from "@/components/ui/stat-card"
+import { DataTable, DataTablePage } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 
 interface Category {
   id: string
@@ -48,17 +45,25 @@ async function fetchCategoriesList(): Promise<Category[]> {
     throw new Error(error.message)
   }
 
-  const catsWithCounts = await Promise.all(
-    (data || []).map(async (cat) => {
+  const categoriesWithCounts = await Promise.all(
+    (data || []).map(async (category) => {
       const { count } = await supabase
         .from("products")
         .select("*", { count: "exact", head: true })
-        .eq("category_id", cat.id)
-      return { ...cat, product_count: count || 0 }
+        .eq("category_id", category.id)
+
+      return { ...category, product_count: count || 0 }
     })
   )
 
-  return catsWithCounts
+  return categoriesWithCounts
+}
+
+function getProductBand(productCount: number) {
+  if (productCount === 0) return "Empty"
+  if (productCount <= 10) return "Light"
+  if (productCount <= 25) return "Growing"
+  return "Heavy"
 }
 
 export default function CategoriesPage() {
@@ -68,7 +73,12 @@ export default function CategoriesPage() {
   const [formData, setFormData] = useState({ name: "", description: "" })
   const [pendingDelete, setPendingDelete] = useState<Category | null>(null)
 
-  const { data: categories = [], isLoading: loading } = useQuery({
+  const {
+    data: categories = [],
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
     queryKey: QUERY_KEYS.adminCategories(),
     queryFn: fetchCategoriesList,
   })
@@ -80,44 +90,48 @@ export default function CategoriesPage() {
       const supabase = createClient()
 
       if (editingCategory) {
-        const { error } = await supabase
+        const { error: updateError } = await supabase
           .from("product_categories")
           .update({ name: formData.name, description: formData.description || null })
           .eq("id", editingCategory.id)
-        if (error) throw error
+
+        if (updateError) throw updateError
         toast.success("Category updated")
       } else {
-        const { error } = await supabase
+        const { error: insertError } = await supabase
           .from("product_categories")
           .insert({ name: formData.name, description: formData.description || null })
-        if (error) throw error
+
+        if (insertError) throw insertError
         toast.success("Category created")
       }
 
       setIsDialogOpen(false)
       setEditingCategory(null)
       setFormData({ name: "", description: "" })
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminCategories() })
-    } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : "Failed to save category")
+      await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminCategories() })
+    } catch (submitError: unknown) {
+      toast.error(submitError instanceof Error ? submitError.message : "Failed to save category")
     }
   }
 
-  async function handleDelete(cat: Category) {
+  async function handleDelete(category: Category) {
     try {
       const supabase = createClient()
-      const { error } = await supabase.from("product_categories").delete().eq("id", cat.id)
-      if (error) throw error
+      const { error: deleteError } = await supabase.from("product_categories").delete().eq("id", category.id)
+
+      if (deleteError) throw deleteError
+
       toast.success("Category deleted")
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminCategories() })
-    } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : "Failed to delete")
+      await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminCategories() })
+    } catch (deleteError: unknown) {
+      toast.error(deleteError instanceof Error ? deleteError.message : "Failed to delete category")
     }
   }
 
-  function openEdit(cat: Category) {
-    setEditingCategory(cat)
-    setFormData({ name: cat.name, description: cat.description || "" })
+  function openEdit(category: Category) {
+    setEditingCategory(category)
+    setFormData({ name: category.name, description: category.description || "" })
     setIsDialogOpen(true)
   }
 
@@ -127,24 +141,129 @@ export default function CategoriesPage() {
     setIsDialogOpen(true)
   }
 
-  const stats = {
-    categories: categories.length,
-    mappedProducts: categories.reduce((acc, category) => acc + (category.product_count || 0), 0),
-  }
+  const stats = useMemo(() => {
+    const totalCategories = categories.length
+    const mappedProducts = categories.reduce((sum, category) => sum + (category.product_count || 0), 0)
+    const emptyCategories = categories.filter((category) => (category.product_count || 0) === 0).length
+    const activeCategories = categories.filter((category) => (category.product_count || 0) > 0).length
+
+    return { totalCategories, mappedProducts, emptyCategories, activeCategories }
+  }, [categories])
+
+  const productBandOptions = useMemo(
+    () =>
+      ["Empty", "Light", "Growing", "Heavy"].map((band) => ({
+        value: band,
+        label: band,
+      })),
+    []
+  )
+
+  const descriptionOptions = useMemo(
+    () => [
+      { value: "with-description", label: "With Description" },
+      { value: "without-description", label: "Without Description" },
+    ],
+    []
+  )
+
+  const columns = useMemo<DataTableColumn<Category>[]>(
+    () => [
+      {
+        key: "name",
+        label: "Category",
+        sortable: true,
+        resizable: true,
+        initialWidth: 220,
+        accessor: (category) => category.name,
+        render: (category) => (
+          <div className="space-y-1">
+            <p className="font-medium">{category.name}</p>
+            <p className="text-muted-foreground text-xs">
+              Created {new Date(category.created_at).toLocaleDateString()}
+            </p>
+          </div>
+        ),
+      },
+      {
+        key: "description",
+        label: "Description",
+        accessor: (category) => category.description || "",
+        resizable: true,
+        initialWidth: 280,
+        render: (category) => (
+          <span className="text-muted-foreground line-clamp-2 text-sm">{category.description || "No description"}</span>
+        ),
+      },
+      {
+        key: "product_count",
+        label: "Products",
+        sortable: true,
+        accessor: (category) => category.product_count || 0,
+        align: "center",
+        render: (category) => <Badge variant="secondary">{category.product_count || 0}</Badge>,
+      },
+      {
+        key: "product_band",
+        label: "Coverage",
+        accessor: (category) => getProductBand(category.product_count || 0),
+        hideOnMobile: true,
+        render: (category) => <Badge variant="outline">{getProductBand(category.product_count || 0)}</Badge>,
+      },
+    ],
+    []
+  )
+
+  const filters = useMemo<DataTableFilter<Category>[]>(
+    () => [
+      {
+        key: "product_band",
+        label: "Product Coverage",
+        options: productBandOptions,
+      },
+      {
+        key: "description_state",
+        label: "Description",
+        mode: "custom",
+        options: descriptionOptions,
+        filterFn: (category, value) => {
+          const hasDescription = Boolean(category.description?.trim())
+          if (Array.isArray(value)) {
+            return value.some((entry) => {
+              if (entry === "with-description") return hasDescription
+              if (entry === "without-description") return !hasDescription
+              return false
+            })
+          }
+          if (value === "with-description") return hasDescription
+          if (value === "without-description") return !hasDescription
+          return true
+        },
+      },
+    ],
+    [descriptionOptions, productBandOptions]
+  )
+
+  const rowActions = [
+    {
+      label: "Edit",
+      icon: Pencil,
+      onClick: (category: Category) => openEdit(category),
+    },
+    {
+      label: "Delete",
+      icon: Trash2,
+      variant: "destructive" as const,
+      onClick: (category: Category) => setPendingDelete(category),
+    },
+  ]
 
   return (
-    <AdminTablePage
+    <DataTablePage
       title="Categories"
-      description="Organize products by category"
+      description="Organize products by category and track how each category is being used."
       icon={Boxes}
-      backLinkHref="/admin/inventory"
-      backLinkLabel="Back to Inventory"
-      stats={
-        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 md:gap-4">
-          <StatCard title="Categories" value={stats.categories} icon={Boxes} />
-          <StatCard title="Mapped Products" value={stats.mappedProducts} icon={Plus} />
-        </div>
-      }
+      backLink={{ href: "/admin/inventory", label: "Back to Inventory" }}
       actions={
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
@@ -164,7 +283,7 @@ export default function CategoriesPage() {
                   <Input
                     id="name"
                     value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    onChange={(event) => setFormData({ ...formData, name: event.target.value })}
                     required
                   />
                 </div>
@@ -173,8 +292,8 @@ export default function CategoriesPage() {
                   <Textarea
                     id="description"
                     value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    rows={2}
+                    onChange={(event) => setFormData({ ...formData, description: event.target.value })}
+                    rows={3}
                   />
                 </div>
               </div>
@@ -188,77 +307,107 @@ export default function CategoriesPage() {
           </DialogContent>
         </Dialog>
       }
+      stats={
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard
+            title="Categories"
+            value={stats.totalCategories}
+            icon={Boxes}
+            iconBgColor="bg-blue-500/10"
+            iconColor="text-blue-500"
+          />
+          <StatCard
+            title="Mapped Products"
+            value={stats.mappedProducts}
+            icon={Layers3}
+            iconBgColor="bg-emerald-500/10"
+            iconColor="text-emerald-500"
+          />
+          <StatCard
+            title="Active Categories"
+            value={stats.activeCategories}
+            icon={Tag}
+            iconBgColor="bg-amber-500/10"
+            iconColor="text-amber-500"
+          />
+          <StatCard
+            title="Empty Categories"
+            value={stats.emptyCategories}
+            icon={FolderOpen}
+            iconBgColor="bg-red-500/10"
+            iconColor="text-red-500"
+          />
+        </div>
+      }
     >
-      {/* Migrated list layout now uses shared admin table shell + stat cards */}
-      <Card>
-        <CardHeader>
-          <CardTitle>All Categories</CardTitle>
-          <CardDescription>{categories.length} categories</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <TableSkeleton rows={5} cols={3} />
-          ) : categories.length === 0 ? (
-            <EmptyState
-              icon={Boxes}
-              title="No categories yet"
-              description="Create your first category to organize products."
-              action={
-                <Button onClick={openCreate}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Category
-                </Button>
-              }
-            />
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead>Products</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {categories.map((cat) => (
-                    <TableRow key={cat.id}>
-                      <TableCell className="font-medium">{cat.name}</TableCell>
-                      <TableCell className="text-muted-foreground">{cat.description || "—"}</TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">{cat.product_count}</Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button variant="ghost" size="icon" onClick={() => openEdit(cat)}>
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setPendingDelete(cat)}
-                            disabled={(cat.product_count ?? 0) > 0}
-                          >
-                            <Trash2 className="text-destructive h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+      <DataTable<Category>
+        data={categories}
+        columns={columns}
+        filters={filters}
+        getRowId={(category) => category.id}
+        searchPlaceholder="Search category name or description..."
+        searchFn={(category, query) => {
+          const normalizedQuery = query.toLowerCase()
+          return (
+            category.name.toLowerCase().includes(normalizedQuery) ||
+            (category.description || "").toLowerCase().includes(normalizedQuery)
+          )
+        }}
+        isLoading={isLoading}
+        error={error instanceof Error ? error.message : null}
+        onRetry={() => {
+          void refetch()
+        }}
+        rowActions={rowActions}
+        expandable={{
+          render: (category) => (
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="rounded-lg border p-4">
+                <p className="text-muted-foreground text-xs tracking-wide uppercase">Description</p>
+                <p className="mt-2 text-sm">
+                  {category.description || "This category does not have a description yet."}
+                </p>
+              </div>
+              <div className="rounded-lg border p-4">
+                <p className="text-muted-foreground text-xs tracking-wide uppercase">Product Mapping</p>
+                <p className="mt-2 text-sm font-medium">{category.product_count || 0} products linked</p>
+              </div>
+              <div className="rounded-lg border p-4">
+                <p className="text-muted-foreground text-xs tracking-wide uppercase">Coverage Band</p>
+                <p className="mt-2 text-sm font-medium">{getProductBand(category.product_count || 0)}</p>
+              </div>
             </div>
-          )}
-        </CardContent>
-      </Card>
+          ),
+        }}
+        viewToggle
+        cardRenderer={(category) => (
+          <div className="space-y-3 rounded-xl border p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-medium">{category.name}</p>
+                <p className="text-muted-foreground text-sm">{category.description || "No description"}</p>
+              </div>
+              <Badge variant="secondary">{category.product_count || 0}</Badge>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Coverage</span>
+              <Badge variant="outline">{getProductBand(category.product_count || 0)}</Badge>
+            </div>
+          </div>
+        )}
+        emptyTitle="No categories yet"
+        emptyDescription="Create your first category to start organizing the product catalog."
+        emptyIcon={Boxes}
+        skeletonRows={5}
+        urlSync
+      />
 
       <AlertDialog open={pendingDelete !== null} onOpenChange={(open) => !open && setPendingDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Category</AlertDialogTitle>
             <AlertDialogDescription>
-              {pendingDelete ? `Delete "${pendingDelete.name}"?` : "Are you sure?"} This action cannot be undone.
+              {pendingDelete ? `Delete category ${pendingDelete.name}?` : "Are you sure?"} This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -266,7 +415,9 @@ export default function CategoriesPage() {
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => {
-                if (pendingDelete) handleDelete(pendingDelete)
+                if (pendingDelete) {
+                  void handleDelete(pendingDelete)
+                }
                 setPendingDelete(null)
               }}
             >
@@ -275,6 +426,6 @@ export default function CategoriesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </AdminTablePage>
+    </DataTablePage>
   )
 }

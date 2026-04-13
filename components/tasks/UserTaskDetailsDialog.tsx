@@ -8,7 +8,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { EmptyState } from "@/components/ui/patterns"
 import { ResponsiveModal } from "@/components/ui/patterns/responsive-modal"
 import {
-  Users,
   Building2,
   MessageSquare,
   Send,
@@ -18,7 +17,6 @@ import {
   Clock,
   HeadphonesIcon,
 } from "lucide-react"
-import { formatName } from "@/lib/utils"
 import type { Task } from "@/types/task"
 
 interface TaskUpdate {
@@ -97,7 +95,6 @@ interface UserTaskDetailsDialogProps {
   newStatus: string
   isSaving: boolean
   onAddComment: () => Promise<void>
-  onMarkAsDone: () => Promise<void>
   onUpdateStatus: (status: string) => Promise<void>
 }
 
@@ -111,7 +108,6 @@ export function UserTaskDetailsDialog({
   newStatus,
   isSaving,
   onAddComment,
-  onMarkAsDone,
   onUpdateStatus,
 }: UserTaskDetailsDialogProps) {
   return (
@@ -159,53 +155,6 @@ export function UserTaskDetailsDialog({
 
           <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
             <div className="space-y-6">
-              {selectedTask.assignment_type === "multiple" && selectedTask.assigned_users && (
-                <Card className="bg-muted/30 border">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center gap-2 text-base">
-                      <Users className="h-4 w-4" />
-                      Group Task
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div className="space-y-2">
-                      {selectedTask.assigned_users.map((user) => (
-                        <div key={user.id} className="bg-background flex items-center justify-between rounded-md p-2">
-                          <span className="text-sm">
-                            {formatName(user.first_name)} {formatName(user.last_name)}
-                          </span>
-                          {user.completed ? (
-                            <Badge
-                              variant="outline"
-                              className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-                            >
-                              Done
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline">In Progress</Badge>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                    <div className="text-muted-foreground border-t pt-2 text-xs">
-                      {selectedTask.assigned_users.filter((user) => user.completed).length} of{" "}
-                      {selectedTask.assigned_users.length} completed
-                    </div>
-                    {!selectedTask.user_completed && (
-                      <Button onClick={onMarkAsDone} disabled={isSaving} className="w-full gap-2">
-                        <CheckCircle2 className="h-4 w-4" />
-                        Mark Myself as Done
-                      </Button>
-                    )}
-                    {selectedTask.user_completed && (
-                      <div className="rounded-md bg-green-100 p-2 text-center text-sm text-green-800 dark:bg-green-900/30 dark:text-green-400">
-                        You&apos;ve marked this task as done.
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
-
               {selectedTask.assignment_type === "department" && (
                 <Card className="bg-muted/30 border">
                   <CardHeader className="pb-3">
@@ -238,9 +187,7 @@ export function UserTaskDetailsDialog({
                     value={newStatus}
                     onValueChange={onUpdateStatus}
                     disabled={
-                      isSaving ||
-                      selectedTask.assignment_type === "multiple" ||
-                      (selectedTask.assignment_type === "department" && !selectedTask.can_change_status)
+                      isSaving || (selectedTask.assignment_type === "department" && !selectedTask.can_change_status)
                     }
                   >
                     <SelectTrigger>
@@ -253,11 +200,6 @@ export function UserTaskDetailsDialog({
                       <SelectItem value="cancelled">Cancelled</SelectItem>
                     </SelectContent>
                   </Select>
-                  {selectedTask.assignment_type === "multiple" && (
-                    <p className="text-muted-foreground text-xs">
-                      For group tasks, mark yourself as done instead of changing the whole task status.
-                    </p>
-                  )}
                   {selectedTask.assignment_type === "department" && !selectedTask.can_change_status && (
                     <p className="text-xs text-yellow-600 dark:text-yellow-400">
                       Only department leads, admins, and super admins can change the status of department tasks.

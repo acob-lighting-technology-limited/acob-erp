@@ -1,18 +1,17 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { formatName } from "@/lib/utils"
 import { ASSET_TYPE_MAP } from "@/lib/asset-types"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { DataTable, DataTablePage } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter, RowAction } from "@/components/ui/data-table"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { AlertCircle, CheckCircle2, Trash2, Search, Package, Calendar, User, Filter } from "lucide-react"
-import { SearchableSelect } from "@/components/ui/searchable-select"
+import { Badge } from "@/components/ui/badge"
+import { AlertCircle, CheckCircle2, Package, Trash2 } from "lucide-react"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,11 +22,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { StatCard } from "@/components/ui/stat-card"
-import { EmptyState, ListToolbar } from "@/components/ui/patterns"
-import { TableSkeleton } from "@/components/ui/query-states"
-
 import { logger } from "@/lib/logger"
 
 const log = logger("assets-issues")
@@ -74,7 +69,6 @@ async function fetchAssetIssues(): Promise<AssetIssue[]> {
     .from("asset_issues")
     .select("*")
     .order("created_at", { ascending: false })
-
   if (issuesError) throw new Error(issuesError.message)
 
   const issuesWithDetails = await Promise.all(
@@ -112,16 +106,6 @@ async function fetchAssetIssues(): Promise<AssetIssue[]> {
           } else if (assignment.office_location) {
             assignmentData = { type: "office", office_location: assignment.office_location }
           }
-        } else if (
-          assetData.status === "assigned" ||
-          assetData.status === "retired" ||
-          assetData.status === "maintenance"
-        ) {
-          if (assetData.assignment_type === "department" && assetData.department) {
-            assignmentData = { type: "department", department: assetData.department }
-          } else if (assetData.assignment_type === "office" && assetData.office_location) {
-            assignmentData = { type: "office", office_location: assetData.office_location }
-          }
         }
       }
 
@@ -153,306 +137,320 @@ async function fetchAssetIssues(): Promise<AssetIssue[]> {
   return issuesWithDetails as AssetIssue[]
 }
 
+function assignedTo(issue: AssetIssue) {
+  if (!issue.asset?.current_assignment) return "Unassigned"
+  if (issue.asset.current_assignment.type === "individual" && issue.asset.current_assignment.user) {
+    return `${formatName(issue.asset.current_assignment.user.first_name)} ${formatName(issue.asset.current_assignment.user.last_name)}`
+  }
+  if (issue.asset.current_assignment.type === "department" && issue.asset.current_assignment.department) {
+    return issue.asset.current_assignment.department
+  }
+  if (issue.asset.current_assignment.type === "office" && issue.asset.current_assignment.office_location) {
+    return issue.asset.current_assignment.office_location
+  }
+  return "Unassigned"
+}
+
+function IssueCard({
+  issue,
+  onToggle,
+  onDelete,
+}: {
+  issue: AssetIssue
+  onToggle: (issue: AssetIssue) => void
+  onDelete: (id: string) => void
+}) {
+  return (
+    <div className="space-y-3 rounded-xl border p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="font-semibold">{issue.asset?.unique_code || "Unknown Asset"}</p>
+          <p className="text-muted-foreground text-xs">
+            {ASSET_TYPE_MAP[issue.asset?.asset_type || ""]?.label || issue.asset?.asset_type || "-"}
+          </p>
+        </div>
+        <Badge variant={issue.resolved ? "default" : "secondary"}>{issue.resolved ? "Resolved" : "Unresolved"}</Badge>
+      </div>
+      <p className={`text-sm ${issue.resolved ? "text-muted-foreground line-through" : ""}`}>{issue.description}</p>
+      <div className="grid grid-cols-2 gap-3 text-sm">
+        <div>
+          <p className="text-muted-foreground text-xs">Assigned To</p>
+          <p>{assignedTo(issue)}</p>
+        </div>
+        <div>
+          <p className="text-muted-foreground text-xs">Reported By</p>
+          <p>
+            {issue.creator
+              ? `${formatName(issue.creator.first_name)} ${formatName(issue.creator.last_name)}`
+              : "Unknown"}
+          </p>
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Button size="sm" variant="outline" onClick={() => onToggle(issue)}>
+          {issue.resolved ? "Mark Unresolved" : "Resolve"}
+        </Button>
+        <Button size="sm" variant="destructive" onClick={() => onDelete(issue.id)}>
+          Delete
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 export default function AssetIssuesPage() {
-  const [searchQuery, setSearchQuery] = useState("")
-  const [statusFilter, setStatusFilter] = useState("unresolved")
-  const [assetTypeFilter, setAssetTypeFilter] = useState("all")
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
   const queryClient = useQueryClient()
 
-  const { data: issues = [], isLoading: loading } = useQuery({
+  const {
+    data: issues = [],
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: QUERY_KEYS.adminAssetIssues(),
     queryFn: fetchAssetIssues,
   })
 
-  const handleToggleResolved = async (issue: AssetIssue) => {
+  async function handleToggleResolved(issue: AssetIssue) {
     try {
       const supabase = createClient()
-      const { error } = await supabase.from("asset_issues").update({ resolved: !issue.resolved }).eq("id", issue.id)
-      if (error) throw error
+      const { error: updateError } = await supabase
+        .from("asset_issues")
+        .update({ resolved: !issue.resolved })
+        .eq("id", issue.id)
+      if (updateError) throw updateError
       toast.success(issue.resolved ? "Issue marked as unresolved" : "Issue marked as resolved")
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminAssetIssues() })
-    } catch (error: unknown) {
-      log.error("Error toggling issue:", error)
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminAssetIssues() })
+    } catch (err: unknown) {
+      log.error("Error toggling issue:", err)
       toast.error("Failed to update issue")
     }
   }
 
-  const handleDeleteIssue = async (issueId: string) => {
+  async function handleDeleteIssue(issueId: string) {
     try {
       const supabase = createClient()
-      const { error } = await supabase.from("asset_issues").delete().eq("id", issueId)
-      if (error) throw error
+      const { error: deleteError } = await supabase.from("asset_issues").delete().eq("id", issueId)
+      if (deleteError) throw deleteError
       toast.success("Issue deleted")
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminAssetIssues() })
-    } catch (error: unknown) {
-      log.error("Error deleting issue:", error)
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminAssetIssues() })
+    } catch (err: unknown) {
+      log.error("Error deleting issue:", err)
       toast.error("Failed to delete issue")
     }
   }
 
-  const filteredIssues = issues.filter((issue) => {
-    const matchesSearch =
-      searchQuery === "" ||
-      issue.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      issue.asset?.unique_code.toLowerCase().includes(searchQuery.toLowerCase())
+  const assetTypeOptions = useMemo(
+    () =>
+      Object.entries(ASSET_TYPE_MAP).map(([value, item]) => ({
+        value,
+        label: item.label,
+      })),
+    []
+  )
 
-    const matchesStatus =
-      statusFilter === "all" ||
-      (statusFilter === "resolved" && issue.resolved) ||
-      (statusFilter === "unresolved" && !issue.resolved)
+  const columns: DataTableColumn<AssetIssue>[] = [
+    {
+      key: "resolved",
+      label: "Status",
+      sortable: true,
+      accessor: (issue) => (issue.resolved ? "resolved" : "unresolved"),
+      render: (issue) => (
+        <Badge variant={issue.resolved ? "default" : "secondary"}>{issue.resolved ? "Resolved" : "Unresolved"}</Badge>
+      ),
+    },
+    {
+      key: "asset",
+      label: "Asset",
+      sortable: true,
+      accessor: (issue) => issue.asset?.unique_code || "",
+      render: (issue) => (
+        <div>
+          <div className="font-mono text-xs font-medium">{issue.asset?.unique_code || "-"}</div>
+          <div className="text-muted-foreground text-xs">
+            {ASSET_TYPE_MAP[issue.asset?.asset_type || ""]?.label || issue.asset?.asset_type || "-"}
+          </div>
+        </div>
+      ),
+      resizable: true,
+      initialWidth: 180,
+    },
+    {
+      key: "description",
+      label: "Issue Description",
+      sortable: true,
+      accessor: (issue) => issue.description,
+      render: (issue) => (
+        <span
+          className={`block max-w-[320px] truncate text-sm ${issue.resolved ? "text-muted-foreground line-through" : ""}`}
+        >
+          {issue.description}
+        </span>
+      ),
+      resizable: true,
+      initialWidth: 320,
+    },
+    {
+      key: "assigned_to",
+      label: "Assigned To",
+      sortable: true,
+      accessor: (issue) => assignedTo(issue),
+      render: (issue) => <span className="text-sm">{assignedTo(issue)}</span>,
+      resizable: true,
+      initialWidth: 180,
+    },
+    {
+      key: "reported_by",
+      label: "Reported By",
+      sortable: true,
+      accessor: (issue) =>
+        issue.creator ? `${formatName(issue.creator.first_name)} ${formatName(issue.creator.last_name)}` : "Unknown",
+      render: (issue) => (
+        <span className="text-sm">
+          {issue.creator ? `${formatName(issue.creator.first_name)} ${formatName(issue.creator.last_name)}` : "Unknown"}
+        </span>
+      ),
+    },
+    {
+      key: "created_at",
+      label: "Date",
+      sortable: true,
+      accessor: (issue) => issue.created_at,
+      render: (issue) => (
+        <span className="text-muted-foreground text-sm">{new Date(issue.created_at).toLocaleDateString()}</span>
+      ),
+    },
+  ]
 
-    const matchesAssetType = assetTypeFilter === "all" || issue.asset?.asset_type === assetTypeFilter
+  const tableFilters: DataTableFilter<AssetIssue>[] = [
+    {
+      key: "resolved",
+      label: "Status",
+      options: [
+        { value: "resolved", label: "Resolved" },
+        { value: "unresolved", label: "Unresolved" },
+      ],
+      placeholder: "All Statuses",
+    },
+    {
+      key: "asset_type",
+      label: "Asset Type",
+      options: assetTypeOptions,
+      placeholder: "All Asset Types",
+      mode: "custom",
+      filterFn: (issue, values) => values.length === 0 || values.includes(issue.asset?.asset_type || ""),
+    },
+  ]
 
-    return matchesSearch && matchesStatus && matchesAssetType
-  })
+  const rowActions: RowAction<AssetIssue>[] = [
+    {
+      label: "Resolve",
+      icon: CheckCircle2,
+      onClick: (issue) => void handleToggleResolved(issue),
+    },
+    {
+      label: "Delete",
+      icon: Trash2,
+      variant: "destructive",
+      onClick: (issue) => setPendingDeleteId(issue.id),
+    },
+  ]
 
   const stats = {
     total: issues.length,
-    unresolved: issues.filter((i) => !i.resolved).length,
-    resolved: issues.filter((i) => i.resolved).length,
+    unresolved: issues.filter((issue) => !issue.resolved).length,
+    resolved: issues.filter((issue) => issue.resolved).length,
+    assigned: issues.filter((issue) => assignedTo(issue) !== "Unassigned").length,
   }
 
   return (
-    <AdminTablePage
+    <DataTablePage
       title="Asset Issues"
-      description="Track and manage all asset issues across the organization"
+      description="Track and manage asset issues across the organization."
       icon={AlertCircle}
+      backLink={{ href: "/admin/assets", label: "Back to Admin" }}
       stats={
-        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 md:gap-4">
-          <StatCard title="Total Issues" value={stats.total} icon={AlertCircle} description="All tracked issues" />
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <StatCard
-            title="Unresolved Issues"
-            value={stats.unresolved}
+            title="Total Issues"
+            value={stats.total}
             icon={AlertCircle}
-            iconBgColor="bg-orange-100 dark:bg-orange-900/30"
-            iconColor="text-orange-600 dark:text-orange-400"
-            description="Requiring attention"
+            iconBgColor="bg-blue-500/10"
+            iconColor="text-blue-500"
           />
           <StatCard
-            title="Resolved Issues"
+            title="Unresolved"
+            value={stats.unresolved}
+            icon={AlertCircle}
+            iconBgColor="bg-amber-500/10"
+            iconColor="text-amber-500"
+          />
+          <StatCard
+            title="Resolved"
             value={stats.resolved}
             icon={CheckCircle2}
-            iconBgColor="bg-green-100 dark:bg-green-900/30"
-            iconColor="text-green-600 dark:text-green-400"
-            description="Successfully fixed"
+            iconBgColor="bg-emerald-500/10"
+            iconColor="text-emerald-500"
+          />
+          <StatCard
+            title="Assigned Assets"
+            value={stats.assigned}
+            icon={Package}
+            iconBgColor="bg-violet-500/10"
+            iconColor="text-violet-500"
           />
         </div>
       }
-      filters={
-        <ListToolbar
-          search={
-            <div className="relative w-full min-w-0 flex-1 sm:max-w-md">
-              <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform" />
-              <Input
-                placeholder="Search issues or asset codes..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-          }
-          filters={
-            <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2">
-              <SearchableSelect
-                value={statusFilter}
-                onValueChange={setStatusFilter}
-                placeholder="Filter by status"
-                searchPlaceholder="Search status..."
-                icon={<Filter className="h-4 w-4" />}
-                options={[
-                  { value: "all", label: "All Issues" },
-                  {
-                    value: "unresolved",
-                    label: "Unresolved",
-                    icon: <AlertCircle className="h-3 w-3 text-orange-500" />,
-                  },
-                  {
-                    value: "resolved",
-                    label: "Resolved",
-                    icon: <CheckCircle2 className="h-3 w-3 text-green-500" />,
-                  },
-                ]}
-              />
-              <SearchableSelect
-                value={assetTypeFilter}
-                onValueChange={setAssetTypeFilter}
-                placeholder="All Asset Types"
-                searchPlaceholder="Search asset types..."
-                icon={<Package className="h-4 w-4" />}
-                options={[
-                  { value: "all", label: "All Asset Types" },
-                  ...Object.entries(ASSET_TYPE_MAP).map(([key, value]) => ({
-                    value: key,
-                    label: value.label,
-                  })),
-                ]}
-              />
-            </div>
-          }
-        />
-      }
     >
-      <Card>
-        <CardHeader>
-          <CardTitle>Issues List ({filteredIssues.length})</CardTitle>
-          <CardDescription>
-            {statusFilter === "unresolved"
-              ? "Showing unresolved issues requiring attention"
-              : statusFilter === "resolved"
-                ? "Showing resolved issues"
-                : "Showing all issues"}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <TableSkeleton rows={5} cols={7} />
-          ) : filteredIssues.length === 0 ? (
-            <EmptyState
-              icon={AlertCircle}
-              title="No issues found"
-              description={
-                searchQuery || statusFilter !== "all" || assetTypeFilter !== "all"
-                  ? "No issues match your filters."
-                  : "No issues tracked yet."
-              }
-            />
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[50px]">Status</TableHead>
-                    <TableHead>Asset</TableHead>
-                    <TableHead>Issue Description</TableHead>
-                    <TableHead>Assigned To</TableHead>
-                    <TableHead>Reported By</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredIssues.map((issue) => (
-                    <TableRow
-                      key={issue.id}
-                      className={
-                        issue.resolved ? "bg-green-50/50 dark:bg-green-950/10" : "bg-orange-50/50 dark:bg-orange-950/10"
-                      }
-                    >
-                      <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleToggleResolved(issue)}
-                          className="h-8 w-8 p-0"
-                        >
-                          {issue.resolved ? (
-                            <CheckCircle2 className="h-5 w-5 text-green-600" />
-                          ) : (
-                            <div className="h-5 w-5 rounded-full border-2 border-orange-500" />
-                          )}
-                        </Button>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <div className="bg-primary/10 rounded p-1.5">
-                            <Package className="text-primary h-3 w-3" />
-                          </div>
-                          <div>
-                            <div className="font-mono text-xs font-medium">{issue.asset?.unique_code}</div>
-                            <div className="text-muted-foreground text-xs">
-                              {ASSET_TYPE_MAP[issue.asset?.asset_type || ""]?.label || issue.asset?.asset_type}
-                            </div>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="max-w-md">
-                          <p
-                            className={`text-sm ${
-                              issue.resolved ? "text-muted-foreground line-through" : "text-foreground"
-                            }`}
-                          >
-                            {issue.description}
-                          </p>
-                          {issue.resolved && issue.resolved_at && (
-                            <div className="mt-1 flex items-center gap-1 text-xs text-green-600">
-                              <CheckCircle2 className="h-3 w-3" />
-                              <span>
-                                Resolved {new Date(issue.resolved_at).toLocaleDateString()}
-                                {issue.resolver && (
-                                  <span>
-                                    {" "}
-                                    by {formatName(issue.resolver.first_name)} {formatName(issue.resolver.last_name)}
-                                  </span>
-                                )}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {issue.asset?.current_assignment ? (
-                          issue.asset.current_assignment.type === "individual" &&
-                          issue.asset.current_assignment.user ? (
-                            <div className="flex items-center gap-1.5">
-                              <User className="text-muted-foreground h-3 w-3" />
-                              <span className="text-sm">
-                                {formatName(issue.asset.current_assignment.user.first_name)}{" "}
-                                {formatName(issue.asset.current_assignment.user.last_name)}
-                              </span>
-                            </div>
-                          ) : issue.asset.current_assignment.type === "department" &&
-                            issue.asset.current_assignment.department ? (
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-sm">{issue.asset.current_assignment.department}</span>
-                            </div>
-                          ) : issue.asset.current_assignment.type === "office" &&
-                            issue.asset.current_assignment.office_location ? (
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-sm">{issue.asset.current_assignment.office_location}</span>
-                            </div>
-                          ) : (
-                            <span className="text-muted-foreground text-sm">-</span>
-                          )
-                        ) : (
-                          <span className="text-muted-foreground text-sm">Unassigned</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1.5">
-                          <User className="text-muted-foreground h-3 w-3" />
-                          <span className="text-sm">
-                            {issue.creator
-                              ? `${formatName(issue.creator.first_name)} ${formatName(issue.creator.last_name)}`
-                              : "Unknown"}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-muted-foreground flex items-center gap-1.5 text-sm">
-                          <Calendar className="h-3 w-3" />
-                          {new Date(issue.created_at).toLocaleDateString()}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setPendingDeleteId(issue.id)}
-                          className="text-destructive hover:text-destructive h-8 w-8 p-0"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+      <DataTable<AssetIssue>
+        data={issues}
+        columns={columns}
+        filters={tableFilters}
+        getRowId={(issue) => issue.id}
+        searchPlaceholder="Search issue description, asset code, assignee, or reporter..."
+        searchFn={(issue, query) =>
+          [
+            issue.description,
+            issue.asset?.unique_code || "",
+            assignedTo(issue),
+            issue.creator ? `${formatName(issue.creator.first_name)} ${formatName(issue.creator.last_name)}` : "",
+          ]
+            .join(" ")
+            .toLowerCase()
+            .includes(query)
+        }
+        isLoading={isLoading}
+        error={error instanceof Error ? error.message : error ? String(error) : null}
+        onRetry={() => void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminAssetIssues() })}
+        rowActions={rowActions}
+        expandable={{
+          render: (issue) => (
+            <div className="grid gap-4 text-sm sm:grid-cols-3">
+              <div>
+                <p className="text-muted-foreground text-xs">Issue</p>
+                <p className="mt-1">{issue.description}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Assigned To</p>
+                <p className="mt-1">{assignedTo(issue)}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Reported</p>
+                <p className="mt-1">{new Date(issue.created_at).toLocaleDateString()}</p>
+              </div>
             </div>
-          )}
-        </CardContent>
-      </Card>
+          ),
+        }}
+        viewToggle
+        cardRenderer={(issue) => (
+          <IssueCard issue={issue} onToggle={(item) => void handleToggleResolved(item)} onDelete={setPendingDeleteId} />
+        )}
+        emptyTitle="No asset issues found"
+        emptyDescription="Open issues will appear here when assets are reported for maintenance or follow-up."
+        emptyIcon={AlertCircle}
+        skeletonRows={6}
+        minWidth="1180px"
+      />
 
       <AlertDialog open={pendingDeleteId !== null} onOpenChange={(open) => !open && setPendingDeleteId(null)}>
         <AlertDialogContent>
@@ -467,7 +465,7 @@ export default function AssetIssuesPage() {
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => {
-                if (pendingDeleteId) handleDeleteIssue(pendingDeleteId)
+                if (pendingDeleteId) void handleDeleteIssue(pendingDeleteId)
                 setPendingDeleteId(null)
               }}
             >
@@ -476,6 +474,6 @@ export default function AssetIssuesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </AdminTablePage>
+    </DataTablePage>
   )
 }

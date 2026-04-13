@@ -19,7 +19,10 @@ interface TaskFilterBarProps {
   setDepartmentFilter: (v: string) => void
   employeeFilter: string
   setEmployeeFilter: (v: string) => void
+  goalFilter: string
+  setGoalFilter: (v: string) => void
   departments: string[]
+  goals: { id: string; title: string }[]
   activeEmployees: employee[]
   userProfile: UserProfile
 }
@@ -35,7 +38,10 @@ export function TaskFilterBar({
   setDepartmentFilter,
   employeeFilter,
   setEmployeeFilter,
+  goalFilter,
+  setGoalFilter,
   departments,
+  goals,
   activeEmployees,
   userProfile,
 }: TaskFilterBarProps) {
@@ -75,6 +81,20 @@ export function TaskFilterBar({
               <SelectItem value="low">Low</SelectItem>
             </SelectContent>
           </Select>
+          <SearchableSelect
+            value={goalFilter}
+            onValueChange={setGoalFilter}
+            placeholder="All Goals"
+            searchPlaceholder="Search goals..."
+            className="w-full md:w-56"
+            options={[
+              { value: "all", label: "All Goals" },
+              ...goals.map((goal) => ({
+                value: goal.id,
+                label: goal.title,
+              })),
+            ]}
+          />
           {!userProfile?.is_department_lead && (
             <SearchableSelect
               value={departmentFilter}

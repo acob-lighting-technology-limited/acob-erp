@@ -153,23 +153,28 @@ export async function GET(request: NextRequest) {
 
     let cbtScores: CbtReviewRow[] = []
     let reviewers: ReviewerRow[] = []
-    if (cycleId && scopedUserIds.length > 0) {
-      const { data: reviews } = await supabase
+    if (scopedUserIds.length > 0) {
+      let reviewsQuery = supabase
         .from("performance_reviews")
         .select("id, user_id, review_cycle_id, reviewer_id, cbt_score, created_at")
-        .eq("review_cycle_id", cycleId)
         .in("user_id", scopedUserIds)
         .not("cbt_score", "is", null)
         .order("created_at", { ascending: false })
-        .returns<CbtReviewRow[]>()
 
-      const latestByUser = new Map<string, CbtReviewRow>()
+      if (cycleId) {
+        reviewsQuery = reviewsQuery.eq("review_cycle_id", cycleId)
+      }
+
+      const { data: reviews } = await reviewsQuery.returns<CbtReviewRow[]>()
+
+      const latestByUserAndCycle = new Map<string, CbtReviewRow>()
       for (const review of reviews || []) {
-        if (!latestByUser.has(review.user_id)) {
-          latestByUser.set(review.user_id, review)
+        const key = `${review.user_id}:${review.review_cycle_id}`
+        if (!latestByUserAndCycle.has(key)) {
+          latestByUserAndCycle.set(key, review)
         }
       }
-      cbtScores = Array.from(latestByUser.values())
+      cbtScores = Array.from(latestByUserAndCycle.values())
 
       const reviewerIds = Array.from(
         new Set(cbtScores.map((review) => review.reviewer_id).filter((value): value is string => Boolean(value)))

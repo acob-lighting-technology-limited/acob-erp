@@ -4,8 +4,7 @@ import Link from "next/link"
 import { useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { TablePage } from "@/components/admin/admin-table-page"
-import { Card, CardContent } from "@/components/ui/card"
+import { AlertCircle, CalendarDays, Download, FileText, Loader2, Lock, Pencil, Plus, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -21,13 +20,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { TableSkeleton } from "@/components/ui/query-states"
+import { Badge } from "@/components/ui/badge"
+import { StatCard } from "@/components/ui/stat-card"
+import { DataTable, DataTablePage } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { createClient } from "@/lib/supabase/client"
 import { getCurrentOfficeWeek } from "@/lib/meeting-week"
 import { buildMeetingDocumentFileName } from "@/lib/reports/meeting-date"
 import { REPORT_DOC_MAX_SIZE_BYTES, formatLimitMb } from "@/lib/reports/document-upload-limits"
-import { Download, FileText, Loader2, Pencil, Plus, Search, Trash2 } from "lucide-react"
 
 type DocumentType = "minutes"
 
@@ -72,6 +72,16 @@ function formatMeetingDate(value?: string | null): string {
   })
 }
 
+function formatSubmittedDate(value: string): string {
+  return new Date(value).toLocaleString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  })
+}
+
 export function MeetingDocumentTypeTable({
   documentType,
   title,
@@ -91,23 +101,23 @@ export function MeetingDocumentTypeTable({
   const [saving, setSaving] = useState(false)
   const [uploadPhase, setUploadPhase] = useState<UploadPhase>("idle")
 
-  const [searchQuery, setSearchQuery] = useState("")
-  const [weekFilter, setWeekFilter] = useState("all")
-  const [yearFilter, setYearFilter] = useState("all")
-
-  const weekOptions = Array.from({ length: 53 }, (_, i) => i + 1)
-  const yearOptions = [officeWeek.year - 1, officeWeek.year, officeWeek.year + 1, officeWeek.year + 2]
+  const weekOptions = useMemo(() => Array.from({ length: 53 }, (_, i) => i + 1), [])
+  const yearOptions = useMemo(
+    () => [officeWeek.year - 1, officeWeek.year, officeWeek.year + 1, officeWeek.year + 2],
+    [officeWeek.year]
+  )
 
   const {
     data: rows = [],
     refetch,
     isLoading,
+    error,
   } = useQuery({
     queryKey: ["meeting-doc-table", documentType],
     queryFn: async (): Promise<MeetingDocument[]> => {
-      const res = await fetch(`/api/reports/meeting-week-documents?documentType=${documentType}&currentOnly=true`)
-      const payload = await res.json()
-      if (!res.ok) throw new Error(payload.error || "Failed to fetch documents")
+      const response = await fetch(`/api/reports/meeting-week-documents?documentType=${documentType}&currentOnly=true`)
+      const payload = await response.json()
+      if (!response.ok) throw new Error(payload.error || "Failed to fetch documents")
       return payload.data || []
     },
   })
@@ -116,11 +126,11 @@ export function MeetingDocumentTypeTable({
     queryKey: ["meeting-doc-selected-week-lock", documentType, weekNumber, yearNumber],
     enabled: !readOnly,
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("weekly_report_lock_state", {
+      const { data, error: lockError } = await supabase.rpc("weekly_report_lock_state", {
         p_week: weekNumber,
         p_year: yearNumber,
       })
-      if (error) throw new Error(error.message)
+      if (lockError) throw new Error(lockError.message)
       return Array.isArray(data) && data[0] ? Boolean(data[0].is_locked) : false
     },
   })
@@ -134,11 +144,25 @@ export function MeetingDocumentTypeTable({
     queryKey: ["meeting-doc-uploaded-by", uploadedByIds],
     enabled: uploadedByIds.length > 0,
     queryFn: async () => {
-      const { data, error } = await supabase.from("profiles").select("id, full_name").in("id", uploadedByIds)
-      if (error) throw new Error(error.message)
+      const { data, error: uploadedByError } = await supabase
+        .from("profiles")
+        .select("id, full_name")
+        .in("id", uploadedByIds)
+      if (uploadedByError) throw new Error(uploadedByError.message)
       return new Map((data || []).map((row) => [String(row.id), String(row.full_name || "Unknown")]))
     },
   })
+
+  const availableRows = useMemo(
+    () =>
+      rows
+        .filter((row) => compareWeekYear(row.meeting_week, row.meeting_year, officeWeek.week, officeWeek.year) <= 0)
+        .sort((a, b) => {
+          if (a.meeting_year !== b.meeting_year) return b.meeting_year - a.meeting_year
+          return b.meeting_week - a.meeting_week
+        }),
+    [officeWeek.week, officeWeek.year, rows]
+  )
 
   const isSelectedWeekLocked = Boolean(selectedWeekLockState)
   const selectedWeekExistingRow = useMemo(
@@ -147,26 +171,40 @@ export function MeetingDocumentTypeTable({
   )
   const isCreateBlockedForSelectedWeek = !editingDoc && isSelectedWeekLocked && Boolean(selectedWeekExistingRow)
 
-  const filteredRows = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase()
-    return rows
-      .filter((row) => {
-        // no upcoming rows
-        if (compareWeekYear(row.meeting_week, row.meeting_year, officeWeek.week, officeWeek.year) > 0) return false
-        if (weekFilter !== "all" && row.meeting_week !== Number(weekFilter)) return false
-        if (yearFilter !== "all" && row.meeting_year !== Number(yearFilter)) return false
-        if (!q) return true
-        return (
-          row.file_name.toLowerCase().includes(q) ||
-          String(row.meeting_week).includes(q) ||
-          String(row.meeting_year).includes(q)
-        )
-      })
-      .sort((a, b) => {
-        if (a.meeting_year !== b.meeting_year) return b.meeting_year - a.meeting_year
-        return b.meeting_week - a.meeting_week
-      })
-  }, [rows, searchQuery, weekFilter, yearFilter, officeWeek.week, officeWeek.year])
+  const weekFilterOptions = useMemo(
+    () =>
+      weekOptions.map((week) => ({
+        value: String(week),
+        label: `Week ${week}`,
+      })),
+    [weekOptions]
+  )
+
+  const yearFilterOptions = useMemo(
+    () =>
+      yearOptions.map((year) => ({
+        value: String(year),
+        label: String(year),
+      })),
+    [yearOptions]
+  )
+
+  const lockFilterOptions = useMemo(
+    () => [
+      { value: "open", label: "Open" },
+      { value: "locked", label: "Locked" },
+    ],
+    []
+  )
+
+  const stats = useMemo(() => {
+    const total = availableRows.length
+    const locked = availableRows.filter((row) => Boolean(row.is_locked)).length
+    const downloadable = availableRows.filter((row) => Boolean(row.signed_url)).length
+    const currentYear = availableRows.filter((row) => row.meeting_year === officeWeek.year).length
+
+    return { total, locked, downloadable, currentYear }
+  }, [availableRows, officeWeek.year])
 
   const upload = async () => {
     if (readOnly) {
@@ -189,11 +227,11 @@ export function MeetingDocumentTypeTable({
     setSaving(true)
     try {
       const requiresConversion = file.type === DOCX_MIME
-      const fd = new FormData()
-      fd.append("file", file)
-      fd.append("meetingWeek", String(weekNumber))
-      fd.append("meetingYear", String(yearNumber))
-      fd.append("documentType", documentType)
+      const formData = new FormData()
+      formData.append("file", file)
+      formData.append("meetingWeek", String(weekNumber))
+      formData.append("meetingYear", String(yearNumber))
+      formData.append("documentType", documentType)
 
       if (requiresConversion) {
         setUploadPhase("converting")
@@ -208,19 +246,19 @@ export function MeetingDocumentTypeTable({
         }, 1200)
       }
 
-      const res = await fetch("/api/reports/meeting-week-documents", { method: "POST", body: fd })
+      const response = await fetch("/api/reports/meeting-week-documents", { method: "POST", body: formData })
       if (phaseTimer) clearTimeout(phaseTimer)
       setUploadPhase("uploading")
-      const payload = await res.json()
-      if (!res.ok) throw new Error(payload.error || "Upload failed")
+      const payload = await response.json()
+      if (!response.ok) throw new Error(payload.error || "Upload failed")
 
       toast.success(payload?.converted ? "Document uploaded and converted to PDF" : "Document uploaded")
       setShowCreate(false)
       setEditingDoc(null)
       setFile(null)
       await refetch()
-    } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : "Upload failed")
+    } catch (uploadError: unknown) {
+      toast.error(uploadError instanceof Error ? uploadError.message : "Upload failed")
     } finally {
       setSaving(false)
       setUploadPhase("idle")
@@ -236,24 +274,21 @@ export function MeetingDocumentTypeTable({
       return
     }
     const target = rows.find((row) => row.id === id)
-    const isPastRow = target
-      ? compareWeekYear(target.meeting_week, target.meeting_year, officeWeek.week, officeWeek.year) < 0
-      : false
-    if (target?.is_locked || isPastRow) {
+    if (target?.is_locked) {
       toast.error(
-        `Week ${target?.meeting_week ?? weekNumber}, ${target?.meeting_year ?? yearNumber} is locked and can no longer be changed`
+        `Week ${target.meeting_week ?? weekNumber}, ${target.meeting_year ?? yearNumber} is locked and can no longer be changed`
       )
       return
     }
     try {
-      const res = await fetch(`/api/reports/meeting-week-documents?id=${id}`, { method: "DELETE" })
-      const payload = await res.json()
-      if (!res.ok) throw new Error(payload.error || "Delete failed")
+      const response = await fetch(`/api/reports/meeting-week-documents?id=${id}`, { method: "DELETE" })
+      const payload = await response.json()
+      if (!response.ok) throw new Error(payload.error || "Delete failed")
       toast.success("Document deleted")
       setPendingDeleteDoc(null)
       await refetch()
-    } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : "Delete failed")
+    } catch (removeError: unknown) {
+      toast.error(removeError instanceof Error ? removeError.message : "Delete failed")
     }
   }
 
@@ -275,15 +310,14 @@ export function MeetingDocumentTypeTable({
       window.setTimeout(() => {
         toast.dismiss(toastId)
       }, 6000)
-    } catch (error: unknown) {
+    } catch (downloadError: unknown) {
       toast.dismiss(toastId)
-      toast.error(error instanceof Error ? error.message : "Download failed")
+      toast.error(downloadError instanceof Error ? downloadError.message : "Download failed")
     }
   }
 
   const openEdit = (row: MeetingDocument) => {
-    const isPastRow = compareWeekYear(row.meeting_week, row.meeting_year, officeWeek.week, officeWeek.year) < 0
-    if (row.is_locked || isPastRow) {
+    if (row.is_locked) {
       toast.error(`Week ${row.meeting_week}, ${row.meeting_year} is locked and can no longer be edited`)
       return
     }
@@ -295,13 +329,117 @@ export function MeetingDocumentTypeTable({
     setShowCreate(true)
   }
 
+  const columns = useMemo<DataTableColumn<MeetingDocument>[]>(
+    () => [
+      {
+        key: "meeting_date",
+        label: "Meeting Date",
+        sortable: true,
+        accessor: (row) => row.meeting_date || "",
+        render: (row) => formatMeetingDate(row.meeting_date),
+      },
+      {
+        key: "meeting_week",
+        label: "Week",
+        sortable: true,
+        accessor: (row) => row.meeting_week,
+        render: (row) => <span className="font-medium">{`W${row.meeting_week}`}</span>,
+      },
+      {
+        key: "meeting_year",
+        label: "Year",
+        sortable: true,
+        accessor: (row) => row.meeting_year,
+      },
+      {
+        key: "submitted_by",
+        label: "Submitted By",
+        accessor: (row) => (row.uploaded_by ? uploadedByNameMap.get(row.uploaded_by) || "-" : "-"),
+        render: (row) => (row.uploaded_by ? uploadedByNameMap.get(row.uploaded_by) || "-" : "-"),
+      },
+      {
+        key: "created_at",
+        label: "Submitted Date",
+        sortable: true,
+        accessor: (row) => row.created_at,
+        resizable: true,
+        initialWidth: 220,
+        render: (row) => formatSubmittedDate(row.created_at),
+      },
+      {
+        key: "lock_status",
+        label: "Status",
+        accessor: (row) => (row.is_locked ? "locked" : "open"),
+        render: (row) => (
+          <Badge variant={row.is_locked ? "secondary" : "outline"}>{row.is_locked ? "Locked" : "Open"}</Badge>
+        ),
+      },
+    ],
+    [uploadedByNameMap]
+  )
+
+  const filters = useMemo<DataTableFilter<MeetingDocument>[]>(
+    () => [
+      {
+        key: "meeting_week",
+        label: "Week",
+        options: weekFilterOptions,
+      },
+      {
+        key: "meeting_year",
+        label: "Year",
+        options: yearFilterOptions,
+      },
+      {
+        key: "lock_status",
+        label: "Status",
+        options: lockFilterOptions,
+      },
+    ],
+    [lockFilterOptions, weekFilterOptions, yearFilterOptions]
+  )
+
+  const rowActions = useMemo(() => {
+    const actions = []
+    if (!readOnly) {
+      actions.push({
+        label: "Edit",
+        icon: Pencil,
+        onClick: (row: MeetingDocument) => openEdit(row),
+      })
+      actions.push({
+        label: "Delete",
+        icon: Trash2,
+        variant: "destructive" as const,
+        onClick: (row: MeetingDocument) => {
+          if (row.is_locked) {
+            toast.error(`Week ${row.meeting_week}, ${row.meeting_year} is locked and can no longer be deleted`)
+            return
+          }
+          setPendingDeleteDoc(row)
+        },
+      })
+    }
+    actions.push({
+      label: "Download",
+      icon: Download,
+      onClick: (row: MeetingDocument) => {
+        if (!row.signed_url) {
+          toast.error("No downloadable file is available for this record")
+          return
+        }
+        void handleDownload(row)
+      },
+    })
+    return actions
+  }, [readOnly])
+
   return (
-    <TablePage
+    <DataTablePage
       title={title}
       description={description}
       icon={FileText}
-      backLinkHref={backHref}
-      backLinkLabel={backLabel}
+      backLink={{ href: backHref, label: backLabel }}
       actions={
         readOnly ? null : (
           <Button
@@ -314,57 +452,41 @@ export function MeetingDocumentTypeTable({
               setShowCreate(true)
             }}
           >
-            <Plus className="mr-2 h-4 w-4" /> Add
+            <Plus className="mr-2 h-4 w-4" />
+            Add
           </Button>
         )
       }
-      filters={
-        <div className="space-y-4">
-          <div className="relative w-full">
-            <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-            <Input
-              placeholder="Search by file name, week, or year..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
-            <div className="space-y-2">
-              <Label>Week</Label>
-              <Select value={weekFilter} onValueChange={setWeekFilter}>
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue placeholder="All weeks" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All weeks</SelectItem>
-                  {weekOptions.map((w) => (
-                    <SelectItem key={w} value={String(w)}>
-                      Week {w}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Year</Label>
-              <Select value={yearFilter} onValueChange={setYearFilter}>
-                <SelectTrigger className="w-[120px]">
-                  <SelectValue placeholder="All years" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All years</SelectItem>
-                  {yearOptions.map((y) => (
-                    <SelectItem key={y} value={String(y)}>
-                      {y}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+      stats={
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard
+            title="Documents"
+            value={stats.total}
+            icon={FileText}
+            iconBgColor="bg-blue-500/10"
+            iconColor="text-blue-500"
+          />
+          <StatCard
+            title="Locked"
+            value={stats.locked}
+            icon={Lock}
+            iconBgColor="bg-red-500/10"
+            iconColor="text-red-500"
+          />
+          <StatCard
+            title="Downloadable"
+            value={stats.downloadable}
+            icon={Download}
+            iconBgColor="bg-emerald-500/10"
+            iconColor="text-emerald-500"
+          />
+          <StatCard
+            title="This Year"
+            value={stats.currentYear}
+            icon={CalendarDays}
+            iconBgColor="bg-amber-500/10"
+            iconColor="text-amber-500"
+          />
         </div>
       }
     >
@@ -382,7 +504,9 @@ export function MeetingDocumentTypeTable({
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
-                if (pendingDeleteDoc) remove(pendingDeleteDoc.id)
+                if (pendingDeleteDoc) {
+                  void remove(pendingDeleteDoc.id)
+                }
               }}
             >
               Delete
@@ -415,16 +539,16 @@ export function MeetingDocumentTypeTable({
               <Label>Week</Label>
               <Select
                 value={String(weekNumber)}
-                onValueChange={(v) => setWeekNumber(Number(v))}
+                onValueChange={(value) => setWeekNumber(Number(value))}
                 disabled={Boolean(editingDoc)}
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {weekOptions.map((w) => (
-                    <SelectItem key={w} value={String(w)}>
-                      Week {w}
+                  {weekOptions.map((week) => (
+                    <SelectItem key={week} value={String(week)}>
+                      Week {week}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -434,16 +558,16 @@ export function MeetingDocumentTypeTable({
               <Label>Year</Label>
               <Select
                 value={String(yearNumber)}
-                onValueChange={(v) => setYearNumber(Number(v))}
+                onValueChange={(value) => setYearNumber(Number(value))}
                 disabled={Boolean(editingDoc)}
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {yearOptions.map((y) => (
-                    <SelectItem key={y} value={String(y)}>
-                      {y}
+                  {yearOptions.map((year) => (
+                    <SelectItem key={year} value={String(year)}>
+                      {year}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -454,11 +578,11 @@ export function MeetingDocumentTypeTable({
               <Input
                 type="file"
                 accept="application/pdf,.pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                onChange={(e) => {
-                  const selected = e.target.files?.[0] || null
+                onChange={(event) => {
+                  const selected = event.target.files?.[0] || null
                   if (selected && selected.size > REPORT_DOC_MAX_SIZE_BYTES) {
                     toast.error(`File exceeds max size of ${formatLimitMb(REPORT_DOC_MAX_SIZE_BYTES)}`)
-                    e.currentTarget.value = ""
+                    event.currentTarget.value = ""
                     setFile(null)
                     return
                   }
@@ -493,7 +617,9 @@ export function MeetingDocumentTypeTable({
 
           <div className="mt-4 flex gap-2">
             <Button
-              onClick={upload}
+              onClick={() => {
+                void upload()
+              }}
               disabled={saving || (editingDoc ? isSelectedWeekLocked : isCreateBlockedForSelectedWeek)}
             >
               {saving ? (
@@ -517,91 +643,86 @@ export function MeetingDocumentTypeTable({
         </DialogContent>
       </Dialog>
 
-      <Card>
-        <CardContent className="pt-6">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>S/N</TableHead>
-                <TableHead>Meeting Date</TableHead>
-                <TableHead>Week</TableHead>
-                <TableHead>Submitted By</TableHead>
-                <TableHead>Submitted Date</TableHead>
-                <TableHead>Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="p-4">
-                    <TableSkeleton rows={4} cols={6} />
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredRows.map((row, index) => {
-                  const isPastRow =
-                    compareWeekYear(row.meeting_week, row.meeting_year, officeWeek.week, officeWeek.year) < 0
-                  const isActionLocked = isPastRow || Boolean(row.is_locked)
-                  const submittedDate = row.created_at
-                    ? new Date(row.created_at).toLocaleString("en-GB", {
-                        day: "2-digit",
-                        month: "short",
-                        year: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })
-                    : "-"
-                  const submittedBy =
-                    row.uploaded_by && uploadedByNameMap.has(row.uploaded_by)
-                      ? uploadedByNameMap.get(row.uploaded_by)
-                      : "-"
+      <DataTable<MeetingDocument>
+        data={availableRows}
+        columns={columns}
+        filters={filters}
+        getRowId={(row) => row.id}
+        searchPlaceholder="Search by file name, week, or year..."
+        searchFn={(row, query) => {
+          const normalizedQuery = query.toLowerCase()
+          return (
+            row.file_name.toLowerCase().includes(normalizedQuery) ||
+            String(row.meeting_week).includes(normalizedQuery) ||
+            String(row.meeting_year).includes(normalizedQuery)
+          )
+        }}
+        isLoading={isLoading}
+        error={error instanceof Error ? error.message : null}
+        onRetry={() => {
+          void refetch()
+        }}
+        rowActions={rowActions}
+        expandable={{
+          render: (row) => {
+            const submittedBy =
+              row.uploaded_by && uploadedByNameMap.has(row.uploaded_by) ? uploadedByNameMap.get(row.uploaded_by) : "-"
 
-                  return (
-                    <TableRow key={row.id}>
-                      <TableCell>{index + 1}</TableCell>
-                      <TableCell>{formatMeetingDate(row.meeting_date)}</TableCell>
-                      <TableCell className="font-medium">{`W${row.meeting_week}`}</TableCell>
-                      <TableCell>{submittedBy}</TableCell>
-                      <TableCell>{submittedDate}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          {!readOnly && !isActionLocked ? (
-                            <Button variant="ghost" size="icon" onClick={() => openEdit(row)} title="Edit">
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                          ) : null}
-                          {!readOnly && !isActionLocked ? (
-                            <Button variant="ghost" size="icon" onClick={() => setPendingDeleteDoc(row)} title="Delete">
-                              <Trash2 className="h-4 w-4 text-red-600" />
-                            </Button>
-                          ) : null}
-                          {row.signed_url ? (
-                            <Button variant="ghost" size="icon" title="Download" onClick={() => handleDownload(row)}>
-                              <Download className="h-4 w-4" />
-                            </Button>
-                          ) : (
-                            <Button variant="ghost" size="icon" disabled title="Download">
-                              <Download className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  )
-                })
-              )}
+            return (
+              <div className="grid gap-4 md:grid-cols-4">
+                <div className="rounded-lg border p-4">
+                  <p className="text-muted-foreground text-xs tracking-wide uppercase">File Name</p>
+                  <p className="mt-2 text-sm break-words">{row.file_name}</p>
+                </div>
+                <div className="rounded-lg border p-4">
+                  <p className="text-muted-foreground text-xs tracking-wide uppercase">Meeting Date</p>
+                  <p className="mt-2 text-sm">{formatMeetingDate(row.meeting_date)}</p>
+                </div>
+                <div className="rounded-lg border p-4">
+                  <p className="text-muted-foreground text-xs tracking-wide uppercase">Submitted By</p>
+                  <p className="mt-2 text-sm">{submittedBy}</p>
+                </div>
+                <div className="rounded-lg border p-4">
+                  <p className="text-muted-foreground text-xs tracking-wide uppercase">Status</p>
+                  <p className="mt-2 text-sm">{row.is_locked ? "Locked after grace period" : "Editable"}</p>
+                </div>
+              </div>
+            )
+          },
+        }}
+        viewToggle
+        cardRenderer={(row) => {
+          const submittedBy =
+            row.uploaded_by && uploadedByNameMap.has(row.uploaded_by) ? uploadedByNameMap.get(row.uploaded_by) : "-"
 
-              {!isLoading && filteredRows.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-muted-foreground py-8 text-center">
-                    No documents found for current filters.
-                  </TableCell>
-                </TableRow>
-              ) : null}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-    </TablePage>
+          return (
+            <div className="space-y-3 rounded-xl border p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-medium">{`W${row.meeting_week} ${row.meeting_year}`}</p>
+                  <p className="text-muted-foreground text-sm">{formatMeetingDate(row.meeting_date)}</p>
+                </div>
+                <Badge variant={row.is_locked ? "secondary" : "outline"}>{row.is_locked ? "Locked" : "Open"}</Badge>
+              </div>
+              <div className="grid gap-1 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Submitted By</span>
+                  <span>{submittedBy}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Submitted</span>
+                  <span>{formatSubmittedDate(row.created_at)}</span>
+                </div>
+              </div>
+            </div>
+          )
+        }}
+        emptyTitle="No documents found"
+        emptyDescription="No meeting documents matched the current filters."
+        emptyIcon={AlertCircle}
+        skeletonRows={5}
+        urlSync
+      />
+    </DataTablePage>
   )
 }

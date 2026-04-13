@@ -1,24 +1,17 @@
 "use client"
 
-import { useState } from "react"
-import { useQuery } from "@tanstack/react-query"
-import { useQueryClient } from "@tanstack/react-query"
+import { useMemo, useState } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useRouter, useSearchParams } from "next/navigation"
+import { BadgeCheck, CalendarClock, Eye, Plus, ShoppingCart, Wallet } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { QUERY_KEYS } from "@/lib/query-keys"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, ShoppingCart, Search, Filter, Eye } from "lucide-react"
-import Link from "next/link"
-import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { StatCard } from "@/components/ui/stat-card"
-import { EmptyState } from "@/components/ui/empty-state"
-import { TableSkeleton } from "@/components/ui/query-states"
+import { DataTable, DataTablePage } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { PurchaseOrderFormDialog } from "./_components/purchase-order-form-dialog"
-import { useSearchParams } from "next/navigation"
 
 interface PurchaseOrder {
   id: string
@@ -37,7 +30,7 @@ type BadgeVariant = "default" | "destructive" | "secondary" | "outline"
 
 const statusColors: Record<PurchaseOrder["status"], BadgeVariant> = {
   draft: "secondary",
-  pending: "default",
+  pending: "outline",
   approved: "default",
   received: "default",
   cancelled: "destructive",
@@ -61,168 +54,296 @@ async function fetchPurchaseOrdersList(): Promise<PurchaseOrder[]> {
     throw new Error(error.message)
   }
 
-  return ((data || []) as PurchaseOrderRow[]).map((o) => ({
-    ...o,
-    supplier_name: o.supplier?.name || undefined,
+  return ((data || []) as PurchaseOrderRow[]).map((order) => ({
+    ...order,
+    supplier_name: order.supplier?.name || undefined,
   }))
 }
 
+function formatCurrency(amount: number, currency = "NGN") {
+  return new Intl.NumberFormat("en-NG", { style: "currency", currency }).format(amount)
+}
+
+function formatDate(date: string) {
+  return new Date(date).toLocaleDateString("en-NG", { year: "numeric", month: "short", day: "numeric" })
+}
+
+function getDeliveryWindow(order: PurchaseOrder) {
+  if (!order.expected_date) return "Unscheduled"
+  const daysUntilExpected = Math.ceil((new Date(order.expected_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+  if (daysUntilExpected < 0) return "Overdue"
+  if (daysUntilExpected <= 7) return "Due Soon"
+  return "Planned"
+}
+
 export default function PurchaseOrdersPage() {
+  const router = useRouter()
   const queryClient = useQueryClient()
   const searchParams = useSearchParams()
-  const [searchQuery, setSearchQuery] = useState("")
-  const [statusFilter, setStatusFilter] = useState<string>("all")
   const [isCreateOpen, setIsCreateOpen] = useState(searchParams.get("openCreate") === "1")
 
-  const { data: orders = [], isLoading: loading } = useQuery({
+  const {
+    data: orders = [],
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
     queryKey: QUERY_KEYS.adminPurchaseOrders(),
     queryFn: fetchPurchaseOrdersList,
   })
 
-  function formatCurrency(amount: number, currency: string = "NGN") {
-    return new Intl.NumberFormat("en-NG", { style: "currency", currency }).format(amount)
-  }
+  const supplierOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(orders.map((order) => order.supplier_name).filter((supplier): supplier is string => Boolean(supplier)))
+      )
+        .sort()
+        .map((supplier) => ({ value: supplier, label: supplier })),
+    [orders]
+  )
 
-  function formatDate(date: string) {
-    return new Date(date).toLocaleDateString("en-NG", { year: "numeric", month: "short", day: "numeric" })
-  }
+  const statusOptions = useMemo(
+    () =>
+      ["draft", "pending", "approved", "received", "cancelled"].map((status) => ({
+        value: status,
+        label: status.charAt(0).toUpperCase() + status.slice(1),
+      })),
+    []
+  )
 
-  const filtered = orders.filter((o) => {
-    const matchesSearch =
-      o.po_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (o.supplier_name?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false)
-    const matchesStatus = statusFilter === "all" || o.status === statusFilter
-    return matchesSearch && matchesStatus
-  })
+  const deliveryWindowOptions = useMemo(
+    () => [
+      { value: "Overdue", label: "Overdue" },
+      { value: "Due Soon", label: "Due Soon" },
+      { value: "Planned", label: "Planned" },
+      { value: "Unscheduled", label: "Unscheduled" },
+    ],
+    []
+  )
 
-  const stats = {
-    total: orders.length,
-    pending: orders.filter((o) => o.status === "pending").length,
-    approved: orders.filter((o) => o.status === "approved").length,
-    totalValue: orders.reduce((sum, o) => sum + o.total_amount, 0),
-  }
+  const stats = useMemo(() => {
+    const total = orders.length
+    const pending = orders.filter((order) => order.status === "pending").length
+    const approved = orders.filter((order) => order.status === "approved").length
+    const totalValue = orders.reduce((sum, order) => sum + order.total_amount, 0)
+
+    return { total, pending, approved, totalValue }
+  }, [orders])
+
+  const columns = useMemo<DataTableColumn<PurchaseOrder>[]>(
+    () => [
+      {
+        key: "po_number",
+        label: "PO",
+        sortable: true,
+        accessor: (order) => order.po_number,
+        render: (order) => <span className="font-mono text-sm">{order.po_number}</span>,
+      },
+      {
+        key: "supplier_name",
+        label: "Supplier",
+        sortable: true,
+        accessor: (order) => order.supplier_name || "",
+        resizable: true,
+        initialWidth: 220,
+        render: (order) => <span className="font-medium">{order.supplier_name || "Unknown supplier"}</span>,
+      },
+      {
+        key: "order_date",
+        label: "Order Date",
+        sortable: true,
+        accessor: (order) => order.order_date,
+        render: (order) => formatDate(order.order_date),
+      },
+      {
+        key: "expected_date",
+        label: "Expected",
+        sortable: true,
+        accessor: (order) => order.expected_date || "",
+        render: (order) => (
+          <div className="space-y-1">
+            <p>{order.expected_date ? formatDate(order.expected_date) : "Not set"}</p>
+            <p className="text-muted-foreground text-xs">{getDeliveryWindow(order)}</p>
+          </div>
+        ),
+      },
+      {
+        key: "total_amount",
+        label: "Amount",
+        sortable: true,
+        accessor: (order) => order.total_amount,
+        align: "right",
+        render: (order) => formatCurrency(order.total_amount, order.currency),
+      },
+      {
+        key: "status",
+        label: "Status",
+        sortable: true,
+        accessor: (order) => order.status,
+        render: (order) => (
+          <Badge variant={statusColors[order.status]} className="capitalize">
+            {order.status}
+          </Badge>
+        ),
+      },
+    ],
+    []
+  )
+
+  const filters = useMemo<DataTableFilter<PurchaseOrder>[]>(
+    () => [
+      {
+        key: "status",
+        label: "Status",
+        options: statusOptions,
+      },
+      {
+        key: "supplier_name",
+        label: "Supplier",
+        options: supplierOptions,
+      },
+      {
+        key: "delivery_window",
+        label: "Delivery Window",
+        mode: "custom",
+        options: deliveryWindowOptions,
+        filterFn: (order, value) => {
+          const deliveryWindow = getDeliveryWindow(order)
+          if (Array.isArray(value)) {
+            return value.includes(deliveryWindow)
+          }
+          return deliveryWindow === value
+        },
+      },
+    ],
+    [deliveryWindowOptions, statusOptions, supplierOptions]
+  )
 
   return (
-    <AdminTablePage
+    <DataTablePage
       title="Purchase Orders"
-      description="Manage purchase orders"
+      description="Manage purchase orders, supplier commitments, and delivery timing."
       icon={ShoppingCart}
-      backLinkHref="/admin"
-      backLinkLabel="Back to Admin"
+      backLink={{ href: "/admin/purchasing", label: "Back to Purchasing" }}
       actions={
         <Button onClick={() => setIsCreateOpen(true)}>
           <Plus className="mr-2 h-4 w-4" />
           Create PO
         </Button>
       }
+      stats={
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard
+            title="Total Orders"
+            value={stats.total}
+            icon={ShoppingCart}
+            iconBgColor="bg-blue-500/10"
+            iconColor="text-blue-500"
+          />
+          <StatCard
+            title="Pending"
+            value={stats.pending}
+            icon={CalendarClock}
+            iconBgColor="bg-amber-500/10"
+            iconColor="text-amber-500"
+          />
+          <StatCard
+            title="Approved"
+            value={stats.approved}
+            icon={BadgeCheck}
+            iconBgColor="bg-emerald-500/10"
+            iconColor="text-emerald-500"
+          />
+          <StatCard
+            title="Total Value"
+            value={formatCurrency(stats.totalValue)}
+            icon={Wallet}
+            iconBgColor="bg-violet-500/10"
+            iconColor="text-violet-500"
+          />
+        </div>
+      }
     >
-      {/* Stats */}
-      <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4 md:gap-4">
-        <StatCard title="Total Orders" value={stats.total} icon={ShoppingCart} />
-        <StatCard
-          title="Pending"
-          value={stats.pending}
-          icon={ShoppingCart}
-          iconBgColor="bg-orange-100 dark:bg-orange-900/30"
-          iconColor="text-orange-600 dark:text-orange-400"
-        />
-        <StatCard
-          title="Approved"
-          value={stats.approved}
-          icon={ShoppingCart}
-          iconBgColor="bg-green-100 dark:bg-green-900/30"
-          iconColor="text-green-600 dark:text-green-400"
-        />
-        <StatCard title="Total Value" value={formatCurrency(stats.totalValue)} icon={ShoppingCart} />
-      </div>
-
-      {/* Filters */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-            <div className="relative flex-1">
-              <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-              <Input
-                placeholder="Search by PO# or supplier..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
-              />
+      <DataTable<PurchaseOrder>
+        data={orders}
+        columns={columns}
+        filters={filters}
+        getRowId={(order) => order.id}
+        searchPlaceholder="Search purchase order or supplier..."
+        searchFn={(order, query) => {
+          const normalizedQuery = query.toLowerCase()
+          return (
+            order.po_number.toLowerCase().includes(normalizedQuery) ||
+            (order.supplier_name || "").toLowerCase().includes(normalizedQuery)
+          )
+        }}
+        isLoading={isLoading}
+        error={error instanceof Error ? error.message : null}
+        onRetry={() => {
+          void refetch()
+        }}
+        rowActions={[
+          {
+            label: "View",
+            icon: Eye,
+            onClick: (order) => router.push(`/admin/purchasing/orders/${order.id}`),
+          },
+        ]}
+        expandable={{
+          render: (order) => (
+            <div className="grid gap-4 md:grid-cols-4">
+              <div className="rounded-lg border p-4">
+                <p className="text-muted-foreground text-xs tracking-wide uppercase">Supplier</p>
+                <p className="mt-2 text-sm font-medium">{order.supplier_name || "Unknown supplier"}</p>
+              </div>
+              <div className="rounded-lg border p-4">
+                <p className="text-muted-foreground text-xs tracking-wide uppercase">Order Date</p>
+                <p className="mt-2 text-sm">{formatDate(order.order_date)}</p>
+              </div>
+              <div className="rounded-lg border p-4">
+                <p className="text-muted-foreground text-xs tracking-wide uppercase">Expected Date</p>
+                <p className="mt-2 text-sm">
+                  {order.expected_date ? formatDate(order.expected_date) : "Not scheduled"}
+                </p>
+              </div>
+              <div className="rounded-lg border p-4">
+                <p className="text-muted-foreground text-xs tracking-wide uppercase">Delivery Window</p>
+                <p className="mt-2 text-sm font-medium">{getDeliveryWindow(order)}</p>
+              </div>
             </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[180px]">
-                <Filter className="mr-2 h-4 w-4" />
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="draft">Draft</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="approved">Approved</SelectItem>
-                <SelectItem value="received">Received</SelectItem>
-                <SelectItem value="cancelled">Cancelled</SelectItem>
-              </SelectContent>
-            </Select>
+          ),
+        }}
+        viewToggle
+        cardRenderer={(order) => (
+          <div className="space-y-3 rounded-xl border p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-medium">{order.po_number}</p>
+                <p className="text-muted-foreground text-sm">{order.supplier_name || "Unknown supplier"}</p>
+              </div>
+              <Badge variant={statusColors[order.status]} className="capitalize">
+                {order.status}
+              </Badge>
+            </div>
+            <div className="grid gap-1 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Amount</span>
+                <span>{formatCurrency(order.total_amount, order.currency)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Expected</span>
+                <span>{order.expected_date ? formatDate(order.expected_date) : "Not set"}</span>
+              </div>
+            </div>
           </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>All Orders</CardTitle>
-          <CardDescription>{filtered.length} orders</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <TableSkeleton rows={5} cols={6} />
-          ) : filtered.length === 0 ? (
-            <EmptyState
-              icon={ShoppingCart}
-              title="No purchase orders yet"
-              description="Create your first purchase order."
-              action={{ label: "Create PO", href: "/admin/purchasing/orders?openCreate=1", icon: Plus }}
-            />
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>PO #</TableHead>
-                  <TableHead>Supplier</TableHead>
-                  <TableHead>Order Date</TableHead>
-                  <TableHead>Expected</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.map((o) => (
-                  <TableRow key={o.id}>
-                    <TableCell className="font-mono">{o.po_number}</TableCell>
-                    <TableCell className="font-medium">{o.supplier_name || "—"}</TableCell>
-                    <TableCell>{formatDate(o.order_date)}</TableCell>
-                    <TableCell>{o.expected_date ? formatDate(o.expected_date) : "—"}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(o.total_amount, o.currency)}</TableCell>
-                    <TableCell>
-                      <Badge variant={statusColors[o.status]} className="capitalize">
-                        {o.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Link href={`/admin/purchasing/orders/${o.id}`}>
-                        <Button variant="ghost" size="icon">
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                      </Link>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+        )}
+        emptyTitle="No purchase orders yet"
+        emptyDescription="Create your first purchase order to begin tracking supplier procurement."
+        emptyIcon={ShoppingCart}
+        skeletonRows={5}
+        urlSync
+      />
       <PurchaseOrderFormDialog open={isCreateOpen} onOpenChange={setIsCreateOpen} queryClient={queryClient} />
-    </AdminTablePage>
+    </DataTablePage>
   )
 }

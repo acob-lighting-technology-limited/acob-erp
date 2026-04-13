@@ -41,6 +41,7 @@ export default async function AdminKssPage() {
       backLabel="Back to General Meeting"
       title="Knowledge Sharing Session"
       currentUserId={user.id}
+      currentUserRole={role}
       enableScoring
     />
   )

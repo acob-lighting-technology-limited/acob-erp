@@ -1,26 +1,18 @@
 "use client"
 
-import { useState } from "react"
-import { useQuery } from "@tanstack/react-query"
-import { useQueryClient } from "@tanstack/react-query"
+import { useMemo, useState } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useRouter, useSearchParams } from "next/navigation"
+import { AlertTriangle, Eye, Package, Pencil, Plus, Tags, Wallet } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { QUERY_KEYS } from "@/lib/query-keys"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, Package, Search, Filter, Eye, Pencil } from "lucide-react"
-import Link from "next/link"
-import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { StatCard } from "@/components/ui/stat-card"
-import { EmptyState } from "@/components/ui/empty-state"
-import { TableSkeleton } from "@/components/ui/query-states"
+import { DataTable, DataTablePage } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import type { BadgeProps } from "@/components/ui/badge"
 import { ProductFormDialog } from "./_components/product-form-dialog"
-import { useSearchParams } from "next/navigation"
-
 import { logger } from "@/lib/logger"
 
 const log = logger("inventory-products")
@@ -64,189 +56,326 @@ async function fetchProductsList(): Promise<Product[]> {
     throw new Error(error.message)
   }
 
-  return ((data || []) as ProductRow[]).map((p) => ({
-    ...p,
-    category_name: p.category?.name || undefined,
+  return ((data || []) as ProductRow[]).map((product) => ({
+    ...product,
+    category_name: product.category?.name || undefined,
   }))
 }
 
+function formatCurrency(amount: number) {
+  return new Intl.NumberFormat("en-NG", {
+    style: "currency",
+    currency: "NGN",
+  }).format(amount)
+}
+
+function getStockBand(product: Product) {
+  if (product.quantity_on_hand <= product.reorder_level) return "Low"
+  if (product.quantity_on_hand <= product.reorder_level * 2) return "Watch"
+  return "Healthy"
+}
+
 export default function ProductsPage() {
+  const router = useRouter()
   const queryClient = useQueryClient()
   const searchParams = useSearchParams()
-  const [searchQuery, setSearchQuery] = useState("")
-  const [statusFilter, setStatusFilter] = useState<string>("all")
   const [isCreateOpen, setIsCreateOpen] = useState(searchParams.get("openCreate") === "1")
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
 
-  const { data: products = [], isLoading: loading } = useQuery({
+  const {
+    data: products = [],
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
     queryKey: QUERY_KEYS.adminProducts(),
     queryFn: fetchProductsList,
   })
 
-  function formatCurrency(amount: number) {
-    return new Intl.NumberFormat("en-NG", {
-      style: "currency",
-      currency: "NGN",
-    }).format(amount)
-  }
+  const categoryOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          products.map((product) => product.category_name).filter((category): category is string => Boolean(category))
+        )
+      )
+        .sort()
+        .map((category) => ({ value: category, label: category })),
+    [products]
+  )
 
-  const filteredProducts = products.filter((product) => {
-    const matchesSearch =
-      product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      product.sku.toLowerCase().includes(searchQuery.toLowerCase())
+  const statusOptions = useMemo(
+    () =>
+      ["active", "inactive", "discontinued"].map((status) => ({
+        value: status,
+        label: status.charAt(0).toUpperCase() + status.slice(1),
+      })),
+    []
+  )
 
-    const matchesStatus = statusFilter === "all" || product.status === statusFilter
+  const stockBandOptions = useMemo(
+    () => [
+      { value: "Low", label: "Low" },
+      { value: "Watch", label: "Watch" },
+      { value: "Healthy", label: "Healthy" },
+    ],
+    []
+  )
 
-    return matchesSearch && matchesStatus
-  })
+  const stats = useMemo(() => {
+    const total = products.length
+    const active = products.filter((product) => product.status === "active").length
+    const lowStock = products.filter((product) => product.quantity_on_hand <= product.reorder_level).length
+    const totalValue = products.reduce((sum, product) => sum + product.unit_cost * product.quantity_on_hand, 0)
 
-  const stats = {
-    total: products.length,
-    active: products.filter((p) => p.status === "active").length,
-    lowStock: products.filter((p) => p.quantity_on_hand <= p.reorder_level).length,
-    totalValue: products.reduce((sum, p) => sum + p.unit_cost * p.quantity_on_hand, 0),
-  }
+    return { total, active, lowStock, totalValue }
+  }, [products])
+
+  const columns = useMemo<DataTableColumn<Product>[]>(
+    () => [
+      {
+        key: "sku",
+        label: "SKU",
+        sortable: true,
+        accessor: (product) => product.sku,
+        render: (product) => <span className="font-mono text-sm">{product.sku}</span>,
+      },
+      {
+        key: "name",
+        label: "Product",
+        sortable: true,
+        accessor: (product) => product.name,
+        resizable: true,
+        initialWidth: 240,
+        render: (product) => (
+          <div className="space-y-1">
+            <p className="font-medium">{product.name}</p>
+            <p className="text-muted-foreground text-xs">{product.description || "No description provided"}</p>
+          </div>
+        ),
+      },
+      {
+        key: "category_name",
+        label: "Category",
+        sortable: true,
+        accessor: (product) => product.category_name || "",
+        render: (product) => <span>{product.category_name || "Uncategorized"}</span>,
+      },
+      {
+        key: "unit_cost",
+        label: "Cost",
+        sortable: true,
+        accessor: (product) => product.unit_cost,
+        align: "right",
+        render: (product) => formatCurrency(product.unit_cost),
+      },
+      {
+        key: "selling_price",
+        label: "Price",
+        sortable: true,
+        accessor: (product) => product.selling_price,
+        align: "right",
+        render: (product) => formatCurrency(product.selling_price),
+      },
+      {
+        key: "quantity_on_hand",
+        label: "Stock",
+        sortable: true,
+        accessor: (product) => product.quantity_on_hand,
+        align: "right",
+        render: (product) => (
+          <div className="space-y-1 text-right">
+            <p
+              className={
+                product.quantity_on_hand <= product.reorder_level ? "font-medium text-orange-600" : "font-medium"
+              }
+            >
+              {product.quantity_on_hand}
+            </p>
+            <p className="text-muted-foreground text-xs">Reorder at {product.reorder_level}</p>
+          </div>
+        ),
+      },
+      {
+        key: "status",
+        label: "Status",
+        sortable: true,
+        accessor: (product) => product.status,
+        render: (product) => (
+          <Badge variant={statusColors[product.status]} className="capitalize">
+            {product.status}
+          </Badge>
+        ),
+      },
+    ],
+    []
+  )
+
+  const filters = useMemo<DataTableFilter<Product>[]>(
+    () => [
+      {
+        key: "category_name",
+        label: "Category",
+        options: categoryOptions,
+      },
+      {
+        key: "status",
+        label: "Status",
+        options: statusOptions,
+      },
+      {
+        key: "stock_band",
+        label: "Stock Band",
+        mode: "custom",
+        options: stockBandOptions,
+        filterFn: (product, value) => {
+          const stockBand = getStockBand(product)
+          if (Array.isArray(value)) {
+            return value.includes(stockBand)
+          }
+          return stockBand === value
+        },
+      },
+    ],
+    [categoryOptions, statusOptions, stockBandOptions]
+  )
 
   return (
-    <AdminTablePage
+    <DataTablePage
       title="Products"
-      description="Manage your product catalog"
+      description="Manage the product catalog, pricing, and stock posture across inventory."
       icon={Package}
-      backLinkHref="/admin"
-      backLinkLabel="Back to Admin"
+      backLink={{ href: "/admin/inventory", label: "Back to Inventory" }}
       actions={
         <Button onClick={() => setIsCreateOpen(true)}>
           <Plus className="mr-2 h-4 w-4" />
           Add Product
         </Button>
       }
+      stats={
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard
+            title="Total Products"
+            value={stats.total}
+            icon={Package}
+            iconBgColor="bg-blue-500/10"
+            iconColor="text-blue-500"
+          />
+          <StatCard
+            title="Active"
+            value={stats.active}
+            icon={Tags}
+            iconBgColor="bg-emerald-500/10"
+            iconColor="text-emerald-500"
+          />
+          <StatCard
+            title="Low Stock"
+            value={stats.lowStock}
+            icon={AlertTriangle}
+            iconBgColor="bg-amber-500/10"
+            iconColor="text-amber-500"
+          />
+          <StatCard
+            title="Stock Value"
+            value={formatCurrency(stats.totalValue)}
+            icon={Wallet}
+            iconBgColor="bg-violet-500/10"
+            iconColor="text-violet-500"
+          />
+        </div>
+      }
     >
-      {/* Stats */}
-      <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4 md:gap-4">
-        <StatCard title="Total Products" value={stats.total} icon={Package} />
-        <StatCard
-          title="Active"
-          value={stats.active}
-          icon={Package}
-          iconBgColor="bg-green-100 dark:bg-green-900/30"
-          iconColor="text-green-600 dark:text-green-400"
-        />
-        <StatCard
-          title="Low Stock"
-          value={stats.lowStock}
-          icon={Package}
-          iconBgColor="bg-orange-100 dark:bg-orange-900/30"
-          iconColor="text-orange-600 dark:text-orange-400"
-        />
-        <StatCard title="Stock Value" value={formatCurrency(stats.totalValue)} icon={Package} />
-      </div>
-
-      {/* Filters */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-            <div className="relative flex-1">
-              <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-              <Input
-                placeholder="Search by name or SKU..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
-              />
+      <DataTable<Product>
+        data={products}
+        columns={columns}
+        filters={filters}
+        getRowId={(product) => product.id}
+        searchPlaceholder="Search product name, SKU, or description..."
+        searchFn={(product, query) => {
+          const normalizedQuery = query.toLowerCase()
+          return (
+            product.name.toLowerCase().includes(normalizedQuery) ||
+            product.sku.toLowerCase().includes(normalizedQuery) ||
+            (product.description || "").toLowerCase().includes(normalizedQuery)
+          )
+        }}
+        isLoading={isLoading}
+        error={error instanceof Error ? error.message : null}
+        onRetry={() => {
+          void refetch()
+        }}
+        rowActions={[
+          {
+            label: "View Stock",
+            icon: Eye,
+            onClick: (product) => router.push(`/admin/inventory/products/${product.id}`),
+          },
+          {
+            label: "Edit",
+            icon: Pencil,
+            onClick: (product) => setEditingProduct(product),
+          },
+        ]}
+        expandable={{
+          render: (product) => (
+            <div className="grid gap-4 md:grid-cols-4">
+              <div className="rounded-lg border p-4">
+                <p className="text-muted-foreground text-xs tracking-wide uppercase">Description</p>
+                <p className="mt-2 text-sm">{product.description || "No description provided"}</p>
+              </div>
+              <div className="rounded-lg border p-4">
+                <p className="text-muted-foreground text-xs tracking-wide uppercase">Category</p>
+                <p className="mt-2 text-sm">{product.category_name || "Uncategorized"}</p>
+              </div>
+              <div className="rounded-lg border p-4">
+                <p className="text-muted-foreground text-xs tracking-wide uppercase">Reorder Level</p>
+                <p className="mt-2 text-sm font-medium">{product.reorder_level}</p>
+              </div>
+              <div className="rounded-lg border p-4">
+                <p className="text-muted-foreground text-xs tracking-wide uppercase">Stock Band</p>
+                <p className="mt-2 text-sm font-medium">{getStockBand(product)}</p>
+              </div>
             </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[180px]">
-                <Filter className="mr-2 h-4 w-4" />
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="inactive">Inactive</SelectItem>
-                <SelectItem value="discontinued">Discontinued</SelectItem>
-              </SelectContent>
-            </Select>
+          ),
+        }}
+        viewToggle
+        cardRenderer={(product) => (
+          <div className="space-y-3 rounded-xl border p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-medium">{product.name}</p>
+                <p className="text-muted-foreground text-sm">{product.sku}</p>
+              </div>
+              <Badge variant={statusColors[product.status]} className="capitalize">
+                {product.status}
+              </Badge>
+            </div>
+            <div className="grid gap-1 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Category</span>
+                <span>{product.category_name || "Uncategorized"}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Stock</span>
+                <span>{product.quantity_on_hand}</span>
+              </div>
+            </div>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Products Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>All Products</CardTitle>
-          <CardDescription>
-            {filteredProducts.length} product{filteredProducts.length !== 1 ? "s" : ""} found
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <TableSkeleton rows={5} cols={6} />
-          ) : filteredProducts.length === 0 ? (
-            <EmptyState
-              icon={Package}
-              title="No products yet"
-              description="Add your first product to start managing inventory."
-              action={{ label: "Add Product", href: "/admin/inventory/products?openCreate=1", icon: Plus }}
-            />
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>SKU</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead className="text-right">Cost</TableHead>
-                  <TableHead className="text-right">Price</TableHead>
-                  <TableHead className="text-right">Stock</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredProducts.map((product) => (
-                  <TableRow key={product.id}>
-                    <TableCell className="font-mono text-sm">{product.sku}</TableCell>
-                    <TableCell className="font-medium">{product.name}</TableCell>
-                    <TableCell className="text-muted-foreground">{product.category_name || "—"}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(product.unit_cost)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(product.selling_price)}</TableCell>
-                    <TableCell className="text-right">
-                      <span
-                        className={
-                          product.quantity_on_hand <= product.reorder_level ? "font-medium text-orange-600" : ""
-                        }
-                      >
-                        {product.quantity_on_hand}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={statusColors[product.status]} className="capitalize">
-                        {product.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Link href={`/admin/inventory/products/${product.id}`}>
-                          <Button variant="ghost" size="icon">
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        </Link>
-                        <Button variant="ghost" size="icon" onClick={() => setEditingProduct(product)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+        )}
+        emptyTitle="No products yet"
+        emptyDescription="Add your first product to start managing inventory."
+        emptyIcon={Package}
+        skeletonRows={5}
+        urlSync
+      />
       <ProductFormDialog open={isCreateOpen} onOpenChange={setIsCreateOpen} queryClient={queryClient} />
       <ProductFormDialog
         open={editingProduct !== null}
-        onOpenChange={(open) => !open && setEditingProduct(null)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditingProduct(null)
+          }
+        }}
         queryClient={queryClient}
         product={
           editingProduct
@@ -265,6 +394,6 @@ export default function ProductsPage() {
             : null
         }
       />
-    </AdminTablePage>
+    </DataTablePage>
   )
 }

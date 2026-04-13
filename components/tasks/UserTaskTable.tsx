@@ -9,7 +9,6 @@ import {
   ClipboardList,
   Calendar,
   User,
-  Users,
   Building2,
   TrendingUp,
   AlertCircle,
@@ -102,12 +101,9 @@ function buildTaskInfo(task: Task) {
       ? "help desk request"
       : task.source_type === "action_item"
         ? "meeting action point"
-        : task.source_type === "project_task"
-          ? "project task"
-          : "task"
+        : "task"
 
-  const assignmentLabel =
-    task.assignment_type === "department" ? "Dept" : task.assignment_type === "multiple" ? "Group" : "Individual"
+  const assignmentLabel = task.assignment_type === "department" ? "Dept" : "Individual"
 
   return {
     title: task.work_item_number ? `${task.work_item_number} task guide` : "Task guide",
@@ -135,14 +131,13 @@ function buildTaskInfo(task: Task) {
 interface UserTaskTableProps {
   filteredTasks: Task[]
   filterStatus: string
-  assignmentFilter: "individual" | "department" | "multiple"
+  assignmentFilter: "individual" | "department"
   onViewTask: (task: Task) => void
 }
 
 export function UserTaskTable({ filteredTasks, filterStatus, assignmentFilter, onViewTask }: UserTaskTableProps) {
   if (filteredTasks.length === 0) {
-    const assignmentLabel =
-      assignmentFilter === "department" ? "Dept" : assignmentFilter === "multiple" ? "Group" : "Individual"
+    const assignmentLabel = assignmentFilter === "department" ? "Dept" : "Individual"
     return (
       <Card className="border-2">
         <CardContent className="p-12 text-center">
@@ -221,19 +216,12 @@ export function UserTaskTable({ filteredTasks, filterStatus, assignmentFilter, o
                   <Badge className={getPriorityColor(task.priority)}>{task.priority}</Badge>
                 </TableCell>
                 <TableCell>
-                  {task.assignment_type === "multiple" && (
-                    <Badge variant="outline" className="flex w-fit items-center gap-1">
-                      <Users className="h-3 w-3" />
-                      Group
-                    </Badge>
-                  )}
-                  {task.assignment_type === "department" && (
+                  {task.assignment_type === "department" ? (
                     <Badge variant="outline" className="flex w-fit items-center gap-1">
                       <Building2 className="h-3 w-3" />
                       Dept
                     </Badge>
-                  )}
-                  {task.assignment_type === "individual" && (
+                  ) : (
                     <Badge variant="outline" className="flex w-fit items-center gap-1">
                       <User className="h-3 w-3" />
                       Individual

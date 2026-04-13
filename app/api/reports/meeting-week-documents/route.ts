@@ -121,11 +121,13 @@ async function assertWeekAllowsDocumentCreate(
     .eq("document_type", params.documentType)
     .eq("is_current", true)
 
-  const { data: existingRow, error: existingError } = await (
-    params.departmentId
-      ? lockCheckQuery.eq("department_id", params.departmentId)
-      : lockCheckQuery.eq("department", params.department)
-  ).maybeSingle()
+  const scopedLockCheckQuery = params.departmentId
+    ? lockCheckQuery.eq("department_id", params.departmentId)
+    : params.department
+      ? lockCheckQuery.eq("department", params.department)
+      : lockCheckQuery.is("department", null).is("department_id", null)
+
+  const { data: existingRow, error: existingError } = await scopedLockCheckQuery.maybeSingle()
 
   if (existingError) {
     throw new Error(existingError.message)
@@ -455,9 +457,13 @@ export async function POST(request: Request) {
       .eq("is_current", true)
       .order("version_no", { ascending: false })
 
-    const { data: currentRows, error: currentError } = await (departmentId
+    const scopedCurrentRowsQuery = departmentId
       ? currentRowsQuery.eq("department_id", departmentId)
-      : currentRowsQuery.eq("department", department))
+      : department
+        ? currentRowsQuery.eq("department", department)
+        : currentRowsQuery.is("department", null).is("department_id", null)
+
+    const { data: currentRows, error: currentError } = await scopedCurrentRowsQuery
 
     if (currentError) {
       return NextResponse.json({ error: currentError.message }, { status: 500 })

@@ -7,6 +7,8 @@ export type WeeklyReportLockState = {
   graceHours: number
   unlockUntil: string | null
   lockDeadline: string
+  hasOverrideRole: boolean
+  canMutate: boolean
   isLocked: boolean
 }
 
@@ -15,6 +17,8 @@ type LockStateRow = {
   grace_hours: number
   unlock_until: string | null
   lock_deadline: string
+  has_override_role?: boolean
+  can_mutate?: boolean
   is_locked: boolean
 }
 
@@ -52,6 +56,8 @@ export async function fetchWeeklyReportLockState(
       graceHours: 24,
       unlockUntil: null,
       lockDeadline: fallbackDeadline.toISOString(),
+      hasOverrideRole: false,
+      canMutate: true,
       isLocked: false,
     }
   }
@@ -62,6 +68,8 @@ export async function fetchWeeklyReportLockState(
     graceHours: row.grace_hours,
     unlockUntil: row.unlock_until,
     lockDeadline: row.lock_deadline,
+    hasOverrideRole: row.has_override_role ?? false,
+    canMutate: row.can_mutate ?? !row.is_locked,
     isLocked: row.is_locked,
   }
 }

@@ -31,7 +31,7 @@ export default async function AnniversarySignaturePage({ searchParams }: { searc
         icon={FileSignature}
         backLink={{ href: "/tools", label: "Back to Tools" }}
       />
-      <SignatureCreator profile={profile} variant="anniversary" />
+      <SignatureCreator profile={profile} authEmail={data.user.email} variant="anniversary" />
     </PageWrapper>
   )
 }

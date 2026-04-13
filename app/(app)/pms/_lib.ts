@@ -27,6 +27,7 @@ type ReviewRow = {
 
 type GoalRow = {
   id: string
+  department?: string | null
   approval_status: string | null
   status: string | null
 }
@@ -44,13 +45,20 @@ export async function getCurrentUserPmsData() {
     redirect("/auth/login")
   }
 
-  const [{ data: profile }, { data: goals }, { data: attendance }, { data: latestReview }] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select("id, first_name, last_name, department")
-      .eq("id", user.id)
-      .maybeSingle<ProfileRow>(),
-    supabase.from("goals_objectives").select("id, approval_status, status").eq("user_id", user.id).returns<GoalRow[]>(),
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("id, first_name, last_name, department")
+    .eq("id", user.id)
+    .maybeSingle<ProfileRow>()
+
+  const [{ data: goals }, { data: attendance }, { data: latestReview }] = await Promise.all([
+    profile?.department
+      ? supabase
+          .from("goals_objectives")
+          .select("id, department, approval_status, status")
+          .eq("department", profile.department)
+          .returns<GoalRow[]>()
+      : Promise.resolve({ data: [] as GoalRow[] }),
     supabase
       .from("attendance_records")
       .select("id, date, clock_in, clock_out, total_hours, status")

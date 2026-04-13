@@ -4,7 +4,7 @@ import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 
 const log = logger("performance-goal-linking")
 
-type SupportedTaskSource = "manual" | "project_task" | "help_desk"
+type SupportedTaskSource = "manual" | "help_desk"
 
 type GoalRecord = {
   id: string
@@ -27,18 +27,16 @@ type GoalLinkParams = {
   explicitGoalId?: string | null
 }
 
-type GoalBucket = "help_desk" | "project_delivery" | "compliance" | "operational"
+type GoalBucket = "help_desk" | "compliance" | "operational"
 
 const BUCKET_KEYWORDS: Record<GoalBucket, string[]> = {
   help_desk: ["help desk", "support", "ticket", "service desk", "customer support"],
-  project_delivery: ["project", "deployment", "implementation", "delivery", "rollout"],
   compliance: ["compliance", "report", "reporting", "audit", "documentation"],
   operational: ["operations", "operational", "execution", "delivery", "assigned work", "general"],
 }
 
 const BUCKET_TITLES: Record<GoalBucket, string> = {
   help_desk: "Help Desk Delivery",
-  project_delivery: "Project Delivery",
   compliance: "Compliance and Reporting",
   operational: "Operational Execution",
 }
@@ -51,7 +49,6 @@ function normalize(value: string | null | undefined) {
 
 function resolveGoalBucket(sourceType: SupportedTaskSource, title?: string | null): GoalBucket {
   if (sourceType === "help_desk") return "help_desk"
-  if (sourceType === "project_task") return "project_delivery"
 
   const normalizedTitle = normalize(title)
   if (BUCKET_KEYWORDS.compliance.some((keyword) => normalizedTitle.includes(keyword))) {
@@ -137,33 +134,9 @@ export async function resolveAutoLinkedGoalId(params: GoalLinkParams): Promise<s
     return rankedGoal.goal.id
   }
 
-  const fallbackTitle = BUCKET_TITLES[bucket]
-  const now = new Date().toISOString()
-  const { data: createdGoal, error: createError } = await dataClient
-    .from("goals_objectives")
-    .insert({
-      user_id: params.assignedTo,
-      review_cycle_id: cycle?.id ?? null,
-      title: fallbackTitle,
-      description: `System-generated KPI bucket for ${fallbackTitle.toLowerCase()}.`,
-      priority: "medium",
-      status: "in_progress",
-      due_date: cycle?.end_date ?? null,
-      approval_status: "approved",
-      approved_by: params.actorId,
-      approved_at: now,
-      is_system_generated: true,
-    })
-    .select("id")
-    .single<{ id: string }>()
-
-  if (createError || !createdGoal) {
-    log.error(
-      { err: createError, assignedTo: params.assignedTo, sourceType: params.sourceType, fallbackTitle },
-      "Failed to create fallback goal"
-    )
-    return null
-  }
-
-  return createdGoal.id
+  log.warn(
+    { assignedTo: params.assignedTo, sourceType: params.sourceType, bucket, department: params.department || null },
+    "No approved goal available for auto-linking"
+  )
+  return null
 }

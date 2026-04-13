@@ -1,10 +1,26 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0"
 
-const OFFICE_WEEK_ANCHOR_MONTH_INDEX = 0
-const OFFICE_WEEK_ANCHOR_DAY = 12
+const DEFAULT_ANCHOR_DAY = 12
+const anchorCache: Record<number, number> = {}
+
+/** Load per-year anchor days from office_year_config. Call once per invocation. */
+export async function initOfficeYearAnchors(supabase: ReturnType<typeof createClient>): Promise<void> {
+  try {
+    const { data } = await supabase.from("office_year_config").select("year, anchor_day")
+    if (Array.isArray(data)) {
+      for (const row of data) anchorCache[row.year] = row.anchor_day
+    }
+  } catch {
+    // Fail silently — hardcoded fallback will be used.
+  }
+}
+
+export function getAnchorDay(year: number): number {
+  return anchorCache[year] ?? DEFAULT_ANCHOR_DAY
+}
 
 function getOfficeYearStart(year: number): Date {
-  return new Date(year, OFFICE_WEEK_ANCHOR_MONTH_INDEX, OFFICE_WEEK_ANCHOR_DAY)
+  return new Date(year, 0, getAnchorDay(year))
 }
 
 export function getOfficeWeekFromDate(date: Date): { week: number; year: number } {

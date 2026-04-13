@@ -6,10 +6,6 @@ import type { employee, UserProfile } from "./admin-tasks-content"
 
 export type SupabaseClient = ReturnType<typeof createClient>
 
-type TaskAssignmentRow = { user_id: string }
-type ProfileRow = { id: string; first_name: string; last_name: string; department?: string | null }
-type CompletionRow = { user_id: string }
-type TaskAssignedUser = NonNullable<Task["assigned_users"]>[number]
 type NotificationPriority = "low" | "medium" | "high" | "urgent"
 
 export async function enrichTaskWithUsers(supabase: SupabaseClient, task: Task): Promise<Task> {
@@ -21,23 +17,6 @@ export async function enrichTaskWithUsers(supabase: SupabaseClient, task: Task):
       .eq("id", task.assigned_to)
       .single()
     taskData.assigned_to_user = data || undefined
-  }
-  if (task.assignment_type === "multiple") {
-    const { data: assignments } = await supabase.from("task_assignments").select("user_id").eq("task_id", task.id)
-    if (assignments && assignments.length > 0) {
-      const userIds = assignments.map((a) => (a as TaskAssignmentRow).user_id)
-      const { data: userProfiles } = await supabase
-        .from("profiles")
-        .select("id, first_name, last_name, department")
-        .in("id", userIds)
-      const { data: completions } = await supabase.from("task_user_completion").select("user_id").eq("task_id", task.id)
-      const completedIds = new Set((completions as CompletionRow[] | null)?.map((c) => c.user_id) || [])
-      taskData.assigned_users =
-        (userProfiles as ProfileRow[] | null)?.map((profile) => ({
-          ...profile,
-          completed: completedIds.has(profile.id),
-        })) || []
-    }
   }
   return taskData
 }
@@ -68,6 +47,7 @@ export function applyTaskFilters(
     priorityFilter,
     departmentFilter,
     employeeFilter,
+    goalFilter,
     userProfile,
     scopedDepartments,
     employee,
@@ -77,6 +57,7 @@ export function applyTaskFilters(
     priorityFilter: string
     departmentFilter: string
     employeeFilter: string
+    goalFilter: string
     userProfile: UserProfile
     scopedDepartments: string[]
     employee: employee[]
@@ -95,9 +76,6 @@ export function applyTaskFilters(
         matchesDepartment =
           scopedDepartments.includes(task.department || "") ||
           (task.assigned_to_user ? scopedDepartments.includes(task.assigned_to_user.department || "") : false) ||
-          task.assigned_users?.some(
-            (user: TaskAssignedUser) => user.department && scopedDepartments.includes(user.department)
-          ) ||
           false
       }
     } else {
@@ -108,21 +86,18 @@ export function applyTaskFilters(
           ? employee.find((s) => s.id === task.assigned_to)?.department === departmentFilter
           : false)
     }
-    const matchesEmployee =
-      employeeFilter === "all" ||
-      task.assigned_to === employeeFilter ||
-      task.assigned_users?.some((user: TaskAssignedUser) => user.id === employeeFilter)
-    return matchesSearch && matchesStatus && matchesPriority && matchesDepartment && matchesEmployee
+    const matchesEmployee = employeeFilter === "all" || task.assigned_to === employeeFilter
+    const matchesGoal = goalFilter === "all" || task.goal_id === goalFilter
+    return matchesSearch && matchesStatus && matchesPriority && matchesDepartment && matchesEmployee && matchesGoal
   })
 }
 
 export function validateTaskForm(form: TaskFormState): string | null {
   if (form.assignment_type === "individual" && !form.assigned_to)
     return "Please select a employee member for individual assignment"
-  if (form.assignment_type === "multiple" && form.assigned_users.length === 0)
-    return "Please select at least one employee member for multiple assignment"
   if (form.assignment_type === "department" && !form.department)
     return "Please select a department for department assignment"
+  if (!form.goal_id) return "Please link this task to an approved department goal"
   if (form.task_start_date && form.task_end_date) {
     return dateValidation.validateDateRange(form.task_start_date, form.task_end_date, "task date")
   }
@@ -133,7 +108,6 @@ export function filterByDepartments(tasks: Task[], scopedDepartments: string[]):
   return tasks.filter((task) => {
     if (task.department && scopedDepartments.includes(task.department)) return true
     if (task.assigned_to_user?.department && scopedDepartments.includes(task.assigned_to_user.department)) return true
-    if (task.assigned_users?.some((user) => user.department && scopedDepartments.includes(user.department))) return true
     return false
   })
 }
@@ -147,15 +121,6 @@ export async function persistTaskUpdate(
 ) {
   const { error: taskError } = await supabase.from("tasks").update(taskData).eq("id", taskId)
   if (taskError) throw taskError
-  if (form.assignment_type === "multiple") {
-    await supabase.from("task_assignments").delete().eq("task_id", taskId)
-    if (form.assigned_users.length > 0) {
-      const { error } = await supabase
-        .from("task_assignments")
-        .insert(form.assigned_users.map((uid) => ({ task_id: taskId, user_id: uid })))
-      if (error) throw error
-    }
-  }
   await supabase
     .from("task_updates")
     .insert({ task_id: taskId, user_id: userId, update_type: "task_updated", content: "Task details updated by admin" })
@@ -163,17 +128,11 @@ export async function persistTaskUpdate(
 
 export async function persistTaskCreate(
   supabase: SupabaseClient,
-  form: TaskFormState,
+  _form: TaskFormState,
   taskData: Record<string, unknown>
 ) {
   const { data: newTask, error: taskError } = await supabase.from("tasks").insert(taskData).select().single()
   if (taskError) throw taskError
-  if (form.assignment_type === "multiple" && form.assigned_users.length > 0) {
-    const { error } = await supabase
-      .from("task_assignments")
-      .insert(form.assigned_users.map((uid) => ({ task_id: newTask.id, user_id: uid })))
-    if (error) throw error
-  }
   return newTask
 }
 
@@ -198,18 +157,6 @@ export async function sendUpdateNotifications(form: TaskFormState, selectedTask:
         changeDescription: "Task details updated by admin",
       })
     }
-  } else if (form.assignment_type === "multiple" && form.assigned_users.length > 0) {
-    await Promise.all(
-      form.assigned_users.map((uid) =>
-        notifyTaskUpdated({
-          userId: uid,
-          taskId: selectedTask.id,
-          taskTitle: form.title,
-          updatedBy: userId,
-          changeDescription: "Task details updated by admin",
-        })
-      )
-    )
   }
 }
 
@@ -223,17 +170,5 @@ export async function sendCreateNotifications(form: TaskFormState, newTask: Task
       assignedBy: userId,
       priority: newTask.priority as NotificationPriority,
     })
-  } else if (form.assignment_type === "multiple" && form.assigned_users.length > 0) {
-    await Promise.all(
-      form.assigned_users.map((uid) =>
-        notifyTaskAssigned({
-          userId: uid,
-          taskId: newTask.id,
-          taskTitle: newTask.title,
-          assignedBy: userId,
-          priority: newTask.priority as NotificationPriority,
-        })
-      )
-    )
   }
 }

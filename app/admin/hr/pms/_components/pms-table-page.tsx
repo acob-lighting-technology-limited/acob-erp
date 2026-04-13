@@ -8,14 +8,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
+import { exportPmsRowsToExcel, exportPmsRowsToPdf } from "@/lib/pms/export"
 
 type IconKey = "kpi" | "goals" | "attendance" | "cbt" | "behaviour" | "reviews"
-
-type TableColumn = {
-  key: string
-  label: string
-}
-
+type TableColumn = { key: string; label: string }
 type TableRowData = Record<string, string | number | null | undefined>
 
 interface PmsTablePageProps {
@@ -29,6 +26,10 @@ interface PmsTablePageProps {
   rows: TableRowData[]
   columns: TableColumn[]
   searchPlaceholder?: string
+  summaryCards?: Array<{ label: string; value: string | number }>
+  filterKey?: string
+  filterLabel?: string
+  filterAllLabel?: string
 }
 
 const iconMap = {
@@ -57,51 +58,36 @@ export function PmsTablePage({
   rows,
   columns,
   searchPlaceholder = "Search records...",
+  summaryCards = [],
+  filterKey = "department",
+  filterLabel = "Department",
+  filterAllLabel = "All Departments",
 }: PmsTablePageProps) {
   const Icon = iconMap[icon]
   const [searchQuery, setSearchQuery] = useState("")
-  const [departmentFilter, setDepartmentFilter] = useState("all")
+  const [secondaryFilter, setSecondaryFilter] = useState("all")
+  const [isExportOpen, setIsExportOpen] = useState(false)
 
-  const departments = useMemo(
+  const secondaryFilterOptions = useMemo(
     () =>
-      Array.from(
-        new Set(rows.map((row) => normalizeCell(row.department)).filter((department) => department !== "-"))
-      ).sort(),
-    [rows]
+      Array.from(new Set(rows.map((row) => normalizeCell(row[filterKey])).filter((option) => option !== "-"))).sort(),
+    [rows, filterKey]
   )
 
   const filteredRows = useMemo(() => {
     const query = searchQuery.trim().toLowerCase()
     return rows.filter((row) => {
       const values = columns.map((column) => normalizeCell(row[column.key]).toLowerCase())
-      const department = normalizeCell(row.department)
+      const filterValue = normalizeCell(row[filterKey])
       const matchesQuery = query.length === 0 || values.some((value) => value.includes(query))
-      const matchesDepartment = departmentFilter === "all" || department === departmentFilter
-      return matchesQuery && matchesDepartment
+      const matchesSecondary = secondaryFilter === "all" || filterValue === secondaryFilter
+      return matchesQuery && matchesSecondary
     })
-  }, [rows, columns, searchQuery, departmentFilter])
+  }, [rows, columns, filterKey, searchQuery, secondaryFilter])
 
-  function handleExport() {
-    if (filteredRows.length === 0) return
-    const header = ["S/N", ...columns.map((column) => column.label)].join(",")
-    const body = filteredRows
-      .map((row, index) =>
-        [index + 1, ...columns.map((column) => normalizeCell(row[column.key]))]
-          .map((value) => `"${String(value).replace(/"/g, '""')}"`)
-          .join(",")
-      )
-      .join("\n")
-    const csv = `${header}\n${body}`
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
-    const url = window.URL.createObjectURL(blob)
-    const link = document.createElement("a")
-    link.href = url
-    link.download = `${title.toLowerCase().replace(/\s+/g, "-")}-${new Date().toISOString().split("T")[0]}.csv`
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    window.URL.revokeObjectURL(url)
-  }
+  const exportRows = filteredRows.map((row, index) =>
+    Object.fromEntries([["S/N", index + 1], ...columns.map((column) => [column.label, normalizeCell(row[column.key])])])
+  )
 
   return (
     <PageWrapper maxWidth="full" background="gradient">
@@ -113,7 +99,7 @@ export function PmsTablePage({
         actions={
           <Button
             variant="outline"
-            onClick={handleExport}
+            onClick={() => setIsExportOpen(true)}
             disabled={filteredRows.length === 0}
             className="h-8 gap-2"
             size="sm"
@@ -123,6 +109,19 @@ export function PmsTablePage({
           </Button>
         }
       />
+
+      {summaryCards.length > 0 ? (
+        <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+          {summaryCards.map((card) => (
+            <Card key={card.label}>
+              <CardContent className="pt-6">
+                <p className="text-muted-foreground text-sm">{card.label}</p>
+                <p className="text-2xl font-semibold">{card.value}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : null}
 
       <Card className="mb-4 border-2">
         <CardContent className="p-3 sm:p-6">
@@ -136,15 +135,15 @@ export function PmsTablePage({
                 className="pl-10"
               />
             </div>
-            <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+            <Select value={secondaryFilter} onValueChange={setSecondaryFilter}>
               <SelectTrigger className="w-full md:w-56">
-                <SelectValue placeholder="Department" />
+                <SelectValue placeholder={filterLabel} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Departments</SelectItem>
-                {departments.map((department) => (
-                  <SelectItem key={department} value={department}>
-                    {department}
+                <SelectItem value="all">{filterAllLabel}</SelectItem>
+                {secondaryFilterOptions.map((option) => (
+                  <SelectItem key={option} value={option}>
+                    {option}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -166,30 +165,50 @@ export function PmsTablePage({
               <p className="text-muted-foreground text-sm">
                 Showing {filteredRows.length} of {rows.length} record(s).
               </p>
-              <Table className="min-w-[1050px]">
-                <TableHeader className="bg-muted/50">
-                  <TableRow>
-                    <TableHead className="w-16">S/N</TableHead>
-                    {columns.map((column) => (
-                      <TableHead key={column.key}>{column.label}</TableHead>
-                    ))}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredRows.map((row, index) => (
-                    <TableRow key={`${normalizeCell(row.department)}-${index}`}>
-                      <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
+              <div className="overflow-x-auto">
+                <Table className="min-w-[1050px]">
+                  <TableHeader className="bg-emerald-50 dark:bg-emerald-950/30">
+                    <TableRow>
+                      <TableHead className="w-16">S/N</TableHead>
                       {columns.map((column) => (
-                        <TableCell key={column.key}>{normalizeCell(row[column.key])}</TableCell>
+                        <TableHead key={column.key}>{column.label}</TableHead>
                       ))}
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredRows.map((row, index) => (
+                      <TableRow key={`${normalizeCell(row.department)}-${index}`}>
+                        <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
+                        {columns.map((column) => (
+                          <TableCell key={column.key}>{normalizeCell(row[column.key])}</TableCell>
+                        ))}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             </div>
           )}
         </CardContent>
       </Card>
+
+      <ExportOptionsDialog
+        open={isExportOpen}
+        onOpenChange={setIsExportOpen}
+        title={`Export ${title}`}
+        options={[
+          { id: "excel", label: "Excel (.xlsx)", icon: "excel" },
+          { id: "pdf", label: "PDF", icon: "pdf" },
+        ]}
+        onSelect={(id) => {
+          const filename = `${title.toLowerCase().replace(/\s+/g, "-")}-${new Date().toISOString().split("T")[0]}`
+          if (id === "excel") {
+            void exportPmsRowsToExcel(exportRows, filename)
+            return
+          }
+          void exportPmsRowsToPdf(exportRows, filename, title)
+        }}
+      />
     </PageWrapper>
   )
 }

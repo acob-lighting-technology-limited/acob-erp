@@ -1,9 +1,9 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { useRouter } from "next/navigation"
-import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -20,9 +20,10 @@ import { isAssignableProfile } from "@/lib/workforce/assignment-policy"
 import { ASSET_TYPES, ASSET_TYPE_MAP } from "@/lib/asset-types"
 import { getDepartmentForOffice } from "@/lib/office-locations"
 import { assignmentValidation } from "@/lib/validation"
-import { Package, AlertCircle, Loader2, Plus, Download } from "lucide-react"
-import { AdminTablePage } from "@/components/admin/admin-table-page"
+import { Package, AlertCircle, Plus, Download, History, Pencil, RefreshCw, Wrench } from "lucide-react"
 import { StatCard } from "@/components/ui/stat-card"
+import { DataTable, DataTablePage } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter, RowAction } from "@/components/ui/data-table"
 
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
@@ -36,8 +37,6 @@ import { AssetIssuesDialog } from "@/components/assets/AssetIssuesDialog"
 import { AssetTypeDialog } from "@/components/assets/AssetTypeDialog"
 import { AssetExportDialog } from "@/components/assets/AssetExportDialog"
 import { EmployeeAssetsReportDialog } from "@/components/assets/EmployeeAssetsReportDialog"
-import { AssetFilterBar } from "@/components/assets/AssetFilterBar"
-import { TableViewToggle } from "@/components/admin/table-view-toggle"
 import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
 import {
   buildAssetExportRows,
@@ -48,7 +47,6 @@ import {
   exportEmployeeReportToPDF,
   exportEmployeeReportToWord,
 } from "@/lib/assets/asset-export"
-import { AssetListView } from "@/components/assets/AssetListView"
 
 const log = logger("assets-admin-assets-content")
 
@@ -167,8 +165,6 @@ type ProfileNameRow = {
   last_name?: string | null
 }
 
-type SortableValue = string | number
-
 interface AssetActivity {
   id: string
   timestamp: string
@@ -230,16 +226,6 @@ export function AdminAssetsContent({
   const activeEmployees = employees.filter((member) => isAssignableProfile(member, { allowLegacyNullStatus: false }))
   const [departments] = useState<string[]>(initialDepartments)
   const [isLoading, setIsLoading] = useState(false)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [statusFilter, setStatusFilter] = useState<string[]>([])
-  const [departmentFilter, setDepartmentFilter] = useState<string[]>([])
-  const [userFilter, setUserFilter] = useState<string[]>([])
-  const [yearFilter, setYearFilter] = useState<string[]>([])
-  const [officeLocationFilter, setOfficeLocationFilter] = useState<string[]>([])
-  const [assetTypeFilter, setAssetTypeFilter] = useState<string[]>([])
-  const [issueStatusFilter, setIssueStatusFilter] = useState<string[]>([])
-  const [viewMode, setViewMode] = useState<"list" | "card">("list")
-  const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" } | null>(null)
 
   // Export dialog state
   const [exportDialogOpen, setExportDialogOpen] = useState(false)
@@ -363,11 +349,14 @@ export function AdminAssetsContent({
     assigned_at: "",
   })
 
-  const [currentAssignment] = useState<AssetAssignment | null>(null)
+  const [currentAssignment, setCurrentAssignment] = useState<AssetAssignment | null>(null)
 
   const supabase = createClient()
-  const scopedDepartments = userProfile.managed_departments ?? userProfile.lead_departments ?? []
-  const scopedOffices = userProfile.managed_offices ?? []
+  const scopedDepartments = useMemo(
+    () => userProfile.managed_departments ?? userProfile.lead_departments ?? [],
+    [userProfile.lead_departments, userProfile.managed_departments]
+  )
+  const scopedOffices = useMemo(() => userProfile.managed_offices ?? [], [userProfile.managed_offices])
 
   const queryClient = useQueryClient()
 
@@ -1047,13 +1036,49 @@ export function AdminAssetsContent({
     }
   }
 
-  // Sorting function
-  const handleSort = (key: string) => {
-    let direction: "asc" | "desc" = "asc"
-    if (sortConfig && sortConfig.key === key && sortConfig.direction === "asc") {
-      direction = "desc"
+  const openAssignDialog = async (asset: Asset) => {
+    setSelectedAsset(asset)
+
+    let assignmentState: AssetAssignment | null = null
+    let assignedBy = ""
+    let assignedAt = new Date().toISOString().slice(0, 16)
+    const assignmentNotes = ""
+
+    try {
+      const { data: assignment } = await supabase
+        .from("asset_assignments")
+        .select("id, assigned_to, department, office_location, assignment_type, assigned_at, is_current")
+        .eq("asset_id", asset.id)
+        .eq("is_current", true)
+        .maybeSingle<AssetAssignment>()
+
+      if (assignment) {
+        assignmentState = assignment
+        assignedAt = assignment.assigned_at ? new Date(assignment.assigned_at).toISOString().slice(0, 16) : assignedAt
+      }
+    } catch (error) {
+      log.error("Error loading current assignment:", error)
     }
-    setSortConfig({ key, direction })
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    assignedBy = user?.id || ""
+
+    setCurrentAssignment(assignmentState)
+    setAssignForm({
+      assignment_type:
+        (asset.current_assignment?.assignment_type as "individual" | "department" | "office") ||
+        (asset.assignment_type as "individual" | "department" | "office") ||
+        "individual",
+      assigned_to: asset.current_assignment?.assigned_to || "",
+      department: asset.current_assignment?.department || asset.department || "",
+      office_location: asset.current_assignment?.office_location || asset.office_location || "",
+      assignment_notes: assignmentNotes,
+      assigned_by: assignedBy,
+      assigned_at: assignedAt,
+    })
+    setIsAssignDialogOpen(true)
   }
 
   const getEffectiveAssignmentType = (asset: AssignableAsset) =>
@@ -1095,54 +1120,12 @@ export function AdminAssetsContent({
     return `Assigned${statusSuffix}`
   }
 
-  const getSortedAssets = (assetsToSort: Asset[]) => {
-    if (!sortConfig) return assetsToSort
+  const getCreatedByLabel = (createdBy: string) => {
+    const creator = employees.find((employee) => employee.id === createdBy)
+    if (!creator) return "Unknown user"
 
-    const sorted = [...assetsToSort].sort((a, b) => {
-      let aValue: SortableValue
-      let bValue: SortableValue
-
-      switch (sortConfig.key) {
-        case "unique_code":
-          aValue = a.unique_code
-          bValue = b.unique_code
-          break
-        case "asset_type":
-          aValue = ASSET_TYPE_MAP[a.asset_type]?.label || a.asset_type
-          bValue = ASSET_TYPE_MAP[b.asset_type]?.label || b.asset_type
-          break
-        case "model":
-          aValue = a.asset_model || ""
-          bValue = b.asset_model || ""
-          break
-        case "year":
-          aValue = a.acquisition_year || 0
-          bValue = b.acquisition_year || 0
-          break
-        case "status":
-          aValue = a.status
-          bValue = b.status
-          break
-        case "assigned_to":
-          aValue = getAssignedToLabel(a)
-          bValue = getAssignedToLabel(b)
-          break
-        default:
-          return 0
-      }
-
-      if (typeof aValue === "string" && typeof bValue === "string") {
-        return sortConfig.direction === "asc" ? aValue.localeCompare(bValue) : bValue.localeCompare(aValue)
-      }
-
-      if (sortConfig.direction === "asc") {
-        return aValue > bValue ? 1 : aValue < bValue ? -1 : 0
-      } else {
-        return aValue < bValue ? 1 : aValue > bValue ? -1 : 0
-      }
-    })
-
-    return sorted
+    const fullName = `${formatName(creator.first_name)} ${formatName(creator.last_name)}`.trim()
+    return fullName || creator.company_email || "Unknown user"
   }
 
   // Export functions
@@ -1152,15 +1135,15 @@ export function AdminAssetsContent({
   }
 
   const handleExportConfirm = async () => {
+    const exportableAssets = assets.filter((a) => !a.deleted_at)
     const rows = buildAssetExportRows(
-      getSortedAssets(filteredAssets),
+      exportableAssets,
       { selectedColumns, employees, getDepartmentForOffice },
       (asset, withStatus) => getAssignedToLabel(asset, withStatus)
     )
     const filename = `assets-export-${new Date().toISOString().split("T")[0]}`
     if (exportType === "excel") await exportAssetsToExcel(rows, filename)
-    else if (exportType === "pdf")
-      await exportAssetsToPDF(rows, filename, { total: getSortedAssets(filteredAssets).length })
+    else if (exportType === "pdf") await exportAssetsToPDF(rows, filename, { total: exportableAssets.length })
     else if (exportType === "word") await exportAssetsToWord(rows, filename)
     setExportDialogOpen(false)
   }
@@ -1189,77 +1172,23 @@ export function AdminAssetsContent({
     setEmployeeReportDialogOpen(false)
   }
 
-  const filteredAssets = assets.filter((asset) => {
-    const computedStatus = asset.deleted_at ? "archived" : asset.status
-    const assetTypeLabel = ASSET_TYPE_MAP[asset.asset_type]?.label || asset.asset_type
-
-    // Enhanced search - now searches across all relevant fields
-    const matchesSearch =
-      searchQuery === "" ||
-      [
-        asset.unique_code,
-        assetTypeLabel,
-        asset.asset_model,
-        asset.serial_number,
-        asset.acquisition_year?.toString(),
-        computedStatus,
-        asset.notes,
-        asset.department,
-        asset.office_location,
-        getAssignedPersonName(asset),
-        asset.current_assignment?.department,
-      ].some((field) => field?.toLowerCase().includes(searchQuery.toLowerCase()))
-
-    const matchesStatus = statusFilter.length === 0 ? !asset.deleted_at : statusFilter.includes(computedStatus)
-    const matchesYear = yearFilter.length === 0 || yearFilter.includes(asset.acquisition_year?.toString() || "")
-    const matchesAssetType = assetTypeFilter.length === 0 || assetTypeFilter.includes(asset.asset_type)
-    const matchesOfficeLocation =
-      officeLocationFilter.length === 0 ||
-      officeLocationFilter.includes(asset.office_location || "") ||
-      officeLocationFilter.includes(asset.current_assignment?.office_location || "")
-
-    // Filter by issue status
-    const matchesIssueStatus =
-      issueStatusFilter.length === 0 ||
-      (issueStatusFilter.includes("has_issues") && (asset.unresolved_issues_count || 0) > 0) ||
-      (issueStatusFilter.includes("no_issues") && (asset.unresolved_issues_count || 0) === 0)
-
-    // Filter by department - for leads, always filter by their departments
-    let matchesDepartment = true
-    if (userProfile?.is_department_lead) {
-      // Leads: assets are already filtered, but ensure they match lead's departments
-      if (scopedDepartments.length > 0 || scopedOffices.length > 0) {
-        const assignmentDept = asset.current_assignment?.department
-        const assignedUserDept = asset.current_assignment?.assigned_to
-          ? employees.find((s) => s.id === asset.current_assignment?.assigned_to)?.department
-          : null
-        const assignmentOffice = asset.current_assignment?.office_location
-
-        matchesDepartment =
-          (assignmentDept ? scopedDepartments.includes(assignmentDept) : false) ||
-          (assignedUserDept ? scopedDepartments.includes(assignedUserDept) : false) ||
-          (assignmentOffice ? scopedOffices.includes(assignmentOffice) : false)
-      }
-    } else {
-      // Admins: use department filter
-      matchesDepartment =
-        departmentFilter.length === 0 || departmentFilter.includes(asset.current_assignment?.department || "")
-    }
-
-    // Filter by user
-    const matchesUser = userFilter.length === 0 || userFilter.includes(asset.current_assignment?.assigned_to || "")
-
-    return (
-      matchesSearch &&
-      matchesStatus &&
-      matchesDepartment &&
-      matchesUser &&
-      matchesYear &&
-      matchesAssetType &&
-      matchesOfficeLocation &&
-      matchesIssueStatus
-    )
-  })
+  // Pre-filter by role scope (dept leads only see their scope; DataTable handles the rest)
+  const scopedAssets = useMemo(() => {
+    if (!userProfile?.is_department_lead) return assets
+    if (scopedDepartments.length === 0 && scopedOffices.length === 0) return assets
+    return assets.filter((asset) => {
+      const assignmentDept = asset.current_assignment?.department
+      const assignedUserDept = asset.current_assignment?.assigned_to
+        ? employees.find((s) => s.id === asset.current_assignment?.assigned_to)?.department
+        : null
+      const assignmentOffice = asset.current_assignment?.office_location
+      return (
+        (assignmentDept ? scopedDepartments.includes(assignmentDept) : false) ||
+        (assignedUserDept ? scopedDepartments.includes(assignedUserDept) : false) ||
+        (assignmentOffice ? scopedOffices.includes(assignmentOffice) : false)
+      )
+    })
+  }, [assets, employees, userProfile, scopedDepartments, scopedOffices])
 
   const stats = {
     total: assets.filter((d) => !d.deleted_at).length,
@@ -1289,151 +1218,365 @@ export function AdminAssetsContent({
     }
   }
 
-  if (isLoading) {
-    return (
-      <div className="from-background via-background to-muted/20 flex min-h-screen w-full items-center justify-center bg-gradient-to-br">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="text-primary h-8 w-8 animate-spin" />
-          <p className="text-muted-foreground text-sm">Loading assets...</p>
-        </div>
-      </div>
-    )
-  }
+  const assetTypeOptions = assetTypes.map((type) => ({ value: type.code, label: type.label }))
+  const departmentOptions = departments.map((department) => ({ value: department, label: department }))
+  const officeOptions = Array.from(new Set(assets.map((asset) => asset.office_location).filter(Boolean) as string[]))
+    .sort()
+    .map((office) => ({ value: office, label: office }))
+  const yearOptions = Array.from(new Set(assets.map((asset) => String(asset.acquisition_year))))
+    .sort()
+    .map((year) => ({ value: year, label: year }))
+
+  const assetColumns: DataTableColumn<Asset>[] = [
+    {
+      key: "unique_code",
+      label: "Unique Code",
+      sortable: true,
+      accessor: (asset) => asset.unique_code,
+      render: (asset) => <span className="font-mono text-xs font-medium">{asset.unique_code}</span>,
+      resizable: true,
+      initialWidth: 150,
+    },
+    {
+      key: "asset_type",
+      label: "Asset Type",
+      sortable: true,
+      accessor: (asset) => ASSET_TYPE_MAP[asset.asset_type]?.label || asset.asset_type,
+      render: (asset) => <span>{ASSET_TYPE_MAP[asset.asset_type]?.label || asset.asset_type}</span>,
+      resizable: true,
+      initialWidth: 180,
+    },
+    {
+      key: "model",
+      label: "Model",
+      sortable: true,
+      accessor: (asset) => asset.asset_model || "",
+      render: (asset) => <span className="text-muted-foreground text-sm">{asset.asset_model || "-"}</span>,
+      hideOnMobile: true,
+      resizable: true,
+      initialWidth: 160,
+    },
+    {
+      key: "year",
+      label: "Year",
+      sortable: true,
+      accessor: (asset) => asset.acquisition_year,
+      align: "center",
+    },
+    {
+      key: "status",
+      label: "Status",
+      sortable: true,
+      accessor: (asset) => (asset.deleted_at ? "archived" : asset.status),
+      render: (asset) => (
+        <Badge className={getStatusColor(asset.deleted_at ? "archived" : asset.status)} variant="outline">
+          {asset.deleted_at ? "archived" : asset.status}
+        </Badge>
+      ),
+    },
+    {
+      key: "assigned_to",
+      label: "Assigned To",
+      sortable: true,
+      accessor: (asset) => getAssignedToLabel(asset),
+      render: (asset) => <span className="text-sm">{getAssignedToLabel(asset, true)}</span>,
+      resizable: true,
+      initialWidth: 220,
+    },
+    {
+      key: "department",
+      label: "Department",
+      sortable: true,
+      accessor: (asset) => asset.current_assignment?.department || asset.department || "",
+      render: (asset) => <span>{asset.current_assignment?.department || asset.department || "-"}</span>,
+      hideOnMobile: true,
+    },
+    {
+      key: "office_location",
+      label: "Office",
+      sortable: true,
+      accessor: (asset) => asset.current_assignment?.office_location || asset.office_location || "",
+      render: (asset) => <span>{asset.current_assignment?.office_location || asset.office_location || "-"}</span>,
+      hideOnMobile: true,
+    },
+    {
+      key: "issues",
+      label: "Issues",
+      sortable: true,
+      accessor: (asset) => asset.unresolved_issues_count || 0,
+      render: (asset) => (
+        <Badge variant={(asset.unresolved_issues_count || 0) > 0 ? "destructive" : "secondary"}>
+          {asset.unresolved_issues_count || 0}
+        </Badge>
+      ),
+      align: "center",
+    },
+  ]
+
+  const assetFilters: DataTableFilter<Asset>[] = [
+    {
+      key: "status",
+      label: "Status",
+      options: [
+        { value: "available", label: "Available" },
+        { value: "assigned", label: "Assigned" },
+        { value: "maintenance", label: "Maintenance" },
+        { value: "retired", label: "Retired" },
+        { value: "archived", label: "Archived" },
+      ],
+      placeholder: "All Statuses",
+      mode: "custom",
+      filterFn: (asset, values) => values.length === 0 || values.includes(asset.deleted_at ? "archived" : asset.status),
+    },
+    {
+      key: "asset_type",
+      label: "Asset Type",
+      options: assetTypeOptions,
+      placeholder: "All Asset Types",
+    },
+    {
+      key: "department",
+      label: "Department",
+      options: departmentOptions,
+      placeholder: "All Departments",
+      mode: "custom",
+      filterFn: (asset, values) => {
+        const department = asset.current_assignment?.department || asset.department || ""
+        return values.length === 0 || values.includes(department)
+      },
+    },
+    {
+      key: "office_location",
+      label: "Office",
+      options: officeOptions,
+      placeholder: "All Offices",
+      mode: "custom",
+      filterFn: (asset, values) => {
+        const office = asset.current_assignment?.office_location || asset.office_location || ""
+        return values.length === 0 || values.includes(office)
+      },
+    },
+    {
+      key: "year",
+      label: "Year",
+      options: yearOptions,
+      placeholder: "All Years",
+      mode: "custom",
+      filterFn: (asset, values) => values.length === 0 || values.includes(String(asset.acquisition_year)),
+    },
+    {
+      key: "issue_state",
+      label: "Issue State",
+      options: [
+        { value: "with_issues", label: "With Issues" },
+        { value: "clean", label: "No Issues" },
+      ],
+      placeholder: "All Issue States",
+      mode: "custom",
+      filterFn: (asset, values) => {
+        if (values.length === 0) return true
+        const hasIssues = (asset.unresolved_issues_count || 0) > 0
+        return values.some((value) => (value === "with_issues" ? hasIssues : !hasIssues))
+      },
+    },
+  ]
+
+  const assetRowActions: RowAction<Asset>[] = [
+    {
+      label: "Edit",
+      icon: Pencil,
+      onClick: (asset) => void handleOpenAssetDialog(asset),
+      hidden: (asset) => Boolean(asset.deleted_at),
+    },
+    {
+      label: "Assign",
+      icon: Wrench,
+      onClick: (asset) => void openAssignDialog(asset),
+      hidden: (asset) => Boolean(asset.deleted_at),
+    },
+    {
+      label: "Issues",
+      icon: AlertCircle,
+      onClick: (asset) => void handleOpenIssuesDialog(asset),
+      hidden: (asset) => Boolean(asset.deleted_at),
+    },
+    {
+      label: "History",
+      icon: History,
+      onClick: (asset) => void loadAssetHistory(asset),
+    },
+    {
+      label: "Archive",
+      icon: AlertCircle,
+      variant: "destructive",
+      onClick: (asset) => {
+        setAssetToDelete(asset)
+        setIsDeleteDialogOpen(true)
+      },
+      hidden: (asset) => Boolean(asset.deleted_at),
+    },
+    {
+      label: "Restore",
+      icon: RefreshCw,
+      onClick: (asset) => void handleRestoreAsset(asset),
+      hidden: (asset) => !Boolean(asset.deleted_at),
+    },
+  ]
 
   return (
-    <AdminTablePage
+    <DataTablePage
       title="Asset Management"
-      description="Manage asset inventory and assignments"
+      description="Manage asset inventory, assignments, history, and issue tracking."
       icon={Package}
+      backLink={{ href: "/admin", label: "Back to Admin" }}
       actions={
         <div className="flex flex-wrap items-center gap-2">
-          <TableViewToggle viewMode={viewMode} onChange={setViewMode} />
-          <Button
-            variant="outline"
-            onClick={() => setExportOptionsOpen(true)}
-            className="h-8 gap-2"
-            size="sm"
-          >
+          <Button variant="outline" onClick={() => setExportOptionsOpen(true)} className="gap-2" size="sm">
             <Download className="h-4 w-4" />
             Export
           </Button>
           {!userProfile?.is_department_lead && (
-            <Button onClick={() => handleOpenAssetDialog()} className="h-8 gap-2" size="sm">
+            <Button onClick={() => void handleOpenAssetDialog()} className="gap-2" size="sm">
               <Plus className="h-4 w-4" />
               Add Asset
             </Button>
           )}
+          <Button variant="outline" onClick={() => router.push("/admin/assets/issues")} className="gap-2" size="sm">
+            <AlertCircle className="h-4 w-4" />
+            Issues
+          </Button>
         </div>
       }
       stats={
-        <div className="grid grid-cols-3 gap-2 sm:gap-3 md:grid-cols-5 md:gap-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
           <StatCard
-            title="Total assets"
+            title="Total Assets"
             value={stats.total}
             icon={Package}
-            iconBgColor="bg-blue-100 dark:bg-blue-900/30"
-            iconColor="text-blue-600 dark:text-blue-400"
+            iconBgColor="bg-blue-500/10"
+            iconColor="text-blue-500"
           />
-
           <StatCard
             title="Available"
             value={stats.available}
             icon={Package}
-            iconBgColor="bg-green-100 dark:bg-green-900/30"
-            iconColor="text-green-600 dark:text-green-400"
+            iconBgColor="bg-emerald-500/10"
+            iconColor="text-emerald-500"
           />
-
           <StatCard
             title="Assigned"
             value={stats.assigned}
             icon={Package}
-            iconBgColor="bg-purple-100 dark:bg-purple-900/30"
-            iconColor="text-purple-600 dark:text-purple-400"
+            iconBgColor="bg-violet-500/10"
+            iconColor="text-violet-500"
           />
-
           <StatCard
             title="Maintenance"
             value={stats.maintenance}
-            icon={Package}
-            iconBgColor="bg-yellow-100 dark:bg-yellow-900/30"
-            iconColor="text-yellow-600 dark:text-yellow-400"
+            icon={Wrench}
+            iconBgColor="bg-amber-500/10"
+            iconColor="text-amber-500"
           />
-
-          <Card
-            className="cursor-pointer border-2 transition-all hover:border-orange-300 hover:shadow-lg dark:hover:border-orange-700"
-            onClick={() => router.push("/admin/assets/issues")}
-          >
-            <CardContent className="p-3 sm:p-4 md:p-6">
-              <div className="flex items-center justify-between">
-                <div className="min-w-0 flex-1">
-                  <p className="xs:text-xs text-muted-foreground truncate text-[10px] font-medium">Issues</p>
-                  <p className="mt-1 text-lg font-bold text-orange-600 sm:text-xl md:mt-2 md:text-3xl dark:text-orange-400">
-                    {stats.unresolvedIssues}
-                  </p>
-                </div>
-                <div className="ml-1 flex-shrink-0 rounded-lg bg-orange-100 p-1.5 sm:p-2 md:p-3 dark:bg-orange-900/30">
-                  <AlertCircle className="h-4 w-4 text-orange-600 sm:h-5 sm:w-5 md:h-6 md:w-6 dark:text-orange-400" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <StatCard
+            title="Open Issues"
+            value={stats.unresolvedIssues}
+            icon={AlertCircle}
+            iconBgColor="bg-red-500/10"
+            iconColor="text-red-500"
+          />
         </div>
       }
-      filters={
-        <AssetFilterBar
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
-          statusFilter={statusFilter}
-          setStatusFilter={setStatusFilter}
-          departmentFilter={departmentFilter}
-          setDepartmentFilter={setDepartmentFilter}
-          userFilter={userFilter}
-          setUserFilter={setUserFilter}
-          yearFilter={yearFilter}
-          setYearFilter={setYearFilter}
-          officeLocationFilter={officeLocationFilter}
-          setOfficeLocationFilter={setOfficeLocationFilter}
-          assetTypeFilter={assetTypeFilter}
-          setAssetTypeFilter={setAssetTypeFilter}
-          issueStatusFilter={issueStatusFilter}
-          setIssueStatusFilter={setIssueStatusFilter}
-          assetTypes={assetTypes}
-          departments={departments}
-          activeEmployees={activeEmployees}
-          acquisitionYears={Array.from(new Set(assets.map((a) => a.acquisition_year)))}
-          isDepartmentLead={!!userProfile?.is_department_lead}
-        />
-      }
-      filtersInCard={false}
     >
-      <AssetListView
-        assets={getSortedAssets(filteredAssets)}
-        viewMode={viewMode}
-        userProfile={userProfile}
-        isDeleting={isDeleting}
-        onEdit={handleOpenAssetDialog}
-        onIssues={handleOpenIssuesDialog}
-        onHistory={loadAssetHistory}
-        onDelete={(asset) => {
-          setAssetToDelete(asset)
-          setIsDeleteDialogOpen(true)
-        }}
-        onRestore={handleRestoreAsset}
-        getStatusColor={getStatusColor}
-        getEffectiveAssignmentType={getEffectiveAssignmentType}
-        getAssignedPersonName={getAssignedPersonName}
-        sortConfig={sortConfig}
-        onSort={handleSort}
-        hasActiveFilters={
-          Boolean(searchQuery) ||
-          statusFilter.length > 0 ||
-          departmentFilter.length > 0 ||
-          userFilter.length > 0 ||
-          assetTypeFilter.length > 0 ||
-          yearFilter.length > 0 ||
-          officeLocationFilter.length > 0 ||
-          issueStatusFilter.length > 0
+      <DataTable<Asset>
+        data={scopedAssets}
+        columns={assetColumns}
+        filters={assetFilters}
+        getRowId={(asset) => asset.id}
+        searchPlaceholder="Search asset code, type, model, assignee, office, or creator..."
+        searchFn={(asset, query) =>
+          [
+            asset.unique_code,
+            ASSET_TYPE_MAP[asset.asset_type]?.label || asset.asset_type,
+            asset.asset_model || "",
+            asset.serial_number || "",
+            getAssignedToLabel(asset),
+            asset.department || "",
+            asset.office_location || "",
+            getCreatedByLabel(asset.created_by),
+          ]
+            .join(" ")
+            .toLowerCase()
+            .includes(query)
         }
+        isLoading={isLoading}
+        error={initialError || null}
+        onRetry={() => void loadData()}
+        rowActions={assetRowActions}
+        expandable={{
+          render: (asset) => (
+            <div className="grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
+              <div>
+                <p className="text-muted-foreground text-xs">Model</p>
+                <p className="mt-1">{asset.asset_model || "-"}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Serial Number</p>
+                <p className="mt-1">{asset.serial_number || "-"}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Created By</p>
+                <p className="mt-1">{getCreatedByLabel(asset.created_by)}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Issue Count</p>
+                <p className="mt-1">{asset.unresolved_issues_count || 0}</p>
+              </div>
+              <div className="sm:col-span-2 lg:col-span-4">
+                <p className="text-muted-foreground text-xs">Notes</p>
+                <p className="mt-1">{asset.notes || "No notes added."}</p>
+              </div>
+            </div>
+          ),
+        }}
+        viewToggle
+        cardRenderer={(asset) => (
+          <div className="space-y-3 rounded-xl border p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-semibold">{asset.unique_code}</p>
+                <p className="text-muted-foreground text-xs">
+                  {ASSET_TYPE_MAP[asset.asset_type]?.label || asset.asset_type}
+                </p>
+              </div>
+              <Badge className={getStatusColor(asset.deleted_at ? "archived" : asset.status)} variant="outline">
+                {asset.deleted_at ? "archived" : asset.status}
+              </Badge>
+            </div>
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div>
+                <p className="text-muted-foreground text-xs">Assigned To</p>
+                <p>{getAssignedToLabel(asset, true)}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Issues</p>
+                <p>{asset.unresolved_issues_count || 0}</p>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" onClick={() => void handleOpenAssetDialog(asset)}>
+                Edit
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => void handleOpenIssuesDialog(asset)}>
+                Issues
+              </Button>
+            </div>
+          </div>
+        )}
+        emptyTitle="No assets found"
+        emptyDescription="Add the first asset to start tracking inventory, assignments, and maintenance issues."
+        emptyIcon={Package}
+        skeletonRows={8}
+        minWidth="1280px"
       />
       {/* asset Dialog */}
       <AssetFormDialog
@@ -1567,6 +1710,6 @@ export function AdminAssetsContent({
           handleEmployeeReportClick("word")
         }}
       />
-    </AdminTablePage>
+    </DataTablePage>
   )
 }

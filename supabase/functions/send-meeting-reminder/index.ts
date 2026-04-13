@@ -2,7 +2,12 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0"
 import { writeEdgeAuditLog } from "../_shared/audit.ts"
 import { sendEmail } from "../_shared/email.ts"
-import { getCurrentOfficeWeek, getOfficeWeekFromDate, resolveEffectiveMeetingDateIso } from "../_shared/meeting-date.ts"
+import {
+  getCurrentOfficeWeek,
+  getOfficeWeekFromDate,
+  initOfficeYearAnchors,
+  resolveEffectiveMeetingDateIso,
+} from "../_shared/meeting-date.ts"
 import { isEdgeSystemEmailEnabled } from "../_shared/notification-gateway.ts"
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!
@@ -67,22 +72,7 @@ function withSubjectPrefix(moduleName: string, subject: string): string {
   return String(subject || "").trim() || "Notification"
 }
 
-function buildKnowledgeSharingAgendaLabel(presenter?: KnowledgePresenter, department?: string): string {
-  const base = "Knowledge Sharing Session (30 minutes)"
-  const presenterName = presenter?.full_name?.trim()
-  const dept = (department || presenter?.department || "").trim()
-
-  if (presenterName && dept) return `${base} - ${dept}: ${presenterName}`
-  if (presenterName) return `${base} - ${presenterName}`
-  if (dept) return `${base} - ${dept}`
-  return base
-}
-
-function normalizeMeetingAgenda(
-  agendaInput: string[] | string | undefined,
-  presenter?: KnowledgePresenter,
-  department?: string
-): string[] {
+function normalizeMeetingAgenda(agendaInput: string[] | string | undefined): string[] {
   const parsedAgenda = Array.isArray(agendaInput)
     ? agendaInput
     : typeof agendaInput === "string"
@@ -92,7 +82,9 @@ function normalizeMeetingAgenda(
           .filter(Boolean)
       : []
 
-  const fallbackAgenda = [
+  if (parsedAgenda.length > 0) return parsedAgenda
+
+  return [
     "Opening Prayer",
     "Knowledge Sharing Session (30 minutes)",
     "Departmental Updates",
@@ -101,20 +93,6 @@ function normalizeMeetingAgenda(
     "Any Other Business",
     "Adjournment",
   ]
-
-  const baseAgenda = parsedAgenda.length > 0 ? parsedAgenda : fallbackAgenda
-  const knowledgeLine = buildKnowledgeSharingAgendaLabel(presenter, department)
-  const knowledgePattern = /^Knowledge Sharing Session\s*\(30\s*minutes?\)/i
-  const foundIndex = baseAgenda.findIndex((item) => knowledgePattern.test(item))
-
-  if (foundIndex >= 0) {
-    return baseAgenda.map((item, idx) => (idx === foundIndex ? knowledgeLine : item))
-  }
-  if (presenter?.full_name || department) {
-    const insertIndex = Math.min(1, baseAgenda.length)
-    return [...baseAgenda.slice(0, insertIndex), knowledgeLine, ...baseAgenda.slice(insertIndex)]
-  }
-  return baseAgenda
 }
 
 function buildMeetingReminderHtml(
@@ -124,7 +102,9 @@ function buildMeetingReminderHtml(
   agenda: string[],
   preparedByName?: string,
   preparedByDesignation?: string,
-  preparedByDepartment?: string
+  preparedByDepartment?: string,
+  kssPresenter?: KnowledgePresenter,
+  kssDepartment?: string
 ): string {
   const { timingPhrase, effectiveDate } = getMeetingReminderDescriptor(meetingDate, meetingTime)
   const displayTime = formatTimeWithMeridiem(meetingTime)
@@ -142,11 +122,35 @@ function buildMeetingReminderHtml(
       "</span>" +
       "</td>" +
       '<td valign="top" style="padding: 2px 0 0 0; color: #374151; line-height: 1.5;">' +
-      agenda[i] +
+      escapeHtml(agenda[i]) +
       "</td>" +
       "</tr></table>" +
       "</td></tr>"
   }
+
+  // KSS block — rendered separately so the agenda text is irrelevant
+  const presenterName = kssPresenter?.full_name?.trim()
+  const kssdept = (kssDepartment || kssPresenter?.department || "").trim()
+  const kssBlock =
+    presenterName || kssdept
+      ? '<div style="margin: 0 0 22px 0; border: 1px solid #c7d2fe; border-radius: 8px; overflow: hidden; background: #eef2ff;">' +
+        '<div style="padding: 10px 18px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; border-bottom: 1px solid #c7d2fe; background: #e0e7ff; color: #3730a3;">Knowledge Sharing Session</div>' +
+        '<table style="width:100%; border-collapse: collapse;">' +
+        (kssdept
+          ? '<tr><td style="padding: 8px 18px; font-size: 13px; color: #374151; border-bottom: 1px solid #e0e7ff; width: 110px; font-weight: 600;">Department</td>' +
+            '<td style="padding: 8px 18px; font-size: 13px; color: #374151; border-bottom: 1px solid #e0e7ff;">' +
+            escapeHtml(kssdept) +
+            "</td></tr>"
+          : "") +
+        (presenterName
+          ? '<tr><td style="padding: 8px 18px; font-size: 13px; color: #374151; width: 110px; font-weight: 600;">Presenter</td>' +
+            '<td style="padding: 8px 18px; font-size: 13px; color: #374151;">' +
+            escapeHtml(presenterName) +
+            "</td></tr>"
+          : "") +
+        "</table>" +
+        "</div>"
+      : ""
 
   return (
     "<!DOCTYPE html>" +
@@ -158,7 +162,7 @@ function buildMeetingReminderHtml(
     "<style>" +
     'body { margin: 0; padding: 0; background: #fff; font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif; }' +
     ".email-shell { max-width: 600px; margin: 0 auto; overflow: hidden; }" +
-    ".outer-header { background: #0f2d1f; padding: 20px 0; text-align: center; border-bottom: 3px solid #16a34a; }" +
+    ".outer-header { background: #000; padding: 20px 0; text-align: center; border-top: 3px solid #16a34a; border-bottom: 3px solid #16a34a; }" +
     ".wrapper { max-width: 600px; margin: 0 auto; background: #fff; padding: 32px 28px; }" +
     ".title { font-size: 22px; font-weight: 700; color: #111827; margin-bottom: 14px; }" +
     ".text { font-size: 15px; color: #374151; line-height: 1.7; margin: 0 0 18px 0; }" +
@@ -167,7 +171,7 @@ function buildMeetingReminderHtml(
     ".cta { text-align: center; margin: 28px 0; }" +
     ".button { display: inline-block; background: #1e40af; color: #fff; text-decoration: none; padding: 14px 32px; border-radius: 6px; font-weight: 600; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; }" +
     ".note-box { background: #fefce8; border: 1px solid #fde68a; border-radius: 8px; padding: 16px 20px; font-size: 14px; color: #92400e; margin: 20px 0; line-height: 1.6; }" +
-    ".footer { background: #0f2d1f; padding: 20px; text-align: center; font-size: 11px; color: #9ca3af; border-top: 3px solid #16a34a; }" +
+    ".footer { background: #000; padding: 20px; text-align: center; font-size: 11px; color: #d1d5db; border-top: 3px solid #16a34a; border-bottom: 3px solid #16a34a; }" +
     ".footer strong { color: #fff; }" +
     ".footer-system { color: #16a34a; font-weight: 600; }" +
     ".footer-note { color: #9ca3af; font-style: italic; }" +
@@ -175,9 +179,9 @@ function buildMeetingReminderHtml(
     "</head>" +
     "<body>" +
     '<div class="email-shell">' +
-    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#0f2d1f" style="background:#0f2d1f !important;background-color:#0f2d1f !important;border-bottom:3px solid #16a34a;">' +
-    '<tr><td align="center" style="padding:20px 0;background:#0f2d1f !important;background-color:#0f2d1f !important;">' +
-    '<img src="https://erp.acoblighting.com/images/acob-logo-dark.png" height="40" alt="ACOB Lighting">' +
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#000000" style="background:#000000 !important;background-color:#000000 !important;border-top:3px solid #16a34a;border-bottom:3px solid #16a34a;">' +
+    '<tr><td align="center" style="padding:20px 0;background:#000000 !important;background-color:#000000 !important;">' +
+    '<img src="https://erp.acoblighting.com/images/acob-logo-dark.png" height="65" alt="ACOB Lighting">' +
     "</td></tr></table>" +
     '<div class="wrapper">' +
     '<div class="title">Reminder for General Weekly Meeting</div>' +
@@ -204,15 +208,16 @@ function buildMeetingReminderHtml(
     agendaHtml +
     "</table>" +
     "</div>" +
+    kssBlock +
     '<div class="note-box">' +
     "<strong>Note:</strong> Your attendance is crucial to ensure we're all on the same page and can collaborate effectively. " +
     `Please join on time, and feel free to reach out to <a href="mailto:${MEETING_CONTACT_EMAIL}" style="color:#1e40af;font-weight:600;text-decoration:none;">me</a> or any team member if you have questions or concerns.` +
     "</div>" +
     '<p class="text" style="text-align: center; font-weight: 600; color: #16a34a;">Looking forward to seeing you there.</p>' +
     "</div>" +
-    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#0f2d1f" style="background:#0f2d1f !important;background-color:#0f2d1f !important;border-top:3px solid #16a34a;">' +
-    '<tr><td align="center" style="padding:20px;background:#0f2d1f !important;background-color:#0f2d1f !important;font-size:11px;color:#9ca3af;">' +
-    '<span style="color:#d1d5db;">Prepared by ' +
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#000000" style="background:#000000 !important;background-color:#000000 !important;border-top:3px solid #16a34a;border-bottom:3px solid #16a34a;">' +
+    '<tr><td align="center" style="padding:20px;background:#000000 !important;background-color:#000000 !important;font-size:11px;color:#d1d5db;">' +
+    '<span style="color:#f3f4f6;">Prepared by ' +
     preparedBy +
     "</span><br>" +
     (designation ? designation + "<br>" : "") +
@@ -259,13 +264,13 @@ function buildKnowledgeSharingHtml(sessionDate: string, sessionTime: string, dur
     "<style>" +
     'body { margin: 0; padding: 0; background: #fff; font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif; }' +
     ".email-shell { max-width: 600px; margin: 0 auto; overflow: hidden; }" +
-    ".outer-header { background: #0f2d1f; padding: 20px 0; text-align: center; border-bottom: 3px solid #16a34a; }" +
+    ".outer-header { background: #000; padding: 20px 0; text-align: center; border-top: 3px solid #16a34a; border-bottom: 3px solid #16a34a; }" +
     ".wrapper { max-width: 600px; margin: 0 auto; background: #fff; padding: 32px 28px; }" +
     ".title { font-size: 22px; font-weight: 700; color: #111827; margin-bottom: 14px; }" +
     ".text { font-size: 15px; color: #374151; line-height: 1.7; margin: 0 0 18px 0; }" +
     ".note-box { background: #fef3c7; border: 1px solid #fde68a; border-radius: 8px; padding: 16px 20px; font-size: 14px; color: #92400e; margin: 20px 0; line-height: 1.6; text-align: center; }" +
     ".alert-badge { display: inline-block; background: #dc2626; color: #fff; font-size: 11px; font-weight: 700; padding: 4px 12px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px; }" +
-    ".footer { background: #0f2d1f; padding: 20px; text-align: center; font-size: 11px; color: #9ca3af; border-top: 3px solid #16a34a; }" +
+    ".footer { background: #000; padding: 20px; text-align: center; font-size: 11px; color: #d1d5db; border-top: 3px solid #16a34a; border-bottom: 3px solid #16a34a; }" +
     ".footer strong { color: #fff; }" +
     ".footer-system { color: #16a34a; font-weight: 600; }" +
     ".footer-note { color: #9ca3af; font-style: italic; }" +
@@ -273,9 +278,9 @@ function buildKnowledgeSharingHtml(sessionDate: string, sessionTime: string, dur
     "</head>" +
     "<body>" +
     '<div class="email-shell">' +
-    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#0f2d1f" style="background:#0f2d1f !important;background-color:#0f2d1f !important;border-bottom:3px solid #16a34a;">' +
-    '<tr><td align="center" style="padding:20px 0;background:#0f2d1f !important;background-color:#0f2d1f !important;">' +
-    '<img src="https://erp.acoblighting.com/images/acob-logo-dark.png" height="40" alt="ACOB Lighting">' +
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#000000" style="background:#000000 !important;background-color:#000000 !important;border-top:3px solid #16a34a;border-bottom:3px solid #16a34a;">' +
+    '<tr><td align="center" style="padding:20px 0;background:#000000 !important;background-color:#000000 !important;">' +
+    '<img src="https://erp.acoblighting.com/images/acob-logo-dark.png" height="65" alt="ACOB Lighting">' +
     "</td></tr></table>" +
     '<div class="wrapper">' +
     '<div class="title">Reminder: Knowledge Sharing Session</div>' +
@@ -298,9 +303,9 @@ function buildKnowledgeSharingHtml(sessionDate: string, sessionTime: string, dur
     "Attendance is mandatory for all team members." +
     "</div>" +
     "</div>" +
-    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#0f2d1f" style="background:#0f2d1f !important;background-color:#0f2d1f !important;border-top:3px solid #16a34a;">' +
-    '<tr><td align="center" style="padding:20px;background:#0f2d1f !important;background-color:#0f2d1f !important;font-size:11px;color:#9ca3af;">' +
-    '<span style="color:#d1d5db;">Prepared by Admin &amp; HR</span><br>' +
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#000000" style="background:#000000 !important;background-color:#000000 !important;border-top:3px solid #16a34a;border-bottom:3px solid #16a34a;">' +
+    '<tr><td align="center" style="padding:20px;background:#000000 !important;background-color:#000000 !important;font-size:11px;color:#d1d5db;">' +
+    '<span style="color:#f3f4f6;">Prepared by Admin &amp; HR</span><br>' +
     "Administrative Team<br>" +
     "Admin &amp; HR Department<br>" +
     '<strong style="color:#fff;">ACOB Lighting Technology Limited</strong><br>' +
@@ -462,6 +467,7 @@ serve(async (req) => {
     if (!authHeader) return new Response("Unauthorized", { status: 401 })
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+    await initOfficeYearAnchors(supabase)
     const meetingsMailEnabled = await isEdgeSystemEmailEnabled(supabase, "meetings")
     if (!meetingsMailEnabled) {
       return new Response(JSON.stringify({ success: true, skipped: true, reason: "meetings_email_disabled" }), {
@@ -524,7 +530,7 @@ serve(async (req) => {
         resolvedOfficeWeek.year
       )
 
-      const normalizedAgenda = normalizeMeetingAgenda(agenda, knowledgeSharingPresenter, knowledgeSharingDepartment)
+      const normalizedAgenda = normalizeMeetingAgenda(agenda)
       if (kssRosterStatus === "missing") {
         console.warn("[meeting-reminder] KSS roster missing for recurring schedule; sending without roster enrichment")
       }
@@ -537,7 +543,9 @@ serve(async (req) => {
         normalizedAgenda,
         meetingPreparedByName,
         meetingPreparedByDesignation,
-        meetingPreparedByDepartment
+        meetingPreparedByDepartment,
+        knowledgeSharingPresenter,
+        knowledgeSharingDepartment
       )
     } else {
       subject = withSubjectPrefix("Meetings", "Reminder: Knowledge Sharing Session")

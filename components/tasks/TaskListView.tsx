@@ -6,23 +6,11 @@ import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { EmptyState } from "@/components/ui/patterns"
 import { ItemInfoButton } from "@/components/ui/item-info-button"
-import {
-  ClipboardList,
-  Edit,
-  Trash2,
-  Calendar,
-  User,
-  Users,
-  Building2,
-  Ticket,
-  HeadphonesIcon,
-  FolderKanban,
-} from "lucide-react"
+import { ClipboardList, Edit, Trash2, Calendar, User, Building2, Ticket, HeadphonesIcon } from "lucide-react"
 import { formatName } from "@/lib/utils"
 import type { Task } from "@/types/task"
 
 type TaskAssignee = NonNullable<Task["assigned_to_user"]>
-type MultiAssignedUser = NonNullable<Task["assigned_users"]>[number]
 
 interface TaskListViewProps {
   filteredTasks: Task[]
@@ -91,15 +79,6 @@ function getSourceBadge(sourceType?: string) {
           <Ticket className="h-2.5 w-2.5" /> Action
         </Badge>
       )
-    case "project_task":
-      return (
-        <Badge
-          variant="outline"
-          className="gap-1 border-cyan-200 text-[10px] text-cyan-600 dark:border-cyan-800 dark:text-cyan-400"
-        >
-          <FolderKanban className="h-2.5 w-2.5" /> Project
-        </Badge>
-      )
     default:
       return null
   }
@@ -111,18 +90,14 @@ function buildTaskInfo(task: Task) {
       ? "Help Desk request"
       : task.source_type === "action_item"
         ? "Meeting action point"
-        : task.source_type === "project_task"
-          ? "Project task"
-          : "Manual task"
+        : "Manual task"
 
   const ownerLabel =
-    task.assignment_type === "multiple" && task.assigned_users
-      ? `${task.assigned_users.length} people are responsible for this item.`
-      : task.assignment_type === "department" && task.department
-        ? `${task.department} department is responsible for moving this item forward.`
-        : task.assigned_to_user
-          ? `${formatName((task.assigned_to_user as TaskAssignee)?.first_name)} ${formatName((task.assigned_to_user as TaskAssignee)?.last_name)} is currently responsible.`
-          : "This item has not been assigned yet."
+    task.assignment_type === "department" && task.department
+      ? `${task.department} department is responsible for moving this item forward.`
+      : task.assigned_to_user
+        ? `${formatName((task.assigned_to_user as TaskAssignee)?.first_name)} ${formatName((task.assigned_to_user as TaskAssignee)?.last_name)} is currently responsible.`
+        : "This item has not been assigned yet."
 
   return {
     title: task.work_item_number ? `${task.work_item_number} task guide` : "Task guide",
@@ -227,26 +202,7 @@ export function TaskListView({
                     </div>
                   </TableCell>
                   <TableCell>
-                    {task.assignment_type === "multiple" && task.assigned_users ? (
-                      <div className="text-sm">
-                        <div className="text-foreground flex items-center gap-1">
-                          <Users className="h-3 w-3" />
-                          <span>{task.assigned_users.length} people</span>
-                        </div>
-                        <div className="text-muted-foreground mt-1 text-xs">
-                          {task.assigned_users
-                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                            .slice(0, 2)
-                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                            .map(
-                              (user: MultiAssignedUser) =>
-                                `${formatName(user.first_name)} ${formatName(user.last_name)}`
-                            )
-                            .join(", ")}
-                          {task.assigned_users.length > 2 && ` +${task.assigned_users.length - 2} more`}
-                        </div>
-                      </div>
-                    ) : task.assignment_type === "department" && task.department ? (
+                    {task.assignment_type === "department" && task.department ? (
                       <div className="text-sm">
                         <div className="text-foreground flex items-center gap-1">
                           <Building2 className="h-3 w-3" />
@@ -342,13 +298,7 @@ export function TaskListView({
           <CardContent className="space-y-3 p-4">
             {task.description && <p className="text-muted-foreground line-clamp-2 text-sm">{task.description}</p>}
 
-            {task.assignment_type === "multiple" && task.assigned_users ? (
-              <div className="flex items-center gap-2 text-sm">
-                <Users className="text-muted-foreground h-4 w-4" />
-                <span className="text-muted-foreground">Assigned to:</span>
-                <span className="text-foreground font-medium">{task.assigned_users.length} people</span>
-              </div>
-            ) : task.assignment_type === "department" && task.department ? (
+            {task.assignment_type === "department" && task.department ? (
               <div className="flex items-center gap-2 text-sm">
                 <Building2 className="text-muted-foreground h-4 w-4" />
                 <span className="text-muted-foreground">Department:</span>

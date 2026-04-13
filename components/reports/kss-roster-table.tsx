@@ -1,20 +1,16 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { TablePage } from "@/components/admin/admin-table-page"
-import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { SearchableMultiSelect } from "@/components/ui/searchable-multi-select"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,13 +21,25 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { TableSkeleton } from "@/components/ui/query-states"
+import { DataTable, DataTablePage } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
+import { StatCard } from "@/components/ui/stat-card"
 import { createClient } from "@/lib/supabase/client"
 import { getCurrentOfficeWeek } from "@/lib/meeting-week"
 import { isAssignableEmploymentStatus } from "@/lib/workforce/assignment-policy"
 import { REPORT_DOC_MAX_SIZE_BYTES, formatLimitMb } from "@/lib/reports/document-upload-limits"
 import { buildMeetingDocumentFileName } from "@/lib/reports/meeting-date"
-import { Download, Loader2, Pencil, Plus, Presentation, Search, Trash2 } from "lucide-react"
+import {
+  CalendarDays,
+  Download,
+  FileText,
+  Loader2,
+  Pencil,
+  Plus,
+  Presentation,
+  ShieldAlert,
+  Trash2,
+} from "lucide-react"
 
 type Employee = {
   id: string
@@ -51,6 +59,7 @@ type KssRosterEntry = {
   created_at: string
   meeting_date?: string | null
   is_locked?: boolean
+  is_outside_grace_window?: boolean
 }
 
 type KssDocument = {
@@ -91,6 +100,7 @@ interface Props {
   title?: string
   readOnly?: boolean
   currentUserId?: string
+  currentUserRole?: string | null
   enableScoring?: boolean
 }
 
@@ -128,6 +138,7 @@ export function KssRosterTable({
   title = "Knowledge Sharing Session",
   readOnly = false,
   currentUserId,
+  currentUserRole,
   enableScoring = false,
 }: Props) {
   const supabase = createClient()
@@ -139,8 +150,6 @@ export function KssRosterTable({
   const [editingId, setEditingId] = useState<string | null>(null)
   const [pendingDeleteRow, setPendingDeleteRow] = useState<KssRosterEntry | null>(null)
   const [scoringRow, setScoringRow] = useState<KssRosterEntry | null>(null)
-  const [downloadingId, setDownloadingId] = useState<string | null>(null)
-
   const [weekNumber, setWeekNumber] = useState(defaultWeek)
   const [yearNumber, setYearNumber] = useState(defaultYear)
   const [department, setDepartment] = useState("none")
@@ -153,19 +162,13 @@ export function KssRosterTable({
   const [scoreValue, setScoreValue] = useState("")
   const [scoreFeedback, setScoreFeedback] = useState("")
 
-  const [searchQuery, setSearchQuery] = useState("")
-  const [departmentFilter, setDepartmentFilter] = useState("all")
-  const [weekFilter, setWeekFilter] = useState("all")
-  const [yearFilter, setYearFilter] = useState("all")
-  const [timeTypeFilter, setTimeTypeFilter] = useState<string[]>(["current", "past"])
+  const hasGraceOverride = currentUserRole === "developer" || currentUserRole === "super_admin"
 
-  const weekOptions = Array.from({ length: 53 }, (_, i) => i + 1)
-  const yearOptions = [
-    currentOfficeWeek.year - 1,
-    currentOfficeWeek.year,
-    currentOfficeWeek.year + 1,
-    currentOfficeWeek.year + 2,
-  ]
+  const weekOptions = useMemo(() => Array.from({ length: 53 }, (_, i) => i + 1), [])
+  const yearOptions = useMemo(
+    () => [currentOfficeWeek.year - 1, currentOfficeWeek.year, currentOfficeWeek.year + 1, currentOfficeWeek.year + 2],
+    [currentOfficeWeek.year]
+  )
 
   const departments = useMemo(() => {
     return Array.from(new Set(employees.map((e) => e.department).filter(Boolean) as string[])).sort((a, b) =>
@@ -181,6 +184,7 @@ export function KssRosterTable({
     data: roster = [],
     refetch: refetchRoster,
     isLoading: isRosterLoading,
+    error: rosterError,
   } = useQuery({
     queryKey: ["kss-roster-table"],
     queryFn: async (): Promise<KssRosterEntry[]> => {
@@ -195,6 +199,7 @@ export function KssRosterTable({
     data: docs = [],
     refetch: refetchDocs,
     isLoading: isDocsLoading,
+    error: docsError,
   } = useQuery({
     queryKey: ["kss-documents-table"],
     queryFn: async (): Promise<KssDocument[]> => {
@@ -271,51 +276,10 @@ export function KssRosterTable({
     setNotes(selectedWeekExistingRow.notes || "")
   }, [canUploadMissingForLockedWeek, selectedWeekExistingRow, editingId])
 
-  const rows = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase()
-
-    return roster
-      .filter((row) => {
-        const compare = compareWeekYear(
-          row.meeting_week,
-          row.meeting_year,
-          currentOfficeWeek.week,
-          currentOfficeWeek.year
-        )
-        const isCurrent = compare === 0
-        const isPast = compare < 0
-        const isUpcoming = compare > 0
-        const includeByTime =
-          (isCurrent && timeTypeFilter.includes("current")) ||
-          (isPast && timeTypeFilter.includes("past")) ||
-          (isUpcoming && timeTypeFilter.includes("upcoming"))
-        if (!includeByTime) return false
-
-        if (departmentFilter !== "all" && row.department !== departmentFilter) return false
-        if (weekFilter !== "all" && row.meeting_week !== Number(weekFilter)) return false
-        if (yearFilter !== "all" && row.meeting_year !== Number(yearFilter)) return false
-
-        if (!q) return true
-        const presenterName = row.presenter_id ? (employeeNameById.get(row.presenter_id) || "").toLowerCase() : ""
-        return (
-          row.department.toLowerCase().includes(q) ||
-          presenterName.includes(q) ||
-          String(row.meeting_week).includes(q) ||
-          String(row.meeting_year).includes(q)
-        )
-      })
-      .sort((a, b) => compareWeekYear(b.meeting_week, b.meeting_year, a.meeting_week, a.meeting_year))
-  }, [
-    roster,
-    timeTypeFilter,
-    currentOfficeWeek.week,
-    currentOfficeWeek.year,
-    departmentFilter,
-    weekFilter,
-    yearFilter,
-    searchQuery,
-    employeeNameById,
-  ])
+  const rows = useMemo(
+    () => roster.sort((a, b) => compareWeekYear(b.meeting_week, b.meeting_year, a.meeting_week, a.meeting_year)),
+    [roster]
+  )
 
   const myScoresByRosterId = useMemo(() => {
     const map = new Map<string, KssResult>()
@@ -343,31 +307,42 @@ export function KssRosterTable({
     setScoreFeedback("")
   }
 
-  const openScoreDialog = (row: KssRosterEntry) => {
-    const existingScore = myScoresByRosterId.get(row.id)
-    setScoringRow(row)
-    setScoreValue(existingScore ? String(existingScore.score) : "")
-    setScoreFeedback(existingScore?.feedback || "")
-  }
+  const openScoreDialog = useCallback(
+    (row: KssRosterEntry) => {
+      const existingScore = myScoresByRosterId.get(row.id)
+      setScoringRow(row)
+      setScoreValue(existingScore ? String(existingScore.score) : "")
+      setScoreFeedback(existingScore?.feedback || "")
+    },
+    [myScoresByRosterId]
+  )
 
-  const openEdit = (row: KssRosterEntry) => {
-    const doc = docByWeekYear.get(`${row.meeting_year}-${row.meeting_week}`)
-    if (row.is_locked && doc) {
-      toast.error(`Week ${row.meeting_week}, ${row.meeting_year} is locked and can no longer be edited`)
-      return
-    }
-    if (row.is_locked && !doc) {
-      toast.info("This week is locked. You can only upload the missing KSS file.")
-    }
-    setShowCreate(true)
-    setEditingId(row.id)
-    setWeekNumber(row.meeting_week)
-    setYearNumber(row.meeting_year)
-    setDepartment(row.department)
-    setPresenterId(row.presenter_id || "none")
-    setNotes(row.notes || "")
-    setFile(null)
-  }
+  const openEdit = useCallback(
+    (row: KssRosterEntry) => {
+      const doc = docByWeekYear.get(`${row.meeting_year}-${row.meeting_week}`)
+      if (row.is_locked && doc) {
+        toast.error(`Week ${row.meeting_week}, ${row.meeting_year} is locked and can no longer be edited`)
+        return
+      }
+      if (row.is_locked && !doc) {
+        toast.info("This week is locked. You can only upload the missing KSS file.")
+      }
+      if (hasGraceOverride && row.is_outside_grace_window) {
+        toast.info(
+          `Override active: you are editing Week ${row.meeting_week}, ${row.meeting_year} outside the grace period.`
+        )
+      }
+      setShowCreate(true)
+      setEditingId(row.id)
+      setWeekNumber(row.meeting_week)
+      setYearNumber(row.meeting_year)
+      setDepartment(row.department)
+      setPresenterId(row.presenter_id || "none")
+      setNotes(row.notes || "")
+      setFile(null)
+    },
+    [docByWeekYear, hasGraceOverride]
+  )
 
   const handleSave = async () => {
     if (readOnly) {
@@ -559,9 +534,8 @@ export function KssRosterTable({
     })
   }
 
-  const handleDownload = async (doc: KssDocument, row: KssRosterEntry, presenterName: string) => {
+  const handleDownload = useCallback(async (doc: KssDocument, row: KssRosterEntry, presenterName: string) => {
     if (!doc.signed_url) return
-    setDownloadingId(doc.id)
     const toastId = toast.loading("Preparing download...")
     try {
       const anchor = document.createElement("a")
@@ -576,10 +550,8 @@ export function KssRosterTable({
     } catch (error: unknown) {
       toast.dismiss(toastId)
       toast.error(error instanceof Error ? error.message : "Failed to download file")
-    } finally {
-      setDownloadingId((current) => (current === doc.id ? null : current))
     }
-  }
+  }, [])
 
   const saveLabel =
     uploadPhase === "converting"
@@ -592,13 +564,239 @@ export function KssRosterTable({
             ? "Save Changes"
             : "Add KSS"
 
+  const getTimeType = useCallback(
+    (row: KssRosterEntry) => {
+      const compare = compareWeekYear(
+        row.meeting_week,
+        row.meeting_year,
+        currentOfficeWeek.week,
+        currentOfficeWeek.year
+      )
+      if (compare === 0) return "current"
+      if (compare < 0) return "past"
+      return "upcoming"
+    },
+    [currentOfficeWeek.week, currentOfficeWeek.year]
+  )
+
+  const stats = useMemo(() => {
+    const total = rows.length
+    const current = rows.filter((row) => getTimeType(row) === "current").length
+    const past = rows.filter((row) => getTimeType(row) === "past").length
+    const upcoming = rows.filter((row) => getTimeType(row) === "upcoming").length
+
+    return { total, current, past, upcoming }
+  }, [getTimeType, rows])
+
+  const departmentOptions = useMemo(
+    () =>
+      departments.map((dept) => ({
+        value: dept,
+        label: dept,
+      })),
+    [departments]
+  )
+
+  const weekFilterOptions = useMemo(
+    () =>
+      weekOptions.map((week) => ({
+        value: String(week),
+        label: `Week ${week}`,
+      })),
+    [weekOptions]
+  )
+
+  const yearFilterOptions = useMemo(
+    () =>
+      yearOptions.map((year) => ({
+        value: String(year),
+        label: String(year),
+      })),
+    [yearOptions]
+  )
+
+  const timeTypeOptions = useMemo(
+    () => [
+      { value: "current", label: "Current" },
+      { value: "past", label: "Past" },
+      { value: "upcoming", label: "Upcoming" },
+    ],
+    []
+  )
+
+  const columns = useMemo<DataTableColumn<KssRosterEntry>[]>(
+    () => [
+      {
+        key: "department",
+        label: "Department",
+        sortable: true,
+        accessor: (row) => row.department,
+        resizable: true,
+        initialWidth: 200,
+      },
+      {
+        key: "presenter",
+        label: "Presenter",
+        sortable: true,
+        accessor: (row) => (row.presenter_id ? employeeNameById.get(row.presenter_id) || "Unknown" : "-"),
+        render: (row) => (row.presenter_id ? employeeNameById.get(row.presenter_id) || "Unknown" : "-"),
+      },
+      {
+        key: "meeting_date",
+        label: "Meeting Date",
+        sortable: true,
+        accessor: (row) =>
+          row.meeting_date || docByWeekYear.get(`${row.meeting_year}-${row.meeting_week}`)?.meeting_date || "",
+        render: (row) =>
+          formatMeetingDate(
+            row.meeting_date || docByWeekYear.get(`${row.meeting_year}-${row.meeting_week}`)?.meeting_date
+          ),
+      },
+      {
+        key: "meeting_week",
+        label: "Week",
+        sortable: true,
+        accessor: (row) => row.meeting_week,
+        render: (row) => <span className="font-medium">{`W${row.meeting_week}`}</span>,
+      },
+      {
+        key: "meeting_year",
+        label: "Year",
+        sortable: true,
+        accessor: (row) => row.meeting_year,
+      },
+      {
+        key: "submitted_by",
+        label: "Submitted By",
+        accessor: (row) => (row.created_by ? employeeNameById.get(row.created_by) || "Unknown" : "-"),
+        render: (row) => (row.created_by ? employeeNameById.get(row.created_by) || "Unknown" : "-"),
+      },
+      {
+        key: "created_at",
+        label: "Submitted Date",
+        sortable: true,
+        accessor: (row) => row.created_at,
+        resizable: true,
+        initialWidth: 220,
+        render: (row) =>
+          new Date(row.created_at).toLocaleString("en-GB", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+      },
+    ],
+    [docByWeekYear, employeeNameById]
+  )
+
+  const filters = useMemo<DataTableFilter<KssRosterEntry>[]>(
+    () => [
+      {
+        key: "department",
+        label: "Department",
+        options: departmentOptions,
+      },
+      {
+        key: "meeting_week",
+        label: "Week",
+        options: weekFilterOptions,
+      },
+      {
+        key: "meeting_year",
+        label: "Year",
+        options: yearFilterOptions,
+      },
+      {
+        key: "time_type",
+        label: "Time Type",
+        mode: "custom",
+        options: timeTypeOptions,
+        multi: true,
+        filterFn: (row, value) => {
+          const timeType = getTimeType(row)
+          if (Array.isArray(value)) {
+            return value.includes(timeType)
+          }
+          return timeType === value
+        },
+      },
+    ],
+    [departmentOptions, getTimeType, timeTypeOptions, weekFilterOptions, yearFilterOptions]
+  )
+
+  const rowActions = useMemo(() => {
+    const actions = []
+    if (enableScoring && currentUserId) {
+      actions.push({
+        label: "Score",
+        onClick: (row: KssRosterEntry) => {
+          if (!row.presenter_id || row.presenter_id === currentUserId) {
+            toast.error("You can only score another presenter")
+            return
+          }
+          openScoreDialog(row)
+        },
+      })
+    }
+    if (!readOnly) {
+      actions.push({
+        label: "Edit",
+        icon: Pencil,
+        onClick: (row: KssRosterEntry) => {
+          const doc = docByWeekYear.get(`${row.meeting_year}-${row.meeting_week}`)
+          if (row.is_locked && doc) {
+            toast.error(`Week ${row.meeting_week}, ${row.meeting_year} is locked and can no longer be edited`)
+            return
+          }
+          openEdit(row)
+        },
+      })
+      actions.push({
+        label: "Delete",
+        icon: Trash2,
+        variant: "destructive" as const,
+        onClick: (row: KssRosterEntry) => {
+          if (row.is_locked) {
+            toast.error(`Week ${row.meeting_week}, ${row.meeting_year} is locked and can no longer be changed`)
+            return
+          }
+          setPendingDeleteRow(row)
+        },
+      })
+    }
+    actions.push({
+      label: "Download",
+      icon: Download,
+      onClick: (row: KssRosterEntry) => {
+        const doc = docByWeekYear.get(`${row.meeting_year}-${row.meeting_week}`)
+        const presenterName = row.presenter_id ? employeeNameById.get(row.presenter_id) || "Unknown" : "-"
+        if (!doc?.signed_url) {
+          toast.error("No uploaded KSS file is available for this week")
+          return
+        }
+        void handleDownload(doc, row, presenterName)
+      },
+    })
+    return actions
+  }, [
+    currentUserId,
+    docByWeekYear,
+    employeeNameById,
+    enableScoring,
+    handleDownload,
+    openEdit,
+    openScoreDialog,
+    readOnly,
+  ])
+
   return (
-    <TablePage
+    <DataTablePage
       title={title}
       description="Manage KSS roster and uploaded files by week."
       icon={Presentation}
-      backLinkHref={backHref}
-      backLinkLabel={backLabel}
+      backLink={{ href: backHref, label: backLabel }}
       actions={
         readOnly ? null : (
           <Button
@@ -613,86 +811,36 @@ export function KssRosterTable({
           </Button>
         )
       }
-      filters={
-        <div className="space-y-4">
-          <div className="relative w-full">
-            <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-            <Input
-              placeholder="Search by department, presenter, week, or year..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-5">
-            <div className="space-y-2">
-              <Label>Department</Label>
-              <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All departments" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All departments</SelectItem>
-                  {departments.map((dept) => (
-                    <SelectItem key={dept} value={dept}>
-                      {dept}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Week</Label>
-              <Select value={weekFilter} onValueChange={setWeekFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All weeks" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All weeks</SelectItem>
-                  {weekOptions.map((w) => (
-                    <SelectItem key={w} value={String(w)}>
-                      Week {w}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Year</Label>
-              <Select value={yearFilter} onValueChange={setYearFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All years" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All years</SelectItem>
-                  {yearOptions.map((y) => (
-                    <SelectItem key={y} value={String(y)}>
-                      {y}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="col-span-2 space-y-2 md:col-span-1 lg:col-span-2">
-              <Label>Time Type</Label>
-              <SearchableMultiSelect
-                label="Time Type"
-                values={timeTypeFilter}
-                options={[
-                  { value: "current", label: "Current" },
-                  { value: "past", label: "Past" },
-                  { value: "upcoming", label: "Upcoming" },
-                ]}
-                onChange={setTimeTypeFilter}
-                placeholder="Time Type"
-                searchPlaceholder="Search time type..."
-              />
-            </div>
-          </div>
+      stats={
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard
+            title="KSS Rows"
+            value={stats.total}
+            icon={Presentation}
+            iconBgColor="bg-blue-500/10"
+            iconColor="text-blue-500"
+          />
+          <StatCard
+            title="Current"
+            value={stats.current}
+            icon={CalendarDays}
+            iconBgColor="bg-emerald-500/10"
+            iconColor="text-emerald-500"
+          />
+          <StatCard
+            title="Past"
+            value={stats.past}
+            icon={FileText}
+            iconBgColor="bg-amber-500/10"
+            iconColor="text-amber-500"
+          />
+          <StatCard
+            title="Upcoming"
+            value={stats.upcoming}
+            icon={ShieldAlert}
+            iconBgColor="bg-violet-500/10"
+            iconColor="text-violet-500"
+          />
         </div>
       }
     >
@@ -860,6 +1008,11 @@ export function KssRosterTable({
                     This week is locked after the meeting grace window, so past KSS records are read-only.
                   </p>
                 ) : null}
+                {hasGraceOverride && editingId && isSelectedWeekLocked ? (
+                  <p className="text-xs text-amber-700 dark:text-amber-300">
+                    Override active: you are editing this KSS entry outside the normal grace period.
+                  </p>
+                ) : null}
                 {canUploadMissingForLockedWeek ? (
                   <p className="text-muted-foreground text-xs">
                     This week is locked. You can only upload the missing KSS file for the existing roster entry.
@@ -974,125 +1127,96 @@ export function KssRosterTable({
             </div>
           </DialogContent>
         </Dialog>
-
-        <Card>
-          <CardContent className="pt-6">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>S/N</TableHead>
-                  <TableHead>Department</TableHead>
-                  <TableHead>Presenter</TableHead>
-                  <TableHead>Meeting Date</TableHead>
-                  <TableHead>Week</TableHead>
-                  <TableHead>Submitted By</TableHead>
-                  <TableHead>Submitted Date</TableHead>
-                  <TableHead>Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isRosterLoading || isDocsLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={8} className="p-4">
-                      <TableSkeleton rows={4} cols={8} />
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  rows.map((row, index) => {
-                    const doc = docByWeekYear.get(`${row.meeting_year}-${row.meeting_week}`)
-                    const presenterName = row.presenter_id ? employeeNameById.get(row.presenter_id) || "Unknown" : "-"
-                    const isActionLocked = Boolean(row.is_locked)
-                    const canUploadMissing = isActionLocked && !doc
-                    const submittedBy = row.created_by ? employeeNameById.get(row.created_by) || "Unknown" : "-"
-                    const submittedDate = row.created_at
-                      ? new Date(row.created_at).toLocaleString("en-GB", {
-                          day: "2-digit",
-                          month: "short",
-                          year: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })
-                      : "-"
-
-                    return (
-                      <TableRow key={row.id}>
-                        <TableCell>{index + 1}</TableCell>
-                        <TableCell>{row.department}</TableCell>
-                        <TableCell>{presenterName}</TableCell>
-                        <TableCell>{formatMeetingDate(row.meeting_date || doc?.meeting_date)}</TableCell>
-                        <TableCell className="font-medium">{`W${row.meeting_week}`}</TableCell>
-                        <TableCell>{submittedBy}</TableCell>
-                        <TableCell>{submittedDate}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1">
-                            {enableScoring &&
-                            currentUserId &&
-                            row.presenter_id &&
-                            row.presenter_id !== currentUserId ? (
-                              <>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => openScoreDialog(row)}
-                                  title="Score presenter"
-                                  className="h-8 px-2"
-                                >
-                                  {myScoresByRosterId.has(row.id) ? "Update score" : "Score"}
-                                </Button>
-                                {myScoresByRosterId.has(row.id) ? (
-                                  <Badge variant="outline">{`My score: ${myScoresByRosterId.get(row.id)?.score ?? 0}`}</Badge>
-                                ) : null}
-                              </>
-                            ) : null}
-                            {!readOnly && (!isActionLocked || canUploadMissing) ? (
-                              <Button variant="ghost" size="icon" onClick={() => openEdit(row)} title="Edit">
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                            ) : null}
-                            {!readOnly && !isActionLocked ? (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => setPendingDeleteRow(row)}
-                                title="Delete"
-                              >
-                                <Trash2 className="h-4 w-4 text-red-600" />
-                              </Button>
-                            ) : null}
-                            {doc?.signed_url ? (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                title="Download"
-                                onClick={() => handleDownload(doc, row, presenterName)}
-                                disabled={downloadingId === doc.id}
-                              >
-                                <Download className="h-4 w-4" />
-                              </Button>
-                            ) : (
-                              <Button variant="ghost" size="icon" disabled title="Download">
-                                <Download className="h-4 w-4" />
-                              </Button>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })
-                )}
-
-                {!isRosterLoading && !isDocsLoading && rows.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={8} className="text-muted-foreground py-8 text-center">
-                      No rows found for current filters.
-                    </TableCell>
-                  </TableRow>
-                ) : null}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+        <DataTable<KssRosterEntry>
+          data={rows}
+          columns={columns}
+          filters={filters}
+          getRowId={(row) => row.id}
+          searchPlaceholder="Search department, presenter, week, or year..."
+          searchFn={(row, query) => {
+            const normalizedQuery = query.toLowerCase()
+            const presenterName = row.presenter_id ? (employeeNameById.get(row.presenter_id) || "").toLowerCase() : ""
+            return (
+              row.department.toLowerCase().includes(normalizedQuery) ||
+              presenterName.includes(normalizedQuery) ||
+              String(row.meeting_week).includes(normalizedQuery) ||
+              String(row.meeting_year).includes(normalizedQuery)
+            )
+          }}
+          isLoading={isRosterLoading || isDocsLoading}
+          error={
+            rosterError instanceof Error ? rosterError.message : docsError instanceof Error ? docsError.message : null
+          }
+          onRetry={() => {
+            void Promise.all([refetchRoster(), refetchDocs()])
+          }}
+          rowActions={rowActions}
+          expandable={{
+            render: (row) => {
+              const doc = docByWeekYear.get(`${row.meeting_year}-${row.meeting_week}`)
+              const presenterName = row.presenter_id ? employeeNameById.get(row.presenter_id) || "Unknown" : "-"
+              const submittedBy = row.created_by ? employeeNameById.get(row.created_by) || "Unknown" : "-"
+              return (
+                <div className="grid gap-4 md:grid-cols-4">
+                  <div className="rounded-lg border p-4">
+                    <p className="text-muted-foreground text-xs tracking-wide uppercase">Presenter</p>
+                    <p className="mt-2 text-sm">{presenterName}</p>
+                  </div>
+                  <div className="rounded-lg border p-4">
+                    <p className="text-muted-foreground text-xs tracking-wide uppercase">Submitted By</p>
+                    <p className="mt-2 text-sm">{submittedBy}</p>
+                  </div>
+                  <div className="rounded-lg border p-4">
+                    <p className="text-muted-foreground text-xs tracking-wide uppercase">Notes</p>
+                    <p className="mt-2 text-sm">{row.notes || "No notes added"}</p>
+                  </div>
+                  <div className="rounded-lg border p-4">
+                    <p className="text-muted-foreground text-xs tracking-wide uppercase">Document</p>
+                    <p className="mt-2 text-sm">
+                      {doc?.file_name || "No file uploaded"}
+                      {hasGraceOverride && row.is_outside_grace_window ? " • Override used" : ""}
+                    </p>
+                    {enableScoring && myScoresByRosterId.has(row.id) ? (
+                      <p className="mt-2 text-xs">{`My score: ${myScoresByRosterId.get(row.id)?.score ?? 0}`}</p>
+                    ) : null}
+                  </div>
+                </div>
+              )
+            },
+          }}
+          viewToggle
+          cardRenderer={(row) => {
+            const presenterName = row.presenter_id ? employeeNameById.get(row.presenter_id) || "Unknown" : "-"
+            const doc = docByWeekYear.get(`${row.meeting_year}-${row.meeting_week}`)
+            return (
+              <div className="space-y-3 rounded-xl border p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-medium">{row.department}</p>
+                    <p className="text-muted-foreground text-sm">{presenterName}</p>
+                  </div>
+                  <Badge variant="outline">{getTimeType(row)}</Badge>
+                </div>
+                <div className="grid gap-1 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Week</span>
+                    <span>{`W${row.meeting_week} ${row.meeting_year}`}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">File</span>
+                    <span>{doc ? "Uploaded" : "Pending"}</span>
+                  </div>
+                </div>
+              </div>
+            )
+          }}
+          emptyTitle="No KSS rows found"
+          emptyDescription="No KSS rows matched the current filters."
+          emptyIcon={Presentation}
+          skeletonRows={5}
+          urlSync
+        />
       </div>
-    </TablePage>
+    </DataTablePage>
   )
 }

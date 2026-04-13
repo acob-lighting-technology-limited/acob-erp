@@ -3,7 +3,6 @@ import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { logger } from "@/lib/logger"
-import { resolveAutoLinkedGoalId } from "@/lib/performance/goal-linking"
 import {
   canAssignTasks,
   canAssignToDepartment,
@@ -21,10 +20,8 @@ const UpdateTaskSchema = z.object({
   status: z.enum(["pending", "in_progress", "completed", "cancelled"]).optional(),
   due_date: z.string().optional().nullable(),
   department: z.string().optional().nullable(),
-  assignment_type: z.enum(["individual", "multiple", "department"]).optional(),
+  assignment_type: z.enum(["individual", "department"]).optional(),
   assigned_to: z.string().uuid().optional().nullable(),
-  assigned_users: z.array(z.string().uuid()).optional(),
-  project_id: z.string().uuid().optional().nullable(),
   goal_id: z.string().uuid().optional().nullable(),
   task_start_date: z.string().optional().nullable(),
   task_end_date: z.string().optional().nullable(),
@@ -69,7 +66,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
         department?: string | null
         assignment_type?: string | null
         assigned_to?: string | null
-        source_type?: "manual" | "project_task" | "help_desk" | null
+        source_type?: "manual" | "help_desk" | null
         goal_id?: string | null
       }>()
 
@@ -81,14 +78,9 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     const finalAssignedTo =
       finalAssignmentType === "individual" ? (payload.assigned_to ?? existingTask.assigned_to ?? null) : null
     let finalDepartment = payload.department ?? existingTask.department ?? null
-    const finalSourceType = payload.project_id ? "project_task" : existingTask.source_type || "manual"
-    const finalTitle = payload.title ?? existingTask.title ?? null
 
     const assignmentFieldsTouched =
-      payload.assignment_type !== undefined ||
-      payload.assigned_to !== undefined ||
-      payload.assigned_users !== undefined ||
-      payload.department !== undefined
+      payload.assignment_type !== undefined || payload.assigned_to !== undefined || payload.department !== undefined
 
     if (assignmentFieldsTouched && finalAssignmentType === "individual") {
       if (!finalAssignedTo) {
@@ -112,28 +104,6 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       finalDepartment = assignee.department || finalDepartment
     }
 
-    if (assignmentFieldsTouched && finalAssignmentType === "multiple") {
-      const nextAssignedUsers = payload.assigned_users
-      if (!nextAssignedUsers || nextAssignedUsers.length === 0) {
-        return NextResponse.json({ error: "At least one assignee is required for group tasks" }, { status: 400 })
-      }
-
-      const { data: assignees } = await supabase.from("profiles").select("id, department").in("id", nextAssignedUsers)
-
-      const typedAssignees = (assignees || []) as TaskAssignmentTargetProfile[]
-      if (typedAssignees.length !== nextAssignedUsers.length) {
-        return NextResponse.json({ error: "One or more selected assignees were not found" }, { status: 400 })
-      }
-
-      const invalidAssignee = typedAssignees.find((assignee) => !canAssignToProfile(assignerProfile, assignee))
-      if (invalidAssignee) {
-        return NextResponse.json({ error: "You can only assign tasks within your approved scope" }, { status: 403 })
-      }
-
-      const departments = Array.from(new Set(typedAssignees.map((assignee) => assignee.department).filter(Boolean)))
-      finalDepartment = departments.length === 1 ? departments[0] || finalDepartment : finalDepartment
-    }
-
     if (assignmentFieldsTouched && finalAssignmentType === "department") {
       if (!finalDepartment) {
         return NextResponse.json({ error: "Department is required for department tasks" }, { status: 400 })
@@ -151,28 +121,8 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       updatePayload.department = finalDepartment
     }
 
-    const autoGoalId =
-      finalAssignmentType === "individual"
-        ? await resolveAutoLinkedGoalId({
-            supabase,
-            actorId: user.id,
-            assignedTo: finalAssignedTo,
-            department: finalDepartment,
-            sourceType:
-              finalSourceType === "help_desk"
-                ? "help_desk"
-                : finalSourceType === "project_task"
-                  ? "project_task"
-                  : "manual",
-            title: finalTitle,
-            explicitGoalId: payload.goal_id ?? null,
-          })
-        : (payload.goal_id ?? null)
-
     if (payload.goal_id !== undefined) {
       updatePayload.goal_id = payload.goal_id
-    } else {
-      updatePayload.goal_id = autoGoalId
     }
 
     const { data: updatedTask, error } = await supabase
@@ -184,15 +134,6 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
     if (error || !updatedTask) {
       return NextResponse.json({ error: error?.message || "Failed to update task" }, { status: 500 })
-    }
-
-    if (payload.assigned_users) {
-      await supabase.from("task_assignments").delete().eq("task_id", params.id)
-      if (payload.assigned_users.length > 0) {
-        await supabase
-          .from("task_assignments")
-          .insert(payload.assigned_users.map((userId) => ({ task_id: params.id, user_id: userId })))
-      }
     }
 
     await writeAuditLog(

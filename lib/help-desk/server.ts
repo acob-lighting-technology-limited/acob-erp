@@ -2,7 +2,6 @@ import { createClient } from "@/lib/supabase/server"
 import { resolveAdminScope } from "@/lib/admin/rbac"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { BUSINESS_HOUR_START, BUSINESS_HOUR_END, HELP_DESK_SLA } from "@/lib/org-config"
-import { resolveAutoLinkedGoalId } from "@/lib/performance/goal-linking"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import type { SupabaseClient } from "@supabase/supabase-js"
 
@@ -339,6 +338,7 @@ export async function syncHelpDeskTicketTask(params: {
     source_id: params.ticket.id,
     assignment_type: assignmentType,
     work_item_number: params.ticket.ticket_number?.startsWith("TSK-") ? params.ticket.ticket_number : null,
+    goal_id: null,
   }
 
   const { data: syncedTask, error } = existingTask
@@ -364,21 +364,6 @@ export async function syncHelpDeskTicketTask(params: {
 
   if (Object.keys(ticketUpdates).length > 0) {
     await dataClient.from("help_desk_tickets").update(ticketUpdates).eq("id", params.ticket.id)
-  }
-
-  if (params.ticket.assigned_to) {
-    const autoGoalId = await resolveAutoLinkedGoalId({
-      supabase: dataClient as unknown as SupabaseClient,
-      actorId: params.actorId,
-      assignedTo: params.ticket.assigned_to,
-      department: params.ticket.service_department || params.ticket.requester_department || null,
-      sourceType: "help_desk",
-      title: params.ticket.title,
-    })
-
-    if (autoGoalId) {
-      await dataClient.from("tasks").update({ goal_id: autoGoalId }).eq("id", syncedTask.id)
-    }
   }
 
   return {

@@ -5,7 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ClipboardList, Search } from "lucide-react"
 
-type TaskAssignmentTab = "individual" | "department" | "multiple"
+type TaskAssignmentTab = "individual" | "department"
 
 interface UserTasksHeaderProps {
   searchQuery: string
@@ -46,10 +46,9 @@ export function UserTasksHeader({
       </Tabs>
 
       <Tabs value={assignmentFilter} onValueChange={(value) => setAssignmentFilter(value as TaskAssignmentTab)}>
-        <TabsList className="grid w-full max-w-md grid-cols-3">
+        <TabsList className="grid w-full max-w-sm grid-cols-2">
           <TabsTrigger value="individual">Individual</TabsTrigger>
           <TabsTrigger value="department">Dept</TabsTrigger>
-          <TabsTrigger value="multiple">Group</TabsTrigger>
         </TabsList>
       </Tabs>
 
@@ -59,7 +58,7 @@ export function UserTasksHeader({
           <Input
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
-            placeholder="Search by task, project, or work item"
+            placeholder="Search by task or work item"
             className="pl-10"
           />
         </div>

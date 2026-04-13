@@ -9,7 +9,7 @@ import { canAssignRole as canAssignManagedRole } from "@/lib/role-management"
  * 4. employee - Regular employees
  * 5. visitor - Read-only guest access
  *
- * Department leadership is a SEPARATE concern — see is_department_lead + lead_departments.
+ * Department leadership is a SEPARATE concern — see is_department_lead + department.
  * A user of ANY role can be a department lead.
  */
 
@@ -28,10 +28,11 @@ export function isDepartmentLead(profile: { is_department_lead?: boolean } | nul
 
 /** Check if a department lead manages a specific department */
 export function isLeadOfDepartment(
-  profile: { is_department_lead?: boolean; lead_departments?: string[] } | null | undefined,
+  profile: { is_department_lead?: boolean; lead_departments?: string[]; department?: string | null } | null | undefined,
   department: string
 ): boolean {
   if (!isDepartmentLead(profile)) return false
+  if (profile?.department === department) return true
   return Array.isArray(profile?.lead_departments) && profile.lead_departments.includes(department)
 }
 

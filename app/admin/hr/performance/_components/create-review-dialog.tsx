@@ -74,6 +74,7 @@ interface CreateReviewDialogProps {
   initialUserId?: string
   initialCycleId?: string
   initialDepartment?: string
+  initialStatus?: "draft" | "submitted" | "completed"
 }
 
 async function fetchPerformanceCreateData(supabase: ReturnType<typeof createClient>): Promise<PerformanceCreateData> {
@@ -138,6 +139,7 @@ export function CreateReviewDialog({
   initialUserId = "",
   initialCycleId = "",
   initialDepartment = "",
+  initialStatus = "draft",
 }: CreateReviewDialogProps) {
   const supabase = createClient()
   const [saving, setSaving] = useState(false)
@@ -153,6 +155,7 @@ export function CreateReviewDialog({
     kpi_score: 0,
     cbt_score: 0,
     attendance_score: 0,
+    status: "draft" as "draft" | "submitted" | "completed",
   })
   const [competencies, setCompetencies] = useState<BehaviourCompetencies>({
     collaboration: 0,
@@ -241,6 +244,7 @@ export function CreateReviewDialog({
       kpi_score: 0,
       cbt_score: 0,
       attendance_score: 0,
+      status: initialStatus,
     })
     setCompetencies({
       collaboration: 0,
@@ -250,7 +254,7 @@ export function CreateReviewDialog({
       loyalty: 0,
       professional_conduct: 0,
     })
-  }, [open, initialDepartment, initialUserId, initialCycleId])
+  }, [open, initialDepartment, initialUserId, initialCycleId, initialStatus])
 
   useEffect(() => {
     if (!open || !formData.user_id || !formData.review_cycle_id) return
@@ -416,7 +420,8 @@ export function CreateReviewDialog({
                     {loadingScore ? <Loader2 className="text-muted-foreground h-4 w-4 animate-spin" /> : null}
                   </CardTitle>
                   <CardDescription>
-                    Complete the review details. Existing values are pre-filled when available for this quarter.
+                    Complete the review details. Existing values are pre-filled when available for this quarter, but
+                    manual score entry is still allowed for now.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
@@ -455,6 +460,23 @@ export function CreateReviewDialog({
                             setFormData((prev) => ({ ...prev, attendance_score: clampScore(Number(e.target.value)) }))
                           }
                         />
+                      </FormFieldGroup>
+                      <FormFieldGroup label="Status">
+                        <Select
+                          value={formData.status}
+                          onValueChange={(value: "draft" | "submitted" | "completed") =>
+                            setFormData((prev) => ({ ...prev, status: value }))
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="draft">Draft</SelectItem>
+                            <SelectItem value="submitted">Submitted</SelectItem>
+                            <SelectItem value="completed">Completed</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </FormFieldGroup>
                     </div>
                   </div>
@@ -522,7 +544,7 @@ export function CreateReviewDialog({
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={saving || !isSelectionComplete}>
+              <Button type="submit" disabled={saving || !isSelectionComplete} loading={saving}>
                 Save Review
               </Button>
             </div>

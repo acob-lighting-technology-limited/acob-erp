@@ -96,22 +96,18 @@ function mergeDuplicateReviews(reviews: Review[]): Review[] {
     const attendanceScore = latestValue((review) => review.attendance_score)
     const behaviourScore = latestValue((review) => review.behaviour_score)
 
-    const hasAllComponents =
-      kpiScore !== null && cbtScore !== null && attendanceScore !== null && behaviourScore !== null
+    const metricParts = [
+      { value: kpiScore, weight: 70 },
+      { value: cbtScore, weight: 10 },
+      { value: attendanceScore, weight: 10 },
+      { value: behaviourScore, weight: 10 },
+    ].filter((item): item is { value: number; weight: number } => item.value !== null)
 
-    let computedFinal: number | null = null
-    if (hasAllComponents) {
-      if (cbtScore === 0) {
-        const weights = { kpi: 70 / 90, attendance: 10 / 90, behaviour: 10 / 90 }
-        computedFinal =
-          Math.round(
-            (kpiScore * weights.kpi + attendanceScore * weights.attendance + behaviourScore * weights.behaviour) * 100
-          ) / 100
-      } else {
-        computedFinal =
-          Math.round((kpiScore * 0.7 + cbtScore * 0.1 + attendanceScore * 0.1 + behaviourScore * 0.1) * 100) / 100
-      }
-    }
+    const totalWeight = metricParts.reduce((sum, item) => sum + item.weight, 0)
+    const computedFinal =
+      totalWeight > 0
+        ? Math.round((metricParts.reduce((sum, item) => sum + item.value * item.weight, 0) / totalWeight) * 100) / 100
+        : null
 
     return {
       ...canonical,
@@ -142,15 +138,15 @@ async function getReviewsData() {
     return { redirect: "/auth/login" as const }
   }
 
-  let reviews: Awaited<ReturnType<typeof getUnifiedPerformanceReviews>> = []
+  let reviewRows: UnifiedReviewRow[] = []
   try {
-    reviews = await getUnifiedPerformanceReviews(supabase, { userId: user.id })
+    const result = await getUnifiedPerformanceReviews(supabase, { userId: user.id, limit: 200 })
+    reviewRows = result.reviews
   } catch (error) {
     log.error("Error loading reviews:", error)
     return { reviews: [] as Review[] }
   }
 
-  const reviewRows = (reviews || []) as Array<UnifiedReviewRow>
   if (reviewRows.length === 0) {
     return { reviews: [] as Review[] }
   }

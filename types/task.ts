@@ -1,6 +1,6 @@
 export type TaskStatus = "pending" | "in_progress" | "completed" | "cancelled"
-export type TaskSourceType = "manual" | "help_desk" | "action_item" | "project_task"
-export type TaskAssignmentType = "individual" | "multiple" | "department"
+export type TaskSourceType = "manual" | "help_desk" | "action_item"
+export type TaskAssignmentType = "individual" | "department"
 
 export interface TaskPersonSummary {
   id: string
@@ -27,18 +27,12 @@ export interface Task {
   assigned_to?: string | null
   assigned_by?: string | null
   department?: string | null
-  project_id?: string | null
   goal_id?: string | null
   task_start_date?: string | null
   task_end_date?: string | null
   assigned_to_user?: TaskPersonSummary
   assigned_by_user?: Omit<TaskPersonSummary, "id" | "completed">
-  assigned_users?: TaskPersonSummary[]
-  user_completed?: boolean
   can_change_status?: boolean
-  project?: {
-    project_name: string
-  }
 }
 
 export interface TaskUserProfile {
