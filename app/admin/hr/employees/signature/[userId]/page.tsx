@@ -44,7 +44,7 @@ export default async function AdminEmployeeSignaturePage({ params }: { params: {
           <p className="text-muted-foreground">View and manage signature for this employee</p>
         </div>
 
-        <SignatureCreator profile={profile} variant="selectable" />
+        <SignatureCreator profile={profile} variant="selectable" defaultSelectableMode="anniversary" />
       </div>
     </div>
   )

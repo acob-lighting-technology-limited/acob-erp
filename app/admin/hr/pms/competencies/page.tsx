@@ -1,17 +1,17 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
-import { BookOpen, Loader2, Plus, Pencil, Trash2, ToggleLeft, ToggleRight } from "lucide-react"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { BookOpen, Pencil, Plus, ToggleLeft, ToggleRight, Trash2 } from "lucide-react"
 import { toast } from "sonner"
-import { PageHeader, PageWrapper } from "@/components/layout"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { DataTable, DataTablePage } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter, RowAction } from "@/components/ui/data-table"
+import { StatCard } from "@/components/ui/stat-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
   Dialog,
   DialogContent,
@@ -31,53 +31,122 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 
+type CompetencyCategory = "behaviour" | "leadership" | "core"
+
 type Competency = {
   id: string
   key: string
   label: string
   description: string | null
-  category: "behaviour" | "leadership" | "core"
+  category: CompetencyCategory
   is_active: boolean
   sort_order: number
   created_at: string
 }
 
-const CATEGORY_LABELS: Record<string, string> = {
+const CATEGORY_LABELS: Record<CompetencyCategory, string> = {
   behaviour: "Behaviour",
   leadership: "Leadership",
   core: "Core",
 }
 
-const CATEGORY_VARIANTS: Record<string, "default" | "secondary" | "outline"> = {
+const CATEGORY_VARIANTS: Record<CompetencyCategory, "default" | "secondary" | "outline"> = {
   behaviour: "default",
   leadership: "secondary",
   core: "outline",
 }
 
+function formatDate(date: string) {
+  return new Date(date).toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  })
+}
+
+function CompetencyStatusBadge({ isActive }: { isActive: boolean }) {
+  return <Badge variant={isActive ? "default" : "outline"}>{isActive ? "Active" : "Inactive"}</Badge>
+}
+
+function CompetencyCard({
+  competency,
+  onEdit,
+  onToggle,
+  onDelete,
+}: {
+  competency: Competency
+  onEdit: (competency: Competency) => void
+  onToggle: (competency: Competency) => void
+  onDelete: (competency: Competency) => void
+}) {
+  return (
+    <div className="space-y-3 rounded-xl border p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <p className="font-semibold">{competency.label}</p>
+            <CompetencyStatusBadge isActive={competency.is_active} />
+          </div>
+          <code className="bg-muted rounded px-1.5 py-0.5 text-xs">{competency.key}</code>
+        </div>
+        <Badge variant={CATEGORY_VARIANTS[competency.category]}>{CATEGORY_LABELS[competency.category]}</Badge>
+      </div>
+      <p className="text-muted-foreground text-sm">{competency.description || "No description provided."}</p>
+      <div className="grid grid-cols-2 gap-3 text-sm">
+        <div>
+          <p className="text-muted-foreground text-xs">Sort Order</p>
+          <p>{competency.sort_order}</p>
+        </div>
+        <div>
+          <p className="text-muted-foreground text-xs">Created</p>
+          <p>{formatDate(competency.created_at)}</p>
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Button size="sm" variant="outline" onClick={() => onEdit(competency)}>
+          Edit
+        </Button>
+        <Button size="sm" variant="outline" onClick={() => onToggle(competency)}>
+          {competency.is_active ? "Deactivate" : "Activate"}
+        </Button>
+        <Button size="sm" variant="destructive" onClick={() => onDelete(competency)}>
+          Delete
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 export default function AdminCompetenciesPage() {
   const [competencies, setCompetencies] = useState<Competency[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [selected, setSelected] = useState<Competency | null>(null)
 
-  // Form state
   const [key, setKey] = useState("")
   const [label, setLabel] = useState("")
   const [description, setDescription] = useState("")
-  const [category, setCategory] = useState<"behaviour" | "leadership" | "core">("behaviour")
+  const [category, setCategory] = useState<CompetencyCategory>("behaviour")
   const [sortOrder, setSortOrder] = useState("0")
 
   const load = useCallback(async () => {
     setIsLoading(true)
+    setError(null)
     try {
       const res = await fetch("/api/hr/performance/competencies")
-      const data = (await res.json().catch(() => ({}))) as { data?: Competency[] }
+      const data = (await res.json().catch(() => ({}))) as { data?: Competency[]; error?: string }
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to load competencies")
+      }
       setCompetencies(data.data || [])
-    } catch {
-      toast.error("Failed to load competencies")
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to load competencies"
+      setError(message)
+      toast.error(message)
     } finally {
       setIsLoading(false)
     }
@@ -87,31 +156,37 @@ export default function AdminCompetenciesPage() {
     void load()
   }, [load])
 
-  function openCreate() {
+  function resetForm() {
     setKey("")
     setLabel("")
     setDescription("")
     setCategory("behaviour")
     setSortOrder("0")
+    setSelected(null)
+  }
+
+  function openCreate() {
+    resetForm()
     setIsCreateOpen(true)
   }
 
-  function openEdit(c: Competency) {
-    setSelected(c)
-    setLabel(c.label)
-    setDescription(c.description || "")
-    setCategory(c.category)
-    setSortOrder(String(c.sort_order))
+  function openEdit(competency: Competency) {
+    setSelected(competency)
+    setKey(competency.key)
+    setLabel(competency.label)
+    setDescription(competency.description || "")
+    setCategory(competency.category)
+    setSortOrder(String(competency.sort_order))
     setIsEditOpen(true)
   }
 
-  function openDelete(c: Competency) {
-    setSelected(c)
+  function openDelete(competency: Competency) {
+    setSelected(competency)
     setIsDeleteOpen(true)
   }
 
-  async function handleCreate(e: React.FormEvent) {
-    e.preventDefault()
+  async function handleCreate(event: React.FormEvent) {
+    event.preventDefault()
     if (!key || !label) {
       toast.error("Key and label are required")
       return
@@ -130,19 +205,22 @@ export default function AdminCompetenciesPage() {
         }),
       })
       const data = (await res.json().catch(() => ({}))) as { error?: string; message?: string }
-      if (!res.ok) throw new Error(data.error || "Failed to create")
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to create competency")
+      }
       toast.success(data.message || "Competency created")
       setIsCreateOpen(false)
+      resetForm()
       void load()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to create")
+      toast.error(err instanceof Error ? err.message : "Failed to create competency")
     } finally {
       setIsSubmitting(false)
     }
   }
 
-  async function handleEdit(e: React.FormEvent) {
-    e.preventDefault()
+  async function handleEdit(event: React.FormEvent) {
+    event.preventDefault()
     if (!selected) return
     setIsSubmitting(true)
     try {
@@ -158,30 +236,35 @@ export default function AdminCompetenciesPage() {
         }),
       })
       const data = (await res.json().catch(() => ({}))) as { error?: string; message?: string }
-      if (!res.ok) throw new Error(data.error || "Failed to update")
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to update competency")
+      }
       toast.success(data.message || "Competency updated")
       setIsEditOpen(false)
+      resetForm()
       void load()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to update")
+      toast.error(err instanceof Error ? err.message : "Failed to update competency")
     } finally {
       setIsSubmitting(false)
     }
   }
 
-  async function handleToggleActive(c: Competency) {
+  async function handleToggleActive(competency: Competency) {
     try {
       const res = await fetch("/api/hr/performance/competencies", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: c.id, is_active: !c.is_active }),
+        body: JSON.stringify({ id: competency.id, is_active: !competency.is_active }),
       })
       const data = (await res.json().catch(() => ({}))) as { error?: string }
-      if (!res.ok) throw new Error(data.error || "Failed to update")
-      toast.success(`Competency ${!c.is_active ? "activated" : "deactivated"}`)
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to update competency")
+      }
+      toast.success(`Competency ${competency.is_active ? "deactivated" : "activated"}`)
       void load()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to update")
+      toast.error(err instanceof Error ? err.message : "Failed to update competency")
     }
   }
 
@@ -191,153 +274,252 @@ export default function AdminCompetenciesPage() {
     try {
       const res = await fetch(`/api/hr/performance/competencies?id=${selected.id}`, { method: "DELETE" })
       const data = (await res.json().catch(() => ({}))) as { error?: string; message?: string }
-      if (!res.ok) throw new Error(data.error || "Failed to delete")
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to delete competency")
+      }
       toast.success(data.message || "Competency deleted")
       setIsDeleteOpen(false)
+      resetForm()
       void load()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to delete")
+      toast.error(err instanceof Error ? err.message : "Failed to delete competency")
     } finally {
       setIsSubmitting(false)
     }
   }
 
-  const activeCount = competencies.filter((c) => c.is_active).length
+  const categoryOptions = useMemo(
+    () =>
+      Object.entries(CATEGORY_LABELS).map(([value, labelText]) => ({
+        value,
+        label: labelText,
+      })),
+    []
+  )
+
+  const columns: DataTableColumn<Competency>[] = useMemo(
+    () => [
+      {
+        key: "label",
+        label: "Label",
+        sortable: true,
+        accessor: (competency) => competency.label,
+        render: (competency) => <span className="font-medium">{competency.label}</span>,
+        resizable: true,
+        initialWidth: 220,
+      },
+      {
+        key: "key",
+        label: "Key",
+        sortable: true,
+        accessor: (competency) => competency.key,
+        render: (competency) => <code className="bg-muted rounded px-1.5 py-0.5 text-xs">{competency.key}</code>,
+        resizable: true,
+        initialWidth: 180,
+      },
+      {
+        key: "category",
+        label: "Category",
+        sortable: true,
+        accessor: (competency) => competency.category,
+        render: (competency) => (
+          <Badge variant={CATEGORY_VARIANTS[competency.category]}>{CATEGORY_LABELS[competency.category]}</Badge>
+        ),
+      },
+      {
+        key: "sort_order",
+        label: "Order",
+        sortable: true,
+        accessor: (competency) => competency.sort_order,
+        align: "center",
+      },
+      {
+        key: "status",
+        label: "Status",
+        sortable: true,
+        accessor: (competency) => (competency.is_active ? "active" : "inactive"),
+        render: (competency) => <CompetencyStatusBadge isActive={competency.is_active} />,
+      },
+      {
+        key: "description",
+        label: "Description",
+        accessor: (competency) => competency.description || "",
+        render: (competency) => (
+          <span className="text-muted-foreground block max-w-[260px] truncate text-sm">
+            {competency.description || "-"}
+          </span>
+        ),
+        hideOnMobile: true,
+        resizable: true,
+        initialWidth: 260,
+      },
+    ],
+    []
+  )
+
+  const filters: DataTableFilter<Competency>[] = useMemo(
+    () => [
+      {
+        key: "category",
+        label: "Category",
+        options: categoryOptions,
+        placeholder: "All Categories",
+      },
+      {
+        key: "status",
+        label: "Status",
+        options: [
+          { value: "active", label: "Active" },
+          { value: "inactive", label: "Inactive" },
+        ],
+        placeholder: "All Statuses",
+      },
+    ],
+    [categoryOptions]
+  )
+
+  const rowActions: RowAction<Competency>[] = [
+    {
+      label: "Edit",
+      icon: Pencil,
+      onClick: (competency) => openEdit(competency),
+    },
+    {
+      label: "Toggle Status",
+      icon: ToggleRight,
+      onClick: (competency) => void handleToggleActive(competency),
+    },
+    {
+      label: "Delete",
+      icon: Trash2,
+      variant: "destructive",
+      onClick: (competency) => openDelete(competency),
+    },
+  ]
+
+  const activeCount = competencies.filter((competency) => competency.is_active).length
+  const inactiveCount = competencies.length - activeCount
+  const behaviourCount = competencies.filter((competency) => competency.category === "behaviour").length
 
   return (
-    <PageWrapper maxWidth="full" background="gradient">
-      <PageHeader
-        title="Competency Frameworks"
-        description="Manage the behaviour competencies used in performance reviews."
-        icon={BookOpen}
-        backLink={{ href: "/admin/hr/pms", label: "Back to PMS" }}
-        actions={
-          <Button onClick={openCreate} size="sm" className="gap-2">
-            <Plus className="h-4 w-4" />
-            Add Competency
-          </Button>
-        }
+    <DataTablePage
+      title="Competency Frameworks"
+      description="Manage the scoring competencies used across performance reviews."
+      icon={BookOpen}
+      backLink={{ href: "/admin/hr/pms", label: "Back to PMS" }}
+      actions={
+        <Button onClick={openCreate} size="sm" className="gap-2">
+          <Plus className="h-4 w-4" />
+          Add Competency
+        </Button>
+      }
+      stats={
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <StatCard
+            title="Total"
+            value={competencies.length}
+            icon={BookOpen}
+            iconBgColor="bg-blue-500/10"
+            iconColor="text-blue-500"
+          />
+          <StatCard
+            title="Active"
+            value={activeCount}
+            icon={ToggleRight}
+            iconBgColor="bg-emerald-500/10"
+            iconColor="text-emerald-500"
+          />
+          <StatCard
+            title="Inactive"
+            value={inactiveCount}
+            icon={ToggleLeft}
+            iconBgColor="bg-amber-500/10"
+            iconColor="text-amber-500"
+          />
+          <StatCard
+            title="Behaviour"
+            value={behaviourCount}
+            icon={BookOpen}
+            iconBgColor="bg-violet-500/10"
+            iconColor="text-violet-500"
+          />
+        </div>
+      }
+    >
+      <DataTable<Competency>
+        data={competencies}
+        columns={columns}
+        filters={filters}
+        getRowId={(competency) => competency.id}
+        searchPlaceholder="Search competency label, key, or description…"
+        searchFn={(competency, query) => {
+          return [competency.label, competency.key, competency.description || "", competency.category]
+            .join(" ")
+            .toLowerCase()
+            .includes(query)
+        }}
+        isLoading={isLoading}
+        error={error}
+        onRetry={() => void load()}
+        rowActions={rowActions}
+        expandable={{
+          render: (competency) => (
+            <div className="grid gap-4 text-sm sm:grid-cols-3">
+              <div>
+                <p className="text-muted-foreground text-xs">Description</p>
+                <p className="mt-1">{competency.description || "No description provided."}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Category</p>
+                <p className="mt-1">{CATEGORY_LABELS[competency.category]}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Created</p>
+                <p className="mt-1">{formatDate(competency.created_at)}</p>
+              </div>
+            </div>
+          ),
+        }}
+        viewToggle
+        cardRenderer={(competency) => (
+          <CompetencyCard
+            competency={competency}
+            onEdit={openEdit}
+            onToggle={(item) => void handleToggleActive(item)}
+            onDelete={openDelete}
+          />
+        )}
+        emptyTitle="No competencies yet"
+        emptyDescription="Add the first competency to start scoring reviews consistently."
+        emptyIcon={BookOpen}
+        skeletonRows={6}
+        minWidth="920px"
       />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Competencies</CardTitle>
-          <CardDescription>
-            {activeCount} active · {competencies.length} total — these keys appear as scoring fields on every
-            performance review.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="text-muted-foreground flex items-center justify-center gap-2 py-10">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Loading…
-            </div>
-          ) : competencies.length === 0 ? (
-            <p className="text-muted-foreground py-8 text-center text-sm">
-              No competencies found. Add one to get started.
-            </p>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table className="min-w-[700px]">
-                <TableHeader className="bg-emerald-50 dark:bg-emerald-950/30">
-                  <TableRow>
-                    <TableHead className="w-8">Order</TableHead>
-                    <TableHead>Key</TableHead>
-                    <TableHead>Label</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {competencies.map((c) => (
-                    <TableRow key={c.id} className={!c.is_active ? "opacity-50" : ""}>
-                      <TableCell className="text-muted-foreground text-center">{c.sort_order}</TableCell>
-                      <TableCell>
-                        <code className="bg-muted rounded px-1 py-0.5 text-xs">{c.key}</code>
-                      </TableCell>
-                      <TableCell className="font-medium">{c.label}</TableCell>
-                      <TableCell>
-                        <Badge variant={CATEGORY_VARIANTS[c.category] || "outline"}>
-                          {CATEGORY_LABELS[c.category] || c.category}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground max-w-[240px] truncate text-sm">
-                        {c.description || "-"}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={c.is_active ? "default" : "outline"}>
-                          {c.is_active ? "Active" : "Inactive"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex justify-end gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            title={c.is_active ? "Deactivate" : "Activate"}
-                            onClick={() => void handleToggleActive(c)}
-                          >
-                            {c.is_active ? (
-                              <ToggleRight className="h-4 w-4 text-emerald-500" />
-                            ) : (
-                              <ToggleLeft className="text-muted-foreground h-4 w-4" />
-                            )}
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => openEdit(c)}>
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => openDelete(c)}>
-                            <Trash2 className="h-4 w-4 text-red-500" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Create Dialog */}
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Add Competency</DialogTitle>
-            <DialogDescription>
-              Define a new competency that will appear as a scoring field on performance reviews.
-            </DialogDescription>
+            <DialogDescription>Define a new competency that appears as a scoring field on reviews.</DialogDescription>
           </DialogHeader>
-          <form onSubmit={(e) => void handleCreate(e)} className="space-y-4">
+          <form onSubmit={(event) => void handleCreate(event)} className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>Key *</Label>
                 <Input
                   placeholder="e.g. problem_solving"
                   value={key}
-                  onChange={(e) => setKey(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "_"))}
+                  onChange={(event) => setKey(event.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "_"))}
                   required
                 />
-                <p className="text-muted-foreground text-xs">
-                  Lowercase, underscores only. Cannot be changed after creation.
-                </p>
               </div>
               <div className="space-y-2">
                 <Label>Label *</Label>
-                <Input
-                  placeholder="e.g. Problem Solving"
-                  value={label}
-                  onChange={(e) => setLabel(e.target.value)}
-                  required
-                />
+                <Input value={label} onChange={(event) => setLabel(event.target.value)} required />
               </div>
               <div className="space-y-2">
                 <Label>Category</Label>
-                <Select value={category} onValueChange={(v) => setCategory(v as "behaviour" | "leadership" | "core")}>
+                <Select value={category} onValueChange={(value) => setCategory(value as CompetencyCategory)}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -350,50 +532,41 @@ export default function AdminCompetenciesPage() {
               </div>
               <div className="space-y-2">
                 <Label>Sort Order</Label>
-                <Input type="number" min={0} value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} />
+                <Input type="number" min={0} value={sortOrder} onChange={(event) => setSortOrder(event.target.value)} />
               </div>
             </div>
             <div className="space-y-2">
               <Label>Description</Label>
-              <Textarea
-                placeholder="Short explanation of this competency…"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={2}
-              />
+              <Textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} />
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)} disabled={isSubmitting}>
                 Cancel
               </Button>
               <Button type="submit" disabled={isSubmitting} className="gap-2">
-                {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                Add Competency
+                <Plus className="h-4 w-4" />
+                {isSubmitting ? "Saving..." : "Add Competency"}
               </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
 
-      {/* Edit Dialog */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Edit Competency</DialogTitle>
-            <DialogDescription>
-              Updating <code className="bg-muted rounded px-1">{selected?.key}</code> — the key itself cannot be
-              changed.
-            </DialogDescription>
+            <DialogDescription>Update the label, category, and description for this scoring field.</DialogDescription>
           </DialogHeader>
-          <form onSubmit={(e) => void handleEdit(e)} className="space-y-4">
+          <form onSubmit={(event) => void handleEdit(event)} className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>Label *</Label>
-                <Input value={label} onChange={(e) => setLabel(e.target.value)} required />
+                <Input value={label} onChange={(event) => setLabel(event.target.value)} required />
               </div>
               <div className="space-y-2">
                 <Label>Category</Label>
-                <Select value={category} onValueChange={(v) => setCategory(v as "behaviour" | "leadership" | "core")}>
+                <Select value={category} onValueChange={(value) => setCategory(value as CompetencyCategory)}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -406,35 +579,32 @@ export default function AdminCompetenciesPage() {
               </div>
               <div className="space-y-2">
                 <Label>Sort Order</Label>
-                <Input type="number" min={0} value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} />
+                <Input type="number" min={0} value={sortOrder} onChange={(event) => setSortOrder(event.target.value)} />
               </div>
             </div>
             <div className="space-y-2">
               <Label>Description</Label>
-              <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
+              <Textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} />
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsEditOpen(false)} disabled={isSubmitting}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={isSubmitting} className="gap-2">
-                {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
-                Save Changes
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? "Saving..." : "Save Changes"}
               </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
 
-      {/* Delete Dialog */}
       <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Competency</AlertDialogTitle>
+            <AlertDialogTitle>Delete competency?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete <strong>{selected?.label}</strong> (key: <code>{selected?.key}</code>).
-              Existing reviews that already have scores for this key will retain those values, but no new reviews will
-              include this field.
+              This permanently removes <strong>{selected?.label}</strong>. Existing stored scores remain, but future
+              reviews will no longer include this competency.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -444,12 +614,11 @@ export default function AdminCompetenciesPage() {
               disabled={isSubmitting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Delete
+              {isSubmitting ? "Deleting..." : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </PageWrapper>
+    </DataTablePage>
   )
 }

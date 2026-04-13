@@ -1,14 +1,12 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { BarChart3, Download, Loader2, TrendingDown, TrendingUp, Users } from "lucide-react"
-import { toast } from "sonner"
-import { PageHeader, PageWrapper } from "@/components/layout"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { BarChart3, Download, TrendingDown, TrendingUp, Users } from "lucide-react"
+import { DataTable, DataTablePage } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Progress } from "@/components/ui/progress"
 import { StatCard } from "@/components/ui/stat-card"
 import { exportPmsRowsToExcel } from "@/lib/pms/export"
 
@@ -41,6 +39,21 @@ type Cycle = {
   status: string | null
 }
 
+type AnalyticsRow = {
+  id: string
+  employee: string
+  department: string
+  cycle: string
+  reviewType: string
+  kpi: number | null
+  cbt: number | null
+  attendance: number | null
+  behaviour: number | null
+  final: number | null
+  tier: string
+  status: string
+}
+
 function formatName(user: ReviewRow["user"]) {
   if (!user) return "Unknown"
   return `${user.first_name || ""} ${user.last_name || ""}`.trim() || "Unknown"
@@ -57,13 +70,48 @@ function scoreToTier(score: number | null): {
   return { label: "At Risk", variant: "destructive" }
 }
 
+function scoreText(score: number | null) {
+  return score === null ? "-" : `${Math.round(score * 100) / 100}%`
+}
+
+function AnalyticsCard({ row }: { row: AnalyticsRow }) {
+  const finalPct = row.final ?? 0
+  const tier = scoreToTier(row.final)
+  return (
+    <div className="space-y-3 rounded-xl border p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="font-semibold">{row.employee}</p>
+          <p className="text-muted-foreground text-xs">{row.department}</p>
+        </div>
+        <Badge variant={tier.variant}>{tier.label}</Badge>
+      </div>
+      <div className="space-y-1">
+        <div className="flex items-center justify-between text-xs">
+          <span className="text-muted-foreground">Final Score</span>
+          <span>{scoreText(row.final)}</span>
+        </div>
+        <Progress value={finalPct} className="h-2" />
+      </div>
+      <div className="grid grid-cols-2 gap-3 text-sm">
+        <div>
+          <p className="text-muted-foreground text-xs">Quarter</p>
+          <p>{row.cycle}</p>
+        </div>
+        <div>
+          <p className="text-muted-foreground text-xs">Review Type</p>
+          <p>{row.reviewType}</p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function PmsAnalyticsPage() {
   const [reviews, setReviews] = useState<ReviewRow[]>([])
   const [cycles, setCycles] = useState<Cycle[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [cycleFilter, setCycleFilter] = useState("all")
-  const [departmentFilter, setDepartmentFilter] = useState("all")
 
   const loadData = useCallback(async () => {
     setIsLoading(true)
@@ -77,11 +125,13 @@ export default function PmsAnalyticsPage() {
         reviewsRes.json().catch(() => ({})),
         cyclesRes.json().catch(() => ({})),
       ])
-      if (!reviewsRes.ok) throw new Error(reviewsData?.error || "Failed to load reviews")
+      if (!reviewsRes.ok) {
+        throw new Error(reviewsData?.error || "Failed to load reviews")
+      }
       setReviews(reviewsData?.data || [])
       setCycles(cyclesData?.data || [])
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load")
+      setError(err instanceof Error ? err.message : "Failed to load analytics")
     } finally {
       setIsLoading(false)
     }
@@ -91,368 +141,285 @@ export default function PmsAnalyticsPage() {
     void loadData()
   }, [loadData])
 
-  const departments = useMemo(
-    () => Array.from(new Set(reviews.map((r) => r.user?.department).filter(Boolean) as string[])).sort(),
+  const rows = useMemo<AnalyticsRow[]>(
+    () =>
+      reviews.map((review) => ({
+        id: review.id,
+        employee: formatName(review.user),
+        department: review.user?.department || "-",
+        cycle: review.cycle?.name || "-",
+        reviewType: review.cycle?.review_type || "-",
+        kpi: review.kpi_score,
+        cbt: review.cbt_score,
+        attendance: review.attendance_score,
+        behaviour: review.behaviour_score,
+        final: review.final_score,
+        tier: scoreToTier(review.final_score).label,
+        status: review.status || "draft",
+      })),
     [reviews]
   )
 
-  const filtered = useMemo(() => {
-    return reviews.filter((r) => {
-      const cycleMatch = cycleFilter === "all" || r.review_cycle_id === cycleFilter
-      const deptMatch = departmentFilter === "all" || r.user?.department === departmentFilter
-      return cycleMatch && deptMatch
-    })
-  }, [reviews, cycleFilter, departmentFilter])
+  const departmentOptions = useMemo(
+    () =>
+      Array.from(new Set(rows.map((row) => row.department).filter(Boolean)))
+        .sort()
+        .map((department) => ({ value: department, label: department })),
+    [rows]
+  )
 
-  const withScores = useMemo(() => filtered.filter((r) => typeof r.final_score === "number"), [filtered])
+  const cycleOptions = useMemo(() => cycles.map((cycle) => ({ value: cycle.id, label: cycle.name })), [cycles])
 
-  const scores = useMemo(() => withScores.map((r) => r.final_score as number), [withScores])
+  const tierOptions = useMemo(
+    () =>
+      Array.from(new Set(rows.map((row) => row.tier)))
+        .sort()
+        .map((tier) => ({ value: tier, label: tier })),
+    [rows]
+  )
 
-  const mean = scores.length > 0 ? Math.round((scores.reduce((s, v) => s + v, 0) / scores.length) * 100) / 100 : null
+  const scoredRows = rows.filter((row) => typeof row.final === "number")
+  const scores = scoredRows.map((row) => row.final as number)
+  const mean =
+    scores.length > 0 ? Math.round((scores.reduce((sum, value) => sum + value, 0) / scores.length) * 100) / 100 : null
+  const highPerformers = scoredRows.filter((row) => (row.final as number) >= 80).length
+  const atRisk = scoredRows.filter((row) => (row.final as number) < 40).length
+  const activeCycles = cycles.filter((cycle) => cycle.status === "active").length
 
-  const variance =
-    scores.length > 1 && mean !== null ? scores.reduce((s, v) => s + Math.pow(v - mean, 2), 0) / (scores.length - 1) : 0
-  const stddev = Math.round(Math.sqrt(variance) * 100) / 100
+  const exportRows = rows.map((row, index) => ({
+    "S/N": index + 1,
+    Employee: row.employee,
+    Department: row.department,
+    Quarter: row.cycle,
+    "Review Type": row.reviewType,
+    KPI: row.kpi ?? "-",
+    CBT: row.cbt ?? "-",
+    Attendance: row.attendance ?? "-",
+    Behaviour: row.behaviour ?? "-",
+    Final: row.final ?? "-",
+    Tier: row.tier,
+    Status: row.status,
+  }))
 
-  const highPerformers = withScores.filter((r) => (r.final_score as number) >= 80)
-  const atRisk = withScores.filter((r) => (r.final_score as number) < 40)
+  const columns: DataTableColumn<AnalyticsRow>[] = useMemo(
+    () => [
+      {
+        key: "employee",
+        label: "Employee",
+        sortable: true,
+        accessor: (row) => row.employee,
+        render: (row) => <span className="font-medium">{row.employee}</span>,
+        resizable: true,
+        initialWidth: 190,
+      },
+      {
+        key: "department",
+        label: "Department",
+        sortable: true,
+        accessor: (row) => row.department,
+      },
+      {
+        key: "cycle",
+        label: "Quarter",
+        sortable: true,
+        accessor: (row) => row.cycle,
+        resizable: true,
+        initialWidth: 180,
+      },
+      {
+        key: "reviewType",
+        label: "Review Type",
+        sortable: true,
+        accessor: (row) => row.reviewType,
+      },
+      {
+        key: "kpi",
+        label: "KPI",
+        sortable: true,
+        accessor: (row) => row.kpi ?? -1,
+        render: (row) => scoreText(row.kpi),
+      },
+      {
+        key: "cbt",
+        label: "CBT",
+        sortable: true,
+        accessor: (row) => row.cbt ?? -1,
+        render: (row) => scoreText(row.cbt),
+      },
+      {
+        key: "attendance",
+        label: "Attendance",
+        sortable: true,
+        accessor: (row) => row.attendance ?? -1,
+        render: (row) => scoreText(row.attendance),
+      },
+      {
+        key: "behaviour",
+        label: "Behaviour",
+        sortable: true,
+        accessor: (row) => row.behaviour ?? -1,
+        render: (row) => scoreText(row.behaviour),
+      },
+      {
+        key: "final",
+        label: "Final",
+        sortable: true,
+        accessor: (row) => row.final ?? -1,
+        render: (row) => <span className="font-medium">{scoreText(row.final)}</span>,
+      },
+      {
+        key: "tier",
+        label: "Tier",
+        sortable: true,
+        accessor: (row) => row.tier,
+        render: (row) => {
+          const tier = scoreToTier(row.final)
+          return <Badge variant={tier.variant}>{tier.label}</Badge>
+        },
+      },
+    ],
+    []
+  )
 
-  // Score distribution in 10-point buckets
-  const distribution = useMemo(() => {
-    const buckets: Record<string, number> = {
-      "0–10": 0,
-      "11–20": 0,
-      "21–30": 0,
-      "31–40": 0,
-      "41–50": 0,
-      "51–60": 0,
-      "61–70": 0,
-      "71–80": 0,
-      "81–90": 0,
-      "91–100": 0,
-    }
-    const labels = Object.keys(buckets)
-    for (const score of scores) {
-      const idx = Math.min(Math.floor(score / 10), 9)
-      buckets[labels[idx]] = (buckets[labels[idx]] || 0) + 1
-    }
-    return labels.map((label) => ({ label, count: buckets[label] }))
-  }, [scores])
-
-  const maxBucket = Math.max(...distribution.map((b) => b.count), 1)
-
-  // Department averages
-  const deptAverages = useMemo(() => {
-    const map = new Map<string, number[]>()
-    for (const r of withScores) {
-      const dept = r.user?.department || "Unassigned"
-      const list = map.get(dept) || []
-      list.push(r.final_score as number)
-      map.set(dept, list)
-    }
-    return Array.from(map.entries())
-      .map(([dept, s]) => ({
-        dept,
-        avg: Math.round((s.reduce((a, b) => a + b, 0) / s.length) * 100) / 100,
-        count: s.length,
-      }))
-      .sort((a, b) => b.avg - a.avg)
-  }, [withScores])
-
-  // KPI component averages
-  const componentAvgs = useMemo(() => {
-    const pick = (key: "kpi_score" | "cbt_score" | "attendance_score" | "behaviour_score") => {
-      const vals = filtered.map((r) => r[key]).filter((v): v is number => typeof v === "number")
-      return vals.length > 0 ? Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 100) / 100 : null
-    }
-    return {
-      kpi: pick("kpi_score"),
-      cbt: pick("cbt_score"),
-      attendance: pick("attendance_score"),
-      behaviour: pick("behaviour_score"),
-    }
-  }, [filtered])
-
-  const exportRows = withScores
-    .sort((a, b) => (b.final_score as number) - (a.final_score as number))
-    .map((r, i) => {
-      const tier = scoreToTier(r.final_score)
-      return {
-        "S/N": i + 1,
-        Employee: formatName(r.user),
-        Department: r.user?.department || "-",
-        Quarter: r.cycle?.name || "-",
-        KPI: r.kpi_score ?? "-",
-        CBT: r.cbt_score ?? "-",
-        Attendance: r.attendance_score ?? "-",
-        Behaviour: r.behaviour_score ?? "-",
-        Final: r.final_score ?? "-",
-        Tier: tier.label,
-      }
-    })
+  const filters: DataTableFilter<AnalyticsRow>[] = useMemo(
+    () => [
+      {
+        key: "department",
+        label: "Department",
+        options: departmentOptions,
+        placeholder: "All Departments",
+      },
+      {
+        key: "tier",
+        label: "Tier",
+        options: tierOptions,
+        placeholder: "All Tiers",
+      },
+      {
+        key: "cycle",
+        label: "Quarter",
+        options: cycleOptions,
+        placeholder: "All Quarters",
+        mode: "custom",
+        filterFn: (row, values) => {
+          if (values.length === 0) return true
+          const review = reviews.find((item) => item.id === row.id)
+          return values.includes(review?.review_cycle_id || "")
+        },
+      },
+    ],
+    [cycleOptions, departmentOptions, reviews, tierOptions]
+  )
 
   return (
-    <PageWrapper maxWidth="full" background="gradient">
-      <PageHeader
-        title="PMS Analytics"
-        description="Performance distribution, trends, department benchmarking, and HiPo/At-Risk identification."
-        icon={BarChart3}
-        backLink={{ href: "/admin/hr/pms", label: "Back to PMS" }}
-        actions={
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-2"
-            disabled={exportRows.length === 0}
-            onClick={() =>
-              void exportPmsRowsToExcel(exportRows, `pms-analytics-${new Date().toISOString().slice(0, 10)}`)
-            }
-          >
-            <Download className="h-4 w-4" />
-            Export
-          </Button>
-        }
-      />
-
-      {/* Filters */}
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row">
-        <Select value={cycleFilter} onValueChange={setCycleFilter}>
-          <SelectTrigger className="w-full sm:w-56">
-            <SelectValue placeholder="All Cycles" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Cycles</SelectItem>
-            {cycles.map((c) => (
-              <SelectItem key={c.id} value={c.id}>
-                {c.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
-          <SelectTrigger className="w-full sm:w-48">
-            <SelectValue placeholder="All Departments" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Departments</SelectItem>
-            {departments.map((d) => (
-              <SelectItem key={d} value={d}>
-                {d}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+    <DataTablePage
+      title="PMS Analytics"
+      description="Performance distribution, review outcomes, and department benchmarking in one unified analytics table."
+      icon={BarChart3}
+      backLink={{ href: "/admin/hr/pms", label: "Back to PMS" }}
+      actions={
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-2"
+          disabled={exportRows.length === 0}
+          onClick={() =>
+            void exportPmsRowsToExcel(exportRows, `pms-analytics-${new Date().toISOString().slice(0, 10)}`)
+          }
+        >
+          <Download className="h-4 w-4" />
+          Export
+        </Button>
+      }
+      stats={
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <StatCard
+            title="Employees"
+            value={rows.length}
+            icon={Users}
+            iconBgColor="bg-blue-500/10"
+            iconColor="text-blue-500"
+          />
+          <StatCard
+            title="Mean Score"
+            value={mean !== null ? `${mean}%` : "-"}
+            icon={BarChart3}
+            iconBgColor="bg-emerald-500/10"
+            iconColor="text-emerald-500"
+          />
+          <StatCard
+            title="High Performers"
+            value={highPerformers}
+            icon={TrendingUp}
+            iconBgColor="bg-amber-500/10"
+            iconColor="text-amber-500"
+          />
+          <StatCard
+            title="At Risk"
+            value={atRisk}
+            icon={TrendingDown}
+            iconBgColor="bg-violet-500/10"
+            iconColor="text-violet-500"
+          />
+        </div>
+      }
+    >
+      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <StatCard title="Active Cycles" value={activeCycles} icon={BarChart3} />
+        <StatCard title="Reviewed" value={rows.filter((row) => row.status === "completed").length} icon={Users} />
+        <StatCard title="Drafts" value={rows.filter((row) => row.status === "draft").length} icon={TrendingDown} />
+        <StatCard title="Submitted" value={rows.filter((row) => row.status === "submitted").length} icon={TrendingUp} />
       </div>
 
-      {isLoading ? (
-        <div className="text-muted-foreground flex items-center justify-center gap-2 py-16">
-          <Loader2 className="h-5 w-5 animate-spin" />
-          Loading analytics…
-        </div>
-      ) : error ? (
-        <div className="space-y-2 py-8">
-          <p className="text-sm text-red-500">{error}</p>
-          <Button variant="outline" size="sm" onClick={() => void loadData()}>
-            Retry
-          </Button>
-        </div>
-      ) : (
-        <div className="space-y-6">
-          {/* Summary Stats */}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-5">
-            <StatCard title="Employees" value={withScores.length} icon={Users} description="With scored reviews" />
-            <StatCard
-              title="Mean Score"
-              value={mean !== null ? `${mean}%` : "-"}
-              icon={BarChart3}
-              description="Average final score"
-            />
-            <StatCard title="Std Dev" value={`${stddev}%`} icon={BarChart3} description="Score spread" />
-            <StatCard
-              title="High Performers"
-              value={highPerformers.length}
-              icon={TrendingUp}
-              description="Score ≥ 80%"
-            />
-            <StatCard title="At Risk" value={atRisk.length} icon={TrendingDown} description="Score < 40%" />
-          </div>
-
-          {/* Component averages */}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {(
-              [
-                ["KPI", componentAvgs.kpi],
-                ["CBT", componentAvgs.cbt],
-                ["Attendance", componentAvgs.attendance],
-                ["Behaviour", componentAvgs.behaviour],
-              ] as [string, number | null][]
-            ).map(([label, val]) => (
-              <Card key={label}>
-                <CardContent className="pt-4 pb-4">
-                  <p className="text-muted-foreground text-sm">{label} Avg</p>
-                  <p className="text-xl font-semibold">{val !== null ? `${val}%` : "-"}</p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            {/* Score Distribution */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Score Distribution</CardTitle>
-                <CardDescription>How final scores are spread across 10-point bands.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {scores.length === 0 ? (
-                  <p className="text-muted-foreground py-4 text-center text-sm">No scores to show.</p>
-                ) : (
-                  <div className="space-y-2">
-                    {distribution.map(({ label, count }) => (
-                      <div key={label} className="flex items-center gap-3">
-                        <span className="w-14 shrink-0 font-mono text-xs">{label}</span>
-                        <div className="flex h-5 flex-1 overflow-hidden rounded bg-gray-100 dark:bg-gray-800">
-                          <div
-                            className="bg-emerald-500 transition-all"
-                            style={{ width: `${(count / maxBucket) * 100}%` }}
-                          />
-                        </div>
-                        <span className="text-muted-foreground w-8 shrink-0 text-right text-xs">{count}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Department Rankings */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Department Averages</CardTitle>
-                <CardDescription>Average final PMS score per department.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {deptAverages.length === 0 ? (
-                  <p className="text-muted-foreground py-4 text-center text-sm">No department data.</p>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Department</TableHead>
-                          <TableHead>Avg</TableHead>
-                          <TableHead>N</TableHead>
-                          <TableHead>Tier</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {deptAverages.map(({ dept, avg, count }) => {
-                          const tier = scoreToTier(avg)
-                          return (
-                            <TableRow key={dept}>
-                              <TableCell className="font-medium">{dept}</TableCell>
-                              <TableCell>{avg}%</TableCell>
-                              <TableCell>{count}</TableCell>
-                              <TableCell>
-                                <Badge variant={tier.variant}>{tier.label}</Badge>
-                              </TableCell>
-                            </TableRow>
-                          )
-                        })}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* HiPo & At-Risk tables */}
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-emerald-600">
-                  <TrendingUp className="h-4 w-4" />
-                  High Performers (≥ 80%)
-                </CardTitle>
-                <CardDescription>Top decile — candidates for retention, promotion, and HiPo tagging.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {highPerformers.length === 0 ? (
-                  <p className="text-muted-foreground py-4 text-center text-sm">
-                    No employees with score ≥ 80% in this filter.
-                  </p>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Employee</TableHead>
-                          <TableHead>Dept</TableHead>
-                          <TableHead>Score</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {highPerformers
-                          .sort((a, b) => (b.final_score as number) - (a.final_score as number))
-                          .map((r) => (
-                            <TableRow key={r.id}>
-                              <TableCell className="font-medium">{formatName(r.user)}</TableCell>
-                              <TableCell>{r.user?.department || "-"}</TableCell>
-                              <TableCell>
-                                <Badge>{r.final_score}%</Badge>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-red-500">
-                  <TrendingDown className="h-4 w-4" />
-                  At Risk (&lt; 40%)
-                </CardTitle>
-                <CardDescription>Employees needing intervention, PIP, or support plans.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {atRisk.length === 0 ? (
-                  <p className="text-muted-foreground py-4 text-center text-sm">No employees at risk in this filter.</p>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Employee</TableHead>
-                          <TableHead>Dept</TableHead>
-                          <TableHead>Score</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {atRisk
-                          .sort((a, b) => (a.final_score as number) - (b.final_score as number))
-                          .map((r) => (
-                            <TableRow key={r.id}>
-                              <TableCell className="font-medium">{formatName(r.user)}</TableCell>
-                              <TableCell>{r.user?.department || "-"}</TableCell>
-                              <TableCell>
-                                <Badge variant="destructive">{r.final_score}%</Badge>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      )}
-    </PageWrapper>
+      <DataTable<AnalyticsRow>
+        data={rows}
+        columns={columns}
+        filters={filters}
+        getRowId={(row) => row.id}
+        searchPlaceholder="Search employee, department, quarter, or review type…"
+        searchFn={(row, query) =>
+          [row.employee, row.department, row.cycle, row.reviewType, row.tier, row.status]
+            .join(" ")
+            .toLowerCase()
+            .includes(query)
+        }
+        isLoading={isLoading}
+        error={error}
+        onRetry={() => void loadData()}
+        expandable={{
+          render: (row) => (
+            <div className="grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-5">
+              <div>
+                <p className="text-muted-foreground text-xs">KPI</p>
+                <p className="mt-1">{scoreText(row.kpi)}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">CBT</p>
+                <p className="mt-1">{scoreText(row.cbt)}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Attendance</p>
+                <p className="mt-1">{scoreText(row.attendance)}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Behaviour</p>
+                <p className="mt-1">{scoreText(row.behaviour)}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Status</p>
+                <p className="mt-1 capitalize">{row.status}</p>
+              </div>
+            </div>
+          ),
+        }}
+        viewToggle
+        cardRenderer={(row) => <AnalyticsCard row={row} />}
+        emptyTitle="No analytics rows found"
+        emptyDescription="Performance analytics will appear here once reviews have been created and scored."
+        emptyIcon={BarChart3}
+        skeletonRows={8}
+        minWidth="1220px"
+      />
+    </DataTablePage>
   )
 }

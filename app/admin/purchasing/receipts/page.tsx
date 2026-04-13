@@ -1,16 +1,14 @@
 "use client"
 
-import { createClient } from "@/lib/supabase/client"
+import { useMemo } from "react"
 import { useQuery } from "@tanstack/react-query"
+import { CalendarDays, Package, PackageCheck, ReceiptText, ShoppingBag } from "lucide-react"
+import { createClient } from "@/lib/supabase/client"
 import { QUERY_KEYS } from "@/lib/query-keys"
-import { AdminTablePage } from "@/components/admin/admin-table-page"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Package } from "lucide-react"
 import { StatCard } from "@/components/ui/stat-card"
-import { EmptyState } from "@/components/ui/patterns"
-import { TableSkeleton } from "@/components/ui/query-states"
+import { DataTable, DataTablePage } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 
 interface Receipt {
   id: string
@@ -36,12 +34,14 @@ async function fetchReceipts(): Promise<Receipt[]> {
     .select("*, purchase_order:purchase_orders(po_number, supplier:suppliers(name))")
     .order("created_at", { ascending: false })
 
-  if (error && error.code !== "42P01") throw new Error(error.message)
+  if (error && error.code !== "42P01") {
+    throw new Error(error.message)
+  }
 
-  return ((data || []) as ReceiptRow[]).map((r) => ({
-    ...r,
-    po_number: r.purchase_order?.po_number || undefined,
-    supplier_name: r.purchase_order?.supplier?.name || undefined,
+  return ((data || []) as ReceiptRow[]).map((receipt) => ({
+    ...receipt,
+    po_number: receipt.purchase_order?.po_number || undefined,
+    supplier_name: receipt.purchase_order?.supplier?.name || undefined,
   }))
 }
 
@@ -49,75 +49,258 @@ function formatDate(date: string) {
   return new Date(date).toLocaleDateString("en-NG", { year: "numeric", month: "short", day: "numeric" })
 }
 
+function getItemBand(totalItems: number) {
+  if (totalItems <= 5) return "Small"
+  if (totalItems <= 20) return "Medium"
+  return "Large"
+}
+
 export default function ReceiptsPage() {
-  const { data: receipts = [], isLoading } = useQuery({
+  const {
+    data: receipts = [],
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
     queryKey: QUERY_KEYS.adminReceiptsList(),
     queryFn: fetchReceipts,
   })
 
-  const stats = {
-    total: receipts.length,
-    items: receipts.reduce((acc, receipt) => acc + (receipt.total_items || 0), 0),
-  }
+  const stats = useMemo(() => {
+    const total = receipts.length
+    const items = receipts.reduce((sum, receipt) => sum + (receipt.total_items || 0), 0)
+    const linkedOrders = receipts.filter((receipt) => Boolean(receipt.po_number)).length
+    const uniqueSuppliers = new Set(receipts.map((receipt) => receipt.supplier_name).filter(Boolean)).size
+
+    return { total, items, linkedOrders, uniqueSuppliers }
+  }, [receipts])
+
+  const supplierOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          receipts.map((receipt) => receipt.supplier_name).filter((supplier): supplier is string => Boolean(supplier))
+        )
+      )
+        .sort()
+        .map((supplier) => ({
+          value: supplier,
+          label: supplier,
+        })),
+    [receipts]
+  )
+
+  const itemBandOptions = useMemo(
+    () => [
+      { value: "Small", label: "Small" },
+      { value: "Medium", label: "Medium" },
+      { value: "Large", label: "Large" },
+    ],
+    []
+  )
+
+  const poLinkOptions = useMemo(
+    () => [
+      { value: "linked", label: "Linked to PO" },
+      { value: "unlinked", label: "No PO Link" },
+    ],
+    []
+  )
+
+  const columns = useMemo<DataTableColumn<Receipt>[]>(
+    () => [
+      {
+        key: "receipt_number",
+        label: "Receipt",
+        sortable: true,
+        accessor: (receipt) => receipt.receipt_number,
+        render: (receipt) => <span className="font-mono text-sm">{receipt.receipt_number}</span>,
+      },
+      {
+        key: "po_number",
+        label: "PO",
+        sortable: true,
+        accessor: (receipt) => receipt.po_number || "",
+        render: (receipt) => <span className="font-mono text-sm">{receipt.po_number || "No PO"}</span>,
+      },
+      {
+        key: "supplier_name",
+        label: "Supplier",
+        sortable: true,
+        accessor: (receipt) => receipt.supplier_name || "",
+        resizable: true,
+        initialWidth: 220,
+        render: (receipt) => <span className="font-medium">{receipt.supplier_name || "Unknown supplier"}</span>,
+      },
+      {
+        key: "received_date",
+        label: "Received Date",
+        sortable: true,
+        accessor: (receipt) => receipt.received_date,
+        render: (receipt) => formatDate(receipt.received_date),
+      },
+      {
+        key: "total_items",
+        label: "Items",
+        sortable: true,
+        accessor: (receipt) => receipt.total_items,
+        align: "center",
+        render: (receipt) => <Badge variant="secondary">{receipt.total_items}</Badge>,
+      },
+    ],
+    []
+  )
+
+  const filters = useMemo<DataTableFilter<Receipt>[]>(
+    () => [
+      {
+        key: "supplier_name",
+        label: "Supplier",
+        options: supplierOptions,
+      },
+      {
+        key: "item_band",
+        label: "Item Volume",
+        mode: "custom",
+        options: itemBandOptions,
+        filterFn: (receipt, value) => {
+          const itemBand = getItemBand(receipt.total_items)
+          if (Array.isArray(value)) {
+            return value.includes(itemBand)
+          }
+          return itemBand === value
+        },
+      },
+      {
+        key: "po_link",
+        label: "PO Link",
+        mode: "custom",
+        options: poLinkOptions,
+        filterFn: (receipt, value) => {
+          const isLinked = Boolean(receipt.po_number)
+          const evaluate = (entry: string) => {
+            if (entry === "linked") return isLinked
+            if (entry === "unlinked") return !isLinked
+            return false
+          }
+          if (Array.isArray(value)) {
+            return value.some(evaluate)
+          }
+          return evaluate(value)
+        },
+      },
+    ],
+    [itemBandOptions, poLinkOptions, supplierOptions]
+  )
 
   return (
-    <AdminTablePage
+    <DataTablePage
       title="Goods Receipts"
-      description="Record of goods received from suppliers"
+      description="Track received deliveries, linked purchase orders, and inbound item volume."
       icon={Package}
-      backLinkHref="/admin/purchasing"
-      backLinkLabel="Back to Purchasing"
+      backLink={{ href: "/admin/purchasing", label: "Back to Purchasing" }}
       stats={
-        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 md:gap-4">
-          <StatCard title="Receipts" value={stats.total} icon={Package} />
-          <StatCard title="Total Items" value={stats.items} icon={Package} />
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard
+            title="Receipts"
+            value={stats.total}
+            icon={ReceiptText}
+            iconBgColor="bg-blue-500/10"
+            iconColor="text-blue-500"
+          />
+          <StatCard
+            title="Total Items"
+            value={stats.items}
+            icon={PackageCheck}
+            iconBgColor="bg-emerald-500/10"
+            iconColor="text-emerald-500"
+          />
+          <StatCard
+            title="Linked Orders"
+            value={stats.linkedOrders}
+            icon={ShoppingBag}
+            iconBgColor="bg-amber-500/10"
+            iconColor="text-amber-500"
+          />
+          <StatCard
+            title="Suppliers"
+            value={stats.uniqueSuppliers}
+            icon={CalendarDays}
+            iconBgColor="bg-violet-500/10"
+            iconColor="text-violet-500"
+          />
         </div>
       }
     >
-      <Card>
-        <CardHeader>
-          <CardTitle>All Receipts</CardTitle>
-          <CardDescription>{receipts.length} receipts</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <TableSkeleton rows={5} cols={5} />
-          ) : receipts.length === 0 ? (
-            <EmptyState
-              title="No receipts yet"
-              description="Receipts are created when orders are received."
-              icon={Package}
-            />
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Receipt #</TableHead>
-                    <TableHead>PO #</TableHead>
-                    <TableHead>Supplier</TableHead>
-                    <TableHead>Received Date</TableHead>
-                    <TableHead className="text-right">Items</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {receipts.map((r) => (
-                    <TableRow key={r.id}>
-                      <TableCell className="font-mono">{r.receipt_number}</TableCell>
-                      <TableCell className="font-mono">{r.po_number || "—"}</TableCell>
-                      <TableCell>{r.supplier_name || "—"}</TableCell>
-                      <TableCell>{formatDate(r.received_date)}</TableCell>
-                      <TableCell className="text-right">
-                        <Badge variant="secondary">{r.total_items}</Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+      <DataTable<Receipt>
+        data={receipts}
+        columns={columns}
+        filters={filters}
+        getRowId={(receipt) => receipt.id}
+        searchPlaceholder="Search receipt number, PO, or supplier..."
+        searchFn={(receipt, query) => {
+          const normalizedQuery = query.toLowerCase()
+          return (
+            receipt.receipt_number.toLowerCase().includes(normalizedQuery) ||
+            (receipt.po_number || "").toLowerCase().includes(normalizedQuery) ||
+            (receipt.supplier_name || "").toLowerCase().includes(normalizedQuery)
+          )
+        }}
+        isLoading={isLoading}
+        error={error instanceof Error ? error.message : null}
+        onRetry={() => {
+          void refetch()
+        }}
+        expandable={{
+          render: (receipt) => (
+            <div className="grid gap-4 md:grid-cols-4">
+              <div className="rounded-lg border p-4">
+                <p className="text-muted-foreground text-xs tracking-wide uppercase">Receipt Number</p>
+                <p className="mt-2 text-sm font-medium">{receipt.receipt_number}</p>
+              </div>
+              <div className="rounded-lg border p-4">
+                <p className="text-muted-foreground text-xs tracking-wide uppercase">PO Reference</p>
+                <p className="mt-2 text-sm">{receipt.po_number || "No linked purchase order"}</p>
+              </div>
+              <div className="rounded-lg border p-4">
+                <p className="text-muted-foreground text-xs tracking-wide uppercase">Supplier</p>
+                <p className="mt-2 text-sm">{receipt.supplier_name || "Unknown supplier"}</p>
+              </div>
+              <div className="rounded-lg border p-4">
+                <p className="text-muted-foreground text-xs tracking-wide uppercase">Item Volume</p>
+                <p className="mt-2 text-sm font-medium">{getItemBand(receipt.total_items)}</p>
+              </div>
             </div>
-          )}
-        </CardContent>
-      </Card>
-    </AdminTablePage>
+          ),
+        }}
+        viewToggle
+        cardRenderer={(receipt) => (
+          <div className="space-y-3 rounded-xl border p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-medium">{receipt.receipt_number}</p>
+                <p className="text-muted-foreground text-sm">{receipt.supplier_name || "Unknown supplier"}</p>
+              </div>
+              <Badge variant="secondary">{receipt.total_items}</Badge>
+            </div>
+            <div className="grid gap-1 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">PO</span>
+                <span>{receipt.po_number || "No PO"}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Received</span>
+                <span>{formatDate(receipt.received_date)}</span>
+              </div>
+            </div>
+          </div>
+        )}
+        emptyTitle="No receipts yet"
+        emptyDescription="Receipts will appear here once purchase orders are received."
+        emptyIcon={Package}
+        skeletonRows={5}
+        urlSync
+      />
+    </DataTablePage>
   )
 }

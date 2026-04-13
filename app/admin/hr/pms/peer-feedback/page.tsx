@@ -1,15 +1,13 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { Download, Loader2, MessageSquare, Search } from "lucide-react"
-import { PageHeader, PageWrapper } from "@/components/layout"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Download, MessageSquare, UserRoundSearch, Users } from "lucide-react"
+import { DataTable, DataTablePage } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter, RowAction } from "@/components/ui/data-table"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { StatCard } from "@/components/ui/stat-card"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { exportPmsRowsToExcel } from "@/lib/pms/export"
 
 type Profile = {
@@ -50,14 +48,40 @@ function formatMetric(value: number | null | undefined) {
   return typeof value === "number" ? `${value}%` : "-"
 }
 
+function FeedbackCard({ row, onView }: { row: PeerFeedbackRow; onView: (row: PeerFeedbackRow) => void }) {
+  return (
+    <div className="space-y-3 rounded-xl border p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="font-semibold">{formatName(row.subject)}</p>
+          <p className="text-muted-foreground text-xs">{row.subject?.department || "No department"}</p>
+        </div>
+        <Badge variant={row.score >= 70 ? "default" : "secondary"}>{row.score}%</Badge>
+      </div>
+      <div className="grid grid-cols-2 gap-3 text-sm">
+        <div>
+          <p className="text-muted-foreground text-xs">Reviewer</p>
+          <p>{formatName(row.reviewer)}</p>
+        </div>
+        <div>
+          <p className="text-muted-foreground text-xs">Status</p>
+          <p className="capitalize">{row.status}</p>
+        </div>
+      </div>
+      <p className="text-muted-foreground line-clamp-2 text-sm">{row.comments || "No comments provided."}</p>
+      <Button size="sm" variant="outline" onClick={() => onView(row)}>
+        View Details
+      </Button>
+    </div>
+  )
+}
+
 export default function AdminPeerFeedbackPage() {
   const [feedback, setFeedback] = useState<PeerFeedbackRow[]>([])
   const [cycles, setCycles] = useState<Cycle[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [cycleFilter, setCycleFilter] = useState("all")
-  const [departmentFilter, setDepartmentFilter] = useState("all")
+  const [selectedRow, setSelectedRow] = useState<PeerFeedbackRow | null>(null)
 
   const loadData = useCallback(async () => {
     setIsLoading(true)
@@ -71,11 +95,13 @@ export default function AdminPeerFeedbackPage() {
         feedbackRes.json().catch(() => ({})),
         cyclesRes.json().catch(() => ({})),
       ])
-      if (!feedbackRes.ok) throw new Error(feedbackData?.error || "Failed to load feedback")
+      if (!feedbackRes.ok) {
+        throw new Error(feedbackData?.error || "Failed to load feedback")
+      }
       setFeedback((feedbackData?.data || []) as PeerFeedbackRow[])
       setCycles((cyclesData?.data || []) as Cycle[])
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load")
+      setError(err instanceof Error ? err.message : "Failed to load feedback")
     } finally {
       setIsLoading(false)
     }
@@ -85,202 +111,304 @@ export default function AdminPeerFeedbackPage() {
     void loadData()
   }, [loadData])
 
-  const departments = useMemo(
-    () => Array.from(new Set(feedback.map((f) => f.subject?.department).filter(Boolean) as string[])).sort(),
+  const cycleNameMap = useMemo(() => new Map(cycles.map((cycle) => [cycle.id, cycle.name])), [cycles])
+
+  const departmentOptions = useMemo(
+    () =>
+      Array.from(new Set(feedback.map((row) => row.subject?.department).filter(Boolean) as string[]))
+        .sort()
+        .map((department) => ({ value: department, label: department })),
     [feedback]
   )
 
-  const filtered = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase()
-    return feedback.filter((f) => {
-      const subjectName = formatName(f.subject).toLowerCase()
-      const dept = String(f.subject?.department || "").toLowerCase()
-      const cycleMatch = cycleFilter === "all" || f.review_cycle_id === cycleFilter
-      const deptMatch = departmentFilter === "all" || f.subject?.department === departmentFilter
-      const searchMatch = !q || subjectName.includes(q) || dept.includes(q)
-      return cycleMatch && deptMatch && searchMatch
-    })
-  }, [feedback, searchQuery, cycleFilter, departmentFilter])
+  const cycleOptions = useMemo(() => cycles.map((cycle) => ({ value: cycle.id, label: cycle.name })), [cycles])
 
+  const reviewerOptions = useMemo(() => {
+    const reviewers = new Map<string, string>()
+    for (const row of feedback) {
+      const name = formatName(row.reviewer)
+      if (row.reviewer_user_id && name !== "Unknown") {
+        reviewers.set(row.reviewer_user_id, name)
+      }
+    }
+    return Array.from(reviewers.entries())
+      .map(([value, label]) => ({ value, label }))
+      .sort((a, b) => a.label.localeCompare(b.label))
+  }, [feedback])
+
+  const submittedCount = feedback.filter((row) => row.status === "submitted").length
   const avgScore =
-    filtered.length > 0
-      ? Math.round((filtered.reduce((sum, f) => sum + f.score, 0) / filtered.length) * 100) / 100
+    feedback.length > 0
+      ? Math.round((feedback.reduce((sum, row) => sum + row.score, 0) / feedback.length) * 100) / 100
       : null
 
-  const exportRows = filtered.map((f, index) => ({
+  const exportRows = feedback.map((row, index) => ({
     "S/N": index + 1,
-    Subject: formatName(f.subject),
-    Department: f.subject?.department || "-",
-    Score: f.score,
-    Collaboration: f.collaboration ?? "-",
-    Communication: f.communication ?? "-",
-    Teamwork: f.teamwork ?? "-",
-    Professionalism: f.professionalism ?? "-",
-    Comments: f.comments || "",
-    Status: f.status,
-    Date: new Date(f.created_at).toLocaleDateString(),
+    Subject: formatName(row.subject),
+    Reviewer: formatName(row.reviewer),
+    Department: row.subject?.department || "-",
+    Cycle: cycleNameMap.get(row.review_cycle_id) || "-",
+    Score: row.score,
+    Collaboration: row.collaboration ?? "-",
+    Communication: row.communication ?? "-",
+    Teamwork: row.teamwork ?? "-",
+    Professionalism: row.professionalism ?? "-",
+    Comments: row.comments || "",
+    Status: row.status,
+    Date: new Date(row.created_at).toLocaleDateString(),
   }))
 
+  const columns: DataTableColumn<PeerFeedbackRow>[] = useMemo(
+    () => [
+      {
+        key: "subject",
+        label: "Subject",
+        sortable: true,
+        accessor: (row) => formatName(row.subject),
+        render: (row) => <span className="font-medium">{formatName(row.subject)}</span>,
+        resizable: true,
+        initialWidth: 190,
+      },
+      {
+        key: "department",
+        label: "Department",
+        sortable: true,
+        accessor: (row) => row.subject?.department || "-",
+      },
+      {
+        key: "reviewer",
+        label: "Reviewer",
+        sortable: true,
+        accessor: (row) => formatName(row.reviewer),
+        resizable: true,
+        initialWidth: 190,
+      },
+      {
+        key: "cycle",
+        label: "Quarter",
+        sortable: true,
+        accessor: (row) => cycleNameMap.get(row.review_cycle_id) || "-",
+      },
+      {
+        key: "score",
+        label: "Score",
+        sortable: true,
+        accessor: (row) => row.score,
+        render: (row) => <Badge variant={row.score >= 70 ? "default" : "secondary"}>{row.score}%</Badge>,
+      },
+      {
+        key: "status",
+        label: "Status",
+        sortable: true,
+        accessor: (row) => row.status,
+        render: (row) => <Badge variant={row.status === "submitted" ? "default" : "secondary"}>{row.status}</Badge>,
+      },
+      {
+        key: "created_at",
+        label: "Date",
+        sortable: true,
+        accessor: (row) => row.created_at,
+        render: (row) => (
+          <span className="text-muted-foreground text-sm">{new Date(row.created_at).toLocaleDateString()}</span>
+        ),
+      },
+    ],
+    [cycleNameMap]
+  )
+
+  const filters: DataTableFilter<PeerFeedbackRow>[] = useMemo(
+    () => [
+      {
+        key: "department",
+        label: "Department",
+        options: departmentOptions,
+        placeholder: "All Departments",
+        mode: "custom",
+        filterFn: (row, values) => values.length === 0 || values.includes(row.subject?.department || ""),
+      },
+      {
+        key: "cycle",
+        label: "Quarter",
+        options: cycleOptions,
+        placeholder: "All Quarters",
+        mode: "custom",
+        filterFn: (row, values) => values.length === 0 || values.includes(row.review_cycle_id),
+      },
+      {
+        key: "reviewer",
+        label: "Reviewer",
+        options: reviewerOptions,
+        placeholder: "All Reviewers",
+        mode: "custom",
+        filterFn: (row, values) => values.length === 0 || values.includes(row.reviewer_user_id),
+      },
+    ],
+    [cycleOptions, departmentOptions, reviewerOptions]
+  )
+
+  const rowActions: RowAction<PeerFeedbackRow>[] = useMemo(
+    () => [
+      {
+        label: "View",
+        icon: UserRoundSearch,
+        onClick: (row) => setSelectedRow(row),
+      },
+    ],
+    []
+  )
+
   return (
-    <PageWrapper maxWidth="full" background="gradient">
-      <PageHeader
-        title="Peer Feedback"
-        description="View peer feedback submissions across all employees and cycles."
-        icon={MessageSquare}
-        backLink={{ href: "/admin/hr/pms", label: "Back to PMS" }}
-        actions={
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-2"
-            disabled={filtered.length === 0}
-            onClick={() =>
-              void exportPmsRowsToExcel(exportRows, `peer-feedback-${new Date().toISOString().slice(0, 10)}`)
-            }
-          >
-            <Download className="h-4 w-4" />
-            Export
-          </Button>
-        }
+    <DataTablePage
+      title="Peer Feedback"
+      description="Review peer feedback submissions across employees, quarters, and reviewers."
+      icon={MessageSquare}
+      backLink={{ href: "/admin/hr/pms", label: "Back to PMS" }}
+      actions={
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-2"
+          disabled={exportRows.length === 0}
+          onClick={() =>
+            void exportPmsRowsToExcel(exportRows, `peer-feedback-${new Date().toISOString().slice(0, 10)}`)
+          }
+        >
+          <Download className="h-4 w-4" />
+          Export
+        </Button>
+      }
+      stats={
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <StatCard
+            title="Total"
+            value={feedback.length}
+            icon={MessageSquare}
+            iconBgColor="bg-blue-500/10"
+            iconColor="text-blue-500"
+          />
+          <StatCard
+            title="Subjects"
+            value={new Set(feedback.map((row) => row.subject_user_id)).size}
+            icon={Users}
+            iconBgColor="bg-emerald-500/10"
+            iconColor="text-emerald-500"
+          />
+          <StatCard
+            title="Avg Score"
+            value={avgScore !== null ? `${avgScore}%` : "-"}
+            icon={UserRoundSearch}
+            iconBgColor="bg-amber-500/10"
+            iconColor="text-amber-500"
+          />
+          <StatCard
+            title="Submitted"
+            value={submittedCount}
+            icon={MessageSquare}
+            iconBgColor="bg-violet-500/10"
+            iconColor="text-violet-500"
+          />
+        </div>
+      }
+    >
+      <DataTable<PeerFeedbackRow>
+        data={feedback}
+        columns={columns}
+        filters={filters}
+        getRowId={(row) => row.id}
+        searchPlaceholder="Search subject, reviewer, department, or comments…"
+        searchFn={(row, query) => {
+          return [
+            formatName(row.subject),
+            formatName(row.reviewer),
+            row.subject?.department || "",
+            row.comments || "",
+            cycleNameMap.get(row.review_cycle_id) || "",
+          ]
+            .join(" ")
+            .toLowerCase()
+            .includes(query)
+        }}
+        isLoading={isLoading}
+        error={error}
+        onRetry={() => void loadData()}
+        rowActions={rowActions}
+        expandable={{
+          render: (row) => (
+            <div className="grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
+              <div>
+                <p className="text-muted-foreground text-xs">Collaboration</p>
+                <p className="mt-1">{formatMetric(row.collaboration)}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Communication</p>
+                <p className="mt-1">{formatMetric(row.communication)}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Teamwork</p>
+                <p className="mt-1">{formatMetric(row.teamwork)}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Professionalism</p>
+                <p className="mt-1">{formatMetric(row.professionalism)}</p>
+              </div>
+              <div className="sm:col-span-2 lg:col-span-4">
+                <p className="text-muted-foreground text-xs">Comments</p>
+                <p className="mt-1">{row.comments || "No comments provided."}</p>
+              </div>
+            </div>
+          ),
+        }}
+        viewToggle
+        cardRenderer={(row) => <FeedbackCard row={row} onView={setSelectedRow} />}
+        emptyTitle="No peer feedback found"
+        emptyDescription="Peer feedback submissions will appear here once employees start reviewing colleagues."
+        emptyIcon={MessageSquare}
+        skeletonRows={6}
+        minWidth="980px"
       />
 
-      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard
-          title="Total Submissions"
-          value={filtered.length}
-          icon={MessageSquare}
-          description="Peer feedback rows"
-        />
-        <StatCard
-          title="Unique Subjects"
-          value={new Set(filtered.map((f) => f.subject_user_id)).size}
-          icon={MessageSquare}
-          description="Employees reviewed"
-        />
-        <StatCard
-          title="Avg Score"
-          value={avgScore !== null ? `${avgScore}%` : "-"}
-          icon={MessageSquare}
-          description="Overall average"
-        />
-        <StatCard
-          title="Submitted"
-          value={filtered.filter((f) => f.status === "submitted").length}
-          icon={MessageSquare}
-          description="Completed submissions"
-        />
-      </div>
-
-      <Card className="mb-4">
-        <CardContent className="p-3 sm:p-6">
-          <div className="flex flex-col gap-3 md:flex-row">
-            <div className="relative flex-1">
-              <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-              <Input
-                placeholder="Search employee or department…"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
+      <Dialog open={Boolean(selectedRow)} onOpenChange={() => setSelectedRow(null)}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Peer Feedback Details</DialogTitle>
+            <DialogDescription>
+              {selectedRow ? `${formatName(selectedRow.subject)} reviewed by ${formatName(selectedRow.reviewer)}` : ""}
+            </DialogDescription>
+          </DialogHeader>
+          {selectedRow ? (
+            <div className="grid gap-4 text-sm sm:grid-cols-2">
+              <div>
+                <p className="text-muted-foreground text-xs">Department</p>
+                <p className="mt-1">{selectedRow.subject?.department || "-"}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Quarter</p>
+                <p className="mt-1">{cycleNameMap.get(selectedRow.review_cycle_id) || "-"}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Collaboration</p>
+                <p className="mt-1">{formatMetric(selectedRow.collaboration)}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Communication</p>
+                <p className="mt-1">{formatMetric(selectedRow.communication)}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Teamwork</p>
+                <p className="mt-1">{formatMetric(selectedRow.teamwork)}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Professionalism</p>
+                <p className="mt-1">{formatMetric(selectedRow.professionalism)}</p>
+              </div>
+              <div className="sm:col-span-2">
+                <p className="text-muted-foreground text-xs">Comments</p>
+                <p className="mt-1 whitespace-pre-wrap">{selectedRow.comments || "No comments provided."}</p>
+              </div>
             </div>
-            <Select value={cycleFilter} onValueChange={setCycleFilter}>
-              <SelectTrigger className="w-full md:w-56">
-                <SelectValue placeholder="Cycle" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Cycles</SelectItem>
-                {cycles.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
-              <SelectTrigger className="w-full md:w-48">
-                <SelectValue placeholder="Department" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Departments</SelectItem>
-                {departments.map((d) => (
-                  <SelectItem key={d} value={d}>
-                    {d}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Peer Feedback Submissions</CardTitle>
-          <CardDescription>
-            Each row is one peer feedback entry. Subject names are shown; reviewer names are not disclosed to employees.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="text-muted-foreground flex items-center justify-center gap-2 py-10">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Loading…
-            </div>
-          ) : error ? (
-            <div className="space-y-2 py-4">
-              <p className="text-sm text-red-500">{error}</p>
-              <Button variant="outline" size="sm" onClick={() => void loadData()}>
-                Retry
-              </Button>
-            </div>
-          ) : filtered.length === 0 ? (
-            <p className="text-muted-foreground py-8 text-center text-sm">
-              No peer feedback found. Employees submit feedback via the PMS → Peer Feedback page.
-            </p>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table className="min-w-[900px]">
-                <TableHeader className="bg-emerald-50 dark:bg-emerald-950/30">
-                  <TableRow>
-                    <TableHead className="w-12">S/N</TableHead>
-                    <TableHead>Subject</TableHead>
-                    <TableHead>Department</TableHead>
-                    <TableHead>Score</TableHead>
-                    <TableHead>Collab</TableHead>
-                    <TableHead>Comms</TableHead>
-                    <TableHead>Teamwork</TableHead>
-                    <TableHead>Professionalism</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Date</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filtered.map((f, index) => (
-                    <TableRow key={f.id}>
-                      <TableCell className="text-muted-foreground">{index + 1}</TableCell>
-                      <TableCell className="font-medium">{formatName(f.subject)}</TableCell>
-                      <TableCell>{f.subject?.department || "-"}</TableCell>
-                      <TableCell>
-                        <Badge variant={f.score >= 70 ? "default" : "secondary"}>{f.score}%</Badge>
-                      </TableCell>
-                      <TableCell>{formatMetric(f.collaboration)}</TableCell>
-                      <TableCell>{formatMetric(f.communication)}</TableCell>
-                      <TableCell>{formatMetric(f.teamwork)}</TableCell>
-                      <TableCell>{formatMetric(f.professionalism)}</TableCell>
-                      <TableCell>
-                        <Badge variant={f.status === "submitted" ? "default" : "secondary"}>{f.status}</Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
-                        {new Date(f.created_at).toLocaleDateString()}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </PageWrapper>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+    </DataTablePage>
   )
 }

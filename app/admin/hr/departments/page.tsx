@@ -1,14 +1,14 @@
 "use client"
 
-import { Fragment, useState } from "react"
+import { useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
+import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
-import { AdminTablePage } from "@/components/admin/admin-table-page"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { DataTable, DataTablePage } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter, RowAction } from "@/components/ui/data-table"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
   Dialog,
   DialogContent,
@@ -21,16 +21,11 @@ import {
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
-import { ChevronDown, ChevronUp, Mail, Pencil, Plus, Users, Building } from "lucide-react"
+import { Building, Mail, Pencil, Plus, Users } from "lucide-react"
 import { toast } from "sonner"
 import { StatCard } from "@/components/ui/stat-card"
-import { EmptyState } from "@/components/ui/empty-state"
-import { TableSkeleton } from "@/components/ui/query-states"
 import { QUERY_KEYS } from "@/lib/query-keys"
-import Link from "next/link"
-import { cn } from "@/lib/utils"
 import { isAssignableEmploymentStatus } from "@/lib/workforce/assignment-policy"
-
 import { logger } from "@/lib/logger"
 
 const log = logger("hr-departments")
@@ -39,6 +34,28 @@ interface DepartmentsData {
   departments: Department[]
   departmentEmployees: Record<string, DepartmentEmployee[]>
   canManageDepartments: boolean
+}
+
+interface Department {
+  id: string
+  name: string
+  description: string | null
+  is_active: boolean
+  created_at: string
+  updated_at: string
+  office_location?: string | null
+  employee_count?: number
+}
+
+interface DepartmentEmployee {
+  id: string
+  first_name: string | null
+  last_name: string | null
+  company_email: string | null
+  additional_email: string | null
+  designation: string | null
+  employment_status: string | null
+  department: string | null
 }
 
 async function fetchDepartmentsData(): Promise<DepartmentsData> {
@@ -54,7 +71,7 @@ async function fetchDepartmentsData(): Promise<DepartmentsData> {
     canManageDepartments = ["developer", "super_admin", "admin"].includes(profile?.role || "")
   }
 
-  const { data: depts, error } = await supabase.from("departments").select("*").order("name")
+  const { data: departments, error } = await supabase.from("departments").select("*").order("name")
   if (error) throw new Error(error.message)
 
   const { data: profiles } = await supabase
@@ -65,47 +82,49 @@ async function fetchDepartmentsData(): Promise<DepartmentsData> {
   for (const profile of ((profiles || []) as DepartmentEmployee[]).filter((employee) =>
     isAssignableEmploymentStatus(employee.employment_status, { allowLegacyNullStatus: false })
   )) {
-    const deptName = profile.department || "Unassigned"
-    if (!employeesByDepartment[deptName]) employeesByDepartment[deptName] = []
-    employeesByDepartment[deptName].push(profile)
+    const departmentName = profile.department || "Unassigned"
+    if (!employeesByDepartment[departmentName]) employeesByDepartment[departmentName] = []
+    employeesByDepartment[departmentName].push(profile)
   }
 
-  const deptsWithCounts = (depts || []).map((dept) => ({
-    ...dept,
-    employee_count: employeesByDepartment[dept.name]?.length || 0,
+  const departmentsWithCounts = (departments || []).map((department) => ({
+    ...department,
+    employee_count: employeesByDepartment[department.name]?.length || 0,
   }))
 
   return {
-    departments: deptsWithCounts,
+    departments: departmentsWithCounts,
     departmentEmployees: employeesByDepartment,
     canManageDepartments,
   }
 }
 
-interface Department {
-  id: string
-  name: string
-  description: string | null
-  is_active: boolean
-  created_at: string
-  updated_at: string
-  employee_count?: number
+function employeeName(employee: DepartmentEmployee) {
+  return [employee.first_name, employee.last_name].filter(Boolean).join(" ") || "Unknown"
 }
 
-interface DepartmentEmployee {
-  id: string
-  first_name: string | null
-  last_name: string | null
-  company_email: string | null
-  additional_email: string | null
-  designation: string | null
-  employment_status: string | null
-  department: string | null
+function DepartmentCard({ department, onEdit }: { department: Department; onEdit: (department: Department) => void }) {
+  return (
+    <div className="space-y-3 rounded-xl border p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="font-semibold">{department.name}</p>
+          <p className="text-muted-foreground text-xs">{department.employee_count || 0} employees</p>
+        </div>
+        <Badge variant={department.is_active ? "default" : "secondary"}>
+          {department.is_active ? "Active" : "Inactive"}
+        </Badge>
+      </div>
+      <p className="text-muted-foreground text-sm">{department.description || "No description added"}</p>
+      <Button size="sm" variant="outline" onClick={() => onEdit(department)}>
+        Edit
+      </Button>
+    </div>
+  )
 }
 
 export default function DepartmentsPage() {
   const queryClient = useQueryClient()
-  const [expandedDepartments, setExpandedDepartments] = useState<Set<string>>(new Set())
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingDepartment, setEditingDepartment] = useState<Department | null>(null)
   const [formData, setFormData] = useState({
@@ -114,7 +133,7 @@ export default function DepartmentsPage() {
     is_active: true,
   })
 
-  const { data, isLoading: loading } = useQuery({
+  const { data, isLoading, error } = useQuery({
     queryKey: QUERY_KEYS.adminDepartmentsPage(),
     queryFn: fetchDepartmentsData,
   })
@@ -123,8 +142,8 @@ export default function DepartmentsPage() {
   const departmentEmployees = data?.departmentEmployees ?? {}
   const canManageDepartments = data?.canManageDepartments ?? false
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault()
 
     try {
       if (!canManageDepartments) {
@@ -136,9 +155,7 @@ export default function DepartmentsPage() {
 
       if (editingDepartment) {
         const newName = formData.name.trim()
-
-        // Update existing department
-        const { error, data: updatedRows } = await supabase
+        const { error: updateError, data: updatedRows } = await supabase
           .from("departments")
           .update({
             name: newName,
@@ -149,52 +166,45 @@ export default function DepartmentsPage() {
           .eq("id", editingDepartment.id)
           .select()
 
-        if (error) throw error
+        if (updateError) throw updateError
         if (!updatedRows || updatedRows.length === 0) {
-          // Supabase RLS silently blocked the update — no rows were changed
-          throw new Error(
-            "Update was blocked by a database policy. Check that your account has permission to modify departments."
-          )
+          throw new Error("Update was blocked by a database policy. Check your department permissions.")
         }
 
         toast.success("Department updated successfully")
       } else {
-        // Create new department
-        const { error } = await supabase.from("departments").insert({
+        const { error: createError } = await supabase.from("departments").insert({
           name: formData.name,
           description: formData.description || null,
           is_active: formData.is_active,
         })
 
-        if (error) throw error
+        if (createError) throw createError
         toast.success("Department created successfully")
       }
 
       setIsDialogOpen(false)
       setEditingDepartment(null)
       setFormData({ name: "", description: "", is_active: true })
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminDepartmentsPage() })
-    } catch (error: unknown) {
-      log.error("Error saving department:", error)
-      const msg =
-        error instanceof Error
-          ? error.message
-          : ((error as { message?: string })?.message ?? "Failed to save department")
-      toast.error(msg)
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminDepartmentsPage() })
+    } catch (err: unknown) {
+      log.error("Error saving department:", err)
+      const message = err instanceof Error ? err.message : "Failed to save department"
+      toast.error(message)
     }
   }
 
-  function openEditDialog(dept: Department) {
+  function openEditDialog(department: Department) {
     if (!canManageDepartments) {
       toast.error("You can view departments but cannot edit them")
       return
     }
 
-    setEditingDepartment(dept)
+    setEditingDepartment(department)
     setFormData({
-      name: dept.name,
-      description: dept.description || "",
-      is_active: dept.is_active,
+      name: department.name,
+      description: department.description || "",
+      is_active: department.is_active,
     })
     setIsDialogOpen(true)
   }
@@ -210,28 +220,122 @@ export default function DepartmentsPage() {
     setIsDialogOpen(true)
   }
 
-  function toggleDepartmentRow(deptId: string) {
-    setExpandedDepartments((prev) => {
-      const next = new Set(prev)
-      if (next.has(deptId)) next.delete(deptId)
-      else next.add(deptId)
-      return next
-    })
-  }
+  const columns: DataTableColumn<Department>[] = [
+    {
+      key: "name",
+      label: "Name",
+      sortable: true,
+      accessor: (department) => department.name,
+      render: (department) => <span className="font-medium">{department.name}</span>,
+      resizable: true,
+      initialWidth: 220,
+    },
+    {
+      key: "description",
+      label: "Description",
+      accessor: (department) => department.description || "",
+      render: (department) => (
+        <span className="text-muted-foreground block max-w-[260px] truncate text-sm">
+          {department.description || "No description added"}
+        </span>
+      ),
+      resizable: true,
+      initialWidth: 260,
+    },
+    {
+      key: "employee_count",
+      label: "Headcount",
+      sortable: true,
+      accessor: (department) => department.employee_count || 0,
+      render: (department) => <Badge variant="secondary">{department.employee_count || 0} employees</Badge>,
+      align: "center",
+    },
+    {
+      key: "status",
+      label: "Status",
+      sortable: true,
+      accessor: (department) => (department.is_active ? "active" : "inactive"),
+      render: (department) => (
+        <Badge variant={department.is_active ? "default" : "secondary"}>
+          {department.is_active ? "Active" : "Inactive"}
+        </Badge>
+      ),
+    },
+    {
+      key: "created_at",
+      label: "Created",
+      sortable: true,
+      accessor: (department) => department.created_at,
+      render: (department) => (
+        <span className="text-muted-foreground text-sm">
+          {new Date(department.created_at).toLocaleDateString("en-GB")}
+        </span>
+      ),
+    },
+  ]
+
+  const filters: DataTableFilter<Department>[] = [
+    {
+      key: "status",
+      label: "Status",
+      options: [
+        { value: "active", label: "Active" },
+        { value: "inactive", label: "Inactive" },
+      ],
+      placeholder: "All Statuses",
+    },
+    {
+      key: "headcount_band",
+      label: "Headcount",
+      options: [
+        { value: "empty", label: "No Employees" },
+        { value: "small", label: "1-10" },
+        { value: "medium", label: "11-50" },
+        { value: "large", label: "51+" },
+      ],
+      placeholder: "All Sizes",
+      mode: "custom",
+      filterFn: (department, values) => {
+        if (values.length === 0) return true
+        const count = department.employee_count || 0
+        return values.some((value) => {
+          if (value === "empty") return count === 0
+          if (value === "small") return count >= 1 && count <= 10
+          if (value === "medium") return count >= 11 && count <= 50
+          if (value === "large") return count >= 51
+          return false
+        })
+      },
+    },
+  ]
+
+  const rowActions: RowAction<Department>[] = [
+    {
+      label: "Edit",
+      icon: Pencil,
+      onClick: (department) => openEditDialog(department),
+      hidden: () => !canManageDepartments,
+    },
+    {
+      label: "View Employees",
+      icon: Users,
+      onClick: () => {},
+      hidden: () => true,
+    },
+  ]
 
   return (
-    <AdminTablePage
+    <DataTablePage
       title="Departments"
-      description="Manage company departments and organizational structure"
+      description="Manage company departments and organizational structure."
       icon={Building}
-      backLinkHref="/admin/hr"
-      backLinkLabel="Back to HR"
+      backLink={{ href: "/admin/hr", label: "Back to HR" }}
       actions={
         canManageDepartments ? (
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button onClick={openCreateDialog}>
-                <Plus className="mr-2 h-4 w-4" />
+              <Button onClick={openCreateDialog} size="sm" className="gap-2">
+                <Plus className="h-4 w-4" />
                 Add Department
               </Button>
             </DialogTrigger>
@@ -241,7 +345,7 @@ export default function DepartmentsPage() {
                   <DialogTitle>{editingDepartment ? "Edit Department" : "Create Department"}</DialogTitle>
                   <DialogDescription>
                     {editingDepartment
-                      ? "Update the department details below. Renaming will automatically update all assigned employee records."
+                      ? "Update the department details below."
                       : "Add a new department to your organization."}
                   </DialogDescription>
                 </DialogHeader>
@@ -251,7 +355,7 @@ export default function DepartmentsPage() {
                     <Input
                       id="name"
                       value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      onChange={(event) => setFormData({ ...formData, name: event.target.value })}
                       placeholder="e.g., Engineering, Sales, Marketing"
                       required
                     />
@@ -261,8 +365,8 @@ export default function DepartmentsPage() {
                     <Textarea
                       id="description"
                       value={formData.description}
-                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                      placeholder="Brief description of the department's responsibilities..."
+                      onChange={(event) => setFormData({ ...formData, description: event.target.value })}
+                      placeholder="Brief description of the department responsibilities..."
                       rows={3}
                     />
                   </div>
@@ -286,199 +390,109 @@ export default function DepartmentsPage() {
           </Dialog>
         ) : null
       }
+      stats={
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <StatCard
+            title="Total Departments"
+            value={departments.length}
+            icon={Building}
+            iconBgColor="bg-blue-500/10"
+            iconColor="text-blue-500"
+          />
+          <StatCard
+            title="Active"
+            value={departments.filter((department) => department.is_active).length}
+            icon={Building}
+            iconBgColor="bg-emerald-500/10"
+            iconColor="text-emerald-500"
+          />
+          <StatCard
+            title="Total Employees"
+            value={departments.reduce((sum, department) => sum + (department.employee_count || 0), 0)}
+            icon={Users}
+            iconBgColor="bg-amber-500/10"
+            iconColor="text-amber-500"
+          />
+          <StatCard
+            title="Empty Units"
+            value={departments.filter((department) => (department.employee_count || 0) === 0).length}
+            icon={Building}
+            iconBgColor="bg-violet-500/10"
+            iconColor="text-violet-500"
+          />
+        </div>
+      }
     >
-      {/* Stats */}
-      <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 md:gap-4">
-        <StatCard title="Total Departments" value={departments.length} icon={Building} />
-        <StatCard
-          title="Active"
-          value={departments.filter((d) => d.is_active).length}
-          icon={Building}
-          iconBgColor="bg-green-100 dark:bg-green-900/30"
-          iconColor="text-green-600 dark:text-green-400"
-        />
-        <StatCard
-          title="Total Employees"
-          value={departments.reduce((sum, d) => sum + (d.employee_count || 0), 0)}
-          icon={Users}
-        />
-      </div>
-
-      {/* Departments Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>All Departments</CardTitle>
-          <CardDescription>List of all departments in your organization</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <TableSkeleton rows={5} cols={6} />
-          ) : departments.length === 0 ? (
-            <EmptyState
-              icon={Building}
-              title="No departments yet"
-              description="Create your first department to get started."
-              action={
-                canManageDepartments ? { label: "Add Department", onClick: openCreateDialog, icon: Plus } : undefined
-              }
-            />
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-14"></TableHead>
-                  <TableHead className="w-12">#</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead>Employee Count</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {departments.map((dept, index) => {
-                  const isExpanded = expandedDepartments.has(dept.id)
-                  const members = departmentEmployees[dept.name] || []
-
-                  return (
-                    <Fragment key={dept.id}>
-                      <TableRow
-                        key={dept.id}
-                        className={cn(
-                          "hover:bg-muted/30 cursor-pointer transition-colors",
-                          isExpanded && "bg-muted/50"
-                        )}
-                        onClick={() => toggleDepartmentRow(dept.id)}
-                      >
-                        <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              toggleDepartmentRow(dept.id)
-                            }}
-                            className="h-7 w-7"
-                            aria-label={isExpanded ? `Collapse ${dept.name}` : `Expand ${dept.name}`}
-                          >
-                            {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                          </Button>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
-                        <TableCell>
-                          <div className="font-medium">{dept.name}</div>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground max-w-xs truncate text-sm">
-                          {dept.description || "No description added"}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="secondary">{dept.employee_count || 0} employees</Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={dept.is_active ? "default" : "secondary"}>
-                            {dept.is_active ? "Active" : "Inactive"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                          <div className="flex justify-end gap-2">
-                            {canManageDepartments && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => openEditDialog(dept)}
-                                aria-label={`Edit department: ${dept.name}`}
-                                title={`Edit department: ${dept.name}`}
-                              >
+      <DataTable<Department>
+        data={departments}
+        columns={columns}
+        filters={filters}
+        getRowId={(department) => department.id}
+        searchPlaceholder="Search department name or description..."
+        searchFn={(department, query) =>
+          [department.name, department.description || ""].join(" ").toLowerCase().includes(query)
+        }
+        isLoading={isLoading}
+        error={error instanceof Error ? error.message : error ? String(error) : null}
+        onRetry={() => void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminDepartmentsPage() })}
+        rowActions={rowActions}
+        expandable={{
+          render: (department) => {
+            const members = departmentEmployees[department.name] || []
+            return members.length === 0 ? (
+              <p className="text-muted-foreground text-sm">No employees in this department.</p>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-sm font-medium">{members.length} team members</p>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[640px] text-sm">
+                    <thead className="bg-muted/30">
+                      <tr>
+                        <th className="px-3 py-2 text-left text-xs font-semibold tracking-wide uppercase">Employee</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold tracking-wide uppercase">Contact</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold tracking-wide uppercase">Role</th>
+                        <th className="px-3 py-2 text-right text-xs font-semibold tracking-wide uppercase">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {members.map((member) => (
+                        <tr key={member.id} className="border-t">
+                          <td className="px-3 py-2 font-medium">{employeeName(member)}</td>
+                          <td className="text-muted-foreground px-3 py-2">
+                            <div className="flex items-center gap-2">
+                              <Mail className="h-3 w-3" />
+                              <span>
+                                {[member.company_email, member.additional_email].filter(Boolean).join(" | ") || "-"}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-3 py-2">
+                            <Badge variant="outline">{member.designation || "Employee"}</Badge>
+                          </td>
+                          <td className="px-3 py-2 text-right">
+                            <Link href={`/admin/hr/employees?userId=${member.id}`}>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
                                 <Pencil className="h-4 w-4" />
                               </Button>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                      {isExpanded && (
-                        <TableRow key={`${dept.id}-members`} className="bg-muted/10 hover:bg-muted/10 border-t-0">
-                          <TableCell colSpan={6} className="p-0">
-                            <div className="animate-in slide-in-from-top-2 p-6 pt-2 duration-200">
-                              {members.length === 0 ? (
-                                <p className="text-muted-foreground px-1 py-1 text-sm">
-                                  No employees in this department.
-                                </p>
-                              ) : (
-                                <div className="bg-background overflow-hidden rounded-lg border shadow-sm">
-                                  <Table>
-                                    <TableHeader className="bg-muted/30">
-                                      <TableRow>
-                                        <TableHead className="text-muted-foreground w-[70px] text-[10px] font-black tracking-widest uppercase">
-                                          #
-                                        </TableHead>
-                                        <TableHead className="text-muted-foreground text-[10px] font-black tracking-widest uppercase">
-                                          Employee
-                                        </TableHead>
-                                        <TableHead className="text-muted-foreground text-[10px] font-black tracking-widest uppercase">
-                                          Contact
-                                        </TableHead>
-                                        <TableHead className="text-muted-foreground w-[180px] text-[10px] font-black tracking-widest uppercase">
-                                          Role
-                                        </TableHead>
-                                        <TableHead className="w-[80px] text-right"></TableHead>
-                                      </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                      {members.map((member, memberIndex) => (
-                                        <TableRow key={member.id} className="hover:bg-muted/5">
-                                          <TableCell className="text-muted-foreground text-xs font-semibold">
-                                            {memberIndex + 1}
-                                          </TableCell>
-                                          <TableCell className="text-sm font-semibold">
-                                            {[member.first_name, member.last_name].filter(Boolean).join(" ") ||
-                                              "Unknown"}
-                                          </TableCell>
-                                          <TableCell className="text-muted-foreground text-xs">
-                                            <div className="flex items-center gap-2">
-                                              <Mail className="h-3 w-3" />
-                                              <span className="truncate">
-                                                {[member.company_email, member.additional_email]
-                                                  .filter(Boolean)
-                                                  .join(" | ")}
-                                              </span>
-                                            </div>
-                                          </TableCell>
-                                          <TableCell>
-                                            <Badge variant="outline" className="text-xs">
-                                              {member.designation || "Employee"}
-                                            </Badge>
-                                          </TableCell>
-                                          <TableCell className="text-right">
-                                            <Link href={`/admin/hr/employees?userId=${member.id}`}>
-                                              <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="h-8 w-8"
-                                                aria-label="Edit employee department"
-                                                title="Edit employee department"
-                                              >
-                                                <Pencil className="h-4 w-4" />
-                                              </Button>
-                                            </Link>
-                                          </TableCell>
-                                        </TableRow>
-                                      ))}
-                                    </TableBody>
-                                  </Table>
-                                </div>
-                              )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </Fragment>
-                  )
-                })}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
-    </AdminTablePage>
+                            </Link>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )
+          },
+        }}
+        viewToggle
+        cardRenderer={(department) => <DepartmentCard department={department} onEdit={openEditDialog} />}
+        emptyTitle="No departments yet"
+        emptyDescription="Create your first department to start structuring teams and reporting lines."
+        emptyIcon={Building}
+        skeletonRows={5}
+        minWidth="980px"
+      />
+    </DataTablePage>
   )
 }

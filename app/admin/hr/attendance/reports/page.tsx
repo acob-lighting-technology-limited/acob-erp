@@ -1,20 +1,18 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
-import { AdminTablePage } from "@/components/admin/admin-table-page"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { DataTable, DataTablePage } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { StatCard } from "@/components/ui/stat-card"
-import { EmptyState } from "@/components/ui/patterns"
+import { Badge } from "@/components/ui/badge"
 import { BarChart3, Download, FileText, Users } from "lucide-react"
 import { QUERY_KEYS } from "@/lib/query-keys"
-
 import { logger } from "@/lib/logger"
 
 const log = logger("hr-attendance-reports")
@@ -34,6 +32,7 @@ interface AttendanceReport {
   late_days: number
   absent_days: number
   total_hours: number
+  attendance_rate: number
 }
 
 interface AttendanceRecordRow {
@@ -48,6 +47,36 @@ interface AttendanceRecordRow {
       name?: string | null
     } | null
   } | null
+}
+
+function AttendanceCard({ report }: { report: AttendanceReport }) {
+  return (
+    <div className="space-y-3 rounded-xl border p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="font-semibold">{report.user_name}</p>
+          <p className="text-muted-foreground text-xs">{report.department}</p>
+        </div>
+        <Badge
+          variant={
+            report.attendance_rate >= 80 ? "default" : report.attendance_rate >= 60 ? "secondary" : "destructive"
+          }
+        >
+          {report.attendance_rate}%
+        </Badge>
+      </div>
+      <div className="grid grid-cols-2 gap-3 text-sm">
+        <div>
+          <p className="text-muted-foreground text-xs">Present</p>
+          <p>{report.present_days}</p>
+        </div>
+        <div>
+          <p className="text-muted-foreground text-xs">Absent</p>
+          <p>{report.absent_days}</p>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export default function AttendanceReportsPage() {
@@ -73,15 +102,15 @@ export default function AttendanceReportsPage() {
         .from("attendance_records")
         .select(
           `
-                    *,
-                    user:profiles!attendance_records_user_id_fkey (
-                        id,
-                        first_name,
-                        last_name,
-                        department_id,
-                        department:departments (name)
-                    )
-                `
+          *,
+          user:profiles!attendance_records_user_id_fkey (
+            id,
+            first_name,
+            last_name,
+            department_id,
+            department:departments (name)
+          )
+        `
         )
         .gte("date", filters.start_date)
         .lte("date", filters.end_date)
@@ -89,15 +118,12 @@ export default function AttendanceReportsPage() {
       const { data } = await query
 
       if (data) {
-        // Group by user
         const userMap = new Map<string, AttendanceReport>()
 
         data.forEach((record: AttendanceRecordRow) => {
           const recordUser = record.user
           const userId = recordUser?.id
           if (!userId) return
-
-          // Filter by department if selected
           if (filters.department_id !== "all" && recordUser.department_id !== filters.department_id) return
 
           if (!userMap.has(userId)) {
@@ -110,19 +136,25 @@ export default function AttendanceReportsPage() {
               late_days: 0,
               absent_days: 0,
               total_hours: 0,
+              attendance_rate: 0,
             })
           }
 
           const user = userMap.get(userId)!
-          user.total_days++
+          user.total_days += 1
           user.total_hours += record.total_hours || 0
 
-          if (record.status === "present") user.present_days++
-          else if (record.status === "late") user.late_days++
-          else if (record.status === "absent") user.absent_days++
+          if (record.status === "present") user.present_days += 1
+          else if (record.status === "late") user.late_days += 1
+          else if (record.status === "absent") user.absent_days += 1
         })
 
-        setReports(Array.from(userMap.values()))
+        const computedReports = Array.from(userMap.values()).map((report) => ({
+          ...report,
+          attendance_rate: report.total_days > 0 ? Math.round((report.present_days / report.total_days) * 100) : 0,
+        }))
+
+        setReports(computedReports)
       }
     } catch (error) {
       log.error("Error generating report:", error)
@@ -132,154 +164,270 @@ export default function AttendanceReportsPage() {
   }
 
   function exportCSV() {
-    const headers = ["Name", "Department", "Total Days", "Present", "Late", "Absent", "Total Hours"]
-    const rows = reports.map((r) => [
-      r.user_name,
-      r.department,
-      r.total_days,
-      r.present_days,
-      r.late_days,
-      r.absent_days,
-      r.total_hours.toFixed(1),
+    const headers = ["Name", "Department", "Total Days", "Present", "Late", "Absent", "Total Hours", "Attendance Rate"]
+    const rows = reports.map((report) => [
+      report.user_name,
+      report.department,
+      report.total_days,
+      report.present_days,
+      report.late_days,
+      report.absent_days,
+      report.total_hours.toFixed(1),
+      `${report.attendance_rate}%`,
     ])
-
     const csv = [headers, ...rows].map((row) => row.join(",")).join("\n")
     const blob = new Blob([csv], { type: "text/csv" })
     const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `attendance_report_${filters.start_date}_${filters.end_date}.csv`
-    a.click()
+    const link = document.createElement("a")
+    link.href = url
+    link.download = `attendance_report_${filters.start_date}_${filters.end_date}.csv`
+    link.click()
   }
+
+  const departmentOptions = useMemo(
+    () => departments.map((department) => ({ value: department.name, label: department.name })),
+    [departments]
+  )
 
   const stats = {
     employees: reports.length,
     present: reports.reduce((acc, report) => acc + report.present_days, 0),
     absent: reports.reduce((acc, report) => acc + report.absent_days, 0),
+    averageRate:
+      reports.length > 0
+        ? `${Math.round(reports.reduce((sum, report) => sum + report.attendance_rate, 0) / reports.length)}%`
+        : "-",
   }
 
+  const columns: DataTableColumn<AttendanceReport>[] = [
+    {
+      key: "user_name",
+      label: "Employee",
+      sortable: true,
+      accessor: (report) => report.user_name,
+      render: (report) => <span className="font-medium">{report.user_name}</span>,
+      resizable: true,
+      initialWidth: 200,
+    },
+    { key: "department", label: "Department", sortable: true, accessor: (report) => report.department },
+    {
+      key: "total_days",
+      label: "Total Days",
+      sortable: true,
+      accessor: (report) => report.total_days,
+      align: "center",
+    },
+    {
+      key: "present_days",
+      label: "Present",
+      sortable: true,
+      accessor: (report) => report.present_days,
+      render: (report) => <span className="text-green-600">{report.present_days}</span>,
+      align: "center",
+    },
+    {
+      key: "late_days",
+      label: "Late",
+      sortable: true,
+      accessor: (report) => report.late_days,
+      render: (report) => <span className="text-yellow-600">{report.late_days}</span>,
+      align: "center",
+    },
+    {
+      key: "absent_days",
+      label: "Absent",
+      sortable: true,
+      accessor: (report) => report.absent_days,
+      render: (report) => <span className="text-red-600">{report.absent_days}</span>,
+      align: "center",
+    },
+    {
+      key: "total_hours",
+      label: "Hours",
+      sortable: true,
+      accessor: (report) => report.total_hours,
+      render: (report) => report.total_hours.toFixed(1),
+      align: "center",
+    },
+    {
+      key: "attendance_rate",
+      label: "Attendance Rate",
+      sortable: true,
+      accessor: (report) => report.attendance_rate,
+      render: (report) => (
+        <Badge
+          variant={
+            report.attendance_rate >= 80 ? "default" : report.attendance_rate >= 60 ? "secondary" : "destructive"
+          }
+        >
+          {report.attendance_rate}%
+        </Badge>
+      ),
+    },
+  ]
+
+  const reportFilters: DataTableFilter<AttendanceReport>[] = [
+    {
+      key: "department",
+      label: "Department",
+      options: departmentOptions,
+      placeholder: "All Departments",
+    },
+    {
+      key: "rate_band",
+      label: "Attendance Band",
+      options: [
+        { value: "excellent", label: "80%+" },
+        { value: "watch", label: "60-79%" },
+        { value: "risk", label: "Below 60%" },
+      ],
+      placeholder: "All Bands",
+      mode: "custom",
+      filterFn: (report, values) => {
+        if (values.length === 0) return true
+        return values.some((value) => {
+          if (value === "excellent") return report.attendance_rate >= 80
+          if (value === "watch") return report.attendance_rate >= 60 && report.attendance_rate < 80
+          if (value === "risk") return report.attendance_rate < 60
+          return false
+        })
+      },
+    },
+  ]
+
   return (
-    <AdminTablePage
+    <DataTablePage
       title="Attendance Reports"
-      description="Generate and export attendance reports"
+      description="Generate, review, and export attendance performance reports."
       icon={BarChart3}
-      backLinkHref="/admin/hr"
-      backLinkLabel="Back to Attendance"
+      backLink={{ href: "/admin/hr", label: "Back to HR" }}
+      actions={
+        <div className="flex items-center gap-2">
+          <Button onClick={generateReport} disabled={loading} size="sm">
+            <FileText className="mr-2 h-4 w-4" />
+            {loading ? "Generating..." : "Generate Report"}
+          </Button>
+          <Button variant="outline" onClick={exportCSV} disabled={reports.length === 0} size="sm">
+            <Download className="mr-2 h-4 w-4" />
+            Export CSV
+          </Button>
+        </div>
+      }
       stats={
-        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 md:gap-4">
-          <StatCard title="Employees" value={stats.employees} icon={Users} />
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <StatCard
+            title="Employees"
+            value={stats.employees}
+            icon={Users}
+            iconBgColor="bg-blue-500/10"
+            iconColor="text-blue-500"
+          />
           <StatCard
             title="Present Days"
             value={stats.present}
             icon={FileText}
-            iconBgColor="bg-green-100 dark:bg-green-900/30"
-            iconColor="text-green-600 dark:text-green-400"
+            iconBgColor="bg-emerald-500/10"
+            iconColor="text-emerald-500"
           />
           <StatCard
             title="Absent Days"
             value={stats.absent}
             icon={FileText}
-            iconBgColor="bg-red-100 dark:bg-red-900/30"
-            iconColor="text-red-600 dark:text-red-400"
+            iconBgColor="bg-amber-500/10"
+            iconColor="text-amber-500"
+          />
+          <StatCard
+            title="Avg Attendance"
+            value={stats.averageRate}
+            icon={BarChart3}
+            iconBgColor="bg-violet-500/10"
+            iconColor="text-violet-500"
           />
         </div>
       }
-      filters={
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-          <div className="space-y-2">
-            <Label>Department</Label>
-            <Select
-              value={filters.department_id}
-              onValueChange={(value) => setFilters({ ...filters, department_id: value })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="All departments" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Departments</SelectItem>
-                {departments.map((dept) => (
-                  <SelectItem key={dept.id} value={dept.id}>
-                    {dept.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>Start Date</Label>
-            <Input
-              type="date"
-              value={filters.start_date}
-              onChange={(e) => setFilters({ ...filters, start_date: e.target.value })}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>End Date</Label>
-            <Input
-              type="date"
-              value={filters.end_date}
-              onChange={(e) => setFilters({ ...filters, end_date: e.target.value })}
-            />
-          </div>
-          <div className="flex items-end">
-            <Button onClick={generateReport} disabled={loading} className="w-full">
-              <FileText className="mr-2 h-4 w-4" />
-              Generate Report
-            </Button>
-          </div>
-        </div>
-      }
     >
-      {reports.length > 0 ? (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Report Results</CardTitle>
-              <Button variant="outline" onClick={exportCSV}>
-                <Download className="mr-2 h-4 w-4" />
-                Export CSV
-              </Button>
+      <div className="grid grid-cols-1 gap-4 rounded-xl border p-4 md:grid-cols-4">
+        <div className="space-y-2">
+          <Label>Department</Label>
+          <Select
+            value={filters.department_id}
+            onValueChange={(value) => setFilters({ ...filters, department_id: value })}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="All departments" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Departments</SelectItem>
+              {departments.map((department) => (
+                <SelectItem key={department.id} value={department.id}>
+                  {department.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label>Start Date</Label>
+          <Input
+            type="date"
+            value={filters.start_date}
+            onChange={(event) => setFilters({ ...filters, start_date: event.target.value })}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>End Date</Label>
+          <Input
+            type="date"
+            value={filters.end_date}
+            onChange={(event) => setFilters({ ...filters, end_date: event.target.value })}
+          />
+        </div>
+        <div className="flex items-end">
+          <Button onClick={generateReport} disabled={loading} className="w-full">
+            <FileText className="mr-2 h-4 w-4" />
+            Generate
+          </Button>
+        </div>
+      </div>
+
+      <DataTable<AttendanceReport>
+        data={reports}
+        columns={columns}
+        filters={reportFilters}
+        getRowId={(report) => report.user_id}
+        searchPlaceholder="Search employee or department..."
+        searchFn={(report, query) => [report.user_name, report.department].join(" ").toLowerCase().includes(query)}
+        isLoading={loading}
+        expandable={{
+          render: (report) => (
+            <div className="grid gap-4 text-sm sm:grid-cols-4">
+              <div>
+                <p className="text-muted-foreground text-xs">Total Days</p>
+                <p className="mt-1">{report.total_days}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Present Days</p>
+                <p className="mt-1">{report.present_days}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Late Days</p>
+                <p className="mt-1">{report.late_days}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Absent Days</p>
+                <p className="mt-1">{report.absent_days}</p>
+              </div>
             </div>
-            <CardDescription>{reports.length} employees</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Department</TableHead>
-                    <TableHead className="text-center">Total Days</TableHead>
-                    <TableHead className="text-center">Present</TableHead>
-                    <TableHead className="text-center">Late</TableHead>
-                    <TableHead className="text-center">Absent</TableHead>
-                    <TableHead className="text-center">Hours</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {reports.map((report) => (
-                    <TableRow key={report.user_id}>
-                      <TableCell className="font-medium">{report.user_name}</TableCell>
-                      <TableCell>{report.department}</TableCell>
-                      <TableCell className="text-center">{report.total_days}</TableCell>
-                      <TableCell className="text-center text-green-600">{report.present_days}</TableCell>
-                      <TableCell className="text-center text-yellow-600">{report.late_days}</TableCell>
-                      <TableCell className="text-center text-red-600">{report.absent_days}</TableCell>
-                      <TableCell className="text-center">{report.total_hours.toFixed(1)}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <EmptyState
-          icon={FileText}
-          title={loading ? "Generating report..." : "No report generated"}
-          description="Pick a date range and generate attendance results."
-        />
-      )}
-    </AdminTablePage>
+          ),
+        }}
+        viewToggle
+        cardRenderer={(report) => <AttendanceCard report={report} />}
+        emptyTitle={loading ? "Generating report..." : "No report generated"}
+        emptyDescription="Pick a date range and generate attendance results."
+        emptyIcon={FileText}
+        skeletonRows={6}
+        minWidth="1100px"
+      />
+    </DataTablePage>
   )
 }

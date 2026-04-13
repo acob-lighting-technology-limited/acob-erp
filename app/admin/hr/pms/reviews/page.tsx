@@ -2,122 +2,21 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useQueryClient } from "@tanstack/react-query"
-import Link from "next/link"
-import { Download, FileText, Loader2, Plus, Search } from "lucide-react"
-import { PageHeader, PageWrapper } from "@/components/layout"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { useRouter } from "next/navigation"
+import { Download, FileText, Plus, Users, BarChart3, CheckCircle2, RefreshCw, Clock, TrendingUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Badge } from "@/components/ui/badge"
+import { Progress } from "@/components/ui/progress"
+import { StatCard } from "@/components/ui/stat-card"
+import { Card, CardContent } from "@/components/ui/card"
+import { DataTable, DataTablePage } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
 import { CreateReviewDialog } from "../../performance/_components/create-review-dialog"
 import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
 import { exportPmsRowsToExcel, exportPmsRowsToPdf } from "@/lib/pms/export"
-import { Badge } from "@/components/ui/badge"
+import { CalibrationView } from "./_components/calibration-view"
 
-// ─── Calibration sub-component ──────────────────────────────────────────────
-function CalibrationView({ reviews }: { reviews: ReviewRow[] }) {
-  const byDept = useMemo(() => {
-    const map = new Map<string, ReviewRow[]>()
-    for (const r of reviews) {
-      if (typeof r.final_score !== "number") continue
-      const dept = r.user?.department || "Unassigned"
-      const list = map.get(dept) || []
-      list.push(r)
-      map.set(dept, list)
-    }
-
-    return Array.from(map.entries()).map(([dept, rows]) => {
-      const scores = rows
-        .map((r) => r.final_score as number)
-        .filter((s): s is number => typeof s === "number")
-        .sort((a, b) => b - a)
-
-      const mean =
-        scores.length > 0 ? Math.round((scores.reduce((s, v) => s + v, 0) / scores.length) * 100) / 100 : null
-
-      const variance =
-        scores.length > 1 && mean !== null
-          ? scores.reduce((s, v) => s + Math.pow(v - mean, 2), 0) / (scores.length - 1)
-          : 0
-      const stddev = Math.round(Math.sqrt(variance) * 100) / 100
-
-      const ranked = rows
-        .filter((r) => typeof r.final_score === "number")
-        .sort((a, b) => (b.final_score as number) - (a.final_score as number))
-        .map((r, i) => ({
-          name: `${r.user?.first_name || ""} ${r.user?.last_name || ""}`.trim() || "Employee",
-          score: r.final_score as number,
-          rank: i + 1,
-          percentile: scores.length > 0 ? Math.round(((scores.length - i) / scores.length) * 100 * 100) / 100 : 0,
-          z_score:
-            stddev > 0 && mean !== null ? Math.round((((r.final_score as number) - mean) / stddev) * 100) / 100 : 0,
-        }))
-
-      return { dept, mean, stddev, count: scores.length, ranked }
-    })
-  }, [reviews])
-
-  if (byDept.length === 0) {
-    return (
-      <p className="text-muted-foreground py-8 text-center text-sm">
-        No completed reviews with final scores to calibrate. Use the filters above to narrow to a cycle.
-      </p>
-    )
-  }
-
-  return (
-    <div className="space-y-6">
-      {byDept.map(({ dept, mean, stddev, count, ranked }) => (
-        <div key={dept}>
-          <div className="mb-2 flex items-center gap-3">
-            <h3 className="font-semibold">{dept}</h3>
-            <span className="text-muted-foreground text-sm">
-              {count} employee{count !== 1 ? "s" : ""} · Mean: <strong>{mean ?? "-"}%</strong> · Std Dev:{" "}
-              <strong>{stddev}%</strong>
-            </span>
-          </div>
-          <div className="overflow-x-auto">
-            <Table className="min-w-[700px]">
-              <TableHeader className="bg-emerald-50 dark:bg-emerald-950/30">
-                <TableRow>
-                  <TableHead className="w-12">Rank</TableHead>
-                  <TableHead>Employee</TableHead>
-                  <TableHead>Score</TableHead>
-                  <TableHead>Percentile</TableHead>
-                  <TableHead>Z-Score</TableHead>
-                  <TableHead>Tier</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {ranked.map((entry) => (
-                  <TableRow key={entry.name + entry.rank}>
-                    <TableCell className="font-medium">#{entry.rank}</TableCell>
-                    <TableCell>{entry.name}</TableCell>
-                    <TableCell className="font-medium">{entry.score}%</TableCell>
-                    <TableCell>{entry.percentile}%</TableCell>
-                    <TableCell className={entry.z_score >= 0 ? "text-green-600" : "text-red-500"}>
-                      {entry.z_score > 0 ? "+" : ""}
-                      {entry.z_score}σ
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={entry.percentile >= 80 ? "default" : entry.percentile >= 40 ? "secondary" : "outline"}
-                      >
-                        {entry.percentile >= 80 ? "High Performer" : entry.percentile >= 40 ? "Core" : "Needs Support"}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </div>
-      ))}
-    </div>
-  )
-}
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 type ReviewRow = {
   id: string
@@ -143,57 +42,264 @@ type ReviewRow = {
   } | null
 }
 
-type ReviewsApiPayload = {
-  data?: ReviewRow[]
-  error?: string
+type DeptRow = {
+  id: string
+  cycleId: string
+  cycle: string
+  department: string
+  reviews: number
+  submitted: number
+  kpi: string
+  cbt: string
+  attendance: string
+  behaviour: string
+  final: string
+}
+
+type CycleRow = {
+  id: string
+  cycleId: string
+  cycle: string
+  review_type: string
+  reviews: number
+  submitted: number
+  departments: number
+  completed: number
 }
 
 type TabMode = "individual" | "department" | "cycle" | "calibration"
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function formatMetric(value: number | null | undefined): string {
+  return typeof value === "number" && Number.isFinite(value) ? value.toFixed(2).replace(/\.00$/, "") : "-"
+}
+
+function isSubmittedReview(r: ReviewRow) {
+  return ["submitted", "completed"].includes(String(r.status ?? "").toLowerCase())
+}
+
+function isCompletedReview(r: ReviewRow) {
+  return String(r.status ?? "").toLowerCase() === "completed"
+}
+
 function reviewStatusPriority(status: string | null | undefined) {
-  const normalized = String(status || "").toLowerCase()
-  if (normalized === "completed") return 3
-  if (normalized === "submitted") return 2
-  if (normalized === "draft") return 1
+  const s = String(status ?? "").toLowerCase()
+  if (s === "completed") return 3
+  if (s === "submitted") return 2
+  if (s === "draft") return 1
   return 0
 }
 
 function pickCanonicalReview(rows: ReviewRow[]): ReviewRow {
-  return [...rows].sort((left, right) => {
-    const statusDiff = reviewStatusPriority(right.status) - reviewStatusPriority(left.status)
-    if (statusDiff !== 0) return statusDiff
-    return new Date(right.created_at).getTime() - new Date(left.created_at).getTime()
+  return [...rows].sort((a, b) => {
+    const diff = reviewStatusPriority(b.status) - reviewStatusPriority(a.status)
+    if (diff !== 0) return diff
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   })[0]
 }
 
-function formatMetric(value: number | null | undefined) {
-  return typeof value === "number" && Number.isFinite(value) ? value.toFixed(2).replace(/\.00$/, "") : "-"
+function employeeName(r: ReviewRow) {
+  return `${r.user?.first_name ?? ""} ${r.user?.last_name ?? ""}`.trim() || "Employee"
 }
 
-function isSubmittedReview(review: ReviewRow) {
-  return ["submitted", "completed"].includes(String(review.status || "").toLowerCase())
+function StatusBadge({ status }: { status: string | null }) {
+  const s = String(status ?? "").toLowerCase()
+  if (s === "completed")
+    return (
+      <Badge variant="default" className="bg-emerald-600">
+        Completed
+      </Badge>
+    )
+  if (s === "submitted") return <Badge variant="secondary">Submitted</Badge>
+  if (s === "draft") return <Badge variant="outline">Draft</Badge>
+  return <span className="text-muted-foreground text-sm">—</span>
 }
+
+function ScoreBar({ label, value }: { label: string; value: number | null }) {
+  if (value === null || !Number.isFinite(value)) return null
+  const pct = Math.min(100, Math.max(0, value))
+  const color = pct >= 80 ? "bg-emerald-500" : pct >= 60 ? "bg-amber-500" : "bg-red-500"
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between text-xs">
+        <span className="text-muted-foreground">{label}</span>
+        <span className="font-medium">{value?.toFixed(1)}%</span>
+      </div>
+      <div className="bg-muted h-1.5 w-full overflow-hidden rounded-full">
+        <div className={`h-full rounded-full transition-all ${color}`} style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  )
+}
+
+// ─── Individual review — expandable detail ────────────────────────────────────
+
+function ReviewExpandedDetail({ row }: { row: ReviewRow }) {
+  const scores = [
+    { label: "KPI Score", value: row.kpi_score },
+    { label: "Competency (CBT)", value: row.cbt_score },
+    { label: "Attendance", value: row.attendance_score },
+    { label: "Behaviour", value: row.behaviour_score },
+  ]
+  const hasScores = scores.some((s) => s.value !== null)
+
+  return (
+    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="space-y-1 lg:col-span-2">
+        <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">Score Breakdown</p>
+        {hasScores ? (
+          <div className="space-y-3 pt-1">
+            {scores.map((s) => (s.value !== null ? <ScoreBar key={s.label} label={s.label} value={s.value} /> : null))}
+          </div>
+        ) : (
+          <p className="text-muted-foreground text-sm">No scores recorded yet.</p>
+        )}
+      </div>
+
+      <div className="space-y-3">
+        <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">Summary</p>
+        <div className="space-y-2 text-sm">
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Final Score</span>
+            <span className="font-semibold">{row.final_score !== null ? `${row.final_score?.toFixed(2)}%` : "—"}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Status</span>
+            <StatusBadge status={row.status} />
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Cycle</span>
+            <span>{row.cycle?.name ?? "—"}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Type</span>
+            <span>{row.cycle?.review_type ?? "—"}</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">Employee</p>
+        <div className="space-y-2 text-sm">
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Name</span>
+            <span className="font-medium">{employeeName(row)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Department</span>
+            <span>{row.user?.department ?? "—"}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Individual review — card renderer ───────────────────────────────────────
+
+function ReviewCard({ row, onEdit }: { row: ReviewRow; onEdit: (r: ReviewRow) => void }) {
+  const final = row.final_score
+  const pct = final !== null && Number.isFinite(final) ? Math.min(100, Math.max(0, final)) : null
+  const color =
+    pct !== null
+      ? pct >= 80
+        ? "text-emerald-600"
+        : pct >= 60
+          ? "text-amber-600"
+          : "text-red-600"
+      : "text-muted-foreground"
+
+  return (
+    <Card className="transition-shadow hover:shadow-md">
+      <CardContent className="space-y-3 p-4">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <p className="leading-tight font-semibold">{employeeName(row)}</p>
+            <p className="text-muted-foreground mt-0.5 text-xs">{row.user?.department ?? "—"}</p>
+          </div>
+          <StatusBadge status={row.status} />
+        </div>
+
+        {/* Quarter chip */}
+        <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
+          <Clock className="h-3.5 w-3.5" />
+          {row.cycle?.name ?? "No cycle"}
+        </div>
+
+        {/* Final score */}
+        {pct !== null && (
+          <div className="space-y-1">
+            <div className="flex justify-between text-xs">
+              <span className="text-muted-foreground">Final Score</span>
+              <span className={`font-bold ${color}`}>{final?.toFixed(1)}%</span>
+            </div>
+            <div className="bg-muted h-2 w-full overflow-hidden rounded-full">
+              <div
+                className={`h-full rounded-full ${pct >= 80 ? "bg-emerald-500" : pct >= 60 ? "bg-amber-500" : "bg-red-500"}`}
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Score chips */}
+        <div className="flex flex-wrap gap-1.5 text-xs">
+          {[
+            { label: "KPI", value: row.kpi_score },
+            { label: "CBT", value: row.cbt_score },
+            { label: "Att.", value: row.attendance_score },
+            { label: "Beh.", value: row.behaviour_score },
+          ].map((s) => (
+            <span key={s.label} className="bg-muted rounded px-1.5 py-0.5 font-mono">
+              {s.label} {formatMetric(s.value)}
+            </span>
+          ))}
+        </div>
+
+        {/* Edit button */}
+        {row.review_cycle_id && (
+          <Button size="sm" variant="outline" className="w-full" onClick={() => onEdit(row)}>
+            Edit Review
+          </Button>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const PAGE_SIZE = 50
+
+const TABS: DataTableTab[] = [
+  { key: "individual", label: "Individual" },
+  { key: "department", label: "Department" },
+  { key: "cycle", label: "Cycle" },
+  { key: "calibration", label: "Calibration" },
+]
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function AdminPmsReviewsPage() {
+  const router = useRouter()
   const queryClient = useQueryClient()
   const [tab, setTab] = useState<TabMode>("individual")
-  const [isCreateReviewOpen, setIsCreateReviewOpen] = useState(false)
-  const PAGE_SIZE = 50
+  const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [isExportOpen, setIsExportOpen] = useState(false)
   const [isInitialLoading, setIsInitialLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [reviews, setReviews] = useState<ReviewRow[]>([])
   const [totalReviews, setTotalReviews] = useState(0)
-  const [page, setPage] = useState(0)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [quarterFilter, setQuarterFilter] = useState("all")
-  const [departmentFilter, setDepartmentFilter] = useState("all")
-  const [employeeFilter, setEmployeeFilter] = useState("all")
-  const [isExportOpen, setIsExportOpen] = useState(false)
-  const hasLoadedReviewsRef = useRef(false)
+  const [serverPage, setServerPage] = useState(0)
+  const hasLoadedRef = useRef(false)
+
+  // ─── Data ─────────────────────────────────────────────────────────────────
 
   const loadReviews = useCallback(async (pageIndex = 0) => {
-    if (hasLoadedReviewsRef.current) {
+    if (hasLoadedRef.current) {
       setIsRefreshing(true)
     } else {
       setIsInitialLoading(true)
@@ -204,15 +310,19 @@ export default function AdminPmsReviewsPage() {
         limit: String(PAGE_SIZE),
         offset: String(pageIndex * PAGE_SIZE),
       })
-      const response = await fetch(`/api/hr/performance/reviews?${params}`, { cache: "no-store" })
-      const payload = (await response.json().catch(() => null)) as ReviewsApiPayload | null
-      if (!response.ok) throw new Error(payload?.error || "Failed to load reviews")
-      setReviews(payload?.data || [])
-      setTotalReviews((payload as { meta?: { total?: number } })?.meta?.total ?? payload?.data?.length ?? 0)
-      setPage(pageIndex)
-      hasLoadedReviewsRef.current = true
-    } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Failed to load reviews")
+      const res = await fetch(`/api/hr/performance/reviews?${params}`, { cache: "no-store" })
+      const payload = (await res.json().catch(() => null)) as {
+        data?: ReviewRow[]
+        error?: string
+        meta?: { total?: number }
+      } | null
+      if (!res.ok) throw new Error(payload?.error ?? "Failed to load reviews")
+      setReviews(payload?.data ?? [])
+      setTotalReviews(payload?.meta?.total ?? payload?.data?.length ?? 0)
+      setServerPage(pageIndex)
+      hasLoadedRef.current = true
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load reviews")
     } finally {
       setIsInitialLoading(false)
       setIsRefreshing(false)
@@ -223,479 +333,666 @@ export default function AdminPmsReviewsPage() {
     void loadReviews()
   }, [loadReviews])
 
+  // ─── Derived: canonical reviews (one per employee per cycle) ─────────────
+
   const canonicalReviews = useMemo(() => {
     const grouped = new Map<string, ReviewRow[]>()
-    for (const review of reviews) {
-      const key = `${review.user_id || review.id}:${review.review_cycle_id || "no-cycle"}`
-      const current = grouped.get(key) || []
-      current.push(review)
-      grouped.set(key, current)
+    for (const r of reviews) {
+      const key = `${r.user_id ?? r.id}:${r.review_cycle_id ?? "no-cycle"}`
+      grouped.set(key, [...(grouped.get(key) ?? []), r])
     }
-    return Array.from(grouped.values()).map((entries) => pickCanonicalReview(entries))
+    return Array.from(grouped.values()).map(pickCanonicalReview)
   }, [reviews])
 
-  const quarterOptions = useMemo(
-    () => Array.from(new Set(canonicalReviews.map((review) => review.cycle?.name).filter(Boolean) as string[])).sort(),
-    [canonicalReviews]
-  )
-
   const departmentOptions = useMemo(
-    () =>
-      Array.from(new Set(canonicalReviews.map((review) => review.user?.department).filter(Boolean) as string[])).sort(),
+    () => Array.from(new Set(canonicalReviews.map((r) => r.user?.department).filter(Boolean) as string[])).sort(),
     [canonicalReviews]
   )
 
-  const filteredCanonicalReviews = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase()
-    return canonicalReviews.filter((review) => {
-      const employee = `${review.user?.first_name || ""} ${review.user?.last_name || ""}`.trim().toLowerCase()
-      const department = String(review.user?.department || "").toLowerCase()
-      const cycle = String(review.cycle?.name || "").toLowerCase()
-      const matchesQuery =
-        query.length === 0 || employee.includes(query) || department.includes(query) || cycle.includes(query)
-      const matchesQuarter = quarterFilter === "all" || review.cycle?.name === quarterFilter
-      const matchesDepartment = departmentFilter === "all" || review.user?.department === departmentFilter
-      const matchesEmployee = employeeFilter === "all" || review.user?.id === employeeFilter
-      return matchesQuery && matchesQuarter && matchesDepartment && matchesEmployee
-    })
-  }, [canonicalReviews, departmentFilter, quarterFilter, searchQuery, employeeFilter])
+  const quarterOptions = useMemo(
+    () => Array.from(new Set(canonicalReviews.map((r) => r.cycle?.name).filter(Boolean) as string[])).sort(),
+    [canonicalReviews]
+  )
 
-  const departmentRows = useMemo(() => {
+  const reviewTypeOptions = useMemo(
+    () => Array.from(new Set(canonicalReviews.map((r) => r.cycle?.review_type).filter(Boolean) as string[])).sort(),
+    [canonicalReviews]
+  )
+
+  // ─── Derived: department rows ─────────────────────────────────────────────
+
+  const deptRows = useMemo((): DeptRow[] => {
     const grouped = new Map<string, ReviewRow[]>()
-    for (const review of filteredCanonicalReviews) {
-      const key = `${review.cycle?.id || "no-cycle"}::${review.user?.department || "Unknown"}`
-      const current = grouped.get(key) || []
-      current.push(review)
-      grouped.set(key, current)
+    for (const r of canonicalReviews) {
+      const key = `${r.cycle?.id ?? "no-cycle"}::${r.user?.department ?? "Unknown"}`
+      grouped.set(key, [...(grouped.get(key) ?? []), r])
     }
     return Array.from(grouped.entries()).map(([key, rows]) => {
       const [cycleId, department] = key.split("::")
-      const avg = (pick: (review: ReviewRow) => number | null) => {
-        const values = rows
-          .filter((review) => isSubmittedReview(review))
+      const avg = (pick: (r: ReviewRow) => number | null): string => {
+        const vals = rows
+          .filter(isSubmittedReview)
           .map(pick)
-          .filter((value): value is number => value !== null)
-        if (values.length === 0) return "-"
-        return formatMetric(values.reduce((sum, value) => sum + value, 0) / values.length)
+          .filter((v): v is number => v !== null)
+        return vals.length === 0 ? "-" : formatMetric(vals.reduce((s, v) => s + v, 0) / vals.length)
       }
-      const submitted = rows.filter((review) => isSubmittedReview(review)).length
       return {
-        cycleId,
-        cycle: rows[0]?.cycle?.name || "Performance Review",
-        department,
+        id: key,
+        cycleId: cycleId ?? "no-cycle",
+        cycle: rows[0]?.cycle?.name ?? "Performance Review",
+        department: department ?? "Unknown",
         reviews: rows.length,
-        submitted,
-        kpi: avg((review) => review.kpi_score),
-        cbt: avg((review) => review.cbt_score),
-        attendance: avg((review) => review.attendance_score),
-        behaviour: avg((review) => review.behaviour_score),
-        final: avg((review) => review.final_score),
+        submitted: rows.filter(isSubmittedReview).length,
+        kpi: avg((r) => r.kpi_score),
+        cbt: avg((r) => r.cbt_score),
+        attendance: avg((r) => r.attendance_score),
+        behaviour: avg((r) => r.behaviour_score),
+        final: avg((r) => r.final_score),
       }
     })
-  }, [filteredCanonicalReviews])
+  }, [canonicalReviews])
 
-  const cycleRows = useMemo(() => {
+  // ─── Derived: cycle rows ──────────────────────────────────────────────────
+
+  const cycleRows = useMemo((): CycleRow[] => {
     const grouped = new Map<string, ReviewRow[]>()
-    for (const review of filteredCanonicalReviews) {
-      const key = review.cycle?.id || "no-cycle"
-      const current = grouped.get(key) || []
-      current.push(review)
-      grouped.set(key, current)
+    for (const r of canonicalReviews) {
+      const key = r.cycle?.id ?? "no-cycle"
+      grouped.set(key, [...(grouped.get(key) ?? []), r])
     }
     return Array.from(grouped.entries()).map(([cycleId, rows]) => ({
+      id: cycleId,
       cycleId,
-      cycle: rows[0]?.cycle?.name || "Performance Review",
-      review_type: rows[0]?.cycle?.review_type || "-",
+      cycle: rows[0]?.cycle?.name ?? "Performance Review",
+      review_type: rows[0]?.cycle?.review_type ?? "-",
       reviews: rows.length,
-      submitted: rows.filter((review) => isSubmittedReview(review)).length,
-      departments: new Set(rows.map((review) => review.user?.department).filter(Boolean)).size,
-      completed: rows.filter((review) => String(review.status || "").toLowerCase() === "completed").length,
+      submitted: rows.filter(isSubmittedReview).length,
+      departments: new Set(rows.map((r) => r.user?.department).filter(Boolean)).size,
+      completed: rows.filter(isCompletedReview).length,
     }))
-  }, [filteredCanonicalReviews])
+  }, [canonicalReviews])
+
+  // ─── Stats ────────────────────────────────────────────────────────────────
+
+  const totalCount =
+    tab === "individual" ? canonicalReviews.length : tab === "department" ? deptRows.length : cycleRows.length
+
+  const submittedCount = useMemo(() => {
+    if (tab === "individual") return canonicalReviews.filter(isSubmittedReview).length
+    if (tab === "department") return deptRows.reduce((s, r) => s + r.submitted, 0)
+    return cycleRows.reduce((s, r) => s + r.submitted, 0)
+  }, [tab, canonicalReviews, deptRows, cycleRows])
+
+  const completedCount = useMemo(() => {
+    if (tab === "individual") return canonicalReviews.filter(isCompletedReview).length
+    if (tab === "department") return 0
+    return cycleRows.reduce((s, r) => s + r.completed, 0)
+  }, [tab, canonicalReviews, cycleRows])
+
+  const activeQuarter = quarterOptions.at(-1) ?? "—"
+
+  // ─── Export rows ──────────────────────────────────────────────────────────
 
   const exportRows = useMemo(() => {
-    if (tab === "individual") {
-      return filteredCanonicalReviews.map((review, index) => ({
-        "S/N": index + 1,
-        Employee: `${review.user?.first_name || ""} ${review.user?.last_name || ""}`.trim() || "Employee",
-        Department: review.user?.department || "-",
-        Quarter: review.cycle?.name || "-",
-        KPI: formatMetric(review.kpi_score),
-        CBT: formatMetric(review.cbt_score),
-        Attendance: formatMetric(review.attendance_score),
-        Behaviour: formatMetric(review.behaviour_score),
-        Final: formatMetric(review.final_score),
+    if (tab === "individual")
+      return canonicalReviews.map((r, i) => ({
+        "S/N": i + 1,
+        Employee: employeeName(r),
+        Department: r.user?.department ?? "-",
+        Quarter: r.cycle?.name ?? "-",
+        "Review Type": r.cycle?.review_type ?? "-",
+        KPI: formatMetric(r.kpi_score),
+        CBT: formatMetric(r.cbt_score),
+        Attendance: formatMetric(r.attendance_score),
+        Behaviour: formatMetric(r.behaviour_score),
+        "Final Score": formatMetric(r.final_score),
+        Status: r.status ?? "-",
       }))
-    }
-    if (tab === "department") {
-      return departmentRows.map((row, index) => ({
-        "S/N": index + 1,
-        Department: row.department,
-        Quarter: row.cycle,
-        Reviews: row.reviews,
-        Submitted: row.submitted,
-        KPI: row.kpi,
-        CBT: row.cbt,
-        Attendance: row.attendance,
-        Behaviour: row.behaviour,
-        Final: row.final,
+    if (tab === "department")
+      return deptRows.map((r, i) => ({
+        "S/N": i + 1,
+        Department: r.department,
+        Quarter: r.cycle,
+        "Total Reviews": r.reviews,
+        Submitted: r.submitted,
+        "Avg KPI": r.kpi,
+        "Avg CBT": r.cbt,
+        "Avg Attendance": r.attendance,
+        "Avg Behaviour": r.behaviour,
+        "Avg Final": r.final,
       }))
-    }
-    return cycleRows.map((row, index) => ({
-      "S/N": index + 1,
-      Quarter: row.cycle,
-      "Review Type": row.review_type,
-      "Employee Count": row.reviews,
-      Submitted: row.submitted,
-      Departments: row.departments,
-      Completed: row.completed,
+    return cycleRows.map((r, i) => ({
+      "S/N": i + 1,
+      Quarter: r.cycle,
+      "Review Type": r.review_type,
+      "Employee Count": r.reviews,
+      Submitted: r.submitted,
+      Departments: r.departments,
+      Completed: r.completed,
     }))
-  }, [cycleRows, departmentRows, filteredCanonicalReviews, tab])
+  }, [tab, canonicalReviews, deptRows, cycleRows])
+
+  // ─── Navigation helpers ───────────────────────────────────────────────────
+
+  const goToIndividualCycle = useCallback(
+    (cycleId: string) => {
+      router.push(`/admin/hr/pms/reviews/${encodeURIComponent(cycleId)}?mode=individual`)
+    },
+    [router]
+  )
+
+  const goDeptCycle = useCallback(
+    (cycleId: string, department: string) => {
+      router.push(
+        `/admin/hr/pms/reviews/${encodeURIComponent(cycleId)}?mode=department&department=${encodeURIComponent(department)}`
+      )
+    },
+    [router]
+  )
+
+  // ─── Column definitions ───────────────────────────────────────────────────
+
+  const individualColumns: DataTableColumn<ReviewRow>[] = useMemo(
+    () => [
+      {
+        key: "employee",
+        label: "Employee",
+        sortable: true,
+        resizable: true,
+        initialWidth: 180,
+        accessor: (r) => employeeName(r),
+        render: (r) => <span className="font-medium">{employeeName(r)}</span>,
+      },
+      {
+        key: "department",
+        label: "Department",
+        sortable: true,
+        accessor: (r) => r.user?.department ?? "",
+        hideOnMobile: true,
+      },
+      {
+        key: "quarter",
+        label: "Quarter",
+        sortable: true,
+        accessor: (r) => r.cycle?.name ?? "",
+      },
+      {
+        key: "kpi",
+        label: "KPI",
+        accessor: (r) => formatMetric(r.kpi_score),
+        align: "center",
+      },
+      {
+        key: "cbt",
+        label: "CBT",
+        accessor: (r) => formatMetric(r.cbt_score),
+        align: "center",
+        hideOnMobile: true,
+      },
+      {
+        key: "attendance",
+        label: "Attendance",
+        accessor: (r) => formatMetric(r.attendance_score),
+        align: "center",
+        hideOnMobile: true,
+      },
+      {
+        key: "behaviour",
+        label: "Behaviour",
+        accessor: (r) => formatMetric(r.behaviour_score),
+        align: "center",
+        hideOnMobile: true,
+      },
+      {
+        key: "final",
+        label: "Final",
+        align: "center",
+        accessor: (r) => r.final_score ?? -1,
+        render: (r) => {
+          const v = r.final_score
+          if (v === null || !Number.isFinite(v)) return <span className="text-muted-foreground">—</span>
+          const color = v >= 80 ? "text-emerald-600" : v >= 60 ? "text-amber-600" : "text-red-600"
+          return <span className={`font-semibold ${color}`}>{v.toFixed(1)}%</span>
+        },
+      },
+      {
+        key: "status",
+        label: "Status",
+        // accessor is required so the "Status" filter can match against it
+        accessor: (r) => String(r.status ?? "").toLowerCase(),
+        render: (r) => <StatusBadge status={r.status} />,
+      },
+    ],
+    []
+  )
+
+  const deptColumns: DataTableColumn<DeptRow>[] = useMemo(
+    () => [
+      {
+        key: "department",
+        label: "Department",
+        sortable: true,
+        resizable: true,
+        initialWidth: 180,
+        accessor: (r) => r.department,
+        render: (r) => <span className="font-medium">{r.department}</span>,
+      },
+      { key: "cycle", label: "Quarter", sortable: true, accessor: (r) => r.cycle },
+      {
+        key: "reviews",
+        label: "Reviews",
+        align: "center",
+        accessor: (r) => String(r.reviews),
+        render: (r) => <span className="font-medium">{r.reviews}</span>,
+      },
+      {
+        key: "submitted",
+        label: "Submitted",
+        align: "center",
+        accessor: (r) => String(r.submitted),
+        render: (r) => {
+          const pct = r.reviews > 0 ? Math.round((r.submitted / r.reviews) * 100) : 0
+          return (
+            <div className="flex flex-col items-center gap-0.5">
+              <span className="font-medium">{r.submitted}</span>
+              <span className="text-muted-foreground text-xs">{pct}%</span>
+            </div>
+          )
+        },
+      },
+      { key: "kpi", label: "Avg KPI", align: "center", accessor: (r) => r.kpi },
+      { key: "cbt", label: "Avg CBT", align: "center", accessor: (r) => r.cbt, hideOnMobile: true },
+      { key: "attendance", label: "Avg Att.", align: "center", accessor: (r) => r.attendance, hideOnMobile: true },
+      { key: "behaviour", label: "Avg Beh.", align: "center", accessor: (r) => r.behaviour, hideOnMobile: true },
+      {
+        key: "final",
+        label: "Avg Final",
+        align: "center",
+        accessor: (r) => r.final,
+        render: (r) => <span className="font-semibold">{r.final}</span>,
+      },
+    ],
+    []
+  )
+
+  const cycleColumns: DataTableColumn<CycleRow>[] = useMemo(
+    () => [
+      {
+        key: "cycle",
+        label: "Quarter",
+        sortable: true,
+        resizable: true,
+        initialWidth: 200,
+        accessor: (r) => r.cycle,
+        render: (r) => <span className="font-medium">{r.cycle}</span>,
+      },
+      { key: "review_type", label: "Review Type", accessor: (r) => r.review_type },
+      {
+        key: "reviews",
+        label: "Employees",
+        align: "center",
+        accessor: (r) => String(r.reviews),
+        render: (r) => <span className="font-medium">{r.reviews}</span>,
+      },
+      {
+        key: "submitted",
+        label: "Submitted",
+        align: "center",
+        accessor: (r) => String(r.submitted),
+        render: (r) => {
+          const pct = r.reviews > 0 ? Math.round((r.submitted / r.reviews) * 100) : 0
+          return (
+            <div className="min-w-[80px] space-y-1">
+              <div className="flex justify-between text-xs">
+                <span>{r.submitted}</span>
+                <span className="text-muted-foreground">{pct}%</span>
+              </div>
+              <Progress value={pct} className="h-1.5" />
+            </div>
+          )
+        },
+      },
+      { key: "departments", label: "Depts", align: "center", accessor: (r) => String(r.departments) },
+      {
+        key: "completed",
+        label: "Completed",
+        align: "center",
+        accessor: (r) => String(r.completed),
+        render: (r) => {
+          const pct = r.reviews > 0 ? Math.round((r.completed / r.reviews) * 100) : 0
+          return (
+            <span className={r.completed > 0 ? "font-semibold text-emerald-600" : "text-muted-foreground"}>
+              {r.completed} <span className="text-xs font-normal">({pct}%)</span>
+            </span>
+          )
+        },
+      },
+    ],
+    []
+  )
+
+  // ─── Filters ──────────────────────────────────────────────────────────────
+
+  const individualFilters: DataTableFilter<ReviewRow>[] = useMemo(
+    () => [
+      {
+        key: "department",
+        label: "Department",
+        options: departmentOptions.map((d) => ({ value: d, label: d })),
+        placeholder: "All Departments",
+      },
+      {
+        key: "quarter",
+        label: "Quarter",
+        options: quarterOptions.map((q) => ({ value: q, label: q })),
+        placeholder: "All Quarters",
+      },
+      {
+        key: "status",
+        label: "Status",
+        options: [
+          { value: "draft", label: "Draft" },
+          { value: "submitted", label: "Submitted" },
+          { value: "completed", label: "Completed" },
+        ],
+        placeholder: "All Statuses",
+      },
+      {
+        key: "review_type",
+        label: "Review Type",
+        mode: "custom",
+        options: reviewTypeOptions.map((t) => ({ value: t, label: t })),
+        filterFn: (row, selected) => selected.includes(row.cycle?.review_type ?? ""),
+        placeholder: "All Types",
+      },
+    ],
+    [departmentOptions, quarterOptions, reviewTypeOptions]
+  )
+
+  const deptFilters: DataTableFilter<DeptRow>[] = useMemo(
+    () => [
+      {
+        key: "cycle",
+        label: "Quarter",
+        options: quarterOptions.map((q) => ({ value: q, label: q })),
+        placeholder: "All Quarters",
+      },
+      {
+        key: "department",
+        label: "Department",
+        options: departmentOptions.map((d) => ({ value: d, label: d })),
+        placeholder: "All Departments",
+      },
+      {
+        key: "submission",
+        label: "Submission",
+        mode: "custom",
+        options: [
+          { value: "full", label: "Fully Submitted" },
+          { value: "partial", label: "Partial" },
+          { value: "none", label: "Not Started" },
+        ],
+        filterFn: (row, selected) => {
+          const pct = row.reviews > 0 ? row.submitted / row.reviews : 0
+          if (selected.includes("full") && pct === 1) return true
+          if (selected.includes("partial") && pct > 0 && pct < 1) return true
+          if (selected.includes("none") && pct === 0) return true
+          return false
+        },
+        placeholder: "All Statuses",
+      },
+    ],
+    [quarterOptions, departmentOptions]
+  )
+
+  const cycleFilters: DataTableFilter<CycleRow>[] = useMemo(
+    () => [
+      {
+        key: "review_type",
+        label: "Review Type",
+        options: reviewTypeOptions.map((t) => ({ value: t, label: t })),
+        placeholder: "All Types",
+      },
+      {
+        key: "completion",
+        label: "Completion",
+        mode: "custom",
+        options: [
+          { value: "complete", label: "Fully Complete" },
+          { value: "in_progress", label: "In Progress" },
+          { value: "not_started", label: "Not Started" },
+        ],
+        filterFn: (row, selected) => {
+          const pct = row.reviews > 0 ? row.completed / row.reviews : 0
+          if (selected.includes("complete") && pct === 1) return true
+          if (selected.includes("in_progress") && pct > 0 && pct < 1) return true
+          if (selected.includes("not_started") && pct === 0) return true
+          return false
+        },
+        placeholder: "All Stages",
+      },
+    ],
+    [reviewTypeOptions]
+  )
+
+  // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <PageWrapper maxWidth="full" background="gradient">
-      <PageHeader
-        title="PMS Reviews"
-        description="Manage quarterly reviews by individual, department, or cycle."
-        icon={FileText}
-        backLink={{ href: "/admin/hr/pms", label: "Back to PMS" }}
-        actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setIsExportOpen(true)}
-              disabled={exportRows.length === 0}
-              className="h-8 gap-2"
-              size="sm"
-            >
-              <Download className="h-4 w-4" />
-              Export
-            </Button>
-            <Button onClick={() => setIsCreateReviewOpen(true)} className="h-8 gap-2" size="sm">
-              <Plus className="h-4 w-4" />
-              Add Review
-            </Button>
-          </div>
-        }
-      />
-
-      <Tabs value={tab} onValueChange={(value) => setTab(value as TabMode)} className="mb-4">
-        <TabsList>
-          <TabsTrigger value="individual">Individual</TabsTrigger>
-          <TabsTrigger value="department">Department</TabsTrigger>
-          <TabsTrigger value="cycle">Cycle</TabsTrigger>
-          <TabsTrigger value="calibration">Calibration</TabsTrigger>
-        </TabsList>
-      </Tabs>
-
-      <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-3">
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-muted-foreground text-sm">Rows</p>
-            <p className="text-2xl font-semibold">
-              {tab === "individual"
-                ? filteredCanonicalReviews.length
-                : tab === "department"
-                  ? departmentRows.length
-                  : cycleRows.length}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-muted-foreground text-sm">Submitted</p>
-            <p className="text-2xl font-semibold">
-              {tab === "individual"
-                ? filteredCanonicalReviews.filter((review) =>
-                    ["submitted", "completed"].includes(String(review.status || "").toLowerCase())
-                  ).length
-                : tab === "department"
-                  ? departmentRows.reduce((sum, row) => sum + row.submitted, 0)
-                  : cycleRows.reduce((sum, row) => sum + row.submitted, 0)}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-muted-foreground text-sm">Cycle</p>
-            <p className="text-lg font-semibold">{quarterFilter === "all" ? "All Quarters" : quarterFilter}</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card className="mb-4 border-2">
-        <CardContent className="p-3 sm:p-6">
-          <div className="flex flex-col gap-4 md:flex-row">
-            <div className="relative flex-1">
-              <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform" />
-              <Input
-                placeholder="Search quarter, department, or employee..."
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                className="pl-10"
-              />
-            </div>
-            {tab === "individual" || tab === "cycle" ? (
-              <Select value={employeeFilter} onValueChange={setEmployeeFilter}>
-                <SelectTrigger className="w-full md:w-64">
-                  <SelectValue placeholder="Employee" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Employees</SelectItem>
-                  {canonicalReviews.map((review) => (
-                    <SelectItem key={review.user?.id || review.id} value={review.user?.id || ""}>
-                      {`${review.user?.first_name || ""} ${review.user?.last_name || ""}`.trim() || "Employee"}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : null}
-            <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
-              <SelectTrigger className="w-full md:w-56">
-                <SelectValue placeholder="Department" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Departments</SelectItem>
-                {departmentOptions.map((department) => (
-                  <SelectItem key={department} value={department}>
-                    {department}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={quarterFilter} onValueChange={setQuarterFilter}>
-              <SelectTrigger className="w-full md:w-72">
-                <SelectValue placeholder="Quarter" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Quarters</SelectItem>
-                {quarterOptions.map((quarter) => (
-                  <SelectItem key={quarter} value={quarter}>
-                    {quarter}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <CardTitle>
-              {tab === "individual"
-                ? "Individual Reviews"
-                : tab === "department"
-                  ? "Department Reviews"
-                  : "Cycle Reviews"}
-            </CardTitle>
-            {isRefreshing ? (
-              <div className="text-muted-foreground flex items-center gap-2 text-sm">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Refreshing...
-              </div>
-            ) : null}
-          </div>
-          <CardDescription>
-            {tab === "individual"
-              ? "Edit employee reviews directly from the current cycle table."
-              : tab === "department"
-                ? "Open a department inside a quarter to work on that team."
-                : "Open a cycle to review all employees in that quarter."}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {isInitialLoading && reviews.length === 0 ? (
-            <div className="text-muted-foreground flex items-center justify-center gap-2 py-10 text-sm">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Loading review table...
-            </div>
-          ) : error ? (
-            <div className="space-y-3 py-4">
-              <p className="text-sm text-red-500">{error}</p>
-              <Button variant="outline" onClick={() => void loadReviews()}>
-                Retry
-              </Button>
-            </div>
-          ) : tab === "calibration" ? (
-            <CalibrationView reviews={filteredCanonicalReviews} />
-          ) : tab === "individual" ? (
-            <div className="overflow-x-auto">
-              <Table className="min-w-[1150px]">
-                <TableHeader className="bg-emerald-50 dark:bg-emerald-950/30">
-                  <TableRow>
-                    <TableHead className="w-16">S/N</TableHead>
-                    <TableHead>Employee</TableHead>
-                    <TableHead>Department</TableHead>
-                    <TableHead>Quarter</TableHead>
-                    <TableHead>KPI</TableHead>
-                    <TableHead>CBT</TableHead>
-                    <TableHead>Attendance</TableHead>
-                    <TableHead>Behaviour</TableHead>
-                    <TableHead>Final</TableHead>
-                    <TableHead className="text-right">Action</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredCanonicalReviews.map((review, index) => (
-                    <TableRow key={review.id}>
-                      <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
-                      <TableCell className="font-medium">
-                        {`${review.user?.first_name || ""} ${review.user?.last_name || ""}`.trim() || "Employee"}
-                      </TableCell>
-                      <TableCell>{review.user?.department || "-"}</TableCell>
-                      <TableCell>{review.cycle?.name || "-"}</TableCell>
-                      <TableCell>{formatMetric(review.kpi_score)}</TableCell>
-                      <TableCell>{formatMetric(review.cbt_score)}</TableCell>
-                      <TableCell>{formatMetric(review.attendance_score)}</TableCell>
-                      <TableCell>{formatMetric(review.behaviour_score)}</TableCell>
-                      <TableCell>{formatMetric(review.final_score)}</TableCell>
-                      <TableCell className="text-right">
-                        {review.review_cycle_id ? (
-                          <Link
-                            href={`/admin/hr/pms/reviews/${encodeURIComponent(review.review_cycle_id)}?mode=individual`}
-                          >
-                            <Button size="sm" variant="outline">
-                              Edit
-                            </Button>
-                          </Link>
-                        ) : (
-                          "-"
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          ) : tab === "department" ? (
-            <div className="overflow-x-auto">
-              <Table className="min-w-[1100px]">
-                <TableHeader className="bg-emerald-50 dark:bg-emerald-950/30">
-                  <TableRow>
-                    <TableHead className="w-16">S/N</TableHead>
-                    <TableHead>Department</TableHead>
-                    <TableHead>Quarter</TableHead>
-                    <TableHead>Reviews</TableHead>
-                    <TableHead>Submitted</TableHead>
-                    <TableHead>KPI</TableHead>
-                    <TableHead>CBT</TableHead>
-                    <TableHead>Attendance</TableHead>
-                    <TableHead>Behaviour</TableHead>
-                    <TableHead>Final</TableHead>
-                    <TableHead className="text-right">Action</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {departmentRows.map((row, index) => (
-                    <TableRow key={`${row.cycleId}-${row.department}`}>
-                      <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
-                      <TableCell className="font-medium">{row.department}</TableCell>
-                      <TableCell>{row.cycle}</TableCell>
-                      <TableCell>{row.reviews}</TableCell>
-                      <TableCell>{row.submitted}</TableCell>
-                      <TableCell>{row.kpi}</TableCell>
-                      <TableCell>{row.cbt}</TableCell>
-                      <TableCell>{row.attendance}</TableCell>
-                      <TableCell>{row.behaviour}</TableCell>
-                      <TableCell>{row.final}</TableCell>
-                      <TableCell className="text-right">
-                        {row.cycleId !== "no-cycle" ? (
-                          <Link
-                            href={`/admin/hr/pms/reviews/${encodeURIComponent(row.cycleId)}?mode=department&department=${encodeURIComponent(row.department)}`}
-                          >
-                            <Button size="sm" variant="outline">
-                              Edit
-                            </Button>
-                          </Link>
-                        ) : (
-                          "-"
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table className="min-w-[980px]">
-                <TableHeader className="bg-emerald-50 dark:bg-emerald-950/30">
-                  <TableRow>
-                    <TableHead className="w-16">S/N</TableHead>
-                    <TableHead>Quarter</TableHead>
-                    <TableHead>Review Type</TableHead>
-                    <TableHead>Employee Count</TableHead>
-                    <TableHead>Submitted</TableHead>
-                    <TableHead>Departments</TableHead>
-                    <TableHead>Completed</TableHead>
-                    <TableHead className="text-right">Action</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {cycleRows.map((row, index) => (
-                    <TableRow key={row.cycleId}>
-                      <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
-                      <TableCell className="font-medium">{row.cycle}</TableCell>
-                      <TableCell>{row.review_type}</TableCell>
-                      <TableCell>{row.reviews}</TableCell>
-                      <TableCell>{row.submitted}</TableCell>
-                      <TableCell>{row.departments}</TableCell>
-                      <TableCell>{row.completed}</TableCell>
-                      <TableCell className="text-right">
-                        {row.cycleId !== "no-cycle" ? (
-                          <Link href={`/admin/hr/pms/reviews/${encodeURIComponent(row.cycleId)}?mode=individual`}>
-                            <Button size="sm" variant="outline">
-                              Edit
-                            </Button>
-                          </Link>
-                        ) : (
-                          "-"
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+    <DataTablePage
+      title="PMS Reviews"
+      description="Manage quarterly performance reviews by individual, department, or cycle."
+      icon={FileText}
+      backLink={{ href: "/admin/hr/pms", label: "Back to PMS" }}
+      tabs={TABS}
+      activeTab={tab}
+      onTabChange={(t) => setTab(t as TabMode)}
+      actions={
+        <div className="flex flex-wrap items-center gap-2">
+          {isRefreshing && <RefreshCw className="text-muted-foreground h-4 w-4 animate-spin" />}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsExportOpen(true)}
+            disabled={exportRows.length === 0 || tab === "calibration"}
+            className="h-8 gap-2"
+          >
+            <Download className="h-4 w-4" />
+            Export
+          </Button>
+          <Button size="sm" className="h-8 gap-2" onClick={() => setIsCreateOpen(true)}>
+            <Plus className="h-4 w-4" />
+            Add Review
+          </Button>
+        </div>
+      }
+      stats={
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <StatCard
+            title={tab === "individual" ? "Total Reviews" : tab === "department" ? "Departments" : "Cycles"}
+            value={totalCount}
+            icon={Users}
+            iconBgColor="bg-blue-500/10"
+            iconColor="text-blue-500"
+          />
+          <StatCard
+            title="Submitted"
+            value={submittedCount}
+            icon={TrendingUp}
+            iconBgColor="bg-amber-500/10"
+            iconColor="text-amber-500"
+          />
+          <StatCard
+            title="Completed"
+            value={completedCount}
+            icon={CheckCircle2}
+            iconBgColor="bg-emerald-500/10"
+            iconColor="text-emerald-500"
+          />
+          <StatCard
+            title="Active Quarter"
+            value={activeQuarter}
+            icon={BarChart3}
+            iconBgColor="bg-violet-500/10"
+            iconColor="text-violet-500"
+          />
+        </div>
+      }
+    >
+      {/* ── Calibration tab ──────────────────────────────────────────────── */}
+      {tab === "calibration" ? (
+        <CalibrationView reviews={canonicalReviews} />
+      ) : /* ── Individual tab ──────────────────────────────────────────────── */
+      tab === "individual" ? (
+        <DataTable<ReviewRow>
+          data={canonicalReviews}
+          columns={individualColumns}
+          getRowId={(r) => r.id}
+          searchPlaceholder="Search employee, department, quarter…"
+          searchFn={(row, q) => {
+            const name = employeeName(row).toLowerCase()
+            const dept = String(row.user?.department ?? "").toLowerCase()
+            const cycle = String(row.cycle?.name ?? "").toLowerCase()
+            const type = String(row.cycle?.review_type ?? "").toLowerCase()
+            return name.includes(q) || dept.includes(q) || cycle.includes(q) || type.includes(q)
+          }}
+          filters={individualFilters}
+          pagination={{ pageSize: PAGE_SIZE, serverSide: true }}
+          totalRows={totalReviews}
+          currentPage={serverPage}
+          onPageChange={(p) => void loadReviews(p)}
+          isLoading={isInitialLoading}
+          error={error}
+          onRetry={() => void loadReviews()}
+          minWidth="1100px"
+          expandable={{
+            render: (row) => <ReviewExpandedDetail row={row} />,
+          }}
+          rowActions={[
+            {
+              label: "Edit",
+              icon: FileText,
+              onClick: (row) => {
+                if (row.review_cycle_id) goToIndividualCycle(row.review_cycle_id)
+              },
+              hidden: (row) => !row.review_cycle_id,
+            },
+          ]}
+          viewToggle
+          cardRenderer={(row) => (
+            <ReviewCard
+              row={row}
+              onEdit={(r) => {
+                if (r.review_cycle_id) goToIndividualCycle(r.review_cycle_id)
+              }}
+            />
           )}
-          {tab === "individual" && totalReviews > PAGE_SIZE && (
-            <div className="mt-4 flex items-center justify-between text-sm">
-              <p className="text-muted-foreground">
-                Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, totalReviews)} of {totalReviews}
-              </p>
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={page === 0 || isRefreshing}
-                  onClick={() => void loadReviews(page - 1)}
-                >
-                  Previous
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={(page + 1) * PAGE_SIZE >= totalReviews || isRefreshing}
-                  onClick={() => void loadReviews(page + 1)}
-                >
-                  Next
-                </Button>
+          emptyIcon={FileText}
+          emptyTitle="No reviews found"
+          emptyDescription="No reviews match your current search or filters."
+        />
+      ) : /* ── Department tab ──────────────────────────────────────────────── */
+      tab === "department" ? (
+        <DataTable<DeptRow>
+          data={deptRows}
+          columns={deptColumns}
+          getRowId={(r) => r.id}
+          searchPlaceholder="Search department or quarter…"
+          searchFn={(row, q) => row.department.toLowerCase().includes(q) || row.cycle.toLowerCase().includes(q)}
+          filters={deptFilters}
+          isLoading={isInitialLoading}
+          error={error}
+          onRetry={() => void loadReviews()}
+          minWidth="1100px"
+          expandable={{
+            render: (row) => (
+              <div className="grid grid-cols-2 gap-6 text-sm sm:grid-cols-4">
+                {[
+                  { label: "Avg KPI", value: row.kpi },
+                  { label: "Avg CBT", value: row.cbt },
+                  { label: "Avg Attendance", value: row.attendance },
+                  { label: "Avg Behaviour", value: row.behaviour },
+                ].map((s) => (
+                  <div key={s.label}>
+                    <p className="text-muted-foreground text-xs">{s.label}</p>
+                    <p className="mt-0.5 text-lg font-semibold">{s.value}</p>
+                  </div>
+                ))}
               </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            ),
+          }}
+          rowActions={[
+            {
+              label: "Open",
+              icon: FileText,
+              onClick: (row) => {
+                if (row.cycleId !== "no-cycle") goDeptCycle(row.cycleId, row.department)
+              },
+              hidden: (row) => row.cycleId === "no-cycle",
+            },
+          ]}
+          emptyIcon={Users}
+          emptyTitle="No department data"
+          emptyDescription="No department review data matches your filters."
+        />
+      ) : (
+        /* ── Cycle tab ───────────────────────────────────────────────────── */
+        <DataTable<CycleRow>
+          data={cycleRows}
+          columns={cycleColumns}
+          getRowId={(r) => r.id}
+          searchPlaceholder="Search quarter or review type…"
+          searchFn={(row, q) => row.cycle.toLowerCase().includes(q) || row.review_type.toLowerCase().includes(q)}
+          filters={cycleFilters}
+          isLoading={isInitialLoading}
+          error={error}
+          onRetry={() => void loadReviews()}
+          minWidth="900px"
+          expandable={{
+            render: (row) => (
+              <div className="grid grid-cols-2 gap-6 text-sm sm:grid-cols-4">
+                {[
+                  { label: "Total Employees", value: row.reviews },
+                  {
+                    label: "Submitted",
+                    value: `${row.submitted} (${row.reviews > 0 ? Math.round((row.submitted / row.reviews) * 100) : 0}%)`,
+                  },
+                  { label: "Departments", value: row.departments },
+                  {
+                    label: "Completed",
+                    value: `${row.completed} (${row.reviews > 0 ? Math.round((row.completed / row.reviews) * 100) : 0}%)`,
+                  },
+                ].map((s) => (
+                  <div key={s.label}>
+                    <p className="text-muted-foreground text-xs">{s.label}</p>
+                    <p className="mt-0.5 text-lg font-semibold">{s.value}</p>
+                  </div>
+                ))}
+              </div>
+            ),
+          }}
+          rowActions={[
+            {
+              label: "Open",
+              icon: FileText,
+              onClick: (row) => {
+                if (row.cycleId !== "no-cycle") goToIndividualCycle(row.cycleId)
+              },
+              hidden: (row) => row.cycleId === "no-cycle",
+            },
+          ]}
+          emptyIcon={Clock}
+          emptyTitle="No cycles found"
+          emptyDescription="No review cycles match your filters."
+        />
+      )}
 
+      {/* ── Dialogs ────────────────────────────────────────────────────── */}
       <CreateReviewDialog
-        open={isCreateReviewOpen}
-        onOpenChange={setIsCreateReviewOpen}
+        open={isCreateOpen}
+        onOpenChange={setIsCreateOpen}
         queryClient={queryClient}
         mode={tab === "department" ? "department" : "individual"}
-        onSaved={() => {
-          void loadReviews()
-        }}
+        onSaved={() => void loadReviews()}
       />
       <ExportOptionsDialog
         open={isExportOpen}
@@ -707,13 +1004,10 @@ export default function AdminPmsReviewsPage() {
         ]}
         onSelect={(id) => {
           const filename = `pms-reviews-${tab}-${new Date().toISOString().slice(0, 10)}`
-          if (id === "excel") {
-            void exportPmsRowsToExcel(exportRows, filename)
-            return
-          }
-          void exportPmsRowsToPdf(exportRows, filename, "PMS Reviews")
+          if (id === "excel") void exportPmsRowsToExcel(exportRows, filename)
+          else void exportPmsRowsToPdf(exportRows, filename, "PMS Reviews")
         }}
       />
-    </PageWrapper>
+    </DataTablePage>
   )
 }

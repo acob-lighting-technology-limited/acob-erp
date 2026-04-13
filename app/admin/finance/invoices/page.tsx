@@ -1,41 +1,20 @@
 "use client"
 
-import { useState } from "react"
-import { useQuery } from "@tanstack/react-query"
-import { useQueryClient } from "@tanstack/react-query"
+import { useMemo, useState } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useRouter, useSearchParams } from "next/navigation"
+import { CircleDollarSign, Download, Eye, FileClock, FileText, Plus, Send, Wallet } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { QUERY_KEYS } from "@/lib/query-keys"
-import { AdminTablePage } from "@/components/admin/admin-table-page"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, FileText, Search, Filter, Eye, Download, Send } from "lucide-react"
-import Link from "next/link"
 import { StatCard } from "@/components/ui/stat-card"
-import { EmptyState } from "@/components/ui/empty-state"
-import { TableSkeleton } from "@/components/ui/query-states"
-import { useSearchParams } from "next/navigation"
+import { DataTable, DataTablePage } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { InvoiceFormDialog } from "./_components/invoice-form-dialog"
-
 import { logger } from "@/lib/logger"
 
 const log = logger("finance-invoices")
-
-async function fetchInvoicesList(): Promise<Invoice[]> {
-  const supabase = createClient()
-  const { data, error } = await supabase.from("invoices").select("*").order("created_at", { ascending: false })
-  if (error) {
-    if (error.code === "42P01") {
-      log.debug("Invoices table does not exist yet")
-      return []
-    }
-    throw new Error(error.message)
-  }
-  return data || []
-}
 
 interface Invoice {
   id: string
@@ -56,211 +35,357 @@ type InvoiceStatusVariant = "default" | "destructive" | "secondary" | "outline"
 
 const statusColors: Record<Invoice["status"], InvoiceStatusVariant> = {
   draft: "secondary",
-  sent: "default",
+  sent: "outline",
   paid: "default",
   overdue: "destructive",
   cancelled: "secondary",
 }
 
+async function fetchInvoicesList(): Promise<Invoice[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase.from("invoices").select("*").order("created_at", { ascending: false })
+
+  if (error) {
+    if (error.code === "42P01") {
+      log.debug("Invoices table does not exist yet")
+      return []
+    }
+    throw new Error(error.message)
+  }
+
+  return data || []
+}
+
+function formatCurrency(amount: number, currency = "NGN") {
+  return new Intl.NumberFormat("en-NG", {
+    style: "currency",
+    currency,
+  }).format(amount)
+}
+
+function formatDate(date: string) {
+  return new Date(date).toLocaleDateString("en-NG", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  })
+}
+
+function getDueWindow(invoice: Invoice) {
+  const dueDate = new Date(invoice.due_date).getTime()
+  const differenceInDays = Math.ceil((dueDate - Date.now()) / (1000 * 60 * 60 * 24))
+
+  if (differenceInDays < 0) return "Past Due"
+  if (differenceInDays <= 7) return "Due Soon"
+  return "Future"
+}
+
 export default function InvoicesPage() {
+  const router = useRouter()
   const queryClient = useQueryClient()
   const searchParams = useSearchParams()
-  const [searchQuery, setSearchQuery] = useState("")
-  const [statusFilter, setStatusFilter] = useState<string>("all")
   const [isCreateOpen, setIsCreateOpen] = useState(searchParams.get("openCreate") === "1")
 
-  const { data: invoices = [], isLoading: loading } = useQuery({
+  const {
+    data: invoices = [],
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
     queryKey: QUERY_KEYS.adminInvoices(),
     queryFn: fetchInvoicesList,
   })
 
-  function formatCurrency(amount: number, currency: string = "NGN") {
-    return new Intl.NumberFormat("en-NG", {
-      style: "currency",
-      currency: currency,
-    }).format(amount)
-  }
+  const customerOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          invoices.map((invoice) => invoice.customer_name).filter((customer): customer is string => Boolean(customer))
+        )
+      )
+        .sort()
+        .map((customer) => ({ value: customer, label: customer })),
+    [invoices]
+  )
 
-  function formatDate(date: string) {
-    return new Date(date).toLocaleDateString("en-NG", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    })
-  }
+  const statusOptions = useMemo(
+    () =>
+      ["draft", "sent", "paid", "overdue", "cancelled"].map((status) => ({
+        value: status,
+        label: status.charAt(0).toUpperCase() + status.slice(1),
+      })),
+    []
+  )
 
-  const filteredInvoices = invoices.filter((invoice) => {
-    const matchesSearch =
-      invoice.invoice_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      invoice.customer_name.toLowerCase().includes(searchQuery.toLowerCase())
+  const dueWindowOptions = useMemo(
+    () => [
+      { value: "Past Due", label: "Past Due" },
+      { value: "Due Soon", label: "Due Soon" },
+      { value: "Future", label: "Future" },
+    ],
+    []
+  )
 
-    const matchesStatus = statusFilter === "all" || invoice.status === statusFilter
+  const stats = useMemo(() => {
+    const total = invoices.length
+    const draft = invoices.filter((invoice) => invoice.status === "draft").length
+    const paid = invoices.filter((invoice) => invoice.status === "paid").length
+    const overdue = invoices.filter((invoice) => invoice.status === "overdue").length
+    const totalAmount = invoices.reduce((sum, invoice) => sum + invoice.total_amount, 0)
+    const totalPaid = invoices.reduce((sum, invoice) => sum + invoice.amount_paid, 0)
 
-    return matchesSearch && matchesStatus
-  })
+    return {
+      total,
+      draft,
+      paid,
+      overdue,
+      totalAmount,
+      totalPaid,
+      outstanding: totalAmount - totalPaid,
+    }
+  }, [invoices])
 
-  const stats = {
-    total: invoices.length,
-    draft: invoices.filter((i) => i.status === "draft").length,
-    sent: invoices.filter((i) => i.status === "sent").length,
-    paid: invoices.filter((i) => i.status === "paid").length,
-    overdue: invoices.filter((i) => i.status === "overdue").length,
-    totalAmount: invoices.reduce((sum, i) => sum + i.total_amount, 0),
-    totalPaid: invoices.reduce((sum, i) => sum + i.amount_paid, 0),
-  }
+  const columns = useMemo<DataTableColumn<Invoice>[]>(
+    () => [
+      {
+        key: "invoice_number",
+        label: "Invoice",
+        sortable: true,
+        accessor: (invoice) => invoice.invoice_number,
+        resizable: true,
+        initialWidth: 180,
+        render: (invoice) => (
+          <div className="space-y-1">
+            <p className="font-medium">{invoice.invoice_number}</p>
+            <p className="text-muted-foreground text-xs">Created {formatDate(invoice.created_at)}</p>
+          </div>
+        ),
+      },
+      {
+        key: "customer_name",
+        label: "Customer",
+        sortable: true,
+        accessor: (invoice) => invoice.customer_name,
+        resizable: true,
+        initialWidth: 230,
+        render: (invoice) => (
+          <div className="space-y-1">
+            <p className="font-medium">{invoice.customer_name}</p>
+            <p className="text-muted-foreground text-xs">{invoice.customer_email || "No email on file"}</p>
+          </div>
+        ),
+      },
+      {
+        key: "issue_date",
+        label: "Issue Date",
+        sortable: true,
+        accessor: (invoice) => invoice.issue_date,
+        render: (invoice) => formatDate(invoice.issue_date),
+      },
+      {
+        key: "due_date",
+        label: "Due Date",
+        sortable: true,
+        accessor: (invoice) => invoice.due_date,
+        render: (invoice) => (
+          <div className="space-y-1">
+            <p>{formatDate(invoice.due_date)}</p>
+            <p className="text-muted-foreground text-xs">{getDueWindow(invoice)}</p>
+          </div>
+        ),
+      },
+      {
+        key: "total_amount",
+        label: "Amount",
+        sortable: true,
+        accessor: (invoice) => invoice.total_amount,
+        resizable: true,
+        initialWidth: 180,
+        render: (invoice) => (
+          <div className="space-y-1">
+            <p className="font-medium">{formatCurrency(invoice.total_amount, invoice.currency)}</p>
+            <p className="text-muted-foreground text-xs">Due {formatCurrency(invoice.balance_due, invoice.currency)}</p>
+          </div>
+        ),
+      },
+      {
+        key: "status",
+        label: "Status",
+        sortable: true,
+        accessor: (invoice) => invoice.status,
+        render: (invoice) => (
+          <Badge variant={statusColors[invoice.status]} className="capitalize">
+            {invoice.status}
+          </Badge>
+        ),
+      },
+    ],
+    []
+  )
+
+  const filters = useMemo<DataTableFilter<Invoice>[]>(
+    () => [
+      {
+        key: "status",
+        label: "Status",
+        options: statusOptions,
+      },
+      {
+        key: "customer_name",
+        label: "Customer",
+        options: customerOptions,
+      },
+      {
+        key: "due_window",
+        label: "Due Window",
+        mode: "custom",
+        options: dueWindowOptions,
+        filterFn: (invoice, value) => {
+          const dueWindow = getDueWindow(invoice)
+          if (Array.isArray(value)) {
+            return value.includes(dueWindow)
+          }
+          return dueWindow === value
+        },
+      },
+    ],
+    [customerOptions, dueWindowOptions, statusOptions]
+  )
 
   return (
-    <AdminTablePage
+    <DataTablePage
       title="Invoices"
-      description="Create and manage customer invoices"
+      description="Create and manage customer invoices, collections, and overdue balances."
       icon={FileText}
-      backLinkHref="/admin"
-      backLinkLabel="Back to Admin"
+      backLink={{ href: "/admin", label: "Back to Admin" }}
       actions={
         <Button onClick={() => setIsCreateOpen(true)}>
           <Plus className="mr-2 h-4 w-4" />
           Create Invoice
         </Button>
       }
+      stats={
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard
+            title="Total Invoices"
+            value={stats.total}
+            icon={FileText}
+            iconBgColor="bg-blue-500/10"
+            iconColor="text-blue-500"
+          />
+          <StatCard
+            title="Drafts"
+            value={stats.draft}
+            icon={FileClock}
+            iconBgColor="bg-amber-500/10"
+            iconColor="text-amber-500"
+          />
+          <StatCard
+            title="Collected"
+            value={formatCurrency(stats.totalPaid)}
+            icon={CircleDollarSign}
+            iconBgColor="bg-emerald-500/10"
+            iconColor="text-emerald-500"
+          />
+          <StatCard
+            title="Outstanding"
+            value={formatCurrency(stats.outstanding)}
+            icon={Wallet}
+            iconBgColor="bg-red-500/10"
+            iconColor="text-red-500"
+          />
+        </div>
+      }
     >
-      {/* Stats */}
-      <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4 md:gap-4">
-        <StatCard title="Total Invoices" value={stats.total} icon={FileText} description={`${stats.draft} drafts`} />
-        <StatCard title="Total Amount" value={formatCurrency(stats.totalAmount)} icon={FileText} />
-        <StatCard
-          title="Collected"
-          value={formatCurrency(stats.totalPaid)}
-          icon={FileText}
-          iconBgColor="bg-green-100 dark:bg-green-900/30"
-          iconColor="text-green-600 dark:text-green-400"
-          description={`${stats.paid} paid invoices`}
-        />
-        <StatCard
-          title="Outstanding"
-          value={formatCurrency(stats.totalAmount - stats.totalPaid)}
-          icon={FileText}
-          iconBgColor="bg-orange-100 dark:bg-orange-900/30"
-          iconColor="text-orange-600 dark:text-orange-400"
-          description={`${stats.overdue} overdue`}
-        />
-      </div>
-
-      {/* Filters */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-            <div className="relative flex-1">
-              <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-              <Input
-                placeholder="Search by invoice number or customer..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
-              />
+      <DataTable<Invoice>
+        data={invoices}
+        columns={columns}
+        filters={filters}
+        getRowId={(invoice) => invoice.id}
+        searchPlaceholder="Search invoice number, customer, or email..."
+        searchFn={(invoice, query) => {
+          const normalizedQuery = query.toLowerCase()
+          return (
+            invoice.invoice_number.toLowerCase().includes(normalizedQuery) ||
+            invoice.customer_name.toLowerCase().includes(normalizedQuery) ||
+            (invoice.customer_email || "").toLowerCase().includes(normalizedQuery)
+          )
+        }}
+        isLoading={isLoading}
+        error={error instanceof Error ? error.message : null}
+        onRetry={() => {
+          void refetch()
+        }}
+        rowActions={[
+          {
+            label: "View",
+            icon: Eye,
+            onClick: (invoice) => router.push(`/admin/finance/invoices/${invoice.id}`),
+          },
+          {
+            label: "Send",
+            icon: Send,
+            onClick: (invoice) => router.push(`/admin/finance/invoices/${invoice.id}`),
+          },
+          {
+            label: "Download",
+            icon: Download,
+            onClick: (invoice) => router.push(`/admin/finance/invoices/${invoice.id}`),
+          },
+        ]}
+        expandable={{
+          render: (invoice) => (
+            <div className="grid gap-4 md:grid-cols-4">
+              <div className="rounded-lg border p-4">
+                <p className="text-muted-foreground text-xs tracking-wide uppercase">Customer</p>
+                <p className="mt-2 text-sm font-medium">{invoice.customer_name}</p>
+              </div>
+              <div className="rounded-lg border p-4">
+                <p className="text-muted-foreground text-xs tracking-wide uppercase">Email</p>
+                <p className="mt-2 text-sm">{invoice.customer_email || "No email on file"}</p>
+              </div>
+              <div className="rounded-lg border p-4">
+                <p className="text-muted-foreground text-xs tracking-wide uppercase">Paid</p>
+                <p className="mt-2 text-sm">{formatCurrency(invoice.amount_paid, invoice.currency)}</p>
+              </div>
+              <div className="rounded-lg border p-4">
+                <p className="text-muted-foreground text-xs tracking-wide uppercase">Balance Due</p>
+                <p className="mt-2 text-sm font-medium">{formatCurrency(invoice.balance_due, invoice.currency)}</p>
+              </div>
             </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[180px]">
-                <Filter className="mr-2 h-4 w-4" />
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="draft">Draft</SelectItem>
-                <SelectItem value="sent">Sent</SelectItem>
-                <SelectItem value="paid">Paid</SelectItem>
-                <SelectItem value="overdue">Overdue</SelectItem>
-                <SelectItem value="cancelled">Cancelled</SelectItem>
-              </SelectContent>
-            </Select>
+          ),
+        }}
+        viewToggle
+        cardRenderer={(invoice) => (
+          <div className="space-y-3 rounded-xl border p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-medium">{invoice.invoice_number}</p>
+                <p className="text-muted-foreground text-sm">{invoice.customer_name}</p>
+              </div>
+              <Badge variant={statusColors[invoice.status]} className="capitalize">
+                {invoice.status}
+              </Badge>
+            </div>
+            <div className="grid gap-1 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Amount</span>
+                <span>{formatCurrency(invoice.total_amount, invoice.currency)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Due</span>
+                <span>{formatDate(invoice.due_date)}</span>
+              </div>
+            </div>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Invoices Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>All Invoices</CardTitle>
-          <CardDescription>
-            {filteredInvoices.length} invoice{filteredInvoices.length !== 1 ? "s" : ""} found
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <TableSkeleton rows={5} cols={6} />
-          ) : filteredInvoices.length === 0 ? (
-            <EmptyState
-              icon={FileText}
-              title="No invoices yet"
-              description="Create your first invoice to start tracking revenue."
-              action={{ label: "Create Invoice", href: "/admin/finance/invoices?openCreate=1", icon: Plus }}
-            />
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Invoice #</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Issue Date</TableHead>
-                  <TableHead>Due Date</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredInvoices.map((invoice) => (
-                  <TableRow key={invoice.id}>
-                    <TableCell className="font-medium">{invoice.invoice_number}</TableCell>
-                    <TableCell>
-                      <div>
-                        <p className="font-medium">{invoice.customer_name}</p>
-                        {invoice.customer_email && (
-                          <p className="text-muted-foreground text-sm">{invoice.customer_email}</p>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>{formatDate(invoice.issue_date)}</TableCell>
-                    <TableCell>{formatDate(invoice.due_date)}</TableCell>
-                    <TableCell>
-                      <div>
-                        <p className="font-medium">{formatCurrency(invoice.total_amount, invoice.currency)}</p>
-                        {invoice.balance_due > 0 && (
-                          <p className="text-sm text-orange-600">
-                            Due: {formatCurrency(invoice.balance_due, invoice.currency)}
-                          </p>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={statusColors[invoice.status]} className="capitalize">
-                        {invoice.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Link href={`/admin/finance/invoices/${invoice.id}`}>
-                          <Button variant="ghost" size="icon">
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        </Link>
-                        {invoice.status === "draft" && (
-                          <Button variant="ghost" size="icon">
-                            <Send className="h-4 w-4" />
-                          </Button>
-                        )}
-                        <Button variant="ghost" size="icon">
-                          <Download className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+        )}
+        emptyTitle="No invoices yet"
+        emptyDescription="Create your first invoice to start tracking customer revenue."
+        emptyIcon={FileText}
+        skeletonRows={5}
+        urlSync
+      />
       <InvoiceFormDialog open={isCreateOpen} onOpenChange={setIsCreateOpen} queryClient={queryClient} />
-    </AdminTablePage>
+    </DataTablePage>
   )
 }

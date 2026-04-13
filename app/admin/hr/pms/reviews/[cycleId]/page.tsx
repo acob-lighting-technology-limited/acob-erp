@@ -2,20 +2,19 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useQueryClient } from "@tanstack/react-query"
-import Link from "next/link"
 import { useParams, useRouter, useSearchParams } from "next/navigation"
-import { ArrowLeft, Download, FileText, Loader2, Plus, Search } from "lucide-react"
+import { Download, FileText, Plus, Users, CheckCircle2, Clock, BarChart3 } from "lucide-react"
 import { toast } from "sonner"
-import { PageHeader, PageWrapper } from "@/components/layout"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Badge } from "@/components/ui/badge"
+import { StatCard } from "@/components/ui/stat-card"
+import { DataTable, DataTablePage } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter, DataTableTab, RowAction } from "@/components/ui/data-table"
 import { CreateReviewDialog } from "../../../performance/_components/create-review-dialog"
 import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
 import { exportPmsRowsToExcel, exportPmsRowsToPdf } from "@/lib/pms/export"
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 type ReviewRow = {
   id: string
@@ -44,42 +43,77 @@ type ReviewRow = {
   } | null
 }
 
-type ReviewsApiPayload = {
-  data?: ReviewRow[]
-  error?: string
+type DeptSummaryRow = {
+  id: string
+  department: string
+  reviews: number
+  submitted: number
+  completed: number
+  kpi: string
+  cbt: string
+  attendance: string
+  behaviour: string
+  final: string
 }
 
-type TabMode = "individual" | "department" | "cycle"
+type CycleSummaryRow = {
+  id: string
+  cycle: string
+  review_type: string
+  employee_count: number
+  submitted: number
+  departments: number
+  completed: number
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function reviewStatusPriority(status: string | null | undefined) {
-  const normalized = String(status || "").toLowerCase()
-  if (normalized === "completed") return 3
-  if (normalized === "submitted") return 2
-  if (normalized === "draft") return 1
+  const n = String(status || "").toLowerCase()
+  if (n === "completed") return 3
+  if (n === "submitted") return 2
+  if (n === "draft") return 1
   return 0
 }
 
 function pickCanonicalReview(rows: ReviewRow[]) {
-  return [...rows].sort((left, right) => {
-    const statusDiff = reviewStatusPriority(right.status) - reviewStatusPriority(left.status)
-    if (statusDiff !== 0) return statusDiff
-    return new Date(right.created_at).getTime() - new Date(left.created_at).getTime()
+  return [...rows].sort((a, b) => {
+    const diff = reviewStatusPriority(b.status) - reviewStatusPriority(a.status)
+    if (diff !== 0) return diff
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   })[0]
 }
 
-function formatMetric(value: number | null | undefined) {
+function fmt(value: number | null | undefined) {
   return typeof value === "number" && Number.isFinite(value) ? value.toFixed(2).replace(/\.00$/, "") : "-"
 }
 
-function isSubmittedReview(review: ReviewRow) {
+function isSubmitted(review: ReviewRow) {
   return ["submitted", "completed"].includes(String(review.status || "").toLowerCase())
 }
 
-function canMarkReviewCompleted(review: ReviewRow) {
+function canComplete(review: ReviewRow) {
   return [review.kpi_score, review.cbt_score, review.attendance_score, review.behaviour_score].every(
-    (value) => typeof value === "number" && Number.isFinite(value) && value > 0
+    (v) => typeof v === "number" && Number.isFinite(v) && v > 0
   )
 }
+
+function statusBadge(status: string | null) {
+  const s = String(status || "draft").toLowerCase()
+  const cls =
+    s === "completed"
+      ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+      : s === "submitted"
+        ? "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
+        : "bg-gray-100 text-gray-700 dark:bg-gray-800/50 dark:text-gray-400"
+  return (
+    <Badge className={cls} variant="outline">
+      {s}
+    </Badge>
+  )
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function AdminPmsQuarterReviewsPage() {
   const params = useParams<{ cycleId: string }>()
@@ -88,42 +122,34 @@ export default function AdminPmsQuarterReviewsPage() {
   const queryClient = useQueryClient()
 
   const cycleId = String(params.cycleId || "")
-  const mode = ((searchParams.get("mode") as TabMode) || "individual") as TabMode
-  const selectedDepartment = searchParams.get("department") || "all"
+  const mode = ((searchParams.get("mode") as "individual" | "department" | "cycle") || "individual") as
+    | "individual"
+    | "department"
+    | "cycle"
 
   const [isInitialLoading, setIsInitialLoading] = useState(true)
-  const [isRefreshing, setIsRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [reviews, setReviews] = useState<ReviewRow[]>([])
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingTarget, setEditingTarget] = useState<ReviewRow | null>(null)
-  const [searchTerm, setSearchTerm] = useState("")
-  const [statusFilter, setStatusFilter] = useState("all")
-  const [departmentFilter, setDepartmentFilter] = useState(selectedDepartment)
   const [isExportOpen, setIsExportOpen] = useState(false)
-  const [updatingStatusId, setUpdatingStatusId] = useState("")
-  const hasLoadedReviewsRef = useRef(false)
+  const hasLoadedRef = useRef(false)
 
   const loadReviews = useCallback(async () => {
-    if (hasLoadedReviewsRef.current) {
-      setIsRefreshing(true)
-    } else {
-      setIsInitialLoading(true)
-    }
+    if (!hasLoadedRef.current) setIsInitialLoading(true)
     setError(null)
     try {
-      const response = await fetch(`/api/hr/performance/reviews?cycle_id=${encodeURIComponent(cycleId)}`, {
+      const res = await fetch(`/api/hr/performance/reviews?cycle_id=${encodeURIComponent(cycleId)}`, {
         cache: "no-store",
       })
-      const payload = (await response.json().catch(() => null)) as ReviewsApiPayload | null
-      if (!response.ok) throw new Error(payload?.error || "Failed to load quarter reviews")
+      const payload = (await res.json().catch(() => null)) as { data?: ReviewRow[]; error?: string } | null
+      if (!res.ok) throw new Error(payload?.error || "Failed to load quarter reviews")
       setReviews(payload?.data || [])
-      hasLoadedReviewsRef.current = true
-    } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Failed to load quarter reviews")
+      hasLoadedRef.current = true
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load quarter reviews")
     } finally {
       setIsInitialLoading(false)
-      setIsRefreshing(false)
     }
   }, [cycleId])
 
@@ -132,138 +158,121 @@ export default function AdminPmsQuarterReviewsPage() {
     void loadReviews()
   }, [cycleId, loadReviews])
 
-  useEffect(() => {
-    setDepartmentFilter(selectedDepartment)
-  }, [selectedDepartment])
+  // ── Derived data ─────────────────────────────────────────────────────────
 
   const canonicalReviews = useMemo(() => {
-    const groupedByUser = new Map<string, ReviewRow[]>()
-    for (const review of reviews) {
-      const userKey = review.user_id || review.id
-      const existing = groupedByUser.get(userKey) || []
-      existing.push(review)
-      groupedByUser.set(userKey, existing)
+    const grouped = new Map<string, ReviewRow[]>()
+    for (const r of reviews) {
+      const key = r.user_id || r.id
+      grouped.set(key, [...(grouped.get(key) || []), r])
     }
-
-    return Array.from(groupedByUser.values())
-      .map((entries) => pickCanonicalReview(entries))
+    return Array.from(grouped.values())
+      .map((rows) => pickCanonicalReview(rows))
       .sort((a, b) => {
-        const leftName = `${a.user?.first_name || ""} ${a.user?.last_name || ""}`.trim().toLowerCase()
-        const rightName = `${b.user?.first_name || ""} ${b.user?.last_name || ""}`.trim().toLowerCase()
-        return leftName.localeCompare(rightName)
+        const an = `${a.user?.first_name || ""} ${a.user?.last_name || ""}`.trim().toLowerCase()
+        const bn = `${b.user?.first_name || ""} ${b.user?.last_name || ""}`.trim().toLowerCase()
+        return an.localeCompare(bn)
       })
   }, [reviews])
 
   const cycleName = canonicalReviews[0]?.cycle?.name || reviews[0]?.cycle?.name || "Quarter Review"
-  const availableDepartments = useMemo(
-    () =>
-      Array.from(new Set(canonicalReviews.map((review) => review.user?.department).filter(Boolean) as string[])).sort(),
+
+  const availableDepts = useMemo(
+    () => Array.from(new Set(canonicalReviews.map((r) => r.user?.department).filter(Boolean) as string[])).sort(),
     [canonicalReviews]
   )
 
-  const filteredIndividualRows = useMemo(() => {
-    const query = searchTerm.trim().toLowerCase()
-    return canonicalReviews.filter((review) => {
-      const fullName = `${review.user?.first_name || ""} ${review.user?.last_name || ""}`.trim().toLowerCase()
-      const department = String(review.user?.department || "-").toLowerCase()
-      const status = String(review.status || "draft").toLowerCase()
-      const matchesQuery =
-        query.length === 0 || fullName.includes(query) || department.includes(query) || status.includes(query)
-      const matchesDepartment = departmentFilter === "all" || review.user?.department === departmentFilter
-      const matchesStatus = statusFilter === "all" || status === statusFilter
-      return matchesQuery && matchesDepartment && matchesStatus
-    })
-  }, [canonicalReviews, departmentFilter, searchTerm, statusFilter])
-
-  const departmentRows = useMemo(() => {
+  const deptRows = useMemo<DeptSummaryRow[]>(() => {
     const grouped = new Map<string, ReviewRow[]>()
-    for (const review of canonicalReviews) {
-      const department = review.user?.department || "Unknown"
-      const existing = grouped.get(department) || []
-      existing.push(review)
-      grouped.set(department, existing)
+    for (const r of canonicalReviews) {
+      const dept = r.user?.department || "Unknown"
+      grouped.set(dept, [...(grouped.get(dept) || []), r])
     }
-
-    return Array.from(grouped.entries())
-      .map(([department, rows]) => ({
-        department,
+    return Array.from(grouped.entries()).map(([dept, rows]) => {
+      const submitted = rows.filter(isSubmitted)
+      const avg = (field: keyof ReviewRow) => {
+        const vals = submitted.map((r) => r[field]).filter((v): v is number => typeof v === "number")
+        return vals.length > 0 ? fmt(vals.reduce((s, v) => s + v, 0) / vals.length) : "-"
+      }
+      return {
+        id: dept,
+        department: dept,
         reviews: rows.length,
-        submitted: rows.filter((review) => isSubmittedReview(review)).length,
-        completed: rows.filter((review) => review.status === "completed").length,
-        kpi: (() => {
-          const values = rows
-            .filter((review) => isSubmittedReview(review))
-            .map((review) => review.kpi_score)
-            .filter((value): value is number => value !== null)
-          return values.length > 0 ? formatMetric(values.reduce((sum, value) => sum + value, 0) / values.length) : "-"
-        })(),
-        cbt: (() => {
-          const values = rows
-            .filter((review) => isSubmittedReview(review))
-            .map((review) => review.cbt_score)
-            .filter((value): value is number => value !== null)
-          return values.length > 0 ? formatMetric(values.reduce((sum, value) => sum + value, 0) / values.length) : "-"
-        })(),
-        attendance: (() => {
-          const values = rows
-            .filter((review) => isSubmittedReview(review))
-            .map((review) => review.attendance_score)
-            .filter((value): value is number => value !== null)
-          return values.length > 0 ? formatMetric(values.reduce((sum, value) => sum + value, 0) / values.length) : "-"
-        })(),
-        behaviour: (() => {
-          const values = rows
-            .filter((review) => isSubmittedReview(review))
-            .map((review) => review.behaviour_score)
-            .filter((value): value is number => value !== null)
-          return values.length > 0 ? formatMetric(values.reduce((sum, value) => sum + value, 0) / values.length) : "-"
-        })(),
-        final: (() => {
-          const values = rows
-            .filter((review) => isSubmittedReview(review))
-            .map((review) => review.final_score)
-            .filter((value): value is number => value !== null)
-          return values.length > 0 ? formatMetric(values.reduce((sum, value) => sum + value, 0) / values.length) : "-"
-        })(),
-      }))
-      .filter((row) => {
-        const query = searchTerm.trim().toLowerCase()
-        const matchesQuery = query.length === 0 || row.department.toLowerCase().includes(query)
-        const matchesDepartment = departmentFilter === "all" || row.department === departmentFilter
-        return matchesQuery && matchesDepartment
-      })
-  }, [canonicalReviews, departmentFilter, searchTerm])
+        submitted: submitted.length,
+        completed: rows.filter((r) => r.status === "completed").length,
+        kpi: avg("kpi_score"),
+        cbt: avg("cbt_score"),
+        attendance: avg("attendance_score"),
+        behaviour: avg("behaviour_score"),
+        final: avg("final_score"),
+      }
+    })
+  }, [canonicalReviews])
 
-  const cycleRows = useMemo(
+  const cycleRows = useMemo<CycleSummaryRow[]>(
     () => [
       {
+        id: cycleId,
         cycle: cycleName,
         review_type: canonicalReviews[0]?.cycle?.review_type || reviews[0]?.cycle?.review_type || "-",
         employee_count: canonicalReviews.length,
-        submitted: canonicalReviews.filter((review) => isSubmittedReview(review)).length,
-        departments: availableDepartments.length,
-        completed: canonicalReviews.filter((review) => review.status === "completed").length,
+        submitted: canonicalReviews.filter(isSubmitted).length,
+        departments: availableDepts.length,
+        completed: canonicalReviews.filter((r) => r.status === "completed").length,
       },
     ],
-    [availableDepartments.length, canonicalReviews, cycleName, reviews]
+    [availableDepts.length, canonicalReviews, cycleId, cycleName, reviews]
   )
+
+  // ── Status update ────────────────────────────────────────────────────────
+
+  async function handleStatusUpdate(reviewId: string, status: "draft" | "submitted" | "completed") {
+    const target = canonicalReviews.find((r) => r.id === reviewId)
+    try {
+      const res = await fetch("/api/hr/performance/reviews", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: reviewId,
+          user_id: target?.user_id || undefined,
+          review_cycle_id: target?.review_cycle_id || cycleId,
+          status,
+        }),
+      })
+      const payload = (await res.json().catch(() => null)) as { error?: string } | null
+      if (!res.ok) throw new Error(payload?.error || "Failed to update review status")
+      toast.success("Review status updated")
+      await loadReviews()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update review status")
+    }
+  }
+
+  function handleTabChange(nextMode: string) {
+    const p = new URLSearchParams(searchParams.toString())
+    p.set("mode", nextMode)
+    if (nextMode !== "department") p.delete("department")
+    router.replace(`/admin/hr/pms/reviews/${encodeURIComponent(cycleId)}?${p.toString()}`)
+  }
+
+  // ── Export rows ──────────────────────────────────────────────────────────
 
   const exportRows =
     mode === "individual"
-      ? filteredIndividualRows.map((review, index) => ({
-          "S/N": index + 1,
-          Employee: `${review.user?.first_name || ""} ${review.user?.last_name || ""}`.trim() || "Employee",
-          Department: review.user?.department || "-",
-          KPI: formatMetric(review.kpi_score),
-          CBT: formatMetric(review.cbt_score),
-          Attendance: formatMetric(review.attendance_score),
-          Behaviour: formatMetric(review.behaviour_score),
-          Final: formatMetric(review.final_score),
-          Status: String(review.status || "draft"),
+      ? canonicalReviews.map((r, i) => ({
+          "S/N": i + 1,
+          Employee: `${r.user?.first_name || ""} ${r.user?.last_name || ""}`.trim() || "Employee",
+          Department: r.user?.department || "-",
+          KPI: fmt(r.kpi_score),
+          CBT: fmt(r.cbt_score),
+          Attendance: fmt(r.attendance_score),
+          Behaviour: fmt(r.behaviour_score),
+          Final: fmt(r.final_score),
+          Status: String(r.status || "draft"),
         }))
       : mode === "department"
-        ? departmentRows.map((row, index) => ({
-            "S/N": index + 1,
+        ? deptRows.map((row, i) => ({
+            "S/N": i + 1,
             Department: row.department,
             Reviews: row.reviews,
             Submitted: row.submitted,
@@ -274,8 +283,8 @@ export default function AdminPmsQuarterReviewsPage() {
             Final: row.final,
             Completed: row.completed,
           }))
-        : cycleRows.map((row, index) => ({
-            "S/N": index + 1,
+        : cycleRows.map((row, i) => ({
+            "S/N": i + 1,
             Quarter: row.cycle,
             "Review Type": row.review_type,
             "Employee Count": row.employee_count,
@@ -284,338 +293,376 @@ export default function AdminPmsQuarterReviewsPage() {
             Completed: row.completed,
           }))
 
-  async function handleStatusUpdate(reviewId: string, status: "draft" | "submitted" | "completed") {
-    const targetReview = filteredIndividualRows.find((review) => review.id === reviewId)
-    setUpdatingStatusId(reviewId)
-    try {
-      const response = await fetch("/api/hr/performance/reviews", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: reviewId,
-          user_id: targetReview?.user_id || undefined,
-          review_cycle_id: targetReview?.review_cycle_id || cycleId,
-          status,
-        }),
-      })
-      const payload = (await response.json().catch(() => null)) as { error?: string } | null
-      if (!response.ok) throw new Error(payload?.error || "Failed to update review status")
-      toast.success("Review status updated")
-      await loadReviews()
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to update review status")
-    } finally {
-      setUpdatingStatusId("")
-    }
-  }
+  // ── Column / filter definitions ──────────────────────────────────────────
 
-  function handleTabChange(nextMode: string) {
-    const params = new URLSearchParams(searchParams.toString())
-    params.set("mode", nextMode)
-    if (nextMode !== "department") {
-      params.delete("department")
-    } else if (departmentFilter !== "all") {
-      params.set("department", departmentFilter)
-    }
-    router.replace(`/admin/hr/pms/reviews/${encodeURIComponent(cycleId)}?${params.toString()}`)
-  }
+  const deptFilterOptions = useMemo(() => availableDepts.map((d) => ({ value: d, label: d })), [availableDepts])
+
+  const individualColumns = useMemo<DataTableColumn<ReviewRow>[]>(
+    () => [
+      {
+        key: "employee",
+        label: "Employee",
+        sortable: true,
+        resizable: true,
+        initialWidth: 180,
+        accessor: (r) => `${r.user?.first_name || ""} ${r.user?.last_name || ""}`.trim() || "Employee",
+      },
+      {
+        key: "department",
+        label: "Department",
+        sortable: true,
+        resizable: true,
+        initialWidth: 160,
+        accessor: (r) => r.user?.department || "-",
+      },
+      { key: "kpi_score", label: "KPI", sortable: true, width: "w-20", accessor: (r) => fmt(r.kpi_score) },
+      { key: "cbt_score", label: "CBT", sortable: true, width: "w-20", accessor: (r) => fmt(r.cbt_score) },
+      {
+        key: "attendance_score",
+        label: "Attendance",
+        sortable: true,
+        width: "w-24",
+        accessor: (r) => fmt(r.attendance_score),
+      },
+      {
+        key: "behaviour_score",
+        label: "Behaviour",
+        sortable: true,
+        width: "w-24",
+        accessor: (r) => fmt(r.behaviour_score),
+      },
+      {
+        key: "final_score",
+        label: "Final",
+        sortable: true,
+        width: "w-20",
+        accessor: (r) => fmt(r.final_score),
+      },
+      {
+        key: "status",
+        label: "Status",
+        sortable: true,
+        width: "w-28",
+        accessor: (review: ReviewRow) => String(review.status || "draft"),
+        render: (r) => statusBadge(r.status),
+      },
+    ],
+    []
+  )
+
+  const individualFilters = useMemo<DataTableFilter<ReviewRow>[]>(
+    () => [
+      {
+        key: "department",
+        label: "Department",
+        options: deptFilterOptions,
+        placeholder: "All Departments",
+        mode: "custom",
+        filterFn: (r: ReviewRow, vals) => vals.length === 0 || vals.includes(r.user?.department || ""),
+      },
+      {
+        key: "status",
+        label: "Status",
+        options: [
+          { value: "draft", label: "Draft" },
+          { value: "submitted", label: "Submitted" },
+          { value: "completed", label: "Completed" },
+        ],
+        placeholder: "All Statuses",
+        accessor: (review: ReviewRow) => String(review.status || "draft"),
+        mode: "column",
+      },
+    ],
+    [deptFilterOptions]
+  )
+
+  const individualRowActions = useMemo<RowAction<ReviewRow>[]>(
+    () => [
+      {
+        label: "Edit",
+        onClick: (review: ReviewRow) => {
+          setEditingTarget(review)
+          setIsDialogOpen(true)
+        },
+      },
+      {
+        label: "Mark Completed",
+        onClick: (review: ReviewRow) => void handleStatusUpdate(review.id, "completed"),
+        hidden: (review: ReviewRow) => review.status === "completed" || !canComplete(review),
+      },
+      {
+        label: "Reopen Draft",
+        onClick: (review: ReviewRow) => void handleStatusUpdate(review.id, "draft"),
+        hidden: (review: ReviewRow) => review.status !== "completed",
+      },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  )
+
+  const deptColumns = useMemo<DataTableColumn<DeptSummaryRow>[]>(
+    () => [
+      {
+        key: "department",
+        label: "Department",
+        sortable: true,
+        resizable: true,
+        initialWidth: 200,
+        accessor: (r) => r.department,
+      },
+      { key: "reviews", label: "Reviews", sortable: true, width: "w-20", accessor: (r) => String(r.reviews) },
+      { key: "submitted", label: "Submitted", sortable: true, width: "w-24", accessor: (r) => String(r.submitted) },
+      { key: "kpi", label: "KPI", sortable: true, width: "w-20", accessor: (r) => r.kpi },
+      { key: "cbt", label: "CBT", sortable: true, width: "w-20", accessor: (r) => r.cbt },
+      { key: "attendance", label: "Attendance", sortable: true, width: "w-24", accessor: (r) => r.attendance },
+      { key: "behaviour", label: "Behaviour", sortable: true, width: "w-24", accessor: (r) => r.behaviour },
+      { key: "final", label: "Final", sortable: true, width: "w-20", accessor: (r) => r.final },
+      { key: "completed", label: "Completed", sortable: true, width: "w-24", accessor: (r) => String(r.completed) },
+    ],
+    []
+  )
+
+  const deptFilters = useMemo<DataTableFilter<DeptSummaryRow>[]>(
+    () => [
+      {
+        key: "department",
+        label: "Department",
+        options: deptFilterOptions,
+        placeholder: "All Departments",
+        mode: "column",
+      },
+    ],
+    [deptFilterOptions]
+  )
+
+  const deptRowActions = useMemo<RowAction<DeptSummaryRow>[]>(
+    () => [
+      {
+        label: "Open",
+        onClick: (row) => {
+          const p = new URLSearchParams()
+          p.set("mode", "individual")
+          p.set("department", row.department)
+          router.replace(`/admin/hr/pms/reviews/${encodeURIComponent(cycleId)}?${p.toString()}`)
+        },
+      },
+    ],
+    [cycleId, router]
+  )
+
+  const cycleColumns = useMemo<DataTableColumn<CycleSummaryRow>[]>(
+    () => [
+      { key: "cycle", label: "Quarter", sortable: true, resizable: true, initialWidth: 220, accessor: (r) => r.cycle },
+      {
+        key: "review_type",
+        label: "Review Type",
+        sortable: true,
+        width: "w-32",
+        accessor: (r) => r.review_type,
+      },
+      {
+        key: "employee_count",
+        label: "Employees",
+        sortable: true,
+        width: "w-24",
+        accessor: (r) => String(r.employee_count),
+      },
+      {
+        key: "submitted",
+        label: "Submitted",
+        sortable: true,
+        width: "w-24",
+        accessor: (r) => String(r.submitted),
+      },
+      {
+        key: "departments",
+        label: "Depts",
+        sortable: true,
+        width: "w-20",
+        accessor: (r) => String(r.departments),
+      },
+      {
+        key: "completed",
+        label: "Completed",
+        sortable: true,
+        width: "w-24",
+        accessor: (r) => String(r.completed),
+      },
+    ],
+    []
+  )
+
+  // ── Stats ────────────────────────────────────────────────────────────────
+
+  const totalCount = canonicalReviews.length
+  const submittedCount = canonicalReviews.filter(isSubmitted).length
+  const completedCount = canonicalReviews.filter((r) => r.status === "completed").length
+
+  const pageTabs: DataTableTab[] = [
+    { key: "individual", label: "Individual" },
+    { key: "department", label: "Department" },
+    { key: "cycle", label: "Cycle" },
+  ]
 
   return (
-    <PageWrapper maxWidth="full" background="gradient">
-      <PageHeader
-        title={cycleName}
-        description="Review and edit employee records for this quarter."
-        icon={FileText}
-        backLink={{ href: "/admin/hr/pms/reviews", label: "Back to PMS Reviews" }}
-        actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setIsExportOpen(true)}
-              disabled={exportRows.length === 0}
-              className="h-8 gap-2"
-              size="sm"
-            >
-              <Download className="h-4 w-4" />
-              Export
-            </Button>
-            <Button
-              onClick={() => {
-                setEditingTarget(null)
-                setIsDialogOpen(true)
-              }}
-              className="h-8 gap-2"
-              size="sm"
-            >
-              <Plus className="h-4 w-4" />
-              Add Review
-            </Button>
-          </div>
-        }
-      />
-
-      <div className="mb-4">
-        <Link
-          href="/admin/hr/pms/reviews"
-          className="text-muted-foreground hover:text-foreground inline-flex items-center gap-2 text-sm"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to quarterly table
-        </Link>
-      </div>
-
-      <Tabs value={mode} onValueChange={handleTabChange} className="mb-4">
-        <TabsList>
-          <TabsTrigger value="individual">Individual</TabsTrigger>
-          <TabsTrigger value="department">Department</TabsTrigger>
-          <TabsTrigger value="cycle">Cycle</TabsTrigger>
-        </TabsList>
-      </Tabs>
-
-      <Card className="mb-4 border-2">
-        <CardContent className="p-3 sm:p-6">
-          <div className="flex flex-col gap-4 md:flex-row">
-            <div className="relative flex-1">
-              <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform" />
-              <Input
-                placeholder="Search employee, department or status..."
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
-                className="pl-10"
-              />
-            </div>
-            {mode !== "cycle" ? (
-              <Select
-                value={departmentFilter}
-                onValueChange={(value) => {
-                  setDepartmentFilter(value)
-                  if (mode === "department") {
-                    const params = new URLSearchParams(searchParams.toString())
-                    params.set("mode", "department")
-                    if (value === "all") params.delete("department")
-                    else params.set("department", value)
-                    router.replace(`/admin/hr/pms/reviews/${encodeURIComponent(cycleId)}?${params.toString()}`)
-                  }
-                }}
-              >
-                <SelectTrigger className="w-full md:w-48">
-                  <SelectValue placeholder="Department" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Departments</SelectItem>
-                  {availableDepartments.map((department) => (
-                    <SelectItem key={department} value={department}>
-                      {department}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : null}
-            {mode === "individual" ? (
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-full md:w-40">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
-                  <SelectItem value="submitted">Submitted</SelectItem>
-                  <SelectItem value="draft">Draft</SelectItem>
-                </SelectContent>
-              </Select>
-            ) : null}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <CardTitle>
-              {mode === "individual"
-                ? "Quarter Review Entries"
-                : mode === "department"
-                  ? "Department Summary"
-                  : "Cycle Summary"}
-            </CardTitle>
-            {isRefreshing ? (
-              <div className="text-muted-foreground flex items-center gap-2 text-sm">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Refreshing...
+    <DataTablePage
+      title={cycleName}
+      description="Review and edit employee records for this quarter."
+      icon={FileText}
+      backLink={{ href: "/admin/hr/pms/reviews", label: "Back to PMS Reviews" }}
+      tabs={pageTabs}
+      activeTab={mode}
+      onTabChange={handleTabChange}
+      stats={
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
+          <StatCard
+            title="Total"
+            value={totalCount}
+            icon={Users}
+            iconBgColor="bg-blue-500/10"
+            iconColor="text-blue-500"
+          />
+          <StatCard
+            title="Submitted"
+            value={submittedCount}
+            icon={BarChart3}
+            iconBgColor="bg-amber-500/10"
+            iconColor="text-amber-500"
+          />
+          <StatCard
+            title="Completed"
+            value={completedCount}
+            icon={CheckCircle2}
+            iconBgColor="bg-emerald-500/10"
+            iconColor="text-emerald-500"
+          />
+          <StatCard
+            title="Departments"
+            value={availableDepts.length}
+            icon={Clock}
+            iconBgColor="bg-purple-500/10"
+            iconColor="text-purple-500"
+          />
+        </div>
+      }
+      actions={
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setIsExportOpen(true)}
+            disabled={exportRows.length === 0}
+            className="h-8 gap-2"
+            size="sm"
+          >
+            <Download className="h-4 w-4" />
+            Export
+          </Button>
+          <Button
+            onClick={() => {
+              setEditingTarget(null)
+              setIsDialogOpen(true)
+            }}
+            className="h-8 gap-2"
+            size="sm"
+          >
+            <Plus className="h-4 w-4" />
+            Add Review
+          </Button>
+        </div>
+      }
+    >
+      {mode === "individual" && (
+        <DataTable<ReviewRow>
+          data={canonicalReviews}
+          columns={individualColumns}
+          filters={individualFilters}
+          getRowId={(r) => r.id}
+          isLoading={isInitialLoading}
+          error={error}
+          onRetry={() => void loadReviews()}
+          skeletonRows={6}
+          rowActions={individualRowActions}
+          searchPlaceholder="Search employee, department or status…"
+          searchFn={(r, q) => {
+            const name = `${r.user?.first_name || ""} ${r.user?.last_name || ""}`.toLowerCase()
+            return (
+              name.includes(q) ||
+              (r.user?.department || "").toLowerCase().includes(q) ||
+              String(r.status || "")
+                .toLowerCase()
+                .includes(q)
+            )
+          }}
+          expandable={{
+            render: (r) => (
+              <div className="space-y-2 p-4 text-sm">
+                {r.strengths && (
+                  <div>
+                    <span className="text-muted-foreground font-medium">Strengths: </span>
+                    {r.strengths}
+                  </div>
+                )}
+                {r.areas_for_improvement && (
+                  <div>
+                    <span className="text-muted-foreground font-medium">Areas for Improvement: </span>
+                    {r.areas_for_improvement}
+                  </div>
+                )}
+                {r.manager_comments && (
+                  <div>
+                    <span className="text-muted-foreground font-medium">Manager Comments: </span>
+                    {r.manager_comments}
+                  </div>
+                )}
+                {!r.strengths && !r.areas_for_improvement && !r.manager_comments && (
+                  <span className="text-muted-foreground">No additional details.</span>
+                )}
               </div>
-            ) : null}
-          </div>
-          <CardDescription>
-            {mode === "individual"
-              ? "Edit a user review and update its status for this cycle."
-              : mode === "department"
-                ? "Open a department by switching to the individual tab with that department filter."
-                : "Quarter-wide summary for this cycle."}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {isInitialLoading && reviews.length === 0 ? (
-            <div className="text-muted-foreground flex items-center justify-center gap-2 py-10 text-sm">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Loading quarter records...
-            </div>
-          ) : error ? (
-            <div className="space-y-3 py-4">
-              <p className="text-sm text-red-500">{error}</p>
-              <Button variant="outline" onClick={() => void loadReviews()}>
-                Retry
-              </Button>
-            </div>
-          ) : mode === "individual" ? (
-            <Table className="min-w-[1180px]">
-              <TableHeader className="bg-emerald-50 dark:bg-emerald-950/30">
-                <TableRow>
-                  <TableHead className="w-16">S/N</TableHead>
-                  <TableHead>Employee</TableHead>
-                  <TableHead>Department</TableHead>
-                  <TableHead>KPI</TableHead>
-                  <TableHead>CBT</TableHead>
-                  <TableHead>Attendance</TableHead>
-                  <TableHead>Behaviour</TableHead>
-                  <TableHead>Final</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredIndividualRows.map((review, index) => (
-                  <TableRow key={review.id}>
-                    <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
-                    <TableCell className="font-medium">
-                      {`${review.user?.first_name || ""} ${review.user?.last_name || ""}`.trim() || "Employee"}
-                    </TableCell>
-                    <TableCell>{review.user?.department || "-"}</TableCell>
-                    <TableCell>{formatMetric(review.kpi_score)}</TableCell>
-                    <TableCell>{formatMetric(review.cbt_score)}</TableCell>
-                    <TableCell>{formatMetric(review.attendance_score)}</TableCell>
-                    <TableCell>{formatMetric(review.behaviour_score)}</TableCell>
-                    <TableCell>{formatMetric(review.final_score)}</TableCell>
-                    <TableCell className="capitalize">{String(review.status || "draft")}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            setEditingTarget(review)
-                            setIsDialogOpen(true)
-                          }}
-                        >
-                          Edit
-                        </Button>
-                        {review.status !== "completed" ? (
-                          <Button
-                            size="sm"
-                            onClick={() => void handleStatusUpdate(review.id, "completed")}
-                            loading={updatingStatusId === review.id}
-                            disabled={!canMarkReviewCompleted(review)}
-                            title={
-                              !canMarkReviewCompleted(review)
-                                ? "Add KPI, CBT, Attendance, and Behaviour before completing this review."
-                                : undefined
-                            }
-                          >
-                            Mark Completed
-                          </Button>
-                        ) : (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => void handleStatusUpdate(review.id, "draft")}
-                            loading={updatingStatusId === review.id}
-                          >
-                            Reopen Draft
-                          </Button>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          ) : mode === "department" ? (
-            <Table className="min-w-[1080px]">
-              <TableHeader className="bg-emerald-50 dark:bg-emerald-950/30">
-                <TableRow>
-                  <TableHead className="w-16">S/N</TableHead>
-                  <TableHead>Department</TableHead>
-                  <TableHead>Reviews</TableHead>
-                  <TableHead>Submitted</TableHead>
-                  <TableHead>KPI</TableHead>
-                  <TableHead>CBT</TableHead>
-                  <TableHead>Attendance</TableHead>
-                  <TableHead>Behaviour</TableHead>
-                  <TableHead>Final</TableHead>
-                  <TableHead>Completed</TableHead>
-                  <TableHead className="text-right">Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {departmentRows.map((row, index) => (
-                  <TableRow key={row.department}>
-                    <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
-                    <TableCell className="font-medium">{row.department}</TableCell>
-                    <TableCell>{row.reviews}</TableCell>
-                    <TableCell>{row.submitted}</TableCell>
-                    <TableCell>{row.kpi}</TableCell>
-                    <TableCell>{row.cbt}</TableCell>
-                    <TableCell>{row.attendance}</TableCell>
-                    <TableCell>{row.behaviour}</TableCell>
-                    <TableCell>{row.final}</TableCell>
-                    <TableCell>{row.completed}</TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          const params = new URLSearchParams(searchParams.toString())
-                          params.set("mode", "individual")
-                          params.set("department", row.department)
-                          router.replace(`/admin/hr/pms/reviews/${encodeURIComponent(cycleId)}?${params.toString()}`)
-                        }}
-                      >
-                        Open
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          ) : (
-            <Table className="min-w-[900px]">
-              <TableHeader className="bg-emerald-50 dark:bg-emerald-950/30">
-                <TableRow>
-                  <TableHead className="w-16">S/N</TableHead>
-                  <TableHead>Quarter</TableHead>
-                  <TableHead>Review Type</TableHead>
-                  <TableHead>Employee Count</TableHead>
-                  <TableHead>Submitted</TableHead>
-                  <TableHead>Departments</TableHead>
-                  <TableHead>Completed</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {cycleRows.map((row, index) => (
-                  <TableRow key={row.cycle}>
-                    <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
-                    <TableCell className="font-medium">{row.cycle}</TableCell>
-                    <TableCell>{row.review_type}</TableCell>
-                    <TableCell>{row.employee_count}</TableCell>
-                    <TableCell>{row.submitted}</TableCell>
-                    <TableCell>{row.departments}</TableCell>
-                    <TableCell>{row.completed}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+            ),
+            canExpand: (r) => !!(r.strengths || r.areas_for_improvement || r.manager_comments),
+          }}
+          emptyIcon={FileText}
+          emptyTitle="No reviews found"
+          emptyDescription="No reviews have been submitted for this cycle yet."
+          minWidth="1100px"
+        />
+      )}
+
+      {mode === "department" && (
+        <DataTable<DeptSummaryRow>
+          data={deptRows}
+          columns={deptColumns}
+          filters={deptFilters}
+          getRowId={(r) => r.id}
+          isLoading={isInitialLoading}
+          error={error}
+          onRetry={() => void loadReviews()}
+          skeletonRows={4}
+          rowActions={deptRowActions}
+          searchPlaceholder="Search department…"
+          emptyIcon={FileText}
+          emptyTitle="No departments found"
+          emptyDescription="No reviews have been grouped by department yet."
+          minWidth="1000px"
+        />
+      )}
+
+      {mode === "cycle" && (
+        <DataTable<CycleSummaryRow>
+          data={cycleRows}
+          columns={cycleColumns}
+          getRowId={(r) => r.id}
+          isLoading={isInitialLoading}
+          error={error}
+          onRetry={() => void loadReviews()}
+          skeletonRows={1}
+          searchDisabled
+          emptyIcon={FileText}
+          emptyTitle="No cycle data"
+          emptyDescription="No reviews found for this cycle."
+          minWidth="800px"
+        />
+      )}
 
       <CreateReviewDialog
         open={isDialogOpen}
@@ -624,12 +671,11 @@ export default function AdminPmsQuarterReviewsPage() {
         mode={mode === "department" ? "department" : "individual"}
         initialUserId={editingTarget?.user_id || ""}
         initialCycleId={cycleId}
-        initialDepartment={editingTarget?.user?.department || (departmentFilter !== "all" ? departmentFilter : "")}
+        initialDepartment={editingTarget?.user?.department || ""}
         initialStatus={editingTarget?.status || "draft"}
-        onSaved={() => {
-          void loadReviews()
-        }}
+        onSaved={() => void loadReviews()}
       />
+
       <ExportOptionsDialog
         open={isExportOpen}
         onOpenChange={setIsExportOpen}
@@ -647,6 +693,6 @@ export default function AdminPmsQuarterReviewsPage() {
           void exportPmsRowsToPdf(exportRows, filename, cycleName)
         }}
       />
-    </PageWrapper>
+    </DataTablePage>
   )
 }

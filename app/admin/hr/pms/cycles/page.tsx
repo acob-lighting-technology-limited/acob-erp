@@ -3,13 +3,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { Calendar, CheckCircle2, Loader2, Lock, Plus, RefreshCw, Trash2 } from "lucide-react"
 import { toast } from "sonner"
-import { PageHeader, PageWrapper } from "@/components/layout"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { DataTable, DataTablePage } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter, RowAction } from "@/components/ui/data-table"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import {
   AlertDialog,
@@ -44,7 +43,7 @@ type ReviewCycle = {
   updated_at: string | null
 }
 
-const STATUS_COLORS: Record<string, string> = {
+const STATUS_COLORS: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
   planned: "secondary",
   active: "default",
   closed: "outline",
@@ -69,6 +68,57 @@ function formatDate(date: string) {
   return new Date(date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
 }
 
+function StatusBadge({ status }: { status: CycleStatus | null }) {
+  const key = String(status)
+  return <Badge variant={STATUS_COLORS[key] || "outline"}>{STATUS_LABELS[key] || key}</Badge>
+}
+
+function CycleCard({
+  cycle,
+  onAdvance,
+  onDelete,
+}: {
+  cycle: ReviewCycle
+  onAdvance: (cycle: ReviewCycle) => void
+  onDelete: (cycle: ReviewCycle) => void
+}) {
+  const nextStatuses = STATUS_TRANSITIONS[(cycle.status || "planned") as CycleStatus] || []
+
+  return (
+    <div className="space-y-3 rounded-xl border p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="font-semibold">{cycle.name}</p>
+          <p className="text-muted-foreground text-xs capitalize">{cycle.review_type}</p>
+        </div>
+        <StatusBadge status={cycle.status} />
+      </div>
+      <div className="grid grid-cols-2 gap-3 text-sm">
+        <div>
+          <p className="text-muted-foreground text-xs">Start</p>
+          <p>{formatDate(cycle.start_date)}</p>
+        </div>
+        <div>
+          <p className="text-muted-foreground text-xs">End</p>
+          <p>{formatDate(cycle.end_date)}</p>
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {nextStatuses.length > 0 ? (
+          <Button size="sm" variant="outline" onClick={() => onAdvance(cycle)}>
+            Mark {STATUS_LABELS[nextStatuses[0]]}
+          </Button>
+        ) : null}
+        {!["active", "locked"].includes(String(cycle.status)) ? (
+          <Button size="sm" variant="destructive" onClick={() => onDelete(cycle)}>
+            Delete
+          </Button>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
 export default function ReviewCyclesPage() {
   const [cycles, setCycles] = useState<ReviewCycle[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -78,7 +128,6 @@ export default function ReviewCyclesPage() {
   const [deleteTarget, setDeleteTarget] = useState<ReviewCycle | null>(null)
   const [statusTarget, setStatusTarget] = useState<{ cycle: ReviewCycle; newStatus: CycleStatus } | null>(null)
 
-  // Form
   const [name, setName] = useState("")
   const [reviewType, setReviewType] = useState("quarterly")
   const [startDate, setStartDate] = useState("")
@@ -173,136 +222,196 @@ export default function ReviewCyclesPage() {
   }
 
   const activeCycle = useMemo(() => cycles.find((c) => c.status === "active"), [cycles])
+  const reviewTypeOptions = useMemo(
+    () => Array.from(new Set(cycles.map((cycle) => cycle.review_type).filter(Boolean))).sort(),
+    [cycles]
+  )
+
+  const columns: DataTableColumn<ReviewCycle>[] = useMemo(
+    () => [
+      {
+        key: "name",
+        label: "Name",
+        sortable: true,
+        accessor: (cycle) => cycle.name,
+        render: (cycle) => <span className="font-medium">{cycle.name}</span>,
+        resizable: true,
+        initialWidth: 240,
+      },
+      {
+        key: "review_type",
+        label: "Type",
+        sortable: true,
+        accessor: (cycle) => cycle.review_type,
+        render: (cycle) => <span className="capitalize">{cycle.review_type}</span>,
+      },
+      {
+        key: "start_date",
+        label: "Start",
+        sortable: true,
+        accessor: (cycle) => cycle.start_date,
+        render: (cycle) => formatDate(cycle.start_date),
+      },
+      {
+        key: "end_date",
+        label: "End",
+        sortable: true,
+        accessor: (cycle) => cycle.end_date,
+        render: (cycle) => formatDate(cycle.end_date),
+      },
+      {
+        key: "status",
+        label: "Status",
+        sortable: true,
+        accessor: (cycle) => cycle.status || "",
+        render: (cycle) => <StatusBadge status={cycle.status} />,
+      },
+    ],
+    []
+  )
+
+  const filters: DataTableFilter<ReviewCycle>[] = useMemo(
+    () => [
+      {
+        key: "status",
+        label: "Status",
+        options: Object.entries(STATUS_LABELS).map(([value, label]) => ({ value, label })),
+        placeholder: "All Statuses",
+      },
+      {
+        key: "review_type",
+        label: "Review Type",
+        options: reviewTypeOptions.map((value) => ({ value, label: value.replace(/_/g, " ") })),
+        placeholder: "All Review Types",
+      },
+    ],
+    [reviewTypeOptions]
+  )
+
+  const rowActions: RowAction<ReviewCycle>[] = useMemo(
+    () => [
+      {
+        label: "Advance",
+        onClick: (cycle) => {
+          const next = STATUS_TRANSITIONS[(cycle.status || "planned") as CycleStatus]?.[0]
+          if (next) {
+            setStatusTarget({ cycle, newStatus: next })
+          }
+        },
+        hidden: (cycle) => (STATUS_TRANSITIONS[(cycle.status || "planned") as CycleStatus] || []).length === 0,
+      },
+      {
+        label: "Delete",
+        icon: Trash2,
+        variant: "destructive",
+        onClick: (cycle) => setDeleteTarget(cycle),
+        hidden: (cycle) => ["active", "locked"].includes(String(cycle.status)),
+      },
+    ],
+    []
+  )
 
   return (
-    <PageWrapper maxWidth="full" background="gradient">
-      <PageHeader
-        title="Review Cycles"
-        description="Create and manage performance review cycles. Only one cycle can be active at a time."
-        icon={RefreshCw}
-        backLink={{ href: "/admin/hr/pms", label: "Back to PMS" }}
-        actions={
-          <Button onClick={() => setIsCreateOpen(true)} size="sm" className="gap-2">
-            <Plus className="h-4 w-4" />
-            New Cycle
-          </Button>
-        }
+    <DataTablePage
+      title="Review Cycles"
+      description="Create and manage performance review cycles. Only one cycle can be active at a time."
+      icon={RefreshCw}
+      backLink={{ href: "/admin/hr/pms", label: "Back to PMS" }}
+      actions={
+        <Button onClick={() => setIsCreateOpen(true)} size="sm" className="gap-2">
+          <Plus className="h-4 w-4" />
+          New Cycle
+        </Button>
+      }
+      stats={
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <StatCard
+            title="Total"
+            value={cycles.length}
+            icon={Calendar}
+            iconBgColor="bg-blue-500/10"
+            iconColor="text-blue-500"
+          />
+          <StatCard
+            title="Active"
+            value={activeCycle ? activeCycle.name : "None"}
+            icon={CheckCircle2}
+            iconBgColor="bg-emerald-500/10"
+            iconColor="text-emerald-500"
+          />
+          <StatCard
+            title="Planned"
+            value={cycles.filter((cycle) => cycle.status === "planned").length}
+            icon={Calendar}
+            iconBgColor="bg-amber-500/10"
+            iconColor="text-amber-500"
+          />
+          <StatCard
+            title="Closed"
+            value={cycles.filter((cycle) => ["closed", "locked"].includes(String(cycle.status))).length}
+            icon={Lock}
+            iconBgColor="bg-violet-500/10"
+            iconColor="text-violet-500"
+          />
+        </div>
+      }
+    >
+      <DataTable<ReviewCycle>
+        data={cycles}
+        columns={columns}
+        filters={filters}
+        getRowId={(cycle) => cycle.id}
+        searchPlaceholder="Search cycle name, type, status…"
+        searchFn={(cycle, query) => {
+          const name = cycle.name.toLowerCase()
+          const type = cycle.review_type.toLowerCase()
+          const statusText = String(cycle.status || "").toLowerCase()
+          return name.includes(query) || type.includes(query) || statusText.includes(query)
+        }}
+        isLoading={isLoading}
+        error={error}
+        onRetry={() => void loadCycles()}
+        rowActions={rowActions}
+        expandable={{
+          render: (cycle) => (
+            <div className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
+              <div>
+                <p className="text-muted-foreground text-xs">Lifecycle</p>
+                <p className="font-medium">Planned → Active → Closed → Locked</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Created</p>
+                <p>{formatDate(cycle.created_at)}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Updated</p>
+                <p>{cycle.updated_at ? formatDate(cycle.updated_at) : "-"}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Next Transition</p>
+                <p>{STATUS_TRANSITIONS[(cycle.status || "planned") as CycleStatus]?.[0] || "None"}</p>
+              </div>
+            </div>
+          ),
+        }}
+        viewToggle
+        cardRenderer={(cycle) => (
+          <CycleCard
+            cycle={cycle}
+            onAdvance={(item) => {
+              const next = STATUS_TRANSITIONS[(item.status || "planned") as CycleStatus]?.[0]
+              if (next) setStatusTarget({ cycle: item, newStatus: next })
+            }}
+            onDelete={(item) => setDeleteTarget(item)}
+          />
+        )}
+        emptyTitle="No review cycles yet"
+        emptyDescription="Create the first cycle using the New Cycle button."
+        emptyIcon={Calendar}
+        skeletonRows={6}
+        minWidth="800px"
       />
 
-      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard title="Total" value={cycles.length} icon={Calendar} description="All review cycles" />
-        <StatCard
-          title="Active"
-          value={activeCycle ? activeCycle.name : "None"}
-          icon={CheckCircle2}
-          description="Currently running cycle"
-        />
-        <StatCard
-          title="Planned"
-          value={cycles.filter((c) => c.status === "planned").length}
-          icon={Calendar}
-          description="Upcoming cycles"
-        />
-        <StatCard
-          title="Closed"
-          value={cycles.filter((c) => ["closed", "locked"].includes(String(c.status))).length}
-          icon={Lock}
-          description="Completed cycles"
-        />
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>All Review Cycles</CardTitle>
-          <CardDescription>
-            Lifecycle: <strong>Planned → Active → Closed → Locked</strong>. Locked cycles cannot be edited or deleted.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="text-muted-foreground flex items-center justify-center gap-2 py-10">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Loading…
-            </div>
-          ) : error ? (
-            <div className="space-y-2 py-4">
-              <p className="text-sm text-red-500">{error}</p>
-              <Button variant="outline" size="sm" onClick={() => void loadCycles()}>
-                Retry
-              </Button>
-            </div>
-          ) : cycles.length === 0 ? (
-            <p className="text-muted-foreground py-8 text-center text-sm">
-              No review cycles yet. Create the first one using the &quot;New Cycle&quot; button.
-            </p>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table className="min-w-[800px]">
-                <TableHeader className="bg-emerald-50 dark:bg-emerald-950/30">
-                  <TableRow>
-                    <TableHead className="w-12">S/N</TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Start</TableHead>
-                    <TableHead>End</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {cycles.map((cycle, index) => {
-                    const nextStatuses = STATUS_TRANSITIONS[cycle.status as CycleStatus] || []
-                    return (
-                      <TableRow key={cycle.id}>
-                        <TableCell className="text-muted-foreground">{index + 1}</TableCell>
-                        <TableCell className="font-medium">{cycle.name}</TableCell>
-                        <TableCell className="capitalize">{cycle.review_type}</TableCell>
-                        <TableCell>{formatDate(cycle.start_date)}</TableCell>
-                        <TableCell>{formatDate(cycle.end_date)}</TableCell>
-                        <TableCell>
-                          <Badge
-                            variant={
-                              STATUS_COLORS[String(cycle.status)] as "default" | "secondary" | "outline" | "destructive"
-                            }
-                          >
-                            {STATUS_LABELS[String(cycle.status)] || cycle.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            {nextStatuses.map((next) => (
-                              <Button
-                                key={next}
-                                size="sm"
-                                variant="outline"
-                                onClick={() => setStatusTarget({ cycle, newStatus: next })}
-                              >
-                                Mark {STATUS_LABELS[next]}
-                              </Button>
-                            ))}
-                            {!["active", "locked"].includes(String(cycle.status)) && (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="text-destructive hover:text-destructive"
-                                onClick={() => setDeleteTarget(cycle)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Create Dialog */}
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -352,7 +461,7 @@ export default function ReviewCyclesPage() {
             </div>
             <div className="space-y-2">
               <Label>Initial Status</Label>
-              <Select value={status} onValueChange={(v) => setStatus(v as CycleStatus)}>
+              <Select value={status} onValueChange={(value) => setStatus(value as CycleStatus)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -383,7 +492,6 @@ export default function ReviewCyclesPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Status change confirmation */}
       <AlertDialog open={Boolean(statusTarget)} onOpenChange={() => setStatusTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -391,31 +499,33 @@ export default function ReviewCyclesPage() {
               Mark cycle as {statusTarget ? STATUS_LABELS[statusTarget.newStatus] : ""}?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {statusTarget?.newStatus === "active" &&
-                "Activating this cycle will allow reviews and feedback to be submitted. Ensure the previous cycle is closed."}
-              {statusTarget?.newStatus === "closed" &&
-                "Closing this cycle prevents new reviews from being submitted. Existing reviews remain accessible."}
-              {statusTarget?.newStatus === "locked" &&
-                "Locking is permanent. The cycle cannot be re-opened or modified after this."}
+              {statusTarget?.newStatus === "active"
+                ? "Activating this cycle will allow reviews and feedback to be submitted. Ensure the previous cycle is closed."
+                : statusTarget?.newStatus === "closed"
+                  ? "Closing this cycle prevents new reviews from being submitted. Existing reviews remain accessible."
+                  : statusTarget?.newStatus === "locked"
+                    ? "Locking is permanent. The cycle cannot be re-opened or modified after this."
+                    : ""}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isSubmitting}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               disabled={isSubmitting}
-              onClick={() => statusTarget && void handleStatusChange(statusTarget.cycle, statusTarget.newStatus)}
+              onClick={() => {
+                if (statusTarget) void handleStatusChange(statusTarget.cycle, statusTarget.newStatus)
+              }}
             >
-              {isSubmitting ? "Updating…" : "Confirm"}
+              {isSubmitting ? "Updating..." : "Confirm"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Delete confirmation */}
       <AlertDialog open={Boolean(deleteTarget)} onOpenChange={() => setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete &quot;{deleteTarget?.name}&quot;?</AlertDialogTitle>
+            <AlertDialogTitle>Delete cycle {deleteTarget?.name}?</AlertDialogTitle>
             <AlertDialogDescription>
               This will permanently delete the cycle. This cannot be undone. Cycles with linked reviews cannot be
               deleted.
@@ -426,13 +536,15 @@ export default function ReviewCyclesPage() {
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               disabled={isSubmitting}
-              onClick={() => deleteTarget && void handleDelete(deleteTarget)}
+              onClick={() => {
+                if (deleteTarget) void handleDelete(deleteTarget)
+              }}
             >
-              {isSubmitting ? "Deleting…" : "Delete"}
+              {isSubmitting ? "Deleting..." : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </PageWrapper>
+    </DataTablePage>
   )
 }

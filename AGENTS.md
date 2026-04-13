@@ -91,3 +91,217 @@ Preferred patterns:
 
 - Canonical API routes belong under `/api/`.
 - Do not add new features to `/api/v1/` unless the task is explicitly about backward compatibility or legacy maintenance.
+
+---
+
+## Table Page Standard — Mandatory for All List/Data Pages
+
+Every page that shows a list of records **must** use `DataTablePage` + `DataTable`
+from `@/components/ui/data-table`. Never build a one-off table with raw
+`<Table>` / `<PageWrapper>` markup. The only acceptable exception is an
+embedded sub-table inside a component that is already rendered inside a
+`DataTablePage` (e.g. a calibration view).
+
+### Required file structure
+
+```
+app/admin/<section>/<page>/
+  page.tsx                    ← root: uses DataTablePage + DataTable
+  _components/                ← page-specific sub-components only
+    <name>-dialog.tsx
+    <name>-card.tsx
+```
+
+### Mandatory layout order — never rearrange
+
+```
+1. Page header     title · icon · back link · action buttons (Add, Export…)
+2. Tabs            only when the page has 2–5 named views of the same data
+3. Stats cards     3–4 StatCard items — total, a key status, a period, a %
+4. DataTable       renders internally in this fixed order:
+     a. Search bar (debounced 300ms) + Columns toggle + View toggle
+     b. Filter dropdowns  (minimum 2 per table page)
+     c. Active filter pills + "Clear all" button
+     d. Row count  — always visible: "X results" / "Showing X–Y of Z"
+     e. Skeleton rows while loading  (never a spinner)
+     f. Table (sticky header, coloured header row, S/N column)
+        OR card grid when in card view / on mobile
+     g. Pagination controls
+```
+
+### DataTablePage usage
+
+```tsx
+import { DataTablePage } from "@/components/ui/data-table"
+
+<DataTablePage
+  title="Page Title"
+  description="Short description."
+  icon={SomeLucideIcon}
+  backLink={{ href: "/admin/section", label: "Back to Section" }}
+  tabs={TABS}               // optional — DataTableTab[]
+  activeTab={tab}           // required when tabs provided
+  onTabChange={setTab}      // required when tabs provided
+  stats={<StatsRow />}      // strongly recommended
+  actions={
+    <div className="flex gap-2">
+      <Button variant="outline" size="sm"><Download /> Export</Button>
+      <Button size="sm"><Plus /> Add Item</Button>
+    </div>
+  }
+>
+  <DataTable ... />
+</DataTablePage>
+```
+
+### DataTable usage
+
+```tsx
+import { DataTable } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
+
+const columns: DataTableColumn<MyRow>[] = [
+  {
+    key: "name",
+    label: "Name",
+    sortable: true,
+    accessor: (r) => r.name,
+    render: (r) => <span className="font-medium">{r.name}</span>,
+    resizable: true,   // optional — enables drag-to-resize handle
+    initialWidth: 200, // optional — starting width in px when resizable
+  },
+  {
+    key: "status",
+    label: "Status",
+    render: (r) => <StatusBadge status={r.status} />,
+    hideOnMobile: true,
+  },
+]
+
+const filters: DataTableFilter<MyRow>[] = [
+  // minimum 2 filters per table page
+  {
+    key: "department",
+    label: "Department",
+    options: departments.map((d) => ({ value: d, label: d })),
+    // mode: "column" (default) matches against the accessor of the column
+    // with the same key. Use mode: "custom" + filterFn for complex logic.
+  },
+  {
+    key: "status",
+    label: "Status",
+    options: STATUS_OPTIONS,
+  },
+]
+
+<DataTable<MyRow>
+  data={rows}
+  columns={columns}
+  getRowId={(r) => r.id}
+  searchPlaceholder="Search name, department…"
+  searchFn={(row, q) => row.name.toLowerCase().includes(q)}
+  filters={filters}
+  isLoading={isLoading}
+  error={error}
+  onRetry={reload}
+  pagination={{ pageSize: 50 }}                  // optional
+  rowActions={[{ label: "Edit", onClick: open }]} // optional
+  expandable={{ render: (r) => <Detail row={r} /> }} // optional
+  bulkActions={[{ label: "Delete", onClick: bulkDelete, variant: "destructive" }]}
+  selectable   // enable row checkboxes
+  viewToggle   // show list/card toggle
+  cardRenderer={(r) => <MyCard row={r} />}        // required with viewToggle
+  urlSync      // persist search + filters in URL query params
+/>
+```
+
+### Feature checklist — built-in, never re-implement manually
+
+| Feature | Auto | Notes |
+|---------|------|-------|
+| Muted header row | ✅ | `bg-muted/80` — do not change |
+| Sticky header on scroll | ✅ | Always on |
+| Search with 300ms debounce | ✅ | Pass `searchFn` |
+| Clear search × button | ✅ | Inline in the search field |
+| Active filter pills + clear all | ✅ | Appears whenever any filter is active |
+| Multi-select filter dropdowns | ✅ | Pass `filters` |
+| Column visibility toggle | ✅ | Sliders button, top-right of filter bar |
+| Column drag-to-resize | ✅ | Set `resizable: true` on column + `initialWidth` |
+| Column drag-to-reorder | ✅ | Hover any column header to reveal grip handle, drag left/right |
+| Sortable columns with arrows | ✅ | Set `sortable: true` on column |
+| S/N row numbers | ✅ | Disable with `showRowNumbers={false}` |
+| Row count always visible | ✅ | "X results" without pagination; "Showing X–Y of Z" with it |
+| Skeleton loading (shimmer rows) | ✅ | Pass `isLoading` — matches column count |
+| Error state + retry button | ✅ | Pass `error` + `onRetry` |
+| Empty state with clear-filters CTA | ✅ | Different message: no data vs no filter match |
+| Client-side pagination | ✅ | Pass `pagination: { pageSize: N }` |
+| Server-side pagination | ✅ | Add `serverSide: true` + `totalRows` + `onPageChange` |
+| Expandable rows | ✅ | Pass `expandable` |
+| Row actions | ✅ | Pass `rowActions` |
+| Bulk select + actions toolbar | ✅ | Pass `selectable` + `bulkActions` |
+| Keyboard navigation ↑↓ / Enter | ✅ | Always on |
+| List / card view toggle | ✅ | Pass `viewToggle` + `cardRenderer` |
+| Auto card view on mobile | ✅ | Switches automatically at < 768px if `cardRenderer` provided |
+| URL-synced filters | ✅ | Pass `urlSync` — search + filters write to query params |
+
+### Stats cards — required on every table page
+
+```tsx
+import { StatCard } from "@/components/ui/stat-card"
+
+<div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+  <StatCard title="Total"   value={total}   icon={Users}      iconBgColor="bg-blue-500/10"    iconColor="text-blue-500" />
+  <StatCard title="Active"  value={active}  icon={Check}      iconBgColor="bg-emerald-500/10" iconColor="text-emerald-500" />
+  <StatCard title="Pending" value={pending} icon={Clock}      iconBgColor="bg-amber-500/10"   iconColor="text-amber-500" />
+</div>
+```
+
+### Tabs — when to use
+
+Use tabs when a page has 2–5 different views of **the same data source**
+(e.g. Individual / Department / Cycle). Do **not** create separate pages for
+views that share the same shell and data fetch.
+
+```tsx
+const TABS: DataTableTab[] = [
+  { key: "all",      label: "All" },
+  { key: "active",   label: "Active" },
+  { key: "archived", label: "Archived" },
+]
+```
+
+### Export — placement rule
+
+Export button always lives in the page header `actions`. Never inside the
+table or filter bar. Use `ExportOptionsDialog` from
+`@/components/admin/export-options-dialog`. Export logic lives in
+`@/lib/<section>/export.ts`.
+
+### Back link convention
+
+| Page location | Back link |
+|--------------|-----------|
+| `/admin/hr/pms/…` | `{ href: "/admin/hr/pms", label: "Back to PMS" }` |
+| `/admin/hr/…` | `{ href: "/admin/hr", label: "Back to HR" }` |
+| `/admin/…` | `{ href: "/admin", label: "Back to Admin" }` |
+
+### Colour / design token standards
+
+| Element | Class |
+|---------|-------|
+| Table header row | `bg-muted/80` |
+| Filter card border | `border-2` |
+| Blue stat icon | `bg-blue-500/10` + `text-blue-500` |
+| Green stat icon | `bg-emerald-500/10` + `text-emerald-500` |
+| Amber stat icon | `bg-amber-500/10` + `text-amber-500` |
+| Red stat icon | `bg-red-500/10` + `text-red-500` |
+| Purple stat icon | `bg-violet-500/10` + `text-violet-500` |
+
+### Hard prohibitions
+
+- ❌ Raw `<Table>` / `<TableHeader>` inside a page component
+- ❌ Inline search or filter state in a page — all handled by `DataTable`
+- ❌ `<Loader2>` spinner for table loading — skeletons are automatic
+- ❌ Fewer than 2 filter options on any table page
+- ❌ A table page without stats cards
+- ❌ A table page without `DataTablePage` as the root wrapper

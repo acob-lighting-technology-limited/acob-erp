@@ -1,14 +1,14 @@
 "use client"
 
-import { Fragment, useState } from "react"
+import Link from "next/link"
+import { useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
-import { AdminTablePage } from "@/components/admin/admin-table-page"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { DataTable, DataTablePage } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter, RowAction } from "@/components/ui/data-table"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
   Dialog,
   DialogContent,
@@ -22,14 +22,10 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ChevronDown, ChevronUp, Mail, MapPin, Pencil, Plus, Users } from "lucide-react"
+import { Mail, MapPin, Pencil, Plus, Users } from "lucide-react"
 import { toast } from "sonner"
 import { StatCard } from "@/components/ui/stat-card"
-import { EmptyState } from "@/components/ui/empty-state"
-import { TableSkeleton } from "@/components/ui/query-states"
 import { QUERY_KEYS } from "@/lib/query-keys"
-import Link from "next/link"
-import { cn } from "@/lib/utils"
 import { isAssignableEmploymentStatus } from "@/lib/workforce/assignment-policy"
 import { logger } from "@/lib/logger"
 
@@ -85,7 +81,7 @@ async function fetchOfficeLocationsData(): Promise<OfficeLocationsData> {
     canManageLocations = ["developer", "super_admin", "admin"].includes(profile?.role || "")
   }
 
-  const [{ data: locs, error }, { data: depts }] = await Promise.all([
+  const [{ data: locations, error }, { data: departments }] = await Promise.all([
     supabase.from("office_locations").select("*").order("name"),
     supabase.from("departments").select("name").eq("is_active", true).order("name"),
   ])
@@ -101,27 +97,56 @@ async function fetchOfficeLocationsData(): Promise<OfficeLocationsData> {
   for (const profile of (profiles || ([] as LocationEmployee[])).filter((employee) =>
     isAssignableEmploymentStatus(employee.employment_status, { allowLegacyNullStatus: false })
   )) {
-    const locName = profile.office_location?.trim() || "Unassigned"
-    if (!byLocation[locName]) byLocation[locName] = []
-    byLocation[locName].push(profile)
+    const locationName = profile.office_location?.trim() || "Unassigned"
+    if (!byLocation[locationName]) byLocation[locationName] = []
+    byLocation[locationName].push(profile)
   }
 
-  const locsWithCounts = (locs || []).map((loc) => ({
-    ...loc,
-    employee_count: byLocation[loc.name]?.length || 0,
+  const locationsWithCounts = (locations || []).map((location) => ({
+    ...location,
+    employee_count: byLocation[location.name]?.length || 0,
   }))
 
   return {
-    locations: locsWithCounts,
+    locations: locationsWithCounts,
     locationEmployees: byLocation,
     canManageLocations,
-    departments: (depts || []).map((d) => d.name),
+    departments: (departments || []).map((department) => department.name),
   }
+}
+
+function employeeName(employee: LocationEmployee) {
+  return [employee.first_name, employee.last_name].filter(Boolean).join(" ") || "Unknown"
+}
+
+function LocationCard({ location, onEdit }: { location: OfficeLocation; onEdit: (location: OfficeLocation) => void }) {
+  return (
+    <div className="space-y-3 rounded-xl border p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="font-semibold">{location.name}</p>
+          <p className="text-muted-foreground text-xs">{location.employee_count || 0} employees</p>
+        </div>
+        <Badge variant={location.is_active ? "default" : "secondary"}>
+          {location.is_active ? "Active" : "Inactive"}
+        </Badge>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Badge variant="outline">
+          {OFFICE_TYPE_OPTIONS.find((item) => item.value === location.type)?.label || location.type}
+        </Badge>
+        {location.department ? <Badge variant="secondary">{location.department}</Badge> : null}
+      </div>
+      <p className="text-muted-foreground text-sm">{location.description || "No description added"}</p>
+      <Button size="sm" variant="outline" onClick={() => onEdit(location)}>
+        Edit
+      </Button>
+    </div>
+  )
 }
 
 export default function OfficeLocationsPage() {
   const queryClient = useQueryClient()
-  const [expandedLocations, setExpandedLocations] = useState<Set<string>>(new Set())
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingLocation, setEditingLocation] = useState<OfficeLocation | null>(null)
   const [formData, setFormData] = useState({
@@ -132,7 +157,7 @@ export default function OfficeLocationsPage() {
     is_active: true,
   })
 
-  const { data, isLoading: loading } = useQuery({
+  const { data, isLoading, error } = useQuery({
     queryKey: QUERY_KEYS.adminOfficeLocations(),
     queryFn: fetchOfficeLocationsData,
   })
@@ -142,8 +167,8 @@ export default function OfficeLocationsPage() {
   const canManageLocations = data?.canManageLocations ?? false
   const departments = data?.departments ?? []
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault()
     try {
       if (!canManageLocations) {
         toast.error("You can view office locations but cannot modify them")
@@ -153,12 +178,10 @@ export default function OfficeLocationsPage() {
       const supabase = createClient()
 
       if (editingLocation) {
-        const newName = formData.name.trim()
-
-        const { error, data: updatedRows } = await supabase
+        const { error: updateError, data: updatedRows } = await supabase
           .from("office_locations")
           .update({
-            name: newName,
+            name: formData.name.trim(),
             type: formData.type,
             department: formData.department || null,
             description: formData.description || null,
@@ -168,16 +191,14 @@ export default function OfficeLocationsPage() {
           .eq("id", editingLocation.id)
           .select()
 
-        if (error) throw error
+        if (updateError) throw updateError
         if (!updatedRows || updatedRows.length === 0) {
-          throw new Error(
-            "Update was blocked by a database policy. Check that your account has permission to modify office locations."
-          )
+          throw new Error("Update was blocked by a database policy. Check office location permissions.")
         }
 
         toast.success("Office location updated successfully")
       } else {
-        const { error } = await supabase.from("office_locations").insert({
+        const { error: createError } = await supabase.from("office_locations").insert({
           name: formData.name.trim(),
           type: formData.type,
           department: formData.department || null,
@@ -185,36 +206,33 @@ export default function OfficeLocationsPage() {
           is_active: formData.is_active,
         })
 
-        if (error) throw error
+        if (createError) throw createError
         toast.success("Office location created successfully")
       }
 
       setIsDialogOpen(false)
       setEditingLocation(null)
       setFormData({ name: "", type: "office", department: "", description: "", is_active: true })
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminOfficeLocations() })
-    } catch (error: unknown) {
-      log.error("Error saving office location:", error)
-      const msg =
-        error instanceof Error
-          ? error.message
-          : ((error as { message?: string })?.message ?? "Failed to save office location")
-      toast.error(msg)
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminOfficeLocations() })
+    } catch (err: unknown) {
+      log.error("Error saving office location:", err)
+      const message = err instanceof Error ? err.message : "Failed to save office location"
+      toast.error(message)
     }
   }
 
-  function openEditDialog(loc: OfficeLocation) {
+  function openEditDialog(location: OfficeLocation) {
     if (!canManageLocations) {
       toast.error("You can view office locations but cannot edit them")
       return
     }
-    setEditingLocation(loc)
+    setEditingLocation(location)
     setFormData({
-      name: loc.name,
-      type: loc.type,
-      department: loc.department || "",
-      description: loc.description || "",
-      is_active: loc.is_active,
+      name: location.name,
+      type: location.type,
+      department: location.department || "",
+      description: location.description || "",
+      is_active: location.is_active,
     })
     setIsDialogOpen(true)
   }
@@ -229,28 +247,104 @@ export default function OfficeLocationsPage() {
     setIsDialogOpen(true)
   }
 
-  function toggleLocationRow(locationId: string) {
-    setExpandedLocations((prev) => {
-      const next = new Set(prev)
-      if (next.has(locationId)) next.delete(locationId)
-      else next.add(locationId)
-      return next
-    })
-  }
+  const columns: DataTableColumn<OfficeLocation>[] = [
+    {
+      key: "name",
+      label: "Name",
+      sortable: true,
+      accessor: (location) => location.name,
+      render: (location) => <span className="font-medium">{location.name}</span>,
+      resizable: true,
+      initialWidth: 220,
+    },
+    {
+      key: "type",
+      label: "Type",
+      sortable: true,
+      accessor: (location) => OFFICE_TYPE_OPTIONS.find((item) => item.value === location.type)?.label || location.type,
+      render: (location) => (
+        <Badge variant="outline">
+          {OFFICE_TYPE_OPTIONS.find((item) => item.value === location.type)?.label || location.type}
+        </Badge>
+      ),
+    },
+    {
+      key: "department",
+      label: "Linked Department",
+      sortable: true,
+      accessor: (location) => location.department || "",
+      render: (location) =>
+        location.department ? (
+          <Badge variant="secondary">{location.department}</Badge>
+        ) : (
+          <span className="text-muted-foreground text-sm">-</span>
+        ),
+    },
+    {
+      key: "employee_count",
+      label: "Headcount",
+      sortable: true,
+      accessor: (location) => location.employee_count || 0,
+      render: (location) => <Badge variant="secondary">{location.employee_count || 0} employees</Badge>,
+    },
+    {
+      key: "status",
+      label: "Status",
+      sortable: true,
+      accessor: (location) => (location.is_active ? "active" : "inactive"),
+      render: (location) => (
+        <Badge variant={location.is_active ? "default" : "secondary"}>
+          {location.is_active ? "Active" : "Inactive"}
+        </Badge>
+      ),
+    },
+  ]
+
+  const filters: DataTableFilter<OfficeLocation>[] = [
+    {
+      key: "type",
+      label: "Location Type",
+      options: OFFICE_TYPE_OPTIONS,
+      placeholder: "All Types",
+    },
+    {
+      key: "status",
+      label: "Status",
+      options: [
+        { value: "active", label: "Active" },
+        { value: "inactive", label: "Inactive" },
+      ],
+      placeholder: "All Statuses",
+    },
+    {
+      key: "department",
+      label: "Department",
+      options: departments.map((department) => ({ value: department, label: department })),
+      placeholder: "All Departments",
+    },
+  ]
+
+  const rowActions: RowAction<OfficeLocation>[] = [
+    {
+      label: "Edit",
+      icon: Pencil,
+      onClick: (location) => openEditDialog(location),
+      hidden: () => !canManageLocations,
+    },
+  ]
 
   return (
-    <AdminTablePage
+    <DataTablePage
       title="Office Locations"
-      description="Manage office locations and the employees assigned to each location"
+      description="Manage office locations and the employees assigned to each location."
       icon={MapPin}
-      backLinkHref="/admin/hr"
-      backLinkLabel="Back to HR"
+      backLink={{ href: "/admin/hr", label: "Back to HR" }}
       actions={
         canManageLocations ? (
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button onClick={openCreateDialog}>
-                <Plus className="mr-2 h-4 w-4" />
+              <Button onClick={openCreateDialog} size="sm" className="gap-2">
+                <Plus className="h-4 w-4" />
                 Add Location
               </Button>
             </DialogTrigger>
@@ -260,7 +354,7 @@ export default function OfficeLocationsPage() {
                   <DialogTitle>{editingLocation ? "Edit Office Location" : "Add Office Location"}</DialogTitle>
                   <DialogDescription>
                     {editingLocation
-                      ? "Update the office location details below. Renaming will automatically update all assigned employee records."
+                      ? "Update the office location details below."
                       : "Add a new office location to the system."}
                   </DialogDescription>
                 </DialogHeader>
@@ -270,42 +364,42 @@ export default function OfficeLocationsPage() {
                     <Input
                       id="name"
                       value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      onChange={(event) => setFormData({ ...formData, name: event.target.value })}
                       placeholder="e.g., Technical Extension, MD Office"
                       required
                     />
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="type">Location Type</Label>
-                    <Select value={formData.type} onValueChange={(val) => setFormData({ ...formData, type: val })}>
+                    <Select value={formData.type} onValueChange={(value) => setFormData({ ...formData, type: value })}>
                       <SelectTrigger id="type">
                         <SelectValue placeholder="Select type" />
                       </SelectTrigger>
                       <SelectContent>
-                        {OFFICE_TYPE_OPTIONS.map((o) => (
-                          <SelectItem key={o.value} value={o.value}>
-                            {o.label}
+                        {OFFICE_TYPE_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="department">
-                      Linked Department <span className="text-muted-foreground text-xs">(optional)</span>
-                    </Label>
+                    <Label htmlFor="department">Linked Department</Label>
                     <Select
                       value={formData.department || "__none__"}
-                      onValueChange={(val) => setFormData({ ...formData, department: val === "__none__" ? "" : val })}
+                      onValueChange={(value) =>
+                        setFormData({ ...formData, department: value === "__none__" ? "" : value })
+                      }
                     >
                       <SelectTrigger id="department">
                         <SelectValue placeholder="Select department" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="__none__">None</SelectItem>
-                        {departments.map((dept) => (
-                          <SelectItem key={dept} value={dept}>
-                            {dept}
+                        {departments.map((department) => (
+                          <SelectItem key={department} value={department}>
+                            {department}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -316,7 +410,7 @@ export default function OfficeLocationsPage() {
                     <Textarea
                       id="description"
                       value={formData.description}
-                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      onChange={(event) => setFormData({ ...formData, description: event.target.value })}
                       placeholder="Brief description of this location..."
                       rows={3}
                     />
@@ -341,207 +435,117 @@ export default function OfficeLocationsPage() {
           </Dialog>
         ) : null
       }
+      stats={
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <StatCard
+            title="Total Locations"
+            value={locations.length}
+            icon={MapPin}
+            iconBgColor="bg-blue-500/10"
+            iconColor="text-blue-500"
+          />
+          <StatCard
+            title="Active"
+            value={locations.filter((location) => location.is_active).length}
+            icon={MapPin}
+            iconBgColor="bg-emerald-500/10"
+            iconColor="text-emerald-500"
+          />
+          <StatCard
+            title="Employees"
+            value={locations.reduce((sum, location) => sum + (location.employee_count || 0), 0)}
+            icon={Users}
+            iconBgColor="bg-amber-500/10"
+            iconColor="text-amber-500"
+          />
+          <StatCard
+            title="Linked Depts"
+            value={locations.filter((location) => Boolean(location.department)).length}
+            icon={MapPin}
+            iconBgColor="bg-violet-500/10"
+            iconColor="text-violet-500"
+          />
+        </div>
+      }
     >
-      {/* Stats */}
-      <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 md:gap-4">
-        <StatCard title="Total Locations" value={locations.length} icon={MapPin} />
-        <StatCard
-          title="Active"
-          value={locations.filter((l) => l.is_active).length}
-          icon={MapPin}
-          iconBgColor="bg-green-100 dark:bg-green-900/30"
-          iconColor="text-green-600 dark:text-green-400"
-        />
-        <StatCard
-          title="Total Employees"
-          value={locations.reduce((sum, l) => sum + (l.employee_count || 0), 0)}
-          icon={Users}
-        />
-      </div>
-
-      {/* Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>All Office Locations</CardTitle>
-          <CardDescription>Expand a location to see employees assigned there</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <TableSkeleton rows={5} cols={6} />
-          ) : locations.length === 0 ? (
-            <EmptyState
-              icon={MapPin}
-              title="No office locations yet"
-              description="Create your first office location to get started."
-              action={canManageLocations ? { label: "Add Location", onClick: openCreateDialog, icon: Plus } : undefined}
-            />
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-14"></TableHead>
-                  <TableHead className="w-12">#</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Linked Dept</TableHead>
-                  <TableHead>Employee Count</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {locations.map((loc, index) => {
-                  const isExpanded = expandedLocations.has(loc.id)
-                  const members = locationEmployees[loc.name] || []
-
-                  return (
-                    <Fragment key={loc.id}>
-                      <TableRow
-                        className={cn(
-                          "hover:bg-muted/30 cursor-pointer transition-colors",
-                          isExpanded && "bg-muted/50"
-                        )}
-                        onClick={() => toggleLocationRow(loc.id)}
-                      >
-                        <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              toggleLocationRow(loc.id)
-                            }}
-                            className="h-7 w-7"
-                            aria-label={isExpanded ? `Collapse ${loc.name}` : `Expand ${loc.name}`}
-                          >
-                            {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                          </Button>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
-                        <TableCell>
-                          <div className="font-medium">{loc.name}</div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-wrap gap-1">
-                            {loc.department ? (
-                              <Badge variant="secondary">{loc.department}</Badge>
-                            ) : (
-                              <span className="text-muted-foreground text-sm">-</span>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="secondary">{loc.employee_count || 0} employees</Badge>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground max-w-xs truncate text-sm">
-                          {loc.description || "No description added"}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={loc.is_active ? "default" : "secondary"}>
-                            {loc.is_active ? "Active" : "Inactive"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                          <div className="flex justify-end gap-2">
-                            {canManageLocations && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => openEditDialog(loc)}
-                                aria-label={`Edit location: ${loc.name}`}
-                                title={`Edit location: ${loc.name}`}
-                              >
+      <DataTable<OfficeLocation>
+        data={locations}
+        columns={columns}
+        filters={filters}
+        getRowId={(location) => location.id}
+        searchPlaceholder="Search location name, type, department, or description..."
+        searchFn={(location, query) =>
+          [
+            location.name,
+            location.description || "",
+            location.department || "",
+            OFFICE_TYPE_OPTIONS.find((item) => item.value === location.type)?.label || location.type,
+          ]
+            .join(" ")
+            .toLowerCase()
+            .includes(query)
+        }
+        isLoading={isLoading}
+        error={error instanceof Error ? error.message : error ? String(error) : null}
+        onRetry={() => void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminOfficeLocations() })}
+        rowActions={rowActions}
+        expandable={{
+          render: (location) => {
+            const members = locationEmployees[location.name] || []
+            return members.length === 0 ? (
+              <p className="text-muted-foreground text-sm">No employees assigned to this location.</p>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-sm font-medium">{members.length} assigned employees</p>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[640px] text-sm">
+                    <thead className="bg-muted/30">
+                      <tr>
+                        <th className="px-3 py-2 text-left text-xs font-semibold tracking-wide uppercase">Employee</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold tracking-wide uppercase">Contact</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold tracking-wide uppercase">Role</th>
+                        <th className="px-3 py-2 text-right text-xs font-semibold tracking-wide uppercase">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {members.map((member) => (
+                        <tr key={member.id} className="border-t">
+                          <td className="px-3 py-2 font-medium">{employeeName(member)}</td>
+                          <td className="text-muted-foreground px-3 py-2">
+                            <div className="flex items-center gap-2">
+                              <Mail className="h-3 w-3" />
+                              <span>
+                                {[member.company_email, member.additional_email].filter(Boolean).join(" | ") || "-"}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-3 py-2">
+                            <Badge variant="outline">{member.designation || "Employee"}</Badge>
+                          </td>
+                          <td className="px-3 py-2 text-right">
+                            <Link href={`/admin/hr/employees?userId=${member.id}`}>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
                                 <Pencil className="h-4 w-4" />
                               </Button>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-
-                      {isExpanded && (
-                        <TableRow className="bg-muted/10 hover:bg-muted/10 border-t-0">
-                          <TableCell colSpan={6} className="p-0">
-                            <div className="animate-in slide-in-from-top-2 p-6 pt-2 duration-200">
-                              {members.length === 0 ? (
-                                <p className="text-muted-foreground px-1 py-1 text-sm">
-                                  No employees assigned to this location.
-                                </p>
-                              ) : (
-                                <div className="bg-background overflow-hidden rounded-lg border shadow-sm">
-                                  <Table>
-                                    <TableHeader className="bg-muted/30">
-                                      <TableRow>
-                                        <TableHead className="text-muted-foreground w-[70px] text-[10px] font-black tracking-widest uppercase">
-                                          #
-                                        </TableHead>
-                                        <TableHead className="text-muted-foreground text-[10px] font-black tracking-widest uppercase">
-                                          Employee
-                                        </TableHead>
-                                        <TableHead className="text-muted-foreground text-[10px] font-black tracking-widest uppercase">
-                                          Contact
-                                        </TableHead>
-                                        <TableHead className="text-muted-foreground w-[180px] text-[10px] font-black tracking-widest uppercase">
-                                          Role
-                                        </TableHead>
-                                        <TableHead className="w-[80px] text-right"></TableHead>
-                                      </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                      {members.map((member, memberIndex) => (
-                                        <TableRow key={member.id} className="hover:bg-muted/5">
-                                          <TableCell className="text-muted-foreground text-xs font-semibold">
-                                            {memberIndex + 1}
-                                          </TableCell>
-                                          <TableCell className="text-sm font-semibold">
-                                            {[member.first_name, member.last_name].filter(Boolean).join(" ") ||
-                                              "Unknown"}
-                                          </TableCell>
-                                          <TableCell className="text-muted-foreground text-xs">
-                                            <div className="flex items-center gap-2">
-                                              <Mail className="h-3 w-3" />
-                                              <span className="truncate">
-                                                {[member.company_email, member.additional_email]
-                                                  .filter(Boolean)
-                                                  .join(" | ")}
-                                              </span>
-                                            </div>
-                                          </TableCell>
-                                          <TableCell>
-                                            <Badge variant="outline" className="text-xs">
-                                              {member.designation || "Employee"}
-                                            </Badge>
-                                          </TableCell>
-                                          <TableCell className="text-right">
-                                            <Link href={`/admin/hr/employees?userId=${member.id}`}>
-                                              <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="h-8 w-8"
-                                                aria-label="Edit employee office location"
-                                                title="Edit employee office location"
-                                              >
-                                                <Pencil className="h-4 w-4" />
-                                              </Button>
-                                            </Link>
-                                          </TableCell>
-                                        </TableRow>
-                                      ))}
-                                    </TableBody>
-                                  </Table>
-                                </div>
-                              )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </Fragment>
-                  )
-                })}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
-    </AdminTablePage>
+                            </Link>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )
+          },
+        }}
+        viewToggle
+        cardRenderer={(location) => <LocationCard location={location} onEdit={openEditDialog} />}
+        emptyTitle="No office locations yet"
+        emptyDescription="Create your first office location to start organizing workplace assignments."
+        emptyIcon={MapPin}
+        skeletonRows={5}
+        minWidth="1100px"
+      />
+    </DataTablePage>
   )
 }

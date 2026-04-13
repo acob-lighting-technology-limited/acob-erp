@@ -1,16 +1,15 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { BookOpen, Loader2, Plus, Search } from "lucide-react"
+import { BookOpen, Eye, Pencil, Plus, Target, TrendingUp, Users } from "lucide-react"
 import { toast } from "sonner"
-import { PageHeader, PageWrapper } from "@/components/layout"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { DataTable, DataTablePage } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter, RowAction } from "@/components/ui/data-table"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { StatCard } from "@/components/ui/stat-card"
@@ -31,14 +30,18 @@ type Profile = {
 }
 
 type PlanAction = {
+  id?: string
   title: string
   description?: string | null
   due_date?: string | null
+  status?: string | null
+  completed_at?: string | null
 }
 
 type DevelopmentPlan = {
   id: string
   user_id: string
+  review_cycle_id?: string | null
   title: string
   description: string | null
   focus_area: string
@@ -48,7 +51,7 @@ type DevelopmentPlan = {
   progress_pct: number | null
   created_at: string
   user?: Profile | null
-  actions?: Array<{ id: string; title: string; status: string; completed_at: string | null }> | null
+  actions?: PlanAction[] | null
   review?: { id: string } | null
 }
 
@@ -81,33 +84,94 @@ function formatName(profile: Profile | null | undefined) {
   return `${profile?.first_name || ""} ${profile?.last_name || ""}`.trim() || "Unknown"
 }
 
+function formatDate(date: string | null | undefined) {
+  if (!date) return "-"
+  return new Date(date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
+}
+
+function normalizeCycleValue(value: string) {
+  return value === "none" ? "" : value
+}
+
+function PlanCard({
+  plan,
+  cycleName,
+  onView,
+  onEdit,
+}: {
+  plan: DevelopmentPlan
+  cycleName: string
+  onView: (plan: DevelopmentPlan) => void
+  onEdit: (plan: DevelopmentPlan) => void
+}) {
+  return (
+    <div className="space-y-3 rounded-xl border p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="font-semibold">{plan.title}</p>
+          <p className="text-muted-foreground text-xs">{formatName(plan.user)}</p>
+        </div>
+        <Badge variant={STATUS_VARIANTS[plan.status] || "outline"} className="capitalize">
+          {plan.status.replace("_", " ")}
+        </Badge>
+      </div>
+      <div className="grid grid-cols-2 gap-3 text-sm">
+        <div>
+          <p className="text-muted-foreground text-xs">Department</p>
+          <p>{plan.user?.department || "-"}</p>
+        </div>
+        <div>
+          <p className="text-muted-foreground text-xs">Quarter</p>
+          <p>{cycleName}</p>
+        </div>
+      </div>
+      <div className="space-y-1">
+        <div className="flex items-center justify-between text-xs">
+          <span className="text-muted-foreground">Progress</span>
+          <span>{plan.progress_pct || 0}%</span>
+        </div>
+        <Progress value={plan.progress_pct || 0} className="h-2" />
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Button size="sm" variant="outline" onClick={() => onView(plan)}>
+          View
+        </Button>
+        <Button size="sm" variant="outline" onClick={() => onEdit(plan)}>
+          Edit
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 export default function AdminDevelopmentPlansPage() {
   const [plans, setPlans] = useState<DevelopmentPlan[]>([])
   const [employees, setEmployees] = useState<Profile[]>([])
   const [cycles, setCycles] = useState<Cycle[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [isEditOpen, setIsEditOpen] = useState(false)
+  const [viewingPlan, setViewingPlan] = useState<DevelopmentPlan | null>(null)
+  const [editingPlan, setEditingPlan] = useState<DevelopmentPlan | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [statusFilter, setStatusFilter] = useState("all")
-  const [departmentFilter, setDepartmentFilter] = useState("all")
 
-  // Form
   const [selectedEmployee, setSelectedEmployee] = useState("")
-  const [selectedCycle, setSelectedCycle] = useState("")
+  const [selectedCycle, setSelectedCycle] = useState("none")
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
   const [focusArea, setFocusArea] = useState("general")
-  const [priority, setPriority] = useState("medium")
+  const [priority, setPriority] = useState<"low" | "medium" | "high">("medium")
+  const [status, setStatus] = useState<"active" | "completed" | "cancelled" | "on_hold">("active")
   const [targetDate, setTargetDate] = useState("")
+  const [progressPct, setProgressPct] = useState("0")
   const [actionLines, setActionLines] = useState("")
 
   const loadData = useCallback(async () => {
     setIsLoading(true)
+    setError(null)
     try {
       const [plansRes, profilesRes, cyclesRes] = await Promise.all([
-        // Admin fetches all plans by getting a list of all employees first,
-        // then fetching by dept. For simplicity use the all-employees API.
         fetch("/api/hr/performance/development-plans?user_id=all_admin"),
         fetch("/api/hr/profiles?all=true"),
         fetch("/api/hr/performance/cycles"),
@@ -117,11 +181,16 @@ export default function AdminDevelopmentPlansPage() {
         profilesRes.json().catch(() => ({})),
         cyclesRes.json().catch(() => ({})),
       ])
+      if (!plansRes.ok) {
+        throw new Error(plansData?.error || "Failed to load development plans")
+      }
       setPlans(plansData?.data || [])
       setEmployees(profilesData?.data || [])
       setCycles(cyclesData?.data || [])
-    } catch {
-      toast.error("Failed to load data")
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to load development plans"
+      setError(message)
+      toast.error(message)
     } finally {
       setIsLoading(false)
     }
@@ -131,22 +200,53 @@ export default function AdminDevelopmentPlansPage() {
     void loadData()
   }, [loadData])
 
-  const departments = useMemo(
-    () => Array.from(new Set(plans.map((p) => p.user?.department).filter(Boolean) as string[])).sort(),
+  const cycleNameMap = useMemo(() => new Map(cycles.map((cycle) => [cycle.id, cycle.name])), [cycles])
+
+  const departmentOptions = useMemo(
+    () =>
+      Array.from(new Set(plans.map((plan) => plan.user?.department).filter(Boolean) as string[]))
+        .sort()
+        .map((department) => ({ value: department, label: department })),
     [plans]
   )
 
-  const filtered = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase()
-    return plans.filter((p) => {
-      const name = formatName(p.user).toLowerCase()
-      const dept = String(p.user?.department || "").toLowerCase()
-      const statusMatch = statusFilter === "all" || p.status === statusFilter
-      const deptMatch = departmentFilter === "all" || p.user?.department === departmentFilter
-      const searchMatch = !q || name.includes(q) || dept.includes(q) || p.title.toLowerCase().includes(q)
-      return statusMatch && deptMatch && searchMatch
-    })
-  }, [plans, searchQuery, statusFilter, departmentFilter])
+  const cycleOptions = useMemo(() => cycles.map((cycle) => ({ value: cycle.id, label: cycle.name })), [cycles])
+
+  const focusOptions = useMemo(() => Object.entries(FOCUS_LABELS).map(([value, label]) => ({ value, label })), [])
+
+  function resetForm() {
+    setSelectedEmployee("")
+    setSelectedCycle("none")
+    setTitle("")
+    setDescription("")
+    setFocusArea("general")
+    setPriority("medium")
+    setStatus("active")
+    setTargetDate("")
+    setProgressPct("0")
+    setActionLines("")
+    setEditingPlan(null)
+  }
+
+  function openCreate() {
+    resetForm()
+    setIsCreateOpen(true)
+  }
+
+  function openEdit(plan: DevelopmentPlan) {
+    setEditingPlan(plan)
+    setSelectedEmployee(plan.user_id)
+    setSelectedCycle(plan.review_cycle_id || "none")
+    setTitle(plan.title)
+    setDescription(plan.description || "")
+    setFocusArea(plan.focus_area)
+    setPriority(plan.priority)
+    setStatus(plan.status)
+    setTargetDate(plan.target_date || "")
+    setProgressPct(String(plan.progress_pct || 0))
+    setActionLines((plan.actions || []).map((action) => action.title).join("\n"))
+    setIsEditOpen(true)
+  }
 
   async function handleCreate(event: React.FormEvent) {
     event.preventDefault()
@@ -167,27 +267,23 @@ export default function AdminDevelopmentPlansPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           user_id: selectedEmployee,
-          review_cycle_id: selectedCycle || null,
+          review_cycle_id: normalizeCycleValue(selectedCycle) || null,
           title,
           description: description || null,
           focus_area: focusArea,
           priority,
           target_date: targetDate || null,
+          status,
           actions: actions.length > 0 ? actions : undefined,
         }),
       })
       const data = (await res.json().catch(() => ({}))) as { error?: string; message?: string }
-      if (!res.ok) throw new Error(data.error || "Failed to create")
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to create plan")
+      }
       toast.success(data.message || "Development plan created")
       setIsCreateOpen(false)
-      setSelectedEmployee("")
-      setSelectedCycle("")
-      setTitle("")
-      setDescription("")
-      setFocusArea("general")
-      setPriority("medium")
-      setTargetDate("")
-      setActionLines("")
+      resetForm()
       void loadData()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to create plan")
@@ -196,158 +292,289 @@ export default function AdminDevelopmentPlansPage() {
     }
   }
 
+  async function handleEdit(event: React.FormEvent) {
+    event.preventDefault()
+    if (!editingPlan) return
+    setIsSubmitting(true)
+    try {
+      const res = await fetch("/api/hr/performance/development-plans", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: editingPlan.id,
+          title,
+          description: description || null,
+          focus_area: focusArea,
+          priority,
+          status,
+          target_date: targetDate || null,
+          progress_pct: Number(progressPct) || 0,
+        }),
+      })
+      const data = (await res.json().catch(() => ({}))) as { error?: string; message?: string }
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to update plan")
+      }
+      toast.success(data.message || "Development plan updated")
+      setIsEditOpen(false)
+      resetForm()
+      void loadData()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update plan")
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const totalPlans = plans.length
+  const activePlans = plans.filter((plan) => plan.status === "active").length
+  const completedPlans = plans.filter((plan) => plan.status === "completed").length
+  const avgProgress =
+    plans.length > 0
+      ? `${Math.round(plans.reduce((sum, plan) => sum + (plan.progress_pct || 0), 0) / plans.length)}%`
+      : "-"
+
+  const columns: DataTableColumn<DevelopmentPlan>[] = useMemo(
+    () => [
+      {
+        key: "employee",
+        label: "Employee",
+        sortable: true,
+        accessor: (plan) => formatName(plan.user),
+        render: (plan) => <span className="font-medium">{formatName(plan.user)}</span>,
+        resizable: true,
+        initialWidth: 180,
+      },
+      {
+        key: "department",
+        label: "Department",
+        sortable: true,
+        accessor: (plan) => plan.user?.department || "-",
+      },
+      {
+        key: "title",
+        label: "Plan",
+        sortable: true,
+        accessor: (plan) => plan.title,
+        render: (plan) => <span className="block max-w-[220px] truncate">{plan.title}</span>,
+        resizable: true,
+        initialWidth: 220,
+      },
+      {
+        key: "review_cycle",
+        label: "Quarter",
+        sortable: true,
+        accessor: (plan) => cycleNameMap.get(plan.review_cycle_id || "") || "-",
+      },
+      {
+        key: "focus_area",
+        label: "Focus",
+        sortable: true,
+        accessor: (plan) => FOCUS_LABELS[plan.focus_area] || plan.focus_area,
+      },
+      {
+        key: "priority",
+        label: "Priority",
+        sortable: true,
+        accessor: (plan) => plan.priority,
+        render: (plan) => (
+          <Badge variant={PRIORITY_VARIANTS[plan.priority] || "secondary"} className="capitalize">
+            {plan.priority}
+          </Badge>
+        ),
+      },
+      {
+        key: "progress_pct",
+        label: "Progress",
+        sortable: true,
+        accessor: (plan) => plan.progress_pct || 0,
+        render: (plan) => (
+          <div className="flex items-center gap-2">
+            <Progress value={plan.progress_pct || 0} className="h-2 w-20" />
+            <span className="text-muted-foreground text-xs">{plan.progress_pct || 0}%</span>
+          </div>
+        ),
+      },
+      {
+        key: "status",
+        label: "Status",
+        sortable: true,
+        accessor: (plan) => plan.status,
+        render: (plan) => (
+          <Badge variant={STATUS_VARIANTS[plan.status] || "outline"} className="capitalize">
+            {plan.status.replace("_", " ")}
+          </Badge>
+        ),
+      },
+      {
+        key: "target_date",
+        label: "Due",
+        sortable: true,
+        accessor: (plan) => plan.target_date || "",
+        render: (plan) => <span className="text-muted-foreground text-sm">{formatDate(plan.target_date)}</span>,
+      },
+    ],
+    [cycleNameMap]
+  )
+
+  const filters: DataTableFilter<DevelopmentPlan>[] = useMemo(
+    () => [
+      {
+        key: "department",
+        label: "Department",
+        options: departmentOptions,
+        placeholder: "All Departments",
+        mode: "custom",
+        filterFn: (plan, values) => values.length === 0 || values.includes(plan.user?.department || ""),
+      },
+      {
+        key: "status",
+        label: "Status",
+        options: [
+          { value: "active", label: "Active" },
+          { value: "on_hold", label: "On Hold" },
+          { value: "completed", label: "Completed" },
+          { value: "cancelled", label: "Cancelled" },
+        ],
+        placeholder: "All Statuses",
+      },
+      {
+        key: "review_cycle",
+        label: "Quarter",
+        options: cycleOptions,
+        placeholder: "All Quarters",
+        mode: "custom",
+        filterFn: (plan, values) => values.length === 0 || values.includes(plan.review_cycle_id || ""),
+      },
+      {
+        key: "focus_area",
+        label: "Focus Area",
+        options: focusOptions,
+        placeholder: "All Focus Areas",
+      },
+    ],
+    [cycleOptions, departmentOptions, focusOptions]
+  )
+
+  const rowActions: RowAction<DevelopmentPlan>[] = [
+    {
+      label: "View",
+      icon: Eye,
+      onClick: (plan) => setViewingPlan(plan),
+    },
+    {
+      label: "Edit",
+      icon: Pencil,
+      onClick: (plan) => openEdit(plan),
+    },
+  ]
+
   return (
-    <PageWrapper maxWidth="full" background="gradient">
-      <PageHeader
-        title="Development Plans"
-        description="Create and track employee development plans linked to performance reviews."
-        icon={BookOpen}
-        backLink={{ href: "/admin/hr/pms", label: "Back to PMS" }}
-        actions={
-          <Button onClick={() => setIsCreateOpen(true)} size="sm" className="gap-2">
-            <Plus className="h-4 w-4" />
-            New Plan
-          </Button>
+    <DataTablePage
+      title="Development Plans"
+      description="Create and track employee development plans linked to performance reviews."
+      icon={BookOpen}
+      backLink={{ href: "/admin/hr/pms", label: "Back to PMS" }}
+      actions={
+        <Button onClick={openCreate} size="sm" className="gap-2">
+          <Plus className="h-4 w-4" />
+          New Plan
+        </Button>
+      }
+      stats={
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <StatCard
+            title="Total Plans"
+            value={totalPlans}
+            icon={BookOpen}
+            iconBgColor="bg-blue-500/10"
+            iconColor="text-blue-500"
+          />
+          <StatCard
+            title="Active"
+            value={activePlans}
+            icon={Users}
+            iconBgColor="bg-emerald-500/10"
+            iconColor="text-emerald-500"
+          />
+          <StatCard
+            title="Completed"
+            value={completedPlans}
+            icon={Target}
+            iconBgColor="bg-amber-500/10"
+            iconColor="text-amber-500"
+          />
+          <StatCard
+            title="Avg Progress"
+            value={avgProgress}
+            icon={TrendingUp}
+            iconBgColor="bg-violet-500/10"
+            iconColor="text-violet-500"
+          />
+        </div>
+      }
+    >
+      <DataTable<DevelopmentPlan>
+        data={plans}
+        columns={columns}
+        filters={filters}
+        getRowId={(plan) => plan.id}
+        searchPlaceholder="Search employee, department, plan title, or focus area…"
+        searchFn={(plan, query) =>
+          [
+            formatName(plan.user),
+            plan.user?.department || "",
+            plan.title,
+            plan.description || "",
+            FOCUS_LABELS[plan.focus_area] || plan.focus_area,
+            cycleNameMap.get(plan.review_cycle_id || "") || "",
+          ]
+            .join(" ")
+            .toLowerCase()
+            .includes(query)
         }
+        isLoading={isLoading}
+        error={error}
+        onRetry={() => void loadData()}
+        rowActions={rowActions}
+        expandable={{
+          render: (plan) => (
+            <div className="grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
+              <div>
+                <p className="text-muted-foreground text-xs">Description</p>
+                <p className="mt-1">{plan.description || "No description provided."}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Quarter</p>
+                <p className="mt-1">{cycleNameMap.get(plan.review_cycle_id || "") || "-"}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Due Date</p>
+                <p className="mt-1">{formatDate(plan.target_date)}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Action Items</p>
+                <p className="mt-1">{plan.actions?.length || 0}</p>
+              </div>
+            </div>
+          ),
+        }}
+        viewToggle
+        cardRenderer={(plan) => (
+          <PlanCard
+            plan={plan}
+            cycleName={cycleNameMap.get(plan.review_cycle_id || "") || "-"}
+            onView={setViewingPlan}
+            onEdit={openEdit}
+          />
+        )}
+        emptyTitle="No development plans yet"
+        emptyDescription="Create a plan to start tracking employee growth and follow-up actions."
+        emptyIcon={BookOpen}
+        skeletonRows={6}
+        minWidth="1100px"
       />
 
-      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard title="Total Plans" value={filtered.length} icon={BookOpen} description="All development plans" />
-        <StatCard
-          title="Active"
-          value={filtered.filter((p) => p.status === "active").length}
-          icon={BookOpen}
-          description="In progress"
-        />
-        <StatCard
-          title="Completed"
-          value={filtered.filter((p) => p.status === "completed").length}
-          icon={BookOpen}
-          description="Finished"
-        />
-        <StatCard
-          title="Avg Progress"
-          value={
-            filtered.length > 0
-              ? `${Math.round(filtered.reduce((sum, p) => sum + (p.progress_pct || 0), 0) / filtered.length)}%`
-              : "-"
-          }
-          icon={BookOpen}
-          description="Across active plans"
-        />
-      </div>
-
-      <Card className="mb-4">
-        <CardContent className="p-3 sm:p-6">
-          <div className="flex flex-col gap-3 md:flex-row">
-            <div className="relative flex-1">
-              <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-              <Input
-                placeholder="Search employee, department, or plan title…"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full md:w-44">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="on_hold">On Hold</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-                <SelectItem value="cancelled">Cancelled</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
-              <SelectTrigger className="w-full md:w-48">
-                <SelectValue placeholder="Department" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Departments</SelectItem>
-                {departments.map((d) => (
-                  <SelectItem key={d} value={d}>
-                    {d}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Development Plans</CardTitle>
-          <CardDescription>Click &quot;Edit&quot; on a plan to update status or add notes.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="text-muted-foreground flex items-center justify-center gap-2 py-10">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Loading…
-            </div>
-          ) : filtered.length === 0 ? (
-            <p className="text-muted-foreground py-8 text-center text-sm">
-              No development plans found. Create one using the &quot;New Plan&quot; button.
-            </p>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table className="min-w-[900px]">
-                <TableHeader className="bg-emerald-50 dark:bg-emerald-950/30">
-                  <TableRow>
-                    <TableHead className="w-12">S/N</TableHead>
-                    <TableHead>Employee</TableHead>
-                    <TableHead>Department</TableHead>
-                    <TableHead>Plan</TableHead>
-                    <TableHead>Focus</TableHead>
-                    <TableHead>Priority</TableHead>
-                    <TableHead>Progress</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Due</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filtered.map((plan, index) => (
-                    <TableRow key={plan.id}>
-                      <TableCell className="text-muted-foreground">{index + 1}</TableCell>
-                      <TableCell className="font-medium">{formatName(plan.user)}</TableCell>
-                      <TableCell>{plan.user?.department || "-"}</TableCell>
-                      <TableCell className="max-w-[200px] truncate">{plan.title}</TableCell>
-                      <TableCell>{FOCUS_LABELS[plan.focus_area] || plan.focus_area}</TableCell>
-                      <TableCell>
-                        <Badge variant={PRIORITY_VARIANTS[plan.priority] || "secondary"} className="capitalize">
-                          {plan.priority}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Progress value={plan.progress_pct || 0} className="h-2 w-16" />
-                          <span className="text-muted-foreground text-xs">{plan.progress_pct || 0}%</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={STATUS_VARIANTS[plan.status] || "outline"} className="capitalize">
-                          {plan.status.replace("_", " ")}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
-                        {plan.target_date
-                          ? new Date(plan.target_date).toLocaleDateString("en-GB", { day: "2-digit", month: "short" })
-                          : "-"}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Create Dialog */}
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
@@ -356,7 +583,7 @@ export default function AdminDevelopmentPlansPage() {
               Create a development plan for an employee, optionally linked to a review cycle.
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={(e) => void handleCreate(e)} className="space-y-4">
+          <form onSubmit={(event) => void handleCreate(event)} className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2 space-y-2">
                 <Label>Employee *</Label>
@@ -365,25 +592,18 @@ export default function AdminDevelopmentPlansPage() {
                     <SelectValue placeholder="Select employee…" />
                   </SelectTrigger>
                   <SelectContent>
-                    {employees.map((e) => (
-                      <SelectItem key={e.id} value={e.id}>
-                        {formatName(e)} {e.department ? `(${e.department})` : ""}
+                    {employees.map((employee) => (
+                      <SelectItem key={employee.id} value={employee.id}>
+                        {formatName(employee)} {employee.department ? `(${employee.department})` : ""}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-
               <div className="col-span-2 space-y-2">
                 <Label>Plan Title *</Label>
-                <Input
-                  placeholder="e.g. Improve Leadership Communication"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  required
-                />
+                <Input value={title} onChange={(event) => setTitle(event.target.value)} required />
               </div>
-
               <div className="space-y-2">
                 <Label>Focus Area</Label>
                 <Select value={focusArea} onValueChange={setFocusArea}>
@@ -391,18 +611,17 @@ export default function AdminDevelopmentPlansPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {Object.entries(FOCUS_LABELS).map(([key, label]) => (
-                      <SelectItem key={key} value={key}>
+                    {Object.entries(FOCUS_LABELS).map(([value, label]) => (
+                      <SelectItem key={value} value={value}>
                         {label}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-
               <div className="space-y-2">
                 <Label>Priority</Label>
-                <Select value={priority} onValueChange={setPriority}>
+                <Select value={priority} onValueChange={(value) => setPriority(value as "low" | "medium" | "high")}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -413,67 +632,184 @@ export default function AdminDevelopmentPlansPage() {
                   </SelectContent>
                 </Select>
               </div>
-
               <div className="space-y-2">
-                <Label>Review Cycle (optional)</Label>
+                <Label>Review Cycle</Label>
                 <Select value={selectedCycle} onValueChange={setSelectedCycle}>
                   <SelectTrigger>
                     <SelectValue placeholder="None" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None</SelectItem>
-                    {cycles.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.name}
+                    <SelectItem value="none">None</SelectItem>
+                    {cycles.map((cycle) => (
+                      <SelectItem key={cycle.id} value={cycle.id}>
+                        {cycle.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-
               <div className="space-y-2">
                 <Label>Target Date</Label>
-                <Input type="date" value={targetDate} onChange={(e) => setTargetDate(e.target.value)} />
+                <Input type="date" value={targetDate} onChange={(event) => setTargetDate(event.target.value)} />
               </div>
             </div>
-
             <div className="space-y-2">
               <Label>Description</Label>
-              <Textarea
-                placeholder="What should this plan achieve?"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={2}
-              />
+              <Textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={2} />
             </div>
-
             <div className="space-y-2">
-              <Label>Action Steps (one per line)</Label>
-              <Textarea
-                placeholder={
-                  "Complete leadership course\nSchedule weekly 1:1 with manager\nPresent project update to team"
-                }
-                value={actionLines}
-                onChange={(e) => setActionLines(e.target.value)}
-                rows={4}
-              />
-              <p className="text-muted-foreground text-xs">
-                Each line becomes one action step the employee can tick off.
-              </p>
+              <Label>Action Steps</Label>
+              <Textarea value={actionLines} onChange={(event) => setActionLines(event.target.value)} rows={4} />
             </div>
-
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)} disabled={isSubmitting}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={isSubmitting} className="gap-2">
-                {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                Create Plan
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? "Creating..." : "Create Plan"}
               </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
-    </PageWrapper>
+
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Development Plan</DialogTitle>
+            <DialogDescription>Update the plan details, status, and progress tracking.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={(event) => void handleEdit(event)} className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="col-span-2 space-y-2">
+                <Label>Plan Title *</Label>
+                <Input value={title} onChange={(event) => setTitle(event.target.value)} required />
+              </div>
+              <div className="space-y-2">
+                <Label>Focus Area</Label>
+                <Select value={focusArea} onValueChange={setFocusArea}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(FOCUS_LABELS).map(([value, label]) => (
+                      <SelectItem key={value} value={value}>
+                        {label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Priority</Label>
+                <Select value={priority} onValueChange={(value) => setPriority(value as "low" | "medium" | "high")}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="low">Low</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <Select
+                  value={status}
+                  onValueChange={(value) => setStatus(value as "active" | "completed" | "cancelled" | "on_hold")}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="on_hold">On Hold</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Progress %</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={progressPct}
+                  onChange={(event) => setProgressPct(event.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Target Date</Label>
+                <Input type="date" value={targetDate} onChange={(event) => setTargetDate(event.target.value)} />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Description</Label>
+              <Textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsEditOpen(false)} disabled={isSubmitting}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? "Saving..." : "Save Changes"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(viewingPlan)} onOpenChange={() => setViewingPlan(null)}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{viewingPlan?.title || "Plan Details"}</DialogTitle>
+            <DialogDescription>
+              {viewingPlan ? `${formatName(viewingPlan.user)} • ${viewingPlan.user?.department || "-"}` : ""}
+            </DialogDescription>
+          </DialogHeader>
+          {viewingPlan ? (
+            <div className="grid gap-4 text-sm sm:grid-cols-2">
+              <div>
+                <p className="text-muted-foreground text-xs">Quarter</p>
+                <p className="mt-1">{cycleNameMap.get(viewingPlan.review_cycle_id || "") || "-"}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Due Date</p>
+                <p className="mt-1">{formatDate(viewingPlan.target_date)}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Priority</p>
+                <p className="mt-1 capitalize">{viewingPlan.priority}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Progress</p>
+                <p className="mt-1">{viewingPlan.progress_pct || 0}%</p>
+              </div>
+              <div className="sm:col-span-2">
+                <p className="text-muted-foreground text-xs">Description</p>
+                <p className="mt-1 whitespace-pre-wrap">{viewingPlan.description || "No description provided."}</p>
+              </div>
+              <div className="sm:col-span-2">
+                <p className="text-muted-foreground text-xs">Action Steps</p>
+                <div className="mt-1 space-y-2">
+                  {(viewingPlan.actions || []).length > 0 ? (
+                    (viewingPlan.actions || []).map((action, index) => (
+                      <div key={action.id || `${action.title}-${index}`} className="rounded-lg border p-3">
+                        <p className="font-medium">{action.title}</p>
+                        <p className="text-muted-foreground text-xs">{action.status || "pending"}</p>
+                      </div>
+                    ))
+                  ) : (
+                    <p>No action steps added.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+    </DataTablePage>
   )
 }

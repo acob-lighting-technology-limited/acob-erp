@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { Calendar, ChevronDown, ChevronUp, Loader2, Lock, Plus } from "lucide-react"
+import { Calendar, ChevronDown, ChevronUp, Loader2, Lock, Plus, ShieldCheck, Unlock } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -163,12 +163,7 @@ export function WeekSetupCard() {
 
   const isWeekSetupLocked = useMemo(() => {
     if (!lockState) return false
-    if (lockState.isLocked) return true
-    // Also lock if the meeting date has passed (grace period expired)
-    if (lockState.lockDeadline) {
-      return new Date() >= new Date(lockState.lockDeadline)
-    }
-    return false
+    return !lockState.canMutate
   }, [lockState])
 
   useEffect(() => {
@@ -333,9 +328,27 @@ export function WeekSetupCard() {
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Calendar className="text-muted-foreground h-5 w-5" />
           <CardTitle className="text-base">{`Week Setup: W${weekNumber}, ${yearNumber}`}</CardTitle>
+          {lockState?.hasOverrideRole && (
+            <Badge className="gap-1 bg-emerald-600 text-white hover:bg-emerald-600">
+              <ShieldCheck className="h-3 w-3" />
+              Override Active
+            </Badge>
+          )}
+          {!lockState?.hasOverrideRole && lockState?.unlockUntil && !lockState?.isLocked && (
+            <Badge variant="secondary" className="gap-1">
+              <Unlock className="h-3 w-3" />
+              Temporarily Unlocked
+            </Badge>
+          )}
+          {lockState?.isLocked && (
+            <Badge variant="secondary" className="gap-1">
+              <Lock className="h-3 w-3" />
+              Locked
+            </Badge>
+          )}
         </div>
         <CardDescription>
           Source of truth for reminders, meeting mail, KSS, Minutes of Meeting, Action Points, and the weekly report
@@ -343,6 +356,27 @@ export function WeekSetupCard() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        {lockState && (
+          <div className="bg-muted/40 flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 text-xs">
+            <span className="font-medium">{`Meeting date: ${lockState.meetingDate}`}</span>
+            <span className="text-muted-foreground">{`Grace window: ${lockState.graceHours}h`}</span>
+            <span className="text-muted-foreground">{`Deadline: ${new Date(lockState.lockDeadline).toLocaleString("en-GB")}`}</span>
+            {lockState.hasOverrideRole && (
+              <span className="text-emerald-700 dark:text-emerald-300">
+                Your developer/super-admin role can still create, update, and delete after the grace period.
+              </span>
+            )}
+            {!lockState.hasOverrideRole && lockState.unlockUntil && !lockState.isLocked && (
+              <span className="text-amber-700 dark:text-amber-300">
+                This week is open through a temporary unlock window.
+              </span>
+            )}
+            {!lockState.hasOverrideRole && lockState.isLocked && (
+              <span className="text-muted-foreground">This week is read-only because the grace period has ended.</span>
+            )}
+          </div>
+        )}
+
         {/* ── Week Setup Fields (collapsible) ────────────────────────────────── */}
         <div>
           <button
@@ -475,7 +509,11 @@ export function WeekSetupCard() {
                 <span className="text-muted-foreground text-[11px]">
                   {isWeekSetupLocked
                     ? "This week is locked after the meeting grace window, so the setup is read-only."
-                    : "Saving here updates the week's meeting date, meeting time, KSS presenter, and lock grace window together."}
+                    : lockState?.hasOverrideRole
+                      ? "Your role can override the grace-period lock for this week."
+                      : lockState?.unlockUntil
+                        ? "This week is temporarily unlocked, so changes are allowed until the unlock window closes."
+                        : "Saving here updates the week's meeting date, meeting time, KSS presenter, and lock grace window together."}
                 </span>
               </div>
             </div>

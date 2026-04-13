@@ -1,18 +1,17 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { CheckCircle2, Clock3, Download, Loader2, Plus, Search, ShieldCheck, Target } from "lucide-react"
+import { BarChart3, CheckCircle2, Clock3, Download, Loader2, Plus, ShieldCheck, Target, Users } from "lucide-react"
 import { toast } from "sonner"
-import { PageHeader, PageWrapper } from "@/components/layout"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
+import { StatCard } from "@/components/ui/stat-card"
+import { DataTable, DataTablePage } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter, DataTableTab, RowAction } from "@/components/ui/data-table"
 import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
 import { exportPmsRowsToExcel, exportPmsRowsToPdf } from "@/lib/pms/export"
 
@@ -48,6 +47,8 @@ function clampMetricValue(value: string) {
   if (!Number.isFinite(parsed)) return ""
   return String(Math.min(100, Math.max(1, parsed)))
 }
+
+// ─── Metric Add Dialog (unchanged) ───────────────────────────────────────────
 
 function MetricAddDialog({
   metric,
@@ -202,27 +203,17 @@ function MetricAddDialog({
   async function handleSave() {
     setSaving(true)
     try {
-      if (!userId) {
-        throw new Error("Select an employee first")
-      }
-      if (!cycleId) {
-        throw new Error("Select a cycle first")
-      }
+      if (!userId) throw new Error("Select an employee first")
+      if (!cycleId) throw new Error("Select a cycle first")
 
       if (metric === "kpi") {
         const numericScore = Number(scoreValue)
-        if (!Number.isFinite(numericScore) || numericScore <= 0 || numericScore > 100) {
+        if (!Number.isFinite(numericScore) || numericScore <= 0 || numericScore > 100)
           throw new Error("KPI score must be between 1 and 100")
-        }
-
         const response = await fetch("/api/hr/performance/reviews", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            user_id: userId,
-            review_cycle_id: cycleId,
-            kpi_score: numericScore,
-          }),
+          body: JSON.stringify({ user_id: userId, review_cycle_id: cycleId, kpi_score: numericScore }),
         })
         const payload = (await response.json().catch(() => null)) as { error?: string } | null
         if (!response.ok) throw new Error(payload?.error || "Failed to save")
@@ -232,24 +223,16 @@ function MetricAddDialog({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(
             goalId
-              ? {
-                  id: goalId,
-                  achieved_value: scoreValue ? Number(scoreValue) : null,
-                }
-              : {
-                  department,
-                  review_cycle_id: cycleId,
-                  title: "Department Goal",
-                }
+              ? { id: goalId, achieved_value: scoreValue ? Number(scoreValue) : null }
+              : { department, review_cycle_id: cycleId, title: "Department Goal" }
           ),
         })
         const payload = (await response.json().catch(() => null)) as { error?: string } | null
         if (!response.ok) throw new Error(payload?.error || "Failed to save")
       } else if (metric === "attendance") {
         const numericScore = Number(scoreValue)
-        if (!Number.isFinite(numericScore) || numericScore <= 0 || numericScore > 100) {
+        if (!Number.isFinite(numericScore) || numericScore <= 0 || numericScore > 100)
           throw new Error("Attendance score must be between 1 and 100")
-        }
         const response = await fetch("/api/hr/attendance/admin-records", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -319,7 +302,6 @@ function MetricAddDialog({
               </SelectContent>
             </Select>
           </div>
-
           <div className="space-y-2">
             <Label>Cycle</Label>
             <Select value={cycleId} onValueChange={setCycleId}>
@@ -357,7 +339,7 @@ function MetricAddDialog({
                 min="1"
                 max="100"
                 value={scoreValue}
-                onChange={(event) => setScoreValue(clampMetricValue(event.target.value))}
+                onChange={(e) => setScoreValue(clampMetricValue(e.target.value))}
               />
             </div>
           </div>
@@ -376,7 +358,7 @@ function MetricAddDialog({
                 min="1"
                 max="100"
                 value={scoreValue}
-                onChange={(event) => setScoreValue(clampMetricValue(event.target.value))}
+                onChange={(e) => setScoreValue(clampMetricValue(e.target.value))}
               />
             </div>
           </div>
@@ -387,15 +369,13 @@ function MetricAddDialog({
             <div className="grid gap-3 sm:grid-cols-2">
               {Object.entries(competencies).map(([key, value]) => (
                 <div key={key} className="space-y-2">
-                  <Label>{key.replace("_", " ").replace(/\b\w/g, (char) => char.toUpperCase())}</Label>
+                  <Label>{key.replace("_", " ").replace(/\b\w/g, (c) => c.toUpperCase())}</Label>
                   <Input
                     type="number"
                     min="1"
                     max="100"
                     value={value}
-                    onChange={(event) =>
-                      setCompetencies((prev) => ({ ...prev, [key]: clampMetricValue(event.target.value) }))
-                    }
+                    onChange={(e) => setCompetencies((prev) => ({ ...prev, [key]: clampMetricValue(e.target.value) }))}
                   />
                 </div>
               ))}
@@ -403,20 +383,20 @@ function MetricAddDialog({
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label>Strengths</Label>
-                <Textarea value={strengths} onChange={(event) => setStrengths(event.target.value)} rows={3} />
+                <Textarea value={strengths} onChange={(e) => setStrengths(e.target.value)} rows={3} />
               </div>
               <div className="space-y-2">
                 <Label>Areas for Improvement</Label>
                 <Textarea
                   value={areasForImprovement}
-                  onChange={(event) => setAreasForImprovement(event.target.value)}
+                  onChange={(e) => setAreasForImprovement(e.target.value)}
                   rows={3}
                 />
               </div>
             </div>
             <div className="space-y-2">
               <Label>Manager Comments</Label>
-              <Textarea value={managerComments} onChange={(event) => setManagerComments(event.target.value)} rows={4} />
+              <Textarea value={managerComments} onChange={(e) => setManagerComments(e.target.value)} rows={4} />
             </div>
           </div>
         ) : null}
@@ -433,6 +413,8 @@ function MetricAddDialog({
     </Dialog>
   )
 }
+
+// ─── PmsMetricTabsPage ────────────────────────────────────────────────────────
 
 export function PmsMetricTabsPage({
   metric,
@@ -451,9 +433,6 @@ export function PmsMetricTabsPage({
   const [refreshKey, setRefreshKey] = useState(0)
   const [data, setData] = useState<MetricSnapshotPayload | null>(null)
   const [cycleId, setCycleId] = useState("")
-  const [searchQuery, setSearchQuery] = useState("")
-  const [departmentFilter, setDepartmentFilter] = useState("all")
-  const [userFilter, setUserFilter] = useState("all")
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isExportOpen, setIsExportOpen] = useState(false)
   const [editingRow, setEditingRow] = useState<Record<string, unknown> | null>(null)
@@ -466,6 +445,7 @@ export function PmsMetricTabsPage({
     } else {
       setIsInitialLoading(true)
     }
+
     void (async () => {
       try {
         const query = cycleId ? `&cycle_id=${encodeURIComponent(cycleId)}` : ""
@@ -490,34 +470,16 @@ export function PmsMetricTabsPage({
         }
       }
     })()
+
     return () => {
       active = false
     }
   }, [metric, cycleId, refreshKey])
 
   const rawRows = useMemo(() => data?.rows[tab] || [], [data, tab])
-  const filteredRows = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase()
-    return rawRows.filter((row) => {
-      const values = Object.values(row).map((value) => asString(value).toLowerCase())
-      const matchesQuery = query.length === 0 || values.some((value) => value.includes(query))
-      const matchesDepartment =
-        tab === "individual" || tab === "department"
-          ? departmentFilter === "all" || asString((row as Record<string, unknown>).department) === departmentFilter
-          : true
-      const matchesUser =
-        tab === "department"
-          ? true
-          : userFilter === "all"
-            ? true
-            : tab === "individual"
-              ? asString((row as Record<string, unknown>).user_id) === userFilter
-              : true
-      return matchesQuery && matchesDepartment && matchesUser
-    })
-  }, [rawRows, searchQuery, tab, departmentFilter, userFilter])
 
-  const columns = useMemo(() => {
+  // Column keys used for both DataTable headings and export
+  const columnKeys = useMemo(() => {
     if (metric === "goals") {
       if (tab === "individual")
         return ["employee", "department", "cycle", "total_goals", "approved_goals", "completed_goals"]
@@ -529,226 +491,182 @@ export function PmsMetricTabsPage({
     return ["cycle", "review_type", "employee_count", "submitted_count", "departments_counted", "metric_value"]
   }, [metric, tab])
 
-  const exportRows = filteredRows.map((row, index) =>
-    Object.fromEntries([
-      ["S/N", index + 1],
-      ...columns.map((column) => [
-        column.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase()),
-        asString((row as Record<string, unknown>)[column]),
-      ]),
-    ])
+  const exportRows = useMemo(
+    () =>
+      rawRows.map((row, index) =>
+        Object.fromEntries([
+          ["S/N", index + 1],
+          ...columnKeys.map((col) => [
+            col.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+            asString((row as Record<string, unknown>)[col]),
+          ]),
+        ])
+      ),
+    [rawRows, columnKeys]
+  )
+
+  const tableColumns = useMemo<DataTableColumn<Record<string, unknown>>[]>(
+    () =>
+      columnKeys.map((col) => ({
+        key: col,
+        label: col.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+        sortable: true,
+        accessor: (row) => asString(row[col]),
+      })),
+    [columnKeys]
+  )
+
+  const tableFilters = useMemo<DataTableFilter<Record<string, unknown>>[]>(() => {
+    const result: DataTableFilter<Record<string, unknown>>[] = []
+    if (tab === "individual" || tab === "department") {
+      result.push({
+        key: "department",
+        label: "Department",
+        options: (data?.departments || []).map((d) => ({ value: d, label: d })),
+        placeholder: "All Departments",
+        mode: "column",
+      })
+    }
+    if (tab === "individual") {
+      result.push({
+        key: "employee_user",
+        label: "Employee",
+        options: (data?.users || []).map((u) => ({ value: u.id, label: u.name })),
+        placeholder: "All Employees",
+        mode: "custom",
+        filterFn: (row, vals) => vals.length === 0 || vals.includes(asString(row.user_id)),
+      })
+    }
+    return result
+  }, [tab, data])
+
+  const tableRowActions = useMemo<RowAction<Record<string, unknown>>[] | undefined>(() => {
+    if (tab === "individual" && metric !== "goals") {
+      return [
+        {
+          label: "Edit",
+          onClick: (row) => {
+            setEditingRow(row)
+            setIsModalOpen(true)
+          },
+        },
+      ]
+    }
+    return undefined
+  }, [tab, metric])
+
+  // Stats
+  const metricValues = rawRows
+    .map((row) => {
+      const value = (row as Record<string, unknown>).metric_value
+      return typeof value === "number" && Number.isFinite(value) ? value : null
+    })
+    .filter((v): v is number => v !== null)
+
+  const valueAverage =
+    metricValues.length > 0
+      ? Math.round((metricValues.reduce((sum, v) => sum + v, 0) / metricValues.length) * 100) / 100
+      : null
+
+  const submittedTotal = rawRows.reduce(
+    (sum, row) => sum + asNumber((row as Record<string, unknown>).submitted_count),
+    0
   )
 
   const Icon =
     iconKey === "kpi" ? Target : iconKey === "goals" ? CheckCircle2 : iconKey === "attendance" ? Clock3 : ShieldCheck
 
-  const metricValues = filteredRows
-    .map((row) => {
-      const value = (row as Record<string, unknown>).metric_value
-      return typeof value === "number" && Number.isFinite(value) ? value : null
-    })
-    .filter((value): value is number => value !== null)
-
-  const valueAverage =
-    metricValues.length > 0
-      ? Math.round((metricValues.reduce((sum, value) => sum + value, 0) / metricValues.length) * 100) / 100
-      : null
-
-  const submittedTotal = filteredRows.reduce(
-    (sum, row) => sum + asNumber((row as Record<string, unknown>).submitted_count),
-    0
-  )
+  const pageTabs: DataTableTab[] = [
+    { key: "individual", label: "Individual" },
+    { key: "department", label: "Department" },
+    { key: "cycle", label: "Cycle" },
+  ]
 
   return (
-    <PageWrapper maxWidth="full" background="gradient">
-      <PageHeader
-        title={title}
-        description={description}
-        icon={Icon}
-        backLink={{ href: "/admin/hr/pms", label: "Back to PMS" }}
-        actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setIsExportOpen(true)}
-              disabled={filteredRows.length === 0}
-              className="h-8 gap-2"
-              size="sm"
-            >
-              <Download className="h-4 w-4" />
-              Export
-            </Button>
-            <Button className="h-8 gap-2" size="sm" onClick={() => setIsModalOpen(true)}>
-              <Plus className="h-4 w-4" />
-              {metric === "kpi" ? "Add KPI Score" : metric === "attendance" ? "Add Attendance Score" : "Add Behaviour"}
-            </Button>
-          </div>
+    <DataTablePage
+      title={title}
+      description={description}
+      icon={Icon}
+      backLink={{ href: "/admin/hr/pms", label: "Back to PMS" }}
+      tabs={pageTabs}
+      activeTab={tab}
+      onTabChange={(value) => setTab(value as TabKey)}
+      stats={
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <StatCard
+            title="Total Records"
+            value={rawRows.length}
+            icon={Users}
+            iconBgColor="bg-blue-500/10"
+            iconColor="text-blue-500"
+          />
+          <StatCard
+            title={tab === "individual" ? "Average Value" : "Submitted"}
+            value={tab === "individual" ? String(valueAverage ?? "-") : submittedTotal}
+            icon={BarChart3}
+            iconBgColor="bg-emerald-500/10"
+            iconColor="text-emerald-500"
+          />
+          <StatCard
+            title="Active Cycle"
+            value={data?.cycles.find((c) => c.id === cycleId)?.name || "Current"}
+            icon={Icon}
+            iconBgColor="bg-amber-500/10"
+            iconColor="text-amber-500"
+          />
+        </div>
+      }
+      actions={
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Cycle selector lives in header since it triggers a data refetch */}
+          <Select value={cycleId} onValueChange={setCycleId}>
+            <SelectTrigger className="h-8 w-52 text-sm">
+              <SelectValue placeholder="Select cycle…" />
+            </SelectTrigger>
+            <SelectContent>
+              {(data?.cycles || []).map((cycle) => (
+                <SelectItem key={cycle.id} value={cycle.id}>
+                  {cycle.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            variant="outline"
+            onClick={() => setIsExportOpen(true)}
+            disabled={rawRows.length === 0 || isRefreshing}
+            className="h-8 gap-2"
+            size="sm"
+          >
+            <Download className="h-4 w-4" />
+            Export
+          </Button>
+          <Button className="h-8 gap-2" size="sm" onClick={() => setIsModalOpen(true)}>
+            <Plus className="h-4 w-4" />
+            {metric === "kpi" ? "Add KPI Score" : metric === "attendance" ? "Add Attendance Score" : "Add Behaviour"}
+          </Button>
+        </div>
+      }
+    >
+      <DataTable<Record<string, unknown>>
+        data={rawRows as Record<string, unknown>[]}
+        columns={tableColumns}
+        filters={tableFilters}
+        getRowId={(row) => String(row.user_id || row.department || row.cycle || JSON.stringify(row).slice(0, 40))}
+        isLoading={isInitialLoading}
+        skeletonRows={6}
+        rowActions={tableRowActions}
+        searchPlaceholder={`Search ${tab} records…`}
+        searchFn={(row, query) =>
+          Object.values(row)
+            .map((v) => asString(v).toLowerCase())
+            .some((v) => v.includes(query))
         }
+        emptyIcon={Icon}
+        emptyTitle={`No ${metric} records`}
+        emptyDescription={`No ${metric} data found for the selected cycle and filters.`}
+        minWidth="900px"
       />
-
-      <Tabs value={tab} onValueChange={(value) => setTab(value as TabKey)} className="mt-4 mb-4">
-        <TabsList>
-          <TabsTrigger value="individual">Individual</TabsTrigger>
-          <TabsTrigger value="department">Department</TabsTrigger>
-          <TabsTrigger value="cycle">Cycle</TabsTrigger>
-        </TabsList>
-      </Tabs>
-
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-muted-foreground text-sm">Rows</p>
-            <p className="text-2xl font-semibold">{filteredRows.length}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-muted-foreground text-sm">{tab === "individual" ? "Average Value" : "Submitted"}</p>
-            <p className="text-2xl font-semibold">{tab === "individual" ? (valueAverage ?? "-") : submittedTotal}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-muted-foreground text-sm">{tab === "individual" ? "Cycle" : "Average Value"}</p>
-            <p className="text-lg font-semibold">
-              {tab === "individual"
-                ? data?.cycles.find((cycle) => cycle.id === cycleId)?.name || "Current"
-                : (valueAverage ?? "-")}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card className="mb-4 border-2">
-        <CardContent className="p-3 sm:p-6">
-          <div className="flex flex-col gap-4 md:flex-row md:items-end">
-            <div className="relative flex-1">
-              <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform" />
-              <Input
-                placeholder="Search current view..."
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                className="pl-10"
-              />
-            </div>
-            {tab === "individual" ? (
-              <Select value={userFilter} onValueChange={setUserFilter}>
-                <SelectTrigger className="w-full md:w-64">
-                  <SelectValue placeholder="Employee" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Employees</SelectItem>
-                  {(data?.users || []).map((user) => (
-                    <SelectItem key={user.id} value={user.id}>
-                      {user.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : null}
-            {tab === "individual" || tab === "department" ? (
-              <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
-                <SelectTrigger className="w-full md:w-56">
-                  <SelectValue placeholder="Department" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Departments</SelectItem>
-                  {(data?.departments || []).map((department) => (
-                    <SelectItem key={department} value={department}>
-                      {department}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : null}
-            <Select value={cycleId} onValueChange={setCycleId}>
-              <SelectTrigger className="w-full md:w-72">
-                <SelectValue placeholder="Cycle" />
-              </SelectTrigger>
-              <SelectContent>
-                {(data?.cycles || []).map((cycle) => (
-                  <SelectItem key={cycle.id} value={cycle.id}>
-                    {cycle.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <CardTitle>{tab[0].toUpperCase() + tab.slice(1)} View</CardTitle>
-            {isRefreshing ? (
-              <div className="text-muted-foreground flex items-center gap-2 text-sm">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Refreshing...
-              </div>
-            ) : null}
-          </div>
-          <CardDescription>
-            {tab === "individual"
-              ? "Filter by individual, department and cycle."
-              : tab === "department"
-                ? "Department glance by cycle."
-                : "Cycle summary view."}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {isInitialLoading && filteredRows.length === 0 ? (
-            <div className="text-muted-foreground flex items-center gap-2 py-10 text-sm">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Loading records...
-            </div>
-          ) : filteredRows.length === 0 ? (
-            <p className="text-muted-foreground py-4 text-sm">No records found.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table className="min-w-[1050px]">
-                <TableHeader className="bg-emerald-50 dark:bg-emerald-950/30">
-                  <TableRow>
-                    <TableHead className="w-16">S/N</TableHead>
-                    {columns.map((column) => (
-                      <TableHead key={column}>
-                        {column.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase())}
-                      </TableHead>
-                    ))}
-                    {tab === "individual" && metric !== "goals" ? (
-                      <TableHead className="text-right">Edit</TableHead>
-                    ) : null}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredRows.map((row, index) => (
-                    <TableRow key={`${tab}-${index}`}>
-                      <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
-                      {columns.map((column) => (
-                        <TableCell key={column}>{asString((row as Record<string, unknown>)[column])}</TableCell>
-                      ))}
-                      {tab === "individual" && metric !== "goals" ? (
-                        <TableCell className="text-right">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              setEditingRow(row as Record<string, unknown>)
-                              setIsModalOpen(true)
-                            }}
-                          >
-                            Edit
-                          </Button>
-                        </TableCell>
-                      ) : null}
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
 
       <MetricAddDialog
         metric={metric}
@@ -759,7 +677,7 @@ export function PmsMetricTabsPage({
         }}
         users={data?.users || []}
         cycles={data?.cycles || []}
-        onSaved={() => setRefreshKey((value) => value + 1)}
+        onSaved={() => setRefreshKey((v) => v + 1)}
         initialUserId={asString(editingRow?.user_id) === "-" ? "" : asString(editingRow?.user_id)}
         initialCycleId={cycleId}
       />
@@ -781,6 +699,6 @@ export function PmsMetricTabsPage({
           void exportPmsRowsToPdf(exportRows, filename, title)
         }}
       />
-    </PageWrapper>
+    </DataTablePage>
   )
 }

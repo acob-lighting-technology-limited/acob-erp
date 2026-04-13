@@ -31,6 +31,7 @@ interface SignatureCreatorProps {
   } | null
   authEmail?: string | null
   variant?: "default" | "anniversary" | "selectable"
+  defaultSelectableMode?: "default" | "anniversary"
 }
 
 interface FormData {
@@ -70,6 +71,9 @@ const ANNIVERSARY_TEMPLATE_OPTIONS = [
   { id: "minimal", label: "Template 7" },
   { id: "minimal-clean", label: "Template 8" },
   { id: "minimal-confidential", label: "Template 9" },
+  { id: "diagnostic-logo-only", label: "Diag 1" },
+  { id: "diagnostic-contact-text", label: "Diag 2" },
+  { id: "diagnostic-social-text", label: "Diag 3" },
 ] as const
 
 const isAllowedCompanyEmailDomain = (email: string) =>
@@ -91,7 +95,12 @@ const buildCompanyEmailFallback = (firstName: string, lastName: string) => {
   return `${normalizedLastName.charAt(0)}.${normalizedFirstName}@org.acoblighting.com`
 }
 
-export function SignatureCreator({ profile, authEmail, variant = "default" }: SignatureCreatorProps) {
+export function SignatureCreator({
+  profile,
+  authEmail,
+  variant = "default",
+  defaultSelectableMode = "default",
+}: SignatureCreatorProps) {
   const preferredCompanyEmail =
     normalizePreferredCompanyEmail(authEmail) ||
     normalizePreferredCompanyEmail(profile?.company_email) ||
@@ -113,7 +122,7 @@ export function SignatureCreator({ profile, authEmail, variant = "default" }: Si
   >(ANNIVERSARY_FONT_OPTIONS[1].value)
   const [selectedAnniversaryTemplate, setSelectedAnniversaryTemplate] =
     useState<(typeof ANNIVERSARY_TEMPLATE_OPTIONS)[number]["id"]>("minimal")
-  const [selectedSignatureMode, setSelectedSignatureMode] = useState<"default" | "anniversary">("default")
+  const [selectedSignatureMode, setSelectedSignatureMode] = useState<"default" | "anniversary">(defaultSelectableMode)
   const [darkPreview, setDarkPreview] = useState(false)
 
   useEffect(() => {
@@ -246,6 +255,28 @@ export function SignatureCreator({ profile, authEmail, variant = "default" }: Si
   <a href="https://twitter.com/AcobLimited" style="text-decoration: none; display: inline-block; margin-left: 4px;"><img src="${X_ICON}" width="22" height="22" alt="X (Twitter)" style="${mutedSocialIconStyle}" /></a>
   <a href="https://www.facebook.com/acoblightingtechltd" style="text-decoration: none; display: inline-block; margin-left: 4px;"><img src="${FACEBOOK_ICON}" width="22" height="22" alt="Facebook" style="${mutedSocialIconStyle}" /></a>
   <a href="https://www.instagram.com/acob_lighting/" style="text-decoration: none; display: inline-block; margin-left: 4px;"><img src="${INSTAGRAM_ICON}" width="22" height="22" alt="Instagram" style="${mutedSocialIconStyle}" /></a>
+</div>`
+
+    const contactTextBlock = `<div style="font-size: 14px; color: #374151; line-height: 1.45;">
+  <div style="margin: 0 0 2px 0;">
+    <a href="tel:${formData.phoneNumber.replace(/\s+/g, "")}" style="color: #1f2937; text-decoration: none;">${formattedPhone}</a>
+  </div>
+  <div style="margin: 0 0 2px 0;">
+    <a href="mailto:${formData.companyEmail}" style="color: #1f2937; text-decoration: none;">${formData.companyEmail}</a>
+  </div>
+  <div>
+    <a href="https://www.acoblighting.com" style="color: #1f2937; text-decoration: none;">www.acoblighting.com</a>
+  </div>
+</div>`
+
+    const socialTextBlock = `<div style="margin-top: 8px; margin-bottom: 12px; font-size: 12px; color: #374151; line-height: 1.5;">
+  <a href="https://www.linkedin.com/company/acob-lighting-technology-limited" style="color: #0f5c4d; text-decoration: none;">LinkedIn</a>
+  <span style="color: #9ca3af;"> | </span>
+  <a href="https://twitter.com/AcobLimited" style="color: #0f5c4d; text-decoration: none;">X</a>
+  <span style="color: #9ca3af;"> | </span>
+  <a href="https://www.facebook.com/acoblightingtechltd" style="color: #0f5c4d; text-decoration: none;">Facebook</a>
+  <span style="color: #9ca3af;"> | </span>
+  <a href="https://www.instagram.com/acob_lighting/" style="color: #0f5c4d; text-decoration: none;">Instagram</a>
 </div>`
 
     const anniversaryLogo = `<img src="${ANNIVERSARY_LOGO}" width="250" height="auto" alt="ACOB Lighting Technology Limited 2026 Anniversary Logo" style="display: block;" />`
@@ -440,6 +471,36 @@ export function SignatureCreator({ profile, authEmail, variant = "default" }: Si
     <div style="margin-top: 8px; margin-bottom: 8px;">${socialBlock}</div>
     ${anniversaryFooter}
   </div>`),
+      "diagnostic-logo-only": renderAnniversaryLayout(`<div style="color: #d4af37;">&mdash;&mdash;</div>
+  <p style="margin: 0 0 4px 0; font-size: 14px; color: #4b5563; font-style: italic;">Best Regards,</p>
+  <p style="margin: 0; line-height: 1; font-size: 20px; font-weight: 700; color: #0f172a;">${fullName}</p>
+  <p style="margin: 0 0 10px 0; font-size: 14px; font-weight: 600; color: #0f5c4d;">${formData.companyRole}</p>
+  <div style="padding: 8px 0 14px 0; border-top: 2px solid #e7dec2; border-bottom: 2px solid #e7dec2;">
+    <div style="margin-bottom: 8px;">${anniversaryLogo}</div>
+    ${compactNarrative}
+    ${anniversaryFooter}
+  </div>`),
+      "diagnostic-contact-text": renderAnniversaryLayout(`<div style="color: #d4af37;">&mdash;&mdash;</div>
+  <p style="margin: 0 0 4px 0; font-size: 14px; color: #4b5563; font-style: italic;">Best Regards,</p>
+  <p style="margin: 0; line-height: 1; font-size: 20px; font-weight: 700; color: #0f172a;">${fullName}</p>
+  <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #0f5c4d;">${formData.companyRole}</p>
+  <div style="margin-bottom: 10px;">${contactTextBlock}</div>
+  <div style="padding: 8px 0 14px 0; border-top: 2px solid #e7dec2; border-bottom: 2px solid #e7dec2;">
+    <div style="margin-bottom: 8px;">${anniversaryLogo}</div>
+    ${compactNarrative}
+    ${anniversaryFooter}
+  </div>`),
+      "diagnostic-social-text": renderAnniversaryLayout(`<div style="color: #d4af37;">&mdash;&mdash;</div>
+  <p style="margin: 0 0 4px 0; font-size: 14px; color: #4b5563; font-style: italic;">Best Regards,</p>
+  <p style="margin: 0; line-height: 1; font-size: 20px; font-weight: 700; color: #0f172a;">${fullName}</p>
+  <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #0f5c4d;">${formData.companyRole}</p>
+  <div style="margin-bottom: 10px;">${contactTextBlock}</div>
+  <div style="padding: 8px 0 14px 0; border-top: 2px solid #e7dec2; border-bottom: 2px solid #e7dec2;">
+    <div style="margin-bottom: 8px;">${anniversaryLogo}</div>
+    ${compactNarrative}
+    ${socialTextBlock}
+    ${anniversaryFooter}
+  </div>`),
     }
 
     return templates[selectedAnniversaryTemplate]
@@ -466,9 +527,20 @@ export function SignatureCreator({ profile, authEmail, variant = "default" }: Si
 
   const copyToClipboard = async () => {
     const signature = generateSignature()
+
     try {
-      await navigator.clipboard.writeText(signature)
-      toast.success("Signature copied to clipboard!")
+      if (typeof ClipboardItem !== "undefined" && navigator.clipboard.write) {
+        const clipboardItem = new ClipboardItem({
+          "text/html": new Blob([signature], { type: "text/html" }),
+          "text/plain": new Blob([signature], { type: "text/plain" }),
+        })
+
+        await navigator.clipboard.write([clipboardItem])
+      } else {
+        await navigator.clipboard.writeText(signature)
+      }
+
+      toast.success("Base64 signature copied to clipboard!")
     } catch {
       toast.error("Failed to copy signature")
     }
