@@ -220,7 +220,7 @@ export default function PeerFeedbackPage() {
             <CardContent>
               {myFeedback.length === 0 ? (
                 <p className="text-muted-foreground py-4 text-center text-sm">
-                  No peer feedback submitted yet. Use the "Give Feedback" button to start.
+                  No peer feedback submitted yet. Use the &quot;Give Feedback&quot; button to start.
                 </p>
               ) : (
                 <div className="space-y-3">
