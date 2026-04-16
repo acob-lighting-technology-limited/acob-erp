@@ -40,7 +40,7 @@ interface WeeklySummaryFormProps {
   contentOptions: ContentOption[]
   selectedContentChoices: Set<ContentChoice>
   toggleContentChoice: (choice: ContentChoice, disabled?: boolean) => void
-  adminHrPreparers: string[]
+  preparerOptions: string[]
   selectedPreparedBy: string
   setSelectedPreparedBy: (name: string) => void
 }
@@ -58,7 +58,7 @@ export function WeeklySummaryForm({
   contentOptions,
   selectedContentChoices,
   toggleContentChoice,
-  adminHrPreparers,
+  preparerOptions,
   selectedPreparedBy,
   setSelectedPreparedBy,
 }: WeeklySummaryFormProps) {
@@ -200,15 +200,15 @@ export function WeeklySummaryForm({
           <div className="mt-4 rounded-lg border p-4">
             <div className="mb-2 flex items-center justify-between gap-2">
               <Label htmlFor="prepared-by">Prepared by</Label>
-              <Badge variant="outline">Admin &amp; HR only</Badge>
+              <Badge variant="outline">Any staff</Badge>
             </div>
             <Select value={selectedPreparedBy} onValueChange={setSelectedPreparedBy}>
               <SelectTrigger id="prepared-by" className="w-full">
                 <SelectValue placeholder="Select a name" />
               </SelectTrigger>
               <SelectContent>
-                {adminHrPreparers.length > 0 ? (
-                  adminHrPreparers.map((name) => (
+                {preparerOptions.length > 0 ? (
+                  preparerOptions.map((name) => (
                     <SelectItem key={name} value={name}>
                       {name}
                     </SelectItem>

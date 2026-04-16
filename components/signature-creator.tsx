@@ -5,8 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Copy, Moon, Sun } from "lucide-react"
-import { Switch } from "@/components/ui/switch"
+import { Copy } from "lucide-react"
 import { toast } from "sonner"
 import {
   PHONE_ICON,
@@ -30,8 +29,8 @@ interface SignatureCreatorProps {
     company_email?: string | null
   } | null
   authEmail?: string | null
-  variant?: "default" | "anniversary" | "selectable"
-  defaultSelectableMode?: "default" | "anniversary"
+  variant?: "default" | "anniversary" | "anniversary-hosted" | "selectable"
+  defaultSelectableMode?: "default" | "anniversary" | "anniversary-hosted"
 }
 
 interface FormData {
@@ -45,36 +44,17 @@ interface FormData {
 
 const ANNIVERSARY_FONT_OPTIONS = [
   {
-    id: "serif",
-    label: "Classic Serif",
-    value: "Georgia, 'Times New Roman', Times, serif",
-  },
-  {
     id: "trebuchet",
     label: "Trebuchet",
     value: "'Trebuchet MS', Arial, sans-serif",
   },
-  {
-    id: "cambria",
-    label: "Cambria",
-    value: "Cambria, Georgia, serif",
-  },
 ] as const
 
-const ANNIVERSARY_TEMPLATE_OPTIONS = [
-  { id: "classic", label: "Template 1" },
-  { id: "timeline", label: "Template 2" },
-  { id: "heritage", label: "Template 3" },
-  { id: "renewal", label: "Template 4" },
-  { id: "renewal-accent", label: "Template 5" },
-  { id: "renewal-executive", label: "Template 6" },
-  { id: "minimal", label: "Template 7" },
-  { id: "minimal-clean", label: "Template 8" },
-  { id: "minimal-confidential", label: "Template 9" },
-  { id: "diagnostic-logo-only", label: "Diag 1" },
-  { id: "diagnostic-contact-text", label: "Diag 2" },
-  { id: "diagnostic-social-text", label: "Diag 3" },
-] as const
+const ANNIVERSARY_TEMPLATE_OPTIONS = [{ id: "minimal", label: "Template 7" }] as const
+
+/** Absolute base URL used when generating "hosted images" anniversary signatures.
+ *  Falls back to a relative root so signatures still render in dev/preview. */
+const HOSTED_IMAGES_BASE = (process.env.NEXT_PUBLIC_SITE_URL ?? "").replace(/\/$/, "")
 
 const isAllowedCompanyEmailDomain = (email: string) =>
   email.endsWith("@org.acoblighting.com") || email.endsWith("@acoblighting.com")
@@ -117,13 +97,14 @@ export function SignatureCreator({
 
   const [emailError, setEmailError] = useState("")
   const [phoneError, setPhoneError] = useState("")
-  const [selectedAnniversaryFont, setSelectedAnniversaryFont] = useState<
-    (typeof ANNIVERSARY_FONT_OPTIONS)[number]["value"]
-  >(ANNIVERSARY_FONT_OPTIONS[1].value)
+  const [selectedAnniversaryFont] = useState<(typeof ANNIVERSARY_FONT_OPTIONS)[number]["value"]>(
+    ANNIVERSARY_FONT_OPTIONS[0].value
+  )
   const [selectedAnniversaryTemplate, setSelectedAnniversaryTemplate] =
     useState<(typeof ANNIVERSARY_TEMPLATE_OPTIONS)[number]["id"]>("minimal")
-  const [selectedSignatureMode, setSelectedSignatureMode] = useState<"default" | "anniversary">(defaultSelectableMode)
-  const [darkPreview, setDarkPreview] = useState(false)
+  const [selectedSignatureMode, setSelectedSignatureMode] = useState<"default" | "anniversary" | "anniversary-hosted">(
+    defaultSelectableMode
+  )
 
   useEffect(() => {
     if (!formData.companyEmail.trim()) {
@@ -330,7 +311,7 @@ export function SignatureCreator({
   ${body}
 </div>`
 
-    const templates: Record<(typeof ANNIVERSARY_TEMPLATE_OPTIONS)[number]["id"], string> = {
+    const templates: Record<string, string> = {
       classic: renderAnniversaryLayout(`<div style="color: #d4af37;">&mdash;&mdash;</div>
   <p style="margin: 0 0 4px 0; font-size: 14px; color: #4b5563; font-style: italic;">Best Regards,</p>
   <table cellpadding="0" cellspacing="0" border="0" style="border-collapse: collapse; margin-bottom: 8px;">
@@ -506,6 +487,86 @@ export function SignatureCreator({
     return templates[selectedAnniversaryTemplate]
   }
 
+  /** Generates the anniversary signature using publicly hosted image URLs instead of
+   *  base64 data-URIs. The layout is identical to generateAnniversarySignature. */
+  const generateAnniversaryHostedSignature = (fullName: string, formattedPhone: string) => {
+    const base = HOSTED_IMAGES_BASE
+
+    // Hosted icon URLs
+    const PHONE_ICON_URL = `${base}/images/signature/phone-email.png`
+    const MAIL_ICON_URL = `${base}/images/signature/mail-email.png`
+    const WEB_ICON_URL = `${base}/images/signature/web-email.png`
+    const LINKEDIN_ICON_URL = `${base}/images/signature/linkedin-email.png`
+    const X_ICON_URL = `${base}/images/signature/x-email.png`
+    const FACEBOOK_ICON_URL = `${base}/images/signature/facebook-email.png`
+    const INSTAGRAM_ICON_URL = `${base}/images/signature/instagram-email.png`
+    const ANNIVERSARY_LOGO_URL = `${base}/images/signature/acob-10th-anniversary-email.jpg`
+
+    const contactBlock = `<div style="font-size: 14px; color: #374151; line-height: 1.35;">
+  <div style="margin: 0 0 1px 0;">
+    <img src="${PHONE_ICON_URL}" width="18" height="18" style="vertical-align: middle; opacity: 0.8; margin-right: 6px; display: inline-block;" alt="Phone" /><a href="tel:${formData.phoneNumber.replace(
+      /\s+/g,
+      ""
+    )}" style="color: #1f2937; text-decoration: none; vertical-align: middle;">${formattedPhone}</a>
+  </div>
+  <div style="margin: 0 0 1px 0;">
+    <img src="${MAIL_ICON_URL}" width="18" height="18" style="vertical-align: middle; opacity: 0.8; margin-right: 6px; display: inline-block;" alt="Email" /><a href="mailto:${
+      formData.companyEmail
+    }" style="color: #1f2937; text-decoration: none; vertical-align: middle;">${formData.companyEmail}</a>
+  </div>
+  <div>
+    <img src="${WEB_ICON_URL}" width="18" height="18" style="vertical-align: middle; opacity: 0.8; margin-right: 6px; display: inline-block;" alt="Website" /><a href="https://www.acoblighting.com" style="color: #1f2937; text-decoration: none; vertical-align: middle;">www.acoblighting.com</a>
+  </div>
+</div>`
+
+    const mutedSocialIconStyle =
+      "border-radius: 4px; display: inline-block; filter: brightness(0.9) saturate(0.92); opacity: 0.92;"
+
+    const socialBlock = `<div style="display: inline-block;">
+  <a href="https://www.linkedin.com/company/acob-lighting-technology-limited" style="text-decoration: none; display: inline-block;"><img src="${LINKEDIN_ICON_URL}" width="22" height="22" alt="LinkedIn" style="${mutedSocialIconStyle}" /></a>
+  <a href="https://twitter.com/AcobLimited" style="text-decoration: none; display: inline-block; margin-left: 4px;"><img src="${X_ICON_URL}" width="22" height="22" alt="X (Twitter)" style="${mutedSocialIconStyle}" /></a>
+  <a href="https://www.facebook.com/acoblightingtechltd" style="text-decoration: none; display: inline-block; margin-left: 4px;"><img src="${FACEBOOK_ICON_URL}" width="22" height="22" alt="Facebook" style="${mutedSocialIconStyle}" /></a>
+  <a href="https://www.instagram.com/acob_lighting/" style="text-decoration: none; display: inline-block; margin-left: 4px;"><img src="${INSTAGRAM_ICON_URL}" width="22" height="22" alt="Instagram" style="${mutedSocialIconStyle}" /></a>
+</div>`
+
+    const compactNarrative = `<p style="margin: 0 0 5px 0; font-size: 13px; font-weight: 700; color: #0f5c4d;">A decade of purpose, progress, and power.</p>
+<p style="margin: 0; font-size: 12px; color: #374151;">From 2016 to 2026, ACOB Lighting Technology Limited has remained committed to lighting up communities, driving innovation, and creating lasting impact across Nigeria.</p>`
+
+    const anniversaryLogo = `<img src="${ANNIVERSARY_LOGO_URL}" width="250" height="auto" alt="ACOB Lighting Technology Limited 2026 Anniversary Logo" style="display: block;" />`
+
+    const anniversaryFooter = `<div style="border-top: 0.5px solid #e7dec2; padding-top: 8px; font-size: 11px; color: #6b7280; line-height: 1.4;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse;">
+    <tr>
+      <td style="padding: 0; font-weight: 600; font-style: italic; color: #6b7280; text-align: left;">
+        Celebrating 10 Years of Impact &bull; Lighting up Nigeria!
+      </td>
+      <td style="padding: 0; font-weight: 600; color: #6b7280; text-align: right; white-space: nowrap; vertical-align: top;">
+        2016 &ndash; 2026
+      </td>
+    </tr>
+  </table>
+  <div style="margin-top: 8px; border-top: 0.5px solid #e7dec2;"></div>
+  <p style="margin: 8px 0 0 0; font-size: 10.5px; color: #7a828e; font-style: italic;">This email, including any attachments, contains confidential information intended solely for the recipient(s) named above. If you have received this email in error, please notify the sender immediately and delete the email from your system. Any unauthorized use, disclosure, distribution, or copying of this email is strictly prohibited and may be unlawful.</p>
+</div>`
+
+    const renderLayout = (body: string) =>
+      `<div style="font-family: ${"Trebuchet MS"}, Arial, sans-serif; max-width: 1000px; margin: 0; padding: 12px 0; line-height: 1.5; color: #1f2937;">
+  ${body}
+</div>`
+
+    return renderLayout(`<div style="color: #d4af37;">&mdash;&mdash;</div>
+  <p style="margin: 0 0 4px 0; font-size: 14px; color: #4b5563; font-style: italic;">Best Regards,</p>
+  <p style="margin: 0; line-height: 1; font-size: 20px; font-weight: 700; color: #0f172a;">${fullName}</p>
+  <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #0f5c4d;">${formData.companyRole}</p>
+  <div style="margin-bottom: 10px;">${contactBlock}</div>
+  <div style="padding: 8px 0 14px 0; border-top: 2px solid #e7dec2; border-bottom: 2px solid #e7dec2;">
+    <div style="margin-bottom: 8px;">${anniversaryLogo}</div>
+    ${compactNarrative}
+    <div style="margin-top: 8px; margin-bottom: 12px;">${socialBlock}</div>
+    ${anniversaryFooter}
+  </div>`)
+  }
+
   const generateSignature = () => {
     const formattedFirstName = formatNameProperly(formData.firstName)
     const formattedMiddleName = formData.middleName ? formatNameProperly(formData.middleName) : ""
@@ -520,6 +581,10 @@ export function SignatureCreator({
 
     if (activeVariant === "anniversary") {
       return generateAnniversarySignature(fullName, formattedPhone)
+    }
+
+    if (activeVariant === "anniversary-hosted") {
+      return generateAnniversaryHostedSignature(fullName, formattedPhone)
     }
 
     return generateDefaultSignature(fullName, formattedPhone)
@@ -586,19 +651,27 @@ export function SignatureCreator({
 
   const activeVariant = variant === "selectable" ? selectedSignatureMode : variant
 
-  const pageTitle = activeVariant === "anniversary" ? "10th Anniversary Signature" : "Personal Information"
+  const isAnniversaryVariant = activeVariant === "anniversary" || activeVariant === "anniversary-hosted"
+
+  const pageTitle = isAnniversaryVariant ? "10th Anniversary Signature" : "Personal Information"
   const pageDescription =
     activeVariant === "anniversary"
-      ? "Generate the temporary 10th anniversary email signature"
-      : variant === "selectable"
-        ? "Choose between the standard and anniversary employee signature"
-        : "Fill in your details to generate your signature"
-  const previewTitle = activeVariant === "anniversary" ? "Anniversary Preview" : "Signature Preview"
-  const previewDescription =
+      ? "Generate the temporary 10th anniversary email signature (base64 images)"
+      : activeVariant === "anniversary-hosted"
+        ? "Generate the anniversary signature with publicly hosted images (recommended for email clients that block data URIs)"
+        : variant === "selectable"
+          ? "Choose between the standard and anniversary employee signature"
+          : "Fill in your details to generate your signature"
+  const previewTitle = isAnniversaryVariant ? "Anniversary Preview" : "Signature Preview"
+  const previewDescription = isAnniversaryVariant
+    ? "This is how your temporary anniversary signature will look"
+    : "This is how your signature will look"
+  const copyButtonLabel =
     activeVariant === "anniversary"
-      ? "This is how your temporary anniversary signature will look"
-      : "This is how your signature will look"
-  const copyButtonLabel = activeVariant === "anniversary" ? "Copy Anniversary Signature" : "Copy Signature"
+      ? "Copy Anniversary Signature"
+      : activeVariant === "anniversary-hosted"
+        ? "Copy Anniversary Signature (Hosted)"
+        : "Copy Signature"
 
   return (
     <div className="grid gap-8 lg:grid-cols-2">
@@ -614,15 +687,19 @@ export function SignatureCreator({
               <Label>Signature Type</Label>
               <Tabs
                 value={selectedSignatureMode}
-                onValueChange={(value) => setSelectedSignatureMode(value as "default" | "anniversary")}
+                onValueChange={(value) =>
+                  setSelectedSignatureMode(value as "default" | "anniversary" | "anniversary-hosted")
+                }
               >
                 <TabsList className="h-auto w-full justify-start">
                   <TabsTrigger value="default">Standard</TabsTrigger>
                   <TabsTrigger value="anniversary">10th Anniversary</TabsTrigger>
+                  <TabsTrigger value="anniversary-hosted">Anniversary (Hosted Images)</TabsTrigger>
                 </TabsList>
               </Tabs>
               <p className="text-muted-foreground text-xs">
-                Use the anniversary option when the employee should use the 2026 commemorative signature.
+                Use <strong>Anniversary (Hosted Images)</strong> when your email client strips data-URI images. It uses
+                the same anniversary design but loads images from our hosted public URL.
               </p>
             </div>
           )}
@@ -694,25 +771,6 @@ export function SignatureCreator({
           {activeVariant === "anniversary" && (
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label>Signature Font</Label>
-                <div className="flex flex-wrap gap-2">
-                  {ANNIVERSARY_FONT_OPTIONS.map((font) => (
-                    <Button
-                      key={font.id}
-                      type="button"
-                      variant={selectedAnniversaryFont === font.value ? "default" : "outline"}
-                      className="h-9"
-                      style={{ fontFamily: font.value }}
-                      onClick={() => setSelectedAnniversaryFont(font.value)}
-                    >
-                      {font.label}
-                    </Button>
-                  ))}
-                </div>
-                <p className="text-muted-foreground text-xs">Preview a few email-safe fonts before we keep one.</p>
-              </div>
-
-              <div className="space-y-2">
                 <Label>Anniversary Template</Label>
                 <Tabs
                   value={selectedAnniversaryTemplate}
@@ -735,6 +793,16 @@ export function SignatureCreator({
             </div>
           )}
 
+          {activeVariant === "anniversary-hosted" && (
+            <div className="rounded-md border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950/20">
+              <p className="text-xs text-amber-800 dark:text-amber-300">
+                <strong>Hosted Images Edition</strong> — This signature uses absolute HTTPS URLs for all images instead
+                of embedded base64 data. Images will only display correctly when the receiving email client can reach{" "}
+                <code>{HOSTED_IMAGES_BASE || window?.location?.origin}</code>.
+              </p>
+            </div>
+          )}
+
           <div className="flex">
             <Button onClick={copyToClipboard} disabled={!isFormValid} className="flex-1">
               <Copy className="mr-2 h-4 w-4" />
@@ -747,22 +815,15 @@ export function SignatureCreator({
       {/* Preview */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>{previewTitle}</CardTitle>
-              <CardDescription>{previewDescription}</CardDescription>
-            </div>
-            <div className="flex items-center gap-2">
-              <Sun className="text-muted-foreground h-4 w-4" />
-              <Switch checked={darkPreview} onCheckedChange={setDarkPreview} />
-              <Moon className="text-muted-foreground h-4 w-4" />
-            </div>
+          <div>
+            <CardTitle>{previewTitle}</CardTitle>
+            <CardDescription>{previewDescription}</CardDescription>
           </div>
         </CardHeader>
         <CardContent>
           {isFormValid ? (
             <div
-              className={`rounded-lg border p-4 text-sm ${darkPreview ? "bg-[#1a1a1a]" : "bg-white"}`}
+              className="rounded-lg border bg-white p-4 text-sm"
               dangerouslySetInnerHTML={{ __html: generateSignature() }}
             />
           ) : (

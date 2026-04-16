@@ -202,7 +202,6 @@ export default function AdminPmsCbtPage() {
 
   const usersById = useMemo(() => new Map(data.users.map((user) => [user.id, user])), [data.users])
   const cycleNameById = useMemo(() => new Map(data.cycles.map((cycle) => [cycle.id, cycle.name])), [data.cycles])
-
   const scoresForSelectedCycle = useMemo(
     () => data.scores.filter((score) => selectedCycleId === "all" || score.review_cycle_id === selectedCycleId),
     [data.scores, selectedCycleId]
@@ -411,9 +410,9 @@ export default function AdminPmsCbtPage() {
 
   const cycleRowActions: RowAction<CycleRow>[] = [
     {
-      label: "View Cycle",
+      label: "Manage Questions",
       icon: Eye,
-      onClick: (row) => router.push(`/admin/hr/pms/cbt/${encodeURIComponent(row.id)}`),
+      onClick: (row) => router.push(`/admin/hr/pms/cbt/question?cycleId=${encodeURIComponent(row.id)}`),
     },
   ]
 
@@ -429,7 +428,7 @@ export default function AdminPmsCbtPage() {
   return (
     <DataTablePage
       title="PMS CBT"
-      description="Review CBT results by employee, department, or cycle. Open a cycle to manage its question bank."
+      description="Review CBT results by employee, department, or cycle, then open the question manager to add or edit CBT tests."
       icon={Brain}
       backLink={{ href: "/admin/hr/pms", label: "Back to PMS" }}
       tabs={TABS}
@@ -441,8 +440,8 @@ export default function AdminPmsCbtPage() {
             <RefreshCw className="mr-2 h-4 w-4" />
             Refresh
           </Button>
-          <Link href="/cbt">
-            <Button size="sm">Start Test</Button>
+          <Link href="/admin/hr/pms/cbt/question">
+            <Button size="sm">Create Test</Button>
           </Link>
         </div>
       }
@@ -593,7 +592,10 @@ export default function AdminPmsCbtPage() {
           }}
           viewToggle
           cardRenderer={(row) => (
-            <CycleCard row={row} onView={(item) => router.push(`/admin/hr/pms/cbt/${encodeURIComponent(item.id)}`)} />
+            <CycleCard
+              row={row}
+              onView={(item) => router.push(`/admin/hr/pms/cbt/question?cycleId=${encodeURIComponent(item.id)}`)}
+            />
           )}
           emptyTitle="No CBT cycles found"
           emptyDescription="Create a cycle question bank to start collecting CBT results."

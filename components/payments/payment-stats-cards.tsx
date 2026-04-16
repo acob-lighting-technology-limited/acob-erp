@@ -1,5 +1,5 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { CreditCard, Building2, CheckCircle, Calendar } from "lucide-react"
+import { Calendar, CheckCircle, CreditCard, TriangleAlert, Wallet } from "lucide-react"
+import { StatCard } from "@/components/ui/stat-card"
 
 interface PaymentStats {
   totalDue: number
@@ -16,57 +16,42 @@ interface PaymentStatsCardsProps {
 
 export function PaymentStatsCards({ stats, formatCurrency }: PaymentStatsCardsProps) {
   return (
-    <div className="grid grid-cols-6 gap-2 md:gap-3 lg:grid-cols-5">
-      <Card className="col-span-6 lg:col-span-1">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-2">
-          <CardTitle className="text-[10px] font-medium md:text-sm">Total Outstanding</CardTitle>
-          <CreditCard className="text-muted-foreground h-3.5 w-3.5" />
-        </CardHeader>
-        <CardContent className="p-3 pt-0">
-          <div className="text-base font-bold md:text-2xl">{formatCurrency(stats.totalDue, "NGN")}</div>
-          <p className="text-muted-foreground text-[9px] md:text-xs">Overdue + Up Next (7 days)</p>
-        </CardContent>
-      </Card>
-      <Card className="col-span-6 lg:col-span-1">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-2">
-          <CardTitle className="text-[10px] font-medium md:text-sm">Total Paid</CardTitle>
-          <Building2 className="text-muted-foreground h-3.5 w-3.5" />
-        </CardHeader>
-        <CardContent className="p-3 pt-0">
-          <div className="text-base font-bold md:text-2xl">{formatCurrency(stats.totalPaid, "NGN")}</div>
-          <p className="text-muted-foreground text-[9px] md:text-xs">Lifetime collected</p>
-        </CardContent>
-      </Card>
-      <Card className="col-span-2 lg:col-span-1">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-2">
-          <CardTitle className="text-[10px] font-medium md:text-sm">Completed</CardTitle>
-          <CheckCircle className="h-3.5 w-3.5 text-green-500" />
-        </CardHeader>
-        <CardContent className="p-3 pt-0">
-          <div className="text-base font-bold text-green-600 md:text-2xl">{stats.countCompleted}</div>
-          <p className="text-muted-foreground text-[9px] md:text-xs">Paid Items & History</p>
-        </CardContent>
-      </Card>
-      <Card className="col-span-2 lg:col-span-1">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-2">
-          <CardTitle className="text-[10px] font-medium md:text-sm">Overdue Payments</CardTitle>
-          <CreditCard className="h-3.5 w-3.5 text-red-500" />
-        </CardHeader>
-        <CardContent className="p-3 pt-0">
-          <div className="text-base font-bold text-red-600 md:text-2xl">{stats.countOverdue}</div>
-          <p className="text-muted-foreground text-[9px] md:text-xs">Requires immediate attention</p>
-        </CardContent>
-      </Card>
-      <Card className="col-span-2 lg:col-span-1">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-2">
-          <CardTitle className="text-[10px] font-medium md:text-sm">Due Payments</CardTitle>
-          <Calendar className="h-3.5 w-3.5 text-yellow-500" />
-        </CardHeader>
-        <CardContent className="p-3 pt-0">
-          <div className="text-base font-bold text-yellow-600 md:text-2xl">{stats.countDue}</div>
-          <p className="text-muted-foreground text-[9px] md:text-xs">Due within 7 days</p>
-        </CardContent>
-      </Card>
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <StatCard
+        title="Total Outstanding"
+        value={formatCurrency(stats.totalDue, "NGN")}
+        icon={CreditCard}
+        iconBgColor="bg-blue-500/10"
+        iconColor="text-blue-500"
+      />
+      <StatCard
+        title="Total Paid"
+        value={formatCurrency(stats.totalPaid, "NGN")}
+        icon={Wallet}
+        iconBgColor="bg-emerald-500/10"
+        iconColor="text-emerald-500"
+      />
+      <StatCard
+        title="Completed"
+        value={stats.countCompleted}
+        icon={CheckCircle}
+        iconBgColor="bg-violet-500/10"
+        iconColor="text-violet-500"
+      />
+      <StatCard
+        title="Overdue"
+        value={stats.countOverdue}
+        icon={TriangleAlert}
+        iconBgColor="bg-red-500/10"
+        iconColor="text-red-500"
+      />
+      <StatCard
+        title="Due Soon"
+        value={stats.countDue}
+        icon={Calendar}
+        iconBgColor="bg-amber-500/10"
+        iconColor="text-amber-500"
+      />
     </div>
   )
 }

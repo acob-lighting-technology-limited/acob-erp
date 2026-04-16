@@ -114,14 +114,14 @@ function buildMeetingReminderHtml(
   let agendaHtml = ""
   for (let i = 0; i < agenda.length; i++) {
     agendaHtml +=
-      '<tr><td style="padding: 10px 18px; font-size: 14px; color: #374151; border-bottom: 1px solid #e5e7eb;">' +
+      '<tr><td style="padding: 10px 18px; font-size: 14px; color: #d1d5db; border-bottom: 1px solid #334155;">' +
       '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>' +
       '<td valign="top" style="width: 36px; padding: 0 12px 0 0;">' +
       '<span style="display: inline-block; background: #000; color: #16a34a; font-weight: 700; width: 24px; height: 24px; border-radius: 50%; text-align: center; line-height: 24px; font-size: 12px;">' +
       (i + 1) +
       "</span>" +
       "</td>" +
-      '<td valign="top" style="padding: 2px 0 0 0; color: #374151; line-height: 1.5;">' +
+      '<td valign="top" style="padding: 2px 0 0 0; color: #d1d5db; line-height: 1.5;">' +
       escapeHtml(agenda[i]) +
       "</td>" +
       "</tr></table>" +
@@ -179,8 +179,8 @@ function buildMeetingReminderHtml(
     "</head>" +
     "<body>" +
     '<div class="email-shell">' +
-    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#000000" style="background:#000000 !important;background-color:#000000 !important;border-top:3px solid #16a34a;border-bottom:3px solid #16a34a;">' +
-    '<tr><td align="center" style="padding:20px 0;background:#000000 !important;background-color:#000000 !important;">' +
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#000000" style="background:#000000 !important;background-color:#000000 !important;background-image:linear-gradient(#000000,#000000) !important;border-top:3px solid #16a34a;border-bottom:3px solid #16a34a;mso-line-height-rule:exactly;">' +
+    '<tr><td align="center" style="padding:20px 0;background:#000000 !important;background-color:#000000 !important;background-image:linear-gradient(#000000,#000000) !important;">' +
     '<img src="https://erp.acoblighting.com/images/acob-logo-dark.png" height="65" alt="ACOB Lighting">' +
     "</td></tr></table>" +
     '<div class="wrapper">' +
@@ -215,8 +215,8 @@ function buildMeetingReminderHtml(
     "</div>" +
     '<p class="text" style="text-align: center; font-weight: 600; color: #16a34a;">Looking forward to seeing you there.</p>' +
     "</div>" +
-    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#000000" style="background:#000000 !important;background-color:#000000 !important;border-top:3px solid #16a34a;border-bottom:3px solid #16a34a;">' +
-    '<tr><td align="center" style="padding:20px;background:#000000 !important;background-color:#000000 !important;font-size:11px;color:#d1d5db;">' +
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#000000" style="background:#000000 !important;background-color:#000000 !important;background-image:linear-gradient(#000000,#000000) !important;border-top:3px solid #16a34a;border-bottom:3px solid #16a34a;mso-line-height-rule:exactly;">' +
+    '<tr><td align="center" style="padding:20px;background:#000000 !important;background-color:#000000 !important;background-image:linear-gradient(#000000,#000000) !important;font-size:11px;color:#d1d5db;">' +
     '<span style="color:#f3f4f6;">Prepared by ' +
     preparedBy +
     "</span><br>" +
@@ -278,8 +278,8 @@ function buildKnowledgeSharingHtml(sessionDate: string, sessionTime: string, dur
     "</head>" +
     "<body>" +
     '<div class="email-shell">' +
-    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#000000" style="background:#000000 !important;background-color:#000000 !important;border-top:3px solid #16a34a;border-bottom:3px solid #16a34a;">' +
-    '<tr><td align="center" style="padding:20px 0;background:#000000 !important;background-color:#000000 !important;">' +
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#000000" style="background:#000000 !important;background-color:#000000 !important;background-image:linear-gradient(#000000,#000000) !important;border-top:3px solid #16a34a;border-bottom:3px solid #16a34a;mso-line-height-rule:exactly;">' +
+    '<tr><td align="center" style="padding:20px 0;background:#000000 !important;background-color:#000000 !important;background-image:linear-gradient(#000000,#000000) !important;">' +
     '<img src="https://erp.acoblighting.com/images/acob-logo-dark.png" height="65" alt="ACOB Lighting">' +
     "</td></tr></table>" +
     '<div class="wrapper">' +
@@ -303,8 +303,8 @@ function buildKnowledgeSharingHtml(sessionDate: string, sessionTime: string, dur
     "Attendance is mandatory for all team members." +
     "</div>" +
     "</div>" +
-    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#000000" style="background:#000000 !important;background-color:#000000 !important;border-top:3px solid #16a34a;border-bottom:3px solid #16a34a;">' +
-    '<tr><td align="center" style="padding:20px;background:#000000 !important;background-color:#000000 !important;font-size:11px;color:#d1d5db;">' +
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#000000" style="background:#000000 !important;background-color:#000000 !important;background-image:linear-gradient(#000000,#000000) !important;border-top:3px solid #16a34a;border-bottom:3px solid #16a34a;mso-line-height-rule:exactly;">' +
+    '<tr><td align="center" style="padding:20px;background:#000000 !important;background-color:#000000 !important;background-image:linear-gradient(#000000,#000000) !important;font-size:11px;color:#d1d5db;">' +
     '<span style="color:#f3f4f6;">Prepared by Admin &amp; HR</span><br>' +
     "Administrative Team<br>" +
     "Admin &amp; HR Department<br>" +
@@ -463,6 +463,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders })
 
   try {
+    const requestStartedAt = Date.now()
     const authHeader = req.headers.get("Authorization")
     if (!authHeader) return new Response("Unauthorized", { status: 401 })
 
@@ -553,18 +554,58 @@ serve(async (req) => {
     }
 
     console.log("[meeting-reminder] Sending " + type + " to " + recipients.length + " recipients")
+    console.log(
+      "[meeting-reminder] request summary",
+      JSON.stringify({
+        elapsed_ms: Date.now() - requestStartedAt,
+        type,
+        recipient_count: recipients.length,
+        meeting_date: effectiveMeetingDate || null,
+        meeting_time: meetingTime || null,
+      })
+    )
 
     const results: DeliveryResult[] = []
-    for (const to of recipients) {
+    for (const [index, to] of recipients.entries()) {
+      const recipientStartedAt = Date.now()
       try {
-        const data = await sendEmail({ from, to, subject, html })
+        const data = await sendEmail({
+          from,
+          to,
+          subject,
+          html,
+          traceLabel: `meeting-reminder:${type}:${index + 1}/${recipients.length}:${to}`,
+        })
         console.log("[meeting-reminder] Sent to " + to + ". ID: " + data.id)
+        console.log(
+          "[meeting-reminder] recipient send completed",
+          JSON.stringify({
+            recipient: to,
+            recipient_index: index + 1,
+            recipient_elapsed_ms: Date.now() - recipientStartedAt,
+            send_total_duration_ms: data.totalDurationMs,
+            rate_limit_wait_ms: data.rateLimitWaitMs,
+            resend_api_duration_ms: data.resendApiDurationMs,
+            retry_backoff_ms: data.retryBackoffMs,
+          })
+        )
         results.push({ to, success: true, emailId: data.id })
       } catch (error) {
         console.error("[meeting-reminder] Failed to send to " + to + ":", JSON.stringify(error))
         results.push({ to, success: false, error })
       }
     }
+
+    console.log(
+      "[meeting-reminder] send cycle completed",
+      JSON.stringify({
+        total_elapsed_ms: Date.now() - requestStartedAt,
+        type,
+        recipient_count: recipients.length,
+        success_count: results.filter((result) => result.success).length,
+        failure_count: results.filter((result) => !result.success).length,
+      })
+    )
 
     try {
       const successCount = results.filter((r) => r.success).length

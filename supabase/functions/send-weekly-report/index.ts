@@ -118,6 +118,8 @@ type DeliveryResult = {
   error?: unknown
 }
 
+const DELIVERY_BATCH_SIZE = 2
+
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message
   if (typeof error === "object" && error !== null && "message" in error) {
@@ -125,6 +127,42 @@ function getErrorMessage(error: unknown): string {
     if (typeof message === "string") return message
   }
   return "Unknown error"
+}
+
+function formatDurationMs(durationMs: number): string {
+  if (durationMs < 1000) return `${durationMs}ms`
+  return `${(durationMs / 1000).toFixed(2)}s`
+}
+
+function estimateBase64Bytes(base64: string): number {
+  const sanitized = String(base64 || "").replace(/=+$/, "")
+  return Math.floor((sanitized.length * 3) / 4)
+}
+
+function logWeeklyReportEvent(startedAt: number, stage: string, details: Record<string, unknown> = {}) {
+  console.log(
+    `[weekly-report] ${stage}`,
+    JSON.stringify({
+      elapsed_ms: Date.now() - startedAt,
+      ...details,
+    })
+  )
+}
+
+async function processRecipientBatch<TInput, TResult>(
+  items: TInput[],
+  batchSize: number,
+  worker: (item: TInput, index: number) => Promise<TResult>
+): Promise<TResult[]> {
+  const results: TResult[] = []
+
+  for (let index = 0; index < items.length; index += batchSize) {
+    const batch = items.slice(index, index + batchSize)
+    const batchResults = await Promise.all(batch.map((item, batchIndex) => worker(item, index + batchIndex)))
+    results.push(...batchResults)
+  }
+
+  return results
 }
 
 function autoNumber(text: string): string {
@@ -707,15 +745,15 @@ function buildEmailBody(meetingDate: string, nextMeetingDate: string, ctx: Email
   const isMultiWeek = ctx.weekLabels.length > 1
   const weekPhrase = `<strong>${escapeHtml(oxfordWeekList(ctx.weekLabels))}</strong>`
 
-  // Build the attached-content phrase
   const attachedParts: string[] = []
   if (ctx.includeMinutes) attachedParts.push(isMultiWeek ? "the Minutes of Meeting" : "the Minutes of Meeting")
   if (ctx.includeActionPoint) attachedParts.push("the Action Points")
   if (ctx.includeWeeklyReport) attachedParts.push(isMultiWeek ? "the Weekly Reports" : "the Weekly Report")
-  if (ctx.includeKss)
+  if (ctx.includeKss) {
     attachedParts.push(
       isMultiWeek ? "the Knowledge Sharing Session documents" : "the Knowledge Sharing Session document"
     )
+  }
 
   let attachedPhrase: string
   if (attachedParts.length === 0) {
@@ -730,12 +768,9 @@ function buildEmailBody(meetingDate: string, nextMeetingDate: string, ctx: Email
   const lines: string[] = []
 
   if (isMultiWeek) {
-    // Batch send — no meeting date, no next-meeting date
     lines.push(`Please find attached ${attachedPhrase} for ${weekPhrase}.`)
   } else {
-    // Single week
     if (ctx.includeMinutes || ctx.includeActionPoint) {
-      // Classic formal send — include meeting date
       lines.push(
         `Please find attached ${attachedPhrase} for ${weekPhrase} of the General Meeting held on <strong>${meetingDate}</strong>.`
       )
@@ -743,13 +778,12 @@ function buildEmailBody(meetingDate: string, nextMeetingDate: string, ctx: Email
         `Kindly review and share any observations or questions you may have ahead of the next General Meeting on <strong>${nextMeetingDate}</strong>.`
       )
     } else {
-      // KSS / Weekly Report only — no dates needed
       lines.push(`Please find attached ${attachedPhrase} for ${weekPhrase}.`)
     }
   }
 
   lines.push("Thank you.")
-  return lines.map((l) => `    <p class="text">${l}</p>`).join("\n")
+  return lines.map((line) => `    <p class="text">${line}</p>`).join("\n")
 }
 
 function buildEmailHtml(
@@ -821,6 +855,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders })
 
   try {
+    const requestStartedAt = Date.now()
     const authHeader = req.headers.get("Authorization")
     if (!authHeader) return new Response("Unauthorized", { status: 401 })
 
@@ -870,6 +905,18 @@ serve(async (req) => {
       requestedByUserId,
     } = body
 
+    logWeeklyReportEvent(requestStartedAt, "request received", {
+      requested_recipient_count: Array.isArray(bodyRecipients) ? bodyRecipients.length : testEmail ? 1 : 0,
+      has_weekly_report_base64: Boolean(weeklyReportBase64),
+      has_action_point_base64: Boolean(actionPointBase64),
+      action_point_attachment_count: Array.isArray(bodyActionPointAttachments) ? bodyActionPointAttachments.length : 0,
+      additional_document_id_count: Array.isArray(additionalDocumentIds) ? additionalDocumentIds.length : 0,
+      additional_attachment_count: Array.isArray(bodyAdditionalDocumentAttachments)
+        ? bodyAdditionalDocumentAttachments.length
+        : 0,
+      content_choice: contentChoice || "auto",
+    })
+
     const { week: currentWeek, year: currentYear } = getCurrentOfficeWeek()
 
     // ── Determine meeting week (the week everything is labelled as) ──────
@@ -898,6 +945,12 @@ serve(async (req) => {
     const nextOfficeWeek = getNextOfficeWeek(meetingWeek, meetingYear)
     const nextMeetingDateIso = await resolveEffectiveMeetingDateIso(supabase, nextOfficeWeek.week, nextOfficeWeek.year)
     const nextMeetingDateLabel = formatMeetingDateLabel(nextMeetingDateIso)
+    logWeeklyReportEvent(requestStartedAt, "meeting dates resolved", {
+      meeting_week: meetingWeek,
+      meeting_year: meetingYear,
+      meeting_date: meetingDateIso,
+      next_meeting_date: nextMeetingDateIso,
+    })
 
     // ── Data weeks ──────────────────────────────────────────────────────
     // Everything uses the same meeting week — no previous-week offset
@@ -959,6 +1012,11 @@ serve(async (req) => {
         resolvedWeeklyReportFilename = resolvedWeeklyReportFilename || stored.filename
         includeWeeklyReport = true
         console.log("[weekly-report] Using stored weekly report document", weeklyReportDocumentId)
+        logWeeklyReportEvent(requestStartedAt, "stored weekly report resolved", {
+          weekly_report_document_id: weeklyReportDocumentId,
+          filename: resolvedWeeklyReportFilename,
+          approx_bytes: estimateBase64Bytes(stored.base64),
+        })
       }
     }
 
@@ -969,6 +1027,11 @@ serve(async (req) => {
         resolvedActionPointFilename = resolvedActionPointFilename || stored.filename
         includeActionPoint = true
         console.log("[weekly-report] Using stored action point document", actionPointDocumentId)
+        logWeeklyReportEvent(requestStartedAt, "stored action point resolved", {
+          action_point_document_id: actionPointDocumentId,
+          filename: resolvedActionPointFilename,
+          approx_bytes: estimateBase64Bytes(stored.base64),
+        })
       }
     }
 
@@ -982,6 +1045,10 @@ serve(async (req) => {
           additionalAttachments.push({ filename: att.filename, content: att.base64 })
         }
       }
+      logWeeklyReportEvent(requestStartedAt, "using prefetched additional attachments", {
+        additional_attachment_count: additionalAttachments.length,
+        filenames: additionalAttachments.map((attachment) => attachment.filename),
+      })
     } else if (requestedAdditionalDocumentIds.length > 0) {
       // Fallback: download server-side (legacy path, used if signed_url was unavailable)
       const uniqueDocumentIds = Array.from(new Set(requestedAdditionalDocumentIds))
@@ -995,6 +1062,11 @@ serve(async (req) => {
           })
         }
       }
+      logWeeklyReportEvent(requestStartedAt, "server-side additional attachments resolved", {
+        requested_document_count: uniqueDocumentIds.length,
+        resolved_attachment_count: additionalAttachments.length,
+        filenames: additionalAttachments.map((attachment) => attachment.filename),
+      })
     }
 
     const hasPrefetchedActionPointAttachments =
@@ -1035,6 +1107,11 @@ serve(async (req) => {
 
       const reportRows = (reports || []) as WeeklyReportRow[]
       console.log(`[weekly-report] Generating weekly report PDF: ${reportRows.length} reports`)
+      logWeeklyReportEvent(requestStartedAt, "weekly report data fetched", {
+        report_row_count: reportRows.length,
+        report_data_week: reportDataWeek,
+        report_data_year: reportDataYear,
+      })
 
       const reportPdfBytes = await buildWeeklyReportPDF(
         reportRows,
@@ -1046,6 +1123,9 @@ serve(async (req) => {
       )
 
       reportPdfBase64 = encodeBytesToBase64(reportPdfBytes)
+      logWeeklyReportEvent(requestStartedAt, "weekly report pdf generated", {
+        weekly_report_pdf_bytes: reportPdfBytes.length,
+      })
     }
 
     const recipients =
@@ -1080,6 +1160,15 @@ serve(async (req) => {
       attachments.push(attachment)
     }
     if (attachments.length === 0) throw new Error("No attachments to send")
+    logWeeklyReportEvent(requestStartedAt, "attachments assembled", {
+      recipient_count: recipients.length,
+      attachment_count: attachments.length,
+      attachment_filenames: attachments.map((attachment) => attachment.filename),
+      approx_attachment_total_bytes: attachments.reduce(
+        (total, attachment) => total + estimateBase64Bytes(attachment.content),
+        0
+      ),
+    })
 
     // ── Build dynamic email context ──────────────────────────────────────
     const hasKss = additionalAttachments.some(
@@ -1109,24 +1198,68 @@ serve(async (req) => {
       preparedByDepartment || "Admin & HR Department",
       emailCtx
     )
+    logWeeklyReportEvent(requestStartedAt, "email html built", {
+      subject,
+      html_length: html.length,
+      include_weekly_report: includeWeeklyReport,
+      include_action_point: emailCtx.includeActionPoint,
+      include_kss: hasKss,
+      include_minutes: hasMinutes,
+    })
 
-    const results: DeliveryResult[] = []
-    for (const to of recipients) {
-      try {
-        const data = await sendEmail({
-          from: DEFAULT_SENDER,
-          to,
-          subject,
-          html,
-          attachments,
+    const results = await processRecipientBatch(
+      recipients,
+      DELIVERY_BATCH_SIZE,
+      async (to, index): Promise<DeliveryResult> => {
+        const recipientStartedAt = Date.now()
+        logWeeklyReportEvent(requestStartedAt, "recipient send started", {
+          recipient: to,
+          recipient_index: index + 1,
+          recipient_count: recipients.length,
         })
-        console.log(`[weekly-report] Sent to ${to}. ID: ${data.id}`)
-        results.push({ to, success: true, emailId: data.id })
-      } catch (error) {
-        console.error(`[weekly-report] Failed to send to ${to}:`, JSON.stringify(error))
-        results.push({ to, success: false, error })
+
+        try {
+          const data = await sendEmail({
+            from: DEFAULT_SENDER,
+            to,
+            subject,
+            html,
+            attachments,
+            traceLabel: `weekly-report:${index + 1}/${recipients.length}:${to}`,
+          })
+          console.log(`[weekly-report] Sent to ${to}. ID: ${data.id}`)
+          logWeeklyReportEvent(requestStartedAt, "recipient send completed", {
+            recipient: to,
+            recipient_index: index + 1,
+            email_id: data.id,
+            recipient_elapsed_ms: Date.now() - recipientStartedAt,
+            send_attempts: data.attempts,
+            send_total_duration_ms: data.totalDurationMs,
+            rate_limit_wait_ms: data.rateLimitWaitMs,
+            resend_api_duration_ms: data.resendApiDurationMs,
+            retry_backoff_ms: data.retryBackoffMs,
+          })
+          return { to, success: true, emailId: data.id }
+        } catch (error) {
+          console.error(`[weekly-report] Failed to send to ${to}:`, JSON.stringify(error))
+          logWeeklyReportEvent(requestStartedAt, "recipient send failed", {
+            recipient: to,
+            recipient_index: index + 1,
+            recipient_elapsed_ms: Date.now() - recipientStartedAt,
+            error: getErrorMessage(error),
+          })
+          return { to, success: false, error }
+        }
       }
-    }
+    )
+
+    logWeeklyReportEvent(requestStartedAt, "send cycle completed", {
+      recipient_count: recipients.length,
+      success_count: results.filter((result) => result.success).length,
+      failure_count: results.filter((result) => !result.success).length,
+      total_duration_ms: Date.now() - requestStartedAt,
+      total_duration_human: formatDurationMs(Date.now() - requestStartedAt),
+    })
 
     try {
       const successCount = results.filter((r) => r.success).length

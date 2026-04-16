@@ -610,31 +610,33 @@ export function EmployeeViewModal({
           )}
 
           {viewEmployeeProfile && modalViewMode === "status" && (
-            <div className="mx-auto max-w-md">
-              <ChangeStatusContent
-                employee={
-                  {
-                    id: viewEmployeeProfile.id,
-                    first_name: viewEmployeeProfile.first_name,
-                    last_name: viewEmployeeProfile.last_name,
-                    employment_status: viewEmployeeProfile.employment_status || "active",
-                  } satisfies EmployeeStatusSummary
-                }
-                onSuccess={() => {
-                  setModalViewMode("profile")
-                  loadData()
-                  // Refresh profile data
-                  supabase
-                    .from("profiles")
-                    .select("*")
-                    .eq("id", viewEmployeeProfile.id)
-                    .single()
-                    .then(({ data }) => {
-                      if (data) setViewEmployeeProfile(data as EmployeeProfile)
-                    })
-                }}
-              />
-            </div>
+            <ScrollArea className="h-full pr-4">
+              <div className="mx-auto max-w-md pb-4">
+                <ChangeStatusContent
+                  employee={
+                    {
+                      id: viewEmployeeProfile.id,
+                      first_name: viewEmployeeProfile.first_name,
+                      last_name: viewEmployeeProfile.last_name,
+                      employment_status: viewEmployeeProfile.employment_status || "active",
+                    } satisfies EmployeeStatusSummary
+                  }
+                  onSuccess={() => {
+                    setModalViewMode("profile")
+                    loadData()
+                    // Refresh profile data
+                    supabase
+                      .from("profiles")
+                      .select("*")
+                      .eq("id", viewEmployeeProfile.id)
+                      .single()
+                      .then(({ data }) => {
+                        if (data) setViewEmployeeProfile(data as EmployeeProfile)
+                      })
+                  }}
+                />
+              </div>
+            </ScrollArea>
           )}
 
           {viewEmployeeProfile && modalViewMode === "edit" && (

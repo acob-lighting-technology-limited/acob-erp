@@ -37,6 +37,8 @@ type DeliveryResult = {
   error?: unknown
 }
 
+const DELIVERY_BATCH_SIZE = 2
+
 type MailAttachment = {
   filename: string
   content: string
@@ -107,8 +109,8 @@ function buildAdminBroadcastHtml(
     "</head>" +
     "<body>" +
     '<div class="email-shell">' +
-    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#000000" style="background:#000000 !important;background-color:#000000 !important;border-top:3px solid #16a34a;border-bottom:3px solid #16a34a;">' +
-    '<tr><td align="center" style="padding:20px 0;background:#000000 !important;background-color:#000000 !important;">' +
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#000000" style="background:#000000 !important;background-color:#000000 !important;background-image:linear-gradient(#000000,#000000) !important;border-top:3px solid #16a34a;border-bottom:3px solid #16a34a;mso-line-height-rule:exactly;">' +
+    '<tr><td align="center" style="padding:20px 0;background:#000000 !important;background-color:#000000 !important;background-image:linear-gradient(#000000,#000000) !important;">' +
     '<img src="https://erp.acoblighting.com/images/acob-logo-dark.png" height="65" alt="ACOB Lighting">' +
     "</td></tr></table>" +
     '<div class="wrapper">' +
@@ -119,8 +121,8 @@ function buildAdminBroadcastHtml(
     bodyHtml +
     "</div>" +
     "</div>" +
-    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#000000" style="background:#000000 !important;background-color:#000000 !important;border-top:3px solid #16a34a;border-bottom:3px solid #16a34a;">' +
-    '<tr><td align="center" style="padding:20px;background:#000000 !important;background-color:#000000 !important;font-size:11px;color:#d1d5db;">' +
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#000000" style="background:#000000 !important;background-color:#000000 !important;background-image:linear-gradient(#000000,#000000) !important;border-top:3px solid #16a34a;border-bottom:3px solid #16a34a;mso-line-height-rule:exactly;">' +
+    '<tr><td align="center" style="padding:20px;background:#000000 !important;background-color:#000000 !important;background-image:linear-gradient(#000000,#000000) !important;font-size:11px;color:#d1d5db;">' +
     '<span style="color:#f3f4f6;">Prepared by ' +
     safePreparedBy +
     "</span><br>" +
@@ -137,10 +139,27 @@ function buildAdminBroadcastHtml(
   )
 }
 
+async function processRecipientBatch<TInput, TResult>(
+  items: TInput[],
+  batchSize: number,
+  worker: (item: TInput, index: number) => Promise<TResult>
+): Promise<TResult[]> {
+  const results: TResult[] = []
+
+  for (let index = 0; index < items.length; index += batchSize) {
+    const batch = items.slice(index, index + batchSize)
+    const batchResults = await Promise.all(batch.map((item, batchIndex) => worker(item, index + batchIndex)))
+    results.push(...batchResults)
+  }
+
+  return results
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders })
 
   try {
+    const requestStartedAt = Date.now()
     const authHeader = req.headers.get("Authorization")
     if (!authHeader) return new Response("Unauthorized", { status: 401 })
 
@@ -197,18 +216,60 @@ serve(async (req) => {
     const from = buildBroadcastSender(department)
 
     console.log("[communications-mail] Sending admin_broadcast to " + recipients.length + " recipients")
+    console.log(
+      "[communications-mail] request summary",
+      JSON.stringify({
+        elapsed_ms: Date.now() - requestStartedAt,
+        recipient_count: recipients.length,
+        attachment_count: attachments.length,
+        subject,
+      })
+    )
 
-    const results: DeliveryResult[] = []
-    for (const to of recipients) {
-      try {
-        const data = await sendEmail({ from, to, subject, html, attachments })
-        console.log("[communications-mail] Sent to " + to + ". ID: " + data.id)
-        results.push({ to, success: true, emailId: data.id })
-      } catch (error) {
-        console.error("[communications-mail] Failed to send to " + to + ":", JSON.stringify(error))
-        results.push({ to, success: false, error })
+    const results = await processRecipientBatch(
+      recipients,
+      DELIVERY_BATCH_SIZE,
+      async (to, index): Promise<DeliveryResult> => {
+        const recipientStartedAt = Date.now()
+        try {
+          const data = await sendEmail({
+            from,
+            to,
+            subject,
+            html,
+            attachments,
+            traceLabel: `communications-mail:${index + 1}/${recipients.length}:${to}`,
+          })
+          console.log("[communications-mail] Sent to " + to + ". ID: " + data.id)
+          console.log(
+            "[communications-mail] recipient send completed",
+            JSON.stringify({
+              recipient: to,
+              recipient_index: index + 1,
+              recipient_elapsed_ms: Date.now() - recipientStartedAt,
+              send_total_duration_ms: data.totalDurationMs,
+              rate_limit_wait_ms: data.rateLimitWaitMs,
+              resend_api_duration_ms: data.resendApiDurationMs,
+              retry_backoff_ms: data.retryBackoffMs,
+            })
+          )
+          return { to, success: true, emailId: data.id }
+        } catch (error) {
+          console.error("[communications-mail] Failed to send to " + to + ":", JSON.stringify(error))
+          return { to, success: false, error }
+        }
       }
-    }
+    )
+
+    console.log(
+      "[communications-mail] send cycle completed",
+      JSON.stringify({
+        total_elapsed_ms: Date.now() - requestStartedAt,
+        recipient_count: recipients.length,
+        success_count: results.filter((result) => result.success).length,
+        failure_count: results.filter((result) => !result.success).length,
+      })
+    )
 
     try {
       const successCount = results.filter((r) => r.success).length

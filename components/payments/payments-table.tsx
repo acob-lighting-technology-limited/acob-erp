@@ -1,26 +1,14 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { logger } from "@/lib/logger"
-
-const log = logger("payments-table")
+import { useEffect, useMemo, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { QUERY_KEYS } from "@/lib/query-keys"
+import { format, parseISO, isValid, differenceInDays, isBefore, startOfDay } from "date-fns"
+import { CreditCard, Download, Eye, FileText, Plus, Receipt, Upload } from "lucide-react"
+import { toast } from "sonner"
 import { useRouter } from "next/navigation"
-import {
-  Plus,
-  Search,
-  Download,
-  CreditCard,
-  Eye,
-  Printer,
-  ArrowUpDown,
-  Upload,
-} from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
   Dialog,
@@ -30,28 +18,20 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { toast } from "sonner"
-import { format, parseISO, isValid, differenceInDays, isBefore, startOfDay } from "date-fns"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { AdminTablePage } from "@/components/admin/admin-table-page"
+import { DataTable, DataTablePage } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter, RowAction } from "@/components/ui/data-table"
+import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
 import { CreatePaymentDialog } from "./create-payment-dialog"
 import { ExportColumnsDialog } from "./export-columns-dialog"
-import { ReceiptSelectionDialog } from "./receipt-selection-dialog"
 import { PaymentStatsCards } from "./payment-stats-cards"
+import { ReceiptSelectionDialog } from "./receipt-selection-dialog"
 import { usePaymentExport } from "./use-payment-export"
-import { TableViewToggle } from "@/components/admin/table-view-toggle"
-import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
 import type { CreatePaymentFormData } from "./create-payment-dialog"
+import { logger } from "@/lib/logger"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
-// Types
+const log = logger("payments-table")
+
 interface Payment {
   id: string
   department_id: string
@@ -100,7 +80,21 @@ interface PaymentsTableData {
   categories: Category[]
 }
 
+interface ProcessedPayment extends Payment {
+  amountDue: number
+  departmentName: string
+  issuerDisplay: string
+  dateLabel: string
+  dateSortValue: number
+  paymentTypeLabel: string
+  hasReceipt: boolean
+}
+
 type PaymentTableDocument = NonNullable<Payment["documents"]>[number]
+
+const EMPTY_PAYMENTS: Payment[] = []
+const EMPTY_DEPARTMENTS: Department[] = []
+const EMPTY_CATEGORIES: Category[] = []
 
 async function fetchPaymentsTableData(): Promise<PaymentsTableData> {
   const [paymentsRes, deptRes, catRes] = await Promise.all([
@@ -135,7 +129,6 @@ interface PaymentsTableProps {
     department_id: string | null
     isAdmin: boolean
   }
-  /** Base path for detail pages - default "/admin/finance/payments" for admin, "/payments" for users */
   basePath?: string
 }
 
@@ -149,46 +142,15 @@ export function PaymentsTable({
 }: PaymentsTableProps) {
   const router = useRouter()
   const queryClient = useQueryClient()
-
-  const { data: tableData, isLoading: loading } = useQuery({
-    queryKey: QUERY_KEYS.paymentsTable(),
-    queryFn: fetchPaymentsTableData,
-    initialData:
-      initialPayments.length > 0 || initialDepartments.length > 0 || initialCategories.length > 0
-        ? { payments: initialPayments, departments: initialDepartments, categories: initialCategories }
-        : undefined,
-  })
-
-  const payments = tableData?.payments ?? []
-  const departments = tableData?.departments ?? []
-
-  // Filters
-  const [searchQuery, setSearchQuery] = useState("")
-  const [departmentFilter, setDepartmentFilter] = useState("all")
-  const [categoryFilter, setCategoryFilter] = useState("all")
-  const [statusFilter, setStatusFilter] = useState("all")
-  const [viewMode, setViewMode] = useState<"list" | "card">("list")
-
-  // Sorting
-  const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" }>({
-    key: "date",
-    direction: "asc",
-  })
-
-  // Modal
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [receiptFile, setReceiptFile] = useState<File | null>(null)
-
-  // Receipt Selection Dialog
   const [receiptDialogOpen, setReceiptDialogOpen] = useState(false)
-  const [selectedPaymentForReceipt, setSelectedPaymentForReceipt] = useState<Payment | null>(null)
+  const [selectedPaymentForReceipt, setSelectedPaymentForReceipt] = useState<ProcessedPayment | null>(null)
   const [receiptUploadDialogOpen, setReceiptUploadDialogOpen] = useState(false)
-  const [selectedPaymentForReceiptUpload, setSelectedPaymentForReceiptUpload] = useState<Payment | null>(null)
+  const [selectedPaymentForReceiptUpload, setSelectedPaymentForReceiptUpload] = useState<ProcessedPayment | null>(null)
   const [receiptUploadFile, setReceiptUploadFile] = useState<File | null>(null)
   const [receiptUploading, setReceiptUploading] = useState(false)
-
-  // Export dialog state
   const [exportDialogOpen, setExportDialogOpen] = useState(false)
   const [exportOptionsOpen, setExportOptionsOpen] = useState(false)
   const [exportType, setExportType] = useState<"excel" | "pdf" | null>(null)
@@ -209,7 +171,6 @@ export function PaymentsTable({
     Recurrence: false,
     Reference: true,
   })
-
   const [formData, setFormData] = useState<CreatePaymentFormData>({
     department_id: currentUser.department_id || "",
     category: "",
@@ -227,14 +188,307 @@ export function PaymentsTable({
     notes: "",
   })
 
+  const {
+    data: tableData,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: QUERY_KEYS.paymentsTable(),
+    queryFn: fetchPaymentsTableData,
+    initialData:
+      initialPayments.length > 0 || initialDepartments.length > 0 || initialCategories.length > 0
+        ? { payments: initialPayments, departments: initialDepartments, categories: initialCategories }
+        : undefined,
+  })
+
   useEffect(() => {
     if (initialError) {
       toast.error(initialError)
     }
   }, [initialError])
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const payments = tableData?.payments ?? EMPTY_PAYMENTS
+  const departments = tableData?.departments ?? EMPTY_DEPARTMENTS
+  const categories = tableData?.categories ?? EMPTY_CATEGORIES
+
+  const getRealStatus = (payment: Payment): Payment["status"] => {
+    if (payment.payment_type === "one-time") return "paid"
+    if (payment.status === "paid" || payment.status === "cancelled") return payment.status
+
+    const dateStr = payment.payment_type === "recurring" ? payment.next_payment_due : payment.payment_date
+    if (!dateStr) return "due"
+
+    const date = parseISO(dateStr)
+    if (!isValid(date)) return "due"
+
+    const today = startOfDay(new Date())
+    const daysDiff = differenceInDays(date, today)
+
+    if (isBefore(date, today)) return "overdue"
+    if (daysDiff <= 7) return "due"
+    return "paid"
+  }
+
+  const getAmountDue = (payment: Payment, status: Payment["status"]) => {
+    if (status === "paid" || status === "cancelled") return 0
+    if (status === "due") return payment.amount
+
+    if (payment.payment_type === "recurring" && payment.next_payment_due && payment.recurrence_period) {
+      const dueDate = parseISO(payment.next_payment_due)
+      if (!isValid(dueDate)) return payment.amount
+
+      const today = startOfDay(new Date())
+      const daysPastDue = Math.abs(differenceInDays(today, dueDate))
+
+      let periodsOverdue = 1
+      if (payment.recurrence_period === "monthly") periodsOverdue = Math.floor(daysPastDue / 30) + 1
+      if (payment.recurrence_period === "quarterly") periodsOverdue = Math.floor(daysPastDue / 90) + 1
+      if (payment.recurrence_period === "yearly") periodsOverdue = Math.floor(daysPastDue / 365) + 1
+
+      return payment.amount * periodsOverdue
+    }
+
+    return payment.amount
+  }
+
+  const formatCurrency = (amount: number, currency: string) =>
+    new Intl.NumberFormat("en-NG", { style: "currency", currency }).format(amount)
+
+  const getStatusColor = (status: string) => {
+    if (status === "paid") return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+    if (status === "due") return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
+    if (status === "overdue") return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
+    if (status === "cancelled") return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
+    return ""
+  }
+
+  const processedPayments = useMemo<ProcessedPayment[]>(() => {
+    return payments.map((payment) => {
+      const status = getRealStatus(payment)
+      const dateStr = payment.payment_type === "recurring" ? payment.next_payment_due : payment.payment_date
+      const parsedDate = dateStr ? parseISO(dateStr) : null
+
+      return {
+        ...payment,
+        status,
+        amountDue: getAmountDue(payment, status),
+        departmentName: payment.department?.name || "Unknown",
+        issuerDisplay: payment.issuer_name || "N/A",
+        dateLabel: parsedDate && isValid(parsedDate) ? format(parsedDate, "MMM d, yyyy") : "N/A",
+        dateSortValue: parsedDate && isValid(parsedDate) ? parsedDate.getTime() : 0,
+        paymentTypeLabel: payment.payment_type === "recurring" ? "Recurring" : "One-time",
+        hasReceipt: payment.documents?.some((doc) => doc.document_type === "receipt") ?? false,
+      }
+    })
+  }, [payments])
+
+  const stats = useMemo(
+    () => ({
+      totalDue: processedPayments
+        .filter((payment) => {
+          if (payment.status === "overdue") return true
+          if (payment.status !== "due") return false
+          const dateStr = payment.payment_type === "recurring" ? payment.next_payment_due : payment.payment_date
+          if (!dateStr) return true
+          return differenceInDays(parseISO(dateStr), new Date()) <= 7
+        })
+        .reduce((sum, payment) => sum + payment.amount, 0),
+      totalPaid: processedPayments.reduce((sum, payment) => sum + (payment.amount_paid || 0), 0),
+      countCompleted: processedPayments.filter((payment) => payment.status === "paid" || (payment.amount_paid || 0) > 0)
+        .length,
+      countOverdue: processedPayments.filter((payment) => payment.status === "overdue").length,
+      countDue: processedPayments.filter((payment) => payment.status === "due").length,
+    }),
+    [processedPayments]
+  )
+
+  const departmentOptions = useMemo(
+    () =>
+      (currentUser.isAdmin
+        ? departments
+        : departments.filter((department) => department.id === currentUser.department_id)
+      ).map((department) => ({
+        value: department.id,
+        label: department.name,
+      })),
+    [currentUser.department_id, currentUser.isAdmin, departments]
+  )
+
+  const categoryOptions = useMemo(
+    () =>
+      Array.from(new Set(categories.map((category) => category.name).filter(Boolean)))
+        .sort((a, b) => a.localeCompare(b))
+        .map((category) => ({ value: category, label: category })),
+    [categories]
+  )
+
+  const filters = useMemo<DataTableFilter<ProcessedPayment>[]>(() => {
+    const filterList: DataTableFilter<ProcessedPayment>[] = []
+
+    if (currentUser.isAdmin) {
+      filterList.push({
+        key: "department_id",
+        label: "Department",
+        placeholder: "All Departments",
+        options: departmentOptions,
+      })
+    }
+
+    filterList.push(
+      {
+        key: "payment_type",
+        label: "Type",
+        placeholder: "All Types",
+        options: [
+          { value: "one-time", label: "One-time" },
+          { value: "recurring", label: "Recurring" },
+        ],
+      },
+      {
+        key: "status",
+        label: "Status",
+        placeholder: "All Status",
+        options: [
+          { value: "paid", label: "Paid" },
+          { value: "due", label: "Due" },
+          { value: "overdue", label: "Overdue" },
+          { value: "cancelled", label: "Cancelled" },
+        ],
+      },
+      {
+        key: "category",
+        label: "Category",
+        placeholder: "All Categories",
+        options: categoryOptions,
+      }
+    )
+
+    return filterList
+  }, [categoryOptions, currentUser.isAdmin, departmentOptions])
+
+  const columns = useMemo<DataTableColumn<ProcessedPayment>[]>(
+    () => [
+      {
+        key: "payment_type",
+        label: "Type",
+        sortable: true,
+        accessor: (row) => row.paymentTypeLabel,
+        render: (row) => (
+          <Badge
+            variant="outline"
+            className={
+              row.payment_type === "recurring"
+                ? "border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-700 dark:bg-blue-900/20 dark:text-blue-400"
+                : "border-green-300 bg-green-50 text-green-700 dark:border-green-700 dark:bg-green-900/20 dark:text-green-400"
+            }
+          >
+            {row.paymentTypeLabel}
+          </Badge>
+        ),
+      },
+      {
+        key: "title",
+        label: "Title",
+        sortable: true,
+        accessor: (row) => row.title,
+        resizable: true,
+        initialWidth: 240,
+        render: (row) => (
+          <div className="flex flex-col gap-1">
+            <span className="font-medium">{row.title}</span>
+            {row.payment_type === "one-time" && !row.hasReceipt ? (
+              <Badge
+                variant="outline"
+                className="w-fit border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-300"
+              >
+                Receipt missing
+              </Badge>
+            ) : null}
+          </div>
+        ),
+      },
+      {
+        key: "issuerDisplay",
+        label: "Issuer",
+        sortable: true,
+        accessor: (row) => row.issuerDisplay,
+        resizable: true,
+        initialWidth: 220,
+        render: (row) => (
+          <div className="flex flex-col">
+            <span className="text-sm font-medium">{row.issuerDisplay}</span>
+            <span className="text-muted-foreground text-xs">{row.issuer_phone_number || "-"}</span>
+          </div>
+        ),
+      },
+      {
+        key: "department_id",
+        label: "Department",
+        sortable: true,
+        accessor: (row) => row.department_id,
+        render: (row) => row.departmentName,
+        hideOnMobile: true,
+      },
+      {
+        key: "category",
+        label: "Category",
+        sortable: true,
+        accessor: (row) => row.category,
+        hideOnMobile: true,
+      },
+      {
+        key: "amount",
+        label: "Amount",
+        sortable: true,
+        align: "right",
+        accessor: (row) => row.amount,
+        render: (row) => formatCurrency(row.amount, row.currency),
+      },
+      {
+        key: "amountDue",
+        label: "Amount Due",
+        sortable: true,
+        align: "right",
+        accessor: (row) => row.amountDue,
+        render: (row) => (
+          <span
+            className={
+              row.status === "overdue"
+                ? "font-semibold text-red-600"
+                : row.status === "due"
+                  ? "font-semibold text-yellow-600"
+                  : "text-muted-foreground"
+            }
+          >
+            {formatCurrency(row.amountDue, row.currency)}
+          </span>
+        ),
+      },
+      {
+        key: "status",
+        label: "Status",
+        sortable: true,
+        accessor: (row) => row.status,
+        render: (row) => (
+          <Badge className={getStatusColor(row.status)} variant="outline">
+            {row.status}
+          </Badge>
+        ),
+      },
+      {
+        key: "dateSortValue",
+        label: "Date / Next Due",
+        sortable: true,
+        accessor: (row) => row.dateSortValue,
+        render: (row) => row.dateLabel,
+      },
+    ],
+    []
+  )
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault()
     setSubmitting(true)
 
     try {
@@ -278,51 +532,52 @@ export function PaymentsTable({
         }),
       })
 
-      if (response.ok) {
-        const data = await response.json()
-        const paymentId = data.data.id
-
-        if (formData.category === "one-time" && receiptFile) {
-          const formDataUpload = new FormData()
-          formDataUpload.append("file", receiptFile)
-          formDataUpload.append("payment_id", paymentId)
-          formDataUpload.append("document_type", "receipt")
-          formDataUpload.append("applicable_date", formData.payment_date)
-
-          const uploadResponse = await fetch(`/api/payments/${paymentId}/documents`, {
-            method: "POST",
-            body: formDataUpload,
-          })
-
-          if (!uploadResponse.ok) {
-            toast.warning("Payment created, but receipt upload failed. You can upload it later.")
-          }
-        }
-
-        toast.success("Payment created successfully")
-        setIsModalOpen(false)
-        setReceiptFile(null)
-        setFormData({
-          department_id: currentUser.department_id || "",
-          category: "",
-          title: "",
-          description: "",
-          amount: "",
-          currency: "NGN",
-          recurrence_period: "monthly",
-          next_payment_due: "",
-          payment_date: "",
-          issuer_name: "",
-          issuer_phone_number: "",
-          issuer_address: "",
-          payment_reference: "",
-          notes: "",
-        })
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.paymentsTable() })
-      } else {
+      if (!response.ok) {
         const data = await response.json()
         toast.error(data.error || "Failed to create payment")
+        return
       }
+
+      const data = await response.json()
+      const paymentId = data.data.id
+
+      if (formData.category === "one-time" && receiptFile) {
+        const uploadFormData = new FormData()
+        uploadFormData.append("file", receiptFile)
+        uploadFormData.append("payment_id", paymentId)
+        uploadFormData.append("document_type", "receipt")
+        uploadFormData.append("applicable_date", formData.payment_date)
+
+        const uploadResponse = await fetch(`/api/payments/${paymentId}/documents`, {
+          method: "POST",
+          body: uploadFormData,
+        })
+
+        if (!uploadResponse.ok) {
+          toast.warning("Payment created, but receipt upload failed. You can upload it later.")
+        }
+      }
+
+      toast.success("Payment created successfully")
+      setIsModalOpen(false)
+      setReceiptFile(null)
+      setFormData({
+        department_id: currentUser.department_id || "",
+        category: "",
+        title: "",
+        description: "",
+        amount: "",
+        currency: "NGN",
+        recurrence_period: "monthly",
+        next_payment_due: "",
+        payment_date: "",
+        issuer_name: "",
+        issuer_phone_number: "",
+        issuer_address: "",
+        payment_reference: "",
+        notes: "",
+      })
+      await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.paymentsTable() })
     } catch {
       toast.error("Error creating payment")
     } finally {
@@ -330,151 +585,7 @@ export function PaymentsTable({
     }
   }
 
-  // Compute dynamic status based on due dates
-  const getRealStatus = (p: Payment): "due" | "paid" | "overdue" | "cancelled" => {
-    if (p.payment_type === "one-time") return "paid"
-    if (p.status === "paid" || p.status === "cancelled") return p.status
-
-    const dateStr = p.payment_type === "recurring" ? p.next_payment_due : p.payment_date
-    if (!dateStr) return "due"
-
-    const date = parseISO(dateStr)
-    if (!isValid(date)) return "due"
-
-    const today = startOfDay(new Date())
-    const daysDiff = differenceInDays(date, today)
-
-    if (isBefore(date, today)) return "overdue"
-    if (daysDiff <= 7) return "due"
-    return "paid"
-  }
-
-  const getAmountDue = (p: Payment) => {
-    const status = getRealStatus(p)
-    if (status === "paid" || status === "cancelled") return 0
-    if (status === "due") return p.amount
-
-    if (status === "overdue") {
-      if (p.payment_type === "recurring" && p.next_payment_due && p.recurrence_period) {
-        const dueDate = parseISO(p.next_payment_due)
-        if (!isValid(dueDate)) return p.amount
-
-        const today = startOfDay(new Date())
-        const daysPastDue = Math.abs(differenceInDays(today, dueDate))
-
-        let periodsOverdue = 1
-        if (p.recurrence_period === "monthly") periodsOverdue = Math.floor(daysPastDue / 30) + 1
-        else if (p.recurrence_period === "quarterly") periodsOverdue = Math.floor(daysPastDue / 90) + 1
-        else if (p.recurrence_period === "yearly") periodsOverdue = Math.floor(daysPastDue / 365) + 1
-
-        return p.amount * periodsOverdue
-      }
-      return p.amount
-    }
-
-    return 0
-  }
-
-  const processedPayments = payments.map((p) => ({
-    ...p,
-    status: getRealStatus(p),
-    amountDue: getAmountDue(p),
-  }))
-
-  const stats = {
-    totalDue: processedPayments
-      .filter((p) => {
-        if (p.status === "overdue") return true
-        if (p.status === "due") {
-          const dateStr = p.payment_type === "recurring" ? p.next_payment_due : p.payment_date
-          if (!dateStr) return true
-          return differenceInDays(parseISO(dateStr), new Date()) <= 7
-        }
-        return false
-      })
-      .reduce((sum, p) => sum + p.amount, 0),
-    totalPaid: processedPayments.reduce((sum, p) => sum + (p.amount_paid || 0), 0),
-    countCompleted: processedPayments.filter((p) => p.status === "paid" || (p.amount_paid && p.amount_paid > 0)).length,
-    countOverdue: processedPayments.filter((p) => p.status === "overdue").length,
-    countDue: processedPayments.filter((p) => p.status === "due").length,
-  }
-
-  const filteredPayments = processedPayments.filter((payment) => {
-    const matchesSearch =
-      payment.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (payment.department?.name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (payment.issuer_name || "").toLowerCase().includes(searchQuery.toLowerCase())
-
-    const matchesDepartment = departmentFilter === "all" || payment.department_id === departmentFilter
-    const matchesType = categoryFilter === "all" || payment.payment_type === categoryFilter
-    const matchesStatus = statusFilter === "all" || payment.status === statusFilter
-
-    return matchesSearch && matchesDepartment && matchesType && matchesStatus
-  })
-
-  const handleSort = (key: string) => {
-    let direction: "asc" | "desc" = "asc"
-    if (sortConfig && sortConfig.key === key && sortConfig.direction === "asc") {
-      direction = "desc"
-    }
-    setSortConfig({ key, direction })
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const sortedPayments = [...filteredPayments].sort((a, b) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let valA: any = a
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let valB: any = b
-
-    if (sortConfig.key === "category") {
-      valA = a.payment_type
-      valB = b.payment_type
-
-      if (valA !== valB) {
-        return sortConfig.direction === "asc" ? valA.localeCompare(valB) : valB.localeCompare(valA)
-      }
-
-      const dateStrA = a.payment_type === "recurring" ? a.next_payment_due : a.payment_date
-      const dateStrB = b.payment_type === "recurring" ? b.next_payment_due : b.payment_date
-
-      if (!dateStrA && !dateStrB) return 0
-      if (!dateStrA) return 1
-      if (!dateStrB) return -1
-
-      return new Date(dateStrA).getTime() - new Date(dateStrB).getTime()
-    } else if (sortConfig.key === "date") {
-      const dateStrA = a.payment_type === "recurring" ? a.next_payment_due : a.payment_date
-      const dateStrB = b.payment_type === "recurring" ? b.next_payment_due : b.payment_date
-
-      if (!dateStrA && !dateStrB) return 0
-      if (!dateStrA) return 1
-      if (!dateStrB) return -1
-
-      valA = new Date(dateStrA).getTime()
-      valB = new Date(dateStrB).getTime()
-    } else {
-      const statusPriority: Record<string, number> = { overdue: 0, due: 1, paid: 2, cancelled: 3 }
-      const statusDiff = statusPriority[a.status] - statusPriority[b.status]
-      if (statusDiff !== 0) return statusDiff
-
-      const dateStrA = a.payment_type === "recurring" ? a.next_payment_due : a.payment_date
-      const dateStrB = b.payment_type === "recurring" ? b.next_payment_due : b.payment_date
-
-      if (!dateStrA && !dateStrB) return 0
-      if (!dateStrA) return 1
-      if (!dateStrB) return -1
-
-      valA = new Date(dateStrA).getTime()
-      valB = new Date(dateStrB).getTime()
-    }
-
-    if (valA < valB) return sortConfig.direction === "asc" ? -1 : 1
-    if (valA > valB) return sortConfig.direction === "asc" ? 1 : -1
-    return 0
-  })
-
-  const { handleExportConfirm } = usePaymentExport(sortedPayments, selectedColumns, () => setExportDialogOpen(false))
+  const { handleExportConfirm } = usePaymentExport(processedPayments, selectedColumns, () => setExportDialogOpen(false))
 
   const downloadFile = async (url: string, filename: string) => {
     try {
@@ -489,50 +600,55 @@ export function PaymentsTable({
       setTimeout(() => {
         document.body.removeChild(link)
       }, 100)
-    } catch (error: unknown) {
-      log.error("Error downloading file:", error)
-      throw error
+    } catch (downloadError: unknown) {
+      log.error("Error downloading file:", downloadError)
+      throw downloadError
     }
   }
 
   const downloadPaymentDocument = async (paymentId: string, doc: PaymentTableDocument) => {
     const filename = doc.file_name || `${doc.document_type}_${paymentId.substring(0, 8)}`
     const toastId = toast.loading("Preparing download...")
+
     try {
       await downloadFile(`/api/payments/${paymentId}/documents/${doc.id}/download`, filename)
       window.setTimeout(() => {
         toast.dismiss(toastId)
       }, 6000)
-    } catch (error) {
+    } catch (downloadError) {
       toast.dismiss(toastId)
-      throw error
+      throw downloadError
     }
   }
 
-  const handlePrintDocument = async (payment: Payment, type: "invoice" | "receipt") => {
+  const handlePrintDocument = async (payment: ProcessedPayment, type: "invoice" | "receipt") => {
     if (type === "receipt") {
-      const receipts = payment.documents?.filter((d) => d.document_type === "receipt") || []
+      const receipts = payment.documents?.filter((doc) => doc.document_type === "receipt") || []
+
       if (receipts.length > 1) {
         setSelectedPaymentForReceipt(payment)
         setReceiptDialogOpen(true)
         return
-      } else if (receipts.length === 1) {
+      }
+
+      if (receipts.length === 1) {
         try {
           await downloadPaymentDocument(payment.id, receipts[0])
         } catch {
           toast.error("Error downloading document")
         }
-        return
       }
+
+      return
     }
 
-    const doc = payment.documents?.find((d) => d.document_type === type)
-    if (doc) {
-      try {
-        await downloadPaymentDocument(payment.id, doc)
-      } catch {
-        toast.error("Error downloading document")
-      }
+    const doc = payment.documents?.find((item) => item.document_type === type)
+    if (!doc) return
+
+    try {
+      await downloadPaymentDocument(payment.id, doc)
+    } catch {
+      toast.error("Error downloading document")
     }
   }
 
@@ -548,9 +664,7 @@ export function PaymentsTable({
     }
   }
 
-  const hasReceipt = (payment: Payment) => payment.documents?.some((d) => d.document_type === "receipt") ?? false
-
-  const handleOpenReceiptUpload = (payment: Payment) => {
+  const handleOpenReceiptUpload = (payment: ProcessedPayment) => {
     setSelectedPaymentForReceiptUpload(payment)
     setReceiptUploadFile(null)
     setReceiptUploadDialogOpen(true)
@@ -568,6 +682,7 @@ export function PaymentsTable({
       uploadData.append("file", receiptUploadFile)
       uploadData.append("payment_id", selectedPaymentForReceiptUpload.id)
       uploadData.append("document_type", "receipt")
+
       if (selectedPaymentForReceiptUpload.payment_date) {
         uploadData.append("applicable_date", selectedPaymentForReceiptUpload.payment_date)
       }
@@ -586,339 +701,198 @@ export function PaymentsTable({
       setReceiptUploadDialogOpen(false)
       setSelectedPaymentForReceiptUpload(null)
       setReceiptUploadFile(null)
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.paymentsTable() })
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Failed to upload receipt"
+      await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.paymentsTable() })
+    } catch (uploadError: unknown) {
+      const message = uploadError instanceof Error ? uploadError.message : "Failed to upload receipt"
       toast.error(message)
     } finally {
       setReceiptUploading(false)
     }
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "paid":
-        return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-      case "due":
-        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
-      case "overdue":
-        return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
-      case "cancelled":
-        return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
-      default:
-        return ""
-    }
-  }
-
-  const formatCurrency = (amount: number, currency: string) => {
-    return new Intl.NumberFormat("en-NG", { style: "currency", currency }).format(amount)
-  }
-
-  const filterableDepartments = currentUser.isAdmin
-    ? departments
-    : departments.filter((d) => d.id === currentUser.department_id)
+  const tableRowActions: RowAction<ProcessedPayment>[] = [
+    {
+      label: "View",
+      icon: Eye,
+      onClick: (row) => router.push(`${basePath}/${row.id}`),
+    },
+    {
+      label: "Invoice",
+      icon: FileText,
+      onClick: (row) => void handlePrintDocument(row, "invoice"),
+      hidden: (row) => !row.documents?.some((doc) => doc.document_type === "invoice"),
+    },
+    {
+      label: "Receipt",
+      icon: Receipt,
+      onClick: (row) => void handlePrintDocument(row, "receipt"),
+      hidden: (row) => !row.documents?.some((doc) => doc.document_type === "receipt"),
+    },
+    {
+      label: "Upload Receipt",
+      icon: Upload,
+      onClick: (row) => handleOpenReceiptUpload(row),
+      hidden: (row) => row.payment_type !== "one-time" || row.hasReceipt,
+    },
+  ]
 
   const isAdminPath = basePath.startsWith("/admin")
-  const backLinkHref = isAdminPath ? "/admin" : "/profile"
-  const backLinkLabel = isAdminPath ? "Back to Admin" : "Back to Dashboard"
+  const filterableDepartments = currentUser.isAdmin
+    ? departments
+    : departments.filter((department) => department.id === currentUser.department_id)
+  const backLink = isAdminPath
+    ? { href: "/admin", label: "Back to Admin" }
+    : { href: "/profile", label: "Back to Dashboard" }
 
   return (
-    <AdminTablePage
+    <DataTablePage
       title="Payments"
       description="Manage and track department payments and recurring subscriptions."
       icon={CreditCard}
-      backLinkHref={backLinkHref}
-      backLinkLabel={backLinkLabel}
+      backLink={backLink}
+      stats={<PaymentStatsCards stats={stats} formatCurrency={formatCurrency} />}
       actions={
         <div className="flex flex-wrap items-center gap-2">
-          <TableViewToggle viewMode={viewMode} onChange={setViewMode} />
           <Button variant="outline" className="h-8 gap-2" size="sm" onClick={() => setExportOptionsOpen(true)}>
             <Download className="h-4 w-4" />
             Export
           </Button>
-          <Button onClick={() => setIsModalOpen(true)} className="h-8 gap-2" size="sm">
-            <Plus className="h-4 w-4" />
-            Add Payment
-          </Button>
-        </div>
-      }
-      stats={<PaymentStatsCards stats={stats} formatCurrency={formatCurrency} />}
-      filters={
-        <div className="flex flex-col gap-3 md:flex-row md:items-center">
-          <div className="relative flex-1">
-            <Search className="text-muted-foreground absolute top-2.5 left-2.5 h-4 w-4" />
-            <Input
-              placeholder="Search payments..."
-              className="pl-9 text-sm"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-          <div className="flex gap-2">
-            {currentUser.isAdmin && (
-              <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
-                <SelectTrigger className="flex-1 sm:w-[180px]">
-                  <SelectValue placeholder="Department" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Departments</SelectItem>
-                  {filterableDepartments.map((dept) => (
-                    <SelectItem key={dept.id} value={dept.id}>
-                      {dept.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="flex-1 sm:w-[180px]">
-                <SelectValue placeholder="Category" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                <SelectItem value="one-time">One-time</SelectItem>
-                <SelectItem value="recurring">Recurring</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="flex-1 sm:w-[150px]">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="paid">Paid</SelectItem>
-                <SelectItem value="due">Due</SelectItem>
-                <SelectItem value="overdue">Overdue</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          {currentUser.isAdmin ? (
+            <Button onClick={() => setIsModalOpen(true)} className="h-8 gap-2" size="sm">
+              <Plus className="h-4 w-4" />
+              Add Payment
+            </Button>
+          ) : null}
         </div>
       }
     >
-      {loading ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="bg-muted h-40 animate-pulse rounded-lg border" />
-          ))}
-        </div>
-      ) : sortedPayments.length === 0 ? (
-        <div className="flex min-h-[400px] flex-col items-center justify-center rounded-lg border border-dashed text-center">
-          <CreditCard className="text-muted-foreground mb-4 h-12 w-12" />
-          <h3 className="text-lg font-semibold">No payments found</h3>
-          <p className="text-muted-foreground mb-4 text-sm">Get started by creating your first payment record.</p>
-          <Button onClick={() => setIsModalOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Payment
-          </Button>
-        </div>
-      ) : viewMode === "list" ? (
-        <div className="overflow-x-auto rounded-md border">
-          <Table className="[&_td]:py-2 [&_th]:py-2">
-            <TableHeader className="bg-muted/50">
-              <TableRow>
-                <TableHead className="text-foreground w-[50px] font-bold">#</TableHead>
-                <TableHead
-                  className="text-foreground hover:bg-muted/50 cursor-pointer font-bold"
-                  onClick={() => handleSort("category")}
-                >
-                  <div className="flex items-center gap-1">
-                    Category
-                    <ArrowUpDown className="h-4 w-4" />
-                  </div>
-                </TableHead>
-                <TableHead className="text-foreground font-bold">Title</TableHead>
-                <TableHead className="text-foreground font-bold">Issuer</TableHead>
-                <TableHead className="text-foreground font-bold">Department</TableHead>
-                <TableHead className="text-foreground font-bold">Amount</TableHead>
-                <TableHead className="text-foreground font-bold">Amount Due</TableHead>
-                <TableHead className="text-foreground font-bold">Status</TableHead>
-                <TableHead
-                  className="text-foreground hover:bg-muted/50 cursor-pointer font-bold"
-                  onClick={() => handleSort("date")}
-                >
-                  <div className="flex items-center gap-1">
-                    Date / Next Due
-                    <ArrowUpDown className="h-4 w-4" />
-                  </div>
-                </TableHead>
-                <TableHead className="text-foreground text-right font-bold">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sortedPayments.map((payment, index) => (
-                <TableRow
-                  key={payment.id}
-                  className="hover:bg-muted/50 cursor-pointer"
-                  onClick={() => router.push(`${basePath}/${payment.id}`)}
-                >
-                  <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
-                  <TableCell>
-                    <Badge
-                      variant="outline"
-                      className={
-                        payment.payment_type === "recurring"
-                          ? "border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-700 dark:bg-blue-900/20 dark:text-blue-400"
-                          : "border-green-300 bg-green-50 text-green-700 dark:border-green-700 dark:bg-green-900/20 dark:text-green-400"
-                      }
-                    >
-                      {payment.payment_type === "recurring" ? "Recurring" : "One-time"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="font-medium">
-                    <div className="flex flex-col gap-1">
-                      <span>{payment.title}</span>
-                      {payment.payment_type === "one-time" && !hasReceipt(payment) ? (
-                        <Badge
-                          variant="outline"
-                          className="w-fit border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-300"
-                        >
-                          Receipt missing
-                        </Badge>
-                      ) : null}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-col">
-                      <span className="text-sm font-medium">{payment.issuer_name || "N/A"}</span>
-                      <span className="text-muted-foreground text-xs">{payment.issuer_phone_number || ""}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>{payment.department?.name || "Unknown"}</TableCell>
-                  <TableCell>{formatCurrency(payment.amount, payment.currency)}</TableCell>
-                  <TableCell>
-                    <span
-                      className={
-                        payment.status === "overdue"
-                          ? "font-semibold text-red-600"
-                          : payment.status === "due"
-                            ? "font-semibold text-yellow-600"
-                            : "text-muted-foreground"
-                      }
-                    >
-                      {formatCurrency(payment.amountDue, payment.currency)}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={getStatusColor(payment.status)} variant="outline">
-                      {payment.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {payment.payment_type === "recurring" ? (
-                      <span className={payment.status === "overdue" ? "font-medium text-red-500" : ""}>
-                        {payment.next_payment_due ? format(parseISO(payment.next_payment_due), "MMM d, yyyy") : "N/A"}
-                      </span>
-                    ) : (
-                      <span>
-                        {payment.payment_date ? format(parseISO(payment.payment_date), "MMM d, yyyy") : "N/A"}
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            aria-label="Print payment"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <Printer className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent onClick={(e) => e.stopPropagation()}>
-                          <DropdownMenuLabel>Print Options</DropdownMenuLabel>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            disabled={!payment.documents?.some((d) => d.document_type === "invoice")}
-                            onClick={() => handlePrintDocument(payment, "invoice")}
-                          >
-                            Print Invoice
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            disabled={!payment.documents?.some((d) => d.document_type === "receipt")}
-                            onClick={() => handlePrintDocument(payment, "receipt")}
-                          >
-                            Print Receipt
-                          </DropdownMenuItem>
-                          {payment.payment_type === "one-time" && !hasReceipt(payment) ? (
-                            <>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem onClick={() => handleOpenReceiptUpload(payment)}>
-                                Upload Receipt
-                              </DropdownMenuItem>
-                            </>
-                          ) : null}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label="View payment details"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          router.push(`${basePath}/${payment.id}`)
-                        }}
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      ) : (
-        <div className="grid gap-4 lg:grid-cols-2">
-          {sortedPayments.map((payment) => (
-            <div
-              key={payment.id}
-              className="bg-card rounded-lg border-2 p-5 shadow-sm transition-shadow hover:shadow-md"
-              onClick={() => router.push(`${basePath}/${payment.id}`)}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h3 className="text-foreground font-semibold">{payment.title}</h3>
-                  <p className="text-muted-foreground mt-1 text-sm">{payment.department?.name || "Unknown"}</p>
-                </div>
-                <Badge className={getStatusColor(payment.status)} variant="outline">
-                  {payment.status}
-                </Badge>
+      <DataTable<ProcessedPayment>
+        data={processedPayments}
+        columns={columns}
+        filters={filters}
+        getRowId={(row) => row.id}
+        searchPlaceholder="Search title, issuer, department, or reference..."
+        searchFn={(row, query) =>
+          [
+            row.title,
+            row.issuerDisplay,
+            row.departmentName,
+            row.category,
+            row.payment_reference || "",
+            row.description || "",
+          ]
+            .join(" ")
+            .toLowerCase()
+            .includes(query)
+        }
+        isLoading={isLoading}
+        error={initialError || (error instanceof Error ? error.message : null)}
+        onRetry={() => {
+          void refetch()
+        }}
+        pagination={{ pageSize: 12 }}
+        rowActions={tableRowActions}
+        viewToggle
+        urlSync
+        skeletonRows={6}
+        emptyIcon={CreditCard}
+        emptyTitle="No payments found"
+        emptyDescription="No payments match the current search and filters."
+        cardRenderer={(row) => (
+          <div
+            className="bg-card rounded-lg border p-5 shadow-sm transition-shadow hover:shadow-md"
+            onClick={() => router.push(`${basePath}/${row.id}`)}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="font-semibold">{row.title}</h3>
+                <p className="text-muted-foreground mt-1 text-sm">{row.departmentName}</p>
               </div>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <Badge className={getStatusColor(row.status)} variant="outline">
+                {row.status}
+              </Badge>
+            </div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div>
+                <p className="text-muted-foreground text-xs font-semibold uppercase">Type</p>
+                <p className="font-medium">{row.paymentTypeLabel}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs font-semibold uppercase">Amount</p>
+                <p className="font-medium">{formatCurrency(row.amount, row.currency)}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs font-semibold uppercase">Amount Due</p>
+                <p className="font-medium">{formatCurrency(row.amountDue, row.currency)}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs font-semibold uppercase">Date / Next Due</p>
+                <p className="font-medium">{row.dateLabel}</p>
+              </div>
+            </div>
+          </div>
+        )}
+        expandable={{
+          render: (row) => (
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div className="space-y-3">
                 <div>
-                  <p className="text-muted-foreground text-xs font-semibold uppercase">Type</p>
-                  <p className="text-foreground font-medium">
-                    {payment.payment_type === "recurring" ? "Recurring" : "One-time"}
-                  </p>
+                  <p className="text-muted-foreground text-xs uppercase">Issuer</p>
+                  <p className="font-medium">{row.issuerDisplay}</p>
+                  <p className="text-muted-foreground text-sm">{row.issuer_phone_number || "-"}</p>
+                  <p className="text-muted-foreground text-sm">{row.issuer_address || "-"}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground text-xs font-semibold uppercase">Amount</p>
-                  <p className="text-foreground font-medium">{formatCurrency(payment.amount, payment.currency)}</p>
+                  <p className="text-muted-foreground text-xs uppercase">Reference</p>
+                  <p className="font-medium">{row.payment_reference || "-"}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground text-xs font-semibold uppercase">Amount Due</p>
-                  <p className="text-foreground font-medium">{formatCurrency(payment.amountDue, payment.currency)}</p>
+                  <p className="text-muted-foreground text-xs uppercase">Description</p>
+                  <p className="text-sm">{row.description || "No description provided."}</p>
+                </div>
+              </div>
+              <div className="space-y-3">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <p className="text-muted-foreground text-xs uppercase">Payment Date</p>
+                    <p className="font-medium">
+                      {row.payment_date ? format(parseISO(row.payment_date), "MMM d, yyyy") : "N/A"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-xs uppercase">Next Due</p>
+                    <p className="font-medium">
+                      {row.next_payment_due ? format(parseISO(row.next_payment_due), "MMM d, yyyy") : "N/A"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-xs uppercase">Recurrence</p>
+                    <p className="font-medium">{row.recurrence_period || "N/A"}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-xs uppercase">Documents</p>
+                    <p className="font-medium">{row.documents?.length || 0}</p>
+                  </div>
                 </div>
                 <div>
-                  <p className="text-muted-foreground text-xs font-semibold uppercase">Date / Next Due</p>
-                  <p className="text-foreground font-medium">
-                    {payment.payment_type === "recurring"
-                      ? payment.next_payment_due
-                        ? format(parseISO(payment.next_payment_due), "MMM d, yyyy")
-                        : "N/A"
-                      : payment.payment_date
-                        ? format(parseISO(payment.payment_date), "MMM d, yyyy")
-                        : "N/A"}
-                  </p>
+                  <p className="text-muted-foreground text-xs uppercase">Documents</p>
+                  {row.documents && row.documents.length > 0 ? (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {row.documents.map((document) => (
+                        <Badge key={document.id} variant="outline">
+                          {document.document_type}
+                        </Badge>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm">No documents attached.</p>
+                  )}
                 </div>
               </div>
             </div>
-          ))}
-        </div>
-      )}
+          ),
+        }}
+      />
 
       <CreatePaymentDialog
         open={isModalOpen}
@@ -956,7 +930,7 @@ export function PaymentsTable({
                 id="missing-receipt-file"
                 type="file"
                 accept="image/*,.pdf"
-                onChange={(e) => setReceiptUploadFile(e.target.files?.[0] || null)}
+                onChange={(event) => setReceiptUploadFile(event.target.files?.[0] || null)}
                 className="cursor-pointer"
               />
             </div>
@@ -990,7 +964,11 @@ export function PaymentsTable({
         exportType={exportType}
         selectedColumns={selectedColumns}
         onColumnChange={setSelectedColumns}
-        onConfirm={() => exportType && handleExportConfirm(exportType)}
+        onConfirm={() => {
+          if (exportType) {
+            handleExportConfirm(exportType)
+          }
+        }}
       />
 
       <ExportOptionsDialog
@@ -1006,6 +984,6 @@ export function PaymentsTable({
           setExportDialogOpen(true)
         }}
       />
-    </AdminTablePage>
+    </DataTablePage>
   )
 }

@@ -217,6 +217,7 @@ serve(async (req) => {
           to: recipientEmails,
           subject,
           html,
+          traceLabel: `check-payment-status:${event.event}:${event.payment.id}`,
         })
 
         const notificationTitle = event.event === "due" ? "Payment Due Today" : "Payment Overdue"

@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import Link from "next/link"
+import { useMemo, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { createClient } from "@/lib/supabase/client"
@@ -8,11 +9,13 @@ import { getCurrentOfficeWeek } from "@/lib/meeting-week"
 import { toast } from "sonner"
 import { fetchWeeklyReportLockState, getDefaultMeetingDateIso } from "@/lib/weekly-report-lock"
 import { getDepartmentAliases, normalizeDepartmentName } from "@/shared/departments"
-
-import { FileBarChart, Plus, Download } from "lucide-react"
-import { AdminTablePage } from "@/components/admin/admin-table-page"
+import { CalendarDays, Download, FileBarChart, FileSpreadsheet, Plus } from "lucide-react"
+import { DataTable, DataTablePage } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
+import { StatCard } from "@/components/ui/stat-card"
 import {
   exportAllToPPTX,
+  autoNumberLines,
   sortReportsByDepartment,
   type WeeklyDeptOrder,
   type WeeklyPptxMode,
@@ -20,16 +23,13 @@ import {
   type WeeklyReport,
 } from "@/lib/export-utils"
 import { WeeklyReportAdminDialog } from "@/components/admin/reports/weekly-report-dialog"
-
-import { WeeklyReportFiltersBar } from "./_components/weekly-report-filters-bar"
 import { PptxModeDialog } from "./_components/pptx-mode-dialog"
 import { DeleteReportDialog } from "./_components/delete-report-dialog"
-import { WeeklyReportTable } from "./_components/weekly-report-table"
-import { WeeklyReportCardGrid } from "./_components/weekly-report-card-grid"
 import { Button } from "@/components/ui/button"
-import { TableViewToggle } from "@/components/admin/table-view-toggle"
 import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
 import { downloadWeeklyReportPdf } from "@/lib/reports/export-download"
+import { Badge } from "@/components/ui/badge"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface AdminWeeklyReportsData {
   reports: WeeklyReport[]
@@ -120,6 +120,23 @@ interface WeeklyReportsContentProps {
   }
 }
 
+function getActionTrackerStatus(department: string, trackingData: TrackerStatus[]) {
+  const deptActions = trackingData.filter((action) => action.department === department)
+  if (deptActions.length === 0) {
+    return { label: "Pending", color: "bg-slate-100 text-slate-600 dark:bg-slate-900/40 dark:text-slate-400" }
+  }
+  if (deptActions.every((action) => action.status === "completed")) {
+    return { label: "Finished", color: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" }
+  }
+  if (deptActions.some((action) => action.status === "in_progress" || action.status === "completed")) {
+    return { label: "Started", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" }
+  }
+  if (deptActions.some((action) => action.status === "not_started")) {
+    return { label: "Not Started", color: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400" }
+  }
+  return { label: "Pending", color: "bg-slate-100 text-slate-600 dark:bg-slate-900/40 dark:text-slate-400" }
+}
+
 export function WeeklyReportsContent({
   initialDepartments,
   scopedDepartments: _scopedDepartments = [],
@@ -130,16 +147,13 @@ export function WeeklyReportsContent({
   const [weekFilter, setWeekFilter] = useState(currentOfficeWeek.week)
   const [yearFilter, setYearFilter] = useState(currentOfficeWeek.year)
   const [deptFilter, setDeptFilter] = useState("all")
-  const [searchQuery, setSearchQuery] = useState("")
   const [isAdminDialogOpen, setIsAdminDialogOpen] = useState(false)
   const [editingReport, setEditingReport] = useState<WeeklyReport | null>(null)
-  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
   const [pptxModeDialogOpen, setPptxModeDialogOpen] = useState(false)
   const [pendingPptxExport, setPendingPptxExport] = useState<
     { kind: "single"; report: WeeklyReport } | { kind: "all" } | null
   >(null)
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
-  const [viewMode, setViewMode] = useState<"list" | "card">("list")
   const [exportOptionsOpen, setExportOptionsOpen] = useState(false)
 
   const supabase = createClient()
@@ -164,15 +178,16 @@ export function WeeklyReportsContent({
 
   const {
     data: reportsData,
-    isLoading: loading,
-    refetch: refetchReports,
+    isLoading,
+    refetch,
+    error,
   } = useQuery({
     queryKey: QUERY_KEYS.adminWeeklyReports({ weekFilter, yearFilter, deptFilter }),
     queryFn: () => fetchAdminWeeklyReports(supabase, weekFilter, yearFilter, deptFilter, initialDepartments),
   })
 
-  const reports = reportsData?.reports ?? []
-  const trackingData = reportsData?.trackingData ?? []
+  const reports = useMemo(() => reportsData?.reports ?? [], [reportsData?.reports])
+  const trackingData = useMemo(() => reportsData?.trackingData ?? [], [reportsData?.trackingData])
 
   const { data: lockState } = useQuery({
     queryKey: QUERY_KEYS.adminWeeklyReportLockState(weekFilter, yearFilter),
@@ -180,19 +195,10 @@ export function WeeklyReportsContent({
   })
 
   const isFilteredWeekLocked = lockState?.isLocked ?? false
-
-  const toggleRow = (id: string) => {
-    const newExpanded = new Set(expandedRows)
-    if (newExpanded.has(id)) {
-      newExpanded.delete(id)
-    } else {
-      newExpanded.add(id)
-    }
-    setExpandedRows(newExpanded)
-  }
+  const meetingDate = lockState?.meetingDate || getDefaultMeetingDateIso(weekFilter, yearFilter)
 
   const handleDelete = async (id: string) => {
-    const target = reports.find((r) => r.id === id)
+    const target = reports.find((report) => report.id === id)
     if (target && !canMutateReport(target)) {
       toast.error("You can only modify reports you created")
       return
@@ -205,20 +211,14 @@ export function WeeklyReportsContent({
       }
     }
     try {
-      const { error } = await supabase.from("weekly_reports").delete().eq("id", id)
-      if (error) throw error
+      const { error: deleteError } = await supabase.from("weekly_reports").delete().eq("id", id)
+      if (deleteError) throw deleteError
       toast.success("Report deleted")
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminWeeklyReports() })
     } catch {
       toast.error("Delete failed")
     }
   }
-
-  const filteredReports = reports.filter(
-    (r) =>
-      r.department.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      r.work_done.toLowerCase().includes(searchQuery.toLowerCase())
-  )
 
   const openAllPptxModeDialog = () => {
     setPendingPptxExport({ kind: "all" })
@@ -236,9 +236,9 @@ export function WeeklyReportsContent({
     order: WeeklyDeptOrder = "default"
   ) => {
     if (!pendingPptxExport) return
-    const exportMeetingDate = lockState?.meetingDate || getDefaultMeetingDateIso(weekFilter, yearFilter)
+    const exportMeetingDate = meetingDate
     if (pendingPptxExport.kind === "all") {
-      await exportAllToPPTX(filteredReports, weekFilter, yearFilter, mode, theme, exportMeetingDate, order)
+      await exportAllToPPTX(reports, weekFilter, yearFilter, mode, theme, exportMeetingDate, order)
     } else {
       const { exportToPPTX } = await import("@/lib/export-utils")
       await exportToPPTX(pendingPptxExport.report, mode, theme, exportMeetingDate)
@@ -247,16 +247,175 @@ export function WeeklyReportsContent({
     setPendingPptxExport(null)
   }
 
+  const stats = useMemo(() => {
+    const total = reports.length
+    const withTrackerStarted = reports.filter((report) => {
+      const status = getActionTrackerStatus(report.department, trackingData)
+      return status.label === "Started" || status.label === "Finished"
+    }).length
+    const finished = reports.filter(
+      (report) => getActionTrackerStatus(report.department, trackingData).label === "Finished"
+    ).length
+    const locked = isFilteredWeekLocked ? reports.length : 0
+
+    return { total, withTrackerStarted, finished, locked }
+  }, [isFilteredWeekLocked, reports, trackingData])
+
+  const trackerStatusOptions = useMemo(
+    () => [
+      { value: "Pending", label: "Pending" },
+      { value: "Started", label: "Started" },
+      { value: "Finished", label: "Finished" },
+      { value: "Not Started", label: "Not Started" },
+    ],
+    []
+  )
+
+  const submitterOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          reports
+            .map((report) => {
+              const profile = Array.isArray(report.profiles) ? report.profiles[0] : report.profiles
+              return profile ? `${profile.first_name} ${profile.last_name}` : "Unknown"
+            })
+            .filter(Boolean)
+        )
+      )
+        .sort()
+        .map((value) => ({ value, label: value })),
+    [reports]
+  )
+
+  const columns = useMemo<DataTableColumn<WeeklyReport>[]>(
+    () => [
+      {
+        key: "department",
+        label: "Department",
+        sortable: true,
+        accessor: (report) => report.department,
+        resizable: true,
+        initialWidth: 180,
+      },
+      {
+        key: "meeting_date",
+        label: "Meeting Date",
+        sortable: true,
+        accessor: () => meetingDate,
+        render: () => {
+          const date = new Date(`${meetingDate}T00:00:00`)
+          if (Number.isNaN(date.getTime())) return "-"
+          return date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
+        },
+      },
+      {
+        key: "week_number",
+        label: "Week",
+        sortable: true,
+        accessor: (report) => report.week_number,
+        render: (report) => <span className="font-medium">{`W${report.week_number}`}</span>,
+      },
+      {
+        key: "submitted_by",
+        label: "Submitted By",
+        sortable: true,
+        accessor: (report) => {
+          const profile = Array.isArray(report.profiles) ? report.profiles[0] : report.profiles
+          return profile ? `${profile.first_name} ${profile.last_name}` : "Unknown"
+        },
+        render: (report) => {
+          const profile = Array.isArray(report.profiles) ? report.profiles[0] : report.profiles
+          return profile ? `${profile.first_name} ${profile.last_name}` : "Unknown"
+        },
+      },
+      {
+        key: "created_at",
+        label: "Submission Date",
+        sortable: true,
+        accessor: (report) => report.created_at,
+        render: (report) =>
+          new Date(report.created_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
+      },
+      {
+        key: "tracker_status",
+        label: "Action Tracker",
+        accessor: (report) => getActionTrackerStatus(report.department, trackingData).label,
+        render: (report) => {
+          const trackerStatus = getActionTrackerStatus(report.department, trackingData)
+          return <Badge className={trackerStatus.color}>{trackerStatus.label}</Badge>
+        },
+      },
+    ],
+    [meetingDate, trackingData]
+  )
+
+  const filters = useMemo<DataTableFilter<WeeklyReport>[]>(
+    () => [
+      {
+        key: "tracker_status",
+        label: "Action Tracker",
+        options: trackerStatusOptions,
+      },
+      {
+        key: "submitted_by",
+        label: "Submitted By",
+        options: submitterOptions,
+      },
+    ],
+    [submitterOptions, trackerStatusOptions]
+  )
+
   return (
-    <AdminTablePage
+    <DataTablePage
       title="Weekly Reports"
-      description="Review and export departmental reports"
+      description="Review and export departmental reports."
       icon={FileBarChart}
-      backLinkHref="/admin/reports/general-meeting"
-      backLinkLabel="Back to General Meeting"
+      backLink={{ href: "/admin/reports/general-meeting", label: "Back to General Meeting" }}
       actions={
         <div className="flex flex-wrap items-center gap-2">
-          <TableViewToggle viewMode={viewMode} onChange={setViewMode} />
+          <Select value={String(weekFilter)} onValueChange={(value) => setWeekFilter(Number(value))}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {Array.from({ length: 53 }, (_, index) => index + 1).map((week) => (
+                <SelectItem key={week} value={String(week)}>
+                  Week {week}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={String(yearFilter)} onValueChange={(value) => setYearFilter(Number(value))}>
+            <SelectTrigger className="w-[120px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {[
+                currentOfficeWeek.year - 1,
+                currentOfficeWeek.year,
+                currentOfficeWeek.year + 1,
+                currentOfficeWeek.year + 2,
+              ].map((year) => (
+                <SelectItem key={year} value={String(year)}>
+                  {year}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={deptFilter} onValueChange={setDeptFilter}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Every Department" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Every Department</SelectItem>
+              {initialDepartments.map((department) => (
+                <SelectItem key={department} value={department}>
+                  {department}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Button variant="outline" size="sm" className="h-8 gap-2" onClick={() => setExportOptionsOpen(true)}>
             <Download className="h-4 w-4" />
             Export
@@ -274,54 +433,161 @@ export function WeeklyReportsContent({
           </Button>
         </div>
       }
-      filters={
-        <WeeklyReportFiltersBar
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
-          weekFilter={weekFilter}
-          setWeekFilter={setWeekFilter}
-          yearFilter={yearFilter}
-          setYearFilter={setYearFilter}
-          deptFilter={deptFilter}
-          setDeptFilter={setDeptFilter}
-          initialDepartments={initialDepartments}
-          loading={loading}
-          refetchReports={refetchReports}
-        />
+      stats={
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard
+            title="Reports"
+            value={stats.total}
+            icon={FileBarChart}
+            iconBgColor="bg-blue-500/10"
+            iconColor="text-blue-500"
+          />
+          <StatCard
+            title="Tracker Started"
+            value={stats.withTrackerStarted}
+            icon={CalendarDays}
+            iconBgColor="bg-amber-500/10"
+            iconColor="text-amber-500"
+          />
+          <StatCard
+            title="Finished"
+            value={stats.finished}
+            icon={FileSpreadsheet}
+            iconBgColor="bg-emerald-500/10"
+            iconColor="text-emerald-500"
+          />
+          <StatCard
+            title="Locked Week"
+            value={stats.locked}
+            icon={Download}
+            iconBgColor="bg-violet-500/10"
+            iconColor="text-violet-500"
+          />
+        </div>
       }
     >
-      {viewMode === "list" ? (
-        <WeeklyReportTable
-          loading={loading}
-          filteredReports={filteredReports}
-          meetingDate={lockState?.meetingDate || getDefaultMeetingDateIso(weekFilter, yearFilter)}
-          expandedRows={expandedRows}
-          trackingData={trackingData}
-          isFilteredWeekLocked={isFilteredWeekLocked}
-          canMutateReport={canMutateReport}
-          onToggleRow={toggleRow}
-          onEdit={(r) => {
-            setEditingReport(r)
-            setIsAdminDialogOpen(true)
-          }}
-          onDelete={(id) => setPendingDeleteId(id)}
-          onExportPptx={openSinglePptxModeDialog}
-        />
-      ) : (
-        <WeeklyReportCardGrid
-          reports={filteredReports}
-          meetingDate={lockState?.meetingDate || getDefaultMeetingDateIso(weekFilter, yearFilter)}
-          trackingData={trackingData}
-          isFilteredWeekLocked={isFilteredWeekLocked}
-          canMutateReport={canMutateReport}
-          onEdit={(r) => {
-            setEditingReport(r)
-            setIsAdminDialogOpen(true)
-          }}
-          onDelete={(id) => setPendingDeleteId(id)}
-          onExportPptx={openSinglePptxModeDialog}
-        />
-      )}
+      <DataTable<WeeklyReport>
+        data={reports}
+        columns={columns}
+        filters={filters}
+        getRowId={(report) => report.id}
+        searchPlaceholder="Search department or work done..."
+        searchFn={(report, query) => {
+          const normalizedQuery = query.toLowerCase()
+          return (
+            report.department.toLowerCase().includes(normalizedQuery) ||
+            report.work_done.toLowerCase().includes(normalizedQuery) ||
+            report.tasks_new_week.toLowerCase().includes(normalizedQuery) ||
+            report.challenges.toLowerCase().includes(normalizedQuery)
+          )
+        }}
+        isLoading={isLoading}
+        error={error instanceof Error ? error.message : null}
+        onRetry={() => {
+          void refetch()
+        }}
+        rowActions={[
+          {
+            label: "Edit",
+            onClick: (report) => {
+              if (!canMutateReport(report)) {
+                toast.error("You can only edit your own reports")
+                return
+              }
+              setEditingReport(report)
+              setIsAdminDialogOpen(true)
+            },
+          },
+          {
+            label: "Delete",
+            variant: "destructive",
+            onClick: (report) => setPendingDeleteId(report.id),
+          },
+          {
+            label: "Export PPTX",
+            onClick: (report) => openSinglePptxModeDialog(report),
+          },
+        ]}
+        expandable={{
+          render: (report) => (
+            <div className="grid gap-6 md:grid-cols-3">
+              <div className="space-y-3">
+                <h4 className="text-[10px] font-black tracking-widest text-blue-600 uppercase">Work Done</h4>
+                <div className="space-y-1.5 border-l-2 border-blue-100 pl-3 text-sm dark:border-blue-900/30">
+                  {autoNumberLines(report.work_done)
+                    .split("\n")
+                    .map((line, index) => (
+                      <div key={index}>{line}</div>
+                    ))}
+                </div>
+              </div>
+              <div className="space-y-3">
+                <h4 className="text-[10px] font-black tracking-widest text-emerald-600 uppercase">
+                  Tasks for New Week
+                </h4>
+                <div className="space-y-1.5 border-l-2 border-emerald-100 pl-3 text-sm dark:border-emerald-900/30">
+                  {autoNumberLines(report.tasks_new_week)
+                    .split("\n")
+                    .map((line, index) => (
+                      <div key={index}>{line}</div>
+                    ))}
+                </div>
+              </div>
+              <div className="space-y-3">
+                <h4 className="text-[10px] font-black tracking-widest text-rose-600 uppercase">Challenges</h4>
+                <div className="space-y-1.5 border-l-2 border-rose-100 pl-3 text-sm dark:border-rose-900/30">
+                  {autoNumberLines(report.challenges)
+                    .split("\n")
+                    .map((line, index) => (
+                      <div key={index}>{line}</div>
+                    ))}
+                </div>
+              </div>
+              <div className="md:col-span-3">
+                <Link
+                  href={`/admin/reports/general-meeting/action-tracker?week=${report.week_number}&year=${report.year}&dept=${report.department}`}
+                  className="text-primary inline-flex items-center gap-1 text-sm font-medium hover:underline"
+                >
+                  View action tracker
+                </Link>
+              </div>
+            </div>
+          ),
+        }}
+        viewToggle
+        cardRenderer={(report) => {
+          const profile = Array.isArray(report.profiles) ? report.profiles[0] : report.profiles
+          const submitterName = profile ? `${profile.first_name} ${profile.last_name}` : "Unknown"
+          const trackerStatus = getActionTrackerStatus(report.department, trackingData)
+
+          return (
+            <div className="space-y-3 rounded-xl border p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-medium">{report.department}</p>
+                  <p className="text-muted-foreground text-sm">{submitterName}</p>
+                </div>
+                <Badge className={trackerStatus.color}>{trackerStatus.label}</Badge>
+              </div>
+              <div className="grid gap-1 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Week</span>
+                  <span>{`W${report.week_number}, ${report.year}`}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Submitted</span>
+                  <span>{new Date(report.created_at).toLocaleDateString("en-GB")}</span>
+                </div>
+              </div>
+            </div>
+          )
+        }}
+        emptyTitle="No weekly reports found"
+        emptyDescription="No records were found for the selected criteria."
+        emptyIcon={FileBarChart}
+        skeletonRows={5}
+        urlSync
+      />
 
       <WeeklyReportAdminDialog
         isOpen={isAdminDialogOpen}
@@ -335,7 +601,7 @@ export function WeeklyReportsContent({
         pendingDeleteId={pendingDeleteId}
         onOpenChange={() => setPendingDeleteId(null)}
         onConfirm={(id) => {
-          handleDelete(id)
+          void handleDelete(id)
           setPendingDeleteId(null)
         }}
       />
@@ -367,29 +633,19 @@ export function WeeklyReportsContent({
           }
           if (id === "word") {
             void import("@/lib/export-utils").then(({ exportAllToDocx }) =>
-              exportAllToDocx(
-                filteredReports,
-                weekFilter,
-                yearFilter,
-                lockState?.meetingDate || getDefaultMeetingDateIso(weekFilter, yearFilter)
-              )
+              exportAllToDocx(reports, weekFilter, yearFilter, meetingDate)
             )
             return
           }
           if (id === "excel") {
             void import("@/lib/export-utils").then(({ exportAllToXLSX }) =>
-              exportAllToXLSX(
-                filteredReports,
-                weekFilter,
-                yearFilter,
-                lockState?.meetingDate || getDefaultMeetingDateIso(weekFilter, yearFilter)
-              )
+              exportAllToXLSX(reports, weekFilter, yearFilter, meetingDate)
             )
             return
           }
           openAllPptxModeDialog()
         }}
       />
-    </AdminTablePage>
+    </DataTablePage>
   )
 }
