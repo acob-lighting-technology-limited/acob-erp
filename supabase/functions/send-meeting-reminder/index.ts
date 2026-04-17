@@ -59,6 +59,12 @@ type DeliveryResult = {
   error?: unknown
 }
 
+type ProfileRecipientRow = {
+  id: string
+  company_email: string | null
+  additional_email: string | null
+}
+
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message
   if (typeof error === "object" && error !== null && "message" in error) {
@@ -70,6 +76,103 @@ function getErrorMessage(error: unknown): string {
 
 function withSubjectPrefix(moduleName: string, subject: string): string {
   return String(subject || "").trim() || "Notification"
+}
+
+function normalizeEmail(value: string | null | undefined): string {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+}
+
+async function createInAppMeetingNotifications(params: {
+  supabase: ReturnType<typeof createClient>
+  recipients: string[]
+  successfulResults: DeliveryResult[]
+  subject: string
+  reminderType: ReminderType
+  requestedByUserId?: string
+  meetingDate?: string
+  meetingTime?: string
+  knowledgeSharingDepartment?: string
+  knowledgeSharingPresenter?: KnowledgePresenter
+}) {
+  const {
+    supabase,
+    recipients,
+    successfulResults,
+    subject,
+    reminderType,
+    requestedByUserId,
+    meetingDate,
+    meetingTime,
+    knowledgeSharingDepartment,
+    knowledgeSharingPresenter,
+  } = params
+  if (successfulResults.length === 0 || recipients.length === 0) return
+
+  const normalizedRecipients = Array.from(new Set(recipients.map((email) => normalizeEmail(email)).filter(Boolean)))
+  if (normalizedRecipients.length === 0) return
+
+  const successfulEmailSet = new Set(successfulResults.map((result) => normalizeEmail(result.to)).filter(Boolean))
+  if (successfulEmailSet.size === 0) return
+
+  const [companyMatchResult, additionalMatchResult] = await Promise.all([
+    supabase.from("profiles").select("id, company_email, additional_email").in("company_email", normalizedRecipients),
+    supabase
+      .from("profiles")
+      .select("id, company_email, additional_email")
+      .in("additional_email", normalizedRecipients),
+  ])
+
+  if (companyMatchResult.error) {
+    throw new Error(`Failed to resolve company_email recipients: ${companyMatchResult.error.message}`)
+  }
+  if (additionalMatchResult.error) {
+    throw new Error(`Failed to resolve additional_email recipients: ${additionalMatchResult.error.message}`)
+  }
+
+  const rows = [
+    ...((companyMatchResult.data || []) as ProfileRecipientRow[]),
+    ...((additionalMatchResult.data || []) as ProfileRecipientRow[]),
+  ]
+
+  const userIds = new Set<string>()
+  for (const row of rows) {
+    const companyEmail = normalizeEmail(row.company_email)
+    const additionalEmail = normalizeEmail(row.additional_email)
+    if (successfulEmailSet.has(companyEmail) || successfulEmailSet.has(additionalEmail)) {
+      userIds.add(row.id)
+    }
+  }
+
+  if (userIds.size === 0) return
+
+  const notificationTitle = reminderType === "meeting" ? "General Meeting Reminder" : "Knowledge Sharing Reminder"
+  const notificationRows = Array.from(userIds).map((userId) => ({
+    user_id: userId,
+    type: "system",
+    category: "meetings",
+    priority: "normal",
+    title: notificationTitle,
+    message: subject,
+    action_url: "/notifications",
+    actor_id: requestedByUserId || null,
+    data: {
+      module: "meetings",
+      event: reminderType === "meeting" ? "meeting_reminder" : "knowledge_sharing_reminder",
+      meeting_date: meetingDate || null,
+      meeting_time: meetingTime || null,
+      knowledge_sharing_department: knowledgeSharingDepartment || null,
+      knowledge_sharing_presenter: knowledgeSharingPresenter?.full_name || null,
+      recipient_email_count: successfulEmailSet.size,
+      sent_at: new Date().toISOString(),
+    },
+  }))
+
+  const { error: insertError } = await supabase.from("notifications").insert(notificationRows)
+  if (insertError) {
+    throw new Error(`Failed to create in-app notifications: ${insertError.message}`)
+  }
 }
 
 function normalizeMeetingAgenda(agendaInput: string[] | string | undefined): string[] {
@@ -607,8 +710,26 @@ serve(async (req) => {
       })
     )
 
+    const successfulResults = results.filter((result) => result.success)
     try {
-      const successCount = results.filter((r) => r.success).length
+      await createInAppMeetingNotifications({
+        supabase,
+        recipients,
+        successfulResults,
+        subject,
+        reminderType: type,
+        requestedByUserId,
+        meetingDate: effectiveMeetingDate,
+        meetingTime,
+        knowledgeSharingDepartment,
+        knowledgeSharingPresenter,
+      })
+    } catch (notificationError) {
+      console.error("[meeting-reminder] Failed to create in-app notifications:", notificationError)
+    }
+
+    try {
+      const successCount = successfulResults.length
       const failureCount = results.length - successCount
       const auditEntityId = crypto.randomUUID()
       await writeEdgeAuditLog(supabase, {

@@ -3,9 +3,9 @@
 import { useMemo, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
+import { Edit2, MessageSquare, Plus, Trash2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import {
   AlertDialog,
@@ -17,78 +17,68 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Input } from "@/components/ui/input"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { FeedbackForm } from "@/components/feedback-form"
 import { FeedbackEditModal } from "@/components/feedback-edit-modal"
-import { AppTablePage } from "@/components/app/app-table-page"
-import { Edit2, MessageSquare, Plus, Search, Trash2 } from "lucide-react"
+import { DataTable, DataTablePage } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
+import { StatCard } from "@/components/ui/stat-card"
 import type { Feedback } from "./page"
 import { writeAuditLogClient } from "@/lib/audit/client"
-
 import { logger } from "@/lib/logger"
 
 const log = logger("feedback-feedback-content")
 
 interface FeedbackContentProps {
   initialFeedback: Feedback[]
-  userId: string
 }
 
-export function FeedbackContent({ initialFeedback, userId }: FeedbackContentProps) {
+export function FeedbackContent({ initialFeedback }: FeedbackContentProps) {
   const [userFeedback, setUserFeedback] = useState<Feedback[]>(initialFeedback)
-  const [searchQuery, setSearchQuery] = useState("")
+  const [activeTab, setActiveTab] = useState<"non_anonymous" | "anonymous">("non_anonymous")
   const [isSubmitOpen, setIsSubmitOpen] = useState(false)
   const [selectedFeedback, setSelectedFeedback] = useState<Feedback | null>(null)
   const [showEditModal, setShowEditModal] = useState(false)
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
 
-  const filteredFeedback = useMemo(() => {
-    if (!searchQuery) return userFeedback
-    const query = searchQuery.toLowerCase()
-    return userFeedback.filter(
-      (item) =>
-        item.title?.toLowerCase().includes(query) ||
-        item.description?.toLowerCase().includes(query) ||
-        item.feedback_type?.toLowerCase().includes(query) ||
-        item.status?.toLowerCase().includes(query)
-    )
-  }, [userFeedback, searchQuery])
-
   const getTypeColor = (type: string) => {
-    switch (type) {
-      case "concern":
-        return "bg-yellow-100 text-yellow-800"
-      case "complaint":
-        return "bg-red-100 text-red-800"
-      case "suggestion":
-        return "bg-blue-100 text-blue-800"
-      case "required_item":
-        return "bg-purple-100 text-purple-800"
-      default:
-        return "bg-gray-100 text-gray-800"
-    }
+    if (type === "concern") return "bg-yellow-100 text-yellow-800"
+    if (type === "complaint") return "bg-red-100 text-red-800"
+    if (type === "suggestion") return "bg-blue-100 text-blue-800"
+    if (type === "required_item") return "bg-violet-100 text-violet-800"
+    return "bg-gray-100 text-gray-800"
   }
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case "open":
-        return "bg-green-100 text-green-800"
-      case "in_progress":
-        return "bg-blue-100 text-blue-800"
-      case "resolved":
-        return "bg-purple-100 text-purple-800"
-      case "closed":
-        return "bg-gray-100 text-gray-800"
-      default:
-        return "bg-gray-100 text-gray-800"
-    }
+    if (status === "open") return "bg-green-100 text-green-800"
+    if (status === "in_progress") return "bg-blue-100 text-blue-800"
+    if (status === "resolved") return "bg-violet-100 text-violet-800"
+    if (status === "closed") return "bg-gray-100 text-gray-800"
+    return "bg-gray-100 text-gray-800"
   }
 
   const handleFeedbackSubmitted = (newFeedback: Feedback) => {
-    setUserFeedback((prev) => [newFeedback, ...prev])
+    setUserFeedback((current) => [newFeedback, ...current])
     setIsSubmitOpen(false)
   }
+
+  const filteredFeedback = useMemo(
+    () => userFeedback.filter((item) => (activeTab === "anonymous" ? Boolean(item.is_anonymous) : !item.is_anonymous)),
+    [userFeedback, activeTab]
+  )
+
+  const tabs: DataTableTab[] = useMemo(
+    () => [
+      {
+        key: "non_anonymous",
+        label: `Non-Anonymous (${userFeedback.filter((item) => !item.is_anonymous).length})`,
+      },
+      {
+        key: "anonymous",
+        label: `Anonymous (${userFeedback.filter((item) => Boolean(item.is_anonymous)).length})`,
+      },
+    ],
+    [userFeedback]
+  )
 
   const handleDelete = async (id: string) => {
     const supabase = createClient()
@@ -124,135 +114,182 @@ export function FeedbackContent({ initialFeedback, userId }: FeedbackContentProp
         }
       }
 
-      setUserFeedback((prev) => prev.filter((item) => item.id !== id))
+      setUserFeedback((current) => current.filter((item) => item.id !== id))
       toast.success("Feedback deleted successfully!")
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Failed to delete feedback"
-      toast.error(message)
+      toast.error(error instanceof Error ? error.message : "Failed to delete feedback")
     }
   }
 
-  const handleEdit = (item: Feedback) => {
-    setSelectedFeedback(item)
-    setShowEditModal(true)
-  }
+  const columns = useMemo<DataTableColumn<Feedback>[]>(
+    () => [
+      {
+        key: "title",
+        label: "Title",
+        sortable: true,
+        accessor: (row) => row.title,
+        resizable: true,
+        initialWidth: 280,
+        render: (row) => <span className="font-medium">{row.title}</span>,
+      },
+      {
+        key: "feedback_type",
+        label: "Type",
+        sortable: true,
+        accessor: (row) => row.feedback_type,
+        render: (row) => (
+          <Badge className={getTypeColor(row.feedback_type)}>{row.feedback_type.replaceAll("_", " ")}</Badge>
+        ),
+      },
+      {
+        key: "status",
+        label: "Status",
+        sortable: true,
+        accessor: (row) => row.status,
+        render: (row) => <Badge className={getStatusColor(row.status)}>{row.status.replaceAll("_", " ")}</Badge>,
+      },
+      {
+        key: "created_at",
+        label: "Created",
+        sortable: true,
+        accessor: (row) => row.created_at,
+        render: (row) => new Date(row.created_at).toLocaleDateString("en-GB"),
+      },
+    ],
+    []
+  )
 
-  const handleSaveEdit = (updatedFeedback: Feedback) => {
-    setUserFeedback((prev) => prev.map((item) => (item.id === updatedFeedback.id ? updatedFeedback : item)))
-    setShowEditModal(false)
-    setSelectedFeedback(null)
-  }
+  const filters = useMemo<DataTableFilter<Feedback>[]>(
+    () => [
+      {
+        key: "status",
+        label: "Status",
+        options: [
+          { value: "open", label: "Open" },
+          { value: "in_progress", label: "In Progress" },
+          { value: "resolved", label: "Resolved" },
+          { value: "closed", label: "Closed" },
+        ],
+      },
+      {
+        key: "feedback_type",
+        label: "Type",
+        options: Array.from(new Set(filteredFeedback.map((item) => item.feedback_type))).map((type) => ({
+          value: type,
+          label: type.replaceAll("_", " "),
+        })),
+      },
+    ],
+    [filteredFeedback]
+  )
 
   return (
-    <AppTablePage
+    <DataTablePage
       title="Feedback & Suggestions"
-      description="Share your concerns, complaints, suggestions, or required items with management"
+      description="Share concerns, complaints, suggestions, or required items with management."
       icon={MessageSquare}
+      backLink={{ href: "/profile", label: "Back to Dashboard" }}
+      tabs={tabs}
+      activeTab={activeTab}
+      onTabChange={(tab) => setActiveTab(tab as "non_anonymous" | "anonymous")}
       actions={
         <Button onClick={() => setIsSubmitOpen(true)} size="sm" className="gap-2">
           <Plus className="h-4 w-4" />
           Submit Feedback
         </Button>
       }
-      filters={
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="relative min-w-[200px] flex-1">
-            <Search className="text-muted-foreground absolute top-2.5 left-2.5 h-4 w-4" />
-            <Input
-              placeholder="Search feedback..."
-              className="pl-9 text-sm"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
+      stats={
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <StatCard
+            title="Total"
+            value={userFeedback.length}
+            icon={MessageSquare}
+            iconBgColor="bg-blue-500/10"
+            iconColor="text-blue-500"
+          />
+          <StatCard
+            title="Open"
+            value={filteredFeedback.filter((item) => item.status === "open").length}
+            icon={MessageSquare}
+            iconBgColor="bg-amber-500/10"
+            iconColor="text-amber-500"
+          />
+          <StatCard
+            title="Resolved"
+            value={filteredFeedback.filter((item) => item.status === "resolved").length}
+            icon={MessageSquare}
+            iconBgColor="bg-emerald-500/10"
+            iconColor="text-emerald-500"
+          />
         </div>
       }
     >
-      {filteredFeedback.length === 0 ? (
-        <Card className="border-2">
-          <CardContent className="p-12 text-center">
-            <MessageSquare className="text-muted-foreground mx-auto mb-4 h-16 w-16" />
-            <h3 className="text-foreground mb-2 text-xl font-semibold">No Feedback Yet</h3>
-            <p className="text-muted-foreground">
-              {searchQuery ? "No feedback matches your search." : "Submit your first feedback to get started."}
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card className="border-2">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-12">#</TableHead>
-                  <TableHead>Title</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredFeedback.map((item, index) => (
-                  <TableRow key={item.id} className="hover:bg-muted/50">
-                    <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
-                    <TableCell>
-                      <div className="space-y-1">
-                        <div className="text-foreground font-medium">{item.title}</div>
-                        {item.description && (
-                          <div className="text-muted-foreground line-clamp-2 text-xs">{item.description}</div>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={getTypeColor(item.feedback_type)}>
-                        {item.feedback_type.replaceAll("_", " ")}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={getStatusColor(item.status)}>{item.status.replaceAll("_", " ")}</Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-sm">
-                      {new Date(item.created_at).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button variant="ghost" size="sm" onClick={() => handleEdit(item)}>
-                          <Edit2 className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => setPendingDeleteId(item.id)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </Card>
-      )}
+      <DataTable<Feedback>
+        data={filteredFeedback}
+        columns={columns}
+        filters={filters}
+        getRowId={(row) => row.id}
+        searchPlaceholder="Search title, description, type, or status..."
+        searchFn={(row, query) =>
+          `${row.title} ${row.description || ""} ${row.feedback_type} ${row.status}`.toLowerCase().includes(query)
+        }
+        rowActions={[
+          {
+            label: "Edit",
+            icon: Edit2,
+            onClick: (item) => {
+              setSelectedFeedback(item)
+              setShowEditModal(true)
+            },
+          },
+          {
+            label: "Delete",
+            icon: Trash2,
+            variant: "destructive",
+            onClick: (item) => setPendingDeleteId(item.id),
+          },
+        ]}
+        expandable={{
+          render: (item) => (
+            <div className="space-y-2 text-sm">
+              <p className="text-muted-foreground text-xs uppercase">Description</p>
+              <p>{item.description || "No description provided."}</p>
+            </div>
+          ),
+        }}
+        emptyTitle="No feedback yet"
+        emptyDescription="Submit your first feedback to get started."
+        emptyIcon={MessageSquare}
+        skeletonRows={5}
+        urlSync
+      />
 
       <Dialog open={isSubmitOpen} onOpenChange={setIsSubmitOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Submit Feedback</DialogTitle>
-            <DialogDescription>Share your thoughts with management</DialogDescription>
+            <DialogDescription>Share your thoughts with management.</DialogDescription>
           </DialogHeader>
-          <FeedbackForm userId={userId} onFeedbackSubmitted={handleFeedbackSubmitted} variant="modal" />
+          <FeedbackForm onFeedbackSubmitted={handleFeedbackSubmitted} variant="modal" />
         </DialogContent>
       </Dialog>
 
-      {showEditModal && selectedFeedback && (
+      {showEditModal && selectedFeedback ? (
         <FeedbackEditModal
           feedback={selectedFeedback}
           onClose={() => {
             setShowEditModal(false)
             setSelectedFeedback(null)
           }}
-          onSave={handleSaveEdit}
+          onSave={(updatedFeedback) => {
+            setUserFeedback((current) =>
+              current.map((item) => (item.id === updatedFeedback.id ? updatedFeedback : item))
+            )
+            setShowEditModal(false)
+            setSelectedFeedback(null)
+          }}
         />
-      )}
+      ) : null}
 
       <AlertDialog open={pendingDeleteId !== null} onOpenChange={(open) => !open && setPendingDeleteId(null)}>
         <AlertDialogContent>
@@ -267,7 +304,9 @@ export function FeedbackContent({ initialFeedback, userId }: FeedbackContentProp
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => {
-                if (pendingDeleteId) handleDelete(pendingDeleteId)
+                if (pendingDeleteId) {
+                  void handleDelete(pendingDeleteId)
+                }
                 setPendingDeleteId(null)
               }}
             >
@@ -276,6 +315,6 @@ export function FeedbackContent({ initialFeedback, userId }: FeedbackContentProp
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </AppTablePage>
+    </DataTablePage>
   )
 }

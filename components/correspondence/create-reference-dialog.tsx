@@ -31,6 +31,7 @@ interface CreateReferenceForm {
   action_required: boolean
   due_date: string
   metadata_text: string
+  attachments: File[]
 }
 
 interface CreateReferenceDialogProps {
@@ -43,6 +44,20 @@ interface CreateReferenceDialogProps {
   departmentCodes: DepartmentCodeOption[]
 }
 
+const DISPLAY_CODE_OVERRIDES: Record<string, string> = {
+  "IT and Communications": "ICT",
+  "Legal, Regulatory and Compliance": "RC",
+  "Regulatory and Compliance": "RC",
+  "Regulatory and Compilance": "RC",
+}
+
+const DISPLAY_NAME_OVERRIDES: Record<string, string> = {
+  "Regulatory and Compilance": "Legal, Regulatory and Compliance",
+  "Regulatory and Compliance": "Legal, Regulatory and Compliance",
+  "Human Resources": "Admin & HR",
+  "Admin and HR": "Admin & HR",
+}
+
 export function CreateReferenceDialog({
   open,
   onOpenChange,
@@ -53,6 +68,11 @@ export function CreateReferenceDialog({
   departmentCodes,
 }: CreateReferenceDialogProps) {
   const set = (patch: Partial<CreateReferenceForm>) => onFormChange({ ...form, ...patch })
+  const options = departmentCodes.map((dept) => ({
+    ...dept,
+    displayName: DISPLAY_NAME_OVERRIDES[dept.department_name] || dept.department_name,
+    displayCode: DISPLAY_CODE_OVERRIDES[dept.department_name] || dept.department_code,
+  }))
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -98,9 +118,9 @@ export function CreateReferenceDialog({
                 <SelectValue placeholder="Select department" />
               </SelectTrigger>
               <SelectContent>
-                {departmentCodes.map((dept) => (
+                {options.map((dept) => (
                   <SelectItem key={dept.department_name} value={dept.department_name}>
-                    {dept.department_name} ({dept.department_code})
+                    {dept.displayName} ({dept.displayCode})
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -158,6 +178,19 @@ export function CreateReferenceDialog({
           <div className="space-y-2 md:col-span-2">
             <Label>Notes (Optional)</Label>
             <Textarea rows={3} value={form.metadata_text} onChange={(e) => set({ metadata_text: e.target.value })} />
+          </div>
+
+          <div className="space-y-2 md:col-span-2">
+            <Label>Attachments (PDF)</Label>
+            <Input
+              type="file"
+              accept="application/pdf"
+              multiple
+              onChange={(event) => {
+                set({ attachments: Array.from(event.target.files || []) })
+              }}
+            />
+            <p className="text-muted-foreground text-xs">Attach one or more PDF files.</p>
           </div>
 
           <div className="md:col-span-2">

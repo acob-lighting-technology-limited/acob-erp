@@ -90,7 +90,11 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     }
 
     const normalizedDecision = parsed.data.decision
-    const comments = parsed.data.comments
+    const comments = parsed.data.comments ? String(parsed.data.comments).trim() : null
+
+    if (normalizedDecision === "rejected" && !comments) {
+      return NextResponse.json({ error: "Rejection reason is required" }, { status: 400 })
+    }
 
     const { data: ticket, error: ticketError } = await supabase
       .from("help_desk_tickets")
@@ -137,7 +141,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       .update({
         status: normalizedDecision,
         approver_id: user.id,
-        comments: comments ? String(comments) : null,
+        comments,
         decided_at: now,
       })
       .eq("id", pendingApproval.id)

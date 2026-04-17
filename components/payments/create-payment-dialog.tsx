@@ -18,7 +18,7 @@ import type { Department } from "./payment-types"
 
 export interface CreatePaymentFormData {
   department_id: string
-  category: "one-time" | "recurring" | ""
+  payment_type: "one-time" | "recurring" | ""
   title: string
   description: string
   amount: string
@@ -88,13 +88,15 @@ export function CreatePaymentDialog({
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="category">Category</Label>
+              <Label htmlFor="payment-type">Type</Label>
               <Select
-                value={formData.category}
-                onValueChange={(value: "one-time" | "recurring") => onFormDataChange({ ...formData, category: value })}
+                value={formData.payment_type}
+                onValueChange={(value: "one-time" | "recurring") =>
+                  onFormDataChange({ ...formData, payment_type: value })
+                }
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select Category" />
+                  <SelectValue placeholder="Select Type" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="one-time">One-time</SelectItem>
@@ -192,7 +194,7 @@ export function CreatePaymentDialog({
             </div>
           </div>
 
-          {formData.category === "recurring" ? (
+          {formData.payment_type === "recurring" ? (
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="period">Recurrence Period</Label>
@@ -240,7 +242,7 @@ export function CreatePaymentDialog({
             </div>
           )}
 
-          {formData.category === "one-time" && (
+          {formData.payment_type === "one-time" && (
             <div className="rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-800 dark:bg-green-900/20">
               <div className="space-y-2">
                 <Label htmlFor="receipt" className="flex items-center gap-2">

@@ -2,7 +2,12 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { AdminHelpDeskContent } from "./management/admin-help-desk-content"
-import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
+import {
+  expandDepartmentScopeForQuery,
+  getDepartmentScope,
+  normalizeDepartmentName,
+  resolveAdminScope,
+} from "@/lib/admin/rbac"
 import { listAssignableProfiles } from "@/lib/workforce/assignment-policy"
 import type { EmployeeOption, HelpDeskTicket, LeadDirectoryMember } from "@/components/help-desk/ticket-queue-table"
 
@@ -49,9 +54,10 @@ async function getData() {
     return { redirectTo: "/profile" as const }
   }
   const departmentScope = getDepartmentScope(scope, "general")
+  const queryDepartmentScope = departmentScope ? expandDepartmentScopeForQuery(departmentScope) : null
 
   let ticketsQuery = dataClient.from("help_desk_tickets").select("*").order("created_at", { ascending: false })
-  if (departmentScope && departmentScope.length === 0) {
+  if (queryDepartmentScope && queryDepartmentScope.length === 0) {
     ticketsQuery = ticketsQuery.eq("id", "__none__")
   }
 
@@ -59,7 +65,7 @@ async function getData() {
     ticketsQuery,
     listAssignableProfiles(dataClient, {
       select: "id, first_name, last_name, department, employment_status",
-      departmentScope,
+      departmentScope: queryDepartmentScope,
       allowLegacyNullStatus: false,
     }),
   ])
@@ -139,12 +145,15 @@ async function getData() {
     lead_departments: Array.isArray(profile.lead_departments) ? profile.lead_departments : [],
   })) as LeadDirectoryMember[]
 
+  const scopedDepartments = departmentScope
+    ? new Set(departmentScope.map((departmentName) => normalizeDepartmentName(departmentName)))
+    : null
   const scopedTickets = departmentScope
-    ? ticketsWithStage.filter(
-        (ticket) =>
-          departmentScope.includes(ticket.service_department) ||
-          departmentScope.includes(ticket.requester_department || "")
-      )
+    ? ticketsWithStage.filter((ticket) => {
+        const serviceDepartment = normalizeDepartmentName(ticket.service_department || "")
+        const requesterDepartment = normalizeDepartmentName(ticket.requester_department || "")
+        return Boolean(scopedDepartments?.has(serviceDepartment) || scopedDepartments?.has(requesterDepartment))
+      })
     : ticketsWithStage
 
   return {

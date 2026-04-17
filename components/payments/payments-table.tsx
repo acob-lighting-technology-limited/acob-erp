@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { format, parseISO, isValid, differenceInDays, isBefore, startOfDay } from "date-fns"
 import { CreditCard, Download, Eye, FileText, Plus, Receipt, Upload } from "lucide-react"
@@ -19,7 +19,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
-import type { DataTableColumn, DataTableFilter, RowAction } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
 import { CreatePaymentDialog } from "./create-payment-dialog"
 import { ExportColumnsDialog } from "./export-columns-dialog"
@@ -69,15 +69,9 @@ interface Department {
   name: string
 }
 
-interface Category {
-  id: string
-  name: string
-}
-
 interface PaymentsTableData {
   payments: Payment[]
   departments: Department[]
-  categories: Category[]
 }
 
 interface ProcessedPayment extends Payment {
@@ -94,14 +88,9 @@ type PaymentTableDocument = NonNullable<Payment["documents"]>[number]
 
 const EMPTY_PAYMENTS: Payment[] = []
 const EMPTY_DEPARTMENTS: Department[] = []
-const EMPTY_CATEGORIES: Category[] = []
 
 async function fetchPaymentsTableData(): Promise<PaymentsTableData> {
-  const [paymentsRes, deptRes, catRes] = await Promise.all([
-    fetch("/api/payments"),
-    fetch("/api/departments"),
-    fetch("/api/payments/categories"),
-  ])
+  const [paymentsRes, deptRes] = await Promise.all([fetch("/api/payments"), fetch("/api/departments")])
 
   if (!paymentsRes.ok) {
     const data = await paymentsRes.json().catch(() => ({}))
@@ -110,19 +99,16 @@ async function fetchPaymentsTableData(): Promise<PaymentsTableData> {
 
   const paymentsJson = await paymentsRes.json()
   const departments: Department[] = deptRes.ok ? ((await deptRes.json()).data ?? []) : []
-  const categories: Category[] = catRes.ok ? ((await catRes.json()).data ?? []) : []
 
   return {
     payments: paymentsJson.data ?? [],
     departments,
-    categories,
   }
 }
 
 interface PaymentsTableProps {
   initialPayments?: Payment[]
   initialDepartments?: Department[]
-  initialCategories?: Category[]
   initialError?: string | null
   currentUser: {
     id: string
@@ -135,7 +121,6 @@ interface PaymentsTableProps {
 export function PaymentsTable({
   initialPayments = [],
   initialDepartments = [],
-  initialCategories = [],
   initialError = null,
   currentUser,
   basePath = currentUser.isAdmin ? "/admin/finance/payments" : "/payments",
@@ -156,7 +141,6 @@ export function PaymentsTable({
   const [exportType, setExportType] = useState<"excel" | "pdf" | null>(null)
   const [selectedColumns, setSelectedColumns] = useState<Record<string, boolean>>({
     "#": true,
-    Category: true,
     Title: true,
     Issuer: true,
     Department: true,
@@ -173,7 +157,7 @@ export function PaymentsTable({
   })
   const [formData, setFormData] = useState<CreatePaymentFormData>({
     department_id: currentUser.department_id || "",
-    category: "",
+    payment_type: "",
     title: "",
     description: "",
     amount: "",
@@ -197,8 +181,8 @@ export function PaymentsTable({
     queryKey: QUERY_KEYS.paymentsTable(),
     queryFn: fetchPaymentsTableData,
     initialData:
-      initialPayments.length > 0 || initialDepartments.length > 0 || initialCategories.length > 0
-        ? { payments: initialPayments, departments: initialDepartments, categories: initialCategories }
+      initialPayments.length > 0 || initialDepartments.length > 0
+        ? { payments: initialPayments, departments: initialDepartments }
         : undefined,
   })
 
@@ -210,7 +194,6 @@ export function PaymentsTable({
 
   const payments = tableData?.payments ?? EMPTY_PAYMENTS
   const departments = tableData?.departments ?? EMPTY_DEPARTMENTS
-  const categories = tableData?.categories ?? EMPTY_CATEGORIES
 
   const getRealStatus = (payment: Payment): Payment["status"] => {
     if (payment.payment_type === "one-time") return "paid"
@@ -315,12 +298,30 @@ export function PaymentsTable({
     [currentUser.department_id, currentUser.isAdmin, departments]
   )
 
-  const categoryOptions = useMemo(
+  const monthOptions = useMemo(
     () =>
-      Array.from(new Set(categories.map((category) => category.name).filter(Boolean)))
-        .sort((a, b) => a.localeCompare(b))
-        .map((category) => ({ value: category, label: category })),
-    [categories]
+      Array.from(
+        new Set(
+          processedPayments
+            .map((payment) => {
+              const dateStr = payment.payment_type === "recurring" ? payment.next_payment_due : payment.payment_date
+              if (!dateStr) return null
+              const parsedDate = parseISO(dateStr)
+              if (!isValid(parsedDate)) return null
+              return format(parsedDate, "yyyy-MM")
+            })
+            .filter((value): value is string => Boolean(value))
+        )
+      )
+        .sort((a, b) => b.localeCompare(a))
+        .map((value) => {
+          const parsedDate = parseISO(`${value}-01`)
+          return {
+            value,
+            label: isValid(parsedDate) ? format(parsedDate, "MMMM yyyy") : value,
+          }
+        }),
+    [processedPayments]
   )
 
   const filters = useMemo<DataTableFilter<ProcessedPayment>[]>(() => {
@@ -357,135 +358,178 @@ export function PaymentsTable({
         ],
       },
       {
-        key: "category",
-        label: "Category",
-        placeholder: "All Categories",
-        options: categoryOptions,
+        key: "paymentMonth",
+        label: "Month",
+        placeholder: "All Months",
+        options: monthOptions,
+        mode: "custom",
+        filterFn: (row, selected) => {
+          const dateStr = row.payment_type === "recurring" ? row.next_payment_due : row.payment_date
+          if (!dateStr) return false
+          const parsedDate = parseISO(dateStr)
+          if (!isValid(parsedDate)) return false
+          return selected.includes(format(parsedDate, "yyyy-MM"))
+        },
       }
     )
 
     return filterList
-  }, [categoryOptions, currentUser.isAdmin, departmentOptions])
+  }, [currentUser.isAdmin, departmentOptions, monthOptions])
 
-  const columns = useMemo<DataTableColumn<ProcessedPayment>[]>(
-    () => [
-      {
-        key: "payment_type",
-        label: "Type",
-        sortable: true,
-        accessor: (row) => row.paymentTypeLabel,
-        render: (row) => (
-          <Badge
+  const columns: DataTableColumn<ProcessedPayment>[] = [
+    {
+      key: "payment_type",
+      label: "Type",
+      sortable: true,
+      accessor: (row) => row.payment_type,
+      render: (row) => (
+        <Badge
+          variant="outline"
+          className={
+            row.payment_type === "recurring"
+              ? "border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-700 dark:bg-blue-900/20 dark:text-blue-400"
+              : "border-green-300 bg-green-50 text-green-700 dark:border-green-700 dark:bg-green-900/20 dark:text-green-400"
+          }
+        >
+          {row.paymentTypeLabel}
+        </Badge>
+      ),
+    },
+    {
+      key: "title",
+      label: "Title",
+      sortable: true,
+      accessor: (row) => row.title,
+      resizable: true,
+      initialWidth: 240,
+      render: (row) => <span className="font-medium">{row.title}</span>,
+    },
+    {
+      key: "department_id",
+      label: "Department",
+      sortable: true,
+      accessor: (row) => row.department_id,
+      render: (row) => row.departmentName,
+      hideOnMobile: true,
+    },
+    {
+      key: "amount",
+      label: "Amount",
+      sortable: true,
+      align: "right",
+      accessor: (row) => row.amount,
+      render: (row) => formatCurrency(row.amount, row.currency),
+    },
+    {
+      key: "amountDue",
+      label: "Amount Due",
+      sortable: true,
+      align: "right",
+      accessor: (row) => row.amountDue,
+      render: (row) => (
+        <span
+          className={
+            row.status === "overdue"
+              ? "font-semibold text-red-600"
+              : row.status === "due"
+                ? "font-semibold text-yellow-600"
+                : "text-muted-foreground"
+          }
+        >
+          {formatCurrency(row.amountDue, row.currency)}
+        </span>
+      ),
+    },
+    {
+      key: "status",
+      label: "Status",
+      sortable: true,
+      accessor: (row) => row.status,
+      render: (row) => (
+        <Badge className={getStatusColor(row.status)} variant="outline">
+          {row.status}
+        </Badge>
+      ),
+    },
+    {
+      key: "dateSortValue",
+      label: "Date / Next Due",
+      sortable: true,
+      accessor: (row) => row.dateSortValue,
+      render: (row) => row.dateLabel,
+    },
+    {
+      key: "quick_actions",
+      label: "",
+      align: "right",
+      render: (row) => (
+        <div className="flex items-center justify-end gap-1">
+          <Button
+            type="button"
+            size="icon"
             variant="outline"
-            className={
-              row.payment_type === "recurring"
-                ? "border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-700 dark:bg-blue-900/20 dark:text-blue-400"
-                : "border-green-300 bg-green-50 text-green-700 dark:border-green-700 dark:bg-green-900/20 dark:text-green-400"
-            }
+            className="h-8 w-8"
+            onClick={(event) => {
+              event.stopPropagation()
+              router.push(`${basePath}/${row.id}`, { scroll: false })
+            }}
+            title="View"
+            aria-label="View payment"
           >
-            {row.paymentTypeLabel}
-          </Badge>
-        ),
-      },
-      {
-        key: "title",
-        label: "Title",
-        sortable: true,
-        accessor: (row) => row.title,
-        resizable: true,
-        initialWidth: 240,
-        render: (row) => (
-          <div className="flex flex-col gap-1">
-            <span className="font-medium">{row.title}</span>
-            {row.payment_type === "one-time" && !row.hasReceipt ? (
-              <Badge
-                variant="outline"
-                className="w-fit border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-300"
-              >
-                Receipt missing
-              </Badge>
-            ) : null}
-          </div>
-        ),
-      },
-      {
-        key: "issuerDisplay",
-        label: "Issuer",
-        sortable: true,
-        accessor: (row) => row.issuerDisplay,
-        resizable: true,
-        initialWidth: 220,
-        render: (row) => (
-          <div className="flex flex-col">
-            <span className="text-sm font-medium">{row.issuerDisplay}</span>
-            <span className="text-muted-foreground text-xs">{row.issuer_phone_number || "-"}</span>
-          </div>
-        ),
-      },
-      {
-        key: "department_id",
-        label: "Department",
-        sortable: true,
-        accessor: (row) => row.department_id,
-        render: (row) => row.departmentName,
-        hideOnMobile: true,
-      },
-      {
-        key: "category",
-        label: "Category",
-        sortable: true,
-        accessor: (row) => row.category,
-        hideOnMobile: true,
-      },
-      {
-        key: "amount",
-        label: "Amount",
-        sortable: true,
-        align: "right",
-        accessor: (row) => row.amount,
-        render: (row) => formatCurrency(row.amount, row.currency),
-      },
-      {
-        key: "amountDue",
-        label: "Amount Due",
-        sortable: true,
-        align: "right",
-        accessor: (row) => row.amountDue,
-        render: (row) => (
-          <span
-            className={
-              row.status === "overdue"
-                ? "font-semibold text-red-600"
-                : row.status === "due"
-                  ? "font-semibold text-yellow-600"
-                  : "text-muted-foreground"
-            }
-          >
-            {formatCurrency(row.amountDue, row.currency)}
-          </span>
-        ),
-      },
-      {
-        key: "status",
-        label: "Status",
-        sortable: true,
-        accessor: (row) => row.status,
-        render: (row) => (
-          <Badge className={getStatusColor(row.status)} variant="outline">
-            {row.status}
-          </Badge>
-        ),
-      },
-      {
-        key: "dateSortValue",
-        label: "Date / Next Due",
-        sortable: true,
-        accessor: (row) => row.dateSortValue,
-        render: (row) => row.dateLabel,
-      },
-    ],
-    []
-  )
+            <Eye className="h-4 w-4" />
+          </Button>
+          {row.documents?.some((doc) => doc.document_type === "invoice") ? (
+            <Button
+              type="button"
+              size="icon"
+              variant="outline"
+              className="h-8 w-8"
+              onClick={(event) => {
+                event.stopPropagation()
+                void handlePrintDocument(row, "invoice")
+              }}
+              title="Download invoice"
+              aria-label="Download invoice"
+            >
+              <FileText className="h-4 w-4" />
+            </Button>
+          ) : null}
+          {row.documents?.some((doc) => doc.document_type === "receipt") ? (
+            <Button
+              type="button"
+              size="icon"
+              variant="outline"
+              className="h-8 w-8"
+              onClick={(event) => {
+                event.stopPropagation()
+                void handlePrintDocument(row, "receipt")
+              }}
+              title="Download receipt"
+              aria-label="Download receipt"
+            >
+              <Receipt className="h-4 w-4" />
+            </Button>
+          ) : null}
+          {row.payment_type === "one-time" && !row.hasReceipt ? (
+            <Button
+              type="button"
+              size="icon"
+              variant="outline"
+              className="h-8 w-8"
+              onClick={(event) => {
+                event.stopPropagation()
+                handleOpenReceiptUpload(row)
+              }}
+              title="Upload missing receipt"
+              aria-label="Upload missing receipt"
+            >
+              <Upload className="h-4 w-4" />
+            </Button>
+          ) : null}
+        </div>
+      ),
+    },
+  ]
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -494,7 +538,7 @@ export function PaymentsTable({
     try {
       if (
         !formData.department_id ||
-        !formData.category ||
+        !formData.payment_type ||
         !formData.amount ||
         !formData.title ||
         !formData.issuer_name ||
@@ -505,19 +549,19 @@ export function PaymentsTable({
         return
       }
 
-      if (formData.category === "recurring" && (!formData.recurrence_period || !formData.next_payment_due)) {
+      if (formData.payment_type === "recurring" && (!formData.recurrence_period || !formData.next_payment_due)) {
         toast.error("Recurring payments require a period and start date")
         setSubmitting(false)
         return
       }
 
-      if (formData.category === "one-time" && !formData.payment_date) {
+      if (formData.payment_type === "one-time" && !formData.payment_date) {
         toast.error("One-time payments require a payment date")
         setSubmitting(false)
         return
       }
 
-      if (formData.category === "one-time" && !receiptFile) {
+      if (formData.payment_type === "one-time" && !receiptFile) {
         toast.error("One-time payments require a receipt to be uploaded")
         setSubmitting(false)
         return
@@ -528,6 +572,7 @@ export function PaymentsTable({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...formData,
+          category: formData.payment_type,
           amount: parseFloat(formData.amount),
         }),
       })
@@ -541,7 +586,7 @@ export function PaymentsTable({
       const data = await response.json()
       const paymentId = data.data.id
 
-      if (formData.category === "one-time" && receiptFile) {
+      if (formData.payment_type === "one-time" && receiptFile) {
         const uploadFormData = new FormData()
         uploadFormData.append("file", receiptFile)
         uploadFormData.append("payment_id", paymentId)
@@ -563,7 +608,7 @@ export function PaymentsTable({
       setReceiptFile(null)
       setFormData({
         department_id: currentUser.department_id || "",
-        category: "",
+        payment_type: "",
         title: "",
         description: "",
         amount: "",
@@ -606,7 +651,7 @@ export function PaymentsTable({
     }
   }
 
-  const downloadPaymentDocument = async (paymentId: string, doc: PaymentTableDocument) => {
+  const downloadPaymentDocument = useCallback(async (paymentId: string, doc: PaymentTableDocument) => {
     const filename = doc.file_name || `${doc.document_type}_${paymentId.substring(0, 8)}`
     const toastId = toast.loading("Preparing download...")
 
@@ -619,38 +664,41 @@ export function PaymentsTable({
       toast.dismiss(toastId)
       throw downloadError
     }
-  }
+  }, [])
 
-  const handlePrintDocument = async (payment: ProcessedPayment, type: "invoice" | "receipt") => {
-    if (type === "receipt") {
-      const receipts = payment.documents?.filter((doc) => doc.document_type === "receipt") || []
+  const handlePrintDocument = useCallback(
+    async (payment: ProcessedPayment, type: "invoice" | "receipt") => {
+      if (type === "receipt") {
+        const receipts = payment.documents?.filter((doc) => doc.document_type === "receipt") || []
 
-      if (receipts.length > 1) {
-        setSelectedPaymentForReceipt(payment)
-        setReceiptDialogOpen(true)
+        if (receipts.length > 1) {
+          setSelectedPaymentForReceipt(payment)
+          setReceiptDialogOpen(true)
+          return
+        }
+
+        if (receipts.length === 1) {
+          try {
+            await downloadPaymentDocument(payment.id, receipts[0])
+          } catch {
+            toast.error("Error downloading document")
+          }
+        }
+
         return
       }
 
-      if (receipts.length === 1) {
-        try {
-          await downloadPaymentDocument(payment.id, receipts[0])
-        } catch {
-          toast.error("Error downloading document")
-        }
+      const doc = payment.documents?.find((item) => item.document_type === type)
+      if (!doc) return
+
+      try {
+        await downloadPaymentDocument(payment.id, doc)
+      } catch {
+        toast.error("Error downloading document")
       }
-
-      return
-    }
-
-    const doc = payment.documents?.find((item) => item.document_type === type)
-    if (!doc) return
-
-    try {
-      await downloadPaymentDocument(payment.id, doc)
-    } catch {
-      toast.error("Error downloading document")
-    }
-  }
+    },
+    [downloadPaymentDocument]
+  )
 
   const handleViewReceipt = async (receipt: PaymentTableDocument) => {
     if (!selectedPaymentForReceipt) return
@@ -664,11 +712,11 @@ export function PaymentsTable({
     }
   }
 
-  const handleOpenReceiptUpload = (payment: ProcessedPayment) => {
+  const handleOpenReceiptUpload = useCallback((payment: ProcessedPayment) => {
     setSelectedPaymentForReceiptUpload(payment)
     setReceiptUploadFile(null)
     setReceiptUploadDialogOpen(true)
-  }
+  }, [])
 
   const handleUploadMissingReceipt = async () => {
     if (!selectedPaymentForReceiptUpload || !receiptUploadFile) {
@@ -710,32 +758,6 @@ export function PaymentsTable({
     }
   }
 
-  const tableRowActions: RowAction<ProcessedPayment>[] = [
-    {
-      label: "View",
-      icon: Eye,
-      onClick: (row) => router.push(`${basePath}/${row.id}`),
-    },
-    {
-      label: "Invoice",
-      icon: FileText,
-      onClick: (row) => void handlePrintDocument(row, "invoice"),
-      hidden: (row) => !row.documents?.some((doc) => doc.document_type === "invoice"),
-    },
-    {
-      label: "Receipt",
-      icon: Receipt,
-      onClick: (row) => void handlePrintDocument(row, "receipt"),
-      hidden: (row) => !row.documents?.some((doc) => doc.document_type === "receipt"),
-    },
-    {
-      label: "Upload Receipt",
-      icon: Upload,
-      onClick: (row) => handleOpenReceiptUpload(row),
-      hidden: (row) => row.payment_type !== "one-time" || row.hasReceipt,
-    },
-  ]
-
   const isAdminPath = basePath.startsWith("/admin")
   const filterableDepartments = currentUser.isAdmin
     ? departments
@@ -773,14 +795,7 @@ export function PaymentsTable({
         getRowId={(row) => row.id}
         searchPlaceholder="Search title, issuer, department, or reference..."
         searchFn={(row, query) =>
-          [
-            row.title,
-            row.issuerDisplay,
-            row.departmentName,
-            row.category,
-            row.payment_reference || "",
-            row.description || "",
-          ]
+          [row.title, row.issuerDisplay, row.departmentName, row.payment_reference || "", row.description || ""]
             .join(" ")
             .toLowerCase()
             .includes(query)
@@ -791,7 +806,6 @@ export function PaymentsTable({
           void refetch()
         }}
         pagination={{ pageSize: 12 }}
-        rowActions={tableRowActions}
         viewToggle
         urlSync
         skeletonRows={6}
@@ -801,7 +815,7 @@ export function PaymentsTable({
         cardRenderer={(row) => (
           <div
             className="bg-card rounded-lg border p-5 shadow-sm transition-shadow hover:shadow-md"
-            onClick={() => router.push(`${basePath}/${row.id}`)}
+            onClick={() => router.push(`${basePath}/${row.id}`, { scroll: false })}
           >
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -841,6 +855,22 @@ export function PaymentsTable({
                   <p className="font-medium">{row.issuerDisplay}</p>
                   <p className="text-muted-foreground text-sm">{row.issuer_phone_number || "-"}</p>
                   <p className="text-muted-foreground text-sm">{row.issuer_address || "-"}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground text-xs uppercase">Receipt Status</p>
+                  {row.payment_type === "one-time" ? (
+                    row.hasReceipt ? (
+                      <Badge variant="outline" className="border-emerald-300 text-emerald-700">
+                        Receipt Available
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="border-amber-300 text-amber-700">
+                        Missing Receipt
+                      </Badge>
+                    )
+                  ) : (
+                    <span className="text-sm">Not required</span>
+                  )}
                 </div>
                 <div>
                   <p className="text-muted-foreground text-xs uppercase">Reference</p>

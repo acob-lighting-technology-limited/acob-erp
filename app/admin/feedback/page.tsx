@@ -1,13 +1,10 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
-import { FeedbackViewerClient } from "@/components/feedback-viewer-client"
-import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
-import { MessageSquare, AlertCircle, Clock, CheckCircle, XCircle } from "lucide-react"
-import { StatCard } from "@/components/ui/stat-card"
-import { PageHeader, PageWrapper } from "@/components/layout"
-
+import { AdminFeedbackContent } from "./admin-feedback-content"
+import { expandDepartmentScopeForQuery, getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
 import { logger } from "@/lib/logger"
+import type { FeedbackRecord } from "@/components/feedback/types"
 
 const log = logger("feedback")
 
@@ -24,13 +21,17 @@ export default async function AdminFeedbackPage() {
   if (!scope) {
     redirect("/profile")
   }
+  if (!["developer", "super_admin", "admin"].includes(String(scope.role || ""))) {
+    redirect("/admin")
+  }
   const departmentScope = getDepartmentScope(scope, "general")
+  const queryDepartmentScope = departmentScope ? expandDepartmentScopeForQuery(departmentScope) : null
 
   let feedbackQuery = dataClient.from("feedback").select("*").order("created_at", { ascending: false })
   if (departmentScope) {
     const { data: scopedUsers } =
-      departmentScope.length > 0
-        ? await dataClient.from("profiles").select("id").in("department", departmentScope)
+      queryDepartmentScope && queryDepartmentScope.length > 0
+        ? await dataClient.from("profiles").select("id").in("department", queryDepartmentScope)
         : { data: [] as { id: string }[] }
     const scopedUserIds = (scopedUsers || []).map((row) => row.id)
     feedbackQuery =
@@ -44,7 +45,7 @@ export default async function AdminFeedbackPage() {
   }
 
   // Fetch profiles for all user_ids in feedback
-  let feedbackWithProfiles = feedbackData || []
+  let feedbackWithProfiles: FeedbackRecord[] = []
   if (feedbackData && feedbackData.length > 0) {
     const userIds = Array.from(new Set(feedbackData.map((f) => f.user_id).filter(Boolean)))
 
@@ -53,12 +54,14 @@ export default async function AdminFeedbackPage() {
         .from("profiles")
         .select("id, first_name, last_name, company_email, department")
         .in("id", userIds)
+
       if (departmentScope) {
         profilesQuery =
-          departmentScope.length > 0
-            ? profilesQuery.in("department", departmentScope)
+          queryDepartmentScope && queryDepartmentScope.length > 0
+            ? profilesQuery.in("department", queryDepartmentScope)
             : profilesQuery.eq("id", "__none__")
       }
+
       const { data: profilesData, error: profilesError } = await profilesQuery
 
       if (profilesError) {
@@ -69,7 +72,7 @@ export default async function AdminFeedbackPage() {
       feedbackWithProfiles = feedbackData.map((fb) => ({
         ...fb,
         profiles: profilesData?.find((p) => p.id === fb.user_id) || null,
-      }))
+      })) as FeedbackRecord[]
     }
   }
 
@@ -82,50 +85,5 @@ export default async function AdminFeedbackPage() {
     closed: feedbackWithProfiles.filter((f) => f.status === "closed").length,
   }
 
-  return (
-    <PageWrapper maxWidth="full" background="gradient">
-      <PageHeader
-        title="User Feedback"
-        description="View and manage user concerns, complaints, and suggestions"
-        icon={MessageSquare}
-        backLink={{ href: "/admin", label: "Back to Admin" }}
-      />
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-5 md:gap-4">
-        <StatCard title="Total" value={stats.total} icon={MessageSquare} />
-        <StatCard
-          title="Open"
-          value={stats.open}
-          icon={AlertCircle}
-          iconBgColor="bg-green-100 dark:bg-green-900/30"
-          iconColor="text-green-600 dark:text-green-400"
-        />
-        <StatCard
-          title="In Progress"
-          value={stats.inProgress}
-          icon={Clock}
-          iconBgColor="bg-blue-100 dark:bg-blue-900/30"
-          iconColor="text-blue-600 dark:text-blue-400"
-        />
-        <StatCard
-          title="Resolved"
-          value={stats.resolved}
-          icon={CheckCircle}
-          iconBgColor="bg-purple-100 dark:bg-purple-900/30"
-          iconColor="text-purple-600 dark:text-purple-400"
-        />
-        <StatCard
-          title="Closed"
-          value={stats.closed}
-          icon={XCircle}
-          iconBgColor="bg-gray-100 dark:bg-gray-900/30"
-          iconColor="text-gray-600 dark:text-gray-400"
-        />
-      </div>
-
-      {/* Feedback List */}
-      <FeedbackViewerClient feedback={feedbackWithProfiles || []} />
-    </PageWrapper>
-  )
+  return <AdminFeedbackContent initialFeedback={feedbackWithProfiles} initialStats={stats} />
 }

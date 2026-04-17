@@ -1,11 +1,10 @@
 "use client"
 
-import { useMemo, useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
+import { useMemo } from "react"
 import { Badge } from "@/components/ui/badge"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Search } from "lucide-react"
+import { Bug, AlertTriangle, ShieldAlert } from "lucide-react"
+import { StatCard } from "@/components/ui/stat-card"
+import { DataTablePage, DataTable, type DataTableColumn, type DataTableFilter } from "@/components/ui/data-table"
 
 export interface UiErrorRow {
   id: string
@@ -18,78 +17,108 @@ export interface UiErrorRow {
 
 interface UiErrorsContentProps {
   rows: UiErrorRow[]
+  stats: {
+    total: number
+    last24h: number
+    boundaries: number
+  }
+  error: unknown
 }
 
-export function UiErrorsContent({ rows }: UiErrorsContentProps) {
-  const [query, setQuery] = useState("")
+export function UiErrorsContent({ rows, stats, error }: UiErrorsContentProps) {
+  const columns: DataTableColumn<UiErrorRow>[] = useMemo(
+    () => [
+      {
+        key: "time",
+        label: "Time",
+        sortable: true,
+        accessor: (r) => r.created_at,
+        render: (r) => <span className="text-xs whitespace-nowrap">{new Date(r.created_at).toLocaleString()}</span>,
+      },
+      {
+        key: "source",
+        label: "Source",
+        sortable: true,
+        accessor: (r) => r.source,
+        render: (r) => (
+          <Badge variant="outline" className="text-xs">
+            {r.source}
+          </Badge>
+        ),
+      },
+      {
+        key: "route",
+        label: "Route",
+        sortable: true,
+        accessor: (r) => r.route,
+        render: (r) => <span className="max-w-[220px] truncate font-mono text-xs">{r.route || "-"}</span>,
+      },
+      {
+        key: "user",
+        label: "User",
+        sortable: true,
+        accessor: (r) => r.user_name || "Anonymous",
+      },
+      {
+        key: "message",
+        label: "Message",
+        sortable: true,
+        resizable: true,
+        initialWidth: 500,
+        accessor: (r) => r.message,
+        render: (r) => <span className="max-w-[520px] truncate text-xs">{r.message}</span>,
+      },
+    ],
+    []
+  )
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    if (!q) return rows
-    return rows.filter(
-      (row) =>
-        row.message.toLowerCase().includes(q) ||
-        row.route.toLowerCase().includes(q) ||
-        row.source.toLowerCase().includes(q) ||
-        row.user_name.toLowerCase().includes(q)
-    )
-  }, [rows, query])
+  const filters: DataTableFilter<UiErrorRow>[] = useMemo(() => {
+    const sources = Array.from(new Set(rows.map((r) => r.source))).sort()
+    const routes = Array.from(new Set(rows.map((r) => r.route).filter((x): x is string => !!x))).sort()
+
+    return [
+      {
+        key: "source",
+        label: "Source",
+        options: sources.map((s) => ({ value: s, label: s })),
+      },
+      {
+        key: "route",
+        label: "Route",
+        options: routes.map((r) => ({ value: r, label: r })),
+      },
+    ]
+  }, [rows])
 
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle>Captured UI Errors</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="relative">
-          <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-          <Input
-            placeholder="Search message, route, source, user..."
-            className="pl-9"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
+    <DataTablePage
+      title="UI Error Monitor"
+      description="Centralized frontend runtime errors captured from all pages during beta"
+      icon={Bug}
+      backLink={{ href: "/admin/dev", label: "Back to DEV" }}
+      stats={
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <StatCard title="Total Captured" value={stats.total} icon={Bug} />
+          <StatCard title="Last 24h" value={stats.last24h} icon={AlertTriangle} />
+          <StatCard title="Boundary Catches" value={stats.boundaries} icon={ShieldAlert} />
         </div>
-
-        <div className="overflow-x-auto rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Time</TableHead>
-                <TableHead>Source</TableHead>
-                <TableHead>Route</TableHead>
-                <TableHead>User</TableHead>
-                <TableHead>Message</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-muted-foreground py-8 text-center">
-                    No UI errors found
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filtered.map((row) => (
-                  <TableRow key={row.id}>
-                    <TableCell className="text-xs whitespace-nowrap">
-                      {new Date(row.created_at).toLocaleString()}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="text-xs">
-                        {row.source}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="max-w-[220px] truncate font-mono text-xs">{row.route || "-"}</TableCell>
-                    <TableCell className="text-xs">{row.user_name || "Anonymous"}</TableCell>
-                    <TableCell className="max-w-[520px] truncate text-xs">{row.message}</TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      </CardContent>
-    </Card>
+      }
+    >
+      <DataTable<UiErrorRow>
+        data={rows}
+        columns={columns}
+        getRowId={(r) => r.id}
+        searchPlaceholder="Search message, route, source, user..."
+        searchFn={(row, q) =>
+          row.message.toLowerCase().includes(q) ||
+          row.route.toLowerCase().includes(q) ||
+          row.source.toLowerCase().includes(q) ||
+          row.user_name.toLowerCase().includes(q)
+        }
+        filters={filters}
+        error={error ? "Failed to load logs from backend storage" : null}
+        pagination={{ pageSize: 50 }}
+      />
+    </DataTablePage>
   )
 }

@@ -1,27 +1,9 @@
-import {
-  Users,
-  Package,
-  ClipboardList,
-  FileText,
-  MessageSquare,
-  ScrollText,
-  Briefcase,
-  CreditCard,
-  FolderKanban,
-} from "lucide-react"
+import { Users, Package, ClipboardList, FileText, MessageSquare, ScrollText, Briefcase, CreditCard } from "lucide-react"
 import { formatName } from "@/lib/utils"
 import type { ModuleAction, RecentActivityItem } from "./dashboard-types"
 
-export type AdminDomain = "hr" | "finance" | "assets" | "reports" | "tasks" | "projects" | "communications"
-export const ADMIN_DOMAINS: AdminDomain[] = [
-  "hr",
-  "finance",
-  "assets",
-  "reports",
-  "tasks",
-  "projects",
-  "communications",
-]
+export type AdminDomain = "hr" | "finance" | "assets" | "reports" | "tasks" | "communications"
+export const ADMIN_DOMAINS: AdminDomain[] = ["hr", "finance", "assets", "reports", "tasks", "communications"]
 
 export function normalizeAdminDomains(domains: string[] | null | undefined): AdminDomain[] {
   if (!Array.isArray(domains)) return []
@@ -44,7 +26,6 @@ export function getDomainForAdminPath(path: string): AdminDomain | null {
   if (path.startsWith("/admin/assets") || path.startsWith("/admin/inventory")) return "assets"
   if (path.startsWith("/admin/reports") || path.startsWith("/admin/audit-logs")) return "reports"
   if (path.startsWith("/admin/tasks")) return "tasks"
-  if (path.startsWith("/admin/projects")) return "projects"
   if (
     path.startsWith("/admin/documentation") ||
     path.startsWith("/admin/feedback") ||
@@ -235,14 +216,6 @@ export const primaryModules: ModuleAction[] = [
     href: "/admin/finance",
     icon: CreditCard,
     color: "bg-indigo-500",
-    roles: ["developer", "super_admin", "admin"],
-  },
-  {
-    title: "Projects",
-    description: "Track projects, owners, and current execution status",
-    href: "/admin/projects",
-    icon: FolderKanban,
-    color: "bg-fuchsia-500",
     roles: ["developer", "super_admin", "admin"],
   },
 ]

@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog"
 import { ItemInfoButton } from "@/components/ui/item-info-button"
 import { Plus } from "lucide-react"
+import { useEffect, useMemo } from "react"
 
 export interface CreateTicketForm {
   title: string
@@ -45,6 +46,17 @@ export function CreateTicketDialog({
   departmentOptions,
   userDepartment,
 }: CreateTicketDialogProps) {
+  const availableDepartmentOptions = useMemo(
+    () => departmentOptions.filter((department) => !(userDepartment && department === userDepartment)),
+    [departmentOptions, userDepartment]
+  )
+
+  useEffect(() => {
+    if (availableDepartmentOptions.length === 0) return
+    if (availableDepartmentOptions.includes(form.service_department)) return
+    onFormChange({ ...form, service_department: availableDepartmentOptions[0] || "" })
+  }, [availableDepartmentOptions, form, onFormChange])
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogTrigger asChild>
@@ -108,10 +120,9 @@ export function CreateTicketDialog({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {departmentOptions.map((d) => (
-                  <SelectItem key={d} value={d} disabled={Boolean(userDepartment && d === userDepartment)}>
+                {availableDepartmentOptions.map((d) => (
+                  <SelectItem key={d} value={d}>
                     {d}
-                    {userDepartment && d === userDepartment ? " (Your Department)" : ""}
                   </SelectItem>
                 ))}
               </SelectContent>

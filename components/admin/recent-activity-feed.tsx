@@ -23,8 +23,6 @@ const activityRouteMap: Record<string, string> = {
   assets: "/admin/assets",
   asset_assignment: "/admin/assets",
   asset_assignments: "/admin/assets",
-  project: "/admin/projects",
-  projects: "/admin/projects",
   audit_log: "/admin/audit-logs",
   audit_logs: "/admin/audit-logs",
 }

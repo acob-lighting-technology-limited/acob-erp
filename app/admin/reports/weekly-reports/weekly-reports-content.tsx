@@ -29,7 +29,6 @@ import { Button } from "@/components/ui/button"
 import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
 import { downloadWeeklyReportPdf } from "@/lib/reports/export-download"
 import { Badge } from "@/components/ui/badge"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface AdminWeeklyReportsData {
   reports: WeeklyReport[]
@@ -44,18 +43,13 @@ function expandDepartmentScope(departments: string[]) {
   return Array.from(scoped)
 }
 
-function getDepartmentFilterValues(department: string) {
-  return getDepartmentAliases(department)
-}
-
 async function fetchAdminWeeklyReports(
   supabase: ReturnType<typeof createClient>,
   weekFilter: number,
   yearFilter: number,
-  deptFilter: string,
   initialDepartments: string[]
 ): Promise<AdminWeeklyReportsData> {
-  let query = supabase
+  const query = supabase
     .from("weekly_reports")
     .select(
       "id, department, week_number, year, work_done, tasks_new_week, challenges, status, user_id, created_at, profiles(first_name, last_name)"
@@ -65,9 +59,6 @@ async function fetchAdminWeeklyReports(
     .eq("year", yearFilter)
     .order("department", { ascending: true })
 
-  if (deptFilter !== "all") {
-    query = query.in("department", getDepartmentFilterValues(deptFilter))
-  }
   const { data, error } = await query
   if (error) throw new Error(error.message)
 
@@ -146,7 +137,6 @@ export function WeeklyReportsContent({
   const currentOfficeWeek = getCurrentOfficeWeek()
   const [weekFilter, setWeekFilter] = useState(currentOfficeWeek.week)
   const [yearFilter, setYearFilter] = useState(currentOfficeWeek.year)
-  const [deptFilter, setDeptFilter] = useState("all")
   const [isAdminDialogOpen, setIsAdminDialogOpen] = useState(false)
   const [editingReport, setEditingReport] = useState<WeeklyReport | null>(null)
   const [pptxModeDialogOpen, setPptxModeDialogOpen] = useState(false)
@@ -155,6 +145,9 @@ export function WeeklyReportsContent({
   >(null)
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
   const [exportOptionsOpen, setExportOptionsOpen] = useState(false)
+  const [exportTarget, setExportTarget] = useState<{ kind: "all" } | { kind: "single"; report: WeeklyReport }>({
+    kind: "all",
+  })
 
   const supabase = createClient()
   const queryClient = useQueryClient()
@@ -182,8 +175,8 @@ export function WeeklyReportsContent({
     refetch,
     error,
   } = useQuery({
-    queryKey: QUERY_KEYS.adminWeeklyReports({ weekFilter, yearFilter, deptFilter }),
-    queryFn: () => fetchAdminWeeklyReports(supabase, weekFilter, yearFilter, deptFilter, initialDepartments),
+    queryKey: QUERY_KEYS.adminWeeklyReports({ weekFilter, yearFilter }),
+    queryFn: () => fetchAdminWeeklyReports(supabase, weekFilter, yearFilter, initialDepartments),
   })
 
   const reports = useMemo(() => reportsData?.reports ?? [], [reportsData?.reports])
@@ -271,23 +264,6 @@ export function WeeklyReportsContent({
     []
   )
 
-  const submitterOptions = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          reports
-            .map((report) => {
-              const profile = Array.isArray(report.profiles) ? report.profiles[0] : report.profiles
-              return profile ? `${profile.first_name} ${profile.last_name}` : "Unknown"
-            })
-            .filter(Boolean)
-        )
-      )
-        .sort()
-        .map((value) => ({ value, label: value })),
-    [reports]
-  )
-
   const columns = useMemo<DataTableColumn<WeeklyReport>[]>(
     () => [
       {
@@ -315,6 +291,12 @@ export function WeeklyReportsContent({
         sortable: true,
         accessor: (report) => report.week_number,
         render: (report) => <span className="font-medium">{`W${report.week_number}`}</span>,
+      },
+      {
+        key: "year",
+        label: "Year",
+        sortable: true,
+        accessor: (report) => report.year,
       },
       {
         key: "submitted_by",
@@ -353,17 +335,44 @@ export function WeeklyReportsContent({
   const filters = useMemo<DataTableFilter<WeeklyReport>[]>(
     () => [
       {
+        key: "week_number",
+        label: "Week",
+        options: Array.from({ length: 53 }, (_, index) => {
+          const week = index + 1
+          return { value: String(week), label: `Week ${week}` }
+        }),
+        multi: false,
+        placeholder: `Week ${weekFilter}`,
+      },
+      {
+        key: "year",
+        label: "Year",
+        options: [
+          currentOfficeWeek.year - 1,
+          currentOfficeWeek.year,
+          currentOfficeWeek.year + 1,
+          currentOfficeWeek.year + 2,
+        ].map((year) => ({
+          value: String(year),
+          label: String(year),
+        })),
+        multi: false,
+        placeholder: String(yearFilter),
+      },
+      {
+        key: "department",
+        label: "Department",
+        options: initialDepartments.map((department) => ({ value: department, label: department })),
+        multi: false,
+        placeholder: "Every Department",
+      },
+      {
         key: "tracker_status",
         label: "Action Tracker",
         options: trackerStatusOptions,
       },
-      {
-        key: "submitted_by",
-        label: "Submitted By",
-        options: submitterOptions,
-      },
     ],
-    [submitterOptions, trackerStatusOptions]
+    [currentOfficeWeek.year, initialDepartments, trackerStatusOptions, weekFilter, yearFilter]
   )
 
   return (
@@ -374,49 +383,15 @@ export function WeeklyReportsContent({
       backLink={{ href: "/admin/reports/general-meeting", label: "Back to General Meeting" }}
       actions={
         <div className="flex flex-wrap items-center gap-2">
-          <Select value={String(weekFilter)} onValueChange={(value) => setWeekFilter(Number(value))}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {Array.from({ length: 53 }, (_, index) => index + 1).map((week) => (
-                <SelectItem key={week} value={String(week)}>
-                  Week {week}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={String(yearFilter)} onValueChange={(value) => setYearFilter(Number(value))}>
-            <SelectTrigger className="w-[120px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {[
-                currentOfficeWeek.year - 1,
-                currentOfficeWeek.year,
-                currentOfficeWeek.year + 1,
-                currentOfficeWeek.year + 2,
-              ].map((year) => (
-                <SelectItem key={year} value={String(year)}>
-                  {year}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={deptFilter} onValueChange={setDeptFilter}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Every Department" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Every Department</SelectItem>
-              {initialDepartments.map((department) => (
-                <SelectItem key={department} value={department}>
-                  {department}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button variant="outline" size="sm" className="h-8 gap-2" onClick={() => setExportOptionsOpen(true)}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 gap-2"
+            onClick={() => {
+              setExportTarget({ kind: "all" })
+              setExportOptionsOpen(true)
+            }}
+          >
             <Download className="h-4 w-4" />
             Export
           </Button>
@@ -486,6 +461,24 @@ export function WeeklyReportsContent({
         onRetry={() => {
           void refetch()
         }}
+        onFilterChange={(filterValues) => {
+          const weekValue = filterValues.week_number?.[0]
+          const yearValue = filterValues.year?.[0]
+
+          if (weekValue) {
+            const parsedWeek = Number(weekValue)
+            if (!Number.isNaN(parsedWeek) && parsedWeek !== weekFilter) {
+              setWeekFilter(parsedWeek)
+            }
+          }
+
+          if (yearValue) {
+            const parsedYear = Number(yearValue)
+            if (!Number.isNaN(parsedYear) && parsedYear !== yearFilter) {
+              setYearFilter(parsedYear)
+            }
+          }
+        }}
         rowActions={[
           {
             label: "Edit",
@@ -504,8 +497,11 @@ export function WeeklyReportsContent({
             onClick: (report) => setPendingDeleteId(report.id),
           },
           {
-            label: "Export PPTX",
-            onClick: (report) => openSinglePptxModeDialog(report),
+            label: "Export",
+            onClick: (report) => {
+              setExportTarget({ kind: "single", report })
+              setExportOptionsOpen(true)
+            },
           },
         ]}
         expandable={{
@@ -627,6 +623,24 @@ export function WeeklyReportsContent({
           { id: "excel", label: "Excel (.xlsx)", icon: "excel" },
         ]}
         onSelect={(id) => {
+          if (exportTarget.kind === "single") {
+            const targetReport = exportTarget.report
+            if (id === "pdf") {
+              void import("@/lib/export-utils").then(({ exportToPDF }) => exportToPDF(targetReport, meetingDate))
+              return
+            }
+            if (id === "word") {
+              void import("@/lib/export-utils").then(({ exportToDocx }) => exportToDocx(targetReport, meetingDate))
+              return
+            }
+            if (id === "excel") {
+              void import("@/lib/export-utils").then(({ exportToXLSX }) => exportToXLSX(targetReport, meetingDate))
+              return
+            }
+            openSinglePptxModeDialog(targetReport)
+            return
+          }
+
           if (id === "pdf") {
             void downloadWeeklyReportPdf({ week: weekFilter, year: yearFilter })
             return

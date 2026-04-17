@@ -1,16 +1,14 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { PageHeader, PageWrapper } from "@/components/layout"
 import { FileCode2 } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { DataTable, DataTablePage } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
+import { StatCard } from "@/components/ui/stat-card"
 import type { CorrespondenceRecord } from "@/types/correspondence"
-import { CorrespondenceStats } from "@/components/correspondence/correspondence-stats"
 import { CreateReferenceDialog } from "@/components/correspondence/create-reference-dialog"
-import { CorrespondenceTable } from "@/components/correspondence/correspondence-table"
 
 interface DepartmentCodeOption {
   department_name: string
@@ -33,23 +31,18 @@ function getErrorMessage(error: unknown, fallback: string) {
 export function PortalReferenceGeneratorContent({
   currentViewerName,
   currentViewerDepartment,
-  isDepartmentLead,
   initialRecords,
   departmentCodes,
 }: PortalReferenceGeneratorContentProps) {
-  const initialDepartment = departmentCodes.some((d) => d.department_name === currentViewerDepartment)
+  const initialDepartment = departmentCodes.some((item) => item.department_name === currentViewerDepartment)
     ? currentViewerDepartment
     : ""
 
   const [records, setRecords] = useState<CorrespondenceRecord[]>(initialRecords)
+  const [activeTab, setActiveTab] = useState<"internal" | "external">("internal")
   const [isSaving, setIsSaving] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
   const [dispatchingId, setDispatchingId] = useState<string | null>(null)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [statusFilter, setStatusFilter] = useState("all")
-  const [page, setPage] = useState(1)
-  const [total, setTotal] = useState(initialRecords.length)
-  const pendingRef = useRef<HTMLDivElement | null>(null)
   const [form, setForm] = useState({
     department_name: initialDepartment,
     letter_type: "external",
@@ -60,47 +53,57 @@ export function PortalReferenceGeneratorContent({
     action_required: false,
     due_date: "",
     metadata_text: "",
+    attachments: [] as File[],
   })
 
   const stats = useMemo(
     () => ({
       total: records.length,
-      open: records.filter((r) => ["open", "draft", "under_review", "assigned_action_pending"].includes(r.status))
-        .length,
-      closed: records.filter((r) => ["closed", "sent", "filed"].includes(r.status)).length,
-      incoming: records.filter((r) => r.direction === "incoming").length,
+      open: records.filter((record) =>
+        ["open", "draft", "under_review", "assigned_action_pending"].includes(record.status)
+      ).length,
+      closed: records.filter((record) => ["closed", "sent", "filed"].includes(record.status)).length,
+      internal: records.filter((record) => record.letter_type === "internal").length,
+      external: records.filter((record) => record.letter_type === "external").length,
     }),
     [records]
   )
 
-  const isLead = Boolean(isDepartmentLead)
-  const pendingRecords = useMemo(
-    () => records.filter((r) => ["open", "under_review", "assigned_action_pending"].includes(r.status)),
-    [records]
+  const tabs: DataTableTab[] = useMemo(
+    () => [
+      { key: "internal", label: `Internal (${stats.internal})` },
+      { key: "external", label: `External (${stats.external})` },
+    ],
+    [stats.external, stats.internal]
   )
 
-  const totalPages = Math.max(1, Math.ceil(total / 50))
+  const filteredRecords = useMemo(
+    () =>
+      records.filter((record) =>
+        activeTab === "internal" ? record.letter_type === "internal" : record.letter_type === "external"
+      ),
+    [records, activeTab]
+  )
 
   useEffect(() => {
-    async function loadRecords() {
-      const params = new URLSearchParams({
-        page: String(page),
-        limit: "50",
-      })
-      if (searchQuery.trim()) params.set("search", searchQuery.trim())
-      if (statusFilter !== "all") params.set("status", statusFilter)
+    let active = true
 
-      const res = await fetch(`/api/correspondence/records?${params.toString()}`, { cache: "no-store" })
-      const json = await res.json()
-      setRecords(json.data || [])
-      setTotal(Number(json.total || 0))
+    async function loadRecords() {
+      const response = await fetch("/api/correspondence/records?page=1&limit=100", { cache: "no-store" })
+      const payload = await response.json()
+      if (!response.ok || !active) return
+      setRecords(payload.data || [])
     }
 
     void loadRecords()
-  }, [page, searchQuery, statusFilter])
 
-  async function createRecord(e: React.FormEvent) {
-    e.preventDefault()
+    return () => {
+      active = false
+    }
+  }, [])
+
+  async function createRecord(event: React.FormEvent) {
+    event.preventDefault()
     if (!form.subject.trim()) {
       toast.error("Subject is required")
       return
@@ -113,23 +116,23 @@ export function PortalReferenceGeneratorContent({
     setIsSaving(true)
     try {
       const metadata = form.metadata_text.trim() ? { notes: form.metadata_text.trim() } : null
-      const res = await fetch("/api/correspondence/records", {
+      const formPayload = new FormData()
+      formPayload.append("department_name", form.department_name)
+      formPayload.append("letter_type", form.letter_type)
+      formPayload.append("category", form.category)
+      formPayload.append("subject", form.subject)
+      formPayload.append("recipient_name", form.recipient_name || "")
+      formPayload.append("sender_name", form.sender_name || "")
+      formPayload.append("action_required", String(form.action_required))
+      formPayload.append("due_date", form.due_date || "")
+      formPayload.append("metadata", JSON.stringify(metadata || {}))
+      form.attachments.forEach((file) => formPayload.append("attachments", file))
+      const response = await fetch("/api/correspondence/records", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          department_name: form.department_name,
-          letter_type: form.letter_type,
-          category: form.category,
-          subject: form.subject,
-          recipient_name: form.recipient_name || null,
-          sender_name: form.sender_name || null,
-          action_required: form.action_required,
-          due_date: form.due_date || null,
-          metadata,
-        }),
+        body: formPayload,
       })
-      const body = await res.json()
-      if (!res.ok) throw new Error(body.error || "Failed to create correspondence")
+      const responsePayload = await response.json()
+      if (!response.ok) throw new Error(responsePayload.error || "Failed to create correspondence")
       toast.success("Correspondence created")
       setCreateOpen(false)
       setForm({
@@ -142,8 +145,9 @@ export function PortalReferenceGeneratorContent({
         action_required: false,
         due_date: "",
         metadata_text: "",
+        attachments: [],
       })
-      setPage(1)
+      setRecords((current) => [responsePayload.data, ...current])
     } catch (error: unknown) {
       toast.error(getErrorMessage(error, "Failed to create correspondence"))
     } finally {
@@ -153,13 +157,13 @@ export function PortalReferenceGeneratorContent({
 
   async function updateStatus(recordId: string, status: string) {
     try {
-      const res = await fetch(`/api/correspondence/records/${recordId}`, {
+      const response = await fetch(`/api/correspondence/records/${recordId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status }),
       })
-      const body = await res.json()
-      if (!res.ok) throw new Error(body.error || "Failed to update status")
+      const payload = await response.json()
+      if (!response.ok) throw new Error(payload.error || "Failed to update status")
       toast.success("Status updated")
       setRecords((current) =>
         current.map((record) =>
@@ -174,13 +178,13 @@ export function PortalReferenceGeneratorContent({
   async function dispatchRecord(recordId: string) {
     setDispatchingId(recordId)
     try {
-      const res = await fetch(`/api/correspondence/records/${recordId}/dispatch`, {
+      const response = await fetch(`/api/correspondence/records/${recordId}/dispatch`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ final_status: "sent", dispatch_method: "email" }),
       })
-      const body = await res.json()
-      if (!res.ok) throw new Error(body.error || "Failed to dispatch correspondence")
+      const payload = await response.json()
+      if (!response.ok) throw new Error(payload.error || "Failed to dispatch correspondence")
       toast.success("Correspondence dispatched")
       setRecords((current) =>
         current.map((record) => (record.id === recordId ? { ...record, status: "sent" } : record))
@@ -192,114 +196,175 @@ export function PortalReferenceGeneratorContent({
     }
   }
 
+  const columns = useMemo<DataTableColumn<CorrespondenceRecord>[]>(
+    () => [
+      {
+        key: "reference_number",
+        label: "Reference",
+        sortable: true,
+        accessor: (row) => row.reference_number,
+        resizable: true,
+        initialWidth: 220,
+        render: (row) => <span className="font-medium">{row.reference_number}</span>,
+      },
+      {
+        key: "letter_type",
+        label: "Type",
+        sortable: true,
+        accessor: (row) => row.letter_type || "-",
+        render: (row) => <Badge variant="outline">{row.letter_type || "-"}</Badge>,
+      },
+      {
+        key: "department",
+        label: "Department",
+        sortable: true,
+        accessor: (row) => row.department_name || row.assigned_department_name || "-",
+      },
+      {
+        key: "status",
+        label: "Status",
+        sortable: true,
+        accessor: (row) => row.status,
+        render: (row) => <Badge>{row.status.replaceAll("_", " ")}</Badge>,
+      },
+      {
+        key: "subject",
+        label: "Subject",
+        sortable: true,
+        accessor: (row) => row.subject,
+      },
+    ],
+    []
+  )
+
+  const filters = useMemo<DataTableFilter<CorrespondenceRecord>[]>(
+    () => [
+      {
+        key: "status",
+        label: "Status",
+        options: Array.from(new Set(records.map((record) => record.status))).map((status) => ({
+          value: status,
+          label: status.replaceAll("_", " "),
+        })),
+      },
+      {
+        key: "letter_type",
+        label: "Type",
+        options: [
+          { value: "internal", label: "Internal" },
+          { value: "external", label: "External" },
+        ],
+        mode: "custom",
+        filterFn: (row, selected) => selected.includes(row.letter_type || ""),
+      },
+    ],
+    [records]
+  )
+
   return (
-    <PageWrapper maxWidth="full" background="gradient">
-      <PageHeader
-        title="Reference Generator"
-        description="Create and manage correspondence references."
-        icon={FileCode2}
-        backLink={{ href: "/profile", label: "Back to Home" }}
-        actions={
-          <>
-            {isLead && pendingRecords.length > 0 && (
-              <Button
-                variant="outline"
-                onClick={() => pendingRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
-              >
-                Pending ({pendingRecords.length})
-              </Button>
-            )}
-            <CreateReferenceDialog
-              open={createOpen}
-              onOpenChange={setCreateOpen}
-              form={form}
-              onFormChange={setForm}
-              onSubmit={createRecord}
-              isSaving={isSaving}
-              departmentCodes={departmentCodes}
-            />
-          </>
-        }
-      />
-
-      <CorrespondenceStats {...stats} />
-
-      <Card>
-        <CardContent className="flex flex-col gap-3 pt-6 md:flex-row">
-          <input
-            value={searchQuery}
-            onChange={(event) => {
-              setPage(1)
-              setSearchQuery(event.target.value)
-            }}
-            placeholder="Search reference, subject, recipient, or sender"
-            className="border-input bg-background ring-offset-background placeholder:text-muted-foreground flex h-10 w-full rounded-md border px-3 py-2 text-sm"
+    <DataTablePage
+      title="Reference Generator"
+      description="Create and manage correspondence references."
+      icon={FileCode2}
+      backLink={{ href: "/tools", label: "Back to Tools" }}
+      tabs={tabs}
+      activeTab={activeTab}
+      onTabChange={(tab) => setActiveTab(tab as "internal" | "external")}
+      actions={
+        <CreateReferenceDialog
+          open={createOpen}
+          onOpenChange={setCreateOpen}
+          form={form}
+          onFormChange={setForm}
+          onSubmit={createRecord}
+          isSaving={isSaving}
+          departmentCodes={departmentCodes}
+        />
+      }
+      stats={
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard
+            title="Total"
+            value={stats.total}
+            icon={FileCode2}
+            iconBgColor="bg-blue-500/10"
+            iconColor="text-blue-500"
           />
-          <select
-            value={statusFilter}
-            onChange={(event) => {
-              setPage(1)
-              setStatusFilter(event.target.value)
-            }}
-            className="border-input bg-background h-10 rounded-md border px-3 text-sm md:w-56"
-          >
-            <option value="all">All statuses</option>
-            <option value="draft">Draft</option>
-            <option value="under_review">Under review</option>
-            <option value="approved">Approved</option>
-            <option value="assigned_action_pending">Assigned action pending</option>
-            <option value="open">Open</option>
-            <option value="sent">Sent</option>
-            <option value="filed">Filed</option>
-            <option value="closed">Closed</option>
-          </select>
-        </CardContent>
-      </Card>
-
-      {isLead && pendingRecords.length > 0 && (
-        <Card ref={pendingRef}>
-          <CardHeader>
-            <CardTitle>Pending Items</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {pendingRecords.map((record) => (
-              <div key={record.id} className="flex items-center justify-between rounded border p-3">
-                <div>
-                  <p className="font-medium">{record.reference_number}</p>
-                  <p className="text-muted-foreground text-xs">{record.subject}</p>
-                </div>
-                <Badge variant="secondary">{record.status}</Badge>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
-
-      <CorrespondenceTable
-        records={records}
-        dispatchingId={dispatchingId}
-        onUpdateStatus={updateStatus}
-        onDispatch={dispatchRecord}
-      />
-
-      <div className="flex items-center justify-between text-sm text-slate-500">
-        <span>
-          Page {page} of {totalPages}
-        </span>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((current) => current - 1)}>
-            Previous
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page >= totalPages}
-            onClick={() => setPage((current) => current + 1)}
-          >
-            Next
-          </Button>
+          <StatCard
+            title="Open"
+            value={stats.open}
+            icon={FileCode2}
+            iconBgColor="bg-amber-500/10"
+            iconColor="text-amber-500"
+          />
+          <StatCard
+            title="Closed"
+            value={stats.closed}
+            icon={FileCode2}
+            iconBgColor="bg-emerald-500/10"
+            iconColor="text-emerald-500"
+          />
+          <StatCard
+            title="Internal"
+            value={stats.internal}
+            icon={FileCode2}
+            iconBgColor="bg-violet-500/10"
+            iconColor="text-violet-500"
+          />
         </div>
-      </div>
-    </PageWrapper>
+      }
+    >
+      <DataTable<CorrespondenceRecord>
+        data={filteredRecords}
+        columns={columns}
+        filters={filters}
+        getRowId={(row) => row.id}
+        searchPlaceholder="Search reference, subject, recipient, or sender..."
+        searchFn={(row, query) =>
+          `${row.reference_number} ${row.subject} ${row.recipient_name || ""} ${row.sender_name || ""}`
+            .toLowerCase()
+            .includes(query)
+        }
+        rowActions={[
+          {
+            label: "Send for Review",
+            onClick: (row) => {
+              void updateStatus(row.id, "under_review")
+            },
+            hidden: (row) => row.status !== "draft",
+          },
+          {
+            label: dispatchingId ? "Dispatching..." : "Dispatch",
+            onClick: (row) => {
+              void dispatchRecord(row.id)
+            },
+            hidden: (row) => row.status !== "approved" || dispatchingId === row.id,
+          },
+        ]}
+        expandable={{
+          render: (row) => (
+            <div className="grid gap-3 md:grid-cols-2">
+              <p className="text-sm">
+                <span className="text-muted-foreground">Recipient:</span> {row.recipient_name || "-"}
+              </p>
+              <p className="text-sm">
+                <span className="text-muted-foreground">Sender:</span> {row.sender_name || "-"}
+              </p>
+              <p className="text-sm">
+                <span className="text-muted-foreground">Due Date:</span> {row.due_date || "-"}
+              </p>
+              <p className="text-sm">
+                <span className="text-muted-foreground">Action Required:</span> {row.action_required ? "Yes" : "No"}
+              </p>
+            </div>
+          ),
+        }}
+        emptyTitle="No references found"
+        emptyDescription="No correspondence records match the current filters."
+        emptyIcon={FileCode2}
+        skeletonRows={5}
+        urlSync
+      />
+    </DataTablePage>
   )
 }

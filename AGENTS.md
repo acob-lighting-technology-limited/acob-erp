@@ -94,6 +94,104 @@ Preferred patterns:
 
 ---
 
+## Admin Route Scoping Standard — Mandatory for Every `app/admin/*` Page and API Route
+
+All admin pages and their backing API routes must enforce department-level scoping via the
+centralized helpers in `lib/admin/api-scope.ts`. This is **non-negotiable** — it is the
+single source of truth for what data a user is allowed to see.
+
+### How it works
+
+The middleware resolves the current user's scope once and stamps it on every server request
+as an internal `x-admin-scope` header. Individual pages and routes read that header — they
+never re-derive scope themselves.
+
+```ts
+import { getRequestScope, getScopedDepartments } from "@/lib/admin/api-scope"
+
+// In a server component or API route handler:
+const scope = await getRequestScope()
+const depts = getScopedDepartments(scope)
+// depts === null  → global admin, no filter needed
+// depts === []    → lead with empty scope, return nothing
+// depts === [...] → lead/admin in lead mode, filter by these dept names
+```
+
+### Rules for server components (`"use server"` / no `"use client"`)
+
+```ts
+// ✅ Correct — server-side, scoped
+const scope = await getRequestScope()
+const depts = getScopedDepartments(scope)
+let query = supabase.from("employees").select("*")
+if (depts !== null) query = query.in("department", depts)
+const { data } = await query
+```
+
+### Rules for client components (`"use client"`)
+
+**Client components MUST NOT query Supabase directly.** The browser-side Supabase
+client bypasses all middleware — no scope header is set, and filtering is ignored.
+
+```ts
+// ❌ FORBIDDEN in a "use client" component
+const { data } = await supabase.from("profiles").select("*")
+
+// ✅ Required — call a scoped API route instead
+const res = await fetch("/api/hr/performance/employees")
+const { data } = await res.json()
+```
+
+Every data-fetching client component must call an `/api/` route that applies
+`getRequestScope()` server-side. Never add ad-hoc role checks like
+`is_department_lead && !isAdminLike` — these are wrong and have caused leaks.
+
+### Rules for `/api/` route handlers
+
+Every GET handler that returns a list of records scoped to an organisation must call
+`getRequestScope()` and filter accordingly:
+
+```ts
+// ✅ Every list route handler
+export async function GET(request: NextRequest) {
+  const scope = await getRequestScope()
+  if (!scope) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  const depts = getScopedDepartments(scope)
+
+  let query = supabase.from("my_table").select("*")
+  if (depts !== null) {
+    if (depts.length === 0) return NextResponse.json({ data: [] })
+    query = query.in("department", depts)
+  }
+  // ...
+}
+```
+
+### Pages that are intentionally org-wide (no dept filter needed)
+
+Some pages are inherently org-wide and correct not to dept-filter:
+
+- `app/admin/dev/*` — developer-only diagnostics
+- `app/admin/settings/*` — role/user management (super_admin only)
+- `app/admin/finance/*` — org-wide finance
+- `app/admin/inventory/*` — org-wide stock
+- `app/admin/purchasing/*` — org-wide purchasing
+- `app/admin/hr/office-location` — org-wide location list
+- `app/admin/hr/departments` — org-wide department list
+
+Even these must still call `getRequestScope()` and gate on `scope.isAdminLike` to
+prevent lead-mode access to sections that should be admin-only.
+
+### Hard prohibitions
+
+- ❌ `supabase.from(...)` inside a `"use client"` admin component
+- ❌ `if (profile.is_department_lead && !isAdminLike)` — always broken
+- ❌ Returning all rows from a list route without calling `getRequestScope()`
+- ❌ Passing employee/department data to a dialog without going via a scoped `/api/` route
+- ❌ Creating a new admin page or API route without applying this pattern
+
+---
+
 ## Table Page Standard — Mandatory for All List/Data Pages
 
 Every page that shows a list of records **must** use `DataTablePage` + `DataTable`

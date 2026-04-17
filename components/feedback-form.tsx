@@ -4,7 +4,6 @@ import { useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
-import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
@@ -14,11 +13,9 @@ import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import { toast } from "sonner"
 import { EyeOff } from "lucide-react"
-import { writeAuditLogClient } from "@/lib/audit/client"
 import type { FeedbackRecord } from "@/components/feedback/types"
 
 interface FeedbackFormProps {
-  userId: string
   onFeedbackSubmitted?: (feedback: FeedbackRecord) => void
   variant?: "card" | "modal"
 }
@@ -31,7 +28,7 @@ const FeedbackFormSchema = z.object({
 
 type FeedbackFormValues = z.infer<typeof FeedbackFormSchema>
 
-export function FeedbackForm({ userId, onFeedbackSubmitted, variant = "card" }: FeedbackFormProps) {
+export function FeedbackForm({ onFeedbackSubmitted, variant = "card" }: FeedbackFormProps) {
   const form = useForm<FeedbackFormValues>({
     resolver: zodResolver(FeedbackFormSchema),
     defaultValues: {
@@ -40,52 +37,28 @@ export function FeedbackForm({ userId, onFeedbackSubmitted, variant = "card" }: 
       description: "",
     },
   })
-  const [isAnonymous, setIsAnonymous] = useState(false)
+  const [isAnonymous, setIsAnonymous] = useState(true)
   const [isLoading, setIsLoading] = useState(false)
 
   const onSubmit = form.handleSubmit(async (data) => {
-    const supabase = createClient()
     setIsLoading(true)
 
     try {
-      // Insert feedback - set user_id to null if anonymous
-      const { data: createdFeedback, error } = await supabase
-        .from("feedback")
-        .insert({
-          user_id: isAnonymous ? null : userId,
-          feedback_type: data.feedbackType,
+      const response = await fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          feedbackType: data.feedbackType,
           title: data.title,
           description: data.description,
-          status: "open",
-          is_anonymous: isAnonymous,
-        })
-        .select()
-
-      if (error) throw error
-
-      // Log audit for all feedback - anonymous ones will show as "Anonymous" in the audit log
-      if (createdFeedback && createdFeedback.length > 0) {
-        await writeAuditLogClient(
-          supabase,
-          {
-            action: "create",
-            entityType: "feedback",
-            entityId: createdFeedback[0].id,
-            newValues: {
-              feedback_type: data.feedbackType,
-              title: data.title,
-              description: data.description,
-              status: "open",
-              is_anonymous: isAnonymous,
-            },
-            context: {
-              source: "ui",
-              route: "/feedback",
-            },
-          },
-          { failOpen: true }
-        )
+          isAnonymous,
+        }),
+      })
+      const payload = (await response.json().catch(() => null)) as { error?: string; data?: FeedbackRecord } | null
+      if (!response.ok) {
+        throw new Error(payload?.error || "Failed to submit feedback")
       }
+      const createdFeedback = payload?.data || null
 
       toast.success(isAnonymous ? "Anonymous feedback submitted" : "Feedback submitted successfully!")
       form.reset({
@@ -93,10 +66,10 @@ export function FeedbackForm({ userId, onFeedbackSubmitted, variant = "card" }: 
         title: "",
         description: "",
       })
-      setIsAnonymous(false)
+      setIsAnonymous(true)
 
-      if (onFeedbackSubmitted && createdFeedback && createdFeedback.length > 0) {
-        onFeedbackSubmitted(createdFeedback[0])
+      if (onFeedbackSubmitted && createdFeedback) {
+        onFeedbackSubmitted(createdFeedback)
       }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Failed to submit feedback"

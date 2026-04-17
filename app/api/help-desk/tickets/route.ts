@@ -32,6 +32,10 @@ type InsertTicketResult = {
   error: ErrorWithCode | null
 }
 
+type CommentCountRow = {
+  ticket_id: string | null
+}
+
 const CreateTicketSchema = z.object({
   title: z.string().trim().min(1, "title and service_department are required"),
   description: z.string().optional(),
@@ -102,6 +106,11 @@ export async function GET(request: NextRequest) {
 
     if (scope === "mine") {
       query = query.or(`requester_id.eq.${user.id},assigned_to.eq.${user.id},created_by.eq.${user.id}`)
+    } else if (scope === "service_department") {
+      if (!profile.department) {
+        return NextResponse.json(paginatedResponse([], 0, pagination))
+      }
+      query = query.eq("service_department", profile.department).in("handling_mode", ["queue", "department"])
     } else if (scope === "department") {
       if (!isAdminRole(profile.role) && !profile.is_department_lead) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 })
@@ -124,7 +133,25 @@ export async function GET(request: NextRequest) {
     const { data, error, count } = await query.range(from, to)
     if (error) throw error
 
-    return NextResponse.json(paginatedResponse((data as HelpDeskTicketRow[] | null) || [], count || 0, pagination))
+    const rows = (data as HelpDeskTicketRow[] | null) || []
+    const ticketIds = rows.map((row) => row.id).filter(Boolean)
+    const { data: commentRows } =
+      ticketIds.length > 0
+        ? await supabase.from("help_desk_comments").select("ticket_id").in("ticket_id", ticketIds)
+        : { data: [] }
+    const commentCountMap = new Map<string, number>()
+    for (const row of (commentRows as CommentCountRow[] | null) || []) {
+      const ticketId = String(row.ticket_id || "")
+      if (!ticketId) continue
+      commentCountMap.set(ticketId, (commentCountMap.get(ticketId) || 0) + 1)
+    }
+
+    const rowsWithCounts = rows.map((row) => ({
+      ...row,
+      comment_count: commentCountMap.get(row.id) || 0,
+    }))
+
+    return NextResponse.json(paginatedResponse(rowsWithCounts, count || 0, pagination))
   } catch (error) {
     log.error({ err: String(error) }, "Unhandled error in GET")
     return NextResponse.json({ error: `Failed to fetch tickets: ${describeError(error)}` }, { status: 500 })
@@ -160,13 +187,11 @@ export async function POST(request: NextRequest) {
     const requestType = parsed.data.request_type
     const priority = parsed.data.priority
 
-    const managedDepartments = getManagedDepartments(profile as HelpDeskProfile)
-    if (
-      profile.is_department_lead &&
-      managedDepartments.length > 0 &&
-      !managedDepartments.includes(serviceDepartment)
-    ) {
-      return NextResponse.json({ error: "Forbidden: outside your department scope" }, { status: 403 })
+    if (!isAdminRole(profile.role) && profile.department && profile.department === serviceDepartment) {
+      return NextResponse.json(
+        { error: "You cannot submit help desk requests to your own department" },
+        { status: 400 }
+      )
     }
 
     const submittedAt = new Date()

@@ -55,11 +55,15 @@ export async function loadUserTasks(
           .select("*")
           .eq("department", userProfile.department)
           .eq("assignment_type", "department")
+          .neq("source_type", "help_desk")
       : { data: [] }
 
-  const allTasks = [...(directTasks || []), ...(departmentTasks || [])]
+  const allTasks = [...(directTasks || []), ...(departmentTasks || [])].filter(
+    (task) => String(task.source_type || "") !== "action_item"
+  )
   const uniqueTasks = Array.from(new Map(allTasks.map((task) => [task.id, task])).values()) as Task[]
   if (uniqueTasks.length === 0) return []
+  const taskIds = uniqueTasks.map((task) => task.id)
 
   const userIds = new Set<string>()
   for (const task of uniqueTasks) {
@@ -76,6 +80,17 @@ export async function loadUserTasks(
     ((profiles as BasicProfile[] | null) || []).map((profile) => [profile.id, profile] as const)
   )
 
+  const { data: taskComments } =
+    taskIds.length > 0
+      ? await supabase.from("task_updates").select("task_id").in("task_id", taskIds).eq("update_type", "comment")
+      : { data: [] }
+  const commentCountMap = new Map<string, number>()
+  for (const row of taskComments || []) {
+    const taskId = String((row as { task_id?: string | null }).task_id || "")
+    if (!taskId) continue
+    commentCountMap.set(taskId, (commentCountMap.get(taskId) || 0) + 1)
+  }
+
   const actionItemIds = uniqueTasks
     .filter((task) => task.source_type === "action_item" && task.source_id)
     .map((task) => String(task.source_id))
@@ -91,6 +106,7 @@ export async function loadUserTasks(
 
   const tasksWithUsers = uniqueTasks.map((task) => {
     const taskData: Task = { ...task }
+    taskData.comment_count = commentCountMap.get(task.id) || 0
 
     if (task.source_type === "action_item" && task.source_id) {
       taskData.due_date = resolveActionItemDueDate(actionItemDueDateMap.get(String(task.source_id))) || task.due_date
@@ -115,13 +131,7 @@ export async function loadUserTasks(
     }
 
     if (task.assignment_type === "department") {
-      const canChangeStatus =
-        userProfile?.role === "admin" ||
-        ["developer", "super_admin"].includes(userProfile?.role || "") ||
-        (userProfile?.is_department_lead && task.department
-          ? userProfile?.lead_departments?.includes(task.department)
-          : false)
-      taskData.can_change_status = canChangeStatus
+      taskData.can_change_status = false
     }
 
     return taskData

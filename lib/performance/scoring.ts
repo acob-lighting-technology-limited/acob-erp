@@ -17,6 +17,9 @@ type AttendanceBreakdown = {
   present: number
   total: number
   score: number | null
+  late_penalty_total_ngn?: number
+  late_penalty_steps_total?: number
+  late_days?: number
 }
 
 type DepartmentMetricBreakdown = {
@@ -241,7 +244,10 @@ export async function computeIndividualPerformanceScore(
     .eq("user_id", params.userId)
     .eq("status", "approved")
 
-  let attendanceQuery = supabase.from("attendance_records").select("status, date").eq("user_id", params.userId)
+  let attendanceQuery = supabase
+    .from("attendance_records")
+    .select("status, date, clock_in")
+    .eq("user_id", params.userId)
 
   if (cycle) {
     leaveRequestQuery = leaveRequestQuery.gte("end_date", cycle.start_date).lte("start_date", cycle.end_date)
@@ -267,9 +273,37 @@ export async function computeIndividualPerformanceScore(
     const scorableRecords = attendance.filter((row) => !leaveDateSet.has(String(row.date || "").slice(0, 10)))
 
     let creditSum = 0
+    let latePenaltyTotalNgn = 0
+    let latePenaltyStepsTotal = 0
+    let lateDays = 0
+
+    const cutoffMinutes = 8 * 60 + 20
+    const firstPenaltyHourMinutes = 9 * 60
+    const penaltyPerStepNgn = 1000
     for (const row of scorableRecords) {
       const status = String(row.status || "absent").toLowerCase()
-      creditSum += ATTENDANCE_CREDIT[status] ?? 0
+      const baseCredit = ATTENDANCE_CREDIT[status] ?? 0
+
+      let timelinessFactor = 1
+      const clockInRaw = String((row as { clock_in?: string | null }).clock_in || "")
+      const [hourText, minuteText] = clockInRaw.split(":")
+      const hour = Number(hourText)
+      const minute = Number(minuteText)
+      if (Number.isFinite(hour) && Number.isFinite(minute)) {
+        const clockInMinutes = hour * 60 + minute
+        if (clockInMinutes > cutoffMinutes) {
+          lateDays += 1
+          const penaltySteps =
+            clockInMinutes >= firstPenaltyHourMinutes
+              ? Math.floor((clockInMinutes - firstPenaltyHourMinutes) / 60) + 1
+              : 0
+          latePenaltyStepsTotal += penaltySteps
+          latePenaltyTotalNgn += penaltySteps * penaltyPerStepNgn
+          timelinessFactor = Math.max(0, 1 - penaltySteps * 0.1)
+        }
+      }
+
+      creditSum += baseCredit * timelinessFactor
     }
     attendanceBreakdown.present = scorableRecords.filter((row) =>
       ["present", "wfh", "remote"].includes(String(row.status || "").toLowerCase())
@@ -277,6 +311,9 @@ export async function computeIndividualPerformanceScore(
     attendanceBreakdown.total = scorableRecords.length
     attendanceScore = scorableRecords.length > 0 ? roundScore((creditSum / scorableRecords.length) * 100) : null
     attendanceBreakdown.score = attendanceScore
+    attendanceBreakdown.late_penalty_total_ngn = latePenaltyTotalNgn
+    attendanceBreakdown.late_penalty_steps_total = latePenaltyStepsTotal
+    attendanceBreakdown.late_days = lateDays
   }
 
   let latestReviewQuery = supabase
@@ -347,7 +384,7 @@ export async function computeIndividualPerformanceScore(
     behaviourScore = peerBehaviourScore
   }
 
-  if (latestReview && typeof latestReview.attendance_score === "number") {
+  if (attendanceScore === null && latestReview && typeof latestReview.attendance_score === "number") {
     attendanceScore = roundScore(Number(latestReview.attendance_score) || 0)
     attendanceBreakdown.score = attendanceScore
   }

@@ -44,11 +44,6 @@ interface Department {
   name: string
 }
 
-interface Category {
-  id: string
-  name: string
-}
-
 async function getPaymentsData() {
   const supabase = await createClient()
 
@@ -99,13 +94,9 @@ async function getPaymentsData() {
   }
   const { data: departments } = await departmentsQuery
 
-  // Fetch categories
-  const { data: categories } = await dataClient.from("payment_categories").select("id, name").order("name")
-
   return {
     payments: (payments || []) as Payment[],
     departments: (departments || []) as Department[],
-    categories: (categories || []) as Category[],
     currentUser: {
       id: user.id,
       department_id: null, // Admin doesn't have a specific department filter
@@ -130,7 +121,6 @@ export default async function AdminPaymentsPage() {
     <PaymentsTable
       initialPayments={paymentsData.payments}
       initialDepartments={paymentsData.departments}
-      initialCategories={paymentsData.categories}
       currentUser={paymentsData.currentUser}
       basePath="/admin/finance/payments"
     />

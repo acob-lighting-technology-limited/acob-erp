@@ -6,24 +6,15 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
 import { getCurrentOfficeWeek, getOfficeWeekMonday } from "@/lib/meeting-week"
 import { toast } from "sonner"
-import { CheckCircle2, Clock, Download, FileSpreadsheet, RefreshCw } from "lucide-react"
+import { CheckCircle2, Clock, Download, Eye, FileSpreadsheet, RefreshCw } from "lucide-react"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
 import { Button } from "@/components/ui/button"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import { ActionFormDialog } from "@/components/admin/action-tracker/action-form-dialog"
 import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
 import { Badge } from "@/components/ui/badge"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { fetchWeeklyReportLockState } from "@/lib/weekly-report-lock"
 import { type ActionItem } from "@/lib/export-utils"
@@ -43,6 +34,24 @@ interface ActionTask {
   year: number
   original_week?: number
   work_item_number?: string
+}
+
+interface DepartmentActionRow {
+  id: string
+  department: string
+  tasks: ActionTask[]
+  totalPoints: number
+  completedPoints: number
+  notStartedPoints: number
+  inProgressPoints: number
+  pendingPoints: number
+  summaryStatus: "Finished" | "Started" | "Not Started" | "Pending"
+}
+
+interface ExportScope {
+  label: string
+  department?: string
+  items: ActionItem[]
 }
 
 interface ActionTrackerContentProps {
@@ -109,6 +118,21 @@ function getDueDateClassName(task: ActionTask) {
   return "font-semibold text-yellow-600 dark:text-yellow-400"
 }
 
+function getDeptSummaryStatus(tasks: ActionTask[]): DepartmentActionRow["summaryStatus"] {
+  if (tasks.length === 0) return "Pending"
+  if (tasks.every((task) => task.status === "completed")) return "Finished"
+  if (tasks.some((task) => task.status === "in_progress" || task.status === "completed")) return "Started"
+  if (tasks.some((task) => task.status === "not_started")) return "Not Started"
+  return "Pending"
+}
+
+function getSummaryBadgeClass(status: DepartmentActionRow["summaryStatus"]) {
+  if (status === "Finished") return "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+  if (status === "Started") return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+  if (status === "Not Started") return "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400"
+  return "bg-slate-100 text-slate-600 dark:bg-slate-900/40 dark:text-slate-400"
+}
+
 export function ActionTrackerContent({
   initialDepartments,
   scopedDepartments = [],
@@ -119,8 +143,6 @@ export function ActionTrackerContent({
   const searchParams = useSearchParams()
   const queryClient = useQueryClient()
 
-  const [isFormOpen, setIsFormOpen] = useState(false)
-  const [editingTask, setEditingTask] = useState<ActionTask | null>(null)
   const [weekFilter] = useState(() => {
     const week = searchParams.get("week")
     return week ? parseInt(week, 10) : currentOfficeWeek.week
@@ -130,9 +152,13 @@ export function ActionTrackerContent({
     return year ? parseInt(year, 10) : currentOfficeWeek.year
   })
   const [deptFilter] = useState(() => searchParams.get("dept") || "all")
-  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
   const [isCarryForwarding, setIsCarryForwarding] = useState(false)
   const [exportOptionsOpen, setExportOptionsOpen] = useState(false)
+  const [exportScope, setExportScope] = useState<ExportScope>({
+    label: "All Departments",
+    items: [],
+  })
+  const [viewingDepartment, setViewingDepartment] = useState<DepartmentActionRow | null>(null)
 
   const supabase = createClient()
   const canMutateTask = (task: ActionTask) => canGlobalEdit || editableDepartments.includes(task.department)
@@ -183,33 +209,6 @@ export function ActionTrackerContent({
     }
   }
 
-  const handleDelete = async (id: string) => {
-    const targetTask = tasks.find((task) => task.id === id)
-    if (targetTask && !canMutateTask(targetTask)) {
-      toast.error("You can only delete actions in your departments")
-      return
-    }
-    try {
-      const response = await fetch(`/api/reports/action-tracker/${id}`, { method: "DELETE" })
-      const payload = (await response.json().catch(() => null)) as { error?: string } | null
-      if (!response.ok) throw new Error(payload?.error || "Failed to delete action")
-      toast.success("Action deleted")
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminActionTrackerTasks() })
-    } catch (deleteError) {
-      const message = deleteError instanceof Error ? deleteError.message : "Failed to delete"
-      toast.error(message)
-    }
-  }
-
-  const handleEdit = (task: ActionTask) => {
-    if (!canMutateTask(task)) {
-      toast.error("You can only edit actions in your departments")
-      return
-    }
-    setEditingTask(task)
-    setIsFormOpen(true)
-  }
-
   const handleCarryForward = async () => {
     setIsCarryForwarding(true)
     try {
@@ -253,25 +252,16 @@ export function ActionTrackerContent({
     [tasks]
   )
 
-  const weekOptions = useMemo(
-    () =>
-      Array.from({ length: 53 }, (_, index) => index + 1).map((week) => ({
-        value: String(week),
-        label: `Week ${week}`,
-      })),
-    []
-  )
-
-  const yearOptions = useMemo(
-    () =>
-      [currentOfficeWeek.year - 1, currentOfficeWeek.year, currentOfficeWeek.year + 1, currentOfficeWeek.year + 2].map(
-        (year) => ({
-          value: String(year),
-          label: String(year),
-        })
-      ),
-    [currentOfficeWeek.year]
-  )
+  const toActionItems = (sourceTasks: ActionTask[]): ActionItem[] =>
+    sourceTasks.map((task) => ({
+      id: task.id,
+      title: task.title,
+      description: task.description,
+      department: task.department,
+      status: task.status,
+      week_number: task.week_number,
+      year: task.year,
+    }))
 
   const departmentOptions = useMemo(
     () =>
@@ -280,16 +270,6 @@ export function ActionTrackerContent({
         label: department,
       })),
     [initialDepartments]
-  )
-
-  const statusOptions = useMemo(
-    () => [
-      { value: "pending", label: "Pending" },
-      { value: "not_started", label: "Not Started" },
-      { value: "in_progress", label: "In Progress" },
-      { value: "completed", label: "Completed" },
-    ],
-    []
   )
 
   const priorityOptions = useMemo(
@@ -305,72 +285,90 @@ export function ActionTrackerContent({
     [tasks]
   )
 
-  const columns = useMemo<DataTableColumn<ActionTask>[]>(
+  const departmentRows = useMemo<DepartmentActionRow[]>(() => {
+    const grouped = new Map<string, ActionTask[]>()
+    tasks.forEach((task) => {
+      const existing = grouped.get(task.department) || []
+      existing.push(task)
+      grouped.set(task.department, existing)
+    })
+
+    return Array.from(grouped.entries())
+      .map(([department, deptTasks]) => {
+        const completedPoints = deptTasks.filter((task) => task.status === "completed").length
+        const notStartedPoints = deptTasks.filter((task) => task.status === "not_started").length
+        const inProgressPoints = deptTasks.filter((task) => task.status === "in_progress").length
+        const pendingPoints = deptTasks.filter((task) => task.status === "pending").length
+        return {
+          id: department,
+          department,
+          tasks: deptTasks,
+          totalPoints: deptTasks.length,
+          completedPoints,
+          notStartedPoints,
+          inProgressPoints,
+          pendingPoints,
+          summaryStatus: getDeptSummaryStatus(deptTasks),
+        }
+      })
+      .sort((a, b) => a.department.localeCompare(b.department))
+  }, [tasks])
+
+  const columns = useMemo<DataTableColumn<DepartmentActionRow>[]>(
     () => [
       {
         key: "department",
         label: "Department",
         sortable: true,
-        accessor: (task) => task.department,
+        accessor: (row) => row.department,
         resizable: true,
         initialWidth: 180,
       },
       {
-        key: "title",
-        label: "Action Item",
+        key: "total_points",
+        label: "Action Points",
         sortable: true,
-        accessor: (task) => task.title,
-        resizable: true,
-        initialWidth: 260,
-        render: (task) => (
-          <div className="space-y-1">
-            <p className="font-medium">{task.title}</p>
-            {task.description ? <p className="text-muted-foreground text-xs">{task.description}</p> : null}
-          </div>
+        accessor: (row) => row.totalPoints,
+        render: (row) => (
+          <span className="text-muted-foreground text-sm">
+            {row.completedPoints} of {row.totalPoints} completed
+          </span>
         ),
       },
       {
-        key: "status",
-        label: "Status",
+        key: "summary_status",
+        label: "Summary Status",
         sortable: true,
-        accessor: (task) => task.status,
-        render: (task) => (
-          <Badge variant={task.status === "completed" ? "default" : "outline"} className="capitalize">
-            {task.status.replace(/_/g, " ")}
-          </Badge>
+        accessor: (row) => row.summaryStatus,
+        render: (row) => <Badge className={getSummaryBadgeClass(row.summaryStatus)}>{row.summaryStatus}</Badge>,
+      },
+      {
+        key: "point_breakdown",
+        label: "Breakdown",
+        sortable: true,
+        accessor: (row) =>
+          `${row.notStartedPoints}/${row.inProgressPoints}/${row.pendingPoints}/${row.completedPoints}`,
+        render: (row) => (
+          <span className="text-muted-foreground text-xs">
+            NS: {row.notStartedPoints} | IP: {row.inProgressPoints} | P: {row.pendingPoints} | C: {row.completedPoints}
+          </span>
         ),
-      },
-      {
-        key: "priority",
-        label: "Priority",
-        sortable: true,
-        accessor: (task) => task.priority,
-        render: (task) => <span className="capitalize">{task.priority.replace(/_/g, " ")}</span>,
-      },
-      {
-        key: "due_date",
-        label: "Due Date",
-        sortable: true,
-        accessor: (task) => resolveDueDate(task).toISOString(),
-        render: (task) => <span className={getDueDateClassName(task)}>{formatDueDate(task)}</span>,
-      },
-      {
-        key: "period",
-        label: "Period",
-        sortable: true,
-        accessor: (task) => `${task.year}-W${task.week_number}`,
-        render: (task) => `W${task.week_number}, ${task.year}`,
       },
     ],
     []
   )
 
-  const filters = useMemo<DataTableFilter<ActionTask>[]>(
+  const filters = useMemo<DataTableFilter<DepartmentActionRow>[]>(
     () => [
       {
-        key: "status",
-        label: "Status",
-        options: statusOptions,
+        key: "summary_status",
+        label: "Summary Status",
+        options: [
+          { value: "Pending", label: "Pending" },
+          { value: "Not Started", label: "Not Started" },
+          { value: "Started", label: "Started" },
+          { value: "Finished", label: "Finished" },
+        ],
       },
       {
         key: "department",
@@ -378,38 +376,17 @@ export function ActionTrackerContent({
         options: departmentOptions,
       },
       {
-        key: "priority",
-        label: "Priority",
+        key: "point_priority",
+        label: "Point Priority",
+        mode: "custom",
         options: priorityOptions,
-      },
-      {
-        key: "period",
-        label: "Week",
-        mode: "custom",
-        options: weekOptions,
-        filterFn: (task, value) => {
-          const weekValue = String(task.week_number)
-          if (Array.isArray(value)) {
-            return value.includes(weekValue)
-          }
-          return weekValue === value
-        },
-      },
-      {
-        key: "year_period",
-        label: "Year",
-        mode: "custom",
-        options: yearOptions,
-        filterFn: (task, value) => {
-          const yearValue = String(task.year)
-          if (Array.isArray(value)) {
-            return value.includes(yearValue)
-          }
-          return yearValue === value
+        filterFn: (row, values) => {
+          if (!values || values.length === 0) return true
+          return row.tasks.some((task) => values.includes(task.priority))
         },
       },
     ],
-    [departmentOptions, priorityOptions, statusOptions, weekOptions, yearOptions]
+    [departmentOptions, priorityOptions]
   )
 
   return (
@@ -421,7 +398,18 @@ export function ActionTrackerContent({
       actions={
         <div className="flex flex-wrap items-center gap-2">
           {tasks.length > 0 ? (
-            <Button variant="outline" size="sm" className="h-8 gap-2" onClick={() => setExportOptionsOpen(true)}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 gap-2"
+              onClick={() => {
+                setExportScope({
+                  label: "All Departments",
+                  items: actionItemsForExport,
+                })
+                setExportOptionsOpen(true)
+              }}
+            >
               <Download className="h-4 w-4" />
               Export
             </Button>
@@ -435,7 +423,7 @@ export function ActionTrackerContent({
       stats={
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
           <StatCard
-            title="Total Actions"
+            title="Total Action Points"
             value={stats.total}
             icon={FileSpreadsheet}
             iconBgColor="bg-blue-500/10"
@@ -472,18 +460,21 @@ export function ActionTrackerContent({
         </div>
       }
     >
-      <DataTable<ActionTask>
-        data={tasks}
+      <DataTable<DepartmentActionRow>
+        data={departmentRows}
         columns={columns}
         filters={filters}
-        getRowId={(task) => task.id}
-        searchPlaceholder="Search title, description, or department..."
-        searchFn={(task, query) => {
+        getRowId={(row) => row.id}
+        searchPlaceholder="Search department or action points..."
+        searchFn={(row, query) => {
           const normalizedQuery = query.toLowerCase()
           return (
-            task.title.toLowerCase().includes(normalizedQuery) ||
-            (task.description || "").toLowerCase().includes(normalizedQuery) ||
-            task.department.toLowerCase().includes(normalizedQuery)
+            row.department.toLowerCase().includes(normalizedQuery) ||
+            row.tasks.some(
+              (task) =>
+                task.title.toLowerCase().includes(normalizedQuery) ||
+                (task.description || "").toLowerCase().includes(normalizedQuery)
+            )
           )
         }}
         isLoading={isLoading}
@@ -493,119 +484,152 @@ export function ActionTrackerContent({
         }}
         rowActions={[
           {
-            label: "Mark Complete",
-            onClick: (task) => {
-              void handleStatusChange(task.id, "completed")
+            label: "View",
+            icon: Eye,
+            onClick: (row) => setViewingDepartment(row),
+          },
+          {
+            label: "Export",
+            icon: Download,
+            onClick: (row) => {
+              setExportScope({
+                label: row.department,
+                department: row.department,
+                items: toActionItems(row.tasks),
+              })
+              setExportOptionsOpen(true)
             },
-          },
-          {
-            label: "Edit",
-            onClick: (task) => handleEdit(task),
-          },
-          {
-            label: "Delete",
-            variant: "destructive",
-            onClick: (task) => setPendingDeleteId(task.id),
           },
         ]}
         expandable={{
-          render: (task) => (
-            <div className="grid gap-4 md:grid-cols-4">
-              <div className="rounded-lg border p-4">
-                <p className="text-muted-foreground text-xs tracking-wide uppercase">Department</p>
-                <p className="mt-2 text-sm">{task.department}</p>
+          render: (row) => (
+            <div className="space-y-3">
+              <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">Action Points</p>
+              <div className="overflow-x-auto rounded-lg border">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/40">
+                    <tr>
+                      <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">#</th>
+                      <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">Action Point</th>
+                      <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">Status</th>
+                      <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">Due Date</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {row.tasks.map((task, index) => (
+                      <tr key={task.id} className="border-t">
+                        <td className="text-muted-foreground px-3 py-2 text-xs">{index + 1}</td>
+                        <td className="px-3 py-2">
+                          <p className="font-medium">{task.title}</p>
+                          {task.description ? (
+                            <p className="text-muted-foreground text-xs">{task.description}</p>
+                          ) : null}
+                        </td>
+                        <td className="px-3 py-2">
+                          <Select
+                            value={task.status}
+                            disabled={!canMutateTask(task)}
+                            onValueChange={(newStatus) => {
+                              void handleStatusChange(task.id, newStatus)
+                            }}
+                          >
+                            <SelectTrigger className="h-8 w-[160px] text-xs font-semibold uppercase">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="pending">Pending</SelectItem>
+                              <SelectItem value="not_started">Not Started</SelectItem>
+                              <SelectItem value="in_progress">In Progress</SelectItem>
+                              <SelectItem value="completed">Completed</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </td>
+                        <td className={`px-3 py-2 text-xs ${getDueDateClassName(task)}`}>{formatDueDate(task)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-              <div className="rounded-lg border p-4">
-                <p className="text-muted-foreground text-xs tracking-wide uppercase">Status</p>
-                <p className="mt-2 text-sm capitalize">{task.status.replace(/_/g, " ")}</p>
-              </div>
-              <div className="rounded-lg border p-4">
-                <p className="text-muted-foreground text-xs tracking-wide uppercase">Priority</p>
-                <p className="mt-2 text-sm capitalize">{task.priority.replace(/_/g, " ")}</p>
-              </div>
-              <div className="rounded-lg border p-4">
-                <p className="text-muted-foreground text-xs tracking-wide uppercase">Due Date</p>
-                <p className={`mt-2 text-sm ${getDueDateClassName(task)}`}>{formatDueDate(task)}</p>
-              </div>
-              {task.description ? (
-                <div className="rounded-lg border p-4 md:col-span-4">
-                  <p className="text-muted-foreground text-xs tracking-wide uppercase">Description</p>
-                  <p className="mt-2 text-sm">{task.description}</p>
-                </div>
-              ) : null}
             </div>
           ),
         }}
         viewToggle
-        cardRenderer={(task) => (
+        cardRenderer={(row) => (
           <div className="space-y-3 rounded-xl border p-4">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="font-medium">{task.title}</p>
-                <p className="text-muted-foreground text-sm">{task.department}</p>
+                <p className="font-medium">{row.department}</p>
+                <p className="text-muted-foreground text-sm">{row.totalPoints} action points</p>
               </div>
-              <Badge variant={task.status === "completed" ? "default" : "outline"} className="capitalize">
-                {task.status.replace(/_/g, " ")}
-              </Badge>
+              <Badge className={getSummaryBadgeClass(row.summaryStatus)}>{row.summaryStatus}</Badge>
             </div>
             <div className="grid gap-1 text-sm">
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Priority</span>
-                <span className="capitalize">{task.priority.replace(/_/g, " ")}</span>
+                <span className="text-muted-foreground">Completed</span>
+                <span>{row.completedPoints}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Due</span>
-                <span className={getDueDateClassName(task)}>{formatDueDate(task)}</span>
+                <span className="text-muted-foreground">In Progress</span>
+                <span>{row.inProgressPoints}</span>
               </div>
             </div>
           </div>
         )}
-        emptyTitle="No actions found"
-        emptyDescription="No action items matched the current filters."
+        emptyTitle="No action points found"
+        emptyDescription="No action points matched the current filters."
         emptyIcon={FileSpreadsheet}
         skeletonRows={6}
         urlSync
       />
 
-      <ActionFormDialog
-        isOpen={isFormOpen}
-        onClose={() => setIsFormOpen(false)}
-        onComplete={() => queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminActionTrackerTasks() })}
-        departments={canGlobalEdit ? initialDepartments : editableDepartments}
-        editingAction={editingTask}
-        defaultWeek={weekFilter}
-        defaultYear={yearFilter}
-      />
-
-      <AlertDialog open={pendingDeleteId !== null} onOpenChange={(open) => !open && setPendingDeleteId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Action</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete this action? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => {
-                if (pendingDeleteId) {
-                  void handleDelete(pendingDeleteId)
-                }
-                setPendingDeleteId(null)
-              }}
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <Dialog open={Boolean(viewingDepartment)} onOpenChange={(open) => !open && setViewingDepartment(null)}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>{viewingDepartment?.department || "Department"} Action Points</DialogTitle>
+            <DialogDescription>Update individual action point statuses.</DialogDescription>
+          </DialogHeader>
+          {viewingDepartment ? (
+            <div className="space-y-3">
+              {viewingDepartment.tasks.map((task, index) => (
+                <div key={task.id} className="rounded-lg border p-3">
+                  <div className="mb-2 flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-muted-foreground text-xs">#{index + 1}</p>
+                      <p className="font-medium">{task.title}</p>
+                      {task.description ? <p className="text-muted-foreground text-xs">{task.description}</p> : null}
+                    </div>
+                    <div className="min-w-[170px]">
+                      <Select
+                        value={task.status}
+                        disabled={!canMutateTask(task)}
+                        onValueChange={(newStatus) => {
+                          void handleStatusChange(task.id, newStatus)
+                        }}
+                      >
+                        <SelectTrigger className="h-8 text-xs font-semibold uppercase">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="pending">Pending</SelectItem>
+                          <SelectItem value="not_started">Not Started</SelectItem>
+                          <SelectItem value="in_progress">In Progress</SelectItem>
+                          <SelectItem value="completed">Completed</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <p className={`text-xs ${getDueDateClassName(task)}`}>Due: {formatDueDate(task)}</p>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
 
       <ExportOptionsDialog
         open={exportOptionsOpen}
         onOpenChange={setExportOptionsOpen}
-        title="Export Action Tracker"
+        title={`Export Action Tracker${exportScope.label ? ` - ${exportScope.label}` : ""}`}
         options={[
           { id: "pdf", label: "PDF", icon: "pdf" },
           { id: "pptx", label: "PowerPoint (.pptx)", icon: "pptx" },
@@ -615,24 +639,48 @@ export function ActionTrackerContent({
         onSelect={(id) => {
           if (id === "pdf") {
             void import("@/lib/action-points-export").then(({ exportActionPointsPdf }) =>
-              exportActionPointsPdf(actionItemsForExport, weekFilter, yearFilter, lockState?.meetingDate)
+              exportActionPointsPdf(
+                exportScope.items,
+                weekFilter,
+                yearFilter,
+                lockState?.meetingDate,
+                exportScope.department
+              )
             )
             return
           }
           if (id === "pptx") {
             void import("@/lib/export-utils").then(({ exportActionPointToPPTX }) =>
-              exportActionPointToPPTX(actionItemsForExport, weekFilter, yearFilter, lockState?.meetingDate)
+              exportActionPointToPPTX(
+                exportScope.items,
+                weekFilter,
+                yearFilter,
+                lockState?.meetingDate,
+                exportScope.department
+              )
             )
             return
           }
           if (id === "word") {
             void import("@/lib/action-points-export").then(({ exportActionPointsDocx }) =>
-              exportActionPointsDocx(actionItemsForExport, weekFilter, yearFilter, lockState?.meetingDate)
+              exportActionPointsDocx(
+                exportScope.items,
+                weekFilter,
+                yearFilter,
+                lockState?.meetingDate,
+                exportScope.department
+              )
             )
             return
           }
           void import("@/lib/export-utils").then(({ exportActionPointToXLSX }) =>
-            exportActionPointToXLSX(actionItemsForExport, weekFilter, yearFilter, undefined, lockState?.meetingDate)
+            exportActionPointToXLSX(
+              exportScope.items,
+              weekFilter,
+              yearFilter,
+              exportScope.department,
+              lockState?.meetingDate
+            )
           )
         }}
       />

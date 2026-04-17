@@ -414,10 +414,13 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
   })()
 
   return (
-    <Dialog defaultOpen onOpenChange={(open) => !open && router.push("/payments")}>
-      <DialogContent className="max-h-[92vh] w-[96vw] max-w-6xl overflow-y-auto p-0">
-        <div className="from-background via-background to-muted/20 min-h-screen bg-gradient-to-br p-4 md:p-6">
-          <div className="mx-auto max-w-5xl space-y-6">
+    <Dialog defaultOpen onOpenChange={(open) => !open && router.push("/payments", { scroll: false })}>
+      <DialogContent
+        className="max-h-[82vh] w-[96vw] max-w-3xl overflow-y-auto p-0"
+        onOpenAutoFocus={(event) => event.preventDefault()}
+      >
+        <div className="from-background via-background to-muted/20 bg-gradient-to-br p-3 md:p-4">
+          <div className="mx-auto max-w-3xl space-y-4">
             <PageHeader
               title={payment.title}
               description={

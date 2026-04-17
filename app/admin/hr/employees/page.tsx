@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { AdminEmployeeContent, type Employee, type UserProfile } from "./admin-employee-content"
-import { resolveAdminScope } from "@/lib/admin/rbac"
+import { resolveAdminScope, expandDepartmentScopeForQuery } from "@/lib/admin/rbac"
 import { logger } from "@/lib/logger"
 import type { Database, UserRole } from "@/types/database"
 
@@ -32,8 +32,21 @@ async function getAdminEmployeeData() {
     managed_departments: scope.managedDepartments,
   }
 
-  // Fetch employees - all leads can view users; mutation is restricted in the UI and backend.
-  const query = dataClient.from("profiles").select("*").order("last_name", { ascending: true })
+  // Build the employee query, scoping to managed departments for leads
+  let query = dataClient.from("profiles").select("*").order("last_name", { ascending: true })
+
+  // Leads in lead mode only see their departments; super admins / global mode see all
+  if (!scope.isAdminLike || scope.scopeMode === "lead") {
+    if (scope.isDepartmentLead && scope.managedDepartments.length > 0) {
+      const expandedDepts = expandDepartmentScopeForQuery(scope.managedDepartments)
+      if (expandedDepts.length > 0) {
+        query = query.in("department", expandedDepts)
+      } else {
+        // Lead with no valid dept mappings — return empty list
+        return { employees: [], userProfile }
+      }
+    }
+  }
 
   const { data: employeeData, error: employeeError } = await query
 

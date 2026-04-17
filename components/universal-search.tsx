@@ -100,46 +100,63 @@ export function UniversalSearch({ isAdminMode = false }: UniversalSearchProps) {
         variant="outline"
         className={cn(
           "text-muted-foreground relative h-10 w-full justify-start text-sm sm:pr-12 md:w-64 lg:w-80",
-          isAdminMode &&
-            "border-amber-300/70 bg-amber-50/60 text-amber-900 hover:bg-amber-100/70 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200 dark:hover:bg-amber-900/40"
+          isAdminMode && "hover:opacity-90"
         )}
+        style={
+          isAdminMode
+            ? {
+                borderColor: "var(--navbar-admin-sidebar-border)",
+                backgroundColor: "var(--navbar-admin-accent-soft)",
+                color: "var(--navbar-admin-primary)",
+              }
+            : undefined
+        }
         onClick={() => setOpen(true)}
       >
-        <Search className={cn("mr-2 h-4 w-4", isAdminMode && "text-amber-700 dark:text-amber-300")} />
+        <Search className="mr-2 h-4 w-4" style={isAdminMode ? { color: "var(--navbar-admin-primary)" } : undefined} />
         <span>Search anything...</span>
         <kbd
           className={cn(
             "bg-muted pointer-events-none absolute top-1.5 right-1.5 hidden h-6 items-center gap-1 rounded border px-1.5 font-mono text-[10px] font-medium opacity-100 select-none sm:flex",
-            isAdminMode &&
-              "border-amber-300/60 bg-amber-100/70 text-amber-900 dark:border-amber-800 dark:bg-amber-900/60 dark:text-amber-100"
+            isAdminMode && "bg-transparent"
           )}
+          style={
+            isAdminMode
+              ? {
+                  borderColor: "var(--navbar-admin-sidebar-border)",
+                  backgroundColor: "var(--navbar-admin-accent-soft)",
+                  color: "var(--navbar-admin-primary)",
+                }
+              : undefined
+          }
         >
           <span className="text-xs">⌘</span>K
         </kbd>
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className={cn("max-w-2xl p-0", isAdminMode && "border-amber-300/70 dark:border-amber-900")}>
+        <DialogContent
+          className="max-w-2xl p-0"
+          style={isAdminMode ? { borderColor: "var(--navbar-admin-sidebar-border)" } : undefined}
+        >
           <DialogHeader className="px-6 pt-6">
-            <DialogTitle className={cn(isAdminMode && "text-amber-900 dark:text-amber-200")}>Search</DialogTitle>
+            <DialogTitle style={isAdminMode ? { color: "var(--navbar-admin-primary)" } : undefined}>Search</DialogTitle>
           </DialogHeader>
           <div className="px-6 pb-4">
             <div className="relative">
               <Search
                 className={cn(
                   "text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2",
-                  isAdminMode && "text-amber-700 dark:text-amber-300"
+                  isAdminMode && ""
                 )}
+                style={isAdminMode ? { color: "var(--navbar-admin-primary)" } : undefined}
               />
               <Input
                 placeholder="Search employee, devices, assets, tasks, documentation, feedback..."
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                className={cn(
-                  "pl-9",
-                  isAdminMode &&
-                    "border-amber-300/80 focus-visible:ring-amber-500 dark:border-amber-800 dark:focus-visible:ring-amber-400"
-                )}
+                className={cn("pl-9", isAdminMode && "focus-visible:ring-[var(--navbar-admin-primary)]")}
+                style={isAdminMode ? { borderColor: "var(--navbar-admin-sidebar-border)" } : undefined}
                 autoFocus
               />
               {query && (

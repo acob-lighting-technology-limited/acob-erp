@@ -4,6 +4,7 @@ import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { CorrespondenceRecord, CorrespondenceStatus } from "@/types/correspondence"
 import { writeAuditLog } from "@/lib/audit/write-audit"
+import { getDepartmentAliases, normalizeDepartmentName } from "@/shared/departments"
 
 /** Minimal profile shape used across correspondence access-control helpers */
 interface ProfileLike {
@@ -44,7 +45,9 @@ export async function getAuthContext() {
   const [{ data: scopedProfile }, scope] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id, role, department, lead_departments, is_department_lead, first_name, last_name, full_name")
+      .select(
+        "id, role, department, lead_departments, is_department_lead, first_name, last_name, full_name, designation"
+      )
       .eq("id", user.id)
       .single(),
     resolveAdminScope(supabase as unknown as SupabaseClient, user.id),
@@ -53,7 +56,9 @@ export async function getAuthContext() {
     ? { data: null }
     : await dataClient
         .from("profiles")
-        .select("id, role, department, lead_departments, is_department_lead, first_name, last_name, full_name")
+        .select(
+          "id, role, department, lead_departments, is_department_lead, first_name, last_name, full_name, designation"
+        )
         .eq("id", user.id)
         .single()
 
@@ -84,7 +89,12 @@ export function canAccessDepartment(profile: ProfileLike | null | undefined, dep
       ? profile.lead_departments
       : []
 
-  return managedDepartments.includes(department) || profile?.department === department
+  const canonicalTarget = normalizeDepartmentName(department)
+  const targetAliases = new Set(getDepartmentAliases(canonicalTarget).map((item) => normalizeDepartmentName(item)))
+  const normalizedManaged = managedDepartments.map((item) => normalizeDepartmentName(String(item || "")))
+  const normalizedPrimary = profile?.department ? normalizeDepartmentName(profile.department) : ""
+
+  return normalizedManaged.some((dept) => targetAliases.has(dept)) || targetAliases.has(normalizedPrimary)
 }
 
 export function canAccessRecord(
@@ -154,15 +164,34 @@ export async function appendCorrespondenceAuditLog(params: {
 }
 
 export async function getDepartmentCodeByName(departmentName: string): Promise<string | null> {
+  const requestedName = String(departmentName || "").trim()
+  const normalizedRequested = normalizeDepartmentName(requestedName)
+  const codeOverrides: Record<string, string> = {
+    [normalizeDepartmentName("IT and Communications")]: "ICT",
+    [normalizeDepartmentName("Legal, Regulatory and Compliance")]: "RC",
+    [normalizeDepartmentName("Regulatory and Compliance")]: "RC",
+    [normalizeDepartmentName("Regulatory and Compilance")]: "RC",
+    [normalizeDepartmentName("Admin & HR")]: "HR",
+    [normalizeDepartmentName("Human Resources")]: "HR",
+  }
+
+  if (codeOverrides[normalizedRequested]) {
+    return codeOverrides[normalizedRequested]
+  }
+
   const supabase = await createClient()
   const dataClient = getServiceRoleClientOrFallback(supabase)
   const { data, error } = await dataClient
     .from("correspondence_department_codes")
-    .select("department_code")
-    .eq("department_name", departmentName)
+    .select("department_name, department_code")
     .eq("is_active", true)
-    .single()
 
   if (error || !data) return null
-  return data.department_code
+  const exact = data.find((item) => item.department_name === requestedName)
+  if (exact?.department_code) return exact.department_code
+
+  const normalizedMatch = data.find(
+    (item) => normalizeDepartmentName(String(item.department_name || "")) === normalizedRequested
+  )
+  return normalizedMatch?.department_code || null
 }

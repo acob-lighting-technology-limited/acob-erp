@@ -21,6 +21,8 @@ const VALID_TRANSITIONS: Record<string, string[]> = {
 type TaskRecord = {
   id: string
   status: string
+  goal_id?: string | null
+  assignment_type?: string | null
   assigned_to?: string | null
   assigned_by?: string | null
   department?: string | null
@@ -64,7 +66,9 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
     const { data: task, error: taskError } = await supabase
       .from("tasks")
-      .select("id, status, assigned_to, assigned_by, department, started_at, completed_at, work_item_number")
+      .select(
+        "id, status, goal_id, assignment_type, assigned_to, assigned_by, department, started_at, completed_at, work_item_number"
+      )
       .eq("id", params.id)
       .single<TaskRecord>()
 
@@ -92,6 +96,15 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
     if (!canAccess) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
+
+    if (!task.goal_id) {
+      return NextResponse.json({ error: "Task must be linked to a goal before it can be updated" }, { status: 400 })
+    }
+
+    // Policy: department tasks are updated by department leads only.
+    if (task.assignment_type === "department" && !isLeadForTask(profile ?? null, task.department)) {
+      return NextResponse.json({ error: "Only department leads can update department tasks" }, { status: 403 })
     }
 
     const oldStatus = task.status

@@ -11,6 +11,9 @@ import { StatCard } from "@/components/ui/stat-card"
 import { isAssignableEmploymentStatus } from "@/lib/workforce/assignment-policy"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import type { Database } from "@/types/database"
+import { getDepartmentAliases, normalizeDepartmentName } from "@/shared/departments"
+import { useAdminScope } from "@/components/admin-scope-context"
+import type { ClientAdminScope } from "@/components/admin-scope-context"
 
 interface DashboardStats {
   pendingLeaveRequests: number
@@ -20,11 +23,6 @@ interface DashboardStats {
   totalDepartments: number
   totalOfficeLocations: number
 }
-
-type HrProfile = Pick<
-  Database["public"]["Tables"]["profiles"]["Row"],
-  "role" | "department" | "is_department_lead" | "lead_departments"
->
 
 type ProfileIdRow = Pick<Database["public"]["Tables"]["profiles"]["Row"], "id">
 type AttendanceRow = {
@@ -37,26 +35,33 @@ type ReviewRow = {
 }
 type LocationRow = Pick<Database["public"]["Tables"]["profiles"]["Row"], "office_location" | "department">
 
-async function fetchHrDashboardStats(): Promise<DashboardStats> {
-  const supabase = createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  const { data: profile } = user
-    ? await supabase
-        .from("profiles")
-        .select("role, department, is_department_lead, lead_departments")
-        .eq("id", user.id)
-        .maybeSingle<HrProfile>()
-    : { data: null as HrProfile | null }
+function expandScopedDepartments(departments: string[]): string[] {
+  return Array.from(
+    new Set(departments.flatMap((departmentName) => getDepartmentAliases(departmentName)).filter(Boolean))
+  )
+}
 
-  const isAdminLike = ["developer", "admin", "super_admin"].includes(String(profile?.role || ""))
-  const scopedDepartments =
-    !isAdminLike && profile?.is_department_lead
-      ? Array.from(new Set([profile.department, ...(profile.lead_departments || [])].filter(Boolean)))
-      : []
-  const scopedUserIds = scopedDepartments.length
-    ? (await supabase.from("profiles").select("id").in("department", scopedDepartments)).data?.map(
+async function fetchHrDashboardStats(scope: ClientAdminScope): Promise<DashboardStats> {
+  const supabase = createClient()
+
+  // Derive scoped departments from the already-resolved AdminScope from context —
+  // no extra round-trip to /api/admin/scope-mode needed.
+  const isAdminLike = scope.isAdminLike
+  const isLeadMode = scope.scopeMode === "lead"
+  let scopedDepartments: string[] = []
+
+  if (!isAdminLike || isLeadMode) {
+    // Lead or admin in lead mode: scope to managed departments
+    scopedDepartments = scope.managedDepartments.filter(Boolean)
+  }
+  // isAdminLike in global mode: scopedDepartments stays [] → no filter
+
+  const queryScopedDepartments = expandScopedDepartments(scopedDepartments)
+  const scopedDepartmentTokens = new Set(
+    scopedDepartments.map((departmentName) => normalizeDepartmentName(departmentName))
+  )
+  const scopedUserIds = queryScopedDepartments.length
+    ? (await supabase.from("profiles").select("id").in("department", queryScopedDepartments)).data?.map(
         (row: ProfileIdRow) => row.id
       ) || []
     : []
@@ -89,22 +94,22 @@ async function fetchHrDashboardStats(): Promise<DashboardStats> {
   const reviewRows = scopedUserIds.length > 0 ? reviews?.filter((row) => scopedUserIds.includes(row.user_id)) : reviews
 
   let employeeCountQuery = supabase.from("profiles").select("*", { count: "exact", head: true })
-  if (scopedDepartments.length > 0) {
-    employeeCountQuery = employeeCountQuery.in("department", scopedDepartments)
+  if (queryScopedDepartments.length > 0) {
+    employeeCountQuery = employeeCountQuery.in("department", queryScopedDepartments)
   }
   const { count: employeeCount } = await employeeCountQuery
   let departmentCountQuery = supabase.from("departments").select("*", { count: "exact", head: true })
-  if (scopedDepartments.length > 0) {
-    departmentCountQuery = departmentCountQuery.in("name", scopedDepartments)
+  if (queryScopedDepartments.length > 0) {
+    departmentCountQuery = departmentCountQuery.in("name", queryScopedDepartments)
   }
   const { count: departmentCount } = await departmentCountQuery
   const { data: locations } = await supabase.from("profiles").select("office_location, department, employment_status")
   const locationRows =
-    scopedDepartments.length > 0
+    scopedDepartmentTokens.size > 0
       ? (locations || []).filter(
           (row: LocationRow & { employment_status?: string | null }) =>
             isAssignableEmploymentStatus(row.employment_status, { allowLegacyNullStatus: false }) &&
-            scopedDepartments.includes(String(row.department || ""))
+            scopedDepartmentTokens.has(normalizeDepartmentName(String(row.department || "")))
         )
       : (locations || []).filter((row: LocationRow & { employment_status?: string | null }) =>
           isAssignableEmploymentStatus(row.employment_status, { allowLegacyNullStatus: false })
@@ -123,6 +128,8 @@ async function fetchHrDashboardStats(): Promise<DashboardStats> {
 }
 
 export default function HRAdminDashboard() {
+  const scope = useAdminScope()
+
   const {
     data: stats = {
       pendingLeaveRequests: 0,
@@ -133,8 +140,9 @@ export default function HRAdminDashboard() {
       totalOfficeLocations: 0,
     },
   } = useQuery({
-    queryKey: QUERY_KEYS.adminHrDashboard(),
-    queryFn: fetchHrDashboardStats,
+    // Include scope-relevant fields so toggling lead mode auto-invalidates
+    queryKey: [...QUERY_KEYS.adminHrDashboard(), scope.scopeMode, scope.managedDepartments.join(",")],
+    queryFn: () => fetchHrDashboardStats(scope),
   })
 
   return (
@@ -253,18 +261,18 @@ export default function HRAdminDashboard() {
             </CardContent>
           </Card>
 
-          {/* Fleet Booking */}
+          {/* Resource Booking */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Calendar className="h-5 w-5" />
-                Fleet Booking
+                Resource Booking
               </CardTitle>
-              <CardDescription>Manage resources and review fleet booking applications</CardDescription>
+              <CardDescription>Manage shared resources and review booking applications</CardDescription>
             </CardHeader>
             <CardContent>
               <Link href="/admin/hr/fleet">
-                <Button className="w-full">Open Fleet Admin</Button>
+                <Button className="w-full">Open Resource Booking Admin</Button>
               </Link>
             </CardContent>
           </Card>

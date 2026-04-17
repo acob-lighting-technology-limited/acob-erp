@@ -60,6 +60,8 @@ type ReviewFilter = {
   cycleId?: string | null
   limit?: number
   offset?: number
+  /** Pre-resolved set of user IDs to restrict results to (dept scoping). null = no restriction. */
+  userIds?: string[]
 }
 
 export async function getUnifiedPerformanceReviews(
@@ -77,6 +79,9 @@ export async function getUnifiedPerformanceReviews(
 
   if (filters.userId) {
     query = query.eq("user_id", filters.userId)
+  } else if (filters.userIds && filters.userIds.length > 0) {
+    // Dept-scoped list view: restrict to pre-resolved user IDs
+    query = query.in("user_id", filters.userIds)
   }
   if (filters.cycleId) {
     query = query.eq("review_cycle_id", filters.cycleId)

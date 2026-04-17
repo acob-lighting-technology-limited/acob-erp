@@ -31,6 +31,8 @@ export interface HelpDeskTicket {
   assigned_to: string | null
   assigned_by: string | null
   task_id?: string | null
+  goal_id?: string | null
+  goal_title?: string | null
   requester_department?: string | null
   handling_mode?: string | null
   support_mode?: string | null
@@ -45,6 +47,7 @@ export interface HelpDeskTicket {
   closed_at: string | null
   csat_rating: number | null
   csat_feedback: string | null
+  comment_count?: number
   created_at: string
   updated_at: string
 }

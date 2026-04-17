@@ -1,364 +1,322 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { formatName } from "@/lib/utils"
-import { Package, Calendar, User, FileText, Building2, Hash, Search, Filter } from "lucide-react"
-import { ASSET_TYPE_MAP } from "@/lib/asset-types"
-import type { AssetAssignment } from "./page"
-import { AppTablePage } from "@/components/app/app-table-page"
 import { toast } from "sonner"
+import { Building2, Hash, Package, User } from "lucide-react"
+import { ASSET_TYPE_MAP } from "@/lib/asset-types"
+import { formatName } from "@/lib/utils"
+import type { AssetAssignment } from "./page"
+import { DataTable, DataTablePage } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
-import { EmptyState } from "@/components/ui/patterns"
-import { TableViewToggle } from "@/components/admin/table-view-toggle"
+import { Badge } from "@/components/ui/badge"
 
 interface AssetsContentProps {
   initialAssignments: AssetAssignment[]
   initialError?: string | null
 }
 
+type AssetRow = AssetAssignment & {
+  assignmentType: "Personal" | "Department" | "Office"
+  assetTypeLabel: string
+  statusLabel: string
+}
+
 export function AssetsContent({ initialAssignments, initialError }: AssetsContentProps) {
   const [assignments] = useState<AssetAssignment[]>(initialAssignments)
-  const [viewMode, setViewMode] = useState<"list" | "card">("list")
-  const [searchQuery, setSearchQuery] = useState("")
-  const [statusFilter, setStatusFilter] = useState("all")
-  const [assignmentTypeFilter, setAssignmentTypeFilter] = useState("all")
 
   useEffect(() => {
-    if (initialError) {
-      toast.error(initialError)
-    }
+    if (initialError) toast.error(initialError)
   }, [initialError])
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    })
-  }
+  const rows = useMemo<AssetRow[]>(
+    () =>
+      assignments.map((assignment) => {
+        const assignmentType =
+          assignment.id.startsWith("shared-") && assignment.asset?.assignment_type === "department"
+            ? "Department"
+            : assignment.id.startsWith("shared-") && assignment.asset?.assignment_type === "office"
+              ? "Office"
+              : "Personal"
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "assigned":
-        return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-      case "maintenance":
-        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
-      case "available":
-        return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
-      default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
-    }
-  }
-
-  const getAssetTypeLabel = (assetTypeCode: string) => {
-    return ASSET_TYPE_MAP[assetTypeCode]?.label || assetTypeCode
-  }
-
-  const getAssignmentTypeLabel = (assignment: AssetAssignment) => {
-    if (assignment.id.startsWith("shared-")) {
-      if (assignment.asset?.assignment_type === "department") {
-        return "Department"
-      } else if (assignment.asset?.assignment_type === "office") {
-        return "Office"
-      }
-    }
-    return "Personal"
-  }
-
-  const getAssignmentTypeBadgeColor = (type: string) => {
-    switch (type) {
-      case "Personal":
-        return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
-      case "Department":
-        return "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400"
-      case "Office":
-        return "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400"
-      default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
-    }
-  }
-
-  const filteredAssignments = useMemo(() => {
-    const normalizedSearch = searchQuery.trim().toLowerCase()
-
-    return assignments.filter((assignment) => {
-      const assignmentType = getAssignmentTypeLabel(assignment)
-      const status = assignment.asset?.status || "available"
-      const matchesStatus = statusFilter === "all" || status === statusFilter
-      const matchesAssignmentType = assignmentTypeFilter === "all" || assignmentType === assignmentTypeFilter
-      const matchesSearch =
-        normalizedSearch.length === 0 ||
-        [
-          getAssetTypeLabel(assignment.asset?.asset_type || ""),
-          assignment.asset?.unique_code,
-          assignment.asset?.asset_model,
-          assignment.asset?.serial_number,
-          String(assignment.asset?.acquisition_year || ""),
-          assignment.department,
-          assignment.assigner ? `${assignment.assigner.first_name || ""} ${assignment.assigner.last_name || ""}` : "",
+        return {
+          ...assignment,
           assignmentType,
-        ].some((value) => String(value || "").toLowerCase().includes(normalizedSearch))
+          assetTypeLabel:
+            ASSET_TYPE_MAP[assignment.asset?.asset_type || ""]?.label || assignment.asset?.asset_type || "-",
+          statusLabel: assignment.asset?.status || "available",
+        }
+      }),
+    [assignments]
+  )
 
-      return matchesStatus && matchesAssignmentType && matchesSearch
-    })
-  }, [assignmentTypeFilter, assignments, searchQuery, statusFilter])
+  const statusClass = (status: string) => {
+    if (status === "assigned") return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+    if (status === "maintenance") return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
+    if (status === "available") return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
+    return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
+  }
+
+  const assignmentTypeClass = (type: string) => {
+    if (type === "Personal") return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
+    if (type === "Department") return "bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-400"
+    if (type === "Office") return "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400"
+    return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
+  }
+
+  const columns = useMemo<DataTableColumn<AssetRow>[]>(
+    () => [
+      {
+        key: "asset_type",
+        label: "Asset",
+        sortable: true,
+        accessor: (row) => row.assetTypeLabel,
+        resizable: true,
+        initialWidth: 220,
+        render: (row) => <span className="font-medium">{row.assetTypeLabel}</span>,
+      },
+      {
+        key: "unique_code",
+        label: "Unique Code",
+        sortable: true,
+        accessor: (row) => row.asset?.unique_code || "",
+        render: (row) => (
+          <div className="flex items-center gap-1.5">
+            <Hash className="text-muted-foreground h-3.5 w-3.5" />
+            <span className="font-mono text-sm">{row.asset?.unique_code || "-"}</span>
+          </div>
+        ),
+      },
+      {
+        key: "asset_model",
+        label: "Model",
+        sortable: true,
+        accessor: (row) => row.asset?.asset_model || "",
+      },
+      {
+        key: "serial_number",
+        label: "Serial",
+        sortable: true,
+        accessor: (row) => row.asset?.serial_number || "",
+        hideOnMobile: true,
+      },
+      {
+        key: "acquisition_year",
+        label: "Year",
+        sortable: true,
+        accessor: (row) => row.asset?.acquisition_year || 0,
+        hideOnMobile: true,
+      },
+      {
+        key: "status",
+        label: "Status",
+        sortable: true,
+        accessor: (row) => row.statusLabel,
+        render: (row) => <Badge className={statusClass(row.statusLabel)}>{row.statusLabel}</Badge>,
+      },
+      {
+        key: "assignmentType",
+        label: "Assignment",
+        sortable: true,
+        accessor: (row) => row.assignmentType,
+        render: (row) => <Badge className={assignmentTypeClass(row.assignmentType)}>{row.assignmentType}</Badge>,
+      },
+      {
+        key: "assigned_at",
+        label: "Assigned",
+        sortable: true,
+        accessor: (row) => row.assigned_at,
+        render: (row) =>
+          new Date(row.assigned_at).toLocaleDateString("en-GB", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+      },
+    ],
+    []
+  )
+
+  const assignmentTypeOptions = useMemo(
+    () =>
+      Array.from(new Set(rows.map((row) => row.assignmentType))).map((type) => ({
+        value: type,
+        label: type,
+      })),
+    [rows]
+  )
+
+  const statusOptions = useMemo(
+    () =>
+      Array.from(new Set(rows.map((row) => row.statusLabel))).map((status) => ({
+        value: status,
+        label: status,
+      })),
+    [rows]
+  )
+
+  const assetTypeOptions = useMemo(
+    () =>
+      Array.from(new Set(rows.map((row) => row.assetTypeLabel))).map((assetType) => ({
+        value: assetType,
+        label: assetType,
+      })),
+    [rows]
+  )
+
+  const filters = useMemo<DataTableFilter<AssetRow>[]>(
+    () => [
+      {
+        key: "status",
+        label: "Status",
+        options: statusOptions,
+      },
+      {
+        key: "assignmentType",
+        label: "Assignment Type",
+        options: assignmentTypeOptions,
+      },
+      {
+        key: "asset_type",
+        label: "Asset Type",
+        options: assetTypeOptions,
+      },
+    ],
+    [assignmentTypeOptions, assetTypeOptions, statusOptions]
+  )
 
   return (
-    <AppTablePage
+    <DataTablePage
       title="My Assets"
-      description="View your currently assigned assets and equipment"
+      description="View your currently assigned assets and equipment."
       icon={Package}
-      actions={
-        <TableViewToggle viewMode={viewMode} onChange={setViewMode} />
-      }
+      backLink={{ href: "/profile", label: "Back to Dashboard" }}
       stats={
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard
             title="Assigned Assets"
-            value={assignments.length}
+            value={rows.length}
             icon={Package}
-            iconBgColor="bg-blue-100 dark:bg-blue-900/30"
-            iconColor="text-blue-600 dark:text-blue-400"
+            iconBgColor="bg-blue-500/10"
+            iconColor="text-blue-500"
           />
           <StatCard
             title="Personal"
-            value={assignments.filter((assignment) => getAssignmentTypeLabel(assignment) === "Personal").length}
+            value={rows.filter((row) => row.assignmentType === "Personal").length}
             icon={User}
-            iconBgColor="bg-green-100 dark:bg-green-900/30"
-            iconColor="text-green-600 dark:text-green-400"
+            iconBgColor="bg-emerald-500/10"
+            iconColor="text-emerald-500"
           />
           <StatCard
             title="Department"
-            value={assignments.filter((assignment) => getAssignmentTypeLabel(assignment) === "Department").length}
+            value={rows.filter((row) => row.assignmentType === "Department").length}
             icon={Building2}
-            iconBgColor="bg-purple-100 dark:bg-purple-900/30"
-            iconColor="text-purple-600 dark:text-purple-400"
+            iconBgColor="bg-violet-500/10"
+            iconColor="text-violet-500"
           />
           <StatCard
             title="Office"
-            value={assignments.filter((assignment) => getAssignmentTypeLabel(assignment) === "Office").length}
+            value={rows.filter((row) => row.assignmentType === "Office").length}
             icon={Package}
-            iconBgColor="bg-orange-100 dark:bg-orange-900/30"
-            iconColor="text-orange-600 dark:text-orange-400"
+            iconBgColor="bg-amber-500/10"
+            iconColor="text-amber-500"
           />
         </div>
       }
-      filters={
-        <Card className="border-2">
-          <CardContent className="p-4">
-            <div className="grid gap-3 lg:grid-cols-[1.2fr_220px_220px]">
-              <div className="relative">
-                <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-                <Input
-                  value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                  placeholder="Search by asset name, code, model, serial, year, or assigner..."
-                  className="pl-9"
-                />
-              </div>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger>
-                  <div className="flex items-center gap-2">
-                    <Filter className="h-4 w-4" />
-                    <SelectValue placeholder="All status" />
-                  </div>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="assigned">Assigned</SelectItem>
-                  <SelectItem value="maintenance">Maintenance</SelectItem>
-                  <SelectItem value="available">Available</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={assignmentTypeFilter} onValueChange={setAssignmentTypeFilter}>
-                <SelectTrigger>
-                  <div className="flex items-center gap-2">
-                    <Package className="h-4 w-4" />
-                    <SelectValue placeholder="All assignment types" />
-                  </div>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Assignment Types</SelectItem>
-                  <SelectItem value="Personal">Personal</SelectItem>
-                  <SelectItem value="Department">Department</SelectItem>
-                  <SelectItem value="Office">Office</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </CardContent>
-        </Card>
-      }
     >
-      {/* Assets List/Grid */}
-      {filteredAssignments.length > 0 ? (
-        viewMode === "list" ? (
-          <Card className="border-2">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader className="bg-muted/50">
-                  <TableRow>
-                    <TableHead className="text-foreground w-[50px] font-bold">#</TableHead>
-                    <TableHead className="text-foreground font-bold">Asset Name</TableHead>
-                    <TableHead className="text-foreground font-bold">Unique Code</TableHead>
-                    <TableHead className="text-foreground font-bold">Model</TableHead>
-                    <TableHead className="text-foreground font-bold">Serial Number</TableHead>
-                    <TableHead className="text-foreground font-bold">Year</TableHead>
-                    <TableHead className="text-foreground font-bold">Status</TableHead>
-                    <TableHead className="text-foreground font-bold">Assignment Type</TableHead>
-                    <TableHead className="text-foreground font-bold">Assigned</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredAssignments.map((assignment, index) => {
-                    const assignmentType = getAssignmentTypeLabel(assignment)
-                    return (
-                      <TableRow key={assignment.id}>
-                        <TableCell className="font-medium">{index + 1}</TableCell>
-                        <TableCell className="font-medium">
-                          {getAssetTypeLabel(assignment.asset?.asset_type || "")}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1.5">
-                            <Hash className="text-muted-foreground h-3.5 w-3.5" />
-                            <span className="font-mono text-sm">{assignment.asset?.unique_code || "-"}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>{assignment.asset?.asset_model || "-"}</TableCell>
-                        <TableCell>
-                          {assignment.asset?.serial_number ? (
-                            <span className="font-mono text-sm">{assignment.asset.serial_number}</span>
-                          ) : (
-                            "-"
-                          )}
-                        </TableCell>
-                        <TableCell>{assignment.asset?.acquisition_year || "-"}</TableCell>
-                        <TableCell>
-                          <Badge className={getStatusColor(assignment.asset?.status || "available")}>
-                            {assignment.asset?.status || "available"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={getAssignmentTypeBadgeColor(assignmentType)}>{assignmentType}</Badge>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground text-sm">
-                          {formatDate(assignment.assigned_at)}
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
-                </TableBody>
-              </Table>
+      <DataTable<AssetRow>
+        data={rows}
+        columns={columns}
+        filters={filters}
+        getRowId={(row) => row.id}
+        searchPlaceholder="Search asset name, code, model, serial, or assignment..."
+        searchFn={(row, query) => {
+          const q = query.toLowerCase()
+          return (
+            row.assetTypeLabel.toLowerCase().includes(q) ||
+            String(row.asset?.unique_code || "")
+              .toLowerCase()
+              .includes(q) ||
+            String(row.asset?.asset_model || "")
+              .toLowerCase()
+              .includes(q) ||
+            String(row.asset?.serial_number || "")
+              .toLowerCase()
+              .includes(q) ||
+            row.assignmentType.toLowerCase().includes(q) ||
+            String(row.department || "")
+              .toLowerCase()
+              .includes(q) ||
+            `${row.assigner?.first_name || ""} ${row.assigner?.last_name || ""}`.toLowerCase().includes(q)
+          )
+        }}
+        emptyTitle="No assets found"
+        emptyDescription={
+          rows.length === 0 ? "You do not have any assets assigned yet." : "No assets match the current filters."
+        }
+        emptyIcon={Package}
+        skeletonRows={6}
+        viewToggle
+        cardRenderer={(row) => (
+          <div className="space-y-3 rounded-xl border p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-medium">{row.assetTypeLabel}</p>
+                <p className="text-muted-foreground font-mono text-sm">{row.asset?.unique_code || "-"}</p>
+              </div>
+              <Badge className={assignmentTypeClass(row.assignmentType)}>{row.assignmentType}</Badge>
             </div>
-          </Card>
-        ) : (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {filteredAssignments.map((assignment) => {
-              const assignmentType = getAssignmentTypeLabel(assignment)
-              return (
-                <Card key={assignment.id} className="border-2 shadow-lg transition-shadow hover:shadow-xl">
-                  <CardHeader className="from-primary/5 to-background border-b bg-gradient-to-r">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-start gap-3">
-                        <div className="bg-primary/10 rounded-lg p-3">
-                          <Package className="text-primary h-6 w-6" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <CardTitle className="text-lg">
-                            {getAssetTypeLabel(assignment.asset?.asset_type || "")}
-                          </CardTitle>
-                          <CardDescription className="mt-1 flex items-center gap-1.5">
-                            <Hash className="h-3.5 w-3.5" />
-                            <span className="font-mono text-xs">{assignment.asset?.unique_code || "-"}</span>
-                          </CardDescription>
-                        </div>
-                      </div>
-                      <div className="flex flex-col gap-2">
-                        <Badge className={getStatusColor(assignment.asset?.status || "available")}>
-                          {assignment.asset?.status || "available"}
-                        </Badge>
-                        <Badge className={getAssignmentTypeBadgeColor(assignmentType)}>{assignmentType}</Badge>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-3 p-6">
-                    {assignment.asset?.asset_model && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <FileText className="text-muted-foreground h-4 w-4" />
-                        <span className="text-muted-foreground">Model:</span>
-                        <span className="text-foreground font-medium">{assignment.asset.asset_model}</span>
-                      </div>
-                    )}
-
-                    {assignment.asset?.serial_number && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <FileText className="text-muted-foreground h-4 w-4" />
-                        <span className="text-muted-foreground">Serial:</span>
-                        <span className="text-foreground font-mono">{assignment.asset.serial_number}</span>
-                      </div>
-                    )}
-
-                    {assignment.asset?.acquisition_year && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Calendar className="text-muted-foreground h-4 w-4" />
-                        <span className="text-muted-foreground">Year:</span>
-                        <span className="text-foreground font-medium">{assignment.asset.acquisition_year}</span>
-                      </div>
-                    )}
-
-                    <div className="flex items-center gap-2 text-sm">
-                      <Calendar className="text-muted-foreground h-4 w-4" />
-                      <span className="text-muted-foreground">Assigned:</span>
-                      <span className="text-foreground">{formatDate(assignment.assigned_at)}</span>
-                    </div>
-
-                    {assignment.department ? (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Building2 className="text-muted-foreground h-4 w-4" />
-                        <span className="text-muted-foreground">Department:</span>
-                        <span className="text-foreground font-medium">{assignment.department}</span>
-                      </div>
-                    ) : (
-                      assignment.assigner && (
-                        <div className="flex items-center gap-2 text-sm">
-                          <User className="text-muted-foreground h-4 w-4" />
-                          <span className="text-muted-foreground">Assigned by:</span>
-                          <span className="text-foreground">
-                            {formatName(assignment.assigner.first_name)} {formatName(assignment.assigner.last_name)}
-                          </span>
-                        </div>
-                      )
-                    )}
-
-                    {assignment.assignment_notes && (
-                      <div className="bg-muted/50 mt-4 rounded-lg p-3">
-                        <p className="text-foreground mb-1 text-sm font-medium">Notes:</p>
-                        <p className="text-muted-foreground text-sm">{assignment.assignment_notes}</p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              )
-            })}
+            <div className="grid gap-1 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Status</span>
+                <Badge className={statusClass(row.statusLabel)}>{row.statusLabel}</Badge>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Model</span>
+                <span>{row.asset?.asset_model || "-"}</span>
+              </div>
+            </div>
           </div>
-        )
-      ) : (
-        <EmptyState
-          title="No Assets Found"
-          description={
-            assignments.length === 0
-              ? "You don't have any assets assigned to you at the moment."
-              : "No assets match your current filters."
-          }
-          icon={Package}
-        />
-      )}
-    </AppTablePage>
+        )}
+        expandable={{
+          render: (row) => (
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2 text-sm">
+                <p>
+                  <span className="text-muted-foreground">Serial:</span>{" "}
+                  <span className="font-mono">{row.asset?.serial_number || "-"}</span>
+                </p>
+                <p>
+                  <span className="text-muted-foreground">Acquisition Year:</span> {row.asset?.acquisition_year || "-"}
+                </p>
+                <p>
+                  <span className="text-muted-foreground">Assigned:</span>{" "}
+                  {new Date(row.assigned_at).toLocaleString("en-GB")}
+                </p>
+              </div>
+              <div className="space-y-2 text-sm">
+                {row.department ? (
+                  <p>
+                    <span className="text-muted-foreground">Department:</span> {row.department}
+                  </p>
+                ) : null}
+                {row.assigner ? (
+                  <p>
+                    <span className="text-muted-foreground">Assigned By:</span>{" "}
+                    {`${formatName(row.assigner.first_name)} ${formatName(row.assigner.last_name)}`}
+                  </p>
+                ) : null}
+                <p>
+                  <span className="text-muted-foreground">Notes:</span> {row.assignment_notes || "-"}
+                </p>
+              </div>
+            </div>
+          ),
+        }}
+        urlSync
+      />
+    </DataTablePage>
   )
 }

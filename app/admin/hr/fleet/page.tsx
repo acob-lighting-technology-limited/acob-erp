@@ -1,13 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { CalendarCheck2, CheckCircle2, Paperclip, Plus, XCircle } from "lucide-react"
-import { AdminTablePage } from "@/components/admin/admin-table-page"
+import { CalendarCheck2, CheckCircle2, Paperclip, Plus, XCircle, Box } from "lucide-react"
+
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Dialog,
   DialogContent,
@@ -19,10 +19,15 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { StatCard } from "@/components/ui/stat-card"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { QUERY_KEYS } from "@/lib/query-keys"
-import { TableSkeleton } from "@/components/ui/query-states"
+import {
+  DataTablePage,
+  DataTable,
+  type DataTableColumn,
+  type DataTableFilter,
+  type DataTableTab,
+} from "@/components/ui/data-table"
 
 type FleetResource = {
   id: string
@@ -67,18 +72,25 @@ async function fetchFleetResources(): Promise<FleetResource[]> {
   return payload.data || []
 }
 
-async function fetchFleetBookings(status?: string): Promise<FleetBooking[]> {
-  const statusParam = status === "pending" ? "?status=pending" : ""
-  const response = await fetch(`/api/admin/hr/fleet/bookings${statusParam}`)
+async function fetchFleetBookings(): Promise<FleetBooking[]> {
+  const response = await fetch(`/api/admin/hr/fleet/bookings`)
   const payload = await response.json()
   if (!response.ok) throw new Error(payload.error || "Failed to load bookings")
   return payload.data || []
 }
 
-export default function AdminFleetPage() {
-  const queryClient = useQueryClient()
-  const [tab, setTab] = useState<"pending" | "all">("pending")
+const TABS: DataTableTab[] = [
+  { key: "bookings", label: "Bookings", icon: CalendarCheck2 },
+  { key: "resources", label: "Resources", icon: Box },
+]
 
+export default function AdminFleetPage() {
+  const router = useRouter()
+  const queryClient = useQueryClient()
+  const [tab, setTab] = useState("bookings")
+  const [accessChecked, setAccessChecked] = useState(false)
+
+  const [isResourceDialogOpen, setIsResourceDialogOpen] = useState(false)
   const [resourceName, setResourceName] = useState("")
   const [resourceType, setResourceType] = useState("general")
   const [resourceDescription, setResourceDescription] = useState("")
@@ -89,16 +101,36 @@ export default function AdminFleetPage() {
   const [reviewing, setReviewing] = useState(false)
   const [adminNote, setAdminNote] = useState("")
 
+  useEffect(() => {
+    let isMounted = true
+    async function verifyAccess() {
+      try {
+        const response = await fetch("/api/admin/hr/fleet/bookings?status=pending", { cache: "no-store" })
+        if (!response.ok && (response.status === 401 || response.status === 403)) {
+          router.replace("/admin/hr")
+          return
+        }
+      } finally {
+        if (isMounted) setAccessChecked(true)
+      }
+    }
+    void verifyAccess()
+    return () => {
+      isMounted = false
+    }
+  }, [router])
+
   const { data: resources = [], isLoading: loadingResources } = useQuery({
     queryKey: QUERY_KEYS.adminFleetResources(),
     queryFn: fetchFleetResources,
   })
 
   const { data: bookings = [], isLoading: loadingBookings } = useQuery({
-    queryKey: QUERY_KEYS.adminFleetBookings(tab),
-    queryFn: () => fetchFleetBookings(tab),
+    queryKey: QUERY_KEYS.adminFleetBookings("all"),
+    queryFn: fetchFleetBookings,
   })
 
+  // ─── Resources Actions ───────────────────────────────────────────────────
   async function createResource() {
     setSavingResource(true)
     try {
@@ -118,6 +150,7 @@ export default function AdminFleetPage() {
       setResourceName("")
       setResourceType("general")
       setResourceDescription("")
+      setIsResourceDialogOpen(false)
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminFleetResources() })
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to create resource")
@@ -142,6 +175,7 @@ export default function AdminFleetPage() {
     }
   }
 
+  // ─── Bookings Actions ────────────────────────────────────────────────────
   async function openReview(booking: FleetBooking) {
     setSelectedBooking(booking)
     setAdminNote(booking.admin_note || "")
@@ -170,7 +204,7 @@ export default function AdminFleetPage() {
       if (!response.ok) throw new Error(payload.error || "Review failed")
       toast.success(`Booking ${action}d`)
       setSelectedBooking(null)
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminFleetBookings(tab) })
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminFleetBookings("all") })
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Review failed")
     } finally {
@@ -178,32 +212,275 @@ export default function AdminFleetPage() {
     }
   }
 
-  const pendingCount = bookings.filter((booking) => booking.status === "pending").length
-  const approvedCount = bookings.filter((booking) => booking.status === "approved").length
-  const rejectedCount = bookings.filter((booking) => booking.status === "rejected").length
+  // ─── Columns & Filters ───────────────────────────────────────────────────
+  const bookingColumns: DataTableColumn<FleetBooking>[] = useMemo(
+    () => [
+      {
+        key: "resource",
+        label: "Resource",
+        sortable: true,
+        resizable: true,
+        initialWidth: 200,
+        accessor: (r) => r.resource?.name || "Unknown",
+        render: (r) => <span className="font-medium">{r.resource?.name || "Unknown"}</span>,
+      },
+      {
+        key: "requester",
+        label: "Requester",
+        sortable: true,
+        accessor: (r) => r.requester?.full_name || r.requester?.company_email || "Employee",
+      },
+      {
+        key: "timeframe",
+        label: "Timeframe",
+        accessor: (r) => r.start_at,
+        render: (r) => (
+          <div className="text-xs">
+            <p>{formatDateTime(r.start_at)}</p>
+            <p className="text-muted-foreground">to {formatDateTime(r.end_at)}</p>
+          </div>
+        ),
+      },
+      {
+        key: "reason",
+        label: "Reason",
+        accessor: (r) => r.reason,
+        render: (r) => <span className="max-w-[200px] truncate text-xs">{r.reason}</span>,
+      },
+      {
+        key: "status",
+        label: "Status",
+        accessor: (r) => r.status,
+        render: (r) => (
+          <Badge
+            variant={
+              r.status === "approved"
+                ? "default"
+                : r.status === "pending"
+                  ? "secondary"
+                  : r.status === "rejected"
+                    ? "destructive"
+                    : "outline"
+            }
+          >
+            {r.status}
+          </Badge>
+        ),
+      },
+      {
+        key: "attachments",
+        label: "Attachments",
+        align: "center",
+        accessor: (r) => String(r.attachment_count || 0),
+        render: (r) => (
+          <span className="text-muted-foreground inline-flex items-center gap-1 text-xs">
+            <Paperclip className="h-3 w-3" />
+            {r.attachment_count || 0}
+          </span>
+        ),
+      },
+      {
+        key: "reviewer",
+        label: "Approver",
+        accessor: (r) => r.reviewer?.full_name || "-",
+        render: (r) => <span className="text-xs">{r.reviewer?.full_name || "-"}</span>,
+      },
+    ],
+    []
+  )
+
+  const bookingFilters: DataTableFilter<FleetBooking>[] = useMemo(
+    () => [
+      {
+        key: "status",
+        label: "Status",
+        options: [
+          { value: "pending", label: "Pending" },
+          { value: "approved", label: "Approved" },
+          { value: "rejected", label: "Rejected" },
+          { value: "cancelled", label: "Cancelled" },
+        ],
+      },
+      {
+        key: "resource_type",
+        label: "Resource Type",
+        options: Array.from(new Set(resources.map((r) => r.resource_type))).map((t) => ({ value: t, label: t })),
+        mode: "custom",
+        filterFn: (row, selected) => selected.includes(row.resource?.resource_type || "general"),
+      },
+    ],
+    [resources]
+  )
+
+  const resourceColumns: DataTableColumn<FleetResource>[] = useMemo(
+    () => [
+      {
+        key: "name",
+        label: "Name",
+        sortable: true,
+        resizable: true,
+        initialWidth: 250,
+        accessor: (r) => r.name,
+        render: (r) => (
+          <div>
+            <p className="font-medium">{r.name}</p>
+            {r.description && <p className="text-muted-foreground max-w-[300px] truncate text-xs">{r.description}</p>}
+          </div>
+        ),
+      },
+      {
+        key: "resource_type",
+        label: "Type",
+        sortable: true,
+        accessor: (r) => r.resource_type,
+      },
+      {
+        key: "status",
+        label: "Status",
+        accessor: (r) => String(r.is_active),
+        render: (r) => (
+          <Badge variant={r.is_active ? "default" : "outline"}>{r.is_active ? "Active" : "Inactive"}</Badge>
+        ),
+      },
+    ],
+    []
+  )
+
+  const resourceFilters: DataTableFilter<FleetResource>[] = useMemo(
+    () => [
+      {
+        key: "is_active",
+        label: "Status",
+        options: [
+          { value: "true", label: "Active" },
+          { value: "false", label: "Inactive" },
+        ],
+        mode: "custom",
+        filterFn: (row, selected) => selected.includes(String(row.is_active)),
+      },
+      {
+        key: "resource_type",
+        label: "Type",
+        options: Array.from(new Set(resources.map((r) => r.resource_type))).map((t) => ({ value: t, label: t })),
+      },
+    ],
+    [resources]
+  )
+
+  // ─── Render ──────────────────────────────────────────────────────────────
+  if (!accessChecked) {
+    return (
+      <DataTablePage
+        title="Shared Resource Admin"
+        description="Manage bookable resources and review booking applications"
+        icon={CalendarCheck2}
+        backLink={{ href: "/admin/hr", label: "Back to HR Dashboard" }}
+      >
+        <div className="text-muted-foreground rounded-md border p-6 text-sm">Loading access policy...</div>
+      </DataTablePage>
+    )
+  }
+
+  const pendingCount = bookings.filter((b) => b.status === "pending").length
+  const approvedCount = bookings.filter((b) => b.status === "approved").length
+  const rejectedCount = bookings.filter((b) => b.status === "rejected").length
 
   return (
-    <AdminTablePage
-      title="Fleet Booking Admin"
+    <DataTablePage
+      title="Shared Resource Admin"
       description="Manage bookable resources and review booking applications"
       icon={CalendarCheck2}
-      backLinkHref="/admin/hr"
-      backLinkLabel="Back to HR Dashboard"
+      backLink={{ href: "/admin/hr", label: "Back to HR Dashboard" }}
+      tabs={TABS}
+      activeTab={tab}
+      onTabChange={setTab}
       stats={
-        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 md:gap-4">
-          <StatCard title="Pending" value={pendingCount} icon={CalendarCheck2} />
-          <StatCard title="Approved" value={approvedCount} icon={CheckCircle2} />
-          <StatCard title="Rejected" value={rejectedCount} icon={XCircle} />
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <StatCard
+            title="Pending Review"
+            value={pendingCount}
+            icon={CalendarCheck2}
+            iconBgColor="bg-amber-500/10"
+            iconColor="text-amber-500"
+          />
+          <StatCard
+            title="Approved"
+            value={approvedCount}
+            icon={CheckCircle2}
+            iconBgColor="bg-emerald-500/10"
+            iconColor="text-emerald-500"
+          />
+          <StatCard
+            title="Rejected"
+            value={rejectedCount}
+            icon={XCircle}
+            iconBgColor="bg-red-500/10"
+            iconColor="text-red-500"
+          />
         </div>
       }
+      actions={
+        tab === "resources" ? (
+          <Button size="sm" onClick={() => setIsResourceDialogOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Resource
+          </Button>
+        ) : undefined
+      }
     >
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardTitle>New Resource</CardTitle>
-            <CardDescription>Create additional bookable items for Fleet module.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
+      {tab === "bookings" ? (
+        <DataTable<FleetBooking>
+          data={bookings}
+          columns={bookingColumns}
+          getRowId={(r) => r.id}
+          searchPlaceholder="Search requester, resource, reason..."
+          searchFn={(row, q) =>
+            [row.resource?.name, row.requester?.full_name, row.requester?.company_email, row.reason]
+              .filter(Boolean)
+              .some((v) => String(v).toLowerCase().includes(q))
+          }
+          filters={bookingFilters}
+          isLoading={loadingBookings}
+          pagination={{ pageSize: 50 }}
+          rowActions={[
+            {
+              label: "Review",
+              onClick: openReview,
+            },
+          ]}
+        />
+      ) : (
+        <DataTable<FleetResource>
+          data={resources}
+          columns={resourceColumns}
+          getRowId={(r) => r.id}
+          searchPlaceholder="Search resources..."
+          searchFn={(row, q) => row.name.toLowerCase().includes(q) || (row.description || "").toLowerCase().includes(q)}
+          filters={resourceFilters}
+          isLoading={loadingResources}
+          pagination={{ pageSize: 50 }}
+          rowActions={[
+            {
+              label: "Activate",
+              onClick: toggleResource,
+              hidden: (row) => row.is_active,
+            },
+            {
+              label: "Deactivate",
+              onClick: toggleResource,
+              hidden: (row) => !row.is_active,
+            },
+          ]}
+        />
+      )}
+
+      <Dialog open={isResourceDialogOpen} onOpenChange={setIsResourceDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>New Resource</DialogTitle>
+            <DialogDescription>Create additional bookable items for shared resource booking.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
             <div className="space-y-2">
               <Label>Name</Label>
               <Input
@@ -225,116 +502,28 @@ export default function AdminFleetPage() {
                 rows={3}
               />
             </div>
-            <Button
-              onClick={createResource}
-              disabled={savingResource || resourceName.trim().length < 2}
-              className="w-full"
-            >
-              <Plus className="mr-2 h-4 w-4" /> {savingResource ? "Saving..." : "Create Resource"}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsResourceDialogOpen(false)} disabled={savingResource}>
+              Cancel
             </Button>
-          </CardContent>
-        </Card>
-
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Resources</CardTitle>
-            <CardDescription>Activate/deactivate resources available for booking.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {loadingResources ? (
-              <TableSkeleton rows={3} cols={2} />
-            ) : (
-              <>
-                {resources.map((resource) => (
-                  <div key={resource.id} className="flex items-center justify-between rounded border p-3">
-                    <div>
-                      <p className="font-medium">{resource.name}</p>
-                      <p className="text-muted-foreground text-xs">{resource.resource_type}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant={resource.is_active ? "default" : "outline"}>
-                        {resource.is_active ? "Active" : "Inactive"}
-                      </Badge>
-                      <Button variant="outline" size="sm" onClick={() => toggleResource(resource)}>
-                        {resource.is_active ? "Deactivate" : "Activate"}
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-                {resources.length === 0 ? <p className="text-muted-foreground text-sm">No resources found.</p> : null}
-              </>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card className="mt-4">
-        <CardHeader>
-          <CardTitle>Booking Applications</CardTitle>
-          <CardDescription>Review pending requests and inspect reason/attachments before action.</CardDescription>
-          <Tabs value={tab} onValueChange={(value) => setTab(value as "pending" | "all")}>
-            <TabsList>
-              <TabsTrigger value="pending">Pending</TabsTrigger>
-              <TabsTrigger value="all">All</TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {loadingBookings ? <TableSkeleton rows={3} cols={3} /> : null}
-          {!loadingBookings && bookings.length === 0 ? (
-            <p className="text-muted-foreground text-sm">No bookings found.</p>
-          ) : null}
-
-          {bookings.map((booking) => (
-            <div key={booking.id} className="rounded border p-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <p className="font-medium">{booking.resource?.name || "Resource"}</p>
-                  <p className="text-muted-foreground text-xs">
-                    {formatDateTime(booking.start_at)} - {formatDateTime(booking.end_at)}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge
-                    variant={
-                      booking.status === "approved"
-                        ? "default"
-                        : booking.status === "pending"
-                          ? "secondary"
-                          : booking.status === "rejected"
-                            ? "destructive"
-                            : "outline"
-                    }
-                  >
-                    {booking.status}
-                  </Badge>
-                  <Button variant="outline" size="sm" onClick={() => openReview(booking)}>
-                    Review
-                  </Button>
-                </div>
-              </div>
-              <p className="mt-2 text-sm">{booking.reason}</p>
-              <div className="text-muted-foreground mt-2 text-xs">
-                <p>Requester: {booking.requester?.full_name || booking.requester?.company_email || "Employee"}</p>
-                <p className="inline-flex items-center gap-1">
-                  <Paperclip className="h-3.5 w-3.5" /> {booking.attachment_count || 0} attachment(s)
-                </p>
-              </div>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
+            <Button onClick={createResource} disabled={savingResource || resourceName.trim().length < 2}>
+              {savingResource ? "Saving..." : "Create Resource"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={Boolean(selectedBooking)} onOpenChange={(open) => (!open ? setSelectedBooking(null) : null)}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Review Fleet Application</DialogTitle>
+            <DialogTitle>Review Resource Booking</DialogTitle>
             <DialogDescription>Confirm the reason and supporting files before approval.</DialogDescription>
           </DialogHeader>
 
           {selectedBooking ? (
             <div className="space-y-4 py-2">
-              <div className="rounded border p-3">
+              <div className="bg-muted/30 rounded border p-3">
                 <p className="font-medium">{selectedBooking.resource?.name || "Resource"}</p>
                 <p className="text-muted-foreground text-xs">
                   {formatDateTime(selectedBooking.start_at)} - {formatDateTime(selectedBooking.end_at)}
@@ -360,7 +549,7 @@ export default function AdminFleetPage() {
                         href={file.signed_url}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-primary text-sm underline"
+                        className="text-primary text-sm hover:underline"
                       >
                         Open
                       </a>
@@ -373,7 +562,12 @@ export default function AdminFleetPage() {
 
               <div className="space-y-2">
                 <Label>Admin Note</Label>
-                <Textarea value={adminNote} onChange={(e) => setAdminNote(e.target.value)} rows={3} />
+                <Textarea
+                  value={adminNote}
+                  onChange={(e) => setAdminNote(e.target.value)}
+                  rows={3}
+                  placeholder="Add a note to explain your decision..."
+                />
               </div>
             </div>
           ) : null}
@@ -395,6 +589,6 @@ export default function AdminFleetPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </AdminTablePage>
+    </DataTablePage>
   )
 }

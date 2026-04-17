@@ -1,9 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
-import { PageHeader, PageWrapper } from "@/components/layout"
-import { AlertTriangle, Bug, ShieldAlert } from "lucide-react"
-import { StatCard } from "@/components/ui/stat-card"
-import { EmptyState, ErrorState } from "@/components/ui/patterns"
 import { UiErrorsContent, type UiErrorRow } from "./ui-errors-content"
 
 import { logger } from "@/lib/logger"
@@ -85,38 +81,5 @@ export default async function DevUiErrorsPage() {
     boundaries: rows.filter((r) => r.source.includes("error_boundary")).length,
   }
 
-  return (
-    <PageWrapper maxWidth="full" background="gradient">
-      <PageHeader
-        title="UI Error Monitor"
-        description="Centralized frontend runtime errors captured from all pages during beta"
-        icon={Bug}
-        backLink={{ href: "/admin/dev", label: "Back to DEV" }}
-      />
-
-      <div className="mb-6 grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 md:gap-4">
-        <StatCard title="Total Captured" value={stats.total} icon={Bug} />
-        <StatCard title="Last 24h" value={stats.last24h} icon={AlertTriangle} />
-        <StatCard title="Boundary Catches" value={stats.boundaries} icon={ShieldAlert} />
-      </div>
-
-      {error ? (
-        <ErrorState
-          title="Failed to load logs from backend storage"
-          description="Check server logs and verify audit log access configuration."
-          className="mb-6"
-        />
-      ) : null}
-
-      {rows.length === 0 ? (
-        <EmptyState
-          title="No UI errors captured yet"
-          description="Client runtime errors will appear here once telemetry events are recorded."
-          icon={AlertTriangle}
-        />
-      ) : (
-        <UiErrorsContent rows={rows} />
-      )}
-    </PageWrapper>
-  )
+  return <UiErrorsContent rows={rows} stats={stats} error={error} />
 }

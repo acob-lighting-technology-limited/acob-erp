@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 import { logger } from "@/lib/logger"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
+import { getRequestScope, getScopedDepartments } from "@/lib/admin/api-scope"
 
 const log = logger("peer-feedback")
 
@@ -22,7 +23,7 @@ const SubmitPeerFeedbackSchema = z.object({
  * GET /api/hr/performance/peer-feedback
  *
  * Query params:
- *   subject_user_id  — feedback given TO this user (admins/leads only)
+ *   subject_user_id  — feedback given TO this user, or "all_admin" for admin list view
  *   review_cycle_id  — filter by cycle (optional)
  *   as_reviewer      — "true" → return feedback submitted BY the current user
  */
@@ -39,6 +40,75 @@ export async function GET(request: NextRequest) {
     const cycleId = searchParams.get("review_cycle_id")
     const asReviewer = searchParams.get("as_reviewer") === "true"
 
+    // ── Admin list view: subject_user_id=all_admin ────────────────────────────
+    // The admin peer-feedback page passes this sentinel to request ALL feedback.
+    // Scope it to managed departments so leads only see their dept's feedback.
+    if (subjectUserId === "all_admin") {
+      const scope = await getRequestScope()
+      if (!scope) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+
+      const scopedDepts = getScopedDepartments(scope)
+
+      // Resolve scoped subject user IDs
+      let scopedSubjectIds: string[] | null = null
+      if (scopedDepts !== null) {
+        if (scopedDepts.length > 0) {
+          const { data: deptUsers } = await supabase.from("profiles").select("id").in("department", scopedDepts)
+          scopedSubjectIds = (deptUsers || []).map((p) => p.id)
+        } else {
+          return NextResponse.json({ data: [] }) // empty scope
+        }
+      }
+
+      let query = supabase
+        .from("peer_feedback")
+        .select(
+          "id, subject_user_id, reviewer_user_id, review_cycle_id, score, collaboration, communication, teamwork, professionalism, comments, status, created_at"
+        )
+        .order("created_at", { ascending: false })
+
+      if (scopedSubjectIds !== null) {
+        query = query.in("subject_user_id", scopedSubjectIds)
+      }
+      if (cycleId) query = query.eq("review_cycle_id", cycleId)
+
+      const { data: feedback, error } = await query
+      if (error) {
+        log.error({ err: String(error) }, "Error fetching admin peer feedback")
+        return NextResponse.json({ error: "Failed to fetch peer feedback" }, { status: 500 })
+      }
+
+      // Enrich with profiles
+      const allUserIds = Array.from(
+        new Set(
+          [
+            ...(feedback || []).map((f) => f.subject_user_id),
+            ...(feedback || []).map((f) => f.reviewer_user_id),
+          ].filter(Boolean)
+        )
+      )
+      const { data: profiles } =
+        allUserIds.length > 0
+          ? await supabase.from("profiles").select("id, first_name, last_name, department").in("id", allUserIds)
+          : {
+              data: [] as Array<{
+                id: string
+                first_name: string | null
+                last_name: string | null
+                department: string | null
+              }>,
+            }
+      const profileById = new Map((profiles || []).map((p) => [p.id, p]))
+      const enriched = (feedback || []).map((f) => ({
+        ...f,
+        subject: profileById.get(f.subject_user_id) || null,
+        reviewer: profileById.get(f.reviewer_user_id) || null,
+      }))
+
+      return NextResponse.json({ data: enriched })
+    }
+
+    // ── Per-user view ─────────────────────────────────────────────────────────
     // Employees can only see feedback about themselves, or feedback they submitted
     if (subjectUserId && subjectUserId !== user.id) {
       const { data: profile } = await supabase

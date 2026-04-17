@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 import { canManageMaintenanceMode, parseMaintenanceMode } from "@/lib/maintenance"
 import type { EmploymentStatus } from "@/types/database"
+import { resolveAdminScope, roleCanEnterAdmin } from "@/lib/admin/rbac"
 
 // ---------------------------------------------------------------------------
 // Maintenance-mode in-memory cache (30 s TTL).
@@ -80,6 +81,56 @@ export async function updateSession(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname
   const intendedPath = `${request.nextUrl.pathname}${request.nextUrl.search}`
+
+  // -----------------------------------------------------------------------
+  // ADMIN SCOPE INJECTION — Single Source of Truth
+  // Resolve AdminScope once here and forward it as an internal request header
+  // (x-admin-scope) so every downstream API route / server component can read
+  // it via headers() without an extra DB round-trip.
+  //
+  // IMPORTANT: we set the header on the *forwarded request*, not on the
+  // response — only request headers are readable via `headers()` in server
+  // components and route handlers. Response headers go to the browser only.
+  //
+  // Strip any client-supplied x-admin-scope to prevent spoofing.
+  // -----------------------------------------------------------------------
+  const isAdminOrApiPath =
+    pathname.startsWith("/api/admin") ||
+    pathname.startsWith("/api/hr") ||
+    pathname.startsWith("/api/reports") ||
+    pathname.startsWith("/api/documentation") ||
+    pathname.startsWith("/api/assets") ||
+    pathname.startsWith("/admin")
+
+  if (isAdminOrApiPath && user) {
+    try {
+      // Check role from user_metadata first (fast path, no extra DB query for non-admins)
+      const metaRole = user.user_metadata?.role as string | undefined
+      const metaIsLead = Boolean(user.user_metadata?.is_department_lead)
+      const needsScope = !metaRole || roleCanEnterAdmin(metaRole, metaIsLead)
+      if (needsScope) {
+        const scope = await resolveAdminScope(supabase, user.id)
+        if (scope) {
+          const encoded = Buffer.from(JSON.stringify(scope)).toString("base64")
+          // Build new request headers with the scope injected
+          const forwardedHeaders = new Headers(request.headers)
+          // Strip any client-supplied value first (anti-spoofing)
+          forwardedHeaders.delete("x-admin-scope")
+          forwardedHeaders.set("x-admin-scope", encoded)
+          // Rebuild supabaseResponse with the updated forwarded request headers
+          // so that headers() in server components / API routes can read it
+          supabaseResponse = NextResponse.next({ request: { headers: forwardedHeaders } })
+          supabaseResponse.headers.set("x-request-id", requestId)
+          // Re-apply any cookies that were already set on the previous supabaseResponse
+          request.cookies.getAll().forEach(({ name, value }) => {
+            supabaseResponse.cookies.set(name, value)
+          })
+        }
+      }
+    } catch {
+      // Non-fatal — routes fall back to resolving scope themselves via DB
+    }
+  }
 
   // Check maintenance mode (cached — no DB hit within 30 s window)
   const isMaintenanceMode = await getMaintenanceMode(supabase)

@@ -70,6 +70,7 @@ interface TaskFormDialogProps {
   isSaving: boolean
   scopedAssignableEmployees: employee[]
   scopedAssignableDepartments: string[]
+  initialGoals?: GoalOption[]
   assignmentAuthorityLabel?: string
 }
 
@@ -83,6 +84,7 @@ export function TaskFormDialog({
   isSaving,
   scopedAssignableEmployees,
   scopedAssignableDepartments,
+  initialGoals = [],
   assignmentAuthorityLabel,
 }: TaskFormDialogProps) {
   const [goalOptions, setGoalOptions] = useState<GoalOption[]>([])
@@ -173,14 +175,28 @@ export function TaskFormDialog({
     fetch(`/api/hr/performance/goals${query}`)
       .then((response) => response.json())
       .then((payload) => {
-        const approvedGoals = (payload.data ?? []).filter(
-          (goal: { approval_status?: string }) => goal.approval_status === "approved"
+        const approvedStates = new Set(["approved", "approved_by_lead", "approved_by_manager", "active"])
+        const approvedGoals = (payload.data ?? []).filter((goal: { approval_status?: string }) =>
+          approvedStates.has(String(goal.approval_status || "").toLowerCase())
         )
 
         setGoalOptions(approvedGoals.map((goal: { id: string; title: string }) => ({ id: goal.id, title: goal.title })))
       })
       .catch(() => setGoalOptions([]))
   }, [assignedTo, assignmentType, departmentValue, scopedAssignableEmployees])
+
+  useEffect(() => {
+    if (goalOptions.length > 0 || initialGoals.length === 0) return
+    const selectedEmployee = scopedAssignableEmployees.find((member) => member.id === assignedTo)
+    const targetDepartment =
+      assignmentType === "department"
+        ? departmentValue
+        : assignmentType === "individual"
+          ? selectedEmployee?.department || ""
+          : ""
+    if (!targetDepartment) return
+    setGoalOptions(initialGoals)
+  }, [assignedTo, assignmentType, departmentValue, goalOptions.length, initialGoals, scopedAssignableEmployees])
 
   function buildTaskFormState() {
     const values = getValues()

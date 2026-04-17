@@ -118,6 +118,12 @@ type DeliveryResult = {
   error?: unknown
 }
 
+type ProfileRecipientRow = {
+  id: string
+  company_email: string | null
+  additional_email: string | null
+}
+
 const DELIVERY_BATCH_SIZE = 2
 
 function getErrorMessage(error: unknown): string {
@@ -163,6 +169,97 @@ async function processRecipientBatch<TInput, TResult>(
   }
 
   return results
+}
+
+function normalizeEmail(value: string | null | undefined): string {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+}
+
+async function createInAppWeeklyReportNotifications(params: {
+  supabase: ReturnType<typeof createClient>
+  recipients: string[]
+  successfulResults: DeliveryResult[]
+  subject: string
+  meetingWeek: number
+  meetingYear: number
+  requestedByUserId?: string
+  preparedByName?: string
+}) {
+  const {
+    supabase,
+    recipients,
+    successfulResults,
+    subject,
+    meetingWeek,
+    meetingYear,
+    requestedByUserId,
+    preparedByName,
+  } = params
+  if (successfulResults.length === 0 || recipients.length === 0) return
+
+  const normalizedRecipients = Array.from(new Set(recipients.map((email) => normalizeEmail(email)).filter(Boolean)))
+  if (normalizedRecipients.length === 0) return
+
+  const successfulEmailSet = new Set(successfulResults.map((result) => normalizeEmail(result.to)).filter(Boolean))
+  if (successfulEmailSet.size === 0) return
+
+  const [companyMatchResult, additionalMatchResult] = await Promise.all([
+    supabase.from("profiles").select("id, company_email, additional_email").in("company_email", normalizedRecipients),
+    supabase
+      .from("profiles")
+      .select("id, company_email, additional_email")
+      .in("additional_email", normalizedRecipients),
+  ])
+
+  if (companyMatchResult.error) {
+    throw new Error(`Failed to resolve company_email recipients: ${companyMatchResult.error.message}`)
+  }
+  if (additionalMatchResult.error) {
+    throw new Error(`Failed to resolve additional_email recipients: ${additionalMatchResult.error.message}`)
+  }
+
+  const rows = [
+    ...((companyMatchResult.data || []) as ProfileRecipientRow[]),
+    ...((additionalMatchResult.data || []) as ProfileRecipientRow[]),
+  ]
+
+  const userIds = new Set<string>()
+  for (const row of rows) {
+    const companyEmail = normalizeEmail(row.company_email)
+    const additionalEmail = normalizeEmail(row.additional_email)
+    if (successfulEmailSet.has(companyEmail) || successfulEmailSet.has(additionalEmail)) {
+      userIds.add(row.id)
+    }
+  }
+
+  if (userIds.size === 0) return
+
+  const notificationRows = Array.from(userIds).map((userId) => ({
+    user_id: userId,
+    type: "system",
+    category: "reports",
+    priority: "normal",
+    title: "General Meeting Documents Shared",
+    message: subject,
+    action_url: "/notifications",
+    actor_id: requestedByUserId || null,
+    data: {
+      module: "weekly_report",
+      event: "weekly_report_mail",
+      meeting_week: meetingWeek,
+      meeting_year: meetingYear,
+      prepared_by: preparedByName || null,
+      recipient_email_count: successfulEmailSet.size,
+      sent_at: new Date().toISOString(),
+    },
+  }))
+
+  const { error: insertError } = await supabase.from("notifications").insert(notificationRows)
+  if (insertError) {
+    throw new Error(`Failed to create in-app notifications: ${insertError.message}`)
+  }
 }
 
 function autoNumber(text: string): string {
@@ -1261,8 +1358,24 @@ serve(async (req) => {
       total_duration_human: formatDurationMs(Date.now() - requestStartedAt),
     })
 
+    const successfulResults = results.filter((result) => result.success)
     try {
-      const successCount = results.filter((r) => r.success).length
+      await createInAppWeeklyReportNotifications({
+        supabase,
+        recipients,
+        successfulResults,
+        subject,
+        meetingWeek,
+        meetingYear,
+        requestedByUserId,
+        preparedByName,
+      })
+    } catch (notificationError) {
+      console.error("[weekly-report] Failed to create in-app notifications:", notificationError)
+    }
+
+    try {
+      const successCount = successfulResults.length
       const failureCount = results.length - successCount
       const auditEntityId = crypto.randomUUID()
       await writeEdgeAuditLog(supabase, {

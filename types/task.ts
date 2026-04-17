@@ -28,11 +28,13 @@ export interface Task {
   assigned_by?: string | null
   department?: string | null
   goal_id?: string | null
+  goal_title?: string | null
   task_start_date?: string | null
   task_end_date?: string | null
   assigned_to_user?: TaskPersonSummary
   assigned_by_user?: Omit<TaskPersonSummary, "id" | "completed">
   can_change_status?: boolean
+  comment_count?: number
 }
 
 export interface TaskUserProfile {

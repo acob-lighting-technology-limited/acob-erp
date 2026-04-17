@@ -4,7 +4,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Container } from "@/components/ui/container"
-import { Home, ArrowLeft, LayoutDashboard, Users, FileText, Mail } from "lucide-react"
+import { Home, ArrowLeft, LayoutDashboard, Users, ClipboardList, Mail } from "lucide-react"
 
 export default function NotFound() {
   const router = useRouter()
@@ -71,12 +71,12 @@ export default function NotFound() {
                 </div>
               </Link>
 
-              <Link href="/projects" className="group">
+              <Link href="/tasks" className="group">
                 <div className="bg-muted/50 hover:bg-muted border-border rounded-lg border p-3 transition-colors">
                   <div className="bg-primary mx-auto mb-2 flex h-8 w-8 items-center justify-center rounded-md">
-                    <FileText className="text-primary-foreground h-4 w-4" />
+                    <ClipboardList className="text-primary-foreground h-4 w-4" />
                   </div>
-                  <h4 className="text-foreground text-sm font-medium">Projects</h4>
+                  <h4 className="text-foreground text-sm font-medium">Tasks</h4>
                 </div>
               </Link>
             </div>

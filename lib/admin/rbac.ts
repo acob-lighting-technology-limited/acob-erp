@@ -1,13 +1,16 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { redirect } from "next/navigation"
+import { cookies } from "next/headers"
 import { createClient } from "@/lib/supabase/server"
 import {
   normalizeDepartmentName as normalizeCanonicalDepartmentName,
   normalizeDepartmentList as normalizeCanonicalDepartmentList,
+  getDepartmentAliases,
 } from "@/shared/departments"
 
 export type AdminRole = "developer" | "super_admin" | "admin" | "employee" | "visitor" | string
 export type AdminDomain = "hr" | "finance" | "assets" | "reports" | "tasks" | "projects" | "communications"
+export type AdminScopeMode = "global" | "lead"
 export type AdminSection =
   | "dev"
   | "assets"
@@ -42,6 +45,8 @@ export interface AdminScope {
   managedOffices: string[]
   isAdminLike: boolean
   adminDomains: AdminDomain[] | null
+  scopeMode: AdminScopeMode
+  canToggleLeadScope: boolean
 }
 
 interface ProfileShape {
@@ -60,6 +65,7 @@ interface DepartmentRow {
 }
 
 const ADMIN_DOMAINS: AdminDomain[] = ["hr", "finance", "assets", "reports", "tasks", "projects", "communications"]
+export const ADMIN_SCOPE_MODE_COOKIE = "admin_scope_mode"
 
 function normalizeRoleValue(role: string | null | undefined): string | null {
   if (!role) return null
@@ -94,6 +100,10 @@ function unique(values: string[]): string[] {
         .filter(Boolean)
     )
   )
+}
+
+function normalizeScopeMode(value: string | null | undefined): AdminScopeMode {
+  return value === "lead" ? "lead" : "global"
 }
 
 /**
@@ -196,6 +206,9 @@ async function resolveManagedOffices(
 }
 
 export async function resolveAdminScope(supabase: SupabaseClient, userId: string): Promise<AdminScope | null> {
+  const cookieStore = await cookies()
+  const requestedScopeMode = normalizeScopeMode(cookieStore.get(ADMIN_SCOPE_MODE_COOKIE)?.value)
+
   const { data: profile } = await supabase
     .from("profiles")
     .select("role, department, department_id, office_location, admin_domains, is_department_lead, lead_departments")
@@ -208,7 +221,10 @@ export async function resolveAdminScope(supabase: SupabaseClient, userId: string
   if (!normalizedRole || !roleCanEnterAdmin(normalizedRole, profile.is_department_lead)) return null
 
   const isAdminLike = isAdminLikeRole(normalizedRole)
-  const managedDepartments = isAdminLike ? [] : scopeDepartments(profile)
+  const leadScopedDepartments = scopeDepartments(profile)
+  const canToggleLeadScope = isAdminLike && Boolean(profile.is_department_lead) && leadScopedDepartments.length > 0
+  const scopeMode: AdminScopeMode = canToggleLeadScope ? requestedScopeMode : "global"
+  const managedDepartments = scopeMode === "lead" || !isAdminLike ? leadScopedDepartments : []
   const departmentNamesForLookup = Array.from(
     new Set([
       ...managedDepartments.map((departmentName) => normalizeDepartmentName(departmentName)),
@@ -230,10 +246,11 @@ export async function resolveAdminScope(supabase: SupabaseClient, userId: string
     }
   }
 
-  const managedDepartmentIds = isAdminLike ? [] : scopeDepartmentIds(profile, departmentIdsByName)
-  const managedOffices = isAdminLike
-    ? []
-    : await resolveManagedOffices(supabase, managedDepartments, profile.office_location ?? null)
+  const managedDepartmentIds = managedDepartments.length > 0 ? scopeDepartmentIds(profile, departmentIdsByName) : []
+  const managedOffices =
+    managedDepartments.length > 0
+      ? await resolveManagedOffices(supabase, managedDepartments, profile.office_location ?? null)
+      : []
 
   const isDepartmentLead = Boolean(profile.is_department_lead)
   const adminDomains = normalizeAdminDomains(profile.admin_domains)
@@ -254,10 +271,15 @@ export async function resolveAdminScope(supabase: SupabaseClient, userId: string
     managedOffices,
     isAdminLike,
     adminDomains,
+    scopeMode,
+    canToggleLeadScope,
   }
 }
 
 export function getDepartmentScope(scope: AdminScope, domain: "finance" | "hr" | "general"): string[] | null {
+  if (scope.scopeMode === "lead") {
+    return scope.managedDepartments
+  }
   const role = normalizeRoleValue(scope.role)
   if (role === "developer" || role === "super_admin") return null
   if (role === "admin") {
@@ -268,6 +290,11 @@ export function getDepartmentScope(scope: AdminScope, domain: "finance" | "hr" |
   }
   if (!scope.isDepartmentLead) return []
   return scope.managedDepartments
+}
+
+export function expandDepartmentScopeForQuery(departments: string[]): string[] {
+  const expanded = departments.flatMap((departmentName) => getDepartmentAliases(departmentName))
+  return Array.from(new Set(expanded.filter(Boolean)))
 }
 
 export async function requireAdminSectionAccess(section: AdminSection): Promise<AdminScope> {

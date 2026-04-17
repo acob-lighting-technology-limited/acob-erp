@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
-import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
+import { expandDepartmentScopeForQuery, getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { Users, Package, ClipboardList, FileText, MessageSquare, Shield } from "lucide-react"
@@ -64,9 +64,14 @@ export default async function AdminDashboardPage() {
   } = await supabase.auth.getUser()
   const scope = user ? await resolveAdminScope(supabase, user.id) : null
   const departmentScope = scope ? getDepartmentScope(scope, "general") : null
+  const queryDepartmentScope = departmentScope ? expandDepartmentScopeForQuery(departmentScope) : null
   const profileIdsInScope = departmentScope
-    ? (departmentScope.length > 0
-        ? await dataClient.from("profiles").select("id").in("department", departmentScope).returns<ProfileIdRow[]>()
+    ? (queryDepartmentScope && queryDepartmentScope.length > 0
+        ? await dataClient
+            .from("profiles")
+            .select("id")
+            .in("department", queryDepartmentScope)
+            .returns<ProfileIdRow[]>()
         : { data: [] as ProfileIdRow[] }
       ).data || []
     : null
@@ -83,18 +88,18 @@ export default async function AdminDashboardPage() {
 
   const [employeeStats, assetStats, taskStats, docStats, feedbackStats] = await Promise.all([
     departmentScope
-      ? departmentScope.length > 0
-        ? profilesQ.in("department", departmentScope)
+      ? queryDepartmentScope && queryDepartmentScope.length > 0
+        ? profilesQ.in("department", queryDepartmentScope)
         : profilesQ.eq("id", "__none__")
       : profilesQ,
     departmentScope
-      ? departmentScope.length > 0
-        ? assetsQ.in("department", departmentScope)
+      ? queryDepartmentScope && queryDepartmentScope.length > 0
+        ? assetsQ.in("department", queryDepartmentScope)
         : assetsQ.eq("id", "__none__")
       : assetsQ,
     departmentScope
-      ? departmentScope.length > 0
-        ? tasksQ.in("department", departmentScope)
+      ? queryDepartmentScope && queryDepartmentScope.length > 0
+        ? tasksQ.in("department", queryDepartmentScope)
         : tasksQ.eq("id", "__none__")
       : tasksQ,
     departmentScope
@@ -125,7 +130,9 @@ export default async function AdminDashboardPage() {
     .limit(20)
   if (departmentScope) {
     auditQuery =
-      departmentScope.length > 0 ? auditQuery.in("department", departmentScope) : auditQuery.eq("id", "__none__")
+      queryDepartmentScope && queryDepartmentScope.length > 0
+        ? auditQuery.in("department", queryDepartmentScope)
+        : auditQuery.eq("id", "__none__")
   }
   const { data: rawActivity, error: auditError } = await auditQuery.returns<ActivityLogRow[]>()
   if (auditError) log.error("Recent activity query failed", auditError)
@@ -165,7 +172,9 @@ export default async function AdminDashboardPage() {
   let pendingUsersQ = supabase.from("pending_users").select("*", { count: "exact", head: true }).eq("status", "pending")
   if (departmentScope) {
     pendingUsersQ =
-      departmentScope.length > 0 ? pendingUsersQ.in("department", departmentScope) : pendingUsersQ.eq("id", "__none__")
+      queryDepartmentScope && queryDepartmentScope.length > 0
+        ? pendingUsersQ.in("department", queryDepartmentScope)
+        : pendingUsersQ.eq("id", "__none__")
   }
   const { count: pendingUsersCount } = await pendingUsersQ
   if (pendingUsersCount && pendingUsersCount > 0) {
@@ -205,7 +214,9 @@ export default async function AdminDashboardPage() {
     .in("status", ["pending", "in_progress"])
   if (departmentScope) {
     urgentTasksQ =
-      departmentScope.length > 0 ? urgentTasksQ.in("department", departmentScope) : urgentTasksQ.eq("id", "__none__")
+      queryDepartmentScope && queryDepartmentScope.length > 0
+        ? urgentTasksQ.in("department", queryDepartmentScope)
+        : urgentTasksQ.eq("id", "__none__")
   }
   const { count: urgentTasksCount } = await urgentTasksQ
   if (urgentTasksCount && urgentTasksCount > 0) {
@@ -227,7 +238,10 @@ export default async function AdminDashboardPage() {
     .lt("due_date", today)
     .in("status", ["pending", "in_progress"])
   if (departmentScope) {
-    overdueQ = departmentScope.length > 0 ? overdueQ.in("department", departmentScope) : overdueQ.eq("id", "__none__")
+    overdueQ =
+      queryDepartmentScope && queryDepartmentScope.length > 0
+        ? overdueQ.in("department", queryDepartmentScope)
+        : overdueQ.eq("id", "__none__")
   }
   const { data: overdueTasks } = await overdueQ
   if (overdueTasks && overdueTasks.length > 0) {
@@ -250,7 +264,9 @@ export default async function AdminDashboardPage() {
     .gte("created_at", todayStart.toISOString())
   if (departmentScope) {
     todayAuditQ =
-      departmentScope.length > 0 ? todayAuditQ.in("department", departmentScope) : todayAuditQ.eq("id", "__none__")
+      queryDepartmentScope && queryDepartmentScope.length > 0
+        ? todayAuditQ.in("department", queryDepartmentScope)
+        : todayAuditQ.eq("id", "__none__")
   }
   const { count: todayAuditCount } = await todayAuditQ
   if (todayAuditCount && todayAuditCount > 50) {

@@ -14,7 +14,6 @@ import {
   MessageSquare,
   ScrollText,
   LogOut,
-  FolderKanban,
   CreditCard,
   Calendar,
   Target,
@@ -34,6 +33,7 @@ import { useSidebar } from "@/components/sidebar-context"
 import type { UserRole } from "@/types/database"
 import { getRoleDisplayName, getRoleBadgeColor } from "@/lib/permissions"
 import { motion, AnimatePresence } from "framer-motion"
+import type { AdminScopeMode } from "@/lib/admin/rbac"
 
 interface AdminSidebarProps {
   user?: {
@@ -52,11 +52,12 @@ interface AdminSidebarProps {
     admin_domains?: string[] | null
     lead_departments?: string[]
   }
+  adminScopeMode?: AdminScopeMode
 }
 
-type AdminDomain = "hr" | "finance" | "assets" | "reports" | "tasks" | "projects" | "communications"
+type AdminDomain = "hr" | "finance" | "assets" | "reports" | "tasks" | "communications"
 
-const ADMIN_DOMAINS: AdminDomain[] = ["hr", "finance", "assets", "reports", "tasks", "projects", "communications"]
+const ADMIN_DOMAINS: AdminDomain[] = ["hr", "finance", "assets", "reports", "tasks", "communications"]
 
 function normalizeAdminDomains(domains: string[] | null | undefined): AdminDomain[] {
   if (!Array.isArray(domains)) return []
@@ -80,7 +81,6 @@ function getDomainForAdminPath(path: string): AdminDomain | null {
   if (path.startsWith("/admin/assets") || path.startsWith("/admin/inventory")) return "assets"
   if (path.startsWith("/admin/reports") || path.startsWith("/admin/audit-logs")) return "reports"
   if (path.startsWith("/admin/tasks")) return "tasks"
-  if (path.startsWith("/admin/projects")) return "projects"
   if (
     path.startsWith("/admin/documentation") ||
     path.startsWith("/admin/feedback") ||
@@ -114,13 +114,6 @@ const adminNavigation = [
     name: "Finance",
     href: "/admin/finance",
     icon: CreditCard,
-    roles: ["developer", "super_admin", "admin"],
-  },
-  {
-    section: "management",
-    name: "Projects",
-    href: "/admin/projects",
-    icon: FolderKanban,
     roles: ["developer", "super_admin", "admin"],
   },
   {
@@ -246,7 +239,7 @@ const ADMIN_ROUTE_ALIASES: Record<string, string[]> = {
   // Communications — correspondence is logically part of communications
 }
 
-export function AdminSidebar({ user, profile }: AdminSidebarProps) {
+export function AdminSidebar({ user, profile, adminScopeMode = "global" }: AdminSidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
@@ -337,6 +330,7 @@ export function AdminSidebar({ user, profile }: AdminSidebarProps) {
   const isLead = Boolean(
     profile?.is_department_lead || (profile?.lead_departments && profile.lead_departments.length > 0)
   )
+  const isLeadMode = adminScopeMode === "lead"
 
   const sidebarJSX = (
     <>
@@ -389,10 +383,20 @@ export function AdminSidebar({ user, profile }: AdminSidebarProps) {
                     {getRoleDisplayName(profile.role)}
                   </Badge>
                 )}
+                {/* {isLeadMode && (
+                  <Badge variant="outline" className="mt-0.5 border-amber-300 bg-amber-500/10 text-amber-700">
+                    Lead Filter ON
+                  </Badge>
+                )} */}
               </motion.div>
             )}
           </AnimatePresence>
         </div>
+        {isCollapsed && isLeadMode && (
+          <Badge variant="outline" className="mt-1 border-amber-300 bg-amber-500/10 px-1 text-[10px] text-amber-700">
+            LF
+          </Badge>
+        )}
       </div>
 
       {/* Navigation */}

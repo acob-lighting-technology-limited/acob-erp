@@ -7,7 +7,6 @@ import { motion, AnimatePresence } from "framer-motion"
 import {
   Award,
   Bell,
-  Briefcase,
   Calendar,
   Car,
   ClipboardList,
@@ -54,7 +53,6 @@ interface SidebarProps {
 const navigation = [
   { name: "Home", href: "/profile", icon: LayoutDashboard },
   { name: "Notifications", href: "/notifications", icon: Bell },
-  { name: "My Work", href: "/work", icon: Briefcase },
   { name: "Tasks", href: "/tasks", icon: ClipboardList },
   { name: "Help Desk", href: "/help-desk", icon: ClipboardList },
   { name: "Reports", href: "/reports", icon: FileBarChart },
@@ -68,7 +66,7 @@ const navigation = [
 const hrNavigation = [
   { name: "Leave", href: "/leave", icon: Calendar },
   { name: "Attendance", href: "/attendance", icon: Clock },
-  { name: "Fleet", href: "/fleet", icon: Car },
+  { name: "Shared Resources", href: "/fleet", icon: Car },
   { name: "PMS", href: "/pms", icon: Award },
 ]
 

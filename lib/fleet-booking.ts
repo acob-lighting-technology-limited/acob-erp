@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { canAccessAdminSection, resolveAdminScope } from "@/lib/admin/rbac"
 import type { Database } from "@/types/database"
+import { normalizeDepartmentName } from "@/shared/departments"
 
 export const FLEET_BLOCKING_STATUSES = ["pending", "approved"] as const
 export const FLEET_ALLOWED_MIME_TYPES = new Set([
@@ -77,5 +78,13 @@ export async function assertNoFleetOverlap(params: {
 export async function canManageFleet(supabase: SupabaseClient<Database>, userId: string): Promise<boolean> {
   const scope = await resolveAdminScope(supabase, userId)
   if (!scope) return false
-  return canAccessAdminSection(scope, "hr")
+  const role = String(scope.role || "").toLowerCase()
+  if (role === "developer" || role === "super_admin" || role === "admin") {
+    return canAccessAdminSection(scope, "hr")
+  }
+
+  if (!scope.isDepartmentLead) return false
+  const managed = (scope.managedDepartments || []).map((dept) => normalizeDepartmentName(String(dept || "")))
+  const primary = normalizeDepartmentName(String(scope.department || ""))
+  return managed.includes(normalizeDepartmentName("Admin & HR")) || primary === normalizeDepartmentName("Admin & HR")
 }
