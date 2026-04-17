@@ -31,6 +31,7 @@ export function getDomainForAdminPath(path: string): AdminDomain | null {
     path.startsWith("/admin/feedback") ||
     path.startsWith("/admin/notifications") ||
     path.startsWith("/admin/communications") ||
+    path.startsWith("/admin/correspondence") ||
     path.startsWith("/admin/tools") ||
     path.startsWith("/admin/help-desk")
   ) {
@@ -195,9 +196,9 @@ export const primaryModules: ModuleAction[] = [
     roles: ["developer", "super_admin", "admin"],
   },
   {
-    title: "Reference Generator",
-    description: "Track incoming/outgoing references and approval workflow",
-    href: "/admin/tools/reference-generator",
+    title: "Correspondence",
+    description: "Track incoming/outgoing correspondence and approval workflow",
+    href: "/admin/correspondence",
     icon: FileText,
     color: "bg-violet-500",
     roles: ["developer", "super_admin", "admin"],

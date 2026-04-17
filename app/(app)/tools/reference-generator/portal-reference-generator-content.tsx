@@ -9,6 +9,7 @@ import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/component
 import { StatCard } from "@/components/ui/stat-card"
 import type { CorrespondenceRecord } from "@/types/correspondence"
 import { CreateReferenceDialog } from "@/components/correspondence/create-reference-dialog"
+import { formatName } from "@/lib/utils"
 
 interface DepartmentCodeOption {
   department_name: string
@@ -34,6 +35,8 @@ export function PortalReferenceGeneratorContent({
   initialRecords,
   departmentCodes,
 }: PortalReferenceGeneratorContentProps) {
+  const statusLabel = (status: string) => (status === "under_review" ? "Sent for review" : formatName(status))
+
   const initialDepartment = departmentCodes.some((item) => item.department_name === currentViewerDepartment)
     ? currentViewerDepartment
     : ""
@@ -205,7 +208,7 @@ export function PortalReferenceGeneratorContent({
         accessor: (row) => row.reference_number,
         resizable: true,
         initialWidth: 220,
-        render: (row) => <span className="font-medium">{row.reference_number}</span>,
+        render: (row) => <span className="font-medium">{row.status === "approved" ? row.reference_number : "-"}</span>,
       },
       {
         key: "letter_type",
@@ -225,7 +228,7 @@ export function PortalReferenceGeneratorContent({
         label: "Status",
         sortable: true,
         accessor: (row) => row.status,
-        render: (row) => <Badge>{row.status.replaceAll("_", " ")}</Badge>,
+        render: (row) => <Badge>{statusLabel(row.status)}</Badge>,
       },
       {
         key: "subject",
@@ -263,10 +266,10 @@ export function PortalReferenceGeneratorContent({
 
   return (
     <DataTablePage
-      title="Reference Generator"
+      title="Correspondence"
       description="Create and manage correspondence references."
       icon={FileCode2}
-      backLink={{ href: "/tools", label: "Back to Tools" }}
+      backLink={{ href: "/profile", label: "Back to Home" }}
       tabs={tabs}
       activeTab={activeTab}
       onTabChange={(tab) => setActiveTab(tab as "internal" | "external")}

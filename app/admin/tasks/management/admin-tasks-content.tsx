@@ -162,14 +162,11 @@ export function AdminTasksContent({
   const loadData = async () => {
     setIsLoading(true)
     try {
-      let tasksQuery = supabase
+      const tasksQuery = supabase
         .from("tasks")
         .select("*")
         .neq("category", "weekly_action")
         .order("created_at", { ascending: false })
-      if (userProfile?.is_department_lead && !userProfile.is_global_task_assigner && scopedDepartments.length > 0) {
-        tasksQuery = tasksQuery.in("department", scopedDepartments)
-      }
       const { data: tasksData, error: tasksError } = await tasksQuery
       if (tasksError) throw tasksError
       let result = await Promise.all(
@@ -177,8 +174,22 @@ export function AdminTasksContent({
           .filter((task) => String(task.source_type || "") !== "action_item")
           .map((task) => enrichTaskWithUsers(supabase, task))
       )
+      const goalIds = Array.from(new Set(result.map((task) => task.goal_id).filter(Boolean))) as string[]
+      if (goalIds.length > 0) {
+        const { data: goals } = await supabase.from("goals_objectives").select("id, title").in("id", goalIds)
+        const goalMap = new Map(
+          ((goals as Array<{ id: string; title: string }> | null) || []).map((g) => [g.id, g.title])
+        )
+        result = result.map((task) => ({
+          ...task,
+          goal_title: task.goal_id ? goalMap.get(task.goal_id) || null : null,
+        }))
+      }
       if (userProfile?.is_department_lead && !userProfile.is_global_task_assigner && scopedDepartments.length > 0) {
-        result = filterByDepartments(result, scopedDepartments)
+        result = result.filter((task) => {
+          if (task.assignment_type === "individual" && task.assigned_to === userProfile.id) return true
+          return filterByDepartments([task], scopedDepartments).length > 0
+        })
       }
       setTasks(result as Task[])
     } catch (error: unknown) {
@@ -409,6 +420,14 @@ export function AdminTasksContent({
         ),
       },
       {
+        key: "goal_title",
+        label: "Goal",
+        resizable: true,
+        initialWidth: 220,
+        accessor: (r) => r.goal_title || initialGoals.find((goal) => goal.id === r.goal_id)?.title || "",
+        render: (r) => <span className="line-clamp-1">{r.goal_title || "—"}</span>,
+      },
+      {
         key: "due_date",
         label: "Due Date",
         sortable: true,
@@ -421,7 +440,7 @@ export function AdminTasksContent({
         ),
       },
     ],
-    [workflowOwnerLabel]
+    [initialGoals, workflowOwnerLabel]
   )
 
   const filters: DataTableFilter<Task>[] = useMemo(

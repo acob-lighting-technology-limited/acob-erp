@@ -381,10 +381,7 @@ export function FleetContent() {
               void handleCancel(row.id)
             },
             hidden: (row) =>
-              !(
-                (row.status === "pending" || row.status === "approved") &&
-                new Date(row.start_at).getTime() > Date.now()
-              ) || cancelingId === row.id,
+              !(row.status === "pending" && new Date(row.start_at).getTime() > Date.now()) || cancelingId === row.id,
           },
         ]}
         expandable={{

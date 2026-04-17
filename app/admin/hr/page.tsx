@@ -271,7 +271,7 @@ export default function HRAdminDashboard() {
               <CardDescription>Manage shared resources and review booking applications</CardDescription>
             </CardHeader>
             <CardContent>
-              <Link href="/admin/hr/fleet">
+              <Link href="/admin/hr/resources">
                 <Button className="w-full">Open Resource Booking Admin</Button>
               </Link>
             </CardContent>

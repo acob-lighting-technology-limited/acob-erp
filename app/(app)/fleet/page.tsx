@@ -1,5 +1,5 @@
-﻿import { FleetContent } from "./fleet-content"
+import { redirect } from "next/navigation"
 
-export default function FleetPage() {
-  return <FleetContent />
+export default function FleetLegacyPage() {
+  redirect("/resources")
 }

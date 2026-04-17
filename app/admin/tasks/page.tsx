@@ -28,6 +28,11 @@ type GoalFilterOption = {
   title: string
 }
 
+type GoalRow = {
+  id: string
+  title: string
+}
+
 async function getAdminTasksData() {
   const supabase = await createClient()
   const dataClient = getServiceRoleClientOrFallback(supabase)
@@ -106,6 +111,14 @@ async function getAdminTasksData() {
       ? await dataClient.from("profiles").select("id, first_name, last_name, department").in("id", allIndivUserIds)
       : { data: [] }
   const indivProfileMap = new Map(((indivProfiles as ProfileDepartmentRow[] | null) || []).map((p) => [p.id, p]))
+  const taskGoalIds = Array.from(
+    new Set((((tasksResult.data as Task[] | null) || []).map((task) => task.goal_id).filter(Boolean) as string[]) || [])
+  )
+  const { data: taskGoalRows } =
+    taskGoalIds.length > 0
+      ? await dataClient.from("goals_objectives").select("id, title").in("id", taskGoalIds)
+      : { data: [] as GoalRow[] }
+  const taskGoalMap = new Map(((taskGoalRows as GoalRow[] | null) || []).map((goal) => [goal.id, goal.title]))
 
   const tasksWithUsers = ((tasksResult.data as Task[] | null) || []).map((task) => {
     const taskData: Task = { ...task }
@@ -119,6 +132,7 @@ async function getAdminTasksData() {
           }
         : undefined
     }
+    taskData.goal_title = task.goal_id ? taskGoalMap.get(task.goal_id) || null : null
 
     return taskData
   }) as Task[]
@@ -137,6 +151,9 @@ async function getAdminTasksData() {
         task.assigned_to_user?.department &&
         scopedDepartmentTokens.has(normalizeDepartmentName(task.assigned_to_user.department))
       ) {
+        return true
+      }
+      if (task.assignment_type === "individual" && task.assigned_to === user.id) {
         return true
       }
       return false

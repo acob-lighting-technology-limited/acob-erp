@@ -29,6 +29,7 @@ interface LeaveRequestFormData {
   reason: string
   reliever_identifier: string
   handover_note: string
+  attachment: File | null
 }
 
 interface LeaveRequestFormDialogProps {
@@ -190,6 +191,16 @@ export function LeaveRequestFormDialog({
               onChange={(event) => setFormData((prev) => ({ ...prev, handover_note: event.target.value }))}
               placeholder="Summarize duties and handover details"
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Attachment (Optional)</Label>
+            <Input
+              type="file"
+              accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+              onChange={(event) => setFormData((prev) => ({ ...prev, attachment: event.target.files?.[0] || null }))}
+            />
+            <p className="text-muted-foreground text-xs">Upload a supporting file to the leave SharePoint library.</p>
           </div>
 
           <div className="flex justify-end gap-2">

@@ -380,18 +380,9 @@ export function DepartmentDocumentsBrowser({
       const params = new URLSearchParams()
       params.set("path", path)
       params.set("accessMode", accessMode)
-      const response = await fetch(`/api/onedrive/download?${params.toString()}`)
-      const payload = (await response.json().catch(() => null)) as {
-        data?: { downloadUrl?: string }
-        error?: string
-      } | null
-      if (!response.ok || !payload?.data?.downloadUrl) {
-        throw new Error(payload?.error || "Failed to get file download URL")
-      }
       const link = document.createElement("a")
-      link.href = payload.data.downloadUrl
-      link.target = "_blank"
-      link.rel = "noopener noreferrer"
+      params.set("redirect", "true")
+      link.href = `/api/onedrive/download?${params.toString()}`
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
@@ -404,16 +395,8 @@ export function DepartmentDocumentsBrowser({
       const params = new URLSearchParams()
       params.set("path", path)
       params.set("accessMode", accessMode)
-      const response = await fetch(`/api/onedrive/download?${params.toString()}`)
-      const payload = (await response.json().catch(() => null)) as {
-        data?: { downloadUrl?: string }
-        error?: string
-      } | null
-      if (!response.ok || !payload?.data?.downloadUrl) {
-        throw new Error(payload?.error || "Failed to get file download URL")
-      }
-
-      const blobResponse = await fetch(payload.data.downloadUrl)
+      params.set("raw", "true")
+      const blobResponse = await fetch(`/api/onedrive/download?${params.toString()}`)
       if (!blobResponse.ok) {
         throw new Error("Failed to download file content")
       }

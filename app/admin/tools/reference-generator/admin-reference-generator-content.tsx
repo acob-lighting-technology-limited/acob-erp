@@ -78,6 +78,7 @@ export function AdminReferenceGeneratorContent({
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(initialRecords.length)
   const [isLoading, setIsLoading] = useState(false)
+  const [showCodeManagement, setShowCodeManagement] = useState(false)
 
   const codeForm = useForm<DepartmentCodeFormValues>({
     resolver: zodResolver(DepartmentCodeFormSchema),
@@ -98,6 +99,7 @@ export function AdminReferenceGeneratorContent({
       finalized: records.filter((r) => ["sent", "filed", "closed"].includes(r.status)).length,
     }
   }, [records, total])
+  const statusLabel = (status: string) => (status === "under_review" ? "Sent for review" : formatName(status))
 
   useEffect(() => {
     async function loadRecords() {
@@ -255,7 +257,7 @@ export function AdminReferenceGeneratorContent({
       accessor: (r) => r.reference_number,
       render: (r) => (
         <div className="flex flex-col">
-          <span className="font-mono text-xs font-bold">{r.reference_number}</span>
+          <span className="font-mono text-xs font-bold">{r.status === "approved" ? r.reference_number : "-"}</span>
           <span className="text-muted-foreground line-clamp-1 max-w-[300px] text-[10px] italic">{r.subject}</span>
         </div>
       ),
@@ -285,7 +287,7 @@ export function AdminReferenceGeneratorContent({
       key: "status",
       label: "Status",
       accessor: (r) => r.status,
-      render: (r) => <Badge className="capitalize">{formatName(r.status)}</Badge>,
+      render: (r) => <Badge className="capitalize">{statusLabel(r.status)}</Badge>,
     },
     {
       key: "assignment",
@@ -394,7 +396,7 @@ export function AdminReferenceGeneratorContent({
       label: "Status",
       options: [
         { value: "draft", label: "Draft" },
-        { value: "under_review", label: "Under review" },
+        { value: "under_review", label: "Sent for review" },
         { value: "approved", label: "Approved" },
         { value: "rejected", label: "Rejected" },
         { value: "returned_for_correction", label: "Returned for correction" },
@@ -416,7 +418,7 @@ export function AdminReferenceGeneratorContent({
 
   return (
     <DataTablePage
-      title="Reference Generator"
+      title="Correspondence"
       description="Manage correspondence references and tracking."
       icon={ListFilter}
       backLink={{ href: "/admin", label: "Back to Admin" }}
@@ -463,72 +465,89 @@ export function AdminReferenceGeneratorContent({
       <div className="space-y-6">
         <Card className="border-2">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-sm font-bold">
-              <Building2 className="h-4 w-4" /> Department Code Management
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <form onSubmit={updateDepartmentCode} className="grid gap-4 md:grid-cols-3">
-              <div className="space-y-2">
-                <Label className="text-xs font-semibold">Department Name</Label>
-                <Input {...codeForm.register("department_name")} className="h-9 text-sm" />
-                {codeForm.formState.errors.department_name && (
-                  <p className="text-destructive text-[10px]">{codeForm.formState.errors.department_name.message}</p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs font-semibold">Department Code</Label>
-                <Input {...codeForm.register("department_code")} className="h-9 text-sm" />
-                {codeForm.formState.errors.department_code && (
-                  <p className="text-destructive text-[10px]">{codeForm.formState.errors.department_code.message}</p>
-                )}
-              </div>
-              <div className="flex items-end">
-                <Button type="submit" className="h-9 w-full md:w-auto">
-                  Save Code
-                </Button>
-              </div>
-            </form>
-
-            <div className="space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <CardTitle className="flex items-center gap-2 text-sm font-bold">
+                <Building2 className="h-4 w-4" /> Department Code Management
+              </CardTitle>
               <Button
                 type="button"
                 variant="ghost"
-                className="text-muted-foreground hover:text-foreground h-8 px-0 text-xs transition-colors"
-                onClick={() => setShowMappings((prev) => !prev)}
+                size="sm"
+                className="h-8 text-xs"
+                onClick={() => setShowCodeManagement((prev) => !prev)}
               >
-                Active mappings: {departmentCodes.filter((item) => item.is_active).length}
-                {showMappings ? <ChevronUp className="ml-2 h-4 w-4" /> : <ChevronDown className="ml-2 h-4 w-4" />}
+                {showCodeManagement ? "Collapse" : "Expand"}
+                {showCodeManagement ? <ChevronUp className="ml-1 h-4 w-4" /> : <ChevronDown className="ml-1 h-4 w-4" />}
               </Button>
-
-              {showMappings && (
-                <div className="bg-muted/20 rounded-md border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-muted/50 hover:bg-muted/50">
-                        <TableHead className="h-9 text-[10px] font-black uppercase">Department</TableHead>
-                        <TableHead className="h-9 text-[10px] font-black uppercase">Code</TableHead>
-                        <TableHead className="h-9 text-[10px] font-black uppercase">Status</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {departmentCodes.map((item) => (
-                        <TableRow key={item.department_name} className="hover:bg-muted/30">
-                          <TableCell className="py-2 text-xs font-medium">{item.department_name}</TableCell>
-                          <TableCell className="py-2 font-mono text-xs">{item.department_code}</TableCell>
-                          <TableCell className="py-2">
-                            <Badge variant={item.is_active ? "default" : "outline"} className="px-1.5 py-0 text-[10px]">
-                              {item.is_active ? "Active" : "Inactive"}
-                            </Badge>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
             </div>
-          </CardContent>
+          </CardHeader>
+          {showCodeManagement && (
+            <CardContent className="space-y-4">
+              <form onSubmit={updateDepartmentCode} className="grid gap-4 md:grid-cols-3">
+                <div className="space-y-2">
+                  <Label className="text-xs font-semibold">Department Name</Label>
+                  <Input {...codeForm.register("department_name")} className="h-9 text-sm" />
+                  {codeForm.formState.errors.department_name && (
+                    <p className="text-destructive text-[10px]">{codeForm.formState.errors.department_name.message}</p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs font-semibold">Department Code</Label>
+                  <Input {...codeForm.register("department_code")} className="h-9 text-sm" />
+                  {codeForm.formState.errors.department_code && (
+                    <p className="text-destructive text-[10px]">{codeForm.formState.errors.department_code.message}</p>
+                  )}
+                </div>
+                <div className="flex items-end">
+                  <Button type="submit" className="h-9 w-full md:w-auto">
+                    Save Code
+                  </Button>
+                </div>
+              </form>
+
+              <div className="space-y-3">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="text-muted-foreground hover:text-foreground h-8 px-0 text-xs transition-colors"
+                  onClick={() => setShowMappings((prev) => !prev)}
+                >
+                  Active mappings: {departmentCodes.filter((item) => item.is_active).length}
+                  {showMappings ? <ChevronUp className="ml-2 h-4 w-4" /> : <ChevronDown className="ml-2 h-4 w-4" />}
+                </Button>
+
+                {showMappings && (
+                  <div className="bg-muted/20 rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/50 hover:bg-muted/50">
+                          <TableHead className="h-9 text-[10px] font-black uppercase">Department</TableHead>
+                          <TableHead className="h-9 text-[10px] font-black uppercase">Code</TableHead>
+                          <TableHead className="h-9 text-[10px] font-black uppercase">Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {departmentCodes.map((item) => (
+                          <TableRow key={item.department_name} className="hover:bg-muted/30">
+                            <TableCell className="py-2 text-xs font-medium">{item.department_name}</TableCell>
+                            <TableCell className="py-2 font-mono text-xs">{item.department_code}</TableCell>
+                            <TableCell className="py-2">
+                              <Badge
+                                variant={item.is_active ? "default" : "outline"}
+                                className="px-1.5 py-0 text-[10px]"
+                              >
+                                {item.is_active ? "Active" : "Inactive"}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          )}
         </Card>
 
         <DataTable<CorrespondenceRecord>

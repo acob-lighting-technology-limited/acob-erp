@@ -18,6 +18,7 @@ import {
   Calendar,
   Target,
   FileBarChart,
+  FileCode2,
   Bell,
   Megaphone,
   Wrench,
@@ -86,6 +87,7 @@ function getDomainForAdminPath(path: string): AdminDomain | null {
     path.startsWith("/admin/feedback") ||
     path.startsWith("/admin/notifications") ||
     path.startsWith("/admin/communications") ||
+    path.startsWith("/admin/correspondence") ||
     path.startsWith("/admin/tools") ||
     path.startsWith("/admin/help-desk")
   ) {
@@ -135,6 +137,13 @@ const adminNavigation = [
     name: "Reports",
     href: "/admin/reports",
     icon: FileBarChart,
+    roles: ["developer", "super_admin", "admin"],
+  },
+  {
+    section: "operations",
+    name: "Correspondence",
+    href: "/admin/correspondence",
+    icon: FileCode2,
     roles: ["developer", "super_admin", "admin"],
   },
   {

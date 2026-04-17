@@ -12,6 +12,7 @@ import {
   ClipboardList,
   Clock,
   CreditCard,
+  FileCode2,
   FileBarChart,
   FileText,
   LayoutDashboard,
@@ -59,6 +60,7 @@ const navigation = [
   { name: "Assets", href: "/assets", icon: Package },
   { name: "Payments", href: "/payments", icon: CreditCard },
   { name: "Documentation", href: "/documentation", icon: FileText },
+  { name: "Correspondence", href: "/correspondence", icon: FileCode2 },
   { name: "Feedback", href: "/feedback", icon: MessageSquare },
   { name: "Tools", href: "/tools", icon: Wrench },
 ]
@@ -66,7 +68,7 @@ const navigation = [
 const hrNavigation = [
   { name: "Leave", href: "/leave", icon: Calendar },
   { name: "Attendance", href: "/attendance", icon: Clock },
-  { name: "Shared Resources", href: "/fleet", icon: Car },
+  { name: "Shared Resources", href: "/resources", icon: Car },
   { name: "PMS", href: "/pms", icon: Award },
 ]
 
